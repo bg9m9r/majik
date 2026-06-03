@@ -502,10 +502,10 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         if (!ReferenceEquals(ctx.Self, ctx.ActivePlayer))
         {
             var p = ctx.CurrentPhase;
-            return p == Majik.Core.StateMachine.PhaseStateType.DeclareAttackers
-                || p == Majik.Core.StateMachine.PhaseStateType.DeclareBlockers
-                || p == Majik.Core.StateMachine.PhaseStateType.CombatDamage
-                || p == Majik.Core.StateMachine.PhaseStateType.End;
+            return p == Majik.Core.StateMachine.StepStateType.DeclareAttackers
+                || p == Majik.Core.StateMachine.StepStateType.DeclareBlockers
+                || p == Majik.Core.StateMachine.StepStateType.CombatDamage
+                || p == Majik.Core.StateMachine.StepStateType.End;
         }
         return false;
     }

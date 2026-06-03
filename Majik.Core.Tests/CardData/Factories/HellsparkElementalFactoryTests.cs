@@ -120,7 +120,7 @@ public class HellsparkElementalFactoryTests
         card.Zone.Should().Be(ZoneType.Battlefield);
 
         // Begin an end step — the sacrifice trigger fires.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);
@@ -188,7 +188,7 @@ public class HellsparkElementalFactoryTests
         // the unearth delayed exile fire. Unearth's exile rider is the
         // governing outcome: the card lands in EXILE (CR 702.84c), not the
         // graveyard.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);

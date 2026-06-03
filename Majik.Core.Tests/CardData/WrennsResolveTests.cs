@@ -101,7 +101,7 @@ public class WrennsResolveTests
         _alice.Zones.Hand.GetCards().Should().Contain(new[] { c1, c2 });
 
         // Fire the next end step.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(1, "the delayed end-step exile is pending");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -139,7 +139,7 @@ public class WrennsResolveTests
         c1.SetZone(ZoneType.Graveyard);
 
         // End step arrives.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 

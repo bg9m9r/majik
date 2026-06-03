@@ -33,7 +33,7 @@ namespace Majik.Core.CardData.Factories;
 /// - 3/1 Creature — Vampire Wizard at {1}{B}.
 /// - <b>Each-player's-upkeep triggered ability (CR 603.1 / CR 500.4) with an
 ///   intervening-if (CR 603.4)</b>: fires on <see cref="StepStartedEvent"/>
-///   matching <see cref="PhaseStateType.Upkeep"/> for ANY player (the printed
+///   matching <see cref="StepStateType.Upkeep"/> for ANY player (the printed
 ///   text reads "each player's upkeep", not "your upkeep" — same symmetric
 ///   shape as <see cref="SulfuricVortexFactory"/>). The condition captures the
 ///   active upkeep player off <see cref="StepStartedEvent.Player"/>; the
@@ -141,7 +141,7 @@ public static class AsylumVisitorFactory
 
         var upkeepCondition = new EventTriggerCondition<StepStartedEvent>((e, _) =>
         {
-            if (e.StepType != PhaseStateType.Upkeep) return false;
+            if (e.StepType != StepStateType.Upkeep) return false;
             upkeepPlayer = e.Player;
             return true;
         });

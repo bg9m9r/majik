@@ -197,7 +197,7 @@ public class OcelotPrideFactoryTests
 
         // Fire the End step on the controller's turn — the trigger should
         // queue and resolve to exile-and-return Ocelot Pride.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "the end-step flicker trigger fires at the start of the " +
@@ -252,7 +252,7 @@ public class OcelotPrideFactoryTests
         };
         bus.Publish(new CombatDamageDealtEvent(attacker, blocker, amount: 2));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0) stack.Pop()!.Resolve();
 
@@ -289,7 +289,7 @@ public class OcelotPrideFactoryTests
         // New turn — the latch resets.
         bus.Publish(new TurnStartedEvent(_alice, turnNumber: 2));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0) stack.Pop()!.Resolve();
 

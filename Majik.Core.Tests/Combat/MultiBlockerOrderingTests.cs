@@ -111,7 +111,7 @@ public class MultiBlockerOrderingTests
             blockers.Select(b => new Majik.Core.Players.Agents.BlockerDeclaration(b, attacker)).ToList()));
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         await flow.RunCombatAsync(_alice, _bob, atk, blk,
             new[] { attacker }, blockers, ctx);

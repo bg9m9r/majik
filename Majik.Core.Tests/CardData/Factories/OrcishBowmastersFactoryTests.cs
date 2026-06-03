@@ -160,7 +160,7 @@ public class OrcishBowmastersFactoryTests
         bow.SetZone(ZoneType.Battlefield);
 
         // Bob's draw step begins → reset Bob's counter to 0.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _bob));
 
         // Bob draws the free draw — should NOT fire.
         bus.Publish(new CardDrawnEvent(new Card("Filler", "{0}"), _bob));
@@ -181,7 +181,7 @@ public class OrcishBowmastersFactoryTests
         bow.SetZone(ZoneType.Battlefield);
 
         // Bob's draw step begins → reset.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _bob));
 
         // First draw — free.
         bus.Publish(new CardDrawnEvent(new Card("Free", "{0}"), _bob));
@@ -207,7 +207,7 @@ public class OrcishBowmastersFactoryTests
 
         // Alice's draw step + draws → Bowmasters' controller's own
         // draws never trigger (printed "an opponent draws").
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
         bus.Publish(new CardDrawnEvent(new Card("AliceDraw1", "{0}"), _alice));
         bus.Publish(new CardDrawnEvent(new Card("AliceDraw2", "{0}"), _alice));
 
@@ -230,7 +230,7 @@ public class OrcishBowmastersFactoryTests
         bow.SetZone(ZoneType.Battlefield);
 
         // Bob's draw step happens, free draw consumes the counter slot.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _bob));
         bus.Publish(new CardDrawnEvent(new Card("StepDraw", "{0}"), _bob));
         triggers.PendingCount.Should().Be(0);
 
@@ -257,13 +257,13 @@ public class OrcishBowmastersFactoryTests
         bow.SetZone(ZoneType.Battlefield);
 
         // Bob's draw step 1.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _bob));
         bus.Publish(new CardDrawnEvent(new Card("Turn1Free", "{0}"), _bob));
         triggers.PendingCount.Should().Be(0);
 
         // Bob's draw step 2 (next turn) — counter resets, free draw
         // again.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _bob));
         bus.Publish(new CardDrawnEvent(new Card("Turn2Free", "{0}"), _bob));
         triggers.PendingCount.Should().Be(0,
             "draw-step counter resets each draw step (CR 504.1)");

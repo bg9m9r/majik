@@ -119,7 +119,7 @@ public class EmperorOfBonesFactoryTests
         _alice.Zones.Graveyard.AddCard(zombie);
 
         // Fire the begin-of-combat step on Alice's turn.
-        var step = new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice);
+        var step = new StepStartedEvent(StepStateType.BeginningOfCombat, _alice);
         rig.Bus.Publish(step);
 
         rig.Triggers.PendingCount.Should().BeGreaterThan(0,
@@ -147,7 +147,7 @@ public class EmperorOfBonesFactoryTests
         _alice.Zones.Graveyard.AddCard(zombie);
 
         // Bob's begin-of-combat — Emperor should NOT trigger.
-        var step = new StepStartedEvent(PhaseStateType.BeginningOfCombat, _bob);
+        var step = new StepStartedEvent(StepStateType.BeginningOfCombat, _bob);
         rig.Bus.Publish(step);
         rig.Triggers.PutPendingTriggersOnStack(_bob);
 
@@ -258,7 +258,7 @@ public class EmperorOfBonesFactoryTests
         // an event-time gate).
         System.Threading.Thread.Sleep(5);
 
-        var endStep = new StepStartedEvent(PhaseStateType.End, _alice);
+        var endStep = new StepStartedEvent(StepStateType.End, _alice);
         rig.Bus.Publish(endStep);
         rig.Triggers.PutPendingTriggersOnStack(_alice);
         while (!rig.Stack.IsEmpty) rig.Stack.Pop()!.Resolve();

@@ -107,12 +107,12 @@ public class BallLightningFactoryTests
         // The printed clause has no possessive ("the end step"), so the
         // condition matches an End step started by ANY player — CR 603.3a.
         trigger.Condition
-            .Matches(new StepStartedEvent(PhaseStateType.End, _bob), trigger)
+            .Matches(new StepStartedEvent(StepStateType.End, _bob), trigger)
             .Should().BeTrue("Ball Lightning sacrifices itself on the next end step regardless of whose turn it is");
 
         // It does not fire on a non-End step.
         trigger.Condition
-            .Matches(new StepStartedEvent(PhaseStateType.Upkeep, _alice), trigger)
+            .Matches(new StepStartedEvent(StepStateType.Upkeep, _alice), trigger)
             .Should().BeFalse();
     }
 }

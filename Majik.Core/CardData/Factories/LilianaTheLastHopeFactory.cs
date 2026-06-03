@@ -190,7 +190,7 @@ public static class LilianaTheLastHopeFactory
                 // StepStartedEvent where Step is the End step and the
                 // controller of the emblem is the active player.
                 var condition = new EventTriggerCondition<Majik.Core.Events.StepStartedEvent>(
-                    (e, _) => e.StepType == Majik.Core.StateMachine.PhaseStateType.End
+                    (e, _) => e.StepType == Majik.Core.StateMachine.StepStateType.End
                         && ReferenceEquals(e.Player, controller));
 
                 var spawnEffect = new Effect(

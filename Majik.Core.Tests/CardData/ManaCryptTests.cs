@@ -145,12 +145,12 @@ public class ManaCryptTests
         crypt.SetZone(ZoneType.Battlefield);
 
         // Bob's upkeep — Alice's Mana Crypt does NOT trigger.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "Mana Crypt triggers only on its controller's own upkeep");
 
         // Alice's upkeep — trigger surfaces as pending.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 }

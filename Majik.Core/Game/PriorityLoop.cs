@@ -28,7 +28,7 @@ public sealed class PriorityLoop
     private readonly ZoneService _zoneService;
     private readonly IReadOnlyDictionary<Player, IPlayerAgent> _agents;
     private readonly Func<int> _turnNumberAccessor;
-    private readonly Func<PhaseStateType?> _phaseAccessor;
+    private readonly Func<StepStateType?> _phaseAccessor;
     private readonly LandDropTracker _landDropTracker;
     private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
@@ -68,7 +68,7 @@ public sealed class PriorityLoop
         ZoneService zoneService,
         IReadOnlyDictionary<Player, IPlayerAgent> agents,
         Func<int> turnNumberAccessor,
-        Func<PhaseStateType?> phaseAccessor,
+        Func<StepStateType?> phaseAccessor,
         LandDropTracker landDropTracker,
         Func<Player, PriorityAction.CastSpell, GameContext, Task>? castDispatcher = null,
         Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null,
@@ -252,7 +252,7 @@ public sealed class PriorityLoop
                     throw new InvalidOperationException(
                         "PriorityLoop received PlayLand before RunUntilRoundEndsAsync set an active player.");
                 {
-                    var phase = _phaseAccessor() ?? PhaseStateType.PreCombatMain;
+                    var phase = _phaseAccessor() ?? StepStateType.PreCombatMain;
                     if (!_landDropTracker.CanPlayLand(
                         actor, _activePlayer, phase, _stack.IsEmpty, out var reason))
                     {
@@ -368,7 +368,7 @@ public sealed class PriorityLoop
         if (prefs.FullControl) return false;
 
         // Gate 4 — phase stop on the active side at the current phase.
-        // PhaseStops keys are wire phase labels (PhaseStateType.ToString()
+        // PhaseStops keys are wire phase labels (StepStateType.ToString()
         // — "Untap", "Upkeep", "PreCombatMain", …); values are "mine" /
         // "theirs". When the active player IS the viewer (=current), the
         // active side is "mine"; otherwise "theirs".

@@ -141,7 +141,7 @@ public static class TinybonesThePickpocketFactory
                     Action<StepStartedEvent>? handler = null;
                     handler = (e) =>
                     {
-                        if (e.StepType != PhaseStateType.Cleanup) return;
+                        if (e.StepType != StepStateType.Cleanup) return;
                         foreach (var gyCard in captured.Zones.Graveyard.GetCards().ToList())
                         {
                             if (gyCard is Card c) c.ClearRuntimeGraveyardNonOwnerCast();

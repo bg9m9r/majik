@@ -128,9 +128,9 @@ public class BitterblossomFactoryTests
 
         var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
 
-        var aliceUpkeep = new StepStartedEvent(PhaseStateType.Upkeep, _alice);
-        var bobUpkeep = new StepStartedEvent(PhaseStateType.Upkeep, _bob);
-        var aliceDraw = new StepStartedEvent(PhaseStateType.Draw, _alice);
+        var aliceUpkeep = new StepStartedEvent(StepStateType.Upkeep, _alice);
+        var bobUpkeep = new StepStartedEvent(StepStateType.Upkeep, _bob);
+        var aliceDraw = new StepStartedEvent(StepStateType.Draw, _alice);
 
         trigger.IsTriggered(aliceUpkeep).Should().BeTrue(
             "fires on the controller's own Upkeep");

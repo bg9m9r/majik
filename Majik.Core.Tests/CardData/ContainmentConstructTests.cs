@@ -251,7 +251,7 @@ public class ContainmentConstructTests
             "grant present after the trigger resolves");
 
         // First Cleanup step after the discard — CR 514.2.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         bolt.RuntimeExileCastAllowedCaster.Should().BeNull(
             "the 'this turn' duration ended on the first Cleanup step");

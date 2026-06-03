@@ -156,7 +156,7 @@ public class MishrasBaubleTests
         // Fire the next upkeep — the active player here is Bob, but the
         // delayed trigger doesn't filter on whose upkeep it is; it fires on
         // the first Upkeep StepStartedEvent after activation.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
 
         triggers.PendingCount.Should().Be(1, "the delayed draw is now pending");
 
@@ -187,9 +187,9 @@ public class MishrasBaubleTests
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var e in ability.Effects) e.Execute();
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(0, "only Upkeep steps trigger the delayed draw");
         _alice.Zones.Hand.GetCards().Should().NotContain(top);
@@ -215,13 +215,13 @@ public class MishrasBaubleTests
         foreach (var e in ability.Effects) e.Execute();
 
         // First upkeep fires + resolves + auto-unregisters.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
         // Subsequent upkeeps should not re-fire it (delayed = one-shot per
         // CR 603.7d / TriggerManager.EvaluateTriggers self-removal).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(0,
             "delayed triggered abilities auto-unregister after firing once");
         _alice.Zones.Hand.GetCards().Should().ContainSingle();

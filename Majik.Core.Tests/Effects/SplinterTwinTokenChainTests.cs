@@ -165,7 +165,7 @@ public class SplinterTwinTokenChainTests
             .Single(c => c.IsToken && !ReferenceEquals(c, token1));
 
         // Step into End step — both delayed triggers should fire.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);

@@ -7,12 +7,12 @@ namespace Majik.Core.Game.Phases;
 /// End step implementation.
 /// Triggers end step triggers and effects.
 /// </summary>
-public class EndStep : PhaseState
+public class EndStep : StepState
 {
     private readonly IEventBus? _eventBus;
 
     public EndStep(IEventBus? eventBus = null) 
-        : base(PhaseStateType.End, eventBus)
+        : base(StepStateType.End, eventBus)
     {
         _eventBus = eventBus;
     }

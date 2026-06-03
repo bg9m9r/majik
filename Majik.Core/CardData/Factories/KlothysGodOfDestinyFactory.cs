@@ -64,7 +64,7 @@ namespace Majik.Core.CardData.Factories;
 ///   If it was a land card, add {R} or {G}. Otherwise, you gain 2 life and
 ///   Klothys deals 2 damage to each opponent." Wired via
 ///   <see cref="Triggers.OnStepBegin"/> on
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.PreCombatMain"/>
+///   <see cref="Majik.Core.StateMachine.StepStateType.PreCombatMain"/>
 ///   (the precombat / "first" main phase), restricted to Klothys's
 ///   controller's own turns. On resolution the chosen graveyard card is
 ///   rechecked (still in a graveyard — CR 608.2b), exiled via
@@ -259,7 +259,7 @@ public static class KlothysGodOfDestinyFactory
         trigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.PreCombatMain),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.PreCombatMain),
             effects: new IEffect[] { triggerEffect },
             activeZones: new[] { ZoneType.Battlefield },
             targetRequests: new[]

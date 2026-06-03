@@ -261,7 +261,7 @@ public class MarchOfOtherworldlyLightFactoryTests
         var creature = new Creature("Bear", "{1}{G}", 2, 2);
         PutOnBattlefield(_bob, creature);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var candidates = request.ResolveCandidates(ctx)
             .Cast<ICard>()
             .ToList();
@@ -285,7 +285,7 @@ public class MarchOfOtherworldlyLightFactoryTests
         var artifact = new Artifact("Mox Pearl", "{0}");
         PutOnBattlefield(_bob, artifact);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var candidates = request.ResolveCandidates(ctx)
             .Cast<ICard>()
             .ToList();

@@ -132,7 +132,7 @@ public class ResplendentAngelFactoryTests
         bus.Publish(new LifeChangedEvent(_alice, previousLife: 20, newLife: 25));
 
         // End step fires (Alice's turn).
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "the end-step token trigger fires when 5+ life was gained this turn");
@@ -175,7 +175,7 @@ public class ResplendentAngelFactoryTests
         // Only 4 life gained → intervening-if (CR 603.4) fails.
         bus.Publish(new LifeChangedEvent(_alice, previousLife: 20, newLife: 24));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0) stack.Pop()!.Resolve();
 
@@ -203,7 +203,7 @@ public class ResplendentAngelFactoryTests
 
         // The End step belongs to BOB (the opponent), not the Angel's
         // controller — "each end step" must still fire (CR 500.7).
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "\"each end step\" fires on every player's end step, not just the controller's");
@@ -236,7 +236,7 @@ public class ResplendentAngelFactoryTests
         bus.Publish(new LifeChangedEvent(_alice, previousLife: 20, newLife: 25));
         bus.Publish(new TurnStartedEvent(_alice, turnNumber: 2));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0) stack.Pop()!.Resolve();
 

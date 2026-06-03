@@ -72,7 +72,7 @@ public static class FrostLynxFactory
     /// When <paramref name="eventBus"/> is supplied, the ETB trigger is
     /// registered with <paramref name="triggers"/> for automatic firing on
     /// <see cref="CardMovedEvent"/> to the battlefield, and a one-shot
-    /// <see cref="StateMachine.PhaseStateType.Untap"/> step subscription
+    /// <see cref="StateMachine.StepStateType.Untap"/> step subscription
     /// removes the per-permanent untap-skip after the target controller's
     /// next untap step (CR 502.1 / "next untap step" wording).
     /// </summary>
@@ -177,7 +177,7 @@ public static class FrostLynxFactory
         cleanupHandler = ev =>
         {
             var sse = ev;
-            if (sse.StepType != PhaseStateType.Untap) return;
+            if (sse.StepType != StepStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, targetController)) return;
 
             UntapStepRestrictions.RemoveAll(skipToken);

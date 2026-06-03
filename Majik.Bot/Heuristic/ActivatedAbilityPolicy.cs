@@ -247,10 +247,10 @@ public static class ActivatedAbilityPolicy
     {
         var phase = ctx.CurrentPhase;
         // Mid-combat: pump always relevant.
-        if (phase == PhaseStateType.DeclareAttackers
-            || phase == PhaseStateType.DeclareBlockers
-            || phase == PhaseStateType.CombatDamage
-            || phase == PhaseStateType.BeginningOfCombat)
+        if (phase == StepStateType.DeclareAttackers
+            || phase == StepStateType.DeclareBlockers
+            || phase == StepStateType.CombatDamage
+            || phase == StepStateType.BeginningOfCombat)
         {
             return true;
         }

@@ -39,7 +39,7 @@ public class AttackTaxPaywallTests
     }
 
     private GameContext NewContext() =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
     private Creature MakeBear(Player owner)
     {

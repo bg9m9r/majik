@@ -210,7 +210,7 @@ public class CastPoolFirstAndCancelTests
         var agent = new RemoteAgent(alice);
         var ctx = new Majik.Core.Game.GameContext(
             alice, new[] { alice }, alice, 1,
-            Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack());
 
         _ = agent.ChooseManaSourcesAsync(ctx, ManaCost.Parse("R"));
@@ -233,7 +233,7 @@ public class CastPoolFirstAndCancelTests
         var agent = new RemoteAgent(alice);
         var ctx = new Majik.Core.Game.GameContext(
             alice, new[] { alice }, alice, 1,
-            Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack());
 
         var task = agent.ChooseManaSourcesAsync(ctx, ManaCost.Parse("R"));

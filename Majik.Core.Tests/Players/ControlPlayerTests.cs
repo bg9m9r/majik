@@ -357,8 +357,8 @@ public class ControlPlayerTests
             // (CR 305.1 — a land can only be played during a main phase with
             // an empty stack while you have priority; proposing earlier would
             // be rejected and waste the one-shot).
-            var inMain = ctx.CurrentPhase is Majik.Core.StateMachine.PhaseStateType.PreCombatMain
-                or Majik.Core.StateMachine.PhaseStateType.PostCombatMain;
+            var inMain = ctx.CurrentPhase is Majik.Core.StateMachine.StepStateType.PreCombatMain
+                or Majik.Core.StateMachine.StepStateType.PostCombatMain;
             if (inMain
                 && ReferenceEquals(ctx.Self, ctx.ActivePlayer)
                 && !_playedFor.Contains(ctx.Self.Id))

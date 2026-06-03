@@ -41,7 +41,7 @@ public class JsonOpponentScopedDrainTests
     private readonly Player _carol = new("Carol", 20);
 
     private GameContext NewContext(params Player[] players) =>
-        new(_alice, players, _alice, 1, PhaseStateType.PreCombatMain,
+        new(_alice, players, _alice, 1, StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack(_bus));
 
     private Creature OnBattlefield(Player owner, string name)

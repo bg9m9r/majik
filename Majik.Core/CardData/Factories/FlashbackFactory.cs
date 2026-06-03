@@ -58,7 +58,7 @@ namespace Majik.Core.CardData.Factories;
 ///   mana cost" language — same wiring as Snapcaster).
 /// - When an <see cref="IEventBus"/> is supplied, a one-shot
 ///   <see cref="StepStartedEvent"/> subscription clears the grant on the
-///   first <see cref="PhaseStateType.Cleanup"/> step (CR 514.2 — "until
+///   first <see cref="StepStateType.Cleanup"/> step (CR 514.2 — "until
 ///   end of turn"). No bus → grant persists until callers clear it
 ///   manually (shape-only / test path).
 ///
@@ -119,7 +119,7 @@ public static class FlashbackFactory
     /// <param name="resolver">Resolves raw chosen targets to live engine
     /// objects (same shape as the rest of the targeting subsystem).</param>
     /// <param name="eventBus">Optional event bus; when supplied the granted
-    /// flashback is cleared on the first <see cref="PhaseStateType.Cleanup"/>
+    /// flashback is cleared on the first <see cref="StepStateType.Cleanup"/>
     /// step via a one-shot subscription (CR 514.2).</param>
     public static SpellDefinition BuildSpellDefinition(
         Player caster,
@@ -183,7 +183,7 @@ public static class FlashbackFactory
         Action<StepStartedEvent>? handler = null;
         handler = e =>
         {
-            if (e.StepType != PhaseStateType.Cleanup) return;
+            if (e.StepType != StepStateType.Cleanup) return;
             target.ClearRuntimeFlashback();
             if (handler != null) eventBus.Unsubscribe(handler);
         };

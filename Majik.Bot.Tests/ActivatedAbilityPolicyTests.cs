@@ -317,7 +317,7 @@ public class ActivatedAbilityPolicyTests
 
         var oppCtx = new GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: PhaseStateType.DeclareAttackers, stack: s.Stack);
+            turnNumber: 1, currentPhase: StepStateType.DeclareAttackers, stack: s.Stack);
 
         var pol = new PriorityPolicy(ArchetypeWeights.Prowess);
         var action = pol.Pick(oppCtx, s.Self);

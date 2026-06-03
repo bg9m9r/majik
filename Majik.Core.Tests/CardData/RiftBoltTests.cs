@@ -83,7 +83,7 @@ public class RiftBoltTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, 1, StepStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, rb,
@@ -146,7 +146,7 @@ public class RiftBoltTests
 
         // Fire Alice's upkeep on the bus — registry auto-ticks; counter
         // hits zero, the ready callback captures (card, owner).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
 
         registry.IsTracked(rb).Should().BeFalse();
         ready.Should().NotBeNull("ready callback should have fired");
@@ -160,7 +160,7 @@ public class RiftBoltTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 2, PhaseStateType.Upkeep, _stack);
+            _alice, 2, StepStateType.Upkeep, _stack);
         var freeCast = new CastFromExileAlternativeCost(
             "Suspend resolved (CR 702.62d)", ManaCost.Parse("0"));
 
@@ -194,7 +194,7 @@ public class RiftBoltTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 2, PhaseStateType.Upkeep, _stack);
+            _alice, 2, StepStateType.Upkeep, _stack);
         var freeCast = new CastFromExileAlternativeCost(
             "Suspend resolved (CR 702.62d)", ManaCost.Parse("0"), isSuspendCast: true);
 
@@ -223,7 +223,7 @@ public class RiftBoltTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 2, PhaseStateType.Upkeep, _stack);
+            _alice, 2, StepStateType.Upkeep, _stack);
         var freeCast = new CastFromExileAlternativeCost(
             "Generic cast from exile", ManaCost.Parse("0"));
 

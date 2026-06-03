@@ -204,7 +204,7 @@ public static class RobberOfTheRichFactory
                         Action<StepStartedEvent>? handler = null;
                         handler = (e) =>
                         {
-                            if (e.StepType != PhaseStateType.Cleanup) return;
+                            if (e.StepType != StepStateType.Cleanup) return;
                             stampable.ClearRuntimeExileCast();
                             if (handler != null) eventBus.Unsubscribe(handler);
                         };

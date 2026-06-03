@@ -29,7 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Token rider is the Hanweir Garrison / Hero of Bladehold shape — a
 /// tapped-and-attacking token spliced into the in-progress combat via
 /// <see cref="CombatManager.AddTappedAndAttackingToken"/> (CR 508.3g) — plus a
-/// one-shot <see cref="PhaseStateType.EndOfCombat"/>
+/// one-shot <see cref="StepStateType.EndOfCombat"/>
 /// <see cref="StepStartedEvent"/> subscription that exiles the token (CR 514 /
 /// delayed trigger; same EOT-subscription posture as
 /// <see cref="AvatarRokuFactory"/>'s "until end of combat" rider).
@@ -199,7 +199,7 @@ public class KariZevSkyshipRaiderFactoryTests
             .Single(c => c.IsToken && c.HasSubtype(CardSubtype.Monkey));
 
         // CR 514 / delayed trigger — "Exile that token at end of combat."
-        eventBus.Publish(new StepStartedEvent(PhaseStateType.EndOfCombat, alice));
+        eventBus.Publish(new StepStartedEvent(StepStateType.EndOfCombat, alice));
 
         token.Zone.Should().Be(ZoneType.Exile, "Ragavan is exiled at end of combat");
         alice.Zones.Battlefield.GetCards().Should().NotContain(token,
@@ -239,7 +239,7 @@ public class KariZevSkyshipRaiderFactoryTests
             .Single(c => c.IsToken && c.HasSubtype(CardSubtype.Monkey));
 
         // A non-end-of-combat step must NOT exile the token.
-        eventBus.Publish(new StepStartedEvent(PhaseStateType.Draw, alice));
+        eventBus.Publish(new StepStartedEvent(StepStateType.Draw, alice));
 
         token.Zone.Should().Be(ZoneType.Battlefield,
             "the exile rider only fires on the end-of-combat step");

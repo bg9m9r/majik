@@ -142,7 +142,7 @@ public static class ManifoldMouseFactory
         trigger = new TriggeredAbility(
             source: mouse,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.BeginningOfCombat),
+            condition: Triggers.OnStepBegin(owner, StepStateType.BeginningOfCombat),
             effects: new IEffect[] { effect },
             activeZones: new[] { ZoneType.Battlefield },
             targetRequests: new[]

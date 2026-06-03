@@ -163,7 +163,7 @@ public static class RoilingVortexFactory
         var upkeepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(owner, StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

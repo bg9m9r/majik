@@ -148,12 +148,12 @@ public class SqueeGoblinNabobFactoryTests
         PutInGraveyard(_alice, squee);
 
         // Bob's upkeep — does NOT trigger (only the controller's own).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "Squee only triggers on its owner's own upkeep");
 
         // Alice's upkeep — trigger surfaces as pending.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 

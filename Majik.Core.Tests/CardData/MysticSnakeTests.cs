@@ -56,7 +56,7 @@ public class MysticSnakeTests
     // resolution context MUST be built over the same stack the target spell is
     // pushed onto.
     private GameContext NewContext() =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
     [Fact]
     public void MysticSnake_Identity()

@@ -248,7 +248,7 @@ public class VoiceOfVictoryFactoryTests : IDisposable
         warriors.Should().HaveCount(2);
 
         // Fire the end step — the delayed sacrifice trigger should resolve.
-        eventBus.Publish(new StepStartedEvent(PhaseStateType.End, alice));
+        eventBus.Publish(new StepStartedEvent(StepStateType.End, alice));
         triggers.PutPendingTriggersOnStack(alice);
         while (stack.Count > 0)
         {

@@ -116,7 +116,7 @@ public class SnapcasterMageTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, snap,
@@ -195,7 +195,7 @@ public class SnapcasterMageTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, snap,
@@ -217,7 +217,7 @@ public class SnapcasterMageTests
 
         // Simulate the Cleanup step on Alice's turn — the factory's bus
         // handler should fire and clear the grant (CR 514.2).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         bolt.RuntimeFlashbackCost.Should().BeNull(
             "the runtime flashback grant expires at end of turn");

@@ -48,7 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   intervening-if + CR 121.1)</b>:
 ///     - "your end step" carries the controller filter (CR 500) via
 ///       <see cref="Triggers.OnStepBegin"/>(controller,
-///       <see cref="PhaseStateType.End"/>) — contrast Resplendent Angel's
+///       <see cref="StepStateType.End"/>) — contrast Resplendent Angel's
 ///       filter-free "each end step".
 ///     - The intervening-if "if a player lost 4 or more life this turn"
 ///       (CR 603.4) reads ANY player's <see cref="Player.LifeLostThisTurn"/>
@@ -217,7 +217,7 @@ public static class KnightOfTheEbonLegionFactory
         var endStepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, StepStateType.End),
             effects: new IEffect[] { counterEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

@@ -273,7 +273,7 @@ public class NourishingShoalFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            _alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, shoal,
@@ -307,7 +307,7 @@ public class NourishingShoalFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            _alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, shoal,

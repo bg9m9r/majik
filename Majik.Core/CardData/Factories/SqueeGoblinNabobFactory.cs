@@ -147,7 +147,7 @@ public static class SqueeGoblinNabobFactory
         var upkeepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { returnEffect },
             activeZones: new[] { ZoneType.Graveyard });
 

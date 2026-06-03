@@ -122,7 +122,7 @@ public class JsonExileWithReturnTests : IDisposable
 
     private void FireEndStepReturn()
     {
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         _triggers.PutPendingTriggersOnStack(_alice);
         while (_stack.Count > 0) _stack.Pop()!.Resolve();
     }
@@ -203,7 +203,7 @@ public class JsonExileWithReturnTests : IDisposable
         bear.Zone.Should().Be(ZoneType.Exile);
 
         // A non-End step starting does NOT fire the delayed return.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         _triggers.PendingCount.Should().Be(0,
             "CR 603.7 — the return is gated to the End step only");
         bear.Zone.Should().Be(ZoneType.Exile);

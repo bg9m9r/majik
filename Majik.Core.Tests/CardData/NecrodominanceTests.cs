@@ -188,11 +188,11 @@ public class NecrodominanceTests : IDisposable
 
         // Non-Cleanup steps don't revoke (CR 514.2 — "until end of turn"
         // expires at the next Cleanup step, not earlier).
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         permission.IsActive.Should().BeTrue(
             "end-step doesn't revoke — only the Cleanup step does");
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         permission.IsActive.Should().BeFalse(
             "the Cleanup step revokes the cast-from-exile permission (CR 514.2)");
         wiring.ActiveCasts.Should().BeEmpty(
@@ -229,7 +229,7 @@ public class NecrodominanceTests : IDisposable
             "each permission references the card it exiled");
 
         // Cleanup revokes them all in one shot.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         wiring.ActiveCasts.Should().BeEmpty(
             "the Cleanup step revokes every outstanding permission");
     }

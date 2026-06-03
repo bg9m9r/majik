@@ -119,7 +119,7 @@ public class AjaniNacatlPariahTests
 
         // Fire the End step on the controller's turn — the trigger should
         // queue and resolve to sacrifice + transform.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "the end-step transform trigger fires at the start of the controller's End step");
@@ -156,7 +156,7 @@ public class AjaniNacatlPariahTests
         ajani.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(ajani);
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         if (stack.Count > 0) stack.Pop()!.Resolve();
 
@@ -191,10 +191,10 @@ public class AjaniNacatlPariahTests
 
         // Opponent's end step + controller's non-end steps — none of these
         // should fire the trigger.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         triggers.PendingCount.Should().Be(0,
             "the trigger only fires on the controller's End step");

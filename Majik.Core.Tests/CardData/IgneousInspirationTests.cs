@@ -203,7 +203,7 @@ public class IgneousInspirationTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, 1, StepStateType.PreCombatMain, _stack);
 
         IReadOnlyList<IAdditionalCost>? additional = null;
         if (wasKicked)

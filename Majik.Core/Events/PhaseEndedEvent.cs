@@ -11,14 +11,14 @@ public class PhaseEndedEvent : GameEvent
     /// <summary>
     /// The type of phase that ended.
     /// </summary>
-    public PhaseStateType PhaseType { get; }
+    public StepStateType PhaseType { get; }
 
     /// <summary>
     /// The active player.
     /// </summary>
     public Player Player { get; }
 
-    public PhaseEndedEvent(PhaseStateType phaseType, Player player) 
+    public PhaseEndedEvent(StepStateType phaseType, Player player) 
         : base(EventType.PhaseEnded)
     {
         PhaseType = phaseType;

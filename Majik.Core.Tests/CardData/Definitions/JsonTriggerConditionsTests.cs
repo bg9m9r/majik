@@ -535,7 +535,7 @@ public class JsonTriggerConditionsTests
         top.SetZone(ZoneType.Library);
 
         bus.Publish(new StepStartedEvent(
-            Majik.Core.StateMachine.PhaseStateType.Upkeep, _alice));
+            Majik.Core.StateMachine.StepStateType.Upkeep, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "the controller's own upkeep fires the trigger (CR 500.1 / 603.1)");
@@ -555,7 +555,7 @@ public class JsonTriggerConditionsTests
         BuildAndRegister(UpkeepDrawLoseLifeJson, triggers);
 
         bus.Publish(new StepStartedEvent(
-            Majik.Core.StateMachine.PhaseStateType.Upkeep, _bob));
+            Majik.Core.StateMachine.StepStateType.Upkeep, _bob));
 
         triggers.PendingCount.Should().Be(0, "'at the beginning of YOUR upkeep' is controller-scoped (CR 109.5)");
     }
@@ -569,7 +569,7 @@ public class JsonTriggerConditionsTests
         BuildAndRegister(UpkeepDrawLoseLifeJson, triggers);
 
         bus.Publish(new StepStartedEvent(
-            Majik.Core.StateMachine.PhaseStateType.End, _alice));
+            Majik.Core.StateMachine.StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(0, "the End step is not the Upkeep step");
     }
@@ -604,7 +604,7 @@ public class JsonTriggerConditionsTests
         var (_, card) = BuildAndRegister(EndStepCounterJson, triggers);
 
         bus.Publish(new StepStartedEvent(
-            Majik.Core.StateMachine.PhaseStateType.End, _alice));
+            Majik.Core.StateMachine.StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "the controller's own end step fires the trigger (CR 513.1 / 603.1)");
@@ -623,7 +623,7 @@ public class JsonTriggerConditionsTests
         BuildAndRegister(EndStepCounterJson, triggers);
 
         bus.Publish(new StepStartedEvent(
-            Majik.Core.StateMachine.PhaseStateType.Upkeep, _alice));
+            Majik.Core.StateMachine.StepStateType.Upkeep, _alice));
 
         triggers.PendingCount.Should().Be(0, "the Upkeep step is not the End step");
     }

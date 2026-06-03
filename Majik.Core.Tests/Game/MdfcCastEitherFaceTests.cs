@@ -35,7 +35,7 @@ public class MdfcCastEitherFaceTests : IDisposable
 
     private static GameContext Ctx(Player self, params Player[] all) =>
         new(self, all.Length > 0 ? all : new[] { self }, self, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(new EventBus()));
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(new EventBus()));
 
     // =====================================================================
     // Card model — the front face carries a castable back-face descriptor
@@ -154,7 +154,7 @@ public class MdfcCastEitherFaceTests : IDisposable
         var played = MdfcCastFlow.PlayBackLandFace(
             frontCard: sink, backFace: backFace, caster: alice,
             zones: zones, replacements: replacements, landDropTracker: tracker,
-            activePlayer: alice, phase: PhaseStateType.PreCombatMain, stackEmpty: true);
+            activePlayer: alice, phase: StepStateType.PreCombatMain, stackEmpty: true);
 
         played.Should().BeTrue();
 
@@ -194,7 +194,7 @@ public class MdfcCastEitherFaceTests : IDisposable
 
         MdfcCastFlow.PlayBackLandFace(
             sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements,
-            landDropTracker: null, alice, PhaseStateType.PreCombatMain, true);
+            landDropTracker: null, alice, StepStateType.PreCombatMain, true);
 
         var land = alice.Zones.Battlefield.GetCards().OfType<Land>().Single();
         land.IsTapped.Should().BeFalse("paid 3 life → enters untapped");
@@ -218,7 +218,7 @@ public class MdfcCastEitherFaceTests : IDisposable
 
         MdfcCastFlow.PlayBackLandFace(
             sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements,
-            landDropTracker: null, alice, PhaseStateType.PreCombatMain, true);
+            landDropTracker: null, alice, StepStateType.PreCombatMain, true);
 
         var land = alice.Zones.Battlefield.GetCards().OfType<Land>().Single();
         land.IsTapped.Should().BeTrue("declined → enters tapped");
@@ -238,7 +238,7 @@ public class MdfcCastEitherFaceTests : IDisposable
 
         MdfcCastFlow.PlayBackLandFace(
             sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements: null,
-            landDropTracker: null, alice, PhaseStateType.PreCombatMain, true);
+            landDropTracker: null, alice, StepStateType.PreCombatMain, true);
 
         var land = alice.Zones.Battlefield.GetCards().OfType<Land>().Single();
         var mana = land.Abilities.OfType<ManaAbility>().Single();
@@ -260,7 +260,7 @@ public class MdfcCastEitherFaceTests : IDisposable
 
         var played = MdfcCastFlow.PlayBackLandFace(
             sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements: null,
-            landDropTracker: tracker, alice, PhaseStateType.PreCombatMain, true);
+            landDropTracker: tracker, alice, StepStateType.PreCombatMain, true);
 
         played.Should().BeFalse("CR 305.2 — second land drop is illegal");
         alice.Zones.Hand.GetCards().Should().Contain(sink, "front card stays in hand");

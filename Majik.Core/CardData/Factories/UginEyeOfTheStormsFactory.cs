@@ -259,7 +259,7 @@ public static class UginEyeOfTheStormsFactory
                 Action<StepStartedEvent>? handler = null;
                 handler = (e) =>
                 {
-                    if (e.StepType != PhaseStateType.Cleanup) return;
+                    if (e.StepType != StepStateType.Cleanup) return;
                     foreach (var card in picks) card.ClearRuntimeExileCast();
                     if (handler != null) eventBus.Unsubscribe(handler);
                 };

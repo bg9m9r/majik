@@ -8,7 +8,7 @@ namespace Majik.Core.Events;
 /// GameOver). Carries the typed <see cref="GameStateType"/>.
 /// <para>
 /// This is the game-lifecycle channel, deliberately distinct from the
-/// phase / step channel (<see cref="TurnStateChangedEvent"/>,
+/// phase / step channel (<see cref="PhaseStateChangedEvent"/>,
 /// <see cref="PhaseStartedEvent"/>, <see cref="StepStartedEvent"/>). It
 /// replaced the old multiplexed <c>PhaseChangedEvent</c> emit so
 /// lifecycle names ("Mulligan", "Playing") never leak into the UI's phase

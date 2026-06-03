@@ -133,7 +133,7 @@ public static class SnapcasterMageFactory
                 Action<StepStartedEvent>? handler = null;
                 handler = (e) =>
                 {
-                    if (e.StepType != PhaseStateType.Cleanup) return;
+                    if (e.StepType != StepStateType.Cleanup) return;
                     target.ClearRuntimeFlashback();
                     if (handler != null) eventBus.Unsubscribe(handler);
                 };

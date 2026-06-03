@@ -10,9 +10,9 @@ public class ExtraPhaseAddedEvent : GameEvent
     /// <summary>
     /// The type of phase that was added.
     /// </summary>
-    public PhaseStateType PhaseType { get; }
+    public StepStateType PhaseType { get; }
 
-    public ExtraPhaseAddedEvent(PhaseStateType phaseType) 
+    public ExtraPhaseAddedEvent(StepStateType phaseType) 
         : base(EventType.PhaseStarted)
     {
         PhaseType = phaseType;

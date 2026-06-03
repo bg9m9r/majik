@@ -142,7 +142,7 @@ public class FlickerwispFactoryTests
         // Build a minimal GameContext with both players so AllPlayers spans both sides.
         var bus = new EventBus();
         var stack = new Majik.Core.Stack.Stack(bus);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, stack);
         var candidates = request.CandidateGatherer!(ctx).OfType<Permanent>().ToList();
 
         // All five permanents should be gatherable.
@@ -243,7 +243,7 @@ public class FlickerwispFactoryTests
             "Flickerwisp ETB exiles the target immediately");
 
         // Fire the next end step — delayed trigger should enqueue.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "delayed return rider fires on the first end step after the ETB");
@@ -296,7 +296,7 @@ public class FlickerwispFactoryTests
         _bob.Zones.Battlefield.GetCards().Should().NotContain(stolen);
 
         // Fire the next end step.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "delayed return fires on the first end step");

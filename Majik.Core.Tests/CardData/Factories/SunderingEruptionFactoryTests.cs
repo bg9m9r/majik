@@ -157,7 +157,7 @@ public class SunderingEruptionFactoryTests : IDisposable
             allPlayers: new[] { alice, bob },
             activePlayer: alice,
             turnNumber: 1,
-            currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
             stack: stack);
 
         var candidates = def.TargetRequests[0].ResolveCandidates(ctx);

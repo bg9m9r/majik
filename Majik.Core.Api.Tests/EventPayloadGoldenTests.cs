@@ -57,7 +57,7 @@ public class EventPayloadGoldenTests
     {
         var alice = new Player("Alice");
         var payload = EventPayloadBuilder.Build(
-            new PhaseStartedEvent(Majik.Core.StateMachine.PhaseStateType.PreCombatMain, alice));
+            new PhaseStartedEvent(Majik.Core.StateMachine.StepStateType.PreCombatMain, alice));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "phase", "playerId" });
         payload.GetProperty("playerId").GetGuid().Should().Be(alice.Id);
@@ -69,7 +69,7 @@ public class EventPayloadGoldenTests
     {
         var alice = new Player("Alice");
         var payload = EventPayloadBuilder.Build(
-            new PhaseEndedEvent(Majik.Core.StateMachine.PhaseStateType.PreCombatMain, alice));
+            new PhaseEndedEvent(Majik.Core.StateMachine.StepStateType.PreCombatMain, alice));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "phase", "playerId" });
     }
@@ -79,7 +79,7 @@ public class EventPayloadGoldenTests
     {
         var alice = new Player("Alice");
         var payload = EventPayloadBuilder.Build(
-            new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Upkeep, alice));
+            new StepStartedEvent(Majik.Core.StateMachine.StepStateType.Upkeep, alice));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "step", "playerId" });
         payload.GetProperty("playerId").GetGuid().Should().Be(alice.Id);
@@ -90,7 +90,7 @@ public class EventPayloadGoldenTests
     {
         var alice = new Player("Alice");
         var payload = EventPayloadBuilder.Build(
-            new StepEndedEvent(Majik.Core.StateMachine.PhaseStateType.Upkeep, alice));
+            new StepEndedEvent(Majik.Core.StateMachine.StepStateType.Upkeep, alice));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "step", "playerId" });
     }
@@ -110,9 +110,9 @@ public class EventPayloadGoldenTests
     [Fact]
     public void TurnStateChangedPayload_Golden()
     {
-        var payload = EventPayloadBuilder.Build(new TurnStateChangedEvent(
-            Majik.Core.StateMachine.TurnStateType.TurnBeginning,
-            Majik.Core.StateMachine.TurnStateType.PreCombatMain));
+        var payload = EventPayloadBuilder.Build(new PhaseStateChangedEvent(
+            Majik.Core.StateMachine.PhaseStateType.TurnBeginning,
+            Majik.Core.StateMachine.PhaseStateType.PreCombatMain));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "from", "to" });
         payload.GetProperty("from").GetString().Should().Be("TurnBeginning");
@@ -143,7 +143,7 @@ public class EventPayloadGoldenTests
     public void ExtraPhaseAddedPayload_Golden()
     {
         var payload = EventPayloadBuilder.Build(
-            new ExtraPhaseAddedEvent(Majik.Core.StateMachine.PhaseStateType.PostCombatMain));
+            new ExtraPhaseAddedEvent(Majik.Core.StateMachine.StepStateType.PostCombatMain));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "phase" });
         payload.GetProperty("phase").ValueKind.Should().Be(JsonValueKind.String);

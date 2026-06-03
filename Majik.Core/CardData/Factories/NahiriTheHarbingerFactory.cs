@@ -292,7 +292,7 @@ public static class NahiriTheHarbingerFactory
             source: permanent,
             controller: controller,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End && e.Timestamp > resolvedAt),
+                (e, _) => e.StepType == StepStateType.End && e.Timestamp > resolvedAt),
             effects: new[] { returnEffect });
 
         triggers.RegisterDelayed(delayed);

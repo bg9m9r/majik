@@ -129,7 +129,7 @@ public class SeasClaimTests
         var def = SeasClaimFactory.BuildSpellDefinition(
             sc, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
         var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.PreCombatMain, stack);
+            StepStateType.PreCombatMain, stack);
 
         await castFlow.CastAsync(_alice, sc, def, agent, ctx);
         resolver.ResolveTop(stack);

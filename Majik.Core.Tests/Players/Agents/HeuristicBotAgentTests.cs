@@ -23,7 +23,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
 
@@ -36,7 +36,7 @@ public class HeuristicBotAgentTests
     {
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
     }
@@ -55,7 +55,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(), landPlayAvailable: false);
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(), landPlayAvailable: false);
 
         (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
     }
@@ -69,7 +69,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
     }
@@ -81,7 +81,7 @@ public class HeuristicBotAgentTests
         var b2 = new Creature("B2", "1G", 2, 2) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareAttackersAsync(ctx, new[] { b1, b2 });
 
@@ -101,7 +101,7 @@ public class HeuristicBotAgentTests
         var bigger = new Creature("Big", "2G", 4, 4) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { attacker }, new[] { small, safeNoKill, bigger });
 
@@ -117,7 +117,7 @@ public class HeuristicBotAgentTests
         var safeNoKill = new Creature("SafeNoKill", "1G", 1, 3) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { attacker }, new[] { safeNoKill });
 
@@ -135,7 +135,7 @@ public class HeuristicBotAgentTests
         _alice.LifeTotal = 5;
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { huge }, new[] { bear });
 
@@ -150,7 +150,7 @@ public class HeuristicBotAgentTests
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { huge }, new[] { bear });
 
@@ -173,7 +173,7 @@ public class HeuristicBotAgentTests
         var safe = new Creature("Wall", "3", 4, 5) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { atk }, new[] { dt, safe });
 
@@ -191,7 +191,7 @@ public class HeuristicBotAgentTests
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { atk }, new[] { bear });
 
@@ -208,7 +208,7 @@ public class HeuristicBotAgentTests
         var bot = new HeuristicBotAgent();
         _alice.LifeTotal = 5; // make lethal so the gang is justified
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { atk }, new[] { b1, b2 });
 
@@ -229,7 +229,7 @@ public class HeuristicBotAgentTests
         var smallBlocker = new Creature("SmallBlocker", "1W", 2, 2) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareBlockersAsync(ctx, new[] { bigAtk, smallAtk }, new[] { bigBlocker, smallBlocker });
 
@@ -245,7 +245,7 @@ public class HeuristicBotAgentTests
         var big = new Creature("Big", "3", 4, 4) { Owner = _bob, Controller = _bob };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var req = new Majik.Core.Players.Agents.TargetRequest(
             "target creature", 1, 1, new object[] { small, big });
@@ -265,7 +265,7 @@ public class HeuristicBotAgentTests
         var ourBear = new Creature("OurBear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var req = new Majik.Core.Players.Agents.TargetRequest(
             "any target", 1, 1, new object[] { _alice, _bob, ourBear });
@@ -291,7 +291,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
 
@@ -313,7 +313,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.Untap, new Majik.Core.Stack.Stack());
+            1, StepStateType.Untap, new Majik.Core.Stack.Stack());
 
         (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
     }
@@ -333,7 +333,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
     }
@@ -353,7 +353,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareAttackersAsync(ctx, new[] { bear, spirit });
 
@@ -372,7 +372,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareAttackersAsync(ctx, new[] { our1_1 });
 
@@ -392,7 +392,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         var plan = await bot.DeclareAttackersAsync(ctx, new[] { ourFlier });
 
@@ -417,7 +417,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var x = await bot.ChooseXAsync(ctx, devilsPlay);
         x.Should().Be(5);
@@ -439,7 +439,7 @@ public class HeuristicBotAgentTests
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var x = await bot.ChooseXAsync(ctx, fireball);
         x.Should().Be(4); // 5 untapped - 1 generic printed
@@ -457,7 +457,7 @@ public class HeuristicBotAgentTests
         var modes = new[] { "Draw a card.", "Destroy target creature." };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var idx = await bot.ChooseModeAsync(ctx, modes);
         idx.Should().Be(1);
@@ -472,7 +472,7 @@ public class HeuristicBotAgentTests
         var modes = new[] { "Counter target spell.", "Create a 2/2 creature token." };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var idx = await bot.ChooseModeAsync(ctx, modes);
         idx.Should().Be(1);
@@ -487,7 +487,7 @@ public class HeuristicBotAgentTests
         var theirBig = new Creature("TheirBig", "3G", 4, 4) { Owner = _bob, Controller = _bob };
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var req = new Majik.Core.Players.Agents.TargetRequest(
             "target creature you control", 1, 1, new object[] { ourBig, theirBig });

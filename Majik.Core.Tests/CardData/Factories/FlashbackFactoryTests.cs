@@ -202,12 +202,12 @@ public class FlashbackFactoryTests
         bolt.RuntimeFlashbackCost.Should().NotBeNull("grant is live before EOT");
 
         // Non-cleanup steps don't clear.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         bolt.RuntimeFlashbackCost.Should().NotBeNull(
             "only Cleanup step clears the grant");
 
         // Cleanup step fires — grant goes away (CR 514.2).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         bolt.RuntimeFlashbackCost.Should().BeNull(
             "runtime flashback grant expires at end of turn");
     }

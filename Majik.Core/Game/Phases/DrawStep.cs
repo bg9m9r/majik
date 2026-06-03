@@ -11,13 +11,13 @@ namespace Majik.Core.Game.Phases;
 /// Draw step implementation.
 /// Active player draws a card from their library.
 /// </summary>
-public class DrawStep : PhaseState
+public class DrawStep : StepState
 {
     private readonly IEventBus? _eventBus;
     private readonly ZoneService? _zoneService;
 
     public DrawStep(IEventBus? eventBus = null, ZoneService? zoneService = null) 
-        : base(PhaseStateType.Draw, eventBus)
+        : base(StepStateType.Draw, eventBus)
     {
         _eventBus = eventBus;
         _zoneService = zoneService;

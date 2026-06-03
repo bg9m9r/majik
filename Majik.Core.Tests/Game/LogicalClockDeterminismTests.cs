@@ -216,7 +216,7 @@ public class LogicalClockDeterminismTests
         var alice = new Player("Alice", 20);
         // A "resolvedAt" fence captured from the clock, then a later event.
         var resolvedAt = LogicalClockScope.Current.NextTimestamp();
-        var laterEvent = new StepStartedEvent(PhaseStateType.End, alice);
+        var laterEvent = new StepStartedEvent(StepStateType.End, alice);
         // The event constructed after the fence has a strictly-greater
         // timestamp, so "e.Timestamp > resolvedAt" fences fire exactly once,
         // reproducibly — the property the ~25 factory delayed triggers rely on.

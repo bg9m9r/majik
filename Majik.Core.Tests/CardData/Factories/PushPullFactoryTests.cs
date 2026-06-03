@@ -317,7 +317,7 @@ public class PushPullFactoryTests : IDisposable
         bear.Zone.Should().Be(ZoneType.Battlefield);
 
         // Fire the next End step — the delayed triggers sacrifice both.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);

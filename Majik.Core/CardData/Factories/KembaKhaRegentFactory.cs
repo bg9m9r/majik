@@ -146,7 +146,7 @@ public static class KembaKhaRegentFactory
         var upkeepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { effect },
             // CR 113.6 — functions only from the battlefield.
             activeZones: new[] { ZoneType.Battlefield });

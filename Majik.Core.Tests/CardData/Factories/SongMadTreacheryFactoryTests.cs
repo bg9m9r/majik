@@ -131,7 +131,7 @@ public class SongMadTreacheryFactoryTests
         agent.QueueTargets(new object[] { bear });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 3, PhaseStateType.PreCombatMain, stack);
+        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 3, StepStateType.PreCombatMain, stack);
         await flow.CastAsync(alice, card, def, agent, ctx, alternativeCost: null);
         resolver.ResolveTop(stack);
 

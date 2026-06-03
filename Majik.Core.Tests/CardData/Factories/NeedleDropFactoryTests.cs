@@ -85,7 +85,7 @@ public class NeedleDropFactoryTests : IDisposable
         var def = NeedleDropFactory.BuildSpellDefinition(_alice, resolver: x => x);
         var ctx = new GameContext(
             _alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
         var candidates = def.TargetRequests[0].ResolveCandidates(ctx);
 
         candidates.Should().Contain(damaged, "it was dealt damage this turn");

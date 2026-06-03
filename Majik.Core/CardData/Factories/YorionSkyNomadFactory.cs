@@ -254,7 +254,7 @@ public static class YorionSkyNomadFactory
                 source: yorion,
                 controller: owner,
                 condition: new EventTriggerCondition<StepStartedEvent>(
-                    (e, _) => e.StepType == PhaseStateType.End
+                    (e, _) => e.StepType == StepStateType.End
                               && e.Timestamp > resolvedAt),
                 effects: new IEffect[] { returnEffect });
 

@@ -138,7 +138,7 @@ public static class AjaniNacatlPariahFactory
         var endStepTransform = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.End),
             effects: new IEffect[] { transformEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

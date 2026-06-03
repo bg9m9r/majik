@@ -50,7 +50,7 @@ public class PriorityLoopCastDispatchTests
             new[] { alice, bob }, priority, stack, resolver, zones,
             new Dictionary<Player, IPlayerAgent>
             { [alice] = aliceAgent, [bob] = bobAgent },
-            () => 1, () => PhaseStateType.PreCombatMain,
+            () => 1, () => StepStateType.PreCombatMain,
             new LandDropTracker(),
             castDispatcher: dispatcher);
 
@@ -79,7 +79,7 @@ public class PriorityLoopCastDispatchTests
             new[] { alice, bob }, priority, stack, resolver, zones,
             new Dictionary<Player, IPlayerAgent>
             { [alice] = aliceAgent, [bob] = new ScriptedAgent() },
-            () => 1, () => PhaseStateType.PreCombatMain,
+            () => 1, () => StepStateType.PreCombatMain,
             new LandDropTracker());
 
         var act = async () => await loop.RunUntilRoundEndsAsync(alice);

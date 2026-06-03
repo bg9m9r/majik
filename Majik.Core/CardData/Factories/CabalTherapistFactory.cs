@@ -42,7 +42,7 @@ namespace Majik.Core.CardData.Factories;
 ///   block-declaration time.
 /// - <b>First-main-phase trigger (CR 603.1)</b> scoped to the controller's own
 ///   pre-combat main step via <see cref="Triggers.OnStepBegin"/> with
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.PreCombatMain"/>.
+///   <see cref="Majik.Core.StateMachine.StepStateType.PreCombatMain"/>.
 ///   Battlefield-only (CR 113.6). At resolution:
 ///     1. <b>"you may sacrifice a creature"</b> — prompt the controller's agent
 ///        yes/no. On "yes", pick a creature they control (their own creatures
@@ -218,7 +218,7 @@ public static class CabalTherapistFactory
             source: card,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.PreCombatMain),
+                owner, Majik.Core.StateMachine.StepStateType.PreCombatMain),
             effects: new IEffect[] { triggerEffect },
             activeZones: new[] { ZoneType.Battlefield },
             targetRequests: new[]

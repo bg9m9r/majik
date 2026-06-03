@@ -220,9 +220,9 @@ public class LightningSkelementalFactoryTests
         var trigger = card.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.Condition is EventTriggerCondition<StepStartedEvent>);
 
-        var aliceEnd = new StepStartedEvent(PhaseStateType.End, _alice);
-        var bobEnd = new StepStartedEvent(PhaseStateType.End, _bob);
-        var bobUpkeep = new StepStartedEvent(PhaseStateType.Upkeep, _bob);
+        var aliceEnd = new StepStartedEvent(StepStateType.End, _alice);
+        var bobEnd = new StepStartedEvent(StepStateType.End, _bob);
+        var bobUpkeep = new StepStartedEvent(StepStateType.Upkeep, _bob);
 
         trigger.Condition.Matches(aliceEnd, null!).Should().BeTrue();
         trigger.Condition.Matches(bobEnd, null!).Should().BeTrue();

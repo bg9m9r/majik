@@ -103,7 +103,7 @@ public sealed record GameStateChangedPayload(
 
 /// <summary>Turn-state-machine transition (Beginning / PreCombatMain /
 /// Combat / PostCombatMain / Ending).</summary>
-public sealed record TurnStateChangedPayload(
+public sealed record PhaseStateChangedPayload(
     string? From,
     string To);
 
@@ -202,7 +202,7 @@ public sealed record EventPayloadCatalog(
     PhaseStartedPayload PhaseStarted,
     PhaseEndedPayload PhaseEnded,
     GameStateChangedPayload GameStateChanged,
-    TurnStateChangedPayload TurnStateChanged,
+    PhaseStateChangedPayload PhaseStateChanged,
     StepStartedPayload StepStarted,
     StepEndedPayload StepEnded,
     TurnStartedPayload TurnStarted,

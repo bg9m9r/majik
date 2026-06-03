@@ -97,12 +97,12 @@ public class AetherVialTests
         vial.SetZone(ZoneType.Battlefield);
 
         // Bob's upkeep — should NOT trigger.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "Aether Vial only triggers on its controller's own upkeep");
 
         // Alice's upkeep — surfaces as pending.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 

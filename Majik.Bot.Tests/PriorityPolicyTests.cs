@@ -55,7 +55,7 @@ public class PriorityPolicyTests
 
         var turn2 = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Self,
-            turnNumber: 2, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 2, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
         pol.Pick(turn2, s.Self).Should().BeOfType<PriorityAction.PlayLand>(
             "a new turn resets the land-drop memo");
     }
@@ -77,7 +77,7 @@ public class PriorityPolicyTests
         s.AddCardToHand(s.Self, land);
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
         pol.Pick(oppCtx, s.Self).Should().BeOfType<PriorityAction.PassAction>();
     }
@@ -143,7 +143,7 @@ public class PriorityPolicyTests
         // Opponent's turn, in their main, stack empty — instant cast still legal.
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
 
         // Opponent's turn → policy should *not* cast our instant proactively.
@@ -164,7 +164,7 @@ public class PriorityPolicyTests
 
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
 
         pol.Pick(oppCtx, s.Self).Should().BeOfType<PriorityAction.PassAction>();

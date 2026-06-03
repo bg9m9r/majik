@@ -162,7 +162,7 @@ public class FireblastFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)_bob });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fireblast,

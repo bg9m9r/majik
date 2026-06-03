@@ -191,7 +191,7 @@ public static class FallenShinobiFactory
                     Action<StepStartedEvent>? handler = null;
                     handler = (e) =>
                     {
-                        if (e.StepType != PhaseStateType.Cleanup) return;
+                        if (e.StepType != StepStateType.Cleanup) return;
                         foreach (var top in topCards)
                         {
                             if (top is Card stampable) stampable.ClearRuntimeExileCast();

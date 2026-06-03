@@ -159,7 +159,7 @@ public static class TeferiHeroOfDominariaFactory
                 source: teferi,
                 controller: controller,
                 condition: new EventTriggerCondition<StepStartedEvent>(
-                    (e, _) => e.StepType == PhaseStateType.End),
+                    (e, _) => e.StepType == StepStateType.End),
                 effects: new[] { untapEffect });
 
             teferi.AddAbility(delayed);

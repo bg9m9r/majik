@@ -816,6 +816,9 @@
           "phaseStarted": {
             "$ref": "#/components/schemas/PhaseStartedPayload"
           },
+          "phaseStateChanged": {
+            "$ref": "#/components/schemas/PhaseStateChangedPayload"
+          },
           "playerLost": {
             "$ref": "#/components/schemas/PlayerLostPayload"
           },
@@ -833,9 +836,6 @@
           },
           "turnStarted": {
             "$ref": "#/components/schemas/TurnStartedPayload"
-          },
-          "turnStateChanged": {
-            "$ref": "#/components/schemas/TurnStateChangedPayload"
           }
         },
         "required": [
@@ -846,7 +846,7 @@
           "phaseStarted",
           "phaseEnded",
           "gameStateChanged",
-          "turnStateChanged",
+          "phaseStateChanged",
           "stepStarted",
           "stepEnded",
           "turnStarted",
@@ -1784,6 +1784,24 @@
         ],
         "type": "object"
       },
+      "PhaseStateChangedPayload": {
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
       "PlayDrawRequest": {
         "properties": {
           "choice": {
@@ -2213,24 +2231,6 @@
         "required": [
           "playerId",
           "turn"
-        ],
-        "type": "object"
-      },
-      "TurnStateChangedPayload": {
-        "properties": {
-          "from": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "to": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "from",
-          "to"
         ],
         "type": "object"
       },

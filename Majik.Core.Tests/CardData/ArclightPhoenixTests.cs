@@ -105,7 +105,7 @@ public class ArclightPhoenixTests
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "S3")));
 
         // Begin-combat step on Alice's turn.
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         triggers.PendingCount.Should().Be(1);
         triggers.PutPendingTriggersOnStack(_alice);
@@ -130,7 +130,7 @@ public class ArclightPhoenixTests
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "S1")));
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "S2")));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         // Trigger may surface (the begin-combat event matched), but the
         // intervening-if at resolve time keeps the Phoenix put.
@@ -161,7 +161,7 @@ public class ArclightPhoenixTests
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "S2")));
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "S3")));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         // Even if the trigger fires structurally, the resolve guard re-checks
         // the from-graveyard zone constraint (CR 603.6d) and no-ops. Phoenix
@@ -194,7 +194,7 @@ public class ArclightPhoenixTests
         bus.Publish(new SpellCastEvent(NewInstantSpell(bob, "B3")));
 
         // Alice begins combat.
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         if (triggers.PendingCount > 0)
         {
@@ -221,7 +221,7 @@ public class ArclightPhoenixTests
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "S2")));
         bus.Publish(new SpellCastEvent(NewCreatureSpell(_alice, "Bear")));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         if (triggers.PendingCount > 0)
         {
@@ -234,7 +234,7 @@ public class ArclightPhoenixTests
         // Now add a sorcery — total qualifying = 3. Phoenix in graveyard
         // returns at the next begin-combat.
         bus.Publish(new SpellCastEvent(NewSorcerySpell(_alice, "Twincast")));
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         triggers.PendingCount.Should().Be(1);
         triggers.PutPendingTriggersOnStack(_alice);
@@ -266,7 +266,7 @@ public class ArclightPhoenixTests
         // stay in the graveyard because the count was reset to 0.
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "T2S1")));
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "T2S2")));
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         if (triggers.PendingCount > 0)
         {

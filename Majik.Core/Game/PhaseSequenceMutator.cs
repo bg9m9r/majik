@@ -15,7 +15,7 @@ namespace Majik.Core.Game;
 public sealed class PhaseSequenceMutator
 {
     private readonly IEventBus? _eventBus;
-    private readonly Queue<PhaseStateType> _pending = new();
+    private readonly Queue<StepStateType> _pending = new();
 
     public PhaseSequenceMutator(IEventBus? eventBus = null)
     {
@@ -28,7 +28,7 @@ public sealed class PhaseSequenceMutator
 
     /// <summary>Queue a single phase for insertion (CR 500.8). Fires
     /// <see cref="ExtraPhaseAddedEvent"/>.</summary>
-    public void AddExtraPhase(PhaseStateType phase)
+    public void AddExtraPhase(StepStateType phase)
     {
         _pending.Enqueue(phase);
         _eventBus?.Publish(new ExtraPhaseAddedEvent(phase));
@@ -39,27 +39,27 @@ public sealed class PhaseSequenceMutator
     /// Used by cards like Aggravated Assault.</summary>
     public void AddExtraCombatPhase()
     {
-        AddExtraPhase(PhaseStateType.BeginningOfCombat);
-        AddExtraPhase(PhaseStateType.DeclareAttackers);
-        AddExtraPhase(PhaseStateType.DeclareBlockers);
-        AddExtraPhase(PhaseStateType.CombatDamage);
-        AddExtraPhase(PhaseStateType.EndOfCombat);
+        AddExtraPhase(StepStateType.BeginningOfCombat);
+        AddExtraPhase(StepStateType.DeclareAttackers);
+        AddExtraPhase(StepStateType.DeclareBlockers);
+        AddExtraPhase(StepStateType.CombatDamage);
+        AddExtraPhase(StepStateType.EndOfCombat);
     }
 
     /// <summary>Queue an extra main phase (e.g. Seedborn Muse, Relentless
     /// Assault). Cards that grant an additional main phase grant a
     /// postcombat main (CR 505.1b — the extra main follows the combat it
     /// was created after), so the contextually-correct type is
-    /// <see cref="PhaseStateType.PostCombatMain"/>.</summary>
-    public void AddExtraMainPhase() => AddExtraPhase(PhaseStateType.PostCombatMain);
+    /// <see cref="StepStateType.PostCombatMain"/>.</summary>
+    public void AddExtraMainPhase() => AddExtraPhase(StepStateType.PostCombatMain);
 
     /// <summary>Peek the next pending insertion without consuming it.
     /// Returns null when the queue is empty.</summary>
-    public PhaseStateType? PeekNext() => _pending.Count > 0 ? _pending.Peek() : null;
+    public StepStateType? PeekNext() => _pending.Count > 0 ? _pending.Peek() : null;
 
     /// <summary>Attempt to consume the next pending insertion. Returns
     /// true and outputs the phase when one was available.</summary>
-    public bool TryDequeue(out PhaseStateType phase)
+    public bool TryDequeue(out StepStateType phase)
     {
         if (_pending.Count == 0)
         {

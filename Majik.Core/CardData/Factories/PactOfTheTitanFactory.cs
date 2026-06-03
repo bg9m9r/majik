@@ -31,7 +31,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="PactOfNegationFactory"/> / <see cref="SlaughterPactFactory"/>
 ///   pattern. When a <see cref="TriggerManager"/> is supplied the resolve
 ///   effect registers a <see cref="DelayedTriggeredAbility"/> (CR 603.7)
-///   that fires on the controller's next <see cref="PhaseStateType.Upkeep"/>
+///   that fires on the controller's next <see cref="StepStateType.Upkeep"/>
 ///   <see cref="StepStartedEvent"/>. The trigger calls
 ///   <see cref="Player.PayMana"/> with {4}{R} against the controller's
 ///   mana pool; on failure <see cref="Player.MarkLost"/> flags the
@@ -126,7 +126,7 @@ public static class PactOfTheTitanFactory
                     source: caster,
                     controller: caster,
                     condition: new EventTriggerCondition<StepStartedEvent>(
-                        (e, _) => e.StepType == PhaseStateType.Upkeep
+                        (e, _) => e.StepType == StepStateType.Upkeep
                                   && ReferenceEquals(e.Player, caster)
                                   && e.Timestamp > resolvedAt),
                     effects: new IEffect[] { payOrLoseEffect });

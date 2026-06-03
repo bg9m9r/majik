@@ -338,7 +338,7 @@ public sealed class GameDriver
         foreach (var p in _players)
         {
             var ctx = new GameContext(
-                p, _players, startingPlayer, 0, PhaseStateType.Untap,
+                p, _players, startingPlayer, 0, StepStateType.Untap,
                 new Majik.Core.Stack.Stack());
             await mulligan.RunAsync(p, _agents[p], ctx, ct: ct);
         }

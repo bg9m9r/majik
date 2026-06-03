@@ -52,7 +52,7 @@ namespace Majik.Core.CardData.Factories;
 ///   registers a <see cref="DelayedTriggeredAbility"/> on the supplied
 ///   <see cref="TriggerManager"/> that fires on the next
 ///   <see cref="StepStartedEvent"/> of type
-///   <see cref="PhaseStateType.End"/> and puts the exiled card into the
+///   <see cref="StepStateType.End"/> and puts the exiled card into the
 ///   controller's hand (CR 603.7). Each activation registers its own
 ///   delayed trigger, so multiple activations stack — the
 ///   TriggerManager auto-unregisters each one after firing.
@@ -232,7 +232,7 @@ public static class NecropotenceFactory
                             source: card,
                             controller: owner,
                             condition: new EventTriggerCondition<StepStartedEvent>(
-                                (e, _) => e.StepType == PhaseStateType.End
+                                (e, _) => e.StepType == StepStateType.End
                                           && e.Timestamp > activatedAt),
                             effects: new IEffect[] { returnEffect });
 

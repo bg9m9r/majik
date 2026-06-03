@@ -49,7 +49,7 @@ public class CabalTherapistFactoryTests
     private readonly Player _bob = new("Bob", 20);
 
     private GameContext NewContext(IPlayerAgent agent) =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain,
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack(_bus));
 
     private static T OnBattlefield<T>(T permanent, Player owner) where T : Permanent

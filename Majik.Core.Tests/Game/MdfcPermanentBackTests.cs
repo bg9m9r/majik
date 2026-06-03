@@ -35,7 +35,7 @@ public class MdfcPermanentBackTests : IDisposable
 
     private static GameContext Ctx(Player self) =>
         new(self, new[] { self }, self, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(new EventBus()));
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(new EventBus()));
 
     // ------------------------------------------------------------------
     // Card model — the front carries a castable PERMANENT back face.
@@ -233,7 +233,7 @@ public class MdfcPermanentBackTests : IDisposable
 
         // "This turn" — the FIRST Cleanup the controller owns revokes BOTH
         // grants under one shared subscription (CR 514.2).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         top1.RuntimeExileCastAllowedCaster.Should().BeNull(
             "the play permission does not linger past 'this turn'");

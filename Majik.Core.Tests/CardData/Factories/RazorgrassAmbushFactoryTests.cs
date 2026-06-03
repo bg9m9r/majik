@@ -151,7 +151,7 @@ public class RazorgrassAmbushFactoryTests : IDisposable
             allPlayers: new[] { alice, bob },
             activePlayer: bob,
             turnNumber: 1,
-            currentPhase: Majik.Core.StateMachine.PhaseStateType.DeclareBlockers,
+            currentPhase: Majik.Core.StateMachine.StepStateType.DeclareBlockers,
             stack: stack);
 
         var candidates = def.TargetRequests[0].ResolveCandidates(ctx);
@@ -175,7 +175,7 @@ public class RazorgrassAmbushFactoryTests : IDisposable
             allPlayers: new[] { alice },
             activePlayer: alice,
             turnNumber: 1,
-            currentPhase: Majik.Core.StateMachine.PhaseStateType.DeclareBlockers,
+            currentPhase: Majik.Core.StateMachine.StepStateType.DeclareBlockers,
             stack: stack);
 
         var candidates = def.TargetRequests[0].ResolveCandidates(ctx);

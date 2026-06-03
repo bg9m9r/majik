@@ -163,7 +163,7 @@ public static class SleepFactory
         cleanupHandler = ev =>
         {
             var sse = ev;
-            if (sse.StepType != PhaseStateType.Untap) return;
+            if (sse.StepType != StepStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, target)) return;
 
             foreach (var token in skipTokens)

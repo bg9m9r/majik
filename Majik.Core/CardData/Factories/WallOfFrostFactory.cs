@@ -41,7 +41,7 @@ namespace Majik.Core.CardData.Factories;
 ///   - <b>"Next untap step" one-shot cleanup (CR 611.2b)</b>: when an
 ///     <see cref="IEventBus"/> is supplied, a one-shot
 ///     <see cref="StepStartedEvent"/> handler removes each skip after the
-///     first <see cref="PhaseStateType.Untap"/> step belonging to the
+///     first <see cref="StepStateType.Untap"/> step belonging to the
 ///     blocked creature's controller.
 ///   - Wall of Frost does <b>not</b> tap the blocked creature (distinct
 ///     from Frost Lynx's ETB). CR 509.1 — the skip-untap is the sole
@@ -207,7 +207,7 @@ public static class WallOfFrostFactory
         cleanupHandler = ev =>
         {
             var sse = ev;
-            if (sse.StepType != PhaseStateType.Untap) return;
+            if (sse.StepType != StepStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, targetController)) return;
 
             UntapStepRestrictions.RemoveAll(skipToken);

@@ -65,12 +65,12 @@ public class ExilePlayPermissionTests
             card, _alice, card.ManaCostValue, ExilePlayExpiry.EndOfTurn, bus);
 
         // A non-caster cleanup must NOT expire a "this turn" grant.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _bob));
         card.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "Bob's cleanup is not the caster's cleanup — grant survives");
 
         // First cleanup the CASTER owns ends "this turn" — grant clears.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         card.RuntimeExileCastAllowedCaster.Should().BeNull(
             "first caster cleanup = end of this turn — grant revoked (CR 514.2)");
     }
@@ -87,16 +87,16 @@ public class ExilePlayPermissionTests
             card, _alice, card.ManaCostValue, ExilePlayExpiry.EndOfYourNextTurn, bus);
 
         // First caster cleanup = THIS turn — grant must survive.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         card.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "first caster cleanup belongs to this turn — grant persists");
 
         // An interleaved opponent turn cleanup does not count.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _bob));
         card.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
         // Second caster cleanup = caster's NEXT turn — grant clears.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         card.RuntimeExileCastAllowedCaster.Should().BeNull(
             "second caster cleanup = end of caster's next turn — grant revoked");
     }
@@ -135,7 +135,7 @@ public class ExilePlayPermissionTests
             _alice, ExilePlayExpiry.EndOfTurn, bus,
             () => { c1.ClearRuntimeExileCast(); c2.ClearRuntimeExileCast(); });
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         c1.RuntimeExileCastAllowedCaster.Should().BeNull();
         c2.RuntimeExileCastAllowedCaster.Should().BeNull(

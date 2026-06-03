@@ -184,7 +184,7 @@ public class UnderworldBreachTests
 
         // Fire End step on the controller's turn — the trigger should
         // queue, resolve to a sacrifice (Battlefield → Graveyard).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "Underworld Breach's end-step trigger fires at the start of the controller's End step");
@@ -210,8 +210,8 @@ public class UnderworldBreachTests
         ub.SetZone(ZoneType.Library);
         _zones.MoveCard(ub, ZoneType.Library, ZoneType.Battlefield, _alice);
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
 
         triggers.PendingCount.Should().Be(0,
             "the trigger only fires on the controller's End step");

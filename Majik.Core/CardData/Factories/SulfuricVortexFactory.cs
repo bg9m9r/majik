@@ -21,7 +21,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// - Enchantment {1}{R}{R}, owner/controller wired.
 /// - <b>Upkeep ping triggered ability (CR 603.1 / CR 500.4)</b>: fires
-///   on <see cref="StepStartedEvent"/> matching <see cref="PhaseStateType.Upkeep"/>
+///   on <see cref="StepStartedEvent"/> matching <see cref="StepStateType.Upkeep"/>
 ///   for ANY player (the printed text reads "each player's upkeep", not
 ///   "your upkeep" — different from Roiling Vortex's controller-only
 ///   upkeep). The damage routes to the active player whose upkeep is
@@ -114,7 +114,7 @@ public static class SulfuricVortexFactory
 
         var upkeepCondition = new EventTriggerCondition<StepStartedEvent>((e, _) =>
         {
-            if (e.StepType != PhaseStateType.Upkeep) return false;
+            if (e.StepType != StepStateType.Upkeep) return false;
             upkeepPlayer = e.Player;
             return true;
         });

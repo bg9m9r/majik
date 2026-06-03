@@ -67,7 +67,7 @@ public class ForceOfRageFactoryTests
         _alice.Zones.Hand.AddCard(redFuel);
 
         var probe = new PitchAltCostProbe(PitchAltCostProbe.DefaultLookup);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, StepStateType.PreCombatMain, _stack);
 
         var candidates = probe.CandidatesFor(four, _alice, ctx).ToList();
         candidates.Should().HaveCount(1);
@@ -118,7 +118,7 @@ public class ForceOfRageFactoryTests
 
         // Fire the next End step — the delayed trigger should match and
         // queue itself onto the stack.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         // Resolve everything on the stack — the delayed trigger sacrifices
@@ -159,7 +159,7 @@ public class ForceOfRageFactoryTests
         // turn at instant speed (CR 117.1); the free pitch alt-cost (CR 118.9)
         // is itself only available when it's NOT your turn (the Force-cycle
         // not-your-turn restriction), same as Force of Despair.
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, four,

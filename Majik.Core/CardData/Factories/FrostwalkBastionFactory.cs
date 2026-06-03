@@ -63,7 +63,7 @@ namespace Majik.Core.CardData.Factories;
 ///     2. <b>Skips its next untap step</b> — registers the victim with
 ///        <see cref="UntapStepRestrictions.MarkPermanentDoesNotUntap"/>
 ///        (CR 502.1); a one-shot <see cref="StepStartedEvent"/> handler
-///        removes the skip after the first <see cref="PhaseStateType.Untap"/>
+///        removes the skip after the first <see cref="StepStateType.Untap"/>
 ///        step belonging to the victim's controller (CR 611.2b). Mirrors the
 ///        skip-untap plumbing in <see cref="WallOfFrostFactory"/>.
 ///
@@ -234,7 +234,7 @@ public static class FrostwalkBastionFactory
         cleanupHandler = ev =>
         {
             var sse = ev;
-            if (sse.StepType != PhaseStateType.Untap) return;
+            if (sse.StepType != StepStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, targetController)) return;
 
             UntapStepRestrictions.RemoveAll(skipToken);

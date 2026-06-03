@@ -102,7 +102,7 @@ public class AsylumVisitorFactoryTests
         // Alice (the upkeep player) has no cards in hand → intervening-if holds.
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1,
             "Alice's upkeep and Alice has no cards in hand");
     }
@@ -123,7 +123,7 @@ public class AsylumVisitorFactoryTests
         _bob.Zones.Hand.AddCard(grip);
         grip.SetZone(ZoneType.Hand);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "intervening-if: Bob has a card in hand, the trigger doesn't go on the stack");
     }
@@ -150,7 +150,7 @@ public class AsylumVisitorFactoryTests
         var aliceLifeBefore = _alice.LifeTotal;
         var bobLifeBefore = _bob.LifeTotal;
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(1, "each player's upkeep includes Bob's");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -176,8 +176,8 @@ public class AsylumVisitorFactoryTests
         visitor.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(visitor);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(0, "only Upkeep step matters");
     }

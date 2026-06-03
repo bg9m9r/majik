@@ -41,7 +41,7 @@ public class CollectiveDefianceTests
     }
 
     private GameContext Ctx() =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
     private SpellDefinition Def() =>
         CollectiveDefianceFactory.BuildDefinition(_alice, o => o);

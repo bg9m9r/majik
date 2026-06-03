@@ -182,16 +182,16 @@ public class SuspendAlternativeCostTests
         suspend.ApplySuspend(bolt, _alice, registry);
 
         // Non-upkeep events are ignored.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
         registry.TimeCountersOn(bolt).Should().Be(1);
         fired.Should().Be(0);
 
         // Upkeep of opponent — not the owner — also ignored.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         registry.TimeCountersOn(bolt).Should().Be(1);
 
         // Owner's upkeep — ticks and fires.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         fired.Should().Be(1);
         registry.IsTracked(bolt).Should().BeFalse();
     }
@@ -224,7 +224,7 @@ public class SuspendAlternativeCostTests
         var suspend = new SuspendAlternativeCost(1, ManaCost.Parse("R"));
         suspend.ApplySuspend(bolt, _alice, registry);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
 
         captured.Should().NotBeNull();
         captured!.Card.Should().BeSameAs(bolt);
@@ -249,11 +249,11 @@ public class SuspendAlternativeCostTests
         suspend.ApplySuspend(bolt, _alice, registry);
 
         // First upkeep: 2 → 1, no drain event.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         drained.Should().Be(0, "the card still has 1 counter");
 
         // Second upkeep: 1 → 0, drain fires exactly once.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         drained.Should().Be(1);
     }
 

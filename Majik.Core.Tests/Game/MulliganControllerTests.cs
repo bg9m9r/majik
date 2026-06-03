@@ -218,5 +218,5 @@ public class MulliganControllerTests : IDisposable
     }
 
     private GameContext NewContext() =>
-        new(_alice, new[] { _alice }, _alice, 1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+        new(_alice, new[] { _alice }, _alice, 1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 }

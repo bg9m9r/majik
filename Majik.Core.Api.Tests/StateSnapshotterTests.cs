@@ -25,7 +25,7 @@ public class StateSnapshotterTests
         var stack = new Majik.Core.Stack.Stack(_bus);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice, bob }, stack);
 
         dto.Players.Should().HaveCount(2);
@@ -49,7 +49,7 @@ public class StateSnapshotterTests
         zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus));
 
         var aliceDto = dto.Players.Single(p => p.Id == alice.Id);
@@ -69,7 +69,7 @@ public class StateSnapshotterTests
         stack.Push(spell);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice, new[] { alice }, stack);
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice, new[] { alice }, stack);
 
         dto.Stack.Should().ContainSingle();
         dto.Stack[0].Kind.Should().Be("Spell");
@@ -99,7 +99,7 @@ public class StateSnapshotterTests
         stack.Push(ability);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, stack);
 
         var stackDto = dto.Stack.Should().ContainSingle().Subject;
@@ -129,7 +129,7 @@ public class StateSnapshotterTests
         stack.Push(ability);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, stack);
 
         dto.Stack.Should().ContainSingle().Which.Description.Should().Be(
@@ -146,7 +146,7 @@ public class StateSnapshotterTests
         stack.Push(ability);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, stack);
 
         dto.Stack.Should().ContainSingle().Which.Description.Should().Be("Windswept Heath");
@@ -168,7 +168,7 @@ public class StateSnapshotterTests
         bear.AddAbility(ability);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus));
 
         var cardDto = dto.Players.Single(p => p.Id == alice.Id)
@@ -193,7 +193,7 @@ public class StateSnapshotterTests
         bear.AddAbility(new KeywordAbility("Flying", bear, alice));
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus));
 
         var cardDto = dto.Players.Single(p => p.Id == alice.Id)
@@ -221,7 +221,7 @@ public class StateSnapshotterTests
         bear.Counters.Add(Majik.Core.Counters.CounterType.Charge, 1);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus));
 
         var cardDto = dto.Players.Single(p => p.Id == alice.Id)
@@ -243,7 +243,7 @@ public class StateSnapshotterTests
         zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus));
 
         var cardDto = dto.Players.Single(p => p.Id == alice.Id)
@@ -260,7 +260,7 @@ public class StateSnapshotterTests
         var bob = new Player("Bob", 20);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice, bob }, new Majik.Core.Stack.Stack(_bus), seq: 42);
 
         dto.Seq.Should().Be(42);

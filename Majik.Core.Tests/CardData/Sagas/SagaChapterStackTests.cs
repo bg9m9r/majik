@@ -199,7 +199,7 @@ public class SagaChapterStackTests
             zoneService: _zones,
             agents: agents,
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.PreCombatMain,
+            phaseAccessor: () => StepStateType.PreCombatMain,
             landDropTracker: new LandDropTracker());
     }
 }

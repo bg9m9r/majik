@@ -170,6 +170,6 @@ public class PromptYesNoViewTests
 
     private GameContext NewContext() =>
         new(_alice, new[] { _alice }, _alice, 1,
-            Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack());
 }

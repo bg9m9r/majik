@@ -135,7 +135,7 @@ public class FlareOfDenialFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, flare,
@@ -178,7 +178,7 @@ public class FlareOfDenialFactoryTests
 
         // Alice's own turn as the active player.
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         var act = async () => await _flow.CastAsync(
             _alice, flare,
@@ -205,7 +205,7 @@ public class FlareOfDenialFactoryTests
         MakeRedCreature("Goblin", _alice);                                    // red — skip
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         var probe = new FlareOfDenialAltCostProbe();
         var candidates = probe.CandidatesFor(flare, _alice, ctx).ToList();
@@ -225,7 +225,7 @@ public class FlareOfDenialFactoryTests
         MakeBlueCreature("Merfolk", _alice, isToken: false);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         var probe = new FlareOfDenialAltCostProbe();
         var candidates = probe.CandidatesFor(counterspell, _alice, ctx).ToList();

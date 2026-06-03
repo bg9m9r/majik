@@ -274,7 +274,7 @@ public class OffspringTests
 
         var combatTrigger = mouse.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(new Majik.Core.Events.StepStartedEvent(
-                PhaseStateType.BeginningOfCombat, _alice)));
+                StepStateType.BeginningOfCombat, _alice)));
 
         combatTrigger.SetChosenTargets(new[] { new object[] { ally } });
 
@@ -282,7 +282,7 @@ public class OffspringTests
         var agent = new ScriptedAgent();
         agent.QueueMode(1);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.BeginningOfCombat, _stack);
+            _alice, 1, StepStateType.BeginningOfCombat, _stack);
         var rctx = Majik.Core.Abilities.ResolutionContext.For(_alice, agent, ctx, chosenTargets: null);
 
         foreach (var e in combatTrigger.Effects)
@@ -302,7 +302,7 @@ public class OffspringTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, 1, StepStateType.PreCombatMain, _stack);
         return (agent, ctx);
     }
 

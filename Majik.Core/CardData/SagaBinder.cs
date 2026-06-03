@@ -512,7 +512,7 @@ public static class SagaBinder
         Action<StepStartedEvent>? handler = null;
         handler = e =>
         {
-            if (e.StepType != Majik.Core.StateMachine.PhaseStateType.Cleanup) return;
+            if (e.StepType != Majik.Core.StateMachine.StepStateType.Cleanup) return;
             if (!ReferenceEquals(e.Player, controller)) return;
             cleanupsSeen++;
             if (cleanupsSeen < 2) return;

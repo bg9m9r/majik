@@ -267,7 +267,7 @@ public class NecropotenceTests : IDisposable
         top.Zone.Should().Be(ZoneType.Exile, "exile happens immediately on activation");
 
         // Fire the next End step — the delayed trigger should be queued.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "the delayed end-step return-to-hand is now pending");
@@ -300,9 +300,9 @@ public class NecropotenceTests : IDisposable
         var ability = wiring.Card.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var e in ability.Effects) e.Execute();
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
 
         triggers.PendingCount.Should().Be(0,
             "only End-step StepStartedEvent triggers the delayed return-to-hand");
@@ -343,7 +343,7 @@ public class NecropotenceTests : IDisposable
             "each activation exiles one card from the top of the library");
 
         // Fire the End step once — every delayed trigger should fire.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(3,
             "all three delayed end-step triggers are queued together");

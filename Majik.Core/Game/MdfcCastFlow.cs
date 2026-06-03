@@ -118,7 +118,7 @@ public static class MdfcCastFlow
         ReplacementBus? replacements,
         LandDropTracker? landDropTracker,
         Player activePlayer,
-        Majik.Core.StateMachine.PhaseStateType phase,
+        Majik.Core.StateMachine.StepStateType phase,
         bool stackEmpty,
         ContinuousEffectsService? effects = null)
     {

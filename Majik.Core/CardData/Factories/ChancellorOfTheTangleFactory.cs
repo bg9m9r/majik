@@ -28,7 +28,7 @@ namespace Majik.Core.CardData.Factories;
 ///   on the <see cref="Majik.Core.Events.OpeningHandCheckEvent"/>; on yes
 ///   it registers a <see cref="DelayedTriggeredAbility"/> with the supplied
 ///   <see cref="TriggerManager"/> that fires once on the revealer's first
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.PreCombatMain"/>.
+///   <see cref="Majik.Core.StateMachine.StepStateType.PreCombatMain"/>.
 ///   The delayed trigger adds {G} to the revealer's mana pool (CR 605.1a)
 ///   then auto-unregisters (CR 603.7d).
 ///

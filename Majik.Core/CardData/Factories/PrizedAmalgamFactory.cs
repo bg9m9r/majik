@@ -36,7 +36,7 @@ namespace Majik.Core.CardData.Factories;
 ///   trigger registers a <see cref="DelayedTriggeredAbility"/> on the
 ///   supplied <see cref="TriggerManager"/> that fires on the NEXT
 ///   <see cref="StepStartedEvent"/> with
-///   <see cref="PhaseStateType.End"/>. The delayed effect re-checks
+///   <see cref="StepStateType.End"/>. The delayed effect re-checks
 ///   Amalgam's zone at resolve time and returns it from graveyard to
 ///   battlefield TAPPED via <see cref="ZoneService.MoveCard"/> (so ETB
 ///   triggers fire — CR 603.6a) with a post-move <see cref="Permanent.Tap"/>
@@ -179,7 +179,7 @@ public static class PrizedAmalgamFactory
                     source: card,
                     controller: owner,
                     condition: new EventTriggerCondition<StepStartedEvent>(
-                        (e, _) => e.StepType == PhaseStateType.End
+                        (e, _) => e.StepType == StepStateType.End
                                   && e.Timestamp > registeredAt),
                     effects: new IEffect[] { returnTappedEffect });
 

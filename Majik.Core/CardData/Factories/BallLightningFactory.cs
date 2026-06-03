@@ -34,7 +34,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="KeywordAbility"/> markers.
 /// - <b>End-step self-sacrifice trigger (CR 603.6a / CR 603.3a)</b>: a
 ///   <see cref="TriggeredAbility"/> firing on <see cref="StepStartedEvent"/>
-///   for <see cref="PhaseStateType.End"/>. The printed clause has no
+///   for <see cref="StepStateType.End"/>. The printed clause has no
 ///   possessive ("the end step"), so the trigger fires on the FIRST end step
 ///   after the creature is on the battlefield — on ANY player's turn, not
 ///   just its controller's (the condition is therefore NOT filtered by
@@ -126,7 +126,7 @@ public static class BallLightningFactory
             source: card,
             controller: owner,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End),
+                (e, _) => e.StepType == StepStateType.End),
             effects: new IEffect[] { sacrificeEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

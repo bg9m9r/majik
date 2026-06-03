@@ -205,7 +205,7 @@ public class LightningAxeFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            _alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
+            _alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, stack);
 
         var def = LightningAxeFactory.BuildSpellDefinition(resolver: t => t);
 

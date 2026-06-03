@@ -179,7 +179,7 @@ public static class ArenaOfGloryFactory
                     cleanup = ev =>
                     {
                         var sse = ev;
-                        if (sse.StepType != PhaseStateType.Untap) return;
+                        if (sse.StepType != StepStateType.Untap) return;
                         if (!ReferenceEquals(sse.Player, controller)) return;
 
                         UntapStepRestrictions.RemoveAll(skipToken);

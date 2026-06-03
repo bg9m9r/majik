@@ -82,7 +82,7 @@ public class ForceOfVigorFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { bobArtifact, bobEnchantment });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fov,
@@ -127,7 +127,7 @@ public class ForceOfVigorFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { bobArtifact });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fov,
@@ -154,7 +154,7 @@ public class ForceOfVigorFactoryTests
         _alice.Zones.Hand.AddCard(greenFuel);
 
         var probe = new PitchAltCostProbe(PitchAltCostProbe.DefaultLookup);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, StepStateType.PreCombatMain, _stack);
 
         var candidates = probe.CandidatesFor(fov, _alice, ctx).ToList();
         candidates.Should().HaveCount(1);

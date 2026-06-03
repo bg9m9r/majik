@@ -84,7 +84,7 @@ public class TurnDriverAdditionalMainPhaseTests
         SeedLibrary(_bob, 3);
 
         // Record the postcombat-main + declare-attackers steps the turn emits.
-        var steps = new List<PhaseStateType>();
+        var steps = new List<StepStateType>();
         var enqueued = false;
         _bus.Subscribe<StepStartedEvent>(e =>
         {
@@ -93,7 +93,7 @@ public class TurnDriverAdditionalMainPhaseTests
             // The moment the FIRST combat's DeclareAttackers begins, enqueue a
             // "combat + following main" grant — exactly where Relentless
             // Assault's resolve / a card's exert trigger would.
-            if (e.StepType == PhaseStateType.DeclareAttackers && !enqueued)
+            if (e.StepType == StepStateType.DeclareAttackers && !enqueued)
             {
                 enqueued = true;
                 AdditionalCombatRegistryProvider.Current.EnqueueAdditional(
@@ -104,21 +104,21 @@ public class TurnDriverAdditionalMainPhaseTests
         await NewDriver().RunTurnAsync(_alice, turnNumber: 2);
 
         // Two DeclareAttackers (the natural combat + the additional combat).
-        steps.Count(s => s == PhaseStateType.DeclareAttackers).Should().Be(2,
+        steps.Count(s => s == StepStateType.DeclareAttackers).Should().Be(2,
             "the additional combat phase re-entered DeclareAttackers (CR 506.4)");
 
         // Two PostCombatMain phases: the extra main inserted by the grant
         // (CR 505.1b) + the turn's natural postcombat main.
-        steps.Count(s => s == PhaseStateType.PostCombatMain).Should().Be(2,
+        steps.Count(s => s == StepStateType.PostCombatMain).Should().Be(2,
             "the additional combat is followed by an additional main phase (CR 505.1b)");
 
         // Sequence order: extra DeclareAttackers → extra PostCombatMain comes
         // BEFORE the turn's End step.
-        var extraCombatIdx = steps.LastIndexOf(PhaseStateType.DeclareAttackers);
-        var firstMainAfterExtraCombat = steps.FindIndex(extraCombatIdx, s => s == PhaseStateType.PostCombatMain);
+        var extraCombatIdx = steps.LastIndexOf(StepStateType.DeclareAttackers);
+        var firstMainAfterExtraCombat = steps.FindIndex(extraCombatIdx, s => s == StepStateType.PostCombatMain);
         firstMainAfterExtraCombat.Should().BeGreaterThan(extraCombatIdx,
             "the additional main phase follows the additional combat");
-        steps.IndexOf(PhaseStateType.End).Should().BeGreaterThan(firstMainAfterExtraCombat,
+        steps.IndexOf(StepStateType.End).Should().BeGreaterThan(firstMainAfterExtraCombat,
             "the additional main phase resolves before the turn's End step");
     }
 
@@ -129,12 +129,12 @@ public class TurnDriverAdditionalMainPhaseTests
         SeedLibrary(_alice, 3);
         SeedLibrary(_bob, 3);
 
-        var steps = new List<PhaseStateType>();
+        var steps = new List<StepStateType>();
         var enqueued = false;
         _bus.Subscribe<StepStartedEvent>(e =>
         {
             steps.Add(e.StepType);
-            if (e.StepType == PhaseStateType.DeclareAttackers && !enqueued)
+            if (e.StepType == StepStateType.DeclareAttackers && !enqueued)
             {
                 enqueued = true;
                 // Combat Celebrant / Fear of Missing Out — combat only.
@@ -145,9 +145,9 @@ public class TurnDriverAdditionalMainPhaseTests
 
         await NewDriver().RunTurnAsync(_alice, turnNumber: 2);
 
-        steps.Count(s => s == PhaseStateType.DeclareAttackers).Should().Be(2,
+        steps.Count(s => s == StepStateType.DeclareAttackers).Should().Be(2,
             "the additional combat phase re-entered DeclareAttackers");
-        steps.Count(s => s == PhaseStateType.PostCombatMain).Should().Be(1,
+        steps.Count(s => s == StepStateType.PostCombatMain).Should().Be(1,
             "a combat-only grant adds NO extra main phase (CR 506.4)");
     }
 }

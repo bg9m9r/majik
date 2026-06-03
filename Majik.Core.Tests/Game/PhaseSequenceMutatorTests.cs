@@ -14,7 +14,7 @@ public class PhaseSequenceMutatorTests
     public void AddExtraCombatPhase_QueuesFiveCombatSteps()
     {
         var bus = new EventBus();
-        var added = new List<PhaseStateType>();
+        var added = new List<StepStateType>();
         bus.Subscribe<ExtraPhaseAddedEvent>(e => added.Add(e.PhaseType));
 
         var mutator = new PhaseSequenceMutator(bus);
@@ -22,11 +22,11 @@ public class PhaseSequenceMutatorTests
 
         mutator.PendingCount.Should().Be(5);
         added.Should().Equal(
-            PhaseStateType.BeginningOfCombat,
-            PhaseStateType.DeclareAttackers,
-            PhaseStateType.DeclareBlockers,
-            PhaseStateType.CombatDamage,
-            PhaseStateType.EndOfCombat);
+            StepStateType.BeginningOfCombat,
+            StepStateType.DeclareAttackers,
+            StepStateType.DeclareBlockers,
+            StepStateType.CombatDamage,
+            StepStateType.EndOfCombat);
     }
 
     [Fact]
@@ -40,14 +40,14 @@ public class PhaseSequenceMutatorTests
     public void PeekAndDequeue_FollowFifoOrder()
     {
         var mutator = new PhaseSequenceMutator();
-        mutator.AddExtraPhase(PhaseStateType.PreCombatMain);
-        mutator.AddExtraPhase(PhaseStateType.End);
+        mutator.AddExtraPhase(StepStateType.PreCombatMain);
+        mutator.AddExtraPhase(StepStateType.End);
 
-        mutator.PeekNext().Should().Be(PhaseStateType.PreCombatMain);
+        mutator.PeekNext().Should().Be(StepStateType.PreCombatMain);
         mutator.TryDequeue(out var first).Should().BeTrue();
-        first.Should().Be(PhaseStateType.PreCombatMain);
+        first.Should().Be(StepStateType.PreCombatMain);
         mutator.TryDequeue(out var second).Should().BeTrue();
-        second.Should().Be(PhaseStateType.End);
+        second.Should().Be(StepStateType.End);
         mutator.PendingCount.Should().Be(0);
     }
 

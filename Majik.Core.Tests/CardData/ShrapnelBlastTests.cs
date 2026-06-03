@@ -199,7 +199,7 @@ public class ShrapnelBlastTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
+            alice, new[] { alice, bob }, alice, 1, StepStateType.PreCombatMain, stack);
 
         var def = ShrapnelBlastFactory.BuildSpellDefinition(resolver: t => t);
 

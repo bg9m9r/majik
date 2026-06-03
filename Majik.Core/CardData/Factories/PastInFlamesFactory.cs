@@ -32,7 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Flashback {4}{R} keyword, not from this self-referential grant.
 /// - EOT cleanup: when an <see cref="IEventBus"/> is supplied, a one-shot
 ///   <see cref="StepStartedEvent"/> handler clears every grant stamped by
-///   this resolution on the first <see cref="PhaseStateType.Cleanup"/>
+///   this resolution on the first <see cref="StepStateType.Cleanup"/>
 ///   step (CR 514.2). No bus → grants persist until callers clear them
 ///   (shape / test path). Mirrors the cleanup posture used by
 ///   <see cref="FlashbackFactory"/> + <see cref="SnapcasterMageFactory"/>.
@@ -102,7 +102,7 @@ public static class PastInFlamesFactory
     /// <param name="eventBus">Optional event bus; when supplied a one-shot
     /// <see cref="StepStartedEvent"/> subscription clears every grant
     /// stamped by this resolution on the first
-    /// <see cref="PhaseStateType.Cleanup"/> step (CR 514.2). No bus → no
+    /// <see cref="StepStateType.Cleanup"/> step (CR 514.2). No bus → no
     /// auto-cleanup.</param>
     public static IReadOnlyList<IEffect> BuildResolveEffect(
         Player controller, IEventBus? eventBus = null)
@@ -146,7 +146,7 @@ public static class PastInFlamesFactory
                     Action<StepStartedEvent>? handler = null;
                     handler = e =>
                     {
-                        if (e.StepType != PhaseStateType.Cleanup) return;
+                        if (e.StepType != StepStateType.Cleanup) return;
                         foreach (var c in granted) c.ClearRuntimeFlashback();
                         if (handler != null) eventBus.Unsubscribe(handler);
                     };

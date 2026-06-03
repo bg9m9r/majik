@@ -11,14 +11,14 @@ public class PhaseStartedEvent : GameEvent
     /// <summary>
     /// The type of phase that started.
     /// </summary>
-    public PhaseStateType PhaseType { get; }
+    public StepStateType PhaseType { get; }
 
     /// <summary>
     /// The active player.
     /// </summary>
     public Player Player { get; }
 
-    public PhaseStartedEvent(PhaseStateType phaseType, Player player) 
+    public PhaseStartedEvent(StepStateType phaseType, Player player) 
         : base(EventType.PhaseStarted)
     {
         PhaseType = phaseType;

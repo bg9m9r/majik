@@ -68,7 +68,7 @@ public class SulfuricVortexFactoryTests
 
         var aliceLifeBefore = _alice.LifeTotal;
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1, "your upkeep — Sulfuric Vortex's trigger queues");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -94,7 +94,7 @@ public class SulfuricVortexFactoryTests
         // Bob's upkeep — Sulfuric Vortex's symmetric "each player's
         // upkeep" trigger fires (unlike Roiling Vortex which is
         // controller-only).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(1, "each player's upkeep includes Bob's");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -117,8 +117,8 @@ public class SulfuricVortexFactoryTests
         vortex.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(vortex);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(0, "only Upkeep step matters");
     }

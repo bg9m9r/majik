@@ -28,7 +28,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Delayed upkeep pact</b> — <see cref="BuildResolveEffect"/> wraps
 ///   the counter effect and, when a <see cref="TriggerManager"/> is
 ///   supplied, registers a <see cref="DelayedTriggeredAbility"/> (CR 603.7)
-///   that fires on the controller's next <see cref="PhaseStateType.Upkeep"/>
+///   that fires on the controller's next <see cref="StepStateType.Upkeep"/>
 ///   <see cref="StepStartedEvent"/>. The trigger's effect calls
 ///   <see cref="Player.PayMana"/> with {3}{U}{U} against the controller's
 ///   mana pool; on failure the controller is flagged via
@@ -146,7 +146,7 @@ public static class PactOfNegationFactory
                             source: caster,
                             controller: caster,
                             condition: new EventTriggerCondition<StepStartedEvent>(
-                                (e, _) => e.StepType == PhaseStateType.Upkeep
+                                (e, _) => e.StepType == StepStateType.Upkeep
                                           && ReferenceEquals(e.Player, caster)
                                           && e.Timestamp > resolvedAt),
                             effects: new IEffect[] { payOrLoseEffect });

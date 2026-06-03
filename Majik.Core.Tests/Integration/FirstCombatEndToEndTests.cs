@@ -71,7 +71,7 @@ public class FirstCombatEndToEndTests
         var manaSubAgent = new ScriptedAgent();
         manaSubAgent.QueueTargets(new[] { (object)bob });
         manaSubAgent.QueueMana(ManaPayment.Empty); // already paid externally
-        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
+        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, StepStateType.PreCombatMain, stack);
 
         var def = Majik.Core.CardData.OracleSpellBinder.Bind(
             new Majik.Core.CardData.CardEntity
@@ -97,7 +97,7 @@ public class FirstCombatEndToEndTests
         var blockerAgent = new ScriptedAgent();
         blockerAgent.QueueBlockers(BlockPlan.None);
 
-        var combatCtx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.DeclareAttackers, stack);
+        var combatCtx = new GameContext(alice, new[] { alice, bob }, alice, 1, StepStateType.DeclareAttackers, stack);
         await combat.RunCombatAsync(
             attacker: alice, defender: bob,
             attackerAgent: attackerAgent, defenderAgent: blockerAgent,

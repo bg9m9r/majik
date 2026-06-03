@@ -63,7 +63,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (<see cref="Card.GrantRuntimeExileCast"/>) is stamped on it with a
 ///   ZERO mana cost — "without paying its mana cost" (CR 118.9 / 601.3e).
 ///   When an <see cref="IEventBus"/> is supplied the grant is revoked on
-///   the first <see cref="PhaseStateType.Cleanup"/> step seen afterwards
+///   the first <see cref="StepStateType.Cleanup"/> step seen afterwards
 ///   ("until end of turn" — CR 514.2), mirroring
 ///   <see cref="LightUpTheStageFactory"/> / Containment Construct's
 ///   end-of-turn clear. Without a bus the stamp persists until cleared
@@ -107,7 +107,7 @@ public static class UrzaLordHighArtificerFactory
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">Optional. When supplied, the impulse {5}
     /// ability's "until end of turn" grant clears on the next
-    /// <see cref="PhaseStateType.Cleanup"/> step (CR 514.2).</param>
+    /// <see cref="StepStateType.Cleanup"/> step (CR 514.2).</param>
     /// <param name="triggers">Optional. When supplied, the ETB trigger is
     /// registered so <see cref="CardMovedEvent"/> publications auto-queue
     /// it.</param>
@@ -232,7 +232,7 @@ public static class UrzaLordHighArtificerFactory
         Action<StepStartedEvent>? handler = null;
         handler = (e) =>
         {
-            if (e.StepType != PhaseStateType.Cleanup) return;
+            if (e.StepType != StepStateType.Cleanup) return;
             if (ReferenceEquals(stampable.RuntimeExileCastAllowedCaster, controller))
             {
                 stampable.ClearRuntimeExileCast();

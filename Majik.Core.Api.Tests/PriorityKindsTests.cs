@@ -39,7 +39,7 @@ public class PriorityKindsTests
         _stack = new Majik.Core.Stack.Stack(_bus);
     }
 
-    private GameContext Ctx(PhaseStateType phase = PhaseStateType.Upkeep) =>
+    private GameContext Ctx(StepStateType phase = StepStateType.Upkeep) =>
         new(_alice, new[] { _alice, _bob }, _alice, turnNumber: 1, phase, _stack);
 
     [Fact]
@@ -50,7 +50,7 @@ public class PriorityKindsTests
         _alice.Zones.Hand.AddCard(land); land.SetZone(ZoneType.Hand);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
-            turnNumber: 1, PhaseStateType.PreCombatMain, _stack, landPlayAvailable: true);
+            turnNumber: 1, StepStateType.PreCombatMain, _stack, landPlayAvailable: true);
 
         PriorityKinds.Build(ctx).Should().Contain(typeof(PlayLandCommand));
     }
@@ -71,7 +71,7 @@ public class PriorityKindsTests
         _alice.Zones.Hand.AddCard(land); land.SetZone(ZoneType.Hand);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
-            turnNumber: 1, PhaseStateType.PreCombatMain, _stack, landPlayAvailable: false);
+            turnNumber: 1, StepStateType.PreCombatMain, _stack, landPlayAvailable: false);
 
         PriorityKinds.Build(ctx).Should().NotContain(typeof(PlayLandCommand));
     }
@@ -80,7 +80,7 @@ public class PriorityKindsTests
     public void EmptyBoard_EmptyHand_OpponentTurn_KindsIsPassOnly()
     {
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _bob,
-            turnNumber: 1, PhaseStateType.Upkeep, _stack);
+            turnNumber: 1, StepStateType.Upkeep, _stack);
 
         var kinds = PriorityKinds.Build(ctx);
 
@@ -105,7 +105,7 @@ public class PriorityKindsTests
         halfling.AddAbility(new ManaAbility(halfling, _alice, ManaCost.Parse("G")));
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _bob,
-            turnNumber: 2, PhaseStateType.Upkeep, _stack);
+            turnNumber: 2, StepStateType.Upkeep, _stack);
 
         var kinds = PriorityKinds.Build(ctx);
 

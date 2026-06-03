@@ -347,7 +347,7 @@ public class Game
             throw new InvalidPlayerActionException("Only active player can declare attackers");
         }
 
-        if (PhaseManager.CurrentPhase != Majik.Core.StateMachine.PhaseStateType.DeclareAttackers)
+        if (PhaseManager.CurrentPhase != Majik.Core.StateMachine.StepStateType.DeclareAttackers)
         {
             throw new InvalidGameStateException("Not in declare attackers step");
         }
@@ -370,7 +370,7 @@ public class Game
             throw new InvalidPlayerActionException("Active player cannot declare blockers");
         }
 
-        if (PhaseManager.CurrentPhase != Majik.Core.StateMachine.PhaseStateType.DeclareBlockers)
+        if (PhaseManager.CurrentPhase != Majik.Core.StateMachine.StepStateType.DeclareBlockers)
         {
             throw new InvalidGameStateException("Not in declare blockers step");
         }

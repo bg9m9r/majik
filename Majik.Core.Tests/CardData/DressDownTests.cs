@@ -246,7 +246,7 @@ public class DressDownTests
 
         // Fire End step on the controller's turn — the trigger should
         // queue, resolve to a sacrifice (Battlefield → Graveyard).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "Dress Down's end-step trigger fires at the start of the controller's End step");
@@ -279,10 +279,10 @@ public class DressDownTests
 
         // Opponent's end step + controller's non-end steps — none of these
         // should fire the trigger.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         triggers.PendingCount.Should().Be(0,
             "the trigger only fires on the controller's End step");

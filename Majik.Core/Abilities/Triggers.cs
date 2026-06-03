@@ -213,7 +213,7 @@ public static class Triggers
     /// step, …" trigger. Fires on StepStartedEvent matching the requested
     /// phase, restricted to <paramref name="controller"/>'s own turns.</summary>
     public static ITriggerCondition OnStepBegin(
-        Player controller, Majik.Core.StateMachine.PhaseStateType step)
+        Player controller, Majik.Core.StateMachine.StepStateType step)
     {
         return new EventTriggerCondition<Majik.Core.Events.StepStartedEvent>((e, _) =>
             e.StepType == step

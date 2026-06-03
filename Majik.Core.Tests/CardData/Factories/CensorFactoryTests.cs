@@ -100,7 +100,7 @@ public class CensorFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bobSpell });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, censor,
@@ -130,7 +130,7 @@ public class CensorFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bobSpell });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, censor,

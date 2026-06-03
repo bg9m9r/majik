@@ -47,7 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///     <item><description>CR 702.139c — the creature is registered with
 ///       <see cref="UntapStepRestrictions.MarkPermanentDoesNotUntap"/> so it
 ///       "won't untap during your next untap step." The rider lifts on the
-///       controller's next <see cref="PhaseStateType.Untap"/> step when an
+///       controller's next <see cref="StepStateType.Untap"/> step when an
 ///       event bus is wired (mirrors <see cref="ArenaOfGloryFactory"/>'s exert
 ///       cleanup).</description></item>
 ///     <item><description>CR 603.1 reflexive "when you do" — Glorybringer
@@ -107,7 +107,7 @@ public static class GlorybringerFactory
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">When supplied, the exert "won't untap" rider
-    /// clears on the controller's next <see cref="PhaseStateType.Untap"/>
+    /// clears on the controller's next <see cref="StepStateType.Untap"/>
     /// step (CR 702.139c / 514.2).</param>
     /// <param name="triggers">TriggerManager the exert attack trigger is
     /// registered with so it surfaces as pending. May be null.</param>
@@ -250,7 +250,7 @@ public static class GlorybringerFactory
         Action<StepStartedEvent>? handler = null;
         handler = (e) =>
         {
-            if (e.StepType != PhaseStateType.Untap) return;
+            if (e.StepType != StepStateType.Untap) return;
             if (!ReferenceEquals(e.Player, controller)) return;
 
             UntapStepRestrictions.RemoveAll(card);

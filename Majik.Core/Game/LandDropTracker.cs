@@ -90,7 +90,7 @@ public sealed class LandDropTracker
     public bool CanPlayLand(
         Player player,
         Player activePlayer,
-        PhaseStateType phase,
+        StepStateType phase,
         bool stackEmpty,
         out string reason)
     {

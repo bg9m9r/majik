@@ -930,9 +930,9 @@ public static class CardDefRuntime
             AttacksSelfTriggerDef => Triggers.OnAttackSelf(card),
             DiesSelfTriggerDef => Triggers.OnDies(card),
             AtBeginningOfYourUpkeepTriggerDef =>
-                BuildStepBeginTrigger(card, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                BuildStepBeginTrigger(card, Majik.Core.StateMachine.StepStateType.Upkeep),
             AtBeginningOfYourEndStepTriggerDef =>
-                BuildStepBeginTrigger(card, Majik.Core.StateMachine.PhaseStateType.End),
+                BuildStepBeginTrigger(card, Majik.Core.StateMachine.StepStateType.End),
             WheneverAnotherCreatureEntersTriggerDef anotherEnters =>
                 BuildAnotherCreatureEntersTrigger(anotherEnters, card),
             WheneverAnotherCreatureDiesTriggerDef anotherDies =>
@@ -1057,7 +1057,7 @@ public static class CardDefRuntime
     /// <see cref="Triggers.OnStepBegin"/> with the controller bound late.
     /// </summary>
     private static ITriggerCondition BuildStepBeginTrigger(
-        ICard card, Majik.Core.StateMachine.PhaseStateType step) =>
+        ICard card, Majik.Core.StateMachine.StepStateType step) =>
         new EventTriggerCondition<Majik.Core.Events.StepStartedEvent>((e, _) =>
         {
             var controller = card.Controller;
@@ -2218,8 +2218,8 @@ public static class CardDefRuntime
         // many" multi-target case (Eerie Interlude).
         var filter = def.TargetFilter;
         var returnStep = string.Equals(def.ReturnAt, "next_upkeep", StringComparison.OrdinalIgnoreCase)
-            ? Majik.Core.StateMachine.PhaseStateType.Upkeep
-            : Majik.Core.StateMachine.PhaseStateType.End;
+            ? Majik.Core.StateMachine.StepStateType.Upkeep
+            : Majik.Core.StateMachine.StepStateType.End;
 
         return new Effect(
             $"{card.Name}: exile target {filter}; return at {def.ReturnAt} under owner's control (CR 701.21 / 603.7 / 614)",

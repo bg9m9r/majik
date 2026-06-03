@@ -220,7 +220,7 @@ public class CharmingPrinceFactoryTests : IDisposable
         _alice.Zones.Battlefield.GetCards().Should().NotContain(grizzly);
 
         // Fire the next end step — the delayed trigger should queue.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "delayed return rider fires on the first end step after the ETB");

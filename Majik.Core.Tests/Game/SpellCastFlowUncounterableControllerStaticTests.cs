@@ -40,7 +40,7 @@ public class SpellCastFlowUncounterableControllerStaticTests
     }
 
     private GameContext NewContext() =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
     private static Permanent MakeSource(Player controller, params CardType[] coveredTypes)
     {
@@ -97,7 +97,7 @@ public class SpellCastFlowUncounterableControllerStaticTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_bob, new[] { _alice, _bob }, _bob, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_bob, new[] { _alice, _bob }, _bob, 1, StepStateType.PreCombatMain, _stack);
         var spell = await _flow.CastAsync(_bob, bear,
             SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()), agent, ctx);
 

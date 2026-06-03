@@ -232,7 +232,7 @@ public class LilianaTheLastHopeFactoryTests
         // 2/2 black Zombie creature tokens under Alice. EvaluateTriggers
         // fires via the bus subscription; then drain pending onto the
         // stack and resolve.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0)
         {
@@ -273,7 +273,7 @@ public class LilianaTheLastHopeFactoryTests
         ultimate.Activate();
 
         // Bob's end step should NOT trigger Alice's emblem.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
         triggers.PutPendingTriggersOnStack(_bob);
         while (stack.Count > 0)
         {

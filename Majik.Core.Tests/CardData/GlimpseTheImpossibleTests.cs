@@ -175,7 +175,7 @@ public class GlimpseTheImpossibleTests
         _alice.Zones.Exile.GetCards().Should().HaveCount(3);
 
         // Fire next end step.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(1, "the delayed end-step trigger is pending");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -239,7 +239,7 @@ public class GlimpseTheImpossibleTests
         }
 
         // Fire next end step.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
@@ -279,7 +279,7 @@ public class GlimpseTheImpossibleTests
         _alice.Zones.Exile.GetCards().Should().Contain(new[] { top2, top3 });
 
         // Fire next end step.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
@@ -315,7 +315,7 @@ public class GlimpseTheImpossibleTests
         // There is no way to publish a "before resolve" event in this unit
         // test with real timestamps; instead verify the trigger fires on the
         // first End step after resolve and NOT a second time.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -326,7 +326,7 @@ public class GlimpseTheImpossibleTests
         _alice.Zones.Battlefield.GetCards().Should().HaveCount(1);
 
         // Second end step — delayed trigger is auto-unregistered, so no new pending.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(0, "delayed trigger fires exactly once");
     }
 

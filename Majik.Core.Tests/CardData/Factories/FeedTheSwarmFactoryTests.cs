@@ -87,7 +87,7 @@ public class FeedTheSwarmFactoryTests
         var def = FeedTheSwarmFactory.BuildDefinition(_alice, o => o);
         var ctx = new GameContext(
             _alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
         var candidates = def.TargetRequests[0].CandidateGatherer!(ctx);
 
         candidates.Should().Contain(bobOgre);

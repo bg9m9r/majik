@@ -39,7 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="OpeningHandCheckEvent"/>; on yes it registers a
 ///   <see cref="DelayedTriggeredAbility"/> with the supplied
 ///   <see cref="TriggerManager"/> that fires once on the revealer's first
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/>. The
+///   <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/>. The
 ///   delayed trigger peeks top 4, prompts which (if any) to keep on top
 ///   via <see cref="IPlayerAgent.ChooseLibraryPickAsync"/>, and exiles
 ///   the rest (CR 701.21).

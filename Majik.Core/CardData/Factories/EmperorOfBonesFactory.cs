@@ -35,7 +35,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <item><b>Ability 1 — begin-of-combat exile-and-track</b>: wired as
 ///   <see cref="TriggeredAbility"/> over
 ///   <see cref="Triggers.OnStepBegin"/>(<paramref name="owner"/>,
-///   <see cref="PhaseStateType.BeginningOfCombat"/>) — only fires on the
+///   <see cref="StepStateType.BeginningOfCombat"/>) — only fires on the
 ///   controller's own combat steps (CR 500.4). Resolution honours a
 ///   pre-chosen target on the trigger, or v1 auto-picks the first card
 ///   in any graveyard (deterministic; mirrors Soul-Guide Lantern). The
@@ -190,7 +190,7 @@ public static class EmperorOfBonesFactory
         combatTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.BeginningOfCombat),
+            condition: Triggers.OnStepBegin(owner, StepStateType.BeginningOfCombat),
             effects: new IEffect[] { combatEffect },
             activeZones: new[] { ZoneType.Battlefield },
             targetRequests: new[]
@@ -418,7 +418,7 @@ public static class EmperorOfBonesFactory
                 source: emperor,
                 controller: controller,
                 condition: new EventTriggerCondition<StepStartedEvent>(
-                    (e, _) => e.StepType == PhaseStateType.End
+                    (e, _) => e.StepType == StepStateType.End
                               && e.Timestamp > resolvedAt),
                 effects: new IEffect[] { sacEffect });
 

@@ -35,7 +35,7 @@ namespace Majik.Core.CardData.Factories;
 ///   upkeep, you may put a charge counter on Darksteel Reactor. If
 ///   Darksteel Reactor has twenty or more charge counters on it, you win
 ///   the game." Wired via <see cref="Triggers.OnStepBegin"/> filtered to
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/> and the
+///   <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/> and the
 ///   controller. Resolution:
 ///   <list type="number">
 ///     <item>v1 always adds a charge counter (the "you may" optional gate
@@ -181,7 +181,7 @@ public static class DarksteelReactorFactory
             source: reactor,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

@@ -53,7 +53,7 @@ public class HoldPriorityTests
             new[] { alice, bob }, priority, stack, resolver, zones,
             new Dictionary<Player, IPlayerAgent>
             { [alice] = aliceAgent, [bob] = bobAgent },
-            () => 1, () => PhaseStateType.PreCombatMain, tracker);
+            () => 1, () => StepStateType.PreCombatMain, tracker);
 
         await loop.RunUntilRoundEndsAsync(alice);
 

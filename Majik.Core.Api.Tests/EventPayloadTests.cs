@@ -248,7 +248,7 @@ public class EventPayloadTests
         var eventPayload = EventPayloadBuilder.Build(e, viewer: null);
 
         var snapshot = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            Guid.NewGuid(), 1, Majik.Core.StateMachine.StepStateType.PreCombatMain,
             alice, new[] { alice }, new Majik.Core.Stack.Stack(new EventBus()));
         var snap = snapshot.Players.Single(p => p.Id == alice.Id)
                            .Battlefield.Cards.Single(c => c.InstanceId == bear.InstanceId);
@@ -610,16 +610,16 @@ public class EventPayloadTests
 
     // CR 505 — since Slice 3 the phase value itself distinguishes
     // PreCombatMain from PostCombatMain, so EventPayloadBuilder emits the
-    // disambiguated label straight from the phase. The TurnStateType context
+    // disambiguated label straight from the phase. The PhaseStateType context
     // is accepted for call-site compatibility but no longer affects the label.
     [Fact]
     public void StepStartedEvent_PreCombatMain_EmitsPreCombatMain()
     {
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.PreCombatMain, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.StepStateType.PreCombatMain, alice);
 
         var payload = EventPayloadBuilder.Build(e, viewer: null,
-            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+            turnState: Majik.Core.StateMachine.PhaseStateType.PreCombatMain);
 
         payload.GetProperty("step").GetString().Should().Be(PhaseLabelResolver.PreCombatMain);
     }
@@ -628,12 +628,12 @@ public class EventPayloadTests
     public void StepStartedEvent_PostCombatMain_EmitsPostCombatMain_IndependentOfTurnState()
     {
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.PostCombatMain, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.StepStateType.PostCombatMain, alice);
 
         // Turn-state deliberately left at PreCombatMain to prove the label is
         // driven by the phase value alone, not the turn state.
         var payload = EventPayloadBuilder.Build(e, viewer: null,
-            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+            turnState: Majik.Core.StateMachine.PhaseStateType.PreCombatMain);
 
         payload.GetProperty("step").GetString().Should().Be(PhaseLabelResolver.PostCombatMain);
     }
@@ -642,10 +642,10 @@ public class EventPayloadTests
     public void StepStartedEvent_NonMain_IgnoresTurnState()
     {
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Upkeep, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.StepStateType.Upkeep, alice);
 
         var payload = EventPayloadBuilder.Build(e, viewer: null,
-            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+            turnState: Majik.Core.StateMachine.PhaseStateType.PreCombatMain);
 
         payload.GetProperty("step").GetString().Should().Be("Upkeep");
     }
@@ -653,10 +653,10 @@ public class EventPayloadTests
     [Fact]
     public void StepStartedEvent_PreCombatMain_WithoutTurnState_StillDisambiguated()
     {
-        // Callers that don't supply a TurnStateType now still get the
+        // Callers that don't supply a PhaseStateType now still get the
         // first-class label, since the phase value is authoritative.
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.PreCombatMain, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.StepStateType.PreCombatMain, alice);
 
         var payload = EventPayloadBuilder.Build(e);
 
@@ -681,9 +681,9 @@ public class EventPayloadTests
     [Fact]
     public void TurnStateChangedEvent_EmitsFromAndToTurnStateNames()
     {
-        var e = new TurnStateChangedEvent(
-            Majik.Core.StateMachine.TurnStateType.TurnBeginning,
-            Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+        var e = new PhaseStateChangedEvent(
+            Majik.Core.StateMachine.PhaseStateType.TurnBeginning,
+            Majik.Core.StateMachine.PhaseStateType.PreCombatMain);
 
         var payload = EventPayloadBuilder.Build(e);
 

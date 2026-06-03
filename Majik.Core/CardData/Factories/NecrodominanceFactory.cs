@@ -219,7 +219,7 @@ public static class NecrodominanceFactory
                         Action<StepStartedEvent>? handler = null;
                         handler = (e) =>
                         {
-                            if (e.StepType != PhaseStateType.Cleanup) return;
+                            if (e.StepType != StepStateType.Cleanup) return;
                             permission.Revoke();
                             activeCasts.Remove(permission);
                             if (handler != null) eventBus.Unsubscribe(handler);

@@ -175,7 +175,7 @@ public static class AbbotOfKeralKeepFactory
                 Action<StepStartedEvent>? handler = null;
                 handler = (se) =>
                 {
-                    if (se.StepType != PhaseStateType.Cleanup) return;
+                    if (se.StepType != StepStateType.Cleanup) return;
                     concrete.ClearRuntimeExileCast();
                     if (handler != null) eventBus.Unsubscribe(handler);
                 };

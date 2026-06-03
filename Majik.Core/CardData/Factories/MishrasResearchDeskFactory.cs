@@ -250,7 +250,7 @@ public static class MishrasResearchDeskFactory
         Action<StepStartedEvent>? handler = null;
         handler = (e) =>
         {
-            if (e.StepType != PhaseStateType.Cleanup) return;
+            if (e.StepType != StepStateType.Cleanup) return;
             if (!ReferenceEquals(e.Player, controller)) return;
             cleanupsSeen++;
             if (cleanupsSeen < 2) return;
@@ -349,7 +349,7 @@ public static class MishrasResearchDeskFactory
             source: card,
             controller: owner,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End
+                (e, _) => e.StepType == StepStateType.End
                           && e.Timestamp > resolvedAt),
             effects: new IEffect[] { exileEffect });
 

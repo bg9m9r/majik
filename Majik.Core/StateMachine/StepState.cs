@@ -5,13 +5,13 @@ namespace Majik.Core.StateMachine;
 /// <summary>
 /// Represents a phase-level state (step within a turn).
 /// </summary>
-public class PhaseState : IState
+public class StepState : IState
 {
     public string Name { get; }
-    public PhaseStateType Type { get; }
+    public StepStateType Type { get; }
     private readonly IEventBus? _eventBus;
 
-    public PhaseState(PhaseStateType type, IEventBus? eventBus = null)
+    public StepState(StepStateType type, IEventBus? eventBus = null)
     {
         Type = type;
         Name = type.ToString();

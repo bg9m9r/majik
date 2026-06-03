@@ -180,7 +180,7 @@ public sealed class DiesSelfTriggerDef : TriggerDefinition
 /// step trigger over <see cref="Majik.Core.Events.StepStartedEvent"/>
 /// restricted to the trigger controller's own <c>Upkeep</c> step. Maps to
 /// <see cref="Majik.Core.Abilities.Triggers.OnStepBegin"/> with
-/// <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/>. Controller is
+/// <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/>. Controller is
 /// resolved live (<c>card.Controller</c>) at fire time so a control change
 /// carries the trigger (CR 109.5 — same posture as the other declarative
 /// variants). No extra fields. Models the Phyrexian Arena / Dark Confidant /
@@ -193,7 +193,7 @@ public sealed class AtBeginningOfYourUpkeepTriggerDef : TriggerDefinition { }
 /// step trigger over <see cref="Majik.Core.Events.StepStartedEvent"/>
 /// restricted to the trigger controller's own <c>End</c> step. Maps to
 /// <see cref="Majik.Core.Abilities.Triggers.OnStepBegin"/> with
-/// <see cref="Majik.Core.StateMachine.PhaseStateType.End"/>. Controller is
+/// <see cref="Majik.Core.StateMachine.StepStateType.End"/>. Controller is
 /// resolved live (CR 109.5). No extra fields. Models the Wedding Announcement /
 /// Bonecrusher Giant-token / end-step-payoff family.
 /// </summary>

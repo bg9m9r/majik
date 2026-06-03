@@ -117,7 +117,7 @@ public class LongRoadHomeFactoryTests
             "the +1/+1 counter is placed only on the delayed return");
 
         // Publish an End-step started event — the delayed return should fire.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(1, "the delayed end-step return is pending");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -150,7 +150,7 @@ public class LongRoadHomeFactoryTests
             "Long Road Home exiles any creature, not just controller-side ones");
         _bob.Zones.Exile.GetCards().Should().Contain(bobBear);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
@@ -194,8 +194,8 @@ public class LongRoadHomeFactoryTests
         ResolveCast(_alice, bear, triggers);
 
         // Pump a few non-End steps — the delayed return must not fire.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
         triggers.PendingCount.Should().Be(0,
             "delayed end-step trigger gates on StepType == End (CR 603.7)");
 

@@ -329,7 +329,7 @@ public class EverflowingChaliceTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, 1, StepStateType.PreCombatMain, _stack);
         return (agent, ctx);
     }
 

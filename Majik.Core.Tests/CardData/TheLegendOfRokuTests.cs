@@ -128,12 +128,12 @@ public class TheLegendOfRokuTests
 
         // First Cleanup belongs to the CURRENT turn — grant survives (Saga
         // resolves on the controller's turn).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         exiled.Should().OnlyContain(c => c.RuntimeExileCastAllowedCaster == _alice,
             "the grant survives until end of the controller's NEXT turn");
 
         // Second Cleanup = the controller's next turn → grant clears.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         exiled.Should().OnlyContain(c => c.RuntimeExileCastAllowedCaster == null,
             "the may-play window ends at end of the controller's next turn");
     }
@@ -281,7 +281,7 @@ public class TheLegendOfRokuTests
 
         // End of combat empties the firebending mana (CR 500.4 — "lasts until
         // end of combat").
-        _bus.Publish(new StepStartedEvent(PhaseStateType.EndOfCombat, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.EndOfCombat, _alice));
 
         _alice.ManaPool.Red.Should().Be(0, "the firebending mana lasts only until end of combat");
     }
@@ -317,7 +317,7 @@ public class TheLegendOfRokuTests
 
         // End of combat: only the 2 remaining firebending slots expire; the
         // untagged red the player floated survives.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.EndOfCombat, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.EndOfCombat, _alice));
 
         _alice.ManaPool.Red.Should().Be(1,
             "2 unspent firebending {R} expired; the 1 non-firebending {R} survives");

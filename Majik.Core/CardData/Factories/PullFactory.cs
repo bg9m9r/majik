@@ -70,7 +70,7 @@ namespace Majik.Core.CardData.Factories;
 /// - "Sacrifice them at the beginning of the next end step." (CR 603.7) — when
 ///   a <see cref="TriggerManager"/> is supplied, ONE delayed triggered ability
 ///   is registered that fires on the first <see cref="StepStartedEvent"/> with
-///   <see cref="PhaseStateType.End"/> strictly after this resolution and
+///   <see cref="StepStateType.End"/> strictly after this resolution and
 ///   sacrifices every still-on-battlefield reanimated creature (CR 701.16 →
 ///   <see cref="Fx.MoveToGraveyard(ICard, ZoneMoveReason)"/> with
 ///   <see cref="ZoneMoveReason.Sacrifice"/>, so indestructible is bypassed).
@@ -254,7 +254,7 @@ public static class PullFactory
             source: caster,
             controller: caster,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End
+                (e, _) => e.StepType == StepStateType.End
                           && e.Timestamp > resolvedAt),
             effects: new IEffect[] { sacrificeEffect });
 

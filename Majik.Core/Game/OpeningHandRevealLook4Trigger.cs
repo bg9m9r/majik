@@ -30,7 +30,7 @@ namespace Majik.Core.Game;
 ///   - On a yes-answer a <see cref="DelayedTriggeredAbility"/> is registered
 ///     with the supplied <see cref="TriggerManager"/>. Its condition is a
 ///     <see cref="StepStartedEvent"/> filter that fires the first time
-///     <see cref="PhaseStateType.Upkeep"/> begins on the revealer's turn —
+///     <see cref="StepStateType.Upkeep"/> begins on the revealer's turn —
 ///     then auto-unregisters via TriggerManager's delayed-ability sweep
 ///     (Rule 603.7d).
 ///
@@ -141,7 +141,7 @@ public sealed class OpeningHandRevealLook4Trigger
 
         // CR 500 / Triggers.OnStepBegin — "at the beginning of your first
         // upkeep" filtered to the revealer's upkeep step.
-        var condition = Triggers.OnStepBegin(revealer, PhaseStateType.Upkeep);
+        var condition = Triggers.OnStepBegin(revealer, StepStateType.Upkeep);
 
         var effect = new Effect(
             $"{sourceCard.Name}: look at top {LookAtCount}, may keep 1 on top, exile the rest",

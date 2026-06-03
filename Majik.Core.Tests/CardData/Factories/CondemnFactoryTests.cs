@@ -105,7 +105,7 @@ public class CondemnFactoryTests
         var def = CondemnFactory.BuildDefinition(o => o, AttackerLookup);
         var ctx = new GameContext(
             _alice, new[] { _alice, _bob }, _bob, 1,
-            PhaseStateType.DeclareBlockers, _stack);
+            StepStateType.DeclareBlockers, _stack);
 
         var candidates = def.TargetRequests[0].ResolveCandidates(ctx);
 
@@ -120,7 +120,7 @@ public class CondemnFactoryTests
         var def = CondemnFactory.BuildDefinition(o => o, attackerLookup: null);
         var ctx = new GameContext(
             _alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.DeclareBlockers, _stack);
+            StepStateType.DeclareBlockers, _stack);
 
         def.TargetRequests[0].ResolveCandidates(ctx).Should().BeEmpty(
             "with no combat lookup wired the gatherer reports no candidates");
@@ -234,7 +234,7 @@ public class CondemnFactoryTests
         agent.QueueTargets(new[] { target });
         agent.QueueMana(ManaPayment.Empty);
         var ctx = new GameContext(
-            _alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+            _alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, condemn,

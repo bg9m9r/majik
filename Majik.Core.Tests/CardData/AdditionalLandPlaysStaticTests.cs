@@ -75,12 +75,12 @@ public class AdditionalLandPlaysStaticTests
 
         for (var i = 0; i < 3; i++)
         {
-            tracker.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _)
+            tracker.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _)
                 .Should().BeTrue($"land {i + 1} of 3");
             tracker.RecordLandPlayed(_alice);
         }
 
-        tracker.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out var reason)
+        tracker.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out var reason)
             .Should().BeFalse("the 4th land exceeds the cap");
         reason.Should().Contain("already played");
     }
@@ -120,7 +120,7 @@ public class AdditionalLandPlaysStaticTests
 
         // Spend all three this turn.
         for (var i = 0; i < 3; i++) tracker.RecordLandPlayed(_alice);
-        tracker.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _)
+        tracker.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _)
             .Should().BeFalse();
 
         // New turn — drops reset, Azusa still grants +2.
@@ -167,10 +167,10 @@ public class AdditionalLandPlaysStaticTests
         tracker.EffectiveMaxLandDropsThisTurn(_alice).Should().Be(2);
 
         tracker.RecordLandPlayed(_alice);
-        tracker.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _)
+        tracker.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _)
             .Should().BeTrue("second land allowed");
         tracker.RecordLandPlayed(_alice);
-        tracker.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _)
+        tracker.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _)
             .Should().BeFalse("third land exceeds the cap");
     }
 

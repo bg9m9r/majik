@@ -323,7 +323,7 @@ public class FableOfTheMirrorBreakerTests
             .OfType<Creature>().Single(c => c.IsToken);
         token.Zone.Should().Be(ZoneType.Battlefield);
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);

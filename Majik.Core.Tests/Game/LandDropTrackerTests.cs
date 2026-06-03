@@ -30,9 +30,9 @@ public class LandDropTrackerTests
     public void DefaultMax_OnePerTurn()
     {
         var t = new LandDropTracker();
-        t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _).Should().BeTrue();
+        t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _).Should().BeTrue();
         t.RecordLandPlayed(_alice);
-        t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out var reason).Should().BeFalse();
+        t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out var reason).Should().BeFalse();
         reason.Should().Contain("already played");
     }
 
@@ -40,7 +40,7 @@ public class LandDropTrackerTests
     public void OnOpponentTurn_Rejected()
     {
         var t = new LandDropTracker();
-        t.CanPlayLand(_alice, _bob, PhaseStateType.PreCombatMain, true, out var reason).Should().BeFalse();
+        t.CanPlayLand(_alice, _bob, StepStateType.PreCombatMain, true, out var reason).Should().BeFalse();
         reason.Should().Contain("your turn");
     }
 
@@ -48,7 +48,7 @@ public class LandDropTrackerTests
     public void OutsideMain_Rejected()
     {
         var t = new LandDropTracker();
-        t.CanPlayLand(_alice, _alice, PhaseStateType.End, true, out var reason).Should().BeFalse();
+        t.CanPlayLand(_alice, _alice, StepStateType.End, true, out var reason).Should().BeFalse();
         reason.Should().Contain("main phase");
     }
 
@@ -56,7 +56,7 @@ public class LandDropTrackerTests
     public void StackNotEmpty_Rejected()
     {
         var t = new LandDropTracker();
-        t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, false, out var reason).Should().BeFalse();
+        t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, false, out var reason).Should().BeFalse();
         reason.Should().Contain("stack is empty");
     }
 
@@ -68,10 +68,10 @@ public class LandDropTrackerTests
 
         for (var i = 0; i < 3; i++)
         {
-            t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _).Should().BeTrue();
+            t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _).Should().BeTrue();
             t.RecordLandPlayed(_alice);
         }
-        t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _).Should().BeFalse();
+        t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -104,13 +104,13 @@ public class LandDropTrackerTests
 
         for (var i = 0; i < 3; i++)
         {
-            t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _)
+            t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _)
                 .Should().BeTrue($"land {i + 1} of 3 is allowed");
             t.RecordLandPlayed(_alice);
         }
 
         // 4th land rejected.
-        t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out var reason)
+        t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out var reason)
             .Should().BeFalse();
         reason.Should().Contain("already played");
     }
@@ -160,7 +160,7 @@ public class LandDropTrackerTests
         // Use both plays this turn.
         t.RecordLandPlayed(_alice);
         t.RecordLandPlayed(_alice);
-        t.CanPlayLand(_alice, _alice, PhaseStateType.PreCombatMain, true, out _)
+        t.CanPlayLand(_alice, _alice, StepStateType.PreCombatMain, true, out _)
             .Should().BeFalse();
 
         // New turn — count resets, static persists (source still on field).

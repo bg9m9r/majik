@@ -85,7 +85,7 @@ public class PheliaExuberantShepherdFactoryTests
         _bob.Zones.Battlefield.GetCards().Should().NotContain(grizzly);
 
         // Fire the next end step — the delayed trigger should queue.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "the delayed return rider fires on the first end step after the attack");

@@ -35,7 +35,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Begin-combat self-pump</b> (CR 508.1 — "At the beginning of combat
 ///   on your turn") wired as a <see cref="TriggeredAbility"/> over
 ///   <see cref="StepStartedEvent"/> for
-///   <see cref="PhaseStateType.BeginningOfCombat"/> restricted to the
+///   <see cref="StepStateType.BeginningOfCombat"/> restricted to the
 ///   controller's own turns (<see cref="Triggers.OnStepBegin"/>).
 /// - <b>Intervening-if (CR 603.4)</b> — "if you control an artifact". The
 ///   condition is re-checked on resolution: the +2/+1 only registers when
@@ -159,7 +159,7 @@ public static class ToolcraftExemplarFactory
         var beginCombatTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.BeginningOfCombat),
+            condition: Triggers.OnStepBegin(owner, StepStateType.BeginningOfCombat),
             effects: new IEffect[] { pumpEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

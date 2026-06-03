@@ -5,9 +5,9 @@ namespace Majik.Core.Api;
 /// <summary>
 /// Maps the engine's phase value to its wire string. Since Slice 3 the
 /// engine carries the precombat / postcombat distinction as first-class
-/// <see cref="PhaseStateType.PreCombatMain"/> / <see cref="PhaseStateType.PostCombatMain"/>
+/// <see cref="StepStateType.PreCombatMain"/> / <see cref="StepStateType.PostCombatMain"/>
 /// values (CR 505 names them explicitly), so the label is simply
-/// <c>phase.ToString()</c> — no reconstruction from <see cref="TurnStateType"/>
+/// <c>phase.ToString()</c> — no reconstruction from <see cref="PhaseStateType"/>
 /// is needed. The <paramref name="turnState"/> parameter is retained for
 /// call-site compatibility but no longer participates in disambiguation.
 /// </summary>
@@ -22,11 +22,11 @@ public static class PhaseLabelResolver
     /// (Untap, Upkeep, Draw, PreCombatMain, BeginningOfCombat, …,
     /// PostCombatMain, End, Cleanup).
     /// </summary>
-    public static string Resolve(PhaseStateType phase, TurnStateType? turnState)
+    public static string Resolve(StepStateType phase, PhaseStateType? turnState)
         => phase.ToString();
 
-    /// <summary>Nullable overload mirroring <see cref="Resolve(PhaseStateType, TurnStateType?)"/>.
+    /// <summary>Nullable overload mirroring <see cref="Resolve(StepStateType, PhaseStateType?)"/>.
     /// Returns <c>null</c> when <paramref name="phase"/> is null.</summary>
-    public static string? Resolve(PhaseStateType? phase, TurnStateType? turnState)
+    public static string? Resolve(StepStateType? phase, PhaseStateType? turnState)
         => phase is { } p ? Resolve(p, turnState) : null;
 }

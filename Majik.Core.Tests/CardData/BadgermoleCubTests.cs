@@ -82,7 +82,7 @@ public class BadgermoleCubTests
         var stack = new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus());
         var ctx = new Majik.Core.Game.GameContext(
             _alice, new[] { _alice, bob }, _alice, 1,
-            Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack);
+            Majik.Core.StateMachine.StepStateType.PreCombatMain, stack);
 
         var candidates = etb.TargetRequests[0].ResolveCandidates(ctx);
 

@@ -208,7 +208,7 @@ public class FootstepsOfTheGoryoFactoryTests
 
         // Fire the next End step — the delayed trigger queues onto the stack
         // and resolves into Battlefield → Graveyard (sacrifice).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);

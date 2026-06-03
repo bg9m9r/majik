@@ -178,7 +178,7 @@ public class BerserkFactoryTests
         // Wait so the StepStartedEvent timestamp is strictly after the
         // resolve-time fence (DateTime.UtcNow comparison).
         Thread.Sleep(2);
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, zones);
@@ -204,7 +204,7 @@ public class BerserkFactoryTests
         // No CreatureAttacksEvent — the bear sat back.
 
         Thread.Sleep(2);
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, zones);
@@ -232,7 +232,7 @@ public class BerserkFactoryTests
         _bus.Publish(new CreatureAttacksEvent(other, _bob));
 
         Thread.Sleep(2);
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, zones);
