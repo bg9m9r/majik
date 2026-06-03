@@ -1,8 +1,8 @@
-using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -40,28 +40,34 @@ namespace Majik.Core.CardData.Factories;
 /// and stamps <see cref="Card.TimesKicked"/> = N on the chalice so the ETB
 /// below can scale on it (CR 702.32c — "if a spell was kicked N times, …").
 ///
-/// ## Enters with a charge counter for each time it was kicked (CR 702.32c / CR 122)
+/// ## Enters WITH a charge counter for each time it was kicked (CR 614.1d / CR 702.32c / CR 122)
 ///
-/// Modelled as an ETB <see cref="TriggeredAbility"/> reading the chalice's
-/// stamped <see cref="Card.TimesKicked"/> count and placing that many
-/// <see cref="CounterType.Charge"/> counters at battlefield entry — same
-/// trigger-shape <see cref="SphereOfTheSunsFactory"/> /
-/// <see cref="ReckonerBankbusterFactory"/> use for fixed charge-counter ETBs,
-/// but driven by the cast-time kick count instead of a constant. The strict
-/// CR 614.1d "enters with N counters" replacement only carries the +1/+1
-/// channel today (<see cref="Majik.Core.Effects.EntersWithCountersReplacement"/>),
-/// so the trigger-shape is used for charge counters. A multikicker paid zero
-/// times = zero charge counters (the chalice still enters, but taps for
-/// nothing).
+/// Modelled as a true CR 614.1d "enters the battlefield with N counters"
+/// REPLACEMENT — a dynamic-count <see cref="EntersWithCountersReplacement"/>
+/// keyed on <see cref="Card.TimesKicked"/>, registered against the supplied
+/// <see cref="ReplacementBus"/>. When the chalice's Stack → Battlefield move
+/// runs through <see cref="Services.ZoneService"/>, the replacement queues
+/// that many <see cref="CounterType.Charge"/> counters onto the
+/// <see cref="ZoneMoveIntent.CountersOnEnter"/> bag so the artifact enters
+/// WITH the counters already on it (CR 122 / CR 614.1d) — never a window
+/// where it sits on the battlefield with zero, and observable by other
+/// ETB-counter replacements. This is the correctness upgrade from the older
+/// ETB-trigger shape (which placed the counters in a separate event after the
+/// artifact had already entered).
+///
+/// A multikicker paid zero times = zero charge counters (the chalice still
+/// enters, but taps for nothing). The dynamic count is consumed on entry —
+/// <see cref="ZoneService"/> later clears the kicker sentinels (CR 400.7) so a
+/// blink / token copy enters with zero.
 ///
 /// ## {T}: Add {C} for each charge counter on this artifact (CR 605.1)
 ///
-/// A single dynamic <see cref="ManaAbility"/> whose
+/// A single dynamic <see cref="Abilities.ManaAbility"/> whose
 /// <c>Func&lt;ManaCost&gt;</c> generator counts the chalice's charge counters
 /// at activation and produces that many colourless mana (CR 107.4c — {C}
-/// folds into the generic bucket, same as <see cref="HedronArchiveFactory"/>'s
-/// {C}{C}). Mana abilities don't use the stack (CR 605.3b). Gated on the
-/// chalice being on the battlefield and untapped (the printed {T}).
+/// folds into the generic bucket). Mana abilities don't use the stack
+/// (CR 605.3b). Gated on the chalice being on the battlefield and untapped
+/// (the printed {T}).
 /// </summary>
 [CardName("Everflowing Chalice")]
 public static class EverflowingChaliceFactory
@@ -81,20 +87,21 @@ public static class EverflowingChaliceFactory
     public static ManaCost MultikickerCost => ManaCost.Parse(MultikickerCostText);
 
     /// <summary>
-    /// Construct Everflowing Chalice with no live trigger-manager wiring. The
-    /// ETB "charge counter for each time kicked" trigger is attached for shape
-    /// observability; the dynamic mana ability is attached. Suitable for
-    /// shape / <see cref="NamedCardFactory"/> dispatch tests.
+    /// Construct Everflowing Chalice with no live replacement wiring. The
+    /// "enters with a charge counter for each time kicked" replacement is NOT
+    /// registered (no bus supplied); the dynamic mana ability is attached.
+    /// Suitable for shape / <see cref="NamedCardFactory"/> dispatch tests.
     /// </summary>
-    public static Artifact Create(Player owner) => Create(owner, triggers: null);
+    public static Artifact Create(Player owner) => Create(owner, replacements: null);
 
     /// <summary>
-    /// Construct Everflowing Chalice. When <paramref name="triggers"/> is
-    /// supplied, the ETB "enters with a charge counter for each time it was
-    /// kicked" trigger is registered so the centralised ETB event queues it
-    /// automatically.
+    /// Construct Everflowing Chalice. When <paramref name="replacements"/> is
+    /// supplied, the CR 614.1d "enters with a charge counter for each time it
+    /// was kicked" replacement is registered so a routed
+    /// <see cref="Services.ZoneService"/> ETB makes the artifact enter WITH the
+    /// charge counters.
     /// </summary>
-    public static Artifact Create(Player owner, TriggerManager? triggers)
+    public static Artifact Create(Player owner, ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -102,37 +109,19 @@ public static class EverflowingChaliceFactory
 
         // ----------------------------------------------------------------
         // ETB — "This artifact enters with a charge counter on it for each
-        // time it was kicked." (CR 702.32c / CR 122.) Modelled as an ETB
-        // TriggeredAbility because EntersWithCountersReplacement only covers
-        // +1/+1 today — same posture as Sphere of the Suns / Reckoner
-        // Bankbuster, but the count is the cast-time multikicker tally read
-        // off Card.TimesKicked.
+        // time it was kicked." (CR 614.1d / CR 702.32c / CR 122.) Modelled
+        // as a true "enters the battlefield with N counters" REPLACEMENT
+        // (EntersWithCountersReplacement) with a dynamic count keyed on the
+        // cast-time multikicker tally (Card.TimesKicked). The ZoneService ETB
+        // pipeline queues the charge counters onto the move intent so the
+        // artifact enters WITH them already present.
         // ----------------------------------------------------------------
-        var etbEffect = new Effect(
-            $"{CardName}: enter with a charge counter for each time kicked",
-            () =>
-            {
-                if (chalice.Zone != ZoneType.Battlefield) return;
-                var count = chalice.TimesKicked;
-                if (count > 0)
-                {
-                    chalice.Counters.Add(CounterType.Charge, count);
-                }
-                // CR 400.7 — consume the cast-time kick count so a later
-                // blink / token copy of this object doesn't re-read the
-                // prior cast's tally.
-                chalice.ClearWasKicked();
-            });
-
-        var etbTrigger = new TriggeredAbility(
-            source: chalice,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(chalice),
-            effects: new IEffect[] { etbEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        chalice.AddAbility(etbTrigger);
-        triggers?.RegisterTriggeredAbility(etbTrigger);
+        if (replacements != null)
+        {
+            replacements.Register<ZoneMoveIntent>(
+                new EntersWithCountersReplacement(
+                    chalice, CounterType.Charge, () => chalice.TimesKicked));
+        }
 
         // ----------------------------------------------------------------
         // {T}: Add {C} for each charge counter on this artifact. (CR 605.1 —
@@ -140,12 +129,11 @@ public static class EverflowingChaliceFactory
         //
         // Dynamic Func<ManaCost> generator: count the charge counters at
         // activation, produce that many colourless mana. {C}×N folds into
-        // the generic bucket (CR 107.4c) — same representation Hedron
-        // Archive's {C}{C} uses. The standard tap-as-cost overload is used
-        // (the printed cost is {T}). Gated on the chalice being on the
-        // battlefield and untapped.
+        // the generic bucket (CR 107.4c). The standard tap-as-cost overload
+        // is used (the printed cost is {T}). Gated on the chalice being on
+        // the battlefield and untapped.
         // ----------------------------------------------------------------
-        chalice.AddAbility(new ManaAbility(
+        chalice.AddAbility(new Abilities.ManaAbility(
             source: chalice,
             controller: owner,
             manaGenerator: () => ChargeCounterMana(chalice),

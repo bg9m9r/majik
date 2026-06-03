@@ -730,7 +730,14 @@ public sealed class SpellCastFlow
                     }
                 })).ToList();
         }
-        if (hasKickerPayment)
+        // CR 702.33b / 702.32c / 400.7 — clear the kicker / multikicker
+        // sentinel after the spell resolves. For a PERMANENT spell the clear
+        // is deferred to ZoneService's Stack → Battlefield move (it runs AFTER
+        // any CR 614.1d "enters with a counter for each time it was kicked"
+        // replacement has read the count — Everflowing Chalice), so we only
+        // append the resolution-effect clear for non-permanents (instants /
+        // sorceries), which never reach the battlefield-entry clear.
+        if (hasKickerPayment && card is not Permanent)
         {
             finalEffects = finalEffects.Append(new Effect(
                 "Kicker cleanup — clear Card.WasKicked",
