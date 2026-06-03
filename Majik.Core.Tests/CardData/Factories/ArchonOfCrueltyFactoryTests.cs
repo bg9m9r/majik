@@ -431,4 +431,70 @@ public class ArchonOfCrueltyFactoryTests
             .Should().Contain(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker),
                 "the sacrificed permanent is a creature or planeswalker");
     }
+
+    // -----------------------------------------------------------------------
+    // Bus-aware sacrifice — CR 701.16. When an event bus is supplied the
+    // opponent's forced sacrifice publishes a PermanentSacrificedEvent so
+    // "whenever an opponent sacrifices …" aristocrat payoffs (It That
+    // Betrays, Mayhem Devil) observe it. Pays down thread-bus-into-bare-
+    // fx-sacrifice on the Archon path.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void EtbTrigger_WithEventBus_PublishesPermanentSacrificedEvent_WithOpponentAsSacrificingPlayer()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new EventBus();
+
+        var bobBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bobBear.SetOwner(bob);
+        bobBear.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bobBear);
+        bobBear.SetZone(ZoneType.Battlefield);
+
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        // Archon constructed WITH the bus so its sacrifice routes through the
+        // bus-aware Fx.Sacrifice overload.
+        var archon = ArchonOfCrueltyFactory.Create(alice, eventBus: bus, triggers: null, targetAgent: null);
+        var etb = archon.Abilities.OfType<TriggeredAbility>()
+            .First(t => !(t.Condition is EventTriggerCondition<CreatureAttacksEvent>));
+        etb.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+
+        foreach (var e in etb.Effects) e.Execute();
+
+        bobBear.Zone.Should().Be(ZoneType.Graveyard, "the creature was sacrificed (CR 701.16)");
+        sacrificed.Should().ContainSingle()
+            .Which.SacrificedCard.Should().BeSameAs(bobBear,
+            "the forced sacrifice routes through the bus-aware Fx.Sacrifice overload");
+        sacrificed[0].SacrificingPlayer.Should().BeSameAs(bob,
+            "CR 701.16a — the opponent (the permanent's controller) is the sacrificing player");
+        sacrificed[0].WasToken.Should().BeFalse("Grizzly Bears is not a token");
+    }
+
+    [Fact]
+    public void EtbTrigger_WithoutEventBus_StillSacrifices_PublishesNothing()
+    {
+        // Legacy posture: the bus-less Create overload still sacrifices via the
+        // bare Fx.Sacrifice(permanent) overload (no event), preserving prior
+        // behaviour for callers that supply no bus.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var bobBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bobBear.SetOwner(bob);
+        bobBear.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bobBear);
+        bobBear.SetZone(ZoneType.Battlefield);
+
+        var archon = SetupArchon(alice); // bus-less
+        var etb = GetEtbTrigger(archon);
+        etb.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+
+        foreach (var e in etb.Effects) e.Execute();
+
+        bobBear.Zone.Should().Be(ZoneType.Graveyard, "the creature was still sacrificed");
+    }
 }

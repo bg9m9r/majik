@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -75,7 +76,7 @@ public static class PlaguecrafterFactory
     /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, playerResolver: null, triggers: null, agent: null);
+        Create(owner, playerResolver: null, triggers: null, agent: null, eventBus: null);
 
     /// <summary>
     /// Construct Plaguecrafter with optional runtime services.
@@ -91,11 +92,17 @@ public static class PlaguecrafterFactory
     /// <param name="agent">Optional agent driving each affected player's
     /// "of their choice" sacrifice pick and discard pick. Null falls back to
     /// a deterministic first-eligible / first-card pick.</param>
+    /// <param name="eventBus">Optional event bus. When supplied, each forced
+    /// sacrifice publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// so "whenever a/an [player] sacrifices …" aristocrat payoffs (Mayhem
+    /// Devil, It That Betrays) observe it; null → the legacy publish-nothing
+    /// posture.</param>
     public static Creature Create(
         Player owner,
         Func<IReadOnlyList<Player>>? playerResolver,
         TriggerManager? triggers,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -113,7 +120,7 @@ public static class PlaguecrafterFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: each player sacrifices a creature or planeswalker of their choice; each who can't discards a card",
-            () => Resolve(playerResolver, agent));
+            () => Resolve(playerResolver, agent, eventBus));
 
         var etbTrigger = new TriggeredAbility(
             source: card,
@@ -135,7 +142,8 @@ public static class PlaguecrafterFactory
     // -----------------------------------------------------------------------
     private static void Resolve(
         Func<IReadOnlyList<Player>>? playerResolver,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus)
     {
         var players = playerResolver?.Invoke();
         if (players == null) return; // shape path — no players wired.
@@ -153,7 +161,7 @@ public static class PlaguecrafterFactory
 
             if (eligible.Count > 0)
             {
-                SacrificeOfTheirChoice(pl, eligible, agent);
+                SacrificeOfTheirChoice(pl, eligible, agent, eventBus);
             }
             else
             {
@@ -173,7 +181,8 @@ public static class PlaguecrafterFactory
     private static void SacrificeOfTheirChoice(
         Player player,
         IReadOnlyList<ICard> eligible,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus)
     {
         ICard pick;
         if (agent != null)
@@ -198,7 +207,18 @@ public static class PlaguecrafterFactory
         }
 
         // CR 701.16 — sacrifice bypasses Indestructible / regeneration.
-        Fx.Sacrifice(pick);
+        // CR 701.16a — the affected player (the permanent's controller) is the
+        // sacrificing player. Publish a PermanentSacrificedEvent when a bus is
+        // supplied so aristocrat payoffs (Mayhem Devil, It That Betrays) fire;
+        // else the bare publish-nothing overload (legacy posture).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(pick, player, eventBus);
+        }
+        else
+        {
+            Fx.Sacrifice(pick);
+        }
     }
 
     /// <summary>

@@ -128,7 +128,7 @@ public static class ArchonOfCrueltyFactory
         IEffect BuildEffect(Func<TriggeredAbility?> getTrigger, string label) =>
             new Effect(
                 $"{CardName}: {label} — target opponent sacs creature/planeswalker, discards, loses {LifeSwing}; you draw, gain {LifeSwing}",
-                () => ResolveTriggerBody(getTrigger(), card, owner, targetAgent));
+                () => ResolveTriggerBody(getTrigger(), card, owner, targetAgent, eventBus));
 
         // ----------------------------------------------------------------
         // ETB trigger — "Whenever this creature enters, …"
@@ -177,14 +177,15 @@ public static class ArchonOfCrueltyFactory
         TriggeredAbility? trigger,
         Creature card,
         Player owner,
-        IPlayerAgent? targetAgent)
+        IPlayerAgent? targetAgent,
+        IEventBus? eventBus)
     {
         var controller = card.Controller ?? owner;
         var opponent = ResolveTargetOpponent(trigger);
         if (opponent is null) return; // no target chosen → no-op
 
         // Step 1: opponent sacrifices a creature or planeswalker (CR 701.16).
-        SacrificeCreatureOrPlaneswalker(opponent, targetAgent);
+        SacrificeCreatureOrPlaneswalker(opponent, targetAgent, eventBus);
 
         // Step 2: opponent discards a card (CR 701.8).
         OpponentDiscards(opponent, targetAgent);
@@ -210,7 +211,10 @@ public static class ArchonOfCrueltyFactory
         return trigger.ChosenTargets[0][0] as Player;
     }
 
-    private static void SacrificeCreatureOrPlaneswalker(Player opponent, IPlayerAgent? targetAgent)
+    private static void SacrificeCreatureOrPlaneswalker(
+        Player opponent,
+        IPlayerAgent? targetAgent,
+        IEventBus? eventBus)
     {
         // CR 101.1 / 305.1 — "creature or planeswalker" = battlefield permanents
         // with CardType.Creature OR CardType.Planeswalker controlled by opponent.
@@ -222,8 +226,19 @@ public static class ArchonOfCrueltyFactory
 
         var sacPick = PickSacrificeTarget(opponent, sacCandidates, targetAgent);
         // CR 701.16 — sacrifice bypasses Indestructible (CR 702.12) and
-        // regeneration (CR 701.15).
-        Fx.Sacrifice(sacPick);
+        // regeneration (CR 701.15). CR 701.16a — the opponent (the permanent's
+        // controller) is the sacrificing player. With a bus, publish a
+        // PermanentSacrificedEvent so "whenever an opponent sacrifices …"
+        // payoffs (It That Betrays, Mayhem Devil) observe it; without one,
+        // fall back to the bare publish-nothing overload (legacy posture).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(sacPick, opponent, eventBus);
+        }
+        else
+        {
+            Fx.Sacrifice(sacPick);
+        }
     }
 
     private static ICard PickSacrificeTarget(

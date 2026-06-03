@@ -116,9 +116,9 @@ public static class PhyrexianObliteratorFactory
         // Matches DamageDealtEvent (and its CombatDamageDealtEvent subclass)
         // where TargetCard is this Obliterator. The amount and the source's
         // controller are captured in closures shared with the resolved
-        // effect. (eventBus reserved for parity with sibling factories.)
+        // effect. The bus, when supplied, lets each sacrifice publish a
+        // PermanentSacrificedEvent (CR 701.16) so aristocrat payoffs fire.
         // ----------------------------------------------------------------
-        _ = eventBus;
         int capturedAmount = 0;
         Player? sourceController = null;
 
@@ -134,7 +134,7 @@ public static class PhyrexianObliteratorFactory
                 sourceController = null;
 
                 if (amount <= 0 || chooser is null) return;
-                Sacrifice(chooser, amount);
+                Sacrifice(chooser, amount, eventBus);
             });
 
         var trigger = new TriggeredAbility(
@@ -172,7 +172,7 @@ public static class PhyrexianObliteratorFactory
     /// is available; deterministic first-permanent fallback otherwise. The
     /// count clamps to the number of permanents controlled (CR 701.16e).
     /// </summary>
-    private static void Sacrifice(Player chooser, int count)
+    private static void Sacrifice(Player chooser, int count, IEventBus? eventBus)
     {
         var agent = AgentRegistry.Get(chooser);
 
@@ -186,7 +186,19 @@ public static class PhyrexianObliteratorFactory
             if (candidates.Count == 0) return; // CR 701.16e — nothing left.
 
             var pick = PickSacrifice(chooser, candidates, agent);
-            Fx.Sacrifice(pick);
+            // CR 701.16a — the chooser (the permanent's controller) is the
+            // sacrificing player. Publish a PermanentSacrificedEvent when a
+            // bus is supplied so aristocrat payoffs (It That Betrays, Mayhem
+            // Devil) observe the sacrifice; else the bare publish-nothing
+            // overload (legacy posture).
+            if (eventBus != null)
+            {
+                Fx.Sacrifice(pick, chooser, eventBus);
+            }
+            else
+            {
+                Fx.Sacrifice(pick);
+            }
         }
     }
 
