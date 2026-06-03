@@ -99,6 +99,43 @@ public class Permanent : Card
         return ActiveEffects.EffectiveSubtypes(this);
     }
 
+    /// <summary>
+    /// CR 707.2 / CR 613.2 (Layer 1) — this permanent's <em>effective</em> name
+    /// after the copy-effect pass. When <see cref="ActiveEffects"/> is set this
+    /// consults the layer system (so a clone of a permanent named X reports
+    /// "X" via an active
+    /// <see cref="Majik.Core.Effects.CopyCharacteristicsEffect"/>); when null it
+    /// falls back to the printed <see cref="Card.Name"/>. Same-name matching
+    /// ("another permanent named X", Izzet Staticaster) reads through this so a
+    /// clone counts. Mirrors <see cref="GetEffectiveColors"/> /
+    /// <see cref="GetEffectiveSupertypes"/>.
+    /// </summary>
+    public string GetEffectiveName()
+    {
+        if (ActiveEffects == null)
+        {
+            return Name;
+        }
+        return ActiveEffects.EffectiveName(this);
+    }
+
+    /// <summary>
+    /// CR 707.2 / CR 202.3 — this permanent's <em>effective</em> mana-cost
+    /// string after the copy-effect pass (mana value is derived from it). When
+    /// <see cref="ActiveEffects"/> is set this consults the layer system (a
+    /// clone reports the copied source's mana cost); when null it falls back to
+    /// the printed <see cref="Card.ManaCost"/>. Mirrors
+    /// <see cref="GetEffectiveName"/>.
+    /// </summary>
+    public string GetEffectiveManaCost()
+    {
+        if (ActiveEffects == null)
+        {
+            return ManaCost;
+        }
+        return ActiveEffects.EffectiveManaCost(this);
+    }
+
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
     /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
     public bool IsToken { get; internal set; }

@@ -182,6 +182,74 @@ public class CopyCharacteristicsEffectTests
     }
 
     [Fact]
+    public void Copy_OntoCreature_SurfacesCopiedNameThroughEffectiveName()
+    {
+        var svc = new ContinuousEffectsService();
+        var copier = new Creature("Clone", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        var original = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+
+        svc.Register(new CopyCharacteristicsEffect(copier, original));
+
+        // CR 707.2 — name is a copiable value. The printed Card.Name stays
+        // immutable ("Clone"), but the EFFECTIVE name surfaces the copy so
+        // "another permanent named X" / same-name matching counts the clone.
+        copier.Name.Should().Be("Clone", "the printed name is immutable (CR 707.2 records the copy in the layer system, not on the card)");
+        copier.GetEffectiveName().Should().Be("Grizzly Bears");
+    }
+
+    [Fact]
+    public void Copy_OntoCreature_SurfacesCopiedManaCostThroughEffectiveManaCost()
+    {
+        var svc = new ContinuousEffectsService();
+        var copier = new Creature("Clone", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        var original = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+
+        svc.Register(new CopyCharacteristicsEffect(copier, original));
+
+        // CR 707.2 — mana cost is copiable; the EFFECTIVE mana cost surfaces
+        // the source's "{1}{G}" (mana value 2) for X-cost / mana-value reads.
+        copier.GetEffectiveManaCost().Should().Be("{1}{G}");
+    }
+
+    [Fact]
+    public void EffectiveName_WithoutCopy_FallsBackToPrintedName()
+    {
+        var svc = new ContinuousEffectsService();
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+
+        // No copy effect → effective reads fall through to the printed values.
+        bear.GetEffectiveName().Should().Be("Grizzly Bears");
+        bear.GetEffectiveManaCost().Should().Be("{1}{G}");
+    }
+
+    [Fact]
+    public void EffectiveName_WithNullActiveEffects_FallsBackToPrintedName()
+    {
+        // No ActiveEffects wired at all → printed/static fallback path.
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.GetEffectiveName().Should().Be("Grizzly Bears");
+        bear.GetEffectiveManaCost().Should().Be("{1}{G}");
+    }
+
+    [Fact]
     public void Copy_ExpiresAtEndOfTurn()
     {
         var svc = new ContinuousEffectsService();

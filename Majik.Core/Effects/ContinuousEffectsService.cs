@@ -434,7 +434,7 @@ public sealed class ContinuousEffectsService
             && permanent.MdfcState!.IsBackFace
             && !permanent.IsFaceDown)
         {
-            return SeedBackFaceCharacteristics(back);
+            return SeedBackFaceCharacteristics(back, permanent);
         }
 
         PermanentCharacteristics chars;
@@ -451,6 +451,11 @@ public sealed class ContinuousEffectsService
             chars = new PermanentCharacteristics();
         }
 
+        // CR 707.2 / 613.2 (Layer 1) — seed the printed name + mana cost;
+        // CopyCharacteristicsEffect (Layer 1) overwrites them when this
+        // permanent is a copy. Read back via GetEffectiveName / GetEffectiveManaCost.
+        chars.Name = permanent.Name;
+        chars.ManaCost = permanent.ManaCost;
         // Seed printed types; Layer 4 effects add/remove on top.
         foreach (var t in permanent.CardTypes) chars.Types.Add(t);
         // Seed printed subtypes; Layer 4 effects add/remove on top.
@@ -486,11 +491,20 @@ public sealed class ContinuousEffectsService
     /// does for a front-printed seed.
     /// </summary>
     private static PermanentCharacteristics SeedBackFaceCharacteristics(
-        Majik.Core.CardData.MDFCs.BackFaceCharacteristics back)
+        Majik.Core.CardData.MDFCs.BackFaceCharacteristics back,
+        Permanent permanent)
     {
         PermanentCharacteristics chars = back.IsCreature
             ? new CreatureCharacteristics { Power = back.Power, Toughness = back.Toughness }
             : new PermanentCharacteristics();
+
+        // CR 711.4 — the back face's name is its own; a transforming DFC's back
+        // face has no mana cost (mana value 0), so the runtime card's printed
+        // ManaCost string (the front's cost) is left to represent the cost
+        // string slot rather than fabricating one. Effective-name reads (#1715
+        // analogue) surface the back face's name.
+        chars.Name = back.Name;
+        chars.ManaCost = permanent.ManaCost;
 
         foreach (var t in back.Types) chars.Types.Add(t);
         foreach (var st in back.Subtypes) chars.Subtypes.Add(st);
@@ -545,6 +559,8 @@ public sealed class ContinuousEffectsService
     private static CreatureCharacteristics ReseedAsCreatureRow(PermanentCharacteristics src)
     {
         var dst = new CreatureCharacteristics { Power = 0, Toughness = 0 };
+        dst.Name = src.Name;
+        dst.ManaCost = src.ManaCost;
         foreach (var t in src.Types) dst.Types.Add(t);
         foreach (var st in src.Subtypes) dst.Subtypes.Add(st);
         foreach (var sup in src.Supertypes) dst.Supertypes.Add(sup);
@@ -570,6 +586,8 @@ public sealed class ContinuousEffectsService
         {
             dst = new PermanentCharacteristics();
         }
+        dst.Name = src.Name;
+        dst.ManaCost = src.ManaCost;
         foreach (var t in src.Types) dst.Types.Add(t);
         foreach (var st in src.Subtypes) dst.Subtypes.Add(st);
         foreach (var sup in src.Supertypes) dst.Supertypes.Add(sup);
@@ -877,6 +895,35 @@ public sealed class ContinuousEffectsService
     {
         if (perm == null) throw new ArgumentNullException(nameof(perm));
         return Compute(perm).Supertypes;
+    }
+
+    /// <summary>
+    /// CR 707.2 / CR 613.2 (Layer 1) — current (effective) NAME of a permanent
+    /// after the copy-effect pass, including any active
+    /// <see cref="CopyCharacteristicsEffect"/> (so a clone of a permanent named
+    /// X reports "X"). Mirrors <see cref="EffectiveSupertypes"/> and the
+    /// <c>Compute(perm).Colors</c> read behind
+    /// <see cref="Permanent.GetEffectiveColors"/>: it runs the full layer
+    /// pipeline and returns the resulting name. Same-name matching
+    /// (Izzet Staticaster, "another permanent named X") reads through this so a
+    /// clone counts.
+    /// </summary>
+    public string EffectiveName(Permanent perm)
+    {
+        if (perm == null) throw new ArgumentNullException(nameof(perm));
+        return Compute(perm).Name;
+    }
+
+    /// <summary>
+    /// CR 707.2 / CR 202.3 — current (effective) MANA COST string of a
+    /// permanent after the copy-effect pass (mana value is derived from it).
+    /// Mirrors <see cref="EffectiveName"/>; a clone reports the copied source's
+    /// mana cost.
+    /// </summary>
+    public string EffectiveManaCost(Permanent perm)
+    {
+        if (perm == null) throw new ArgumentNullException(nameof(perm));
+        return Compute(perm).ManaCost;
     }
 
     /// <summary>
