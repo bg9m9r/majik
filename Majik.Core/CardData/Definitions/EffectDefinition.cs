@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(PumpSelfEffectDef), "pump_self")]
 [JsonDerivedType(typeof(GrantKeywordUntilEotTargetEffectDef), "grant_keyword_until_eot_target")]
 [JsonDerivedType(typeof(BecomesArtifactTargetEffectDef), "becomes_artifact_target")]
+[JsonDerivedType(typeof(DamageAndTapEachFlyerOpponentsControlEffectDef), "damage_and_tap_each_flyer_opponents_control")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -1042,4 +1043,45 @@ public sealed class BecomesArtifactTargetEffectDef : EffectDefinition
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
             TargetFilter, "becomes an artifact until end of turn");
+}
+
+/// <summary>
+/// "[This creature] deals N damage to each creature with flying your opponents
+/// control. Tap those creatures." (CR 109.5 "opponents", CR 702.9 Flying,
+/// CR 701.21a Tap) — the Thundermaw Hellkite ETB. An <b>untargeted GROUP</b>
+/// verb (CR 608.2 — affects each member of a defined set, not a chosen target),
+/// so it declares NO <see cref="ToTargetRequest"/>.
+///
+/// <para>
+/// This is the group-apply form of the existing single-target
+/// <see cref="DealDamageEffectDef"/> + <see cref="TapTargetEffectDef"/> verbs:
+/// at resolution it gathers every battlefield creature with flying
+/// (<see cref="Majik.Core.Cards.Creature.HasEffectiveKeyword"/> — printed OR
+/// granted, CR 613.1f) controlled by a player OTHER than the ability's
+/// controller (CR 109.5 — "your opponents"), then applies the SAME two
+/// per-permanent primitives the single-target verbs use to every matched
+/// permanent: <see cref="Majik.Core.Primitives.Fx.DealDamageAny"/> for the
+/// damage and <see cref="Majik.Core.Primitives.Fx.Tap"/> for the tap. The set
+/// is snapshotted before any mutation so a creature that dies to the damage SBA
+/// mid-sweep is still in the original set (it has already been damaged; tapping
+/// a creature that has left the battlefield is skipped). CR 702.9 — only
+/// FLYING creatures are gathered; ground creatures are untouched.
+/// </para>
+///
+/// <para>
+/// <see cref="Amount"/> is the damage dealt to each flyer (default 1 —
+/// Thundermaw Hellkite). The source creature is the ability's own card; the
+/// damage is marked from it (so deathtouch / "dealt damage by" payoffs see the
+/// source — CR 119.3). The verb needs no target slot, so it works on an
+/// <c>etb_self</c> trigger with zero declared targets.
+/// </para>
+/// </summary>
+public sealed class DamageAndTapEachFlyerOpponentsControlEffectDef : EffectDefinition
+{
+    /// <summary>Damage dealt to each opponent-controlled flyer (default 1 —
+    /// Thundermaw Hellkite).</summary>
+    public int Amount { get; set; } = 1;
+
+    // No ToTargetRequest override — this is an untargeted group effect
+    // (CR 608.2), so the owning ability reserves no target slot.
 }
