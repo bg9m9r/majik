@@ -31,6 +31,22 @@ namespace Majik.Core.Players.Agents;
 /// resolution. For non-modal requests it equals <see cref="MinTargets"/> and is
 /// inert.
 /// </para>
+///
+/// <para>
+/// <see cref="ModeIndex"/> (default = null) ties this request to a specific
+/// printed mode of a modal spell (CR 700.2d). It is only needed for SPARSE
+/// modal spells whose targeted modes don't line up one-request-per-mode with
+/// the printed mode list — e.g. Cryptic Command ("Choose two —") prints four
+/// modes but only two are targeted (mode 0 = counter, mode 1 = bounce). When
+/// set, the modal target-collection path in <c>SpellCastFlow</c> keys the
+/// request to its mode index: it collects targets only when that mode was
+/// chosen (raising the effective minimum to <see cref="EffectiveChosenMinTargets"/>
+/// so a chosen targeted mode with no legal target rewinds the cast per
+/// CR 601.2c), and returns the slot at <c>Targets[ModeIndex]</c> so the
+/// EffectFactory's per-mode index lookups stay aligned. Aligned modal spells
+/// (one request per mode, e.g. the Charm family) leave this null and rely on
+/// positional alignment.
+/// </para>
 /// </summary>
 public sealed record TargetRequest(
     string Description,
@@ -39,7 +55,8 @@ public sealed record TargetRequest(
     IReadOnlyList<object> LegalCandidates,
     BotIntent Intent = BotIntent.None,
     Func<GameContext, IReadOnlyList<object>>? CandidateGatherer = null,
-    int? PrintedMinTargets = null)
+    int? PrintedMinTargets = null,
+    int? ModeIndex = null)
 {
     /// <summary>
     /// CR 601.2c — the PRINTED minimum this request demands when its mode is

@@ -8,7 +8,9 @@ using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Spells;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -33,9 +35,136 @@ public class CrypticCommandTests
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
 
+    private readonly SpellCastFlow _flow;
+
     public CrypticCommandTests()
     {
         _stack = new Majik.Core.Stack.Stack(_bus);
+        _flow = new SpellCastFlow(_stack, new ZoneService(_bus), _bus);
+    }
+
+    private GameContext Ctx() =>
+        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+
+    private Instant NewCryptic()
+    {
+        var cc = CrypticCommandFactory.Create(_alice);
+        cc.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(cc);
+        return cc;
+    }
+
+    [Fact]
+    public void BuildDefinition_IsMultiMode_ChooseTwo()
+    {
+        var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);
+
+        def.IsMultiMode.Should().BeTrue();
+        def.MinModes.Should().Be(2);
+        def.MaxModes.Should().Be(2);
+    }
+
+    [Fact]
+    public void BuildDefinition_TargetRequests_CarryModeIndexAndPrintedMinimum()
+    {
+        // CR 601.2c — each targeted mode's request is tied to its printed
+        // mode index and demands a printed minimum of 1 once chosen.
+        var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);
+
+        def.TargetRequests[CrypticCommandFactory.ModeCounter].ModeIndex
+            .Should().Be(CrypticCommandFactory.ModeCounter);
+        def.TargetRequests[CrypticCommandFactory.ModeBounce].ModeIndex
+            .Should().Be(CrypticCommandFactory.ModeBounce);
+        def.TargetRequests[CrypticCommandFactory.ModeCounter].EffectiveChosenMinTargets
+            .Should().Be(1);
+        def.TargetRequests[CrypticCommandFactory.ModeBounce].EffectiveChosenMinTargets
+            .Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Cast_ChosenTargetedMode_NoLegalTarget_CastIllegal_Rewinds()
+    {
+        // CR 601.2c — a CHOSEN targeted mode (mode 1, bounce) that the agent
+        // can't supply a legal target for makes the WHOLE cast illegal (the
+        // cast rewinds) rather than no-opping on resolution. Alice chooses
+        // modes 1 (bounce) + 3 (draw); there is no permanent to bounce, so the
+        // agent returns an empty target slot. The cast must throw, and the
+        // Cryptic Command must remain in Alice's hand (it never reached the
+        // stack).
+        var cc = NewCryptic();
+
+        var agent = new ScriptedAgent();
+        agent.QueueModes(CrypticCommandFactory.ModeBounce, CrypticCommandFactory.ModeDraw);
+        agent.QueueTargets(System.Array.Empty<object>()); // no legal permanent to bounce
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);
+
+        Func<Task> act = async () => await _flow.CastAsync(_alice, cc, def, agent, Ctx());
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*target permanent*",
+                because: "a chosen targeted mode with no legal target is illegal (CR 601.2c)");
+
+        cc.Zone.Should().Be(ZoneType.Hand,
+            because: "an illegal cast rewinds — the card never reaches the stack");
+        _stack.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Cast_UnchosenTargetedMode_NoLegalTarget_StillLegal()
+    {
+        // CR 601.2c — an UNCHOSEN targeted mode never gates the cast. Alice
+        // chooses modes 2 (tap opponents) + 3 (draw), neither of which targets;
+        // the counter/bounce target requests must NOT be prompted, so the cast
+        // succeeds even with nothing to target.
+        var cc = NewCryptic();
+        var top = new Instant("Counterspell", "{U}{U}") { Owner = _alice };
+        _alice.Zones.Library.AddCard(top);
+
+        var agent = new ScriptedAgent();
+        agent.QueueModes(CrypticCommandFactory.ModeTapOpponents, CrypticCommandFactory.ModeDraw);
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);
+
+        var spell = await _flow.CastAsync(_alice, cc, def, agent, Ctx());
+
+        spell.Should().NotBeNull();
+        cc.Zone.Should().Be(ZoneType.Stack);
+        _stack.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Cast_ChosenTargetedMode_WithLegalTarget_ResolvesBothModes()
+    {
+        // End-to-end: Alice chooses modes 1 (bounce) + 3 (draw) with a legal
+        // bounce target. The cast succeeds; on resolution the permanent bounces
+        // and Alice draws. Verifies the sparse-modal slots are keyed by mode
+        // index (Targets[ModeBounce]).
+        var cc = NewCryptic();
+
+        var bobEnch = new Enchantment("Sigil of Sleep", "{U}") { Owner = _bob, Controller = _bob };
+        bobEnch.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bobEnch);
+
+        var top = new Instant("Counterspell", "{U}{U}") { Owner = _alice };
+        _alice.Zones.Library.AddCard(top);
+
+        var agent = new ScriptedAgent();
+        agent.QueueModes(CrypticCommandFactory.ModeBounce, CrypticCommandFactory.ModeDraw);
+        agent.QueueTargets(new object[] { bobEnch }); // bounce target
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);
+
+        var spell = await _flow.CastAsync(_alice, cc, def, agent, Ctx());
+        spell.Resolve();
+
+        bobEnch.Zone.Should().Be(ZoneType.Hand,
+            because: "the bounce mode returns the targeted permanent to its owner's hand");
+        top.Zone.Should().Be(ZoneType.Hand,
+            because: "the draw mode pulls the top card into Alice's hand");
     }
 
     [Fact]
