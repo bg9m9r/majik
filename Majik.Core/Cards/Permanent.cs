@@ -80,6 +80,25 @@ public class Permanent : Card
     public bool HasEffectiveSupertype(Types.CardSupertype supertype) =>
         GetEffectiveSupertypes().Contains(supertype);
 
+    /// <summary>
+    /// CR 205.3 / CR 613.1d — this permanent's <em>effective</em> subtype set
+    /// after the Layer-4 type-changing pass. When <see cref="ActiveEffects"/>
+    /// is set this consults the layer system (so a granted creature type — a
+    /// "becomes a Dragon" Layer-4 effect, Changeling printed-subtype stamping —
+    /// is honoured); when null it falls back to the printed subtypes. Mirrors
+    /// <see cref="GetEffectiveColors"/> / <see cref="GetEffectiveSupertypes"/>.
+    /// Read by protection-from-subtype
+    /// (<see cref="Majik.Core.Rules.Protection.HasProtectionFromSubtype"/>).
+    /// </summary>
+    public IReadOnlySet<Types.CardSubtype> GetEffectiveSubtypes()
+    {
+        if (ActiveEffects == null)
+        {
+            return Subtypes.ToHashSet();
+        }
+        return ActiveEffects.EffectiveSubtypes(this);
+    }
+
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
     /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
     public bool IsToken { get; internal set; }

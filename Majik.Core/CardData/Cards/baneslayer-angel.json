@@ -1,0 +1,9 @@
+{
+  "name": "Baneslayer Angel",
+  "types": ["Creature"],
+  "subtypes": ["Angel"],
+  "manaCost": "{3}{W}{W}",
+  "power": 5,
+  "toughness": 5,
+  "abilities": []
+}

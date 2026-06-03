@@ -50,6 +50,83 @@ public static class Protection
     }
 
     /// <summary>
+    /// CR 702.16 — protection from a creature <em>subtype</em>
+    /// (Baneslayer Angel — "protection from Demons and from Dragons";
+    /// CR 205.3 / CR 702.16). True if any active
+    /// <see cref="ProtectionAbility"/> on <paramref name="card"/> names a
+    /// subtype the <paramref name="source"/> currently has.
+    ///
+    /// CR 613.1d — the source's subtypes can be changed by a Layer-4
+    /// type-changing effect; a <see cref="Permanent"/> source therefore reads
+    /// its <em>effective</em> subtype set (so a creature animated into a Dragon
+    /// is protected against, and one whose Dragon type is removed is not). A
+    /// non-permanent source (an instant/sorcery with a creature subtype — rare,
+    /// but legal) falls back to its printed subtypes.
+    ///
+    /// Quality matching is by enum name, case-insensitively, tolerant of the
+    /// printed plural form ("Demons" → <see cref="CardSubtype.Demon"/>). Only
+    /// protection qualities that resolve to a known <see cref="CardSubtype"/>
+    /// participate — colour / card-type / name qualities are skipped here and
+    /// handled by their dedicated helpers.
+    /// </summary>
+    public static bool HasProtectionFromSubtype(ICard card, ICard source)
+    {
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        if (source == null) throw new ArgumentNullException(nameof(source));
+
+        var sourceSubtypes = source is Permanent perm
+            ? perm.GetEffectiveSubtypes()
+            : (IReadOnlySet<CardSubtype>)source.Subtypes.ToHashSet();
+        if (sourceSubtypes.Count == 0) return false;
+
+        foreach (var quality in Qualities(card))
+        {
+            if (TryParseSubtypeQuality(quality, out var subtype)
+                && sourceSubtypes.Contains(subtype))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Maps a normalised protection-quality token to a <see cref="CardSubtype"/>.
+    /// Accepts the printed plural form ("demons", "dragons", "zombies",
+    /// "elves") by stripping a trailing "es"/"s"; the enum names are the
+    /// canonical singular ("Demon", "Dragon"). Returns false for tokens that
+    /// don't name a creature subtype (colours, card types, names).
+    /// </summary>
+    private static bool TryParseSubtypeQuality(string quality, out CardSubtype subtype)
+    {
+        subtype = default;
+        if (string.IsNullOrWhiteSpace(quality)) return false;
+
+        // Exact singular match first (Enum.TryParse is case-insensitive).
+        if (Enum.TryParse(quality, ignoreCase: true, out subtype)
+            && Enum.IsDefined(subtype))
+        {
+            return true;
+        }
+
+        // Depluralise the printed form: "dragons" -> "dragon",
+        // "zombies" -> "zombie", "elves" -> not handled (no irregulars in the
+        // covered set). Try "-es" then "-s".
+        string singular = quality;
+        if (quality.EndsWith("ies", StringComparison.Ordinal))
+        {
+            singular = quality[..^3] + "y"; // "faeries" -> "faery" (no enum); harmless
+        }
+        else if (quality.EndsWith("s", StringComparison.Ordinal))
+        {
+            singular = quality[..^1];
+        }
+
+        return Enum.TryParse(singular, ignoreCase: true, out subtype)
+            && Enum.IsDefined(subtype);
+    }
+
+    /// <summary>
     /// CR 702.16 — true if any <see cref="ProtectionAbility"/> on
     /// <paramref name="card"/> matches the resolving
     /// <paramref name="source"/> spell via its

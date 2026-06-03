@@ -48,6 +48,11 @@ public static class TargetLegality
         if (!CanBeTargetedBy(target, caster)) return false;
         if (source == null) return true;
 
+        // CR 702.16e / 205.3 — protection from a creature SUBTYPE forbids the
+        // target (a spell/ability whose source is a Demon/Dragon can't target
+        // Baneslayer Angel). Independent of who controls the source.
+        if (Protection.HasProtectionFromSubtype(target, source)) return false;
+
         var opponentSource = !ReferenceEquals(target.Controller, caster);
         foreach (var c in EffectiveColorsOf(source))
         {

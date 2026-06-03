@@ -436,6 +436,14 @@ public sealed class CombatFlow
             if (Majik.Core.Rules.Protection.HasProtectionFromColor(target, c))
                 return true;
         }
+
+        // CR 702.16e / 205.3 — protection from a creature SUBTYPE prevents
+        // combat damage from a matching source (Baneslayer Angel takes no
+        // damage from a Demon or Dragon). Reads the source's effective
+        // subtypes (Layer-4).
+        if (Majik.Core.Rules.Protection.HasProtectionFromSubtype(target, source))
+            return true;
+
         return false;
     }
 
