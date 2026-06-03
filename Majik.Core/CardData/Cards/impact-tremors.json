@@ -1,0 +1,18 @@
+{
+  "name": "Impact Tremors",
+  "types": ["Enchantment"],
+  "manaCost": "{1}{R}",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": {
+        "type": "whenever_another_creature_enters",
+        "youControlOnly": true,
+        "includeSelf": true
+      },
+      "effects": [
+        { "type": "deal_damage_each_opponent", "amount": 1 }
+      ]
+    }
+  ]
+}
