@@ -2,6 +2,22 @@
   "name": "Grixis Panorama",
   "types": ["Land"],
   "abilities": [
-    { "kind": "mana", "produces": "C" }
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}" },
+        { "type": "tap_self" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        {
+          "type": "search_library",
+          "basicLand": true,
+          "subtypes": ["Island", "Swamp", "Mountain"],
+          "destination": "battlefield_tapped"
+        }
+      ]
+    }
   ]
 }

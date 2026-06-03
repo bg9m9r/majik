@@ -52,6 +52,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(BecomesArtifactTargetEffectDef), "becomes_artifact_target")]
 [JsonDerivedType(typeof(DamageAndTapEachFlyerOpponentsControlEffectDef), "damage_and_tap_each_flyer_opponents_control")]
 [JsonDerivedType(typeof(CounterTargetSpellEffectDef), "counter_target_spell")]
+[JsonDerivedType(typeof(SearchLibraryEffectDef), "search_library")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -1285,4 +1286,84 @@ public sealed class CounterTargetSpellEffectDef : EffectDefinition
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.SpellOnStackRequest(Noncreature, Creature);
+}
+
+/// <summary>
+/// "Search your library for a [filtered] card, put it [destination], then
+/// shuffle" (CR 701.19 — Search; CR 701.20a — the post-search shuffle rider).
+/// The declarative serialization of the bespoke library-tutor factories
+/// (<see cref="Majik.Core.CardData.Factories.MysticalTutorFactory"/> /
+/// <see cref="Majik.Core.CardData.Factories.BantPanoramaFactory"/> et al.) onto
+/// the shared <see cref="Majik.Core.Zones.LibrarySearch"/> +
+/// <see cref="Majik.Core.Zones.LibraryShuffle"/> plumbing — an <b>untargeted</b>
+/// verb (the searched card is a hidden choice, not a chosen target — CR 115.1a),
+/// so it declares no <see cref="ToTargetRequest"/>.
+///
+/// <para>
+/// This is the ONE declarative shape for the whole "search your library for a
+/// filtered card" cluster. The panorama land cycle (Bant / Akoum / Esper /
+/// Grixis / Jund / Naya Panorama — "{1}, {T}, Sacrifice this land: Search your
+/// library for a basic [two/three colours], put it onto the battlefield tapped,
+/// then shuffle") becomes a declarative <c>sacrifice_self</c> cost (CR 117.5 —
+/// the cost is paid as the ability resolves, so this land is OFF the battlefield
+/// during the search) + this verb with the basic-land
+/// <see cref="Subtypes"/> filter + <c>destination: "battlefield_tapped"</c>.
+/// </para>
+///
+/// <para>The card filter is composed from up to three optional, ANDed clauses:
+/// <list type="bullet">
+///   <item><see cref="Subtypes"/> — the card must have at least ONE of the
+///   listed land subtypes (CR 205.3 — Forest / Plains / Island / Swamp /
+///   Mountain; the panorama trios). Empty = no subtype restriction.</item>
+///   <item><see cref="BasicLand"/> (default <c>false</c>) — the card must be a
+///   Basic Land (CR 205.4a — the Basic supertype). Combined with
+///   <see cref="Subtypes"/> this is the panorama "basic Forest / Plains /
+///   Island" filter.</item>
+///   <item><see cref="CardType"/> — the card must have the named
+///   <see cref="Majik.Core.Cards.Types.CardType"/> (e.g. <c>"Creature"</c>,
+///   <c>"Land"</c>). Null = no card-type restriction.</item>
+/// </list>
+/// With no clause set the verb searches for ANY card (the unconditional tutor).
+/// </para>
+///
+/// <para><see cref="Destination"/> (CR 701.19 — "put it …"):
+/// <list type="bullet">
+///   <item><c>"hand"</c> (default) — the Demonic/Worldly/Vampiric-Tutor
+///   family.</item>
+///   <item><c>"battlefield"</c> — put onto the battlefield untapped
+///   (Green Sun's Zenith-style).</item>
+///   <item><c>"battlefield_tapped"</c> — put onto the battlefield TAPPED (the
+///   panorama / fetch-for-a-basic family).</item>
+/// </list>
+/// </para>
+///
+/// <para><see cref="Shuffle"/> (default <c>true</c>) — CR 701.20a: shuffle the
+/// library whether or not a card was found. The panoramas / wishes all shuffle;
+/// the rare "search but do not shuffle" tutor (e.g. a top-of-library placement)
+/// flips it off.</para>
+/// </summary>
+public sealed class SearchLibraryEffectDef : EffectDefinition
+{
+    /// <summary>Land subtypes (CR 205.3) the found card must have at least one
+    /// of — e.g. <c>["Forest", "Plains", "Island"]</c> for Bant Panorama. Empty
+    /// = no subtype restriction.</summary>
+    public List<string> Subtypes { get; set; } = new();
+
+    /// <summary>"basic" supertype restriction (CR 205.4a). Default <c>false</c>.
+    /// Combined with <see cref="Subtypes"/> for the panorama "basic Forest /
+    /// Plains / Island" filter.</summary>
+    public bool BasicLand { get; set; }
+
+    /// <summary>Optional <see cref="Majik.Core.Cards.Types.CardType"/> name
+    /// (e.g. <c>"Creature"</c>, <c>"Land"</c>) the found card must have. Null =
+    /// no card-type restriction.</summary>
+    public string? CardType { get; set; }
+
+    /// <summary>Where the found card is put: <c>"hand"</c> (default),
+    /// <c>"battlefield"</c>, or <c>"battlefield_tapped"</c>.</summary>
+    public string Destination { get; set; } = "hand";
+
+    /// <summary>Shuffle the library after the search (CR 701.20a). Default
+    /// <c>true</c>.</summary>
+    public bool Shuffle { get; set; } = true;
 }

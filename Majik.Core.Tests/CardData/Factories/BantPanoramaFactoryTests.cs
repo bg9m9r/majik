@@ -111,6 +111,9 @@ public class BantPanoramaFactoryTests
         var fetch = land.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<AdditionalCost>()
                 .Any(c => c.CostType == AdditionalCostType.Tap));
+        // CR 117.5 — the sacrifice + tap are activation COSTS (paid now), then
+        // the search effect resolves with this land already off the battlefield.
+        foreach (var cost in fetch.Costs.OfType<AdditionalCost>()) cost.Pay(_alice);
         foreach (var eff in fetch.Effects) eff.Execute();
 
         // Basic Forest fetched to battlefield tapped; off-color Mountain untouched.
@@ -140,6 +143,7 @@ public class BantPanoramaFactoryTests
         var fetch = land.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<AdditionalCost>()
                 .Any(c => c.CostType == AdditionalCostType.Tap));
+        foreach (var cost in fetch.Costs.OfType<AdditionalCost>()) cost.Pay(_alice);
         foreach (var eff in fetch.Effects) eff.Execute();
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(basicPlains);
@@ -164,6 +168,7 @@ public class BantPanoramaFactoryTests
         var fetch = land.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<AdditionalCost>()
                 .Any(c => c.CostType == AdditionalCostType.Tap));
+        foreach (var cost in fetch.Costs.OfType<AdditionalCost>()) cost.Pay(_alice);
         foreach (var eff in fetch.Effects) eff.Execute();
 
         _alice.Zones.Graveyard.GetCards().Should().Contain(land);

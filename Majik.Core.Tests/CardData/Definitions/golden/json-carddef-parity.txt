@@ -2375,8 +2375,10 @@
       ]
     },
     "activated": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BAdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
     },
     "triggered": {
       "count": 0,
@@ -10608,8 +10610,10 @@
       ]
     },
     "activated": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BAdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
     },
     "triggered": {
       "count": 0,
@@ -15583,8 +15587,10 @@
       ]
     },
     "activated": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BAdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
     },
     "triggered": {
       "count": 0,
@@ -18348,8 +18354,10 @@
       ]
     },
     "activated": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BAdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
     },
     "triggered": {
       "count": 0,
@@ -23861,8 +23869,10 @@
       ]
     },
     "activated": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BAdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
     },
     "triggered": {
       "count": 0,
