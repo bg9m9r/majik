@@ -108,6 +108,15 @@ public static class TargetFilters
         {
             "any" or "any_target" or "creature_or_player" =>
                 ($"{verb} to any target", IsAnyTarget),
+            // CR 120.3 — "any target that was dealt damage this turn"
+            // (Needle Drop). A creature / planeswalker / player that has the
+            // per-turn "was dealt damage" flag set. Both the candidate gatherer
+            // and the CR 608.2b resolution re-check apply the flag, so a target
+            // that loses the property (impossible mid-turn, but the cleanup
+            // sweep clears it) fizzles cleanly.
+            "any_target_dealt_damage_this_turn" =>
+                ($"{verb} to any target that was dealt damage this turn",
+                    o => IsAnyTarget(o) && WasDealtDamageThisTurn(o)),
             "player" =>
                 ($"target player to {verb}", o => o is Player),
             "creature" =>
@@ -214,6 +223,21 @@ public static class TargetFilters
         Player => true,
         Planeswalker pw => OnBattlefield(pw),
         Creature c => OnBattlefield(c),
+        _ => false,
+    };
+
+    /// <summary>
+    /// CR 120.3 — has this object been dealt damage during the current turn?
+    /// Reads <see cref="Player.WasDealtDamageThisTurn"/> for players and
+    /// <see cref="Permanent.WasDealtDamageThisTurn"/> for permanents (creatures
+    /// / planeswalkers). Anything else is never "dealt damage". Exposed so
+    /// hand-written factories (Needle Drop) reuse the same predicate the JSON /
+    /// DSL filter uses.
+    /// </summary>
+    public static bool WasDealtDamageThisTurn(object o) => o switch
+    {
+        Player p => p.WasDealtDamageThisTurn,
+        Permanent perm => perm.WasDealtDamageThisTurn,
         _ => false,
     };
 
