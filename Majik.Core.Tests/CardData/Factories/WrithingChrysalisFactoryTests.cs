@@ -133,10 +133,10 @@ public class WrithingChrysalisFactoryTests
             toughness: 1,
             subtypes: new[] { CardSubtype.Eldrazi, CardSubtype.Spawn });
 
-        var evt = new CardMovedEvent(anotherEldrazi, ZoneType.Battlefield, ZoneType.Graveyard);
+        var evt = new PermanentSacrificedEvent(anotherEldrazi, _alice, wasToken: false);
 
         sacTrigger.Condition.Matches(evt, sacTrigger).Should().BeTrue(
-            "another Eldrazi leaving the battlefield satisfies the trigger");
+            "you sacrificing another Eldrazi satisfies the trigger");
 
         foreach (var e in sacTrigger.Effects) e.Execute();
 
@@ -153,7 +153,7 @@ public class WrithingChrysalisFactoryTests
             .Single(t => t.ActiveZones.Contains(ZoneType.Battlefield));
 
         // "another Eldrazi" — the source itself does not count (CR 603.2).
-        var evt = new CardMovedEvent(card, ZoneType.Battlefield, ZoneType.Graveyard);
+        var evt = new PermanentSacrificedEvent(card, _alice, wasToken: false);
 
         sacTrigger.Condition.Matches(evt, sacTrigger).Should().BeFalse(
             "Writhing Chrysalis sacrificing itself is not 'another Eldrazi'");
@@ -174,9 +174,9 @@ public class WrithingChrysalisFactoryTests
             toughness: 1,
             subtypes: new[] { CardSubtype.Goblin });
 
-        var evt = new CardMovedEvent(goblin, ZoneType.Battlefield, ZoneType.Graveyard);
+        var evt = new PermanentSacrificedEvent(goblin, _alice, wasToken: false);
 
         sacTrigger.Condition.Matches(evt, sacTrigger).Should().BeFalse(
-            "a non-Eldrazi leaving the battlefield does not trigger");
+            "you sacrificing a non-Eldrazi does not trigger");
     }
 }

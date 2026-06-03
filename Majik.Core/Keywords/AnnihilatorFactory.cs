@@ -66,7 +66,8 @@ public static class AnnihilatorFactory
     public static TriggeredAbility Build(
         Creature source,
         int n,
-        Func<Player, IPlayerAgent?>? agentSelector = null)
+        Func<Player, IPlayerAgent?>? agentSelector = null,
+        Majik.Core.Events.IEventBus? eventBus = null)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
         if (source.Controller == null)
@@ -150,7 +151,22 @@ public static class AnnihilatorFactory
                     // — token in graveyard ceases to exist next SBA
                     // pass. Fx.Sacrifice routes through the binder's
                     // reason-gated MoveToGraveyard.
-                    Fx.Sacrifice(pick);
+                    //
+                    // CR 701.16a — the defending player IS the sacrificing
+                    // player. When an event bus is supplied, publish a
+                    // PermanentSacrificedEvent so "whenever an opponent
+                    // sacrifices …" payoffs (It That Betrays) observe the
+                    // sacrifice with the correct sacrificing-player /
+                    // nontoken context. Without a bus, fall back to the
+                    // bare (publish-nothing) overload — legacy posture.
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(pick, victim, eventBus);
+                    }
+                    else
+                    {
+                        Fx.Sacrifice(pick);
+                    }
                     sacrificed++;
                 }
             });

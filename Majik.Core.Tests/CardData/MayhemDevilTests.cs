@@ -65,11 +65,10 @@ public class MayhemDevilTests
     }
 
     [Fact]
-    public void MayhemDevil_CreatureMovesToGraveyard_TriggerFires()
+    public void MayhemDevil_AnyPlayerSacrifices_TriggerFires()
     {
-        // v1 approximation: any permanent moving Battlefield → Graveyard
-        // fires the trigger (see factory xmldoc — true "sacrifices a
-        // permanent" semantics await a dedicated PermanentSacrificedEvent).
+        // "Whenever a PLAYER sacrifices a permanent" — fires on ANY
+        // player's sacrifice (CR 603.1), no SacrificingPlayer filter.
         var devil = MayhemDevilFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(devil);
         devil.SetZone(ZoneType.Battlefield);
@@ -78,69 +77,31 @@ public class MayhemDevilTests
         bear.SetOwner(_bob);
         bear.SetController(_bob);
 
-        var moveEvent = new CardMovedEvent(bear, ZoneType.Battlefield, ZoneType.Graveyard);
+        var sacEvent = new PermanentSacrificedEvent(bear, _bob, wasToken: false);
 
         var trigger = devil.Abilities.OfType<TriggeredAbility>().Single();
-        trigger.IsTriggered(moveEvent).Should().BeTrue();
+        trigger.IsTriggered(sacEvent).Should().BeTrue(
+            "an opponent's sacrifice fires Mayhem Devil");
     }
 
     [Fact]
-    public void MayhemDevil_ArtifactMovesToGraveyard_TriggerFires()
+    public void MayhemDevil_ControllerOwnSacrifice_TriggerFires()
     {
-        // Artifact, enchantment, land, planeswalker all count as
-        // permanents and satisfy the predicate.
+        // "a player" includes the controller — Mayhem Devil fires on the
+        // controller's own sacrifice too (token or nontoken).
         var devil = MayhemDevilFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(devil);
         devil.SetZone(ZoneType.Battlefield);
 
-        var clue = new Artifact("Clue Token", "{0}");
-        clue.SetOwner(_alice);
-        clue.SetController(_alice);
+        var token = new Creature("Eldrazi Spawn", "{0}", 0, 1);
+        token.SetOwner(_alice);
+        token.SetController(_alice);
 
-        var moveEvent = new CardMovedEvent(clue, ZoneType.Battlefield, ZoneType.Graveyard);
-
-        var trigger = devil.Abilities.OfType<TriggeredAbility>().Single();
-        trigger.IsTriggered(moveEvent).Should().BeTrue();
-    }
-
-    [Fact]
-    public void MayhemDevil_NonPermanentToGraveyard_DoesNotFire()
-    {
-        // Instant/sorcery spell resolution can produce a synthetic
-        // Battlefield → Graveyard event in test setups; the predicate
-        // filters on permanent types so non-permanent cards don't
-        // trigger the ability.
-        var devil = MayhemDevilFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(devil);
-        devil.SetZone(ZoneType.Battlefield);
-
-        var bolt = new Instant("Lightning Bolt", "{R}");
-        bolt.SetOwner(_alice);
-        bolt.SetController(_alice);
-
-        var moveEvent = new CardMovedEvent(bolt, ZoneType.Battlefield, ZoneType.Graveyard);
+        var sacEvent = new PermanentSacrificedEvent(token, _alice, wasToken: true);
 
         var trigger = devil.Abilities.OfType<TriggeredAbility>().Single();
-        trigger.IsTriggered(moveEvent).Should().BeFalse(
-            "the predicate restricts to permanent card types — instants don't count");
-    }
-
-    [Fact]
-    public void MayhemDevil_GraveyardToExile_DoesNotFire()
-    {
-        // Only Battlefield → Graveyard satisfies the v1 condition.
-        var devil = MayhemDevilFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(devil);
-        devil.SetZone(ZoneType.Battlefield);
-
-        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
-        bear.SetOwner(_bob);
-        bear.SetController(_bob);
-
-        var moveEvent = new CardMovedEvent(bear, ZoneType.Graveyard, ZoneType.Exile);
-
-        var trigger = devil.Abilities.OfType<TriggeredAbility>().Single();
-        trigger.IsTriggered(moveEvent).Should().BeFalse();
+        trigger.IsTriggered(sacEvent).Should().BeTrue(
+            "the controller's own sacrifice (even of a token) fires Mayhem Devil");
     }
 
     [Fact]

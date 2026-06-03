@@ -109,4 +109,15 @@ public enum EventType
     // applied. The player-scoped twin of <c>CounterAdded</c>. Published by
     // <c>PlayerCountersService.Add</c> when a non-zero placement landed.
     PlayerCounterAdded,
+
+    // CR 701.16 — a permanent was SACRIFICED (moved from the battlefield to
+    // its owner's graveyard as a sacrifice cost or effect — Annihilator,
+    // edicts, sac-costs). Distinct from a "destroy" / SBA death: carries the
+    // sacrificing player and whether the permanent was a token, so
+    // "whenever a/an [opponent] sacrifices …" aristocrat triggers
+    // (It That Betrays, Mayhem Devil, Writhing Chrysalis) fire without the
+    // CardMovedEvent over/under-fire footprint. Published by the
+    // bus-aware <c>Fx.Sacrifice</c> overload at the moment the permanent
+    // leaves the battlefield.
+    PermanentSacrificed,
 }
