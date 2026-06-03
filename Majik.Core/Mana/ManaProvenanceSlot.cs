@@ -41,6 +41,20 @@ public sealed class ManaProvenanceSlot
     public ManaColor Color { get; }
 
     /// <summary>
+    /// Optional spend-restriction rider on this unit of mana (CR 106.4 —
+    /// "Some abilities produce mana with a restriction on how that mana can
+    /// be spent."). When non-null, the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> may only let this
+    /// slot pay a cost whose context (the spell being cast) satisfies the
+    /// restriction's predicate; otherwise the slot's mana is treated as
+    /// unavailable for that payment and stays floating. <c>null</c> ⇒
+    /// vanilla mana, spendable on any cost. Ancient Ziggurat ("creature
+    /// spell only"), Cavern of Souls (chosen-type creature), Eldrazi Temple
+    /// ("Eldrazi spells/abilities") all stamp this.
+    /// </summary>
+    public SpendRestriction? Restriction { get; }
+
+    /// <summary>
     /// Optional reaction fired when this slot is spent paying a cost. The
     /// argument is the object the mana was spent on — the cast
     /// <see cref="ICard"/> for a spell, or <c>null</c> for a non-spell
@@ -50,10 +64,30 @@ public sealed class ManaProvenanceSlot
     /// </summary>
     public Action<ICard?>? OnSpent { get; }
 
-    public ManaProvenanceSlot(object source, ManaColor color, Action<ICard?>? onSpent = null)
+    public ManaProvenanceSlot(
+        object source,
+        ManaColor color,
+        Action<ICard?>? onSpent = null,
+        SpendRestriction? restriction = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Color = color;
         OnSpent = onSpent;
+        Restriction = restriction;
+    }
+
+    /// <summary>
+    /// Whether this slot's mana may be spent on <paramref name="spentOn"/>
+    /// (the spell being cast, or <c>null</c> for a non-spell context such as
+    /// an ability-activation cost). Unrestricted slots return <c>true</c>
+    /// unconditionally; restricted slots delegate to the
+    /// <see cref="SpendRestriction"/> predicate, which treats a null spell as
+    /// "no permission" (CR 106.4 — the restriction only allows the named kind
+    /// of spend).
+    /// </summary>
+    public bool CanSpendOn(Majik.Core.Spells.ISpell? spentOn)
+    {
+        if (Restriction is null) return true;
+        return Restriction.SatisfiedBy(spentOn);
     }
 }

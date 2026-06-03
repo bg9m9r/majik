@@ -314,6 +314,37 @@ public sealed class ManaPaymentResolver
             return false;
         }
 
+        // CR 106.4 — spend-restriction gate. Some mana carries a "spend this
+        // mana only to cast a creature spell" (Ancient Ziggurat), "…of the
+        // chosen type" (Cavern of Souls), or "…on Eldrazi spells" (Eldrazi
+        // Temple) rider. Such a unit is UNAVAILABLE to pay this cost unless
+        // the object being paid for (spentOn) satisfies the restriction. The
+        // pool buckets colour counts, so the per-slot restriction lives in the
+        // provenance ledger (existing floating slots) plus the produced mana of
+        // any restricted ability in THIS payment. Recompute payability with the
+        // blocked colored units removed; if it no longer covers the cost,
+        // reject atomically (nothing has been tapped yet).
+        var spellContext = spentOn != null
+            ? new Spells.Spell(spentOn, payer)
+            : null;
+        var blockedW = CountBlocked(payer, abilities, ValueObjects.ManaColor.White, spellContext);
+        var blockedU = CountBlocked(payer, abilities, ValueObjects.ManaColor.Blue, spellContext);
+        var blockedB = CountBlocked(payer, abilities, ValueObjects.ManaColor.Black, spellContext);
+        var blockedR = CountBlocked(payer, abilities, ValueObjects.ManaColor.Red, spellContext);
+        var blockedG = CountBlocked(payer, abilities, ValueObjects.ManaColor.Green, spellContext);
+        var hasBlocked = blockedW + blockedU + blockedB + blockedR + blockedG > 0;
+        if (hasBlocked)
+        {
+            var spendable = simulated.RemoveColored(
+                white: blockedW, blue: blockedU, black: blockedB,
+                red: blockedR, green: blockedG);
+            var (_, canPaySpendable) = spendable.Pay(cost);
+            if (!canPaySpendable)
+            {
+                return false;
+            }
+        }
+
         // Snapshot the player's pool BEFORE we tap producers + pay, so
         // we can diff the colored buckets post-spend to compute Sunburst-
         // style "colors of mana spent" (CR 702.44b). Pool-before-spend +
@@ -326,11 +357,45 @@ public sealed class ManaPaymentResolver
         {
             ab.Activate();
         }
-        foreach (var p in produced)
+        // CR 106.4 — stamp every produced unit with its ability's spend-
+        // restriction (and any provenance reaction) so the ledger records
+        // which floating units are restricted. Restriction-only abilities
+        // (Ancient Ziggurat) record slots even without an OnSpent callback;
+        // ManaAbilityActivator already stamps reaction slots on the float-
+        // then-cast path, so this covers the source-tapped-at-pay path.
+        for (var i = 0; i < abilities.Count; i++)
         {
-            payer.AddManaToPool(p);
+            var concrete = abilities[i] as Abilities.ManaAbility;
+            var restriction = concrete?.SpendRestriction;
+            var reaction = concrete?.ProvenanceReaction;
+            if (restriction != null || reaction != null)
+            {
+                payer.AddManaToPool(
+                    produced[i],
+                    provenanceSource: abilities[i],
+                    onSpent: reaction,
+                    restriction: restriction);
+            }
+            else
+            {
+                payer.AddManaToPool(produced[i]);
+            }
+        }
+
+        // CR 106.4 — withhold the blocked restricted colored mana from the pool
+        // across the actual payment so the bucketed ManaPool.Pay (which has no
+        // per-slot view and would otherwise greedily spend a restricted unit on
+        // a generic pip) can only consume SPENDABLE mana. The withheld mana is
+        // restored afterward and stays floating, its provenance slots intact.
+        if (hasBlocked)
+        {
+            payer.WithholdColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG);
         }
         var ok = payer.PayMana(cost);
+        if (hasBlocked)
+        {
+            payer.RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG);
+        }
         if (!ok) return false;
 
         var poolAfter = payer.ManaPool;
@@ -382,5 +447,61 @@ public sealed class ManaPaymentResolver
         if (deltaG > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Green, deltaG, spentOn);
 
         return true;
+    }
+
+    /// <summary>
+    /// CR 106.4 — count the units of <paramref name="color"/> that are
+    /// UNAVAILABLE for the current payment because they carry a spend-
+    /// restriction the spell being cast (<paramref name="spell"/>, null for a
+    /// non-spell context) does not satisfy. Two sources contribute:
+    /// <list type="number">
+    /// <item>floating mana already in the payer's provenance ledger
+    /// (e.g. mana floated via a Cavern of Souls ability earlier this step);</item>
+    /// <item>mana about to be produced by the <paramref name="abilities"/>
+    /// tapped for THIS payment (e.g. Ancient Ziggurat's any-color ability) —
+    /// not yet in the ledger at gate time, so counted from the ability's
+    /// <see cref="Abilities.ManaAbility.SpendRestriction"/> + its generated
+    /// colored amount.</item>
+    /// </list>
+    /// Generic mana is never restricted, so only WUBRG colors are counted.
+    /// </summary>
+    private static int CountBlocked(
+        Player payer,
+        IReadOnlyList<IManaAbility> abilities,
+        ValueObjects.ManaColor color,
+        Spells.ISpell? spell)
+    {
+        var blocked = 0;
+
+        // (1) Already-floating restricted slots that don't satisfy the spell.
+        foreach (var slot in payer.ManaProvenance)
+        {
+            if (slot.Color == color && slot.Restriction != null && !slot.CanSpendOn(spell))
+            {
+                blocked++;
+            }
+        }
+
+        // (2) About-to-be-produced restricted units from this payment.
+        foreach (var ab in abilities)
+        {
+            var restriction = (ab as Abilities.ManaAbility)?.SpendRestriction;
+            if (restriction == null || restriction.SatisfiedBy(spell))
+            {
+                continue;
+            }
+            var produced = ab.ManaGenerated;
+            blocked += color switch
+            {
+                ValueObjects.ManaColor.White => produced.White,
+                ValueObjects.ManaColor.Blue => produced.Blue,
+                ValueObjects.ManaColor.Black => produced.Black,
+                ValueObjects.ManaColor.Red => produced.Red,
+                ValueObjects.ManaColor.Green => produced.Green,
+                _ => 0,
+            };
+        }
+
+        return blocked;
     }
 }

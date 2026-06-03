@@ -17,15 +17,18 @@ namespace Majik.Core.Mana;
 /// being cast — if the predicate returns <c>false</c>, the tagged mana
 /// is ineligible to pay any pip on that spell.</para>
 ///
-/// <para><b>Engine wiring status (2026-05):</b> the data type ships now
-/// so factories (Cavern, Eldrazi Temple, future Workshop) can stamp
-/// their restrictions on the generated <see cref="ManaAbility"/>. The
-/// payment-gate side — filtering tagged mana out of
-/// <see cref="Majik.Core.ValueObjects.ManaPool"/> entries during
-/// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> — is deferred
-/// because <c>ManaPool</c> stores bucketed colour counts, not slot-level
-/// provenance; flipping that surface is a separate slice. See
-/// <c>MODERN_COVERAGE.md</c>.</para>
+/// <para><b>Engine wiring status (2026-06):</b> both halves now ship.
+/// Factories (Cavern, Eldrazi Temple, Ancient Ziggurat) stamp their
+/// restriction on the generated <see cref="ManaAbility"/>; the restriction
+/// rides each produced colored unit into the per-slot
+/// <see cref="ManaProvenanceSlot"/> ledger, and the payment gate in
+/// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> treats restricted
+/// mana the spell doesn't satisfy as UNAVAILABLE — it removes those colored
+/// units from the spendable pool before checking payability and withholds
+/// them across the actual (bucketed) spend so they can't pay a non-matching
+/// pip. <c>ManaPool</c> still stores bucketed colour counts; the slot-level
+/// restriction lives in the parallel provenance ledger rather than on the
+/// pool. CR 106.4 — the restriction applies at spend time.</para>
 ///
 /// <para>Value-typed: two restrictions with the same description and
 /// predicate-reference compare equal. Predicates are by-reference compared

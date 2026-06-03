@@ -50,11 +50,12 @@ namespace Majik.Core.CardData.Factories;
 ///   <b>unrestricted</b> per the printed oracle (the restriction rider
 ///   only applies to the second activated mana ability).
 ///
-///   <b>Payment-gate enforcement</b> (filtering tagged pool entries
-///   when paying a non-matching cost) is deferred until
-///   <see cref="ManaPool"/> grows per-slot tags — today the pool stores
-///   bucketed colour counts only. The restriction is observational
-///   metadata on the ability until the resolver wires it up.
+///   <b>Payment-gate enforcement is live</b>: the
+///   <see cref="Majik.Core.Costs.ManaPaymentResolver"/> rides the
+///   restriction onto each produced colored unit and treats those units as
+///   unavailable when the cast object doesn't satisfy the predicate
+///   (non-creature, or the wrong chosen type), rejecting the payment
+///   atomically.
 /// - <b>"That spell can't be countered"</b>: requires flagging the spell
 ///   object at cast time (when one of Cavern's mana entries pays a pip on
 ///   a chosen-type creature spell) and gating counter-spells in

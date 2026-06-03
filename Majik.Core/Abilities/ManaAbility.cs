@@ -27,12 +27,13 @@ public class ManaAbility : IManaAbility
     /// CR 106.4 — the restriction is part of the mana's provenance, not
     /// the ability itself, and applies at spend time.
     ///
-    /// <para>v1 of the spend-restriction primitive ships the data only:
-    /// the rider lives here so factories can stamp it, and the payment
-    /// resolver will consult it once
-    /// <see cref="Majik.Core.ValueObjects.ManaPool"/> grows per-slot
-    /// provenance (today's pool stores bucketed colour counts, no tags).
-    /// Until then, restriction is observational metadata.</para>
+    /// <para>The payment gate is now live: the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> stamps this
+    /// restriction onto every colored unit this ability produces (a
+    /// <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> carrying the rider)
+    /// and treats such units as unavailable when paying a cost whose spell
+    /// the restriction doesn't satisfy. CR 106.4 — the restriction applies at
+    /// spend time, not generation time.</para>
     /// </summary>
     public SpendRestriction? SpendRestriction { get; }
 
