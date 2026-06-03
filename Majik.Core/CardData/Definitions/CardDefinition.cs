@@ -62,6 +62,26 @@ public sealed class CardDefinition
     /// </summary>
     public List<string> Colors { get; set; } = new();
 
+    /// <summary>
+    /// CR 702 — printed evergreen / keyword-ability lines on this card
+    /// (e.g. <c>["Haste"]</c>, <c>["Flying", "Trample"]</c>,
+    /// <c>["Devoid", "Haste"]</c>). Each entry is stamped onto the runtime
+    /// card as a plain <see cref="Majik.Core.Abilities.KeywordAbility"/>
+    /// marker by <see cref="CardDefRuntime.Build"/>, so the combat / timing
+    /// subsystems that read those markers (Haste, Flying, Trample,
+    /// First strike, …) see the keyword without a bespoke factory. This is
+    /// the declarative home for the broad cluster of creatures whose only
+    /// printed clause beyond the vanilla body is a keyword line.
+    ///
+    /// <para>CR 702.114 — <c>"Devoid"</c> is special-cased: in addition to
+    /// the marker it flips the runtime card's
+    /// <see cref="Majik.Core.Cards.Card.IsDevoid"/> flag so the card is
+    /// colourless for all rules purposes (tutor / colour-matters predicates),
+    /// overriding the coloured pips in its mana cost. Pair it with a Haste
+    /// line for the Eldrazi-Obligator-style "Devoid + Haste" residual.</para>
+    /// </summary>
+    public List<string> Keywords { get; set; } = new();
+
     /// <summary>Ability list. Each entry is a discriminated union via
     /// the <c>kind</c> JSON property.</summary>
     public List<AbilityDefinition> Abilities { get; set; } = new();
@@ -122,6 +142,15 @@ public sealed class CardDefinition
         foreach (var letter in Colors)
         {
             builder.WithColorIndicator(letter);
+        }
+
+        // CR 702 — printed keyword lines (Haste / Flying / Devoid / …). Each
+        // becomes a KeywordAbility marker on the runtime card; "Devoid" also
+        // flips the colourless flag (CR 702.114) — both handled in
+        // CardDefRuntime.Build off CardDef.Keywords.
+        foreach (var keyword in Keywords)
+        {
+            builder.WithKeyword(keyword);
         }
 
         // Ability union → canonical CardDefAbility entries. The mappers
