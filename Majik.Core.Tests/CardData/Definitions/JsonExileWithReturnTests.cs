@@ -4,6 +4,7 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
+using Planeswalker = Majik.Core.Cards.Planeswalker;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -78,6 +79,35 @@ public class JsonExileWithReturnTests : IDisposable
         bear.SetZone(ZoneType.Battlefield);
         return bear;
     }
+
+    private Planeswalker NewControlledPlaneswalker(Player owner, string name, string cost, int loyalty)
+    {
+        var pw = new Planeswalker(name, cost, loyalty);
+        pw.SetOwner(owner);
+        pw.SetController(owner);
+        owner.Zones.Battlefield.AddCard(pw);
+        pw.SetZone(ZoneType.Battlefield);
+        return pw;
+    }
+
+    // Semester's End shape: "exile any number of target creatures and/or
+    // planeswalkers you control; return them at the next end step, each with a
+    // +1/+1 counter if it's a creature and a loyalty counter if it's a
+    // planeswalker."
+    private static SpellDefinition BuildSemestersEnd() =>
+        CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Semester's End",
+            new EffectDefinition[]
+            {
+                new ExileWithReturnEffectDef
+                {
+                    TargetFilter = "creature_or_planeswalker_you_control",
+                    MinTargets = 0,
+                    MaxTargets = 99,
+                    ReturnAt = "next_end_step",
+                    CounterOnReturn = "plus_one_plus_one_or_loyalty",
+                },
+            });
 
     private void ExecuteCast(SpellDefinition def, params object[] targets)
     {
@@ -228,6 +258,57 @@ public class JsonExileWithReturnTests : IDisposable
     // Shape-only fallback — no registered TriggerManager → exile happens, the
     // delayed return is skipped (same posture as the hand-rolled factories).
     // -----------------------------------------------------------------------
+
+    // -----------------------------------------------------------------------
+    // The counter-on-return rider (Semester's End) — exile a mixed batch of
+    // creatures + planeswalkers, return them all at the next end step, each
+    // creature with a +1/+1 counter (CR 122.1c) and each planeswalker with a
+    // loyalty counter (CR 122.1b). The "for many" generalization of the
+    // Otherworldly Journey single-target +1/+1-on-return rider.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SemestersEnd_ReturnsCreaturesWithPlusOneCounter_AndPlaneswalkersWithLoyalty()
+    {
+        var bear = NewControlledCreature(_alice, "Grizzly Bears", "{1}{G}");
+        var cat = NewControlledCreature(_alice, "Savannah Lions", "{W}");
+        var pw = NewControlledPlaneswalker(_alice, "Ajani, Caller of the Pride", "{2}{W}", 4);
+
+        var def = BuildSemestersEnd();
+        ExecuteCast(def, bear, cat, pw);
+
+        bear.Zone.Should().Be(ZoneType.Exile);
+        cat.Zone.Should().Be(ZoneType.Exile);
+        pw.Zone.Should().Be(ZoneType.Exile);
+
+        FireEndStepReturn();
+
+        bear.Zone.Should().Be(ZoneType.Battlefield);
+        cat.Zone.Should().Be(ZoneType.Battlefield);
+        pw.Zone.Should().Be(ZoneType.Battlefield);
+
+        bear.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "CR 122.1c — a creature returns with an additional +1/+1 counter");
+        cat.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1);
+
+        // CR 122.1b — a planeswalker returns with an additional loyalty counter
+        // on TOP of its starting loyalty (it re-enters fresh at 4, then +1 = 5).
+        pw.Counters.Count(CounterType.Loyalty).Should().Be(1,
+            "the rider adds ONE loyalty counter; it is NOT a +1/+1 counter");
+        pw.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "a planeswalker gets loyalty, never a +1/+1 counter");
+    }
+
+    [Fact]
+    public void SemestersEnd_Definition_HasOneMultiTargetCreatureOrPlaneswalkerSlot()
+    {
+        var def = BuildSemestersEnd();
+
+        def.TargetRequests.Should().HaveCount(1);
+        var tr = def.TargetRequests[0];
+        tr.MinTargets.Should().Be(0, "\"any number of\" — declining is legal");
+        tr.MaxTargets.Should().BeGreaterThan(1);
+    }
 
     [Fact]
     public void EerieInterlude_NoTriggerManager_ExilesButSkipsDelayedReturn()

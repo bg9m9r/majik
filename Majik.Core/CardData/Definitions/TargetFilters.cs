@@ -68,6 +68,11 @@ public static class TargetFilters
     private static ControlScope ControlScopeOf(string filter) => filter switch
     {
         "creature_you_control" => ControlScope.YouControl,
+        // CR 109.5 — "creature and/or planeswalker you control" (Semester's
+        // End's mixed-batch exile-with-return). The base predicate gates on a
+        // battlefield creature OR planeswalker; the control rider is applied
+        // context-aware here.
+        "creature_or_planeswalker_you_control" => ControlScope.YouControl,
         "creature_you_dont_control" or "creature_you_don't_control" => ControlScope.YouDontControl,
         // CR 109.5 — "tapped creature an opponent controls" (Harbinger of the
         // Tides). The base predicate gates on a TAPPED battlefield creature;
@@ -147,6 +152,14 @@ public static class TargetFilters
             // context. Used by the fight family (Prey Upon, Pounce).
             "creature_you_control" =>
                 ($"target creature you control to {verb}", o => o is Creature c && OnBattlefield(c)),
+            // CR 109.5 — "creature and/or planeswalker you control" (Semester's
+            // End). Base predicate: a battlefield creature OR planeswalker; the
+            // "you control" rider is applied context-aware in the candidate
+            // gatherer (ControlScopeOf above).
+            "creature_or_planeswalker_you_control" =>
+                ($"target creature and/or planeswalker you control to {verb}",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && (p.HasType(CardType.Creature) || p.HasType(CardType.Planeswalker))),
             "creature_you_dont_control" or "creature_you_don't_control" =>
                 ($"target creature you don't control to {verb}", o => o is Creature c && OnBattlefield(c)),
             // CR 205.3m — a "Wizard" is a creature with the Wizard subtype. The
