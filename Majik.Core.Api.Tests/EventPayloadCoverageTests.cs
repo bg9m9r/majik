@@ -76,6 +76,7 @@ public class EventPayloadCoverageTests
         "ManaAbilityActivatedEvent",
         "OpeningHandCheckEvent",
         "PermanentSacrificedEvent",
+        "PermanentTappedEvent",
         "PlayerCounterAddedEvent",
         "PriorityPassedEvent",
         "PriorityReceivedEvent",

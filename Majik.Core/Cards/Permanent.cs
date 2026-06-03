@@ -318,9 +318,18 @@ public class Permanent : Card
     }
 
     /// <summary>
-    /// Tap the permanent.
+    /// Tap the permanent (no attributed actor). CR 701.21.
     /// </summary>
-    public void Tap()
+    public void Tap() => Tap(causedBy: null);
+
+    /// <summary>
+    /// Tap the permanent, attributing the tap to <paramref name="causedBy"/>
+    /// (the "you" in a "whenever you tap …" trigger, CR 603.2). Publishes a
+    /// <see cref="Majik.Core.Domain.DomainEvents.PermanentTappedEvent"/> via
+    /// the ambient <see cref="Majik.Core.Events.EventBusRegistry"/> — once per
+    /// real tap, at every tap site. CR 701.21.
+    /// </summary>
+    public void Tap(Player? causedBy)
     {
         if (_isTapped)
         {
@@ -331,6 +340,14 @@ public class Permanent : Card
         // CR 613 — tap state gates some continuous effects (Paradise Druid's
         // "hexproof as long as untapped", vehicles, etc.); invalidate.
         ActiveEffects?.BumpGeneration();
+
+        // CR 701.21 — announce the tap so "whenever you tap a creature …"
+        // triggers (Solitary Sanctuary) can observe it. Best-effort: the bus
+        // is looked up via the per-game ambient registry (the leaf Permanent
+        // carries no bus reference); null outside a game scope, where
+        // publishing is a no-op (direct-construction unit tests).
+        Majik.Core.Events.EventBusRegistry.Get(Controller ?? causedBy)
+            ?.Publish(new Majik.Core.Domain.DomainEvents.PermanentTappedEvent(this, causedBy));
     }
 
     /// <summary>

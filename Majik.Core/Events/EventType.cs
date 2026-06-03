@@ -104,6 +104,13 @@ public enum EventType
     // to this. Published after the explore action fully resolves.
     Explored,
 
+    // CR 701.21 — a permanent became tapped. Published once per real tap at
+    // every tap site (tap cost, "tap target …" effect, attack tap CR 508.1f,
+    // manual Tap()). The "Whenever you tap a creature …" hook (Solitary
+    // Sanctuary) subscribes here; the event's CausedBy carries the tapping
+    // player so a "you tap" trigger can scope to its own controller.
+    Tapped,
+
     // CR 122 / CR 614 — one or more counters have been placed on a PLAYER
     // (poison — CR 704.5c; energy — CR 107.16; experience — CR 107.14; or
     // a generic player counter), after all replacement effects have been
