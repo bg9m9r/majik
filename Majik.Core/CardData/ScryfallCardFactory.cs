@@ -91,6 +91,15 @@ public sealed class ScryfallCardFactory
         // triggered abilities). Instant/sorcery effects are bound at cast
         // time, not here.
         KeywordBinder.Bind(card, entity, owner);
+        // Intensity (CR — Static Discharge family). Stamp the printed
+        // "Starting intensity N" onto the card so the cast-time resolve body
+        // (StaticDischargeTemplate) reads the live value via
+        // IntensifyHelper.IntensityOf. No-op for cards without the keyword.
+        if (card is Card concreteForIntensity)
+        {
+            Majik.Core.Keywords.IntensifyHelper.ApplyStartingIntensityFromOracle(
+                concreteForIntensity, entity.OracleText);
+        }
         OracleManaBinder.Bind(card, entity, owner);
         AffinityBinder.Bind(card, entity);
         // CR 714.2b — pass the live TriggerManager so Saga chapter abilities

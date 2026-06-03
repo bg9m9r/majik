@@ -411,6 +411,46 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// Intensity (Mystery Booster 2, e.g. Static Discharge). A card-scoped
+    /// numeric value — NOT a counter on a permanent. Intensity is a property
+    /// of the card object that persists across every zone it occupies
+    /// (battlefield, graveyard, hand, library, exile); a card with the
+    /// Intensity keyword has a "Starting intensity N" value, and "intensify
+    /// by N" raises it. Because instants/sorceries (the printed Intensity
+    /// cards) never become permanents, intensity cannot live on
+    /// <see cref="Permanent.Counters"/> — it lives here on the card so it is
+    /// observable while the card sits in the graveyard waiting to be recast.
+    ///
+    /// <para>Defaults to <c>0</c>; a card without the Intensity keyword keeps
+    /// it at 0 and never reads it. The printed "Starting intensity" value is
+    /// stamped at card-build time via <see cref="SetStartingIntensity"/>;
+    /// "intensify by N" raises it via <see cref="Intensify"/>. The live value
+    /// drives X-valued effects ("deals damage equal to its intensity") read
+    /// through the <see cref="Intensity"/> probe — the same live-count posture
+    /// as <see cref="PendingCastColorCounts"/>.</para>
+    /// </summary>
+    public int Intensity { get; private set; }
+
+    /// <summary>Stamp this card's starting intensity (the printed
+    /// "Starting intensity N" keyword value). Called once at card-build time
+    /// by the card's factory. Idempotent re-seeds are allowed (a fresh build
+    /// of the same printed card always starts at the printed value).</summary>
+    public void SetStartingIntensity(int value)
+    {
+        if (value < 0) throw new ArgumentOutOfRangeException(nameof(value));
+        Intensity = value;
+    }
+
+    /// <summary>Raise this card's intensity by <paramref name="amount"/>
+    /// ("intensify by N"). Amount must be positive — printed intensify values
+    /// are always &gt; 0.</summary>
+    public void Intensify(int amount = 1)
+    {
+        if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        Intensity += amount;
+    }
+
+    /// <summary>
     /// CR 202.3b — when this card was cast as a spell with a variable {X}
     /// cost, the value chosen for X. Stamped by
     /// <see cref="Majik.Core.Game.SpellCastFlow"/> right after the caster
