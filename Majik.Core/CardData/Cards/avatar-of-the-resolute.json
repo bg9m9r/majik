@@ -1,0 +1,9 @@
+{
+  "name": "Avatar of the Resolute",
+  "types": ["Creature"],
+  "subtypes": ["Avatar"],
+  "manaCost": "{G}{G}",
+  "power": 3,
+  "toughness": 2,
+  "colors": ["G"]
+}
