@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
 
@@ -68,10 +69,53 @@ public static class SpellCopier
         // Re-run every effect on the original spell. This is the load-bearing
         // semantic the binding cards rely on: "copy that spell" means the
         // listed effects fire a second time. See class-level remarks for the
-        // gaps (no stack push, no re-target, simultaneous resolution).
+        // gaps (no stack push, simultaneous resolution).
+        //
+        // CR 707.10a — a copy uses the original's targets (the v1 stub reuses
+        // them verbatim; the "may choose new targets" rider is dropped). So we
+        // resolve the copied effects against a ResolutionContext built from the
+        // original spell's ChosenTargets, mirroring Spell.ResolveAsync, rather
+        // than the raw Execute() path's empty ResolutionContext.Legacy. Without
+        // this, a copy of a TARGETED spell (whose effect — e.g. any declarative
+        // JSON targeted verb — reads its pick off ChosenTargets) would resolve
+        // with no targets and no-op. The synchronous Execute()-style behaviour
+        // is preserved for untargeted spells (empty ChosenTargets → the same
+        // empty list Legacy carried).
+        var rc = BuildCopyContext(spell);
         foreach (var effect in spell.Effects)
         {
-            effect.Execute();
+            // SpellCopier's binders all sit on the synchronous resolution path,
+            // so drive the async effect body to completion here (the same
+            // GetAwaiter().GetResult() shim Effect.Execute() used). The ONLY
+            // change versus Execute() is the context now carries the original's
+            // chosen targets instead of ResolutionContext.Legacy.
+            effect.ExecuteAsync(rc).GetAwaiter().GetResult();
         }
+    }
+
+    /// <summary>
+    /// Build the resolution context a copied spell's effects resolve against,
+    /// threading the original spell's <see cref="Spell.ChosenTargets"/>
+    /// (CR 707.10a — targets reused verbatim in the v1 stub). The flat
+    /// cast-time target list (CR 601.2c) is wrapped as a single target group
+    /// so a targeted JSON verb reads <c>ChosenTargets[0]</c> uniformly with the
+    /// ability / spell resolve paths. Untargeted spells yield an empty
+    /// chosen-targets list — the same posture <see cref="ResolutionContext.Legacy"/>
+    /// carried, so their behaviour is unchanged.
+    /// </summary>
+    private static ResolutionContext BuildCopyContext(Spell spell)
+    {
+        var chosen = spell.ChosenTargets.Count > 0
+            ? new IReadOnlyList<object>[] { spell.ChosenTargets.ToList() }
+            : System.Array.Empty<IReadOnlyList<object>>();
+
+        // No live agent / game is available on this synchronous re-execution
+        // seam (it mirrors the old Execute() path); a copied targeted verb only
+        // needs the chosen targets, which is exactly what was missing.
+        return ResolutionContext.For(
+            controller: spell.Controller,
+            agent: null,
+            game: null,
+            chosenTargets: chosen);
     }
 }
