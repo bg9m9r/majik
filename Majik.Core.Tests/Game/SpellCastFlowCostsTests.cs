@@ -85,6 +85,35 @@ public class SpellCastFlowCostsTests
         firebolt.Zone.Should().Be(ZoneType.Exile);
     }
 
+    [Fact]
+    public async Task FlashbackCost_CastsFromGraveyard_StampsWasCastFromGraveyard()
+    {
+        // CR 601.2 / CR 113.5 — a Graveyard → Stack cast stamps the
+        // "cast from a graveyard" sentinel so graveyard-cast punisher triggers
+        // (Ash Zealot) can read it off the live spell at cast time.
+        var firebolt = new Instant("Firebolt", "R") { Owner = _alice, Zone = ZoneType.Graveyard };
+        _alice.Zones.Graveyard.AddCard(firebolt);
+
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+
+        var spell = await _flow.CastAsync(
+            _alice, firebolt,
+            new SpellDefinition(
+                Modes: System.Array.Empty<string>(), HasVariableX: false,
+                TargetRequests: System.Array.Empty<TargetRequest>(),
+                EffectFactory: _ => new IEffect[] { new Effect("noop", () => { }) }),
+            agent, ctx,
+            alternativeCost: new FlashbackAlternativeCost(ManaCost.Parse("4R")));
+
+        spell.WasCastFromGraveyard.Should().BeTrue(
+            "the card was in the graveyard immediately before the stack push");
+        spell.WasCastFromHand.Should().BeFalse();
+        spell.WasCastFromLibrary.Should().BeFalse();
+    }
+
     // -----------------------------------------------------------------
     // New: enforced additional costs declared on SpellDefinition itself
     // (template-bound "As an additional cost to cast this spell, …")
