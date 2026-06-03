@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -23,6 +24,7 @@ namespace Majik.Core.Costs;
 public sealed class SacrificeAnotherCreatureCost : ICost
 {
     private readonly Permanent _self;
+    private readonly IEventBus? _eventBus;
 
     /// <summary>
     /// Optionally set by the agent to indicate which creature to sacrifice.
@@ -31,9 +33,14 @@ public sealed class SacrificeAnotherCreatureCost : ICost
     /// </summary>
     public Creature? Target { get; set; }
 
-    public SacrificeAnotherCreatureCost(Permanent self)
+    /// <param name="self">The ability's source — excluded from the picker.</param>
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeAnotherCreatureCost(Permanent self, IEventBus? eventBus = null)
     {
         _self = self ?? throw new ArgumentNullException(nameof(self));
+        _eventBus = eventBus;
     }
 
     public string Description =>
@@ -61,8 +68,6 @@ public sealed class SacrificeAnotherCreatureCost : ICost
             throw new InvalidOperationException(
                 $"Cannot pay {Description}: no eligible creature to sacrifice.");
 
-        player.Zones.Battlefield.RemoveCard(pick);
-        player.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(player, pick, _eventBus);
     }
 }

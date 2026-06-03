@@ -234,6 +234,37 @@ public class SaiMasterThopteristFactoryTests
     }
 
     [Fact]
+    public void Sai_SacCost_BuiltWithBus_PublishesPermanentSacrificedEvent_PerArtifact()
+    {
+        // Production path: Sai built with a live bus threads it into the
+        // sac-two-artifacts activation cost, so paying it fires a
+        // PermanentSacrificedEvent (CR 701.16a) per sacrificed artifact for
+        // "whenever you sacrifice …" aristocrat payoffs.
+        var alice = new Player("Alice", 20);
+        var bus = new EventBus();
+        var seen = new System.Collections.Generic.List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+
+        var sai = SaiMasterThopteristFactory.Create(alice, bus, triggers: null, zoneService: null);
+        sai.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(sai);
+
+        var a1 = new Artifact("Mox A", "{0}") { Owner = alice, Controller = alice };
+        var a2 = new Artifact("Mox B", "{0}") { Owner = alice, Controller = alice };
+        a1.SetZone(ZoneType.Battlefield);
+        a2.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(a1);
+        alice.Zones.Battlefield.AddCard(a2);
+
+        var sac = sai.Abilities.OfType<ActivatedAbility>().Single()
+            .Costs.OfType<SacrificeTwoArtifactsCost>().Single();
+        sac.Pay(alice);
+
+        seen.Should().HaveCount(2);
+        seen.Should().OnlyContain(ev => ev.SacrificingPlayer == alice);
+    }
+
+    [Fact]
     public void Sai_DrawActivation_DrawsOneCard()
     {
         // Seed Alice's library with one card so the draw is observable.

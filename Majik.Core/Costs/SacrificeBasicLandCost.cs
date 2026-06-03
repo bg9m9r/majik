@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -25,10 +26,16 @@ public sealed class SacrificeBasicLandCost : IAdditionalCost
     /// <summary>The required basic-land subtype.</summary>
     public CardSubtype RequiredSubtype { get; }
 
-    public SacrificeBasicLandCost(ICard target, CardSubtype requiredSubtype)
+    private readonly IEventBus? _eventBus;
+
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeBasicLandCost(ICard target, CardSubtype requiredSubtype, IEventBus? eventBus = null)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         RequiredSubtype = requiredSubtype;
+        _eventBus = eventBus;
     }
 
     public string Description => $"sacrifice a {RequiredSubtype}";
@@ -42,9 +49,7 @@ public sealed class SacrificeBasicLandCost : IAdditionalCost
     public bool Pay(Player caster)
     {
         if (!CanPay(caster)) return false;
-        caster.Zones.Battlefield.RemoveCard(Target);
-        caster.Zones.Graveyard.AddCard(Target);
-        Target.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, Target, _eventBus);
         return true;
     }
 }

@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -24,15 +25,21 @@ public sealed class SacrificeNNonlandPermanentsCost : ICost
     /// <summary>The number of nonland permanents to sacrifice.</summary>
     public int Count { get; }
 
+    private readonly IEventBus? _eventBus;
+
     /// <inheritdoc/>
     public string Description => $"sacrifice {Count} nonland permanents";
 
-    public SacrificeNNonlandPermanentsCost(int count)
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) per sacrifice so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeNNonlandPermanentsCost(int count, IEventBus? eventBus = null)
     {
         if (count < 0)
             throw new ArgumentOutOfRangeException(nameof(count),
                 "Sacrifice count must be non-negative.");
         Count = count;
+        _eventBus = eventBus;
     }
 
     private static bool IsEligible(Permanent p) =>
@@ -63,9 +70,7 @@ public sealed class SacrificeNNonlandPermanentsCost : ICost
 
         foreach (var pick in toSacrifice)
         {
-            player.Zones.Battlefield.RemoveCard(pick);
-            player.Zones.Graveyard.AddCard(pick);
-            pick.SetZone(ZoneType.Graveyard);
+            SacrificeCostHelper.Sacrifice(player, pick, _eventBus);
         }
     }
 }

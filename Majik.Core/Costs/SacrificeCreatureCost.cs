@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -13,10 +14,17 @@ namespace Majik.Core.Costs;
 public sealed class SacrificeCreatureCost : IAdditionalCost
 {
     private readonly Creature _target;
+    private readonly IEventBus? _eventBus;
 
-    public SacrificeCreatureCost(Creature target)
+    /// <param name="target">The creature sacrificed as the cost.</param>
+    /// <param name="eventBus">Optional event bus. When supplied, paying the
+    /// cost publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the caster so aristocrat payoffs fire. Null preserves the
+    /// legacy publish-nothing posture.</param>
+    public SacrificeCreatureCost(Creature target, IEventBus? eventBus = null)
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
+        _eventBus = eventBus;
     }
 
     public string Description => $"sacrifice {_target.Name}";
@@ -36,9 +44,7 @@ public sealed class SacrificeCreatureCost : IAdditionalCost
     public bool Pay(Player caster)
     {
         if (!CanPay(caster)) return false;
-        caster.Zones.Battlefield.RemoveCard(_target);
-        caster.Zones.Graveyard.AddCard(_target);
-        _target.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, _target, _eventBus);
         Sacrificed = _target;
         return true;
     }
@@ -55,6 +61,16 @@ public sealed class SacrificeCreatureCost : IAdditionalCost
 /// </summary>
 public sealed class SacrificeACreatureAdditionalCost : IAdditionalCost
 {
+    private readonly IEventBus? _eventBus;
+
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeACreatureAdditionalCost(IEventBus? eventBus = null)
+    {
+        _eventBus = eventBus;
+    }
+
     public Creature? Sacrificed { get; private set; }
 
     public string Description => "sacrifice a creature";
@@ -74,9 +90,7 @@ public sealed class SacrificeACreatureAdditionalCost : IAdditionalCost
             .OfType<Creature>()
             .FirstOrDefault();
         if (pick == null) return false;
-        caster.Zones.Battlefield.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, pick, _eventBus);
         Sacrificed = pick;
         return true;
     }
@@ -90,6 +104,16 @@ public sealed class SacrificeACreatureAdditionalCost : IAdditionalCost
 /// </summary>
 public sealed class SacrificeAnArtifactAdditionalCost : IAdditionalCost
 {
+    private readonly IEventBus? _eventBus;
+
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeAnArtifactAdditionalCost(IEventBus? eventBus = null)
+    {
+        _eventBus = eventBus;
+    }
+
     public Permanent? Sacrificed { get; private set; }
 
     public string Description => "sacrifice an artifact";
@@ -109,9 +133,7 @@ public sealed class SacrificeAnArtifactAdditionalCost : IAdditionalCost
             .OfType<Permanent>()
             .FirstOrDefault(p => p.HasType(CardType.Artifact));
         if (pick == null) return false;
-        caster.Zones.Battlefield.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, pick, _eventBus);
         Sacrificed = pick;
         return true;
     }
@@ -164,6 +186,16 @@ public sealed class PayLifeAdditionalCost : IAdditionalCost
 /// </summary>
 public sealed class SacrificeAGoblinAdditionalCost : IAdditionalCost
 {
+    private readonly IEventBus? _eventBus;
+
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeAGoblinAdditionalCost(IEventBus? eventBus = null)
+    {
+        _eventBus = eventBus;
+    }
+
     /// <summary>The Goblin that was sacrificed (null before <see cref="Pay"/>).</summary>
     public Creature? Sacrificed { get; private set; }
 
@@ -184,9 +216,7 @@ public sealed class SacrificeAGoblinAdditionalCost : IAdditionalCost
             .OfType<Creature>()
             .FirstOrDefault(c => c.HasSubtype(CardSubtype.Goblin));
         if (pick == null) return false;
-        caster.Zones.Battlefield.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, pick, _eventBus);
         Sacrificed = pick;
         return true;
     }
@@ -211,6 +241,16 @@ public sealed class SacrificeAGoblinAdditionalCost : IAdditionalCost
 /// </summary>
 public sealed class SacrificeALandAdditionalCost : IAdditionalCost
 {
+    private readonly IEventBus? _eventBus;
+
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeALandAdditionalCost(IEventBus? eventBus = null)
+    {
+        _eventBus = eventBus;
+    }
+
     /// <summary>The land that was sacrificed (null before <see cref="Pay"/>).</summary>
     public Permanent? Sacrificed { get; private set; }
 
@@ -231,9 +271,7 @@ public sealed class SacrificeALandAdditionalCost : IAdditionalCost
             .OfType<Permanent>()
             .FirstOrDefault(p => p.HasType(CardType.Land));
         if (pick == null) return false;
-        caster.Zones.Battlefield.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, pick, _eventBus);
         Sacrificed = pick;
         return true;
     }
