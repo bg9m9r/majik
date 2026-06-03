@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
 [JsonDerivedType(typeof(GainControlEffectDef), "gain_control")]
 [JsonDerivedType(typeof(FightEffectDef), "fight")]
+[JsonDerivedType(typeof(ExploreTargetEffectDef), "explore_target")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -731,4 +732,47 @@ public sealed class AmassSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public string Tribe { get; set; } = "Zombie";
+}
+
+/// <summary>
+/// "Target creature you control explores" (CR 701.40) — the targeted explore
+/// verb. The declarative serialization of the Explore keyword action onto the
+/// shared <see cref="Majik.Core.Keywords.ExploreAction.ExploreAsync"/>
+/// primitive (PR #2237). At resolution the effect reads the chosen creature off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> at the
+/// reserved index and explores it under <b>its</b> controller (CR 701.40a — the
+/// exploring permanent's controller reveals the top card; the +1/+1 counter, if
+/// any, lands on the exploring creature). The keep-on-top / graveyard choice
+/// (CR 701.40c) consults the resolving context's agent, and a
+/// <see cref="Majik.Core.Events.CreatureExploredEvent"/> is published so
+/// "Whenever a creature you control explores" payoffs (Wildgrowth Walker) fire.
+///
+/// <para>
+/// CR 608.2b — an illegal target at resolution (the chosen creature has left the
+/// battlefield since the ability / spell was put on the stack) fizzles cleanly:
+/// no explore. The candidate gatherer / resolution re-check apply the
+/// <see cref="TargetFilter"/> predicate via <see cref="TargetFilters"/>.
+/// </para>
+///
+/// <para>
+/// The canonical case is the <b>Map</b> token's
+/// "{1}, {T}, Sacrifice this token: Target creature you control explores"
+/// activated ability (CR 111.10 — Lost Caverns of Ixalan), shared by Get Lost,
+/// Sentinel of the Nameless City, Spyglass Siren, et al. Get Lost / Spyglass
+/// Siren produce the token; the verb is what the token's ability resolves to.
+/// </para>
+///
+/// <see cref="TargetFilter"/> defaults to <c>"creature_you_control"</c> (every
+/// printed explore-target effect today says "creature you control"); any other
+/// filter string the runtime understands is honoured.
+/// </summary>
+public sealed class ExploreTargetEffectDef : EffectDefinition
+{
+    /// <summary>Target filter (default <c>"creature_you_control"</c>).</summary>
+    public string TargetFilter { get; set; } = "creature_you_control";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "explore", Majik.Core.Cards.BotIntent.Buff);
 }

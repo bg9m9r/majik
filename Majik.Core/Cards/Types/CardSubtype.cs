@@ -95,6 +95,9 @@ public enum CardSubtype
     Monkey,
     /// <summary>Pirate creature subtype — Ragavan, Nimble Pilferer; Captain Lannery Storm. CR 205.3m.</summary>
     Pirate,
+    /// <summary>Siren creature subtype — Spyglass Siren, Siren Stormtamer,
+    /// Siren of the Fanged Coast. CR 205.3m.</summary>
+    Siren,
     /// <summary>Scout creature subtype — Tireless Tracker, Joraga Treespeaker. CR 205.3m.</summary>
     Scout,
     /// <summary>Illusion creature subtype — Phantasmal Image, Phantasmal Bear,
@@ -356,6 +359,11 @@ public enum CardSubtype
     Gnome,
     Blood,
     Powerstone,
+    /// <summary>Map artifact-token subtype — the Lost Caverns of Ixalan
+    /// explore-payload token ("{1}, {T}, Sacrifice this token: Target creature
+    /// you control explores. Activate only as a sorcery."). Always an artifact
+    /// token. CR 111.10 / CR 701.40.</summary>
+    Map,
     /// <summary>Myr creature/artifact subtype — Myr Enforcer, Myr Retriever,
     /// the Mirrodin Myr cycle. Always paired with the Artifact type.
     /// CR 205.3g + CR 205.3m.</summary>
