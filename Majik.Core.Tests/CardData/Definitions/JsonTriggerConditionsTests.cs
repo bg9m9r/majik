@@ -39,6 +39,9 @@ namespace Majik.Core.Tests.CardData.Definitions;
 ///   <see cref="CardMovedEvent"/> — Battlefield → Graveyard self move; the
 ///   ability stays active in the Graveyard so it is observable after the
 ///   zone stamp.</item>
+///   <item><c>whenever_a_creature_you_control_explores</c> (CR 701.40e) over
+///   <see cref="CreatureExploredEvent"/> — controller-scoped explore payoff
+///   (the declarative Wildgrowth Walker shape).</item>
 /// </list>
 /// </summary>
 public class JsonTriggerConditionsTests
@@ -1116,5 +1119,100 @@ public class JsonTriggerConditionsTests
 
         triggers.PendingCount.Should().Be(1,
             "includeSelf lets the source's own entry fire ('this creature or another Warrior', Mardu Woe-Reaper)");
+    }
+
+    // ------------------------------------------------------------------
+    // whenever_a_creature_you_control_explores — CR 701.40e, over
+    // CreatureExploredEvent (controller-scoped). The DECLARATIVE Wildgrowth
+    // Walker shape: "Whenever a creature you control explores, put a +1/+1
+    // counter on this creature and you gain 3 life." Pairs the trigger over
+    // the existing CreatureExploredEvent (PR #2237) with the declarative
+    // put_counter + gain_life_self effect verbs. CR 109.5 — "a creature YOU
+    // control" gates on the explore event's Controller equalling the trigger
+    // controller; the source's own explore counts ("a creature you control"
+    // includes the source).
+    // ------------------------------------------------------------------
+
+    private const string ExplorePayoffJson = """
+    {
+      "name": "Test Wildgrowth Walker",
+      "types": ["Creature"],
+      "manaCost": "1G",
+      "power": 1,
+      "toughness": 3,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_a_creature_you_control_explores" },
+          "effects": [
+            { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" },
+            { "type": "gain_life_self", "amount": 3 }
+          ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void CreatureYouControlExplores_FiresForController_AddsCounterAndGainsLife()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(ExplorePayoffJson, triggers);
+
+        // A creature the controller controls explores (CR 701.40e). The
+        // exploring creature is distinct from the payoff source; the trigger
+        // gates purely on the explore event's Controller (CR 109.5).
+        var explorer = new Creature("Scout", "G", 1, 1) { Owner = _alice };
+        explorer.SetController(_alice);
+        bus.Publish(new CreatureExploredEvent(
+            explorer, _alice, revealedCard: null, revealedLand: false));
+
+        triggers.PendingCount.Should().Be(1,
+            "a creature you control exploring fires the trigger (CR 701.40e)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        card.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the put_counter self effect lands a +1/+1 counter on the payoff source (CR 122.1)");
+        _alice.LifeTotal.Should().Be(23,
+            "the gain_life_self effect gains the controller 3 life (CR 119.3)");
+    }
+
+    [Fact]
+    public void CreatureYouControlExplores_DoesNotFire_ForOpponentExplore()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(ExplorePayoffJson, triggers);
+
+        // An opponent's creature exploring is NOT "a creature you control"
+        // (CR 109.5) — the explore event's Controller is Bob.
+        var enemyScout = new Creature("Enemy Scout", "G", 1, 1) { Owner = _bob };
+        enemyScout.SetController(_bob);
+        bus.Publish(new CreatureExploredEvent(
+            enemyScout, _bob, revealedCard: null, revealedLand: false));
+
+        triggers.PendingCount.Should().Be(0,
+            "'a creature YOU control explores' is controller-scoped (CR 109.5)");
+    }
+
+    [Fact]
+    public void CreatureYouControlExplores_Fires_WhenSourceItselfExplores()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(ExplorePayoffJson, triggers);
+
+        // The source IS "a creature you control" — its own explore fires it
+        // (Wildgrowth Walker triggers off its own explore too, CR 701.40e).
+        bus.Publish(new CreatureExploredEvent(
+            card, _alice, revealedCard: null, revealedLand: false));
+
+        triggers.PendingCount.Should().Be(1,
+            "the source counts as 'a creature you control', so its own explore fires it (CR 701.40e)");
     }
 }
