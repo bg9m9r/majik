@@ -1,0 +1,6 @@
+{
+  "name": "Solitary Sanctuary",
+  "types": ["Enchantment"],
+  "manaCost": "{2}{W}",
+  "colors": ["W"]
+}

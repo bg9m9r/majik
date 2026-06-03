@@ -83,6 +83,30 @@ public static class Triggers
     }
 
     /// <summary>
+    /// "Whenever you tap an untapped creature an opponent controls" — fires on
+    /// a <see cref="PermanentTappedEvent"/> when (a) the tap was caused by
+    /// <paramref name="controller"/> (the "you"), (b) the tapped permanent is
+    /// a creature, and (c) it is controlled by a player other than
+    /// <paramref name="controller"/> (an opponent). Models Solitary Sanctuary
+    /// (CR 603.2 — the trigger event is "you tapping", so a tap with no
+    /// attributed actor, or a tap of your own / your other opponents'
+    /// creatures by someone else, does not fire).
+    /// </summary>
+    public static ITriggerCondition OnYouTapCreatureAnOpponentControls(Player controller)
+    {
+        if (controller == null)
+        {
+            throw new ArgumentNullException(nameof(controller));
+        }
+
+        return new EventTriggerCondition<PermanentTappedEvent>((e, _) =>
+            ReferenceEquals(e.CausedBy, controller)
+            && e.Permanent.HasType(CardType.Creature)
+            && e.Permanent.Controller != null
+            && !ReferenceEquals(e.Permanent.Controller, controller));
+    }
+
+    /// <summary>
     /// "Whenever PLAYER draws a card" — fires when the given player draws.
     /// </summary>
     public static ITriggerCondition OnCardDrawnByPlayer(Player player)

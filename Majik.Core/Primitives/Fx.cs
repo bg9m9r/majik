@@ -660,11 +660,14 @@ public static class Fx
     // ------------------------------------------------------------------
 
     /// <summary>CR 701.21 — tap <paramref name="permanent"/>. No-op if
-    /// already tapped.</summary>
-    public static void Tap(Permanent permanent)
+    /// already tapped. <paramref name="causedBy"/> (optional) attributes the
+    /// tap to the player who caused it, so "whenever you tap …" triggers
+    /// (Solitary Sanctuary, CR 603.2) can scope to their own controller.</summary>
+    public static void Tap(Permanent permanent, Player? causedBy = null)
     {
         if (permanent is null) throw new ArgumentNullException(nameof(permanent));
-        permanent.Tap();
+        if (permanent.IsTapped) return; // CR 701.21a — already tapped: no-op.
+        permanent.Tap(causedBy);
     }
 
     /// <summary>CR 701.27 — untap <paramref name="permanent"/>. No-op if
