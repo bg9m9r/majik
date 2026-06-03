@@ -891,9 +891,34 @@ public static class CardDefRuntime
                 BuildDealsCombatDamageToPlayerSelfTrigger(card),
             WheneverACreatureYouControlExploresTriggerDef =>
                 BuildWheneverACreatureYouControlExploresTrigger(card),
+            StateWhenCountersGeTriggerDef threshold =>
+                BuildStateWhenCountersGeTrigger(threshold, card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    /// <summary>
+    /// CR 603.8 — "When there are N or more [type] counters on this …".
+    /// A state trigger (not event-driven): wired as a
+    /// <see cref="StateChangeTriggerCondition"/> whose predicate reads the live
+    /// counter count off this permanent's
+    /// <see cref="Majik.Core.Cards.Permanent.Counters"/> bag and returns true once
+    /// it reaches <see cref="StateWhenCountersGeTriggerDef.Threshold"/>. Evaluated
+    /// by <see cref="TriggerManager.EvaluateStateChangeTriggers"/> after each SBA
+    /// pass (CR 704 checkpoint). Fires on the rising edge only, so a
+    /// threshold-reached payoff (Mazemind Tome's exile-for-life) enqueues exactly
+    /// once. A non-<see cref="Majik.Core.Cards.Permanent"/> card can never carry
+    /// counters, so the predicate is constant-false for it.
+    /// </summary>
+    private static ITriggerCondition BuildStateWhenCountersGeTrigger(
+        StateWhenCountersGeTriggerDef def, ICard card)
+    {
+        var counter = new Majik.Core.Counters.CounterType(def.Counter);
+        var threshold = def.Threshold;
+        return new StateChangeTriggerCondition(() =>
+            card is Permanent permanent
+            && permanent.Counters.Count(counter) >= threshold);
+    }
 
     /// <summary>
     /// CR 701.40e / CR 603.1 — "Whenever a creature you control explores, …".
