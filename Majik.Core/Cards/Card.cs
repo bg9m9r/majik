@@ -222,6 +222,64 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 601.3e — runtime "you may cast this card from a graveyard you don't
+    /// own" grant. When non-null, the named player may cast the card while it
+    /// is in a Graveyard zone via a
+    /// <see cref="Majik.Core.Costs.GraveyardNonOwnerCastAlternativeCost"/>;
+    /// unlike Flashback / Escape / Lurrus, the allowed caster is NOT the
+    /// card's owner — the card stays in its owner's graveyard, and a
+    /// different player becomes a legal source of the cast (Tinybones, the
+    /// Pickpocket: "cast target nonland permanent card from that player's
+    /// graveyard"). Mirrors <see cref="RuntimeExileCastAllowedCaster"/>, the
+    /// Ragavan exile analogue. Cleared at end of turn by the granting
+    /// effect's bus subscription.
+    /// </summary>
+    public Player? RuntimeGraveyardNonOwnerCastAllowedCaster { get; private set; }
+
+    /// <summary>
+    /// The mana cost the <see cref="RuntimeGraveyardNonOwnerCastAllowedCaster"/>
+    /// pays to cast this card from a graveyard they don't own under the runtime
+    /// grant. Typically the card's printed mana cost (possibly converted to
+    /// all-generic when <see cref="RuntimeGraveyardNonOwnerCastAnyTypeMana"/>).
+    /// </summary>
+    public ValueObjects.ManaCost? RuntimeGraveyardNonOwnerCastCost { get; private set; }
+
+    /// <summary>
+    /// CR 601.3e — when true, "mana of any type can be spent to cast that
+    /// spell" (Tinybones). The granting effect converts the printed cost to
+    /// an all-generic cost of equal mana value so any colour of mana pays it.
+    /// </summary>
+    public bool RuntimeGraveyardNonOwnerCastAnyTypeMana { get; private set; }
+
+    /// <summary>
+    /// Stamp a non-owner graveyard-cast grant on this card (CR 601.3e).
+    /// <paramref name="allowedCaster"/> is the player who may cast (need not
+    /// be the owner); <paramref name="cost"/> is the mana cost they pay
+    /// (typically the printed cost, possibly converted to all-generic when
+    /// <paramref name="anyTypeMana"/> is true). Idempotent — later grants
+    /// overwrite earlier ones. Cleared at EOT by the granting effect's
+    /// bookkeeping. Distinct from <see cref="GrantRuntimeGraveyardCast"/>
+    /// (the owner-only Lurrus grant).
+    /// </summary>
+    public void GrantRuntimeGraveyardNonOwnerCast(
+        Player allowedCaster, ValueObjects.ManaCost cost, bool anyTypeMana = false)
+    {
+        if (allowedCaster == null) throw new ArgumentNullException(nameof(allowedCaster));
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        RuntimeGraveyardNonOwnerCastAllowedCaster = allowedCaster;
+        RuntimeGraveyardNonOwnerCastCost = cost;
+        RuntimeGraveyardNonOwnerCastAnyTypeMana = anyTypeMana;
+    }
+
+    /// <summary>Clear any runtime non-owner graveyard-cast grant on this card.</summary>
+    public void ClearRuntimeGraveyardNonOwnerCast()
+    {
+        RuntimeGraveyardNonOwnerCastAllowedCaster = null;
+        RuntimeGraveyardNonOwnerCastCost = null;
+        RuntimeGraveyardNonOwnerCastAnyTypeMana = false;
+    }
+
+    /// <summary>
     /// CR 702.143 — runtime Escape grant. When non-null, the card has
     /// Escape while in its owner's graveyard, with this mana cost as the
     /// alt-cost mana payment and <see cref="RuntimeEscapeExileCount"/> as
