@@ -1255,6 +1255,7 @@ public static class CardDefRuntime
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
             AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
             CounterTargetSpellEffectDef counter => BuildCounterTargetSpellEffect(counter, card, targetRequestIndex),
+            SearchLibraryEffectDef search => BuildSearchLibraryEffect(search, card, controller),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
@@ -1299,6 +1300,129 @@ public static class CardDefRuntime
                 Majik.Core.Keywords.AmassAction.Apply(controller, amount, tribe);
             });
     }
+
+    private static IEffect BuildSearchLibraryEffect(
+        SearchLibraryEffectDef def, ICard card, Player controller)
+    {
+        // CR 701.19 — "Search your library for a [filtered] card, put it
+        // [destination], then shuffle" (CR 701.20a). The declarative form of the
+        // bespoke tutor factories onto the shared LibrarySearch.PromptOnlyAsync
+        // (agent prompt + deterministic fallback) + LibraryShuffle plumbing. The
+        // searched card is a hidden choice (CR 115.1a), not a chosen target — so
+        // this is an untargeted effect.
+        var subtypes = def.Subtypes
+            .Select(ParseSubtype)
+            .ToArray();
+        var requireBasic = def.BasicLand;
+        var cardType = ParseOptionalType(def.CardType);
+        var destination = def.Destination;
+        var shuffle = def.Shuffle;
+
+        // Human-readable label for the agent prompt + a stable shuffle reason.
+        var label = BuildSearchLabel(subtypes, def.Subtypes, requireBasic, def.CardType);
+        var shuffleReason = $"search:{card.Name}";
+
+        return new Effect(
+            $"{card.Name}: search library for {label} -> {destination}, shuffle={shuffle}",
+            async ctx =>
+            {
+                // CR 701.19a — the searching player is the ability's controller
+                // (re-resolved live; a control change since the ability went on
+                // the stack carries). For a sacrifice-self panorama the source is
+                // already in the graveyard, so we lean on the controller capture.
+                var searcher = (card as Permanent)?.Controller ?? controller;
+
+                bool Matches(ICard c)
+                {
+                    if (requireBasic && !c.HasSupertype(CardSupertype.Basic)) return false;
+                    if (cardType is { } ct && !c.HasType(ct)) return false;
+                    if (subtypes.Length > 0 && !subtypes.Any(c.HasSubtype)) return false;
+                    return true;
+                }
+
+                var candidates = searcher.Zones.Library.GetCards()
+                    .Where(Matches)
+                    .ToList();
+
+                // CR 701.19a — prompt even on zero candidates so a human searcher
+                // sees the failed search; deterministic first-match otherwise.
+                var pick = await LibrarySearch.PromptOnlyAsync(ctx, searcher, candidates, label)
+                    .ConfigureAwait(false);
+
+                if (pick != null)
+                {
+                    MoveTutoredCard(pick, searcher, destination);
+                }
+
+                // CR 701.20a — shuffle whether or not a card was found.
+                if (shuffle)
+                {
+                    LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);
+                }
+            });
+    }
+
+    /// <summary>
+    /// Move a tutored card from the searcher's library to its
+    /// <paramref name="destination"/> (CR 701.19). Routes through the registered
+    /// <see cref="ZoneServiceRegistry"/> service when one is live (so ETB
+    /// replacements / CardMovedEvent subscribers fire on a fetched permanent),
+    /// falling back to a direct zone move on the pure-shape test path. The
+    /// <c>battlefield_tapped</c> destination applies the printed "tapped" rider
+    /// after the move.
+    /// </summary>
+    private static void MoveTutoredCard(ICard pick, Player searcher, string destination)
+    {
+        var toBattlefield = destination is "battlefield" or "battlefield_tapped";
+        var enterTapped = destination == "battlefield_tapped";
+        var toZone = toBattlefield ? ZoneType.Battlefield : ZoneType.Hand;
+
+        var zones = ZoneServiceRegistry.Get(searcher);
+        if (zones != null)
+        {
+            zones.MoveCard(pick, ZoneType.Library, toZone, searcher);
+        }
+        else
+        {
+            searcher.Zones.Library.RemoveCard(pick);
+            if (toZone == ZoneType.Battlefield)
+            {
+                searcher.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(searcher);
+            }
+            else
+            {
+                searcher.Zones.Hand.AddCard(pick);
+                pick.SetZone(ZoneType.Hand);
+            }
+        }
+
+        if (enterTapped && pick is Permanent perm && !perm.IsTapped)
+        {
+            perm.Tap();
+        }
+    }
+
+    private static string BuildSearchLabel(
+        CardSubtype[] subtypes, IReadOnlyList<string> subtypeNames, bool requireBasic, string? cardType)
+    {
+        var basic = requireBasic ? "basic " : "";
+        if (subtypes.Length > 0)
+        {
+            return $"{basic}{string.Join("/", subtypeNames)} card";
+        }
+        if (!string.IsNullOrWhiteSpace(cardType))
+        {
+            return $"{basic}{cardType.ToLowerInvariant()} card";
+        }
+        return requireBasic ? "basic land card" : "card";
+    }
+
+    /// <summary>Parse an optional card-type filter — <c>null</c>/empty means "no
+    /// card-type restriction" (returns <c>null</c>).</summary>
+    private static CardType? ParseOptionalType(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? null : ParseType(raw);
 
     private static IEffect BuildGainLifeSelfEffect(GainLifeSelfEffectDef def, ICard card, Player controller)
     {
