@@ -24,6 +24,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(WheneverAnotherCreatureDiesTriggerDef), "whenever_another_creature_dies")]
 [JsonDerivedType(typeof(DealsCombatDamageToPlayerSelfTriggerDef), "whenever_this_deals_combat_damage_to_a_player")]
 [JsonDerivedType(typeof(WheneverACreatureYouControlExploresTriggerDef), "whenever_a_creature_you_control_explores")]
+[JsonDerivedType(typeof(StateWhenCountersGeTriggerDef), "state_when_counters_ge")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -320,3 +321,37 @@ public sealed class DealsCombatDamageToPlayerSelfTriggerDef : TriggerDefinition 
 /// counter on this creature and you gain 3 life"). No extra fields.
 /// </summary>
 public sealed class WheneverACreatureYouControlExploresTriggerDef : TriggerDefinition { }
+
+/// <summary>
+/// "When there are <see cref="Threshold"/> or more <see cref="Counter"/>
+/// counters on this permanent, …" — a <em>state trigger</em> (CR 603.8).
+/// Unlike an event trigger, a state trigger fires whenever its condition is
+/// satisfied rather than in response to a particular event; the engine models
+/// it as a <see cref="Majik.Core.Abilities.StateChangeTriggerCondition"/>
+/// (rising-edge over the predicate) evaluated by
+/// <see cref="Majik.Core.Abilities.TriggerManager.EvaluateStateChangeTriggers"/>
+/// after each state-based-action pass (CR 704 checkpoint where 603.8 triggers
+/// are looked for, CR 603.3).
+///
+/// <para>
+/// The predicate reads the live page/charge/quest/etc. counter count off this
+/// permanent's <see cref="Majik.Core.Cards.Permanent.Counters"/> bag and
+/// returns true once it is &gt;= <see cref="Threshold"/>. Models the
+/// counter-threshold payoff family: Mazemind Tome ("four or more page
+/// counters → exile it, gain 4 life"), and broadly any "When there are N or
+/// more [type] counters on this …" state trigger. The threshold-reached
+/// effect itself (exile / gain life / etc.) is supplied separately by the
+/// card's effect list — this def only expresses the firing condition.
+/// </para>
+/// </summary>
+public sealed class StateWhenCountersGeTriggerDef : TriggerDefinition
+{
+    /// <summary>The counter type whose count gates the trigger
+    /// (e.g. <c>"Page"</c>). Parsed as a
+    /// <see cref="Majik.Core.Counters.CounterType"/> by name.</summary>
+    public string Counter { get; set; } = string.Empty;
+
+    /// <summary>The inclusive lower bound: the trigger fires on the rising
+    /// edge of <c>count &gt;= Threshold</c> (CR 603.8). Mazemind Tome = 4.</summary>
+    public int Threshold { get; set; }
+}

@@ -157,4 +157,18 @@ public sealed record CounterType(string Name)
     /// one stun counter is removed instead (one untap step per counter).
     /// </summary>
     public static readonly CounterType Stun = new("Stun");
+
+    /// <summary>
+    /// CR 122 / CR 603.8 — Page counters. Card-specific marker used by
+    /// Mazemind Tome (Core Set 2021). Each of Mazemind Tome's two activated
+    /// abilities puts one page counter on it (Scry 1 / Draw a card); once it
+    /// accumulates four or more page counters a <em>state trigger</em>
+    /// (CR 603.8 — "When there are four or more page counters on this
+    /// artifact, exile it. If you do, you gain 4 life.") fires and exiles
+    /// the artifact for 4 life. The counter is an opaque marker — no
+    /// built-in P/T or ability semantics; the threshold payoff is wired as a
+    /// <see cref="Majik.Core.Abilities.StateChangeTriggerCondition"/> by
+    /// <see cref="Majik.Core.CardData.Factories.MazemindTomeFactory"/>.
+    /// </summary>
+    public static readonly CounterType Page = new("Page");
 }
