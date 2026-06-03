@@ -220,4 +220,52 @@ public class PlaguecrafterFactoryTests
             "Bob couldn't sacrifice, so he discards a card (CR 701.8)");
         bob.Zones.Hand.GetCards().Should().NotContain(bobSpell);
     }
+
+    // -----------------------------------------------------------------------
+    // Bus-aware sacrifice — CR 701.16a. When an event bus is supplied each
+    // player's forced sacrifice publishes a PermanentSacrificedEvent crediting
+    // that player as the sacrificer, so aristocrat payoffs (Mayhem Devil, It
+    // That Betrays) fire on the Plaguecrafter path. Pays down
+    // thread-bus-into-bare-fx-sacrifice.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Plaguecrafter_Etb_WithEventBus_PublishesPermanentSacrificedEvent_PerSacrificingPlayer()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new EventBus();
+
+        var aliceBear = new Creature("Grizzly Bears", "1G", 2, 2);
+        aliceBear.SetOwner(alice);
+        aliceBear.SetController(alice);
+        alice.Zones.Battlefield.AddCard(aliceBear);
+        aliceBear.SetZone(ZoneType.Battlefield);
+
+        var bobBear = new Creature("Forest Bear", "1G", 2, 2);
+        bobBear.SetOwner(bob);
+        bobBear.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bobBear);
+        bobBear.SetZone(ZoneType.Battlefield);
+
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        var pc = PlaguecrafterFactory.Create(
+            alice,
+            playerResolver: () => new[] { alice, bob },
+            triggers: null,
+            agent: null,
+            eventBus: bus);
+
+        var etb = SelectEtbTrigger(pc);
+        foreach (var effect in etb.Effects) effect.Execute();
+
+        // Two players each sacrificed a creature → two events, each crediting
+        // the controlling player (CR 701.16a).
+        sacrificed.Should().HaveCount(2,
+            "each forced sacrifice routes through the bus-aware Fx.Sacrifice overload");
+        sacrificed.Should().Contain(ev => ev.SacrificedCard == aliceBear && ev.SacrificingPlayer == alice);
+        sacrificed.Should().Contain(ev => ev.SacrificedCard == bobBear && ev.SacrificingPlayer == bob);
+    }
 }

@@ -254,4 +254,60 @@ public class PhyrexianObliteratorFactoryTests
             "trigger only fires when the Obliterator itself is dealt damage");
         _bob.Zones.Battlefield.GetCards().Should().HaveCount(1, "no sacrifice");
     }
+
+    // -----------------------------------------------------------------------
+    // Bus-aware sacrifice — CR 701.16. Each forced sacrifice publishes a
+    // PermanentSacrificedEvent carrying the sacrificing player so aristocrat
+    // payoffs (It That Betrays, Mayhem Devil) fire on the Obliterator path.
+    // Pays down thread-bus-into-bare-fx-sacrifice.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PhyrexianObliterator_Takes2Damage_PublishesTwoPermanentSacrificedEvents_WithSourceControllerAsSacrificer()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        var ob = PhyrexianObliteratorFactory.Create(_alice, bus, triggers);
+        _alice.Zones.Battlefield.AddCard(ob);
+        ob.SetZone(ZoneType.Battlefield);
+
+        var blaster = new Creature("Blaster", "{2}{R}", 3, 3) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Battlefield.AddCard(blaster);
+        blaster.SetZone(ZoneType.Battlefield);
+
+        var p1 = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        var p2 = new Creature("Llanowar Elves", "{G}", 1, 1) { Owner = _bob, Controller = _bob };
+        foreach (var p in new[] { p1, p2 })
+        {
+            _bob.Zones.Battlefield.AddCard(p);
+            p.SetZone(ZoneType.Battlefield);
+        }
+
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        bus.Publish(new DamageDealtEvent(
+            sourceCard: blaster,
+            sourcePlayer: null,
+            targetCard: ob,
+            targetPlayer: null,
+            amount: 2,
+            damageType: DamageType.Combat));
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        var queued = stack.Pop();
+        queued.Should().NotBeNull();
+        queued!.Resolve();
+
+        // Two permanents sacrificed → two events, each crediting Bob (the
+        // source's controller) as the sacrificing player (CR 701.16a).
+        sacrificed.Should().HaveCount(2,
+            "each of the 2 forced sacrifices routes through the bus-aware Fx.Sacrifice overload");
+        sacrificed.Should().OnlyContain(ev => ev.SacrificingPlayer == _bob,
+            "CR 701.16a — the source's controller is the sacrificing player");
+        sacrificed.Should().OnlyContain(ev => ev.WasToken == false,
+            "the sacrificed permanents are not tokens");
+    }
 }
