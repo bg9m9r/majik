@@ -34892,6 +34892,59 @@
   "mdfc": null,
   "colors": []
 }
+==== svyelun-of-sea-and-sky ====
+{
+  "name": "Svyelun of Sea and Sky",
+  "manaCost": "{1}{U}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "God",
+    "Merfolk"
+  ],
+  "power": 3,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== swamp ====
 {
   "name": "Swamp",
