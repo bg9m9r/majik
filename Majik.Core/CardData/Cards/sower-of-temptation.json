@@ -1,0 +1,23 @@
+{
+  "name": "Sower of Temptation",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Wizard"],
+  "manaCost": "{2}{U}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "gain_control",
+          "targetFilter": "creature",
+          "duration": "while_source_on_battlefield",
+          "untap": false,
+          "gainsHaste": false
+        }
+      ]
+    }
+  ]
+}
