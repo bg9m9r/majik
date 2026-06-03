@@ -236,7 +236,7 @@ public class MistriseVillageFactoryTests : IDisposable
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, bolt,
@@ -261,7 +261,7 @@ public class MistriseVillageFactoryTests : IDisposable
         var agent1 = new ScriptedAgent();
         agent1.QueueMana(ManaPayment.Empty);
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         var aliceSpell = await _flow.CastAsync(
             _alice, aliceBolt,
@@ -291,7 +291,7 @@ public class MistriseVillageFactoryTests : IDisposable
         foreach (var fx in ab.Effects) fx.Execute();
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, _stack);
+            StepStateType.PreCombatMain, _stack);
 
         // First spell — consumes the rider.
         var first = new Instant("Bolt1", "{R}") { Owner = _alice, Zone = ZoneType.Hand };

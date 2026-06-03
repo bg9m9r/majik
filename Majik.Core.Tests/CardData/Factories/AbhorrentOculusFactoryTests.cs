@@ -194,12 +194,12 @@ public class AbhorrentOculusFactoryTests
 
         // Alice's upkeep — Oculus does NOT trigger (printed "each
         // opponent's upkeep").
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(0,
             "controller's own upkeeps are excluded");
 
         // Bob's upkeep — trigger fires.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(1,
             "an opponent's upkeep surfaces the manifest-dread trigger");
     }
@@ -216,15 +216,15 @@ public class AbhorrentOculusFactoryTests
         oculus.SetZone(ZoneType.Battlefield);
 
         // Bob's Draw step — wrong step, should not fire.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _bob));
         triggers.PendingCount.Should().Be(0);
 
         // Bob's End step — wrong step.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
         triggers.PendingCount.Should().Be(0);
 
         // Bob's Upkeep — fires.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(1);
     }
 

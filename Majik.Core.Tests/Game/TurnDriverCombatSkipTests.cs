@@ -95,7 +95,7 @@ public class TurnDriverCombatSkipTests
         // opponent's effect mid-turn.
         _bus.Subscribe<Majik.Core.Events.StepStartedEvent>(e =>
         {
-            if (e.StepType == PhaseStateType.PreCombatMain && !bear.IsTapped)
+            if (e.StepType == StepStateType.PreCombatMain && !bear.IsTapped)
             {
                 bear.Tap();
             }

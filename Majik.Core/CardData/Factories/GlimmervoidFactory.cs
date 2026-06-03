@@ -81,7 +81,7 @@ public static class GlimmervoidFactory
     /// Construct Glimmervoid. When <paramref name="triggers"/> is supplied,
     /// the end-step sacrifice trigger is registered so a
     /// <see cref="StepStartedEvent"/> with
-    /// <see cref="StepStartedEvent.StepType"/> == <see cref="PhaseStateType.End"/>
+    /// <see cref="StepStartedEvent.StepType"/> == <see cref="StepStateType.End"/>
     /// automatically queues the ability on the stack (CR 603.2).
     /// </summary>
     public static Land Create(Player owner, TriggerManager? triggers)
@@ -155,7 +155,7 @@ public static class GlimmervoidFactory
         var endStepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, StepStateType.End),
             effects: new IEffect[] { sacEffect },
             interveningIf: ControllerHasNoArtifacts,
             activeZones: new[] { ZoneType.Battlefield });

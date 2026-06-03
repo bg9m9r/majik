@@ -246,7 +246,7 @@ public static class ReflectionOfKikiJikiFactory
             source: card,
             controller: controller,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End && e.Timestamp > resolvedAt),
+                (e, _) => e.StepType == StepStateType.End && e.Timestamp > resolvedAt),
             effects: new IEffect[] { sacEffect });
 
         triggers.RegisterDelayed(delayed);

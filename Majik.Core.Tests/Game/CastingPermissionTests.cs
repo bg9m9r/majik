@@ -16,7 +16,7 @@ public class CastingPermissionTests
         var bolt = new Instant("Bolt", "R");
 
         CastingPermission.CanCast(bolt, _alice, _bob,
-            PhaseStateType.End, stackIsEmpty: false, out _).Should().BeTrue();
+            StepStateType.End, stackIsEmpty: false, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public class CastingPermissionTests
         var sorc = new Sorcery("Divination", "2U");
 
         CastingPermission.CanCast(sorc, _alice, _alice,
-            PhaseStateType.PreCombatMain, stackIsEmpty: true, out _).Should().BeTrue();
+            StepStateType.PreCombatMain, stackIsEmpty: true, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class CastingPermissionTests
         var sorc = new Sorcery("Divination", "2U");
 
         CastingPermission.CanCast(sorc, _alice, _bob,
-            PhaseStateType.PreCombatMain, stackIsEmpty: true, out var reason).Should().BeFalse();
+            StepStateType.PreCombatMain, stackIsEmpty: true, out var reason).Should().BeFalse();
         reason.Should().Contain("your turn");
     }
 
@@ -44,7 +44,7 @@ public class CastingPermissionTests
         var sorc = new Sorcery("Divination", "2U");
 
         CastingPermission.CanCast(sorc, _alice, _alice,
-            PhaseStateType.End, stackIsEmpty: true, out var reason).Should().BeFalse();
+            StepStateType.End, stackIsEmpty: true, out var reason).Should().BeFalse();
         reason.Should().Contain("main phase");
     }
 
@@ -54,7 +54,7 @@ public class CastingPermissionTests
         var sorc = new Sorcery("Divination", "2U");
 
         CastingPermission.CanCast(sorc, _alice, _alice,
-            PhaseStateType.PreCombatMain, stackIsEmpty: false, out var reason).Should().BeFalse();
+            StepStateType.PreCombatMain, stackIsEmpty: false, out var reason).Should().BeFalse();
         reason.Should().Contain("stack is empty");
     }
 
@@ -64,7 +64,7 @@ public class CastingPermissionTests
         var land = new Land("Mountain");
 
         CastingPermission.CanCast(land, _alice, _alice,
-            PhaseStateType.PreCombatMain, stackIsEmpty: true, out var reason).Should().BeFalse();
+            StepStateType.PreCombatMain, stackIsEmpty: true, out var reason).Should().BeFalse();
         reason.Should().Contain("LandDropTracker");
     }
 }

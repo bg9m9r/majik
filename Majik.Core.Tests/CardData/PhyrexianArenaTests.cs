@@ -117,12 +117,12 @@ public class PhyrexianArenaTests
         arena.SetZone(ZoneType.Battlefield);
 
         // Bob's upkeep — Alice's Arena does NOT trigger (only her own).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "Phyrexian Arena only triggers on its controller's own upkeep");
 
         // Alice's upkeep — trigger surfaces as pending.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 

@@ -25,7 +25,7 @@ namespace Majik.Core.Api.Tests;
 /// same driver <see cref="Majik.Core.Game.GameDriver"/> runs in the live
 /// match) and replays the captured <see cref="StepStartedEvent"/> phase
 /// labels. Since Slice 3 each main phase carries its own first-class
-/// <see cref="PhaseStateType"/> value (PreCombatMain / PostCombatMain), so
+/// <see cref="StepStateType"/> value (PreCombatMain / PostCombatMain), so
 /// the label is authoritative without consulting the turn state.
 ///
 /// CR 505 — the two main phases are distinct steps; clients key on the
@@ -71,9 +71,9 @@ public class PhaseLabelTurnDriverTests
         // StepStartedEvent's label comes straight from its phase. We still
         // track the turn-state (as GameFacade does) but it no longer affects
         // the label. Record the order the two main steps serialize.
-        TurnStateType? currentTurnState = null;
+        PhaseStateType? currentTurnState = null;
         var mainLabels = new List<string>();
-        bus.Subscribe<TurnStateChangedEvent>(e => currentTurnState = e.CurrentState);
+        bus.Subscribe<PhaseStateChangedEvent>(e => currentTurnState = e.CurrentState);
         bus.Subscribe<StepStartedEvent>(e =>
         {
             if (!e.StepType.IsMain()) return;

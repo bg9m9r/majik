@@ -445,7 +445,7 @@ public class RemoteAgentTests
         var agent = new RemoteAgent(_alice);
         var ctx = new GameContext(
             _alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.Upkeep, new Majik.Core.Stack.Stack());
+            StepStateType.Upkeep, new Majik.Core.Stack.Stack());
 
         _ = agent.ChoosePriorityActionAsync(ctx);
 
@@ -466,7 +466,7 @@ public class RemoteAgentTests
             allPlayers: new[] { _alice, bob },
             activePlayer: bob,
             turnNumber: 1,
-            currentPhase: PhaseStateType.PreCombatMain,
+            currentPhase: StepStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack());
 
         _ = agent.ChoosePriorityActionAsync(ctx);
@@ -490,7 +490,7 @@ public class RemoteAgentTests
             allPlayers: new[] { _alice, bob },
             activePlayer: bob,
             turnNumber: 1,
-            currentPhase: PhaseStateType.End,
+            currentPhase: StepStateType.End,
             stack: new Majik.Core.Stack.Stack());
 
         _ = agent.ChoosePriorityActionAsync(ctx);
@@ -513,7 +513,7 @@ public class RemoteAgentTests
             allPlayers: new[] { _alice, bob },
             activePlayer: bob,
             turnNumber: 1,
-            currentPhase: PhaseStateType.End,
+            currentPhase: StepStateType.End,
             stack: new Majik.Core.Stack.Stack());
 
         _ = agent.ChoosePriorityActionAsync(ctx);
@@ -552,7 +552,7 @@ public class RemoteAgentTests
             allPlayers: new[] { _alice, bob },
             activePlayer: bob,
             turnNumber: 1,
-            currentPhase: PhaseStateType.DeclareAttackers,
+            currentPhase: StepStateType.DeclareAttackers,
             stack: new Majik.Core.Stack.Stack());
 
         _ = agent.ChoosePriorityActionAsync(ctx);
@@ -574,7 +574,7 @@ public class RemoteAgentTests
         stack.Push(new TestStackObject());
         var ctx = new GameContext(
             _alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.PreCombatMain, stack);
+            StepStateType.PreCombatMain, stack);
 
         _ = agent.ChoosePriorityActionAsync(ctx);
 
@@ -1565,7 +1565,7 @@ public class RemoteAgentTests
     }
 
     private GameContext NewContext() =>
-        new(_alice, new[] { _alice }, _alice, 1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+        new(_alice, new[] { _alice }, _alice, 1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
     // -----------------------------------------------------------------------
     // PLAN 01 Slice D — the unified ChooseAsync prompts (ChooseFromHand /

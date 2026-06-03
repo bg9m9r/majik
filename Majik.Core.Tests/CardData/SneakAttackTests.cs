@@ -174,7 +174,7 @@ public class SneakAttackTests
 
         // Fire the next End step — the delayed trigger matches and queues
         // itself onto the stack.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         // Resolve everything on the stack — the delayed trigger fires its
@@ -239,7 +239,7 @@ public class SneakAttackTests
         _alice.Zones.Battlefield.GetCards().Should().Contain(new[] { emrakul, griselbrand });
 
         // Fire the next End step — both delayed triggers match.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);
@@ -293,7 +293,7 @@ public class SneakAttackTests
             .Which.Should().BeSameAs(sneakAttack);
 
         // No delayed trigger should have been registered (nothing to sac).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(0,
             "no creature placed → no delayed end-step sacrifice registered");
     }

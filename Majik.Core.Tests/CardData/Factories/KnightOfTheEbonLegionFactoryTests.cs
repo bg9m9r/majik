@@ -132,7 +132,7 @@ public class KnightOfTheEbonLegionFactoryTests
         _bob.LoseLife(4);
 
         // Alice's (the controller's) end step fires.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "the end-step counter trigger fires when a player lost 4+ life this turn");
@@ -160,7 +160,7 @@ public class KnightOfTheEbonLegionFactoryTests
         // Only 3 life lost → intervening-if (CR 603.4) fails.
         _bob.LoseLife(3);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0) stack.Pop()!.Resolve();
 
@@ -185,7 +185,7 @@ public class KnightOfTheEbonLegionFactoryTests
 
         // The End step belongs to BOB, not the Knight's controller — "your end
         // step" must NOT fire (CR 500).
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
 
         triggers.PendingCount.Should().Be(0,
             "\"your end step\" fires only on the controller's end step");

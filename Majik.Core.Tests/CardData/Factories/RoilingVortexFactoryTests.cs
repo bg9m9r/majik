@@ -140,11 +140,11 @@ public class RoilingVortexFactoryTests
 
         // Bob's upkeep — Alice's Vortex does NOT trigger (oracle: "your
         // upkeep").
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0);
 
         // Alice's upkeep — upkeep trigger surfaces.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 

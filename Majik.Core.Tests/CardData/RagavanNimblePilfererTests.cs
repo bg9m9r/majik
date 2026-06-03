@@ -255,7 +255,7 @@ public class RagavanNimblePilfererTests
         pilfered.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
         // Cleanup step fires — CR 514.2 / 514.3.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         pilfered.RuntimeExileCastAllowedCaster.Should().BeNull(
             "EOT cleanup clears the may-cast grant");

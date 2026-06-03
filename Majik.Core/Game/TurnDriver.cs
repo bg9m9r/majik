@@ -50,16 +50,16 @@ public sealed class TurnDriver
     // game's queue once the scope is active (and is stable within the run).
     private AdditionalCombatQueue _additionalCombats
         => AdditionalCombatRegistryProvider.Current;
-    private PhaseStateType _currentPhase;
+    private StepStateType _currentPhase;
     private int _currentTurnNumber;
 
     // CR 505 — the phase value itself distinguishes PreCombatMain from
     // PostCombatMain (Slice 3), so phase/step labels are unambiguous. We
     // still track the outer turn-level state (CR 500.1 turn structure) here
-    // and publish a TurnStateChangedEvent at each turn-state boundary for
-    // TurnStateChangedEvent consumers (GameFacade._currentTurnState).
+    // and publish a PhaseStateChangedEvent at each turn-state boundary for
+    // PhaseStateChangedEvent consumers (GameFacade._currentTurnState).
     // Starts null; the first SetTurnState at turn start populates it.
-    private TurnStateType? _currentTurnState;
+    private PhaseStateType? _currentTurnState;
 
     /// <summary>
     /// Per-turn event tally — creatures died, permanents left, cards drawn.
@@ -305,8 +305,8 @@ public sealed class TurnDriver
         _currentTurnState = null;
 
         // Beginning phase (CR 501-504: Untap, Upkeep, Draw).
-        SetTurnState(TurnStateType.TurnBeginning);
-        SetPhase(PhaseStateType.Untap);
+        SetTurnState(PhaseStateType.TurnBeginning);
+        SetPhase(StepStateType.Untap);
 
         // CR 502.2 / 730.2 — the second turn-based action of the untap step:
         // the day/night check. If it's day and the previous turn's active
@@ -320,10 +320,10 @@ public sealed class TurnDriver
 
         UntapStep(activePlayer);
 
-        SetPhase(PhaseStateType.Upkeep);
+        SetPhase(StepStateType.Upkeep);
         await PriorityRound(activePlayer, ct);
 
-        SetPhase(PhaseStateType.Draw);
+        SetPhase(StepStateType.Draw);
         // CR 117.5 / 614.12 — "Skip your draw step" replacement effects
         // (Necropotence, Yawgmoth's Bargain, etc.) are consulted via
         // SkipDrawRegistry. Turn 1 already skips by convention; on any
@@ -335,19 +335,19 @@ public sealed class TurnDriver
         await PriorityRound(activePlayer, ct);
 
         // Main 1 (CR 505 — precombat main phase).
-        SetTurnState(TurnStateType.PreCombatMain);
-        SetPhase(PhaseStateType.PreCombatMain);
+        SetTurnState(PhaseStateType.PreCombatMain);
+        SetPhase(StepStateType.PreCombatMain);
         // CR 714.2 — Saga lore-counter tick fires at the precombat main.
         AdvanceSagas(activePlayer);
         await PriorityRound(activePlayer, ct);
 
         // Combat (CR 506-511).
-        SetTurnState(TurnStateType.Combat);
-        SetPhase(PhaseStateType.BeginningOfCombat);
+        SetTurnState(PhaseStateType.Combat);
+        SetPhase(StepStateType.BeginningOfCombat);
         await PriorityRound(activePlayer, ct);
 
         var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
-        SetPhase(PhaseStateType.DeclareAttackers);
+        SetPhase(StepStateType.DeclareAttackers);
         await RunCombat(activePlayer, defender, ct);
 
         // CR 506.4 / CR 505.1b — additional combat phases drain the queue.
@@ -359,15 +359,15 @@ public sealed class TurnDriver
         // Missing Out) do not.
         while (_additionalCombats.TryConsume(out var followedByMainPhase))
         {
-            SetTurnState(TurnStateType.Combat);
-            SetPhase(PhaseStateType.BeginningOfCombat);
+            SetTurnState(PhaseStateType.Combat);
+            SetPhase(StepStateType.BeginningOfCombat);
             await PriorityRound(activePlayer, ct);
-            SetPhase(PhaseStateType.DeclareAttackers);
+            SetPhase(StepStateType.DeclareAttackers);
             await RunCombat(activePlayer, defender, ct);
 
             // CR 511 — every combat phase has its own end-of-combat step, so
             // "until end of combat" durations expire per extra combat too.
-            SetPhase(PhaseStateType.EndOfCombat);
+            SetPhase(StepStateType.EndOfCombat);
 
             if (followedByMainPhase)
             {
@@ -375,8 +375,8 @@ public sealed class TurnDriver
                 // no defined steps) where the active player gets priority
                 // (CR 505.4). It's a postcombat main (it follows a combat
                 // phase) so it carries the PostCombatMain turn-state label.
-                SetTurnState(TurnStateType.PostCombatMain);
-                SetPhase(PhaseStateType.PostCombatMain);
+                SetTurnState(PhaseStateType.PostCombatMain);
+                SetPhase(StepStateType.PostCombatMain);
                 await PriorityRound(activePlayer, ct);
             }
         }
@@ -386,19 +386,19 @@ public sealed class TurnDriver
         // CR 511 — end of combat step. Emit the step event so "until end of
         // combat" durations (e.g. Firebending mana) can expire before the
         // postcombat main begins.
-        SetPhase(PhaseStateType.EndOfCombat);
+        SetPhase(StepStateType.EndOfCombat);
 
         // Main 2 (CR 505 — postcombat main phase).
-        SetTurnState(TurnStateType.PostCombatMain);
-        SetPhase(PhaseStateType.PostCombatMain);
+        SetTurnState(PhaseStateType.PostCombatMain);
+        SetPhase(StepStateType.PostCombatMain);
         await PriorityRound(activePlayer, ct);
 
         // End phase (CR 512-514: End step, Cleanup).
-        SetTurnState(TurnStateType.TurnEnding);
-        SetPhase(PhaseStateType.End);
+        SetTurnState(PhaseStateType.TurnEnding);
+        SetPhase(StepStateType.End);
         await PriorityRound(activePlayer, ct);
 
-        SetPhase(PhaseStateType.Cleanup);
+        SetPhase(StepStateType.Cleanup);
         Cleanup(activePlayer);
 
         // CR 502.2 / 730.2 — remember this turn's active player so the NEXT
@@ -460,7 +460,7 @@ public sealed class TurnDriver
 
     private Player? _activePlayerForStepEvents;
 
-    private void SetPhase(PhaseStateType phase)
+    private void SetPhase(StepStateType phase)
     {
         _currentPhase = phase;
         // CR 500 — emit StepStartedEvent so binders for "at the beginning
@@ -473,7 +473,7 @@ public sealed class TurnDriver
 
     /// <summary>
     /// CR 500.1 — advance the outer turn-level state and publish a
-    /// <see cref="Majik.Core.Events.TurnStateChangedEvent"/> so downstream
+    /// <see cref="Majik.Core.Events.PhaseStateChangedEvent"/> so downstream
     /// wire code can recover which main phase we're in (CR 505). This is
     /// the only place the live turn flow surfaces the turn-state; there is
     /// no separate turn-level state machine in the production match path.
@@ -481,12 +481,12 @@ public sealed class TurnDriver
     /// changed, so repeated entries (e.g. extra combat phases re-entering
     /// Combat) don't emit redundant events.
     /// </summary>
-    private void SetTurnState(TurnStateType turnState)
+    private void SetTurnState(PhaseStateType turnState)
     {
         if (_currentTurnState == turnState) return;
         var previous = _currentTurnState;
         _currentTurnState = turnState;
-        _eventBus?.Publish(new Majik.Core.Events.TurnStateChangedEvent(previous, turnState));
+        _eventBus?.Publish(new Majik.Core.Events.PhaseStateChangedEvent(previous, turnState));
     }
 
     private void UntapStep(Player active)

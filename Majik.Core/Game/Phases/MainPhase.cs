@@ -7,18 +7,18 @@ namespace Majik.Core.Game.Phases;
 /// Main phase implementation.
 /// Players can cast spells, activate abilities, and play lands.
 /// </summary>
-public class MainPhase : PhaseState
+public class MainPhase : StepState
 {
     private readonly IEventBus? _eventBus;
 
     /// <summary>
     /// Construct a main phase. CR 505 splits the main phase into a
-    /// precombat (<see cref="PhaseStateType.PreCombatMain"/>) and postcombat
-    /// (<see cref="PhaseStateType.PostCombatMain"/>) instance; the type is
+    /// precombat (<see cref="StepStateType.PreCombatMain"/>) and postcombat
+    /// (<see cref="StepStateType.PostCombatMain"/>) instance; the type is
     /// carried in from the sequence so each registers under its own label.
     /// Defaults to the precombat main when unspecified.
     /// </summary>
-    public MainPhase(PhaseStateType type = PhaseStateType.PreCombatMain, IEventBus? eventBus = null)
+    public MainPhase(StepStateType type = StepStateType.PreCombatMain, IEventBus? eventBus = null)
         : base(type, eventBus)
     {
         if (!type.IsMain())

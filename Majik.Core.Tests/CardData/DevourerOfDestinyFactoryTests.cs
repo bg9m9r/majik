@@ -132,7 +132,7 @@ public class DevourerOfDestinyFactoryTests
 
         // Drive Alice's upkeep — the scheduled delayed trigger should
         // become pending exactly once.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1,
             "yes-revealing must register a one-shot first-upkeep trigger");
     }
@@ -148,7 +148,7 @@ public class DevourerOfDestinyFactoryTests
         await subscriber.HandleAsync(new OpeningHandCheckEvent(
             _alice, _alice.Zones.Hand.GetCards().ToList()));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(0,
             "declined reveal must not schedule any first-upkeep trigger");
     }
@@ -166,17 +166,17 @@ public class DevourerOfDestinyFactoryTests
 
         // Bob's upkeep doesn't fire it — CR 500.2 each player has their own
         // beginning-of-upkeep step, and the printed text is "YOUR first upkeep".
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "trigger is scoped to the revealer's own upkeep, not the opponent's");
 
         // Alice's draw step doesn't fire it either.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
         triggers.PendingCount.Should().Be(0,
             "trigger is scoped to upkeep, not draw");
 
         // Alice's upkeep does fire it.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 
@@ -212,7 +212,7 @@ public class DevourerOfDestinyFactoryTests
 
         // Drive Alice's first upkeep — trigger goes pending, then resolves
         // off the stack (the DelayedTriggeredAbilityTests pattern).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
@@ -258,7 +258,7 @@ public class DevourerOfDestinyFactoryTests
         await subscriber.HandleAsync(new OpeningHandCheckEvent(
             _alice, _alice.Zones.Hand.GetCards().ToList()));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
@@ -343,7 +343,7 @@ public class DevourerOfDestinyFactoryTests
             new[] { _alice, _bob },
             _alice,
             turnNumber: 0,
-            currentPhase: PhaseStateType.PreCombatMain,
+            currentPhase: StepStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack());
 
         var pool = castTrigger.TargetRequests[0].ResolveCandidates(ctx);

@@ -115,7 +115,7 @@ public class UrzasBaubleTests
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var e in ability.Effects) e.Execute();
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(1);
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
@@ -142,9 +142,9 @@ public class UrzasBaubleTests
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var e in ability.Effects) e.Execute();
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Draw, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(0);
         _alice.Zones.Hand.GetCards().Should().NotContain(top);

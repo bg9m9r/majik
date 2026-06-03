@@ -19,7 +19,7 @@ namespace Majik.Core.Tests.CardData;
 /// Covers:
 /// - Identity (name, type, mana cost, owner/controller).
 /// - NamedCardFactory dispatch + Enchantment shape.
-/// - End-step trigger gates on <see cref="PhaseStateType.End"/> only.
+/// - End-step trigger gates on <see cref="StepStateType.End"/> only.
 /// - "Each end step" — fires on both controller's AND opponent's end step
 ///   (no active-player filter).
 /// - Resolution: untaps every Land the enchantment's controller controls;
@@ -70,11 +70,11 @@ public class WildernessReclamationTests
 
         var trigger = rec.Abilities.OfType<TriggeredAbility>().Single();
 
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue("printed trigger reads 'at the beginning of each end step'");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeFalse("upkeep is not the end step");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.Draw, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Draw, _alice))
             .Should().BeFalse("draw is not the end step");
     }
 
@@ -89,9 +89,9 @@ public class WildernessReclamationTests
 
         var trigger = rec.Abilities.OfType<TriggeredAbility>().Single();
 
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue("controller's own end step fires the trigger");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _bob))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _bob))
             .Should().BeTrue("opponent's end step also fires the trigger ('each')");
     }
 

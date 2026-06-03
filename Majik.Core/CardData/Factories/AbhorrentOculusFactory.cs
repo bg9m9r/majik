@@ -133,7 +133,7 @@ public static class AbhorrentOculusFactory
         // ----------------------------------------------------------------
         var opponentUpkeepCondition = new EventTriggerCondition<StepStartedEvent>(
             (e, _) =>
-                e.StepType == PhaseStateType.Upkeep
+                e.StepType == StepStateType.Upkeep
                 && !ReferenceEquals(e.Player, card.Controller ?? owner));
 
         // CR 701.59 — resolve manifest dread for the trigger's

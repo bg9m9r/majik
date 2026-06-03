@@ -146,7 +146,7 @@ public class ChancellorOfTheTangleFactoryTests
             _alice, _alice.Zones.Hand.GetCards().ToList()));
 
         // Drive Alice's PreCombatMain — the scheduled delayed trigger fires.
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
         triggers.PendingCount.Should().Be(1,
             "yes-revealing must register a one-shot first-PreCombatMain trigger");
     }
@@ -162,7 +162,7 @@ public class ChancellorOfTheTangleFactoryTests
         await subscriber.HandleAsync(new OpeningHandCheckEvent(
             _alice, _alice.Zones.Hand.GetCards().ToList()));
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
         triggers.PendingCount.Should().Be(0,
             "declined reveal must not schedule any first-main trigger");
     }
@@ -185,7 +185,7 @@ public class ChancellorOfTheTangleFactoryTests
         var greenBefore = _alice.ManaPool.Green;
 
         // Advance to Alice's first PreCombatMain — trigger goes pending.
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         // Resolve the trigger off the stack (same pattern as DevourerOfDestiny
@@ -211,17 +211,17 @@ public class ChancellorOfTheTangleFactoryTests
             _alice, _alice.Zones.Hand.GetCards().ToList()));
 
         // Bob's PreCombatMain doesn't fire it.
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _bob));
         triggers.PendingCount.Should().Be(0,
             "trigger is scoped to revealer's own PreCombatMain, not opponent's");
 
         // Alice's Upkeep doesn't fire it.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(0,
             "trigger is scoped to PreCombatMain, not upkeep");
 
         // Alice's PreCombatMain fires it exactly once.
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
         triggers.PendingCount.Should().Be(1);
     }
 
@@ -241,7 +241,7 @@ public class ChancellorOfTheTangleFactoryTests
             _alice, _alice.Zones.Hand.GetCards().ToList()));
 
         // First PreCombatMain: trigger fires.
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
         triggers.PendingCount.Should().Be(1, "first PreCombatMain fires the trigger");
 
         // Drain onto stack and resolve so the delayed trigger unregisters.
@@ -249,7 +249,7 @@ public class ChancellorOfTheTangleFactoryTests
         stack.Pop()!.Resolve();
 
         // Second PreCombatMain: trigger must NOT fire again.
-        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.PreCombatMain, _alice));
         triggers.PendingCount.Should().Be(0,
             "CR 603.7d — delayed trigger auto-unregisters after firing once");
     }

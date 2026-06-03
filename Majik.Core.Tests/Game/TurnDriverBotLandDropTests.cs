@@ -187,7 +187,7 @@ public class TurnDriverBotLandDropTests
         bus.Subscribe<StepStartedEvent>(e =>
         {
             if (ReferenceEquals(e.Player, alice)
-                && e.StepType == Majik.Core.StateMachine.PhaseStateType.Untap)
+                && e.StepType == Majik.Core.StateMachine.StepStateType.Untap)
             {
                 tracker.SetMaxLandDropsThisTurn(alice, 3);
             }

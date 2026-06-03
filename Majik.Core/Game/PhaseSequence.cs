@@ -10,45 +10,45 @@ public static class PhaseSequence
     /// <summary>
     /// Standard phase sequence for a normal turn.
     /// </summary>
-    public static readonly PhaseStateType[] StandardSequence = new[]
+    public static readonly StepStateType[] StandardSequence = new[]
     {
-        PhaseStateType.Untap,
-        PhaseStateType.Upkeep,
-        PhaseStateType.Draw,
-        PhaseStateType.PreCombatMain,     // Pre-combat main phase
-        PhaseStateType.BeginningOfCombat,
-        PhaseStateType.DeclareAttackers,
-        PhaseStateType.DeclareBlockers,
-        PhaseStateType.CombatDamage,
-        PhaseStateType.EndOfCombat,
-        PhaseStateType.PostCombatMain,    // Post-combat main phase
-        PhaseStateType.End,
-        PhaseStateType.Cleanup
+        StepStateType.Untap,
+        StepStateType.Upkeep,
+        StepStateType.Draw,
+        StepStateType.PreCombatMain,     // Pre-combat main phase
+        StepStateType.BeginningOfCombat,
+        StepStateType.DeclareAttackers,
+        StepStateType.DeclareBlockers,
+        StepStateType.CombatDamage,
+        StepStateType.EndOfCombat,
+        StepStateType.PostCombatMain,    // Post-combat main phase
+        StepStateType.End,
+        StepStateType.Cleanup
     };
 
     /// <summary>
     /// Standard phase sequence for the first turn (skips draw step).
     /// </summary>
-    public static readonly PhaseStateType[] FirstTurnSequence = new[]
+    public static readonly StepStateType[] FirstTurnSequence = new[]
     {
-        PhaseStateType.Untap,
-        PhaseStateType.Upkeep,
+        StepStateType.Untap,
+        StepStateType.Upkeep,
         // Draw step skipped on first turn
-        PhaseStateType.PreCombatMain,     // Pre-combat main phase
-        PhaseStateType.BeginningOfCombat,
-        PhaseStateType.DeclareAttackers,
-        PhaseStateType.DeclareBlockers,
-        PhaseStateType.CombatDamage,
-        PhaseStateType.EndOfCombat,
-        PhaseStateType.PostCombatMain,    // Post-combat main phase
-        PhaseStateType.End,
-        PhaseStateType.Cleanup
+        StepStateType.PreCombatMain,     // Pre-combat main phase
+        StepStateType.BeginningOfCombat,
+        StepStateType.DeclareAttackers,
+        StepStateType.DeclareBlockers,
+        StepStateType.CombatDamage,
+        StepStateType.EndOfCombat,
+        StepStateType.PostCombatMain,    // Post-combat main phase
+        StepStateType.End,
+        StepStateType.Cleanup
     };
 
     /// <summary>
     /// Get the phase sequence for a turn.
     /// </summary>
-    public static PhaseStateType[] GetSequence(bool isFirstTurn)
+    public static StepStateType[] GetSequence(bool isFirstTurn)
     {
         return isFirstTurn ? FirstTurnSequence : StandardSequence;
     }
@@ -56,7 +56,7 @@ public static class PhaseSequence
     /// <summary>
     /// Get the next phase in the sequence.
     /// </summary>
-    public static PhaseStateType? GetNextPhase(PhaseStateType currentPhase, bool isFirstTurn)
+    public static StepStateType? GetNextPhase(StepStateType currentPhase, bool isFirstTurn)
     {
         var sequence = GetSequence(isFirstTurn);
         var currentIndex = Array.IndexOf(sequence, currentPhase);
@@ -72,7 +72,7 @@ public static class PhaseSequence
     /// <summary>
     /// Check if a phase is in the standard sequence.
     /// </summary>
-    public static bool IsInSequence(PhaseStateType phase, bool isFirstTurn)
+    public static bool IsInSequence(StepStateType phase, bool isFirstTurn)
     {
         var sequence = GetSequence(isFirstTurn);
         return Array.IndexOf(sequence, phase) >= 0;

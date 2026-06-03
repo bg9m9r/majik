@@ -210,15 +210,15 @@ public class LegionWarbossFactoryTests
         var trigger = GetBeginCombatTrigger(c);
 
         trigger.IsTriggered(
-            new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice))
+            new StepStartedEvent(StepStateType.BeginningOfCombat, _alice))
             .Should().BeTrue("fires at the beginning of combat on the controller's turn.");
 
         trigger.IsTriggered(
-            new StepStartedEvent(PhaseStateType.BeginningOfCombat, _bob))
+            new StepStartedEvent(StepStateType.BeginningOfCombat, _bob))
             .Should().BeFalse("'on your turn' — not on the opponent's combat.");
 
         trigger.IsTriggered(
-            new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+            new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeFalse("only the beginning-of-combat step triggers it.");
     }
 

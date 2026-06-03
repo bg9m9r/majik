@@ -84,7 +84,7 @@ public sealed class AdventureAlternativeCost : IAlternativeCost
     /// shape <see cref="PitchAlternativeCost.IsLegalInContext"/> uses).
     /// Instant Adventures always return true.
     /// </summary>
-    public bool IsLegalInContext(Player activePlayer, Majik.Core.StateMachine.PhaseStateType? currentPhase, bool stackIsEmpty, Player caster)
+    public bool IsLegalInContext(Player activePlayer, Majik.Core.StateMachine.StepStateType? currentPhase, bool stackIsEmpty, Player caster)
     {
         if (!IsSorcerySpeed) return true;
         if (!ReferenceEquals(caster, activePlayer)) return false;

@@ -84,7 +84,7 @@ public static class WildernessReclamationFactory
     /// is supplied the end-step trigger is registered so a
     /// <see cref="StepStartedEvent"/> with
     /// <see cref="StepStartedEvent.StepType"/> ==
-    /// <see cref="PhaseStateType.End"/> automatically queues the ability
+    /// <see cref="StepStateType.End"/> automatically queues the ability
     /// on the stack (CR 603.2).
     /// </summary>
     public static Enchantment Create(Player owner, TriggerManager? triggers)
@@ -124,7 +124,7 @@ public static class WildernessReclamationFactory
             source: card,
             controller: owner,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End),
+                (e, _) => e.StepType == StepStateType.End),
             effects: new IEffect[] { untapEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

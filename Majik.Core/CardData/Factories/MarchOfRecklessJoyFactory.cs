@@ -193,7 +193,7 @@ public static class MarchOfRecklessJoyFactory
                             Action<StepStartedEvent>? handler = null;
                             handler = (e) =>
                             {
-                                if (e.StepType != PhaseStateType.Cleanup) return;
+                                if (e.StepType != StepStateType.Cleanup) return;
                                 if (!ReferenceEquals(e.Player, caster)) return;
                                 cleanupsSeen++;
                                 if (cleanupsSeen < 2) return;

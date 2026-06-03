@@ -153,7 +153,7 @@ public static class SheoldredWhisperingOneFactory
         var yourUpkeepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(owner, StepStateType.Upkeep),
             effects: new IEffect[] { reanimateEffect },
             activeZones: new[] { ZoneType.Battlefield });
 
@@ -178,7 +178,7 @@ public static class SheoldredWhisperingOneFactory
 
         var opponentUpkeepCondition = new EventTriggerCondition<StepStartedEvent>((e, _) =>
         {
-            if (e.StepType != PhaseStateType.Upkeep) return false;
+            if (e.StepType != StepStateType.Upkeep) return false;
             // CR 102.1 — an opponent is any player other than the controller.
             if (ReferenceEquals(e.Player, owner)) return false;
             triggeringOpponent = e.Player;

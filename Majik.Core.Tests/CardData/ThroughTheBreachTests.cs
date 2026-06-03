@@ -181,7 +181,7 @@ public class ThroughTheBreachTests
 
         // Fire the next End step — the delayed trigger should match and
         // queue itself onto the stack.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         // Resolve everything on the stack — the delayed trigger fires
@@ -231,7 +231,7 @@ public class ThroughTheBreachTests
 
         // No delayed trigger should have been registered (nothing to sac).
         // Stepping into the End step should not queue anything.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(0,
             "no creature placed → no delayed end-step sacrifice registered");
     }

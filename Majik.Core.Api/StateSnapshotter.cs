@@ -20,12 +20,12 @@ public static class StateSnapshotter
     public static GameStateDto Snapshot(
         Guid gameId,
         int turnNumber,
-        PhaseStateType? phase,
+        StepStateType? phase,
         Player activePlayer,
         IReadOnlyList<Player> players,
         Majik.Core.Stack.Stack stack,
         Player? viewer = null,
-        TurnStateType? turnState = null,
+        PhaseStateType? turnState = null,
         // PLAN 04 — the per-game seq of the last event folded into this
         // snapshot. Threaded onto GameStateDto.Seq so the portal can drop
         // stale snapshots. Defaults to 0 for callers that don't track seq.

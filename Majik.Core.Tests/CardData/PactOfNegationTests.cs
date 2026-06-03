@@ -127,7 +127,7 @@ public class PactOfNegationTests
         _alice.AddManaToPool(ManaCost.Parse("{3}{U}{U}"));
 
         // Fire the next Upkeep step for Alice.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1, "the delayed upkeep pact is queued");
 
         triggers.PutPendingTriggersOnStack(_alice);
@@ -161,7 +161,7 @@ public class PactOfNegationTests
         foreach (var effect in def.EffectFactory(chosen)) effect.Execute();
 
         // Alice's mana pool is empty — PayMana({3}{U}{U}) will fail.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
@@ -194,14 +194,14 @@ public class PactOfNegationTests
         foreach (var effect in def.EffectFactory(chosen)) effect.Execute();
 
         // Bob's upkeep first — should NOT fire Alice's pact.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         triggers.PendingCount.Should().Be(0,
             "the pact only fires on the controller's (Alice's) upkeep");
         _alice.HasLost.Should().BeFalse();
 
         // Now Alice's upkeep — the pact fires (and with an empty pool she
         // loses, confirming the trigger registered correctly).
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         triggers.PendingCount.Should().Be(1);
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();

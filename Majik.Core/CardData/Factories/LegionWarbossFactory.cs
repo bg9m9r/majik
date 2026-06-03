@@ -58,7 +58,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Begin-combat token (CR 508.1 — "At the beginning of combat on your
 ///   turn")</b> — wired as a <see cref="TriggeredAbility"/> over
 ///   <see cref="StepStartedEvent"/> for
-///   <see cref="PhaseStateType.BeginningOfCombat"/> restricted to the
+///   <see cref="StepStateType.BeginningOfCombat"/> restricted to the
 ///   controller's own turns (<see cref="Triggers.OnStepBegin"/>). On
 ///   resolution it creates one 1/1 red Goblin creature token under Warboss's
 ///   controller (CR 111 / CR 111.4) via
@@ -219,7 +219,7 @@ public static class LegionWarbossFactory
         var beginCombatTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.BeginningOfCombat),
+            condition: Triggers.OnStepBegin(owner, StepStateType.BeginningOfCombat),
             effects: new IEffect[] { beginCombatEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

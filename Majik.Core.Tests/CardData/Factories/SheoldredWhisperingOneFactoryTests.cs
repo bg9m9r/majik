@@ -98,9 +98,9 @@ public class SheoldredWhisperingOneFactoryTests
         var yourUpkeep = YourUpkeepTrigger(sheoldred);
 
         // Alice's upkeep fires the return trigger.
-        yourUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+        yourUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeTrue("At the beginning of your upkeep — CR 603.1");
-        yourUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _bob))
+        yourUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _bob))
             .Should().BeFalse("\"your upkeep\" fires for the controller only — CR 603.1");
 
         foreach (var e in yourUpkeep.Effects) e.Execute();
@@ -121,9 +121,9 @@ public class SheoldredWhisperingOneFactoryTests
 
         var yourUpkeep = YourUpkeepTrigger(sheoldred);
 
-        yourUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _bob))
+        yourUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _bob))
             .Should().BeFalse("opponent's upkeep must not fire the your-upkeep return");
-        yourUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Draw, _alice))
+        yourUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Draw, _alice))
             .Should().BeFalse("only the Upkeep step fires it");
     }
 
@@ -164,7 +164,7 @@ public class SheoldredWhisperingOneFactoryTests
         var oppUpkeep = OpponentUpkeepTrigger(sheoldred);
 
         // Fire on Bob's upkeep (sets "that player" = Bob via the condition).
-        oppUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _bob))
+        oppUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _bob))
             .Should().BeTrue("At the beginning of each opponent's upkeep — CR 603.1");
 
         foreach (var e in oppUpkeep.Effects) e.Execute();
@@ -185,9 +185,9 @@ public class SheoldredWhisperingOneFactoryTests
 
         var oppUpkeep = OpponentUpkeepTrigger(sheoldred);
 
-        oppUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+        oppUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeFalse("the controller's own upkeep is not an opponent's upkeep — CR 102.1");
-        oppUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Draw, _bob))
+        oppUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Draw, _bob))
             .Should().BeFalse("only the Upkeep step fires it");
     }
 
@@ -200,7 +200,7 @@ public class SheoldredWhisperingOneFactoryTests
 
         var oppUpkeep = OpponentUpkeepTrigger(sheoldred);
 
-        oppUpkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _bob)).Should().BeTrue();
+        oppUpkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _bob)).Should().BeTrue();
 
         // Bob controls no creatures → resolving is a clean no-op.
         var act = () => { foreach (var e in oppUpkeep.Effects) e.Execute(); };

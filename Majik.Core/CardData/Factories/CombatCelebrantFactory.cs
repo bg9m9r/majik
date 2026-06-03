@@ -37,7 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   2. <b>CR 702.139c exert rider</b> — "won't untap during your next
 ///      untap step." Registered via
 ///      <see cref="UntapStepRestrictions.MarkPermanentDoesNotUntap"/>; lifts
-///      on the controller's next <see cref="PhaseStateType.Untap"/> step when
+///      on the controller's next <see cref="StepStateType.Untap"/> step when
 ///      an event bus is wired (same posture as Glorybringer / Arena of Glory).
 ///   3. <b>"untap all OTHER creatures you control"</b> (CR 701.20a) — every
 ///      creature the controller controls except Combat Celebrant itself.
@@ -81,7 +81,7 @@ public static class CombatCelebrantFactory
     /// registered so it surfaces as pending.</param>
     /// <param name="eventBus">When supplied, the once-per-turn exert gate is
     /// reset on each <see cref="TurnStartedEvent"/> and the "won't untap"
-    /// rider lifts on the controller's next <see cref="PhaseStateType.Untap"/>
+    /// rider lifts on the controller's next <see cref="StepStateType.Untap"/>
     /// step.</param>
     /// <param name="mayExert">"You may exert it as it attacks" chooser.
     /// Returns true to exert. Null defaults to declining (the safe shape-only
@@ -191,7 +191,7 @@ public static class CombatCelebrantFactory
         Action<StepStartedEvent>? handler = null;
         handler = (e) =>
         {
-            if (e.StepType != PhaseStateType.Untap) return;
+            if (e.StepType != StepStateType.Untap) return;
             if (!ReferenceEquals(e.Player, controller)) return;
 
             UntapStepRestrictions.RemoveAll(card);

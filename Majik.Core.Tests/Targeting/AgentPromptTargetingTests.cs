@@ -213,7 +213,7 @@ public class AgentPromptTargetingTests
         var lowLifeBob = new Player("Bob", 3);
         var ctx = new GameContext(
             _alice, new[] { _alice, lowLifeBob }, _alice, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var bot = new HeuristicBotAgent();
         var req = new TargetRequest(
@@ -258,6 +258,6 @@ public class AgentPromptTargetingTests
     {
         var stack = new Majik.Core.Stack.Stack();
         return new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, stack);
+            StepStateType.PreCombatMain, stack);
     }
 }

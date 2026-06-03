@@ -212,7 +212,7 @@ public class MysticForgeFactoryTests : IDisposable
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _alice }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(),
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(),
             landPlayAvailable: false);
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
@@ -230,7 +230,7 @@ public class MysticForgeFactoryTests : IDisposable
 
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _alice }, _alice,
-            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(),
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(),
             landPlayAvailable: false);
 
         var action = await bot.ChoosePriorityActionAsync(ctx);

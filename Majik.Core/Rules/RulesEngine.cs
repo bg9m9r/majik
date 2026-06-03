@@ -155,7 +155,7 @@ public class RulesEngine
     /// <summary>
     /// Validate if a spell can be cast in current phase.
     /// </summary>
-    public bool CanCastInPhase(ICard card, PhaseStateType? currentPhase, bool isStackEmpty)
+    public bool CanCastInPhase(ICard card, StepStateType? currentPhase, bool isStackEmpty)
     {
         if (card == null)
         {

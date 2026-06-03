@@ -51,7 +51,7 @@ namespace Majik.Core.CardData.Factories;
 ///   onto the battlefield attacking" rather than "declared", it does NOT
 ///   re-trigger Kari Zev's own attack trigger (CR 508.3g).
 /// - <b>"Exile that token at end of combat"</b> — a delayed effect (CR 603.7e)
-///   modelled as a one-shot <see cref="PhaseStateType.EndOfCombat"/>
+///   modelled as a one-shot <see cref="StepStateType.EndOfCombat"/>
 ///   <see cref="StepStartedEvent"/> subscription (same EOT-subscription posture
 ///   as <see cref="AvatarRokuFactory"/>'s "until end of combat" rider and
 ///   <see cref="RagavanNimblePilfererFactory"/>'s Cleanup grant-clear). On the
@@ -187,7 +187,7 @@ public static class KariZevSkyshipRaiderFactory
         Action<StepStartedEvent>? handler = null;
         handler = e =>
         {
-            if (e.StepType != PhaseStateType.EndOfCombat) return;
+            if (e.StepType != StepStateType.EndOfCombat) return;
 
             // Exile the specific token created by this attack. Guard against a
             // token that already left the battlefield (CR 111.8 — a token that

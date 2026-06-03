@@ -47,7 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///     <item><b>Upkeep tick (CR 702.63c)</b>: "At the beginning of your
 ///       upkeep, remove a time counter from it." Wired via
 ///       <see cref="Triggers.OnStepBegin"/> filtered to
-///       <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/> + the
+///       <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/> + the
 ///       controller. Removes one <see cref="CounterType.Time"/> counter.</item>
 ///     <item><b>Sacrifice on last removed (CR 702.63d / CR 701.16)</b>:
 ///       "When the last is removed, sacrifice it." After the upkeep tick,
@@ -146,7 +146,7 @@ public static class KeldonMaraudersFactory
             source: card,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

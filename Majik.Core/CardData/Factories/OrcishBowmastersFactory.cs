@@ -274,7 +274,7 @@ public static class OrcishBowmastersFactory
         {
             eventBus.Subscribe<StepStartedEvent>(e =>
             {
-                if (e.StepType != PhaseStateType.Draw) return;
+                if (e.StepType != StepStateType.Draw) return;
                 if (e.Player == null) return;
                 drawsThisStep[e.Player] = 0;
             });

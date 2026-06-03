@@ -159,7 +159,7 @@ public static class BirthingRitualFactory
         var endStepTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.End),
             effects: new IEffect[] { resolveEffect },
             interveningIf: () => ControllerHasCreature(card.Controller ?? owner),
             activeZones: new[] { ZoneType.Battlefield });

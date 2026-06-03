@@ -25,7 +25,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Triggered ability scoped to <see cref="ZoneType.Graveyard"/>
 ///   (CR 603.6d — abilities that function only from a non-battlefield zone),
 ///   firing on <see cref="StepStartedEvent"/> for
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.BeginningOfCombat"/>
+///   <see cref="Majik.Core.StateMachine.StepStateType.BeginningOfCombat"/>
 ///   filtered to the controller's own turns. On match, the effect checks the
 ///   instant+sorcery cast count for this turn and — when ≥ 3 — moves the
 ///   Phoenix from its controller's graveyard to the controller's battlefield.
@@ -81,7 +81,7 @@ public static class ArclightPhoenixFactory
     /// subscription resets it. When <paramref name="triggers"/> is supplied,
     /// the begin-combat trigger is registered so a
     /// <see cref="StepStartedEvent"/> for
-    /// <see cref="Majik.Core.StateMachine.PhaseStateType.BeginningOfCombat"/>
+    /// <see cref="Majik.Core.StateMachine.StepStateType.BeginningOfCombat"/>
     /// on the controller's turn automatically places it on the stack.
     /// </summary>
     public static Creature Create(Player owner, IEventBus? eventBus, TriggerManager? triggers)
@@ -184,7 +184,7 @@ public static class ArclightPhoenixFactory
             source: card,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.BeginningOfCombat),
+                owner, Majik.Core.StateMachine.StepStateType.BeginningOfCombat),
             effects: new IEffect[] { returnEffect },
             activeZones: new[] { ZoneType.Graveyard });
 

@@ -98,13 +98,13 @@ public class BirthingRitualTests
 
         var trigger = rit.Abilities.OfType<TriggeredAbility>().Single();
 
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue("printed text is 'at the beginning of your end step'");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _bob))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _bob))
             .Should().BeFalse("'your' end step ≠ opponent's end step");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeFalse("upkeep is not the end step");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.Draw, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Draw, _alice))
             .Should().BeFalse("draw is not the end step");
     }
 

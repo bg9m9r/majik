@@ -236,7 +236,7 @@ public class SleepFactoryTests : IDisposable
         UntapStepRestrictions.ShouldSkipUntap(bear2, _bob).Should().BeTrue();
 
         // Simulate Bob's next Untap step.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Untap, _bob));
+        _bus.Publish(new StepStartedEvent(StepStateType.Untap, _bob));
 
         // Restrictions must be lifted after that step.
         UntapStepRestrictions.ShouldSkipUntap(bear1, _bob).Should().BeFalse(
@@ -256,7 +256,7 @@ public class SleepFactoryTests : IDisposable
         foreach (var e in effects) e.Execute();
 
         // Alice's untap step fires — Bob's creatures should still be skipped.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Untap, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Untap, _alice));
 
         UntapStepRestrictions.ShouldSkipUntap(bear, _bob).Should().BeTrue(
             "Alice's untap step must not clear the skip placed on Bob's creatures");

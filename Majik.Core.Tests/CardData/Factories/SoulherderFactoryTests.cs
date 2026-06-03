@@ -202,10 +202,10 @@ public class SoulherderFactoryTests
         // Pre-supply the flicker target via SetChosenTargets — same shape
         // as Spell Queller / Sword of Hearth and Home tests.
         var flickerTrigger = soulherder.Abilities.OfType<TriggeredAbility>()
-            .Single(t => t.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice)));
+            .Single(t => t.IsTriggered(new StepStartedEvent(StepStateType.End, _alice)));
         flickerTrigger.SetChosenTargets(new[] { new[] { (object)bear } });
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         // Drain triggers in a loop — the flicker resolution itself
         // publishes CardMovedEvent which queues another (the exile
@@ -247,7 +247,7 @@ public class SoulherderFactoryTests
         _alice.Zones.Battlefield.AddCard(soulherder);
         soulherder.SetZone(ZoneType.Battlefield);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         var act = () => { while (stack.Count > 0) stack.Pop()!.Resolve(); };
         act.Should().NotThrow();
@@ -280,7 +280,7 @@ public class SoulherderFactoryTests
         bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _bob));
         triggers.PutPendingTriggersOnStack(_alice);
         while (stack.Count > 0) stack.Pop()!.Resolve();
 

@@ -124,7 +124,7 @@ public class TenaciousUnderdogFactoryTests
         // The delayed end-step sacrifice is now registered: firing the End step
         // queues it; resolve the stack to sacrifice the creature (CR 701.16 →
         // owner's graveyard).
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         var resolver = new StackResolver(bus, zones);
         while (!stack.IsEmpty) resolver.ResolveTop(stack);

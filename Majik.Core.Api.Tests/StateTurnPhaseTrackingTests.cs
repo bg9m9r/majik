@@ -21,7 +21,7 @@ public class StateTurnPhaseTrackingTests
         var state = facade.GetState();
 
         state.TurnNumber.Should().Be(1);
-        state.Phase.Should().Be(PhaseStateType.PreCombatMain.ToString());
+        state.Phase.Should().Be(StepStateType.PreCombatMain.ToString());
     }
 
     [Fact]
@@ -41,23 +41,23 @@ public class StateTurnPhaseTrackingTests
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var alice = new Player("Alice");
 
-        facade.EventBus_Publish(new PhaseStartedEvent(PhaseStateType.DeclareAttackers, alice));
+        facade.EventBus_Publish(new PhaseStartedEvent(StepStateType.DeclareAttackers, alice));
 
-        facade.GetState().Phase.Should().Be(PhaseStateType.DeclareAttackers.ToString());
+        facade.GetState().Phase.Should().Be(StepStateType.DeclareAttackers.ToString());
     }
 
     // CR 505 — since Slice 3 the phase value itself carries the pre/post
     // distinction (PreCombatMain / PostCombatMain), so the snapshot label
     // comes straight from the phase and no longer depends on the tracked
-    // TurnStateType to disambiguate.
+    // PhaseStateType to disambiguate.
     [Fact]
     public void GetState_Phase_PreCombatMain_LabelsPreCombatMain()
     {
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var alice = new Player("Alice");
 
-        facade.EventBus_Publish(new TurnStateChangedEvent(TurnStateType.TurnBeginning, TurnStateType.PreCombatMain));
-        facade.EventBus_Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, alice));
+        facade.EventBus_Publish(new PhaseStateChangedEvent(PhaseStateType.TurnBeginning, PhaseStateType.PreCombatMain));
+        facade.EventBus_Publish(new StepStartedEvent(StepStateType.PreCombatMain, alice));
 
         facade.GetState().Phase.Should().Be(PhaseLabelResolver.PreCombatMain);
     }
@@ -70,8 +70,8 @@ public class StateTurnPhaseTrackingTests
 
         // Even with the turn-state left at PreCombatMain, the postcombat phase
         // value alone produces the PostCombatMain label.
-        facade.EventBus_Publish(new TurnStateChangedEvent(TurnStateType.TurnBeginning, TurnStateType.PreCombatMain));
-        facade.EventBus_Publish(new StepStartedEvent(PhaseStateType.PostCombatMain, alice));
+        facade.EventBus_Publish(new PhaseStateChangedEvent(PhaseStateType.TurnBeginning, PhaseStateType.PreCombatMain));
+        facade.EventBus_Publish(new StepStartedEvent(StepStateType.PostCombatMain, alice));
 
         facade.GetState().Phase.Should().Be(PhaseLabelResolver.PostCombatMain);
     }
@@ -82,10 +82,10 @@ public class StateTurnPhaseTrackingTests
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var alice = new Player("Alice");
 
-        facade.EventBus_Publish(new TurnStateChangedEvent(TurnStateType.TurnBeginning, TurnStateType.PreCombatMain));
-        facade.EventBus_Publish(new StepStartedEvent(PhaseStateType.Upkeep, alice));
+        facade.EventBus_Publish(new PhaseStateChangedEvent(PhaseStateType.TurnBeginning, PhaseStateType.PreCombatMain));
+        facade.EventBus_Publish(new StepStartedEvent(StepStateType.Upkeep, alice));
 
-        facade.GetState().Phase.Should().Be(PhaseStateType.Upkeep.ToString());
+        facade.GetState().Phase.Should().Be(StepStateType.Upkeep.ToString());
     }
 }
 

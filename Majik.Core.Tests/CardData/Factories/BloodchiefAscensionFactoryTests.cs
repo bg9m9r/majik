@@ -60,7 +60,7 @@ public class BloodchiefAscensionFactoryTests
         _bob.LifeLostThisTurn.Should().Be(3);
 
         var questTrigger = card.Abilities.OfType<TriggeredAbility>()
-            .Single(t => t.IsTriggered(new StepStartedEvent(PhaseStateType.End, _bob)));
+            .Single(t => t.IsTriggered(new StepStartedEvent(StepStateType.End, _bob)));
 
         foreach (var effect in questTrigger.Effects) effect.Execute();
 
@@ -79,7 +79,7 @@ public class BloodchiefAscensionFactoryTests
         _bob.LoseLife(1); // below the 2 threshold
 
         var trigger = card.Abilities.OfType<TriggeredAbility>().First();
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _bob)).Should().BeFalse(
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _bob)).Should().BeFalse(
             "intervening-if fails: opponent lost less than 2 life this turn (CR 603.4)");
         card.Counters.Count(CounterType.Quest).Should().Be(0);
     }
@@ -96,7 +96,7 @@ public class BloodchiefAscensionFactoryTests
         var trigger = card.Abilities.OfType<TriggeredAbility>().First();
         // Controller's own end step — printed "each opponent's end
         // step" excludes it (CR 500.4).
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice)).Should().BeFalse(
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice)).Should().BeFalse(
             "Ascension's quest trigger fires only on opponents' end steps");
     }
 

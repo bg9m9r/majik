@@ -173,12 +173,12 @@ public class KatakiWarsWageTests
         PutOnBattlefield(kataki, _alice);
 
         // Bob's upkeep — Alice's artifact tax does NOT trigger.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         _triggers.PendingCount.Should().Be(0,
             "the granted tax is scoped to the bearer's controller (Alice), not Bob");
 
         // Alice's upkeep — the artifact's granted tax surfaces as pending.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         _triggers.PendingCount.Should().Be(1,
             "Alice's artifact taxes on Alice's upkeep");
     }
@@ -197,11 +197,11 @@ public class KatakiWarsWageTests
         bobWidget.Abilities.OfType<ITriggeredAbility>().Should().HaveCount(1,
             "Kataki grants to ALL artifacts, not just the controller's");
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         _triggers.PendingCount.Should().Be(0,
             "Bob's artifact tax is scoped to Bob's upkeep, not Alice's");
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _bob));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _bob));
         _triggers.PendingCount.Should().Be(1,
             "Bob's artifact taxes on Bob's upkeep");
     }
@@ -273,7 +273,7 @@ public class KatakiWarsWageTests
             "the granted trigger is unregistered from the manager when the grant ends");
 
         // And it no longer fires.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         _triggers.PendingCount.Should().Be(0);
     }
 }

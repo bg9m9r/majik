@@ -48,7 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="MdfcState.IsBackFace"/> to read the active face (CR 712).
 /// - <b>End-step trigger (CR 603.1 / CR 500.4)</b> scoped to the controller's
 ///   own end step via <see cref="Triggers.OnStepBegin"/> with
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.End"/>. On resolution
+///   <see cref="Majik.Core.StateMachine.StepStateType.End"/>. On resolution
 ///   (front face only — the trigger no-ops once transformed since the back
 ///   face has no end-step ability):
 ///     1. Put an invitation counter on this enchantment (CR 122 — a generic
@@ -267,7 +267,7 @@ public static class WeddingAnnouncementFactory
         var trigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.End),
             effects: new IEffect[] { endStepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

@@ -51,7 +51,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Pay-{E}{E} upkeep draw trigger</b> (CR 500.4 upkeep / CR 117.5
 ///   optional "may pay" / CR 120.2 draw / CR 119.3 life loss) — a
 ///   <see cref="TriggeredAbility"/> over <see cref="Triggers.OnStepBegin"/>
-///   filtered to <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/>
+///   filtered to <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/>
 ///   and the controller (same upkeep-trigger shape as
 ///   <see cref="TheOneRingFactory"/>). On resolution the controller's
 ///   registered <see cref="IPlayerAgent"/> is consulted for the optional
@@ -234,7 +234,7 @@ public static class GlintSleeveSiphonerFactory
             source: card,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

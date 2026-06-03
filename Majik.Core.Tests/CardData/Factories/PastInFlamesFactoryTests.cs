@@ -154,12 +154,12 @@ public class PastInFlamesFactoryTests
         ponder.RuntimeFlashbackCost.Should().NotBeNull();
 
         // Non-cleanup step doesn't clear.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         bolt.RuntimeFlashbackCost.Should().NotBeNull();
         ponder.RuntimeFlashbackCost.Should().NotBeNull();
 
         // Cleanup step clears EVERY grant from this resolution.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         bolt.RuntimeFlashbackCost.Should().BeNull(
             "CR 514.2 — until end of turn → Cleanup step clears the grant");
         ponder.RuntimeFlashbackCost.Should().BeNull();

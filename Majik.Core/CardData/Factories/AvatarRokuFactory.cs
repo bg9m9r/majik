@@ -83,7 +83,7 @@ public static class AvatarRokuFactory
     /// Dragon-token ETB through <see cref="ZoneService"/>.</param>
     /// <param name="eventBus">Optional event bus — drives the firebending
     /// "until end of combat" mana expiry on the controller's
-    /// <see cref="PhaseStateType.EndOfCombat"/> step.</param>
+    /// <see cref="StepStateType.EndOfCombat"/> step.</param>
     /// <param name="triggers">Optional trigger manager — registers the
     /// firebending attack trigger (and the Dragon token's firebending
     /// trigger).</param>
@@ -131,7 +131,7 @@ public static class AvatarRokuFactory
     ///
     /// The mana is added to the controller's pool when the attack trigger
     /// resolves. The "lasts until end of combat" rider is modelled with a
-    /// one-shot <see cref="PhaseStateType.EndOfCombat"/> subscription that
+    /// one-shot <see cref="StepStateType.EndOfCombat"/> subscription that
     /// removes up to N red mana still floating in the pool (clamped to what's
     /// present so only the unspent firebending mana is removed). This is the
     /// minimal correct end-of-combat mana duration — the engine otherwise
@@ -177,7 +177,7 @@ public static class AvatarRokuFactory
                 Action<StepStartedEvent>? handler = null;
                 handler = e =>
                 {
-                    if (e.StepType != PhaseStateType.EndOfCombat) return;
+                    if (e.StepType != StepStateType.EndOfCombat) return;
                     if (!ReferenceEquals(e.Player, controller)) return;
 
                     var unspent = controller.RemoveProvenanceSlots(

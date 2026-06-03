@@ -214,7 +214,7 @@ public static class DalkovanEncampmentFactory
             source: land,
             controller: controller,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == Majik.Core.StateMachine.PhaseStateType.End
+                (e, _) => e.StepType == Majik.Core.StateMachine.StepStateType.End
                           && e.Timestamp > resolvedAt),
             effects: new IEffect[] { cleanupEffect });
 

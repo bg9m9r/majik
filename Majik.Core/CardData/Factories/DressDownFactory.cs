@@ -116,7 +116,7 @@ public static class DressDownFactory
         var endStepSac = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.End),
             effects: new IEffect[] { sacEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

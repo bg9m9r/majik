@@ -91,11 +91,11 @@ public class KembaKhaRegentFactoryTests
 
         var upkeep = UpkeepTrigger(kemba);
 
-        upkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+        upkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeTrue("At the beginning of your upkeep — CR 603.1");
-        upkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _bob))
+        upkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _bob))
             .Should().BeFalse("\"your upkeep\" fires for the controller only — CR 603.1");
-        upkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Draw, _alice))
+        upkeep.IsTriggered(new StepStartedEvent(StepStateType.Draw, _alice))
             .Should().BeFalse("only the Upkeep step fires it");
     }
 
@@ -160,7 +160,7 @@ public class KembaKhaRegentFactoryTests
             .OfType<Creature>().Count(c => c.IsToken);
 
         var upkeep = UpkeepTrigger(kemba);
-        upkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice)).Should().BeTrue();
+        upkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice)).Should().BeTrue();
         foreach (var e in upkeep.Effects) e.Execute();
 
         var tokens = _alice.Zones.Battlefield.GetCards()
@@ -184,7 +184,7 @@ public class KembaKhaRegentFactoryTests
         kemba.SetZone(ZoneType.Battlefield);
 
         var upkeep = UpkeepTrigger(kemba);
-        upkeep.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice)).Should().BeTrue();
+        upkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice)).Should().BeTrue();
 
         var act = () => { foreach (var e in upkeep.Effects) e.Execute(); };
         act.Should().NotThrow();

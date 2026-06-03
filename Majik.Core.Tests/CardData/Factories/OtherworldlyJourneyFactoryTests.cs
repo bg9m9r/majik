@@ -131,7 +131,7 @@ public class OtherworldlyJourneyFactoryTests
         bear.Zone.Should().Be(ZoneType.Exile, "CR 701.21 exile fires immediately");
 
         // Fire the delayed end-step return.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(1,
             "the delayed end-step return trigger is pending after the End step starts");
 
@@ -165,7 +165,7 @@ public class OtherworldlyJourneyFactoryTests
         _bob.Zones.Exile.GetCards().Should().Contain(bobBear,
             "card routes to its owner's exile pile, not the caster's");
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 

@@ -327,7 +327,7 @@ public class SowingMycospawnFactoryTests : IDisposable
             new[] { _alice, _bob },
             _alice,
             turnNumber: 0,
-            currentPhase: PhaseStateType.PreCombatMain,
+            currentPhase: StepStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack());
 
         var pool = exileTrigger.TargetRequests[0].ResolveCandidates(ctx);

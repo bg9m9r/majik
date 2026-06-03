@@ -74,7 +74,7 @@ public class TurnDriverDayNightTests
         {
             void Handler(StepStartedEvent e)
             {
-                if (e.StepType != Majik.Core.StateMachine.PhaseStateType.Upkeep) return;
+                if (e.StepType != Majik.Core.StateMachine.StepStateType.Upkeep) return;
                 if (!ReferenceEquals(e.Player, caster)) return;
                 Bus.Unsubscribe<StepStartedEvent>(Handler);
                 for (var i = 0; i < count; i++)

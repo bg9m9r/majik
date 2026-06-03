@@ -31,7 +31,7 @@ namespace Majik.Core.Game;
 ///   - On a yes-answer a <see cref="DelayedTriggeredAbility"/> is registered
 ///     with the supplied <see cref="TriggerManager"/>. Its condition is a
 ///     <see cref="StepStartedEvent"/> filter that fires the first time
-///     <see cref="PhaseStateType.PreCombatMain"/> begins on the revealer's
+///     <see cref="StepStateType.PreCombatMain"/> begins on the revealer's
 ///     turn — then auto-unregisters via TriggerManager's delayed-ability
 ///     sweep (Rule 603.7d).
 ///
@@ -147,7 +147,7 @@ public sealed class OpeningHandRevealAddManaTrigger
         // "at the beginning of your first main phase" — PreCombatMain step
         // filtered to the revealer's own turn (same shape as Devourer's
         // first-upkeep trigger but targeting PreCombatMain instead).
-        var condition = Triggers.OnStepBegin(revealer, PhaseStateType.PreCombatMain);
+        var condition = Triggers.OnStepBegin(revealer, StepStateType.PreCombatMain);
 
         var effect = new Effect(
             $"{sourceCard.Name}: add {manaPayload} (opening-hand reveal rider, CR 103.6)",

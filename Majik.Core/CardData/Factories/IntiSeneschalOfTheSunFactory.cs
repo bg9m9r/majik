@@ -69,7 +69,7 @@ namespace Majik.Core.CardData.Factories;
 ///   so the controller may play it (CR 118.9) — the same impulse-draw
 ///   primitive as <see cref="EmberheartChallengerFactory"/> / Light Up the
 ///   Stage. The grant duration is "until your next end step" (CR 514.2),
-///   cleared on the SECOND <see cref="PhaseStateType.End"/> step belonging
+///   cleared on the SECOND <see cref="StepStateType.End"/> step belonging
 ///   to the controller seen after the discard (the controller's *next* end
 ///   step — the first End step seen may be the one in the very turn the
 ///   discard happened, e.g. a combat-step discard on the controller's own
@@ -124,7 +124,7 @@ public static class IntiSeneschalOfTheSunFactory
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">When supplied, the discard trigger's impulse
-    /// grant clears on the controller's next <see cref="PhaseStateType.End"/>
+    /// grant clears on the controller's next <see cref="StepStateType.End"/>
     /// step (CR 514.2).</param>
     /// <param name="triggers">TriggerManager the attack + discard triggers
     /// are registered with so they surface as pending. May be null.</param>
@@ -347,7 +347,7 @@ public static class IntiSeneschalOfTheSunFactory
         Action<StepStartedEvent>? handler = null;
         handler = (e) =>
         {
-            if (e.StepType != PhaseStateType.End) return;
+            if (e.StepType != StepStateType.End) return;
             if (!ReferenceEquals(e.Player, controller)) return;
 
             controllerEndStepsSeen[0]++;

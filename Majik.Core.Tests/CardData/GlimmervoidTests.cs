@@ -182,13 +182,13 @@ public class GlimmervoidTests
 
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue("printed trigger reads 'at the beginning of the end step'");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.Upkeep, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
             .Should().BeFalse("upkeep is not the end step");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.Draw, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Draw, _alice))
             .Should().BeFalse("draw is not the end step");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice))
             .Should().BeFalse("combat is not the end step");
     }
 
@@ -203,9 +203,9 @@ public class GlimmervoidTests
 
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue("Alice's end step triggers Glimmervoid");
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _bob))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _bob))
             .Should().BeFalse("opponent's end step does NOT trigger Glimmervoid");
     }
 
@@ -231,7 +231,7 @@ public class GlimmervoidTests
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         // IsTriggered checks the event type only (step event matches).
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue("the trigger event matches — step is End");
 
         // InterveningIf blocks queueing when condition is false.
@@ -249,7 +249,7 @@ public class GlimmervoidTests
 
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
-        trigger.IsTriggered(new StepStartedEvent(PhaseStateType.End, _alice))
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
             .Should().BeTrue();
         trigger.CanBePutOnStack().Should().BeTrue(
             "no artifacts — intervening-if is true, trigger can queue (CR 603.4)");
@@ -319,7 +319,7 @@ public class GlimmervoidTests
         land.SetZone(ZoneType.Battlefield);
         // No artifacts.
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);
@@ -350,7 +350,7 @@ public class GlimmervoidTests
         _alice.Zones.Battlefield.AddCard(artifact);
         artifact.SetZone(ZoneType.Battlefield);
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         // InterveningIf is false → trigger is not queued by the manager.
         triggers.PendingCount.Should().Be(0,

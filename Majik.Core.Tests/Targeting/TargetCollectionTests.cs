@@ -27,7 +27,7 @@ public class TargetCollectionTests
     private GameContext NewContext()
     {
         var stack = new Majik.Core.Stack.Stack();
-        return new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
+        return new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, stack);
     }
 
     /// <summary>Agent that returns a fixed pick for the next ChooseTargetsAsync,

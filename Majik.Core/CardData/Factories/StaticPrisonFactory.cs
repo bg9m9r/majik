@@ -71,7 +71,7 @@ namespace Majik.Core.CardData.Factories;
 ///   not just the controller's — mirrors The Lab Society / Smokestack /
 ///   the Static Prison printed text exactly. Wired as a raw
 ///   <see cref="EventTriggerCondition{StepStartedEvent}"/> matching
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/> with
+///   <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/> with
 ///   NO controller filter (contrast with
 ///   <see cref="Triggers.OnStepBegin"/>, which restricts to the
 ///   controller's own upkeep). Resolution body removes one
@@ -215,7 +215,7 @@ public static class StaticPrisonFactory
             source: prison,
             controller: owner,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                (e, _) => e.StepType == Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

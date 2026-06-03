@@ -291,7 +291,7 @@ public class RobberOfTheRichTests
 
         pilfered.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         pilfered.RuntimeExileCastAllowedCaster.Should().BeNull(
             "EOT cleanup clears the may-cast grant");

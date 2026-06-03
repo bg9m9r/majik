@@ -110,7 +110,7 @@ public static class PhyrexianArenaFactory
         var trigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

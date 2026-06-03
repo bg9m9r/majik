@@ -194,7 +194,7 @@ public class SplinterTwinTests
 
         // Fire the next End step — the delayed trigger should match and
         // queue itself onto the stack.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         // Resolve everything on the stack — the delayed trigger fires

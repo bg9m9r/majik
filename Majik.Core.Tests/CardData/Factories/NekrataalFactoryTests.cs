@@ -123,7 +123,7 @@ public class NekrataalFactoryTests
         var etb = GetEtb(nek);
         var ctx = new GameContext(
             _alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(_bus));
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(_bus));
         var candidates = etb.TargetRequests[0].CandidateGatherer!(ctx);
 
         candidates.Should().Contain(greenBear);
@@ -237,7 +237,7 @@ public class NekrataalFactoryTests
 
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, stack);
 
         await flow.CastAsync(
             _alice, nek,

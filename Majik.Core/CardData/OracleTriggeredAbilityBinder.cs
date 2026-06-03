@@ -317,7 +317,7 @@ public static class OracleTriggeredAbilityBinder
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
-                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.StepStateType.Upkeep),
                 effects: effects);
         }
 
@@ -328,7 +328,7 @@ public static class OracleTriggeredAbilityBinder
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
-                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.PhaseStateType.End),
+                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.StepStateType.End),
                 effects: effects);
         }
 

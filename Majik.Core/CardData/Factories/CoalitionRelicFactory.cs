@@ -56,7 +56,7 @@ namespace Majik.Core.CardData.Factories;
 /// … Add one mana of any color for each …"</b> — a
 /// <see cref="TriggeredAbility"/> firing on the controller's precombat main
 /// step (<see cref="Triggers.OnStepBegin"/> with
-/// <see cref="Majik.Core.StateMachine.PhaseStateType.PreCombatMain"/>; the
+/// <see cref="Majik.Core.StateMachine.StepStateType.PreCombatMain"/>; the
 /// "first" qualifier degrades to the precombat main, the standard posture
 /// <see cref="CabalTherapistFactory"/> takes — in a 1v1 game with no
 /// additional-main-phase effects the precombat main IS the first main phase).
@@ -176,7 +176,7 @@ public static class CoalitionRelicFactory
             source: relic,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.PreCombatMain),
+                owner, Majik.Core.StateMachine.StepStateType.PreCombatMain),
             effects: new IEffect[] { cashEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

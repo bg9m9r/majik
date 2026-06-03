@@ -212,11 +212,11 @@ public class GlintSleeveSiphonerFactoryTests
         var c = GlintSleeveSiphonerFactory.Create(_alice);
         var up = UpkeepTrigger(c);
 
-        var evt = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Upkeep, _alice);
+        var evt = new StepStartedEvent(Majik.Core.StateMachine.StepStateType.Upkeep, _alice);
         up.Condition.Matches(evt, up).Should().BeTrue(
             "the trigger fires at the controller's upkeep (CR 500.4)");
 
-        var oppEvt = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Upkeep, _bob);
+        var oppEvt = new StepStartedEvent(Majik.Core.StateMachine.StepStateType.Upkeep, _bob);
         up.Condition.Matches(oppEvt, up).Should().BeFalse(
             "'your upkeep' is the controller's upkeep, not the opponent's");
     }

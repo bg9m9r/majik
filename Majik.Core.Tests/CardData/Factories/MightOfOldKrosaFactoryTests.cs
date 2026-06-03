@@ -91,7 +91,7 @@ public class MightOfOldKrosaFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         // Alice's own precombat main phase (CR 505) — the "instead" clause applies.
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mok, MightOfOldKrosaFactory.BuildDefinition(ctx, _alice), agent, ctx);
         _resolver.ResolveTop(_stack);
@@ -116,7 +116,7 @@ public class MightOfOldKrosaFactoryTests
         // Cast at instant speed during Alice's upkeep — NOT a main phase, so the
         // base +2/+2 applies (CR 116.3a — instants may be cast any time priority
         // is held; the conditional only triggers in a main phase).
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Upkeep, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.Upkeep, _stack);
 
         await _flow.CastAsync(_alice, mok, MightOfOldKrosaFactory.BuildDefinition(ctx, _alice), agent, ctx);
         _resolver.ResolveTop(_stack);
@@ -141,7 +141,7 @@ public class MightOfOldKrosaFactoryTests
         // It is Bob's main phase, not Alice's. "Your main phase" means the
         // caster's own main phase (only the active player has a main phase,
         // CR 505), so casting on Bob's turn yields the base +2/+2.
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mok, MightOfOldKrosaFactory.BuildDefinition(ctx, _alice), agent, ctx);
         _resolver.ResolveTop(_stack);
@@ -163,7 +163,7 @@ public class MightOfOldKrosaFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mok, MightOfOldKrosaFactory.BuildDefinition(ctx, _alice), agent, ctx);
         _resolver.ResolveTop(_stack);
@@ -193,7 +193,7 @@ public class MightOfOldKrosaFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { dead });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mok, MightOfOldKrosaFactory.BuildDefinition(ctx, _alice), agent, ctx);
         _resolver.ResolveTop(_stack);

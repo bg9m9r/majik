@@ -97,7 +97,7 @@ public class VandalblastFactoryTests
 
         var def = VandalblastFactory.BuildDefinition(_alice, o => o);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.PreCombatMain,
+            _alice, 1, StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
 
         var candidates = def.TargetRequests[0].ResolveCandidates(ctx);

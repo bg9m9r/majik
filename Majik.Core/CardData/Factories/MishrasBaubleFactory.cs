@@ -150,7 +150,7 @@ public static class MishrasBaubleFactory
                     source: bauble,
                     controller: owner,
                     condition: new EventTriggerCondition<StepStartedEvent>(
-                        (e, _) => e.StepType == PhaseStateType.Upkeep
+                        (e, _) => e.StepType == StepStateType.Upkeep
                                   && e.Timestamp > activatedAt),
                     effects: new IEffect[] { drawEffect });
 

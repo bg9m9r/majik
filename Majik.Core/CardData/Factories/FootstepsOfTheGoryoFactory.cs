@@ -61,7 +61,7 @@ namespace Majik.Core.CardData.Factories;
 /// - "Sacrifice that creature at the beginning of the next end step"
 ///   (CR 603.7): when a <see cref="TriggerManager"/> is supplied, a one-shot
 ///   <see cref="DelayedTriggeredAbility"/> is registered that fires on the
-///   first <see cref="StepStartedEvent"/> with <see cref="PhaseStateType.End"/>
+///   first <see cref="StepStartedEvent"/> with <see cref="StepStateType.End"/>
 ///   strictly after this resolution (timestamp fence mirrors Goryo's
 ///   Vengeance / Berserk). On fire, if the creature is still on the
 ///   battlefield it is sacrificed (CR 701.16 →
@@ -229,7 +229,7 @@ public static class FootstepsOfTheGoryoFactory
             source: caster,
             controller: caster,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End
+                (e, _) => e.StepType == StepStateType.End
                           && e.Timestamp > resolvedAt),
             effects: new IEffect[] { sacrificeEffect });
 

@@ -149,7 +149,7 @@ public class BoomBustFactoryTests
             allPlayers: new[] { _alice, _bob },
             activePlayer: _alice,
             turnNumber: 1,
-            currentPhase: PhaseStateType.PreCombatMain,
+            currentPhase: StepStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
 
         var youControl = def.TargetRequests[0].ResolveCandidates(ctx);

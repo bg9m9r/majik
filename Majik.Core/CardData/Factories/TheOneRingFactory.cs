@@ -48,7 +48,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Upkeep trigger</b> (CR 500.4 / CR 603.1): "At the beginning of
 ///   your upkeep, you lose 1 life for each burden counter on The One
 ///   Ring." Wired via <see cref="Triggers.OnStepBegin"/> filtered to
-///   <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/> and the
+///   <see cref="Majik.Core.StateMachine.StepStateType.Upkeep"/> and the
 ///   controller. Resolution reads the live burden count off the
 ///   permanent's <see cref="Permanent.Counters"/> bag and calls
 ///   <see cref="Player.LoseLife"/>.
@@ -177,7 +177,7 @@ public static class TheOneRingFactory
             source: ring,
             controller: owner,
             condition: Triggers.OnStepBegin(
-                owner, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                owner, Majik.Core.StateMachine.StepStateType.Upkeep),
             effects: new IEffect[] { upkeepEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

@@ -77,7 +77,7 @@ public static class EventPayloadBuilder
     /// first-class phase values, so phase / step labels are already
     /// disambiguated and the <paramref name="turnState"/> argument is retained
     /// only for call-site compatibility (it no longer affects the labels).</summary>
-    public static JsonElement Build(GameEvent e, Player? viewer, TurnStateType? turnState) => e switch
+    public static JsonElement Build(GameEvent e, Player? viewer, PhaseStateType? turnState) => e switch
     {
         CardMovedEvent x => BuildCardMoved(x, viewer),
         CardDrawnEvent x => BuildCardDrawn(x, viewer),
@@ -103,7 +103,7 @@ public static class EventPayloadBuilder
         GameStateChangedEvent x => Serialize(new GameStateChangedPayload(
             From: x.PreviousState?.ToString(),
             To: x.CurrentState.ToString())),
-        TurnStateChangedEvent x => Serialize(new TurnStateChangedPayload(
+        PhaseStateChangedEvent x => Serialize(new PhaseStateChangedPayload(
             From: x.PreviousState?.ToString(),
             To: x.CurrentState.ToString())),
         StepStartedEvent x => Serialize(new StepStartedPayload(

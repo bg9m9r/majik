@@ -270,12 +270,12 @@ public class WallOfFrostFactoryTests : IDisposable
             "skip is registered after trigger resolves");
 
         // Simulate Alice's untap step — should NOT clear the skip (wrong player).
-        _bus.Publish(new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Untap, _alice));
+        _bus.Publish(new StepStartedEvent(Majik.Core.StateMachine.StepStateType.Untap, _alice));
         UntapStepRestrictions.ShouldSkipUntap(attacker, _bob).Should().BeTrue(
             "Alice's untap step does not clear Bob's skip-untap restriction");
 
         // Simulate Bob's (the attacker's controller) untap step — clears the skip.
-        _bus.Publish(new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Untap, _bob));
+        _bus.Publish(new StepStartedEvent(Majik.Core.StateMachine.StepStateType.Untap, _bob));
         UntapStepRestrictions.ShouldSkipUntap(attacker, _bob).Should().BeFalse(
             "Bob's next untap step removes the skip-untap restriction (CR 611.2b — one-shot)");
     }

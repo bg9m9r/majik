@@ -146,7 +146,7 @@ public class GoryosVengeanceTests
 
         // Fire the next End step — the delayed trigger queues onto the
         // stack and resolves into Battlefield → Exile.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
         var resolver = new StackResolver(_bus, _zones);
@@ -178,7 +178,7 @@ public class GoryosVengeanceTests
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty();
 
         // No delayed trigger registered (nothing to exile).
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(0);
     }
 }

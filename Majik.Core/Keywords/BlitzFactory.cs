@@ -80,7 +80,7 @@ public static class BlitzFactory
     ///
     /// Called from the creature's ETB path. CR 603.7 — the delayed sacrifice is
     /// a one-shot delayed triggered ability that fires on the FIRST
-    /// <see cref="StepStartedEvent"/> for <see cref="PhaseStateType.End"/>
+    /// <see cref="StepStartedEvent"/> for <see cref="StepStateType.End"/>
     /// strictly after the creature entered (activation-time fence mirrors
     /// Through the Breach). CR 701.16 — sacrifice moves it from the
     /// controller's battlefield to its owner's graveyard.
@@ -144,7 +144,7 @@ public static class BlitzFactory
             controller: creature.Controller ?? creature.Owner
                 ?? throw new InvalidOperationException("Blitz source must have a controller or owner"),
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End
+                (e, _) => e.StepType == StepStateType.End
                           && e.Timestamp > resolvedAt),
             effects: new IEffect[] { sacEffect });
 

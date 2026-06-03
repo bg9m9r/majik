@@ -54,7 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   combat on your turn"). Wired as a targeted
 ///   <see cref="TriggeredAbility"/> over
 ///   <see cref="Triggers.OnStepBegin"/> for
-///   <see cref="PhaseStateType.BeginningOfCombat"/> restricted to the
+///   <see cref="StepStateType.BeginningOfCombat"/> restricted to the
 ///   controller's own turns, with a 1..1 "target creature"
 ///   <see cref="TargetRequest"/>. The intervening-if ("if The Ozolith has
 ///   counters on it") gates the trigger at fire time AND on resolution. On
@@ -186,7 +186,7 @@ public static class TheOzolithFactory
         // ----------------------------------------------------------------
         var beginCombatCondition = new EventTriggerCondition<StepStartedEvent>((e, _) =>
             // CR 508.1 — begin-of-combat on the controller's own turn.
-            e.StepType == PhaseStateType.BeginningOfCombat
+            e.StepType == StepStateType.BeginningOfCombat
             && ReferenceEquals(e.Player, card.Controller ?? owner)
             // CR 603.4 — intervening-if checked as the trigger would fire.
             && card.Counters.HasAny);

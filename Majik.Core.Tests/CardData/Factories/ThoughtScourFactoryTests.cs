@@ -83,7 +83,7 @@ public class ThoughtScourFactoryTests
         var stack = new Majik.Core.Stack.Stack();
         var ctx   = new GameContext(
             _alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.PreCombatMain, stack);
+            _alice, 1, StepStateType.PreCombatMain, stack);
 
         var candidates = tr.ResolveCandidates(ctx);
 

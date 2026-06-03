@@ -261,7 +261,7 @@ public class NeoformTests
 
         var ctx = new GameContext(
             alice, new[] { alice, bob }, alice, 1,
-            PhaseStateType.PreCombatMain, stack);
+            StepStateType.PreCombatMain, stack);
 
         var def = NeoformFactory.BuildSpellDefinition(alice);
 

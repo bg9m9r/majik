@@ -10,12 +10,12 @@ namespace Majik.Core.Game.Phases;
 /// Untap step implementation.
 /// Untaps all permanents controlled by the active player.
 /// </summary>
-public class UntapStep : PhaseState
+public class UntapStep : StepState
 {
     private readonly IEventBus? _eventBus;
 
     public UntapStep(IEventBus? eventBus = null) 
-        : base(PhaseStateType.Untap, eventBus)
+        : base(StepStateType.Untap, eventBus)
     {
         _eventBus = eventBus;
     }

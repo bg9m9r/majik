@@ -143,9 +143,9 @@ public class DesertFactoryTests
     [Fact]
     public void Desert_IsEndOfCombatStep_OnlyTrueForEndOfCombat()
     {
-        DesertFactory.IsEndOfCombatStep(PhaseStateType.EndOfCombat).Should().BeTrue();
-        DesertFactory.IsEndOfCombatStep(PhaseStateType.DeclareAttackers).Should().BeFalse();
-        DesertFactory.IsEndOfCombatStep(PhaseStateType.PostCombatMain).Should().BeFalse();
-        DesertFactory.IsEndOfCombatStep(PhaseStateType.PreCombatMain).Should().BeFalse();
+        DesertFactory.IsEndOfCombatStep(StepStateType.EndOfCombat).Should().BeTrue();
+        DesertFactory.IsEndOfCombatStep(StepStateType.DeclareAttackers).Should().BeFalse();
+        DesertFactory.IsEndOfCombatStep(StepStateType.PostCombatMain).Should().BeFalse();
+        DesertFactory.IsEndOfCombatStep(StepStateType.PreCombatMain).Should().BeFalse();
     }
 }

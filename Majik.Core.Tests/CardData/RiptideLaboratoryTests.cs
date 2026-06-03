@@ -169,7 +169,7 @@ public class RiptideLaboratoryTests
 
         var ctx = new Majik.Core.Game.GameContext(
             _alice, new[] { _alice, _bob }, _alice, 1,
-            Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
         var candidates = request.ResolveCandidates(ctx);
 

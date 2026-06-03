@@ -43,7 +43,7 @@ public class JsonTargetingEffectsTests
     private readonly Player _bob = new("Bob", 20);
 
     private GameContext NewContext(Majik.Core.Stack.Stack stack) =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, stack);
 
     private static Creature OnBattlefield(Creature creature, Player owner)
     {

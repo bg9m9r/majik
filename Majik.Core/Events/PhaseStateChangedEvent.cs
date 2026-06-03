@@ -6,15 +6,15 @@ namespace Majik.Core.Events;
 /// Fired by <c>TurnDriver.SetTurnState</c> when the turn-level (phase)
 /// state transitions (TurnBeginning → PreCombatMain → Combat →
 /// PostCombatMain → TurnEnding). Carries the typed
-/// <see cref="TurnStateType"/> so listeners can recover which main phase
+/// <see cref="PhaseStateType"/> so listeners can recover which main phase
 /// the game is in (CR 505).
 /// </summary>
-public class TurnStateChangedEvent : GameEvent
+public class PhaseStateChangedEvent : GameEvent
 {
-    public TurnStateType? PreviousState { get; }
-    public TurnStateType CurrentState { get; }
+    public PhaseStateType? PreviousState { get; }
+    public PhaseStateType CurrentState { get; }
 
-    public TurnStateChangedEvent(TurnStateType? previousState, TurnStateType currentState)
+    public PhaseStateChangedEvent(PhaseStateType? previousState, PhaseStateType currentState)
         : base(EventType.PhaseStarted)
     {
         PreviousState = previousState;

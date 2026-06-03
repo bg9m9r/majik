@@ -158,7 +158,7 @@ public class DamageDealtEventPayloadTests
             }));
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+            1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 
         await flow.RunCombatAsync(
             _alice, _bob, atkAgent, blkAgent,

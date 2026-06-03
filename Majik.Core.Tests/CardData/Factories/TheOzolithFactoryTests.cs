@@ -191,7 +191,7 @@ public class TheOzolithFactoryTests
         triggers.BindCard(ozolith);
         ozolith.Counters.Add(CounterType.PlusOnePlusOne, 2);
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "CR 508.1 begin-combat trigger fires on Alice's turn while The Ozolith has counters");
@@ -211,7 +211,7 @@ public class TheOzolithFactoryTests
         ozolith.Counters.Add(CounterType.PlusOnePlusOne, 2);
 
         // Bob's beginning of combat — "on YOUR turn" gates this out.
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _bob));
 
         triggers.PendingCount.Should().Be(0,
             "'on your turn' restricts the trigger to Alice's own combat");
@@ -230,7 +230,7 @@ public class TheOzolithFactoryTests
         triggers.BindCard(ozolith);
         // No counters on The Ozolith.
 
-        bus.Publish(new StepStartedEvent(PhaseStateType.BeginningOfCombat, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.BeginningOfCombat, _alice));
 
         triggers.PendingCount.Should().Be(0,
             "intervening-if 'if The Ozolith has counters on it' (CR 603.4) suppresses the trigger");

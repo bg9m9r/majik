@@ -93,7 +93,7 @@ public class GhostlyFlickerFactoryTests
 
         var def = GhostlyFlickerFactory.BuildDefinition(_alice);
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain,
             new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
 
         var candidates = def.TargetRequests[0].CandidateGatherer!(ctx);

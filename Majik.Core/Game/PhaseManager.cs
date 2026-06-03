@@ -15,8 +15,8 @@ public class PhaseManager
     private readonly IEventBus? _eventBus;
     private readonly PhaseSequenceMutator _sequenceMutator;
 
-    private PhaseStateType? _currentPhase;
-    private PhaseStateType[] _currentSequence = Array.Empty<PhaseStateType>();
+    private StepStateType? _currentPhase;
+    private StepStateType[] _currentSequence = Array.Empty<StepStateType>();
     private int _currentPhaseIndex;
     private Player? _activePlayer;
     private bool _isFirstTurn;
@@ -29,7 +29,7 @@ public class PhaseManager
     /// <summary>
     /// The current phase.
     /// </summary>
-    public PhaseStateType? CurrentPhase => _currentPhase;
+    public StepStateType? CurrentPhase => _currentPhase;
 
     /// <summary>
     /// Whether the current phase can transition to the next.
@@ -141,7 +141,7 @@ public class PhaseManager
 
     /// <summary>Queue an extra phase. Delegates to
     /// <see cref="SequenceMutator"/>; kept here for back-compat.</summary>
-    public void AddExtraPhase(PhaseStateType phase) => _sequenceMutator.AddExtraPhase(phase);
+    public void AddExtraPhase(StepStateType phase) => _sequenceMutator.AddExtraPhase(phase);
 
     /// <summary>Queue a complete extra combat phase.</summary>
     public void AddExtraCombatPhase() => _sequenceMutator.AddExtraCombatPhase();
@@ -155,7 +155,7 @@ public class PhaseManager
         => _currentPhase == null && _sequenceMutator.PendingCount == 0;
 
     /// <summary>Get the next phase that will execute.</summary>
-    public PhaseStateType? GetNextPhase()
+    public StepStateType? GetNextPhase()
     {
         var pending = _sequenceMutator.PeekNext();
         if (pending != null) return pending;
@@ -179,17 +179,17 @@ public class PhaseManager
         // Execute phase-specific logic based on phase type
         switch (_currentPhase.Value)
         {
-            case PhaseStateType.Untap:
+            case StepStateType.Untap:
                 // Untap logic will be implemented when we have permanents
                 // For now, just auto-complete
                 break;
                 
-            case PhaseStateType.Upkeep:
+            case StepStateType.Upkeep:
                 // Upkeep triggers will be implemented when we have triggers
                 // For now, just auto-complete
                 break;
                 
-            case PhaseStateType.Draw:
+            case StepStateType.Draw:
                 // Draw a card (if not first turn)
                 if (!_isFirstTurn && _activePlayer.Zones.Library.GetCards().Any())
                 {
@@ -204,23 +204,23 @@ public class PhaseManager
                 }
                 break;
                 
-            case PhaseStateType.PreCombatMain:
-            case PhaseStateType.PostCombatMain:
+            case StepStateType.PreCombatMain:
+            case StepStateType.PostCombatMain:
                 // Main phase: players can cast spells (handled by stack/priority in future)
                 // For now, just auto-complete
                 break;
                 
-            case PhaseStateType.End:
+            case StepStateType.End:
                 // End step triggers will be implemented when we have triggers
                 // For now, just auto-complete
                 break;
                 
-            case PhaseStateType.Cleanup:
+            case StepStateType.Cleanup:
                 // Cleanup: discard to hand size, remove damage
                 // For now, just auto-complete
                 break;
                 
-            case PhaseStateType.BeginningOfCombat:
+            case StepStateType.BeginningOfCombat:
                 // Beginning of Combat step (Rule 507)
                 if (_combatManager != null && _activePlayer != null)
                 {
@@ -228,19 +228,19 @@ public class PhaseManager
                 }
                 break;
 
-            case PhaseStateType.DeclareAttackers:
+            case StepStateType.DeclareAttackers:
                 // Declare Attackers step (Rule 508)
                 // Player must declare attackers - handled by Game.DeclareAttackers()
                 // Phase will wait for player action
                 break;
 
-            case PhaseStateType.DeclareBlockers:
+            case StepStateType.DeclareBlockers:
                 // Declare Blockers step (Rule 509)
                 // Defending player must declare blockers - handled by Game.DeclareBlockers()
                 // Phase will wait for player action
                 break;
 
-            case PhaseStateType.CombatDamage:
+            case StepStateType.CombatDamage:
                 // Combat Damage step (Rule 510)
                 // Only assign damage if combat is in progress (attackers were declared)
                 if (_combatManager != null && _combatManager.IsInCombat)
@@ -249,7 +249,7 @@ public class PhaseManager
                 }
                 break;
 
-            case PhaseStateType.EndOfCombat:
+            case StepStateType.EndOfCombat:
                 // End of Combat step (Rule 511)
                 // Only end combat if combat is in progress
                 if (_combatManager != null && _combatManager.IsInCombat)
@@ -290,13 +290,13 @@ public class PhaseManager
         // Main phases and combat will require player input in future
         switch (_currentPhase.Value)
         {
-            case PhaseStateType.PreCombatMain:
-            case PhaseStateType.PostCombatMain:
+            case StepStateType.PreCombatMain:
+            case StepStateType.PostCombatMain:
                 // Main phase requires stack empty and all players passed
                 return stack?.IsEmpty == true && priorityManager?.AllPlayersPassed == true;
                 
-            case PhaseStateType.DeclareAttackers:
-            case PhaseStateType.DeclareBlockers:
+            case StepStateType.DeclareAttackers:
+            case StepStateType.DeclareBlockers:
                 // Combat phases will wait for player in future
                 // For now, auto-advance if stack empty and all passed
                 return stack?.IsEmpty == true && priorityManager?.AllPlayersPassed == true;
@@ -387,11 +387,11 @@ public class PhaseManager
     /// <summary>
     /// Check if a phase needs priority (Rule 117.3a).
     /// </summary>
-    private static bool NeedsPriority(PhaseStateType phase)
+    private static bool NeedsPriority(StepStateType phase)
     {
         // Phases that don't give priority: Untap (Rule 502.4), certain Cleanup steps (Rule 514.3)
         // For now, only Untap doesn't give priority
         // Cleanup will be handled in future when we implement cleanup logic
-        return phase != PhaseStateType.Untap;
+        return phase != StepStateType.Untap;
     }
 }

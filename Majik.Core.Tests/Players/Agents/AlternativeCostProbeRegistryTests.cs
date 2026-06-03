@@ -144,7 +144,7 @@ public class AlternativeCostProbeRegistryTests
     }
 
     private GameContext NewContext(Player activePlayer) =>
-        new(_alice, new[] { _alice, _bob }, activePlayer, 1, PhaseStateType.PreCombatMain, _stack);
+        new(_alice, new[] { _alice, _bob }, activePlayer, 1, StepStateType.PreCombatMain, _stack);
 
     private sealed class StubProbe : IAlternativeCostProbe
     {

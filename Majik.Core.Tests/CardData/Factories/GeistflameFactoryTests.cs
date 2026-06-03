@@ -151,7 +151,7 @@ public class GeistflameFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, stack);
+            StepStateType.PreCombatMain, stack);
 
         var spell = await flow.CastAsync(
             _alice, geistflame, def, agent, ctx,

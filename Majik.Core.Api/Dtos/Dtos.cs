@@ -270,7 +270,7 @@ public sealed record AutoPassPrefs(
         FullControl: false,
         PhaseStops: new Dictionary<string, string>
         {
-            [nameof(Majik.Core.StateMachine.PhaseStateType.BeginningOfCombat)] = "theirs",
-            [nameof(Majik.Core.StateMachine.PhaseStateType.End)] = "theirs",
+            [nameof(Majik.Core.StateMachine.StepStateType.BeginningOfCombat)] = "theirs",
+            [nameof(Majik.Core.StateMachine.StepStateType.End)] = "theirs",
         });
 }

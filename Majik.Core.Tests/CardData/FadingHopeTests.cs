@@ -97,7 +97,7 @@ public class FadingHopeTests : IDisposable
             TopOrder: Array.Empty<ICard>()));
         AgentRegistry.Set(_alice, agent);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, card, FadingHopeFactory.BuildDefinition(_alice, _zones), agent, ctx, alternativeCost: null);
@@ -143,7 +143,7 @@ public class FadingHopeTests : IDisposable
             TopOrder: Array.Empty<ICard>()));
         AgentRegistry.Set(_alice, agent);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, card, FadingHopeFactory.BuildDefinition(_alice, _zones), agent, ctx, alternativeCost: null);
@@ -186,7 +186,7 @@ public class FadingHopeTests : IDisposable
             TopOrder: Array.Empty<ICard>()));
         AgentRegistry.Set(_alice, agent);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, card, FadingHopeFactory.BuildDefinition(_alice, _zones), agent, ctx, alternativeCost: null);
@@ -221,7 +221,7 @@ public class FadingHopeTests : IDisposable
         agent.QueueMana(ManaPayment.Empty);
         AgentRegistry.Set(_alice, agent);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, card, FadingHopeFactory.BuildDefinition(_alice, _zones), agent, ctx, alternativeCost: null);

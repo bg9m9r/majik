@@ -62,7 +62,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="GrimFlayerFactory"/>'s self-sourced combat-damage trigger.
 /// - <b>End-step self-sacrifice (CR 603 + CR 701.16)</b>: a
 ///   <see cref="TriggeredAbility"/> over <see cref="StepStartedEvent"/> firing
-///   on <see cref="Majik.Core.StateMachine.PhaseStateType.End"/>. The printed
+///   on <see cref="Majik.Core.StateMachine.StepStateType.End"/>. The printed
 ///   wording — "At the beginning of the end step" — is <i>unscoped</i>, so per
 ///   CR 603.3d it triggers on <b>every</b> player's end step (the condition
 ///   matches on step type alone, no controller filter — byte-identical to
@@ -219,7 +219,7 @@ public static class LightningSkelementalFactory
             // Unscoped "the end step" — fires on any player's end step
             // (CR 603.3d). Match on step type alone, no controller filter.
             condition: new EventTriggerCondition<StepStartedEvent>((e, _) =>
-                e.StepType == Majik.Core.StateMachine.PhaseStateType.End),
+                e.StepType == Majik.Core.StateMachine.StepStateType.End),
             effects: new IEffect[] { sacrificeEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

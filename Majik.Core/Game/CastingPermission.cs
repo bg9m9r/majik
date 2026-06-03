@@ -21,7 +21,7 @@ public static class CastingPermission
         ICard card,
         Player caster,
         Player activePlayer,
-        PhaseStateType currentPhase,
+        StepStateType currentPhase,
         bool stackIsEmpty,
         out string reason)
     {

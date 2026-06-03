@@ -163,7 +163,7 @@ public class HarbingerOfTheTidesFactoryTests
         var req = etb.TargetRequests[0];
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(new EventBus()));
+            StepStateType.PreCombatMain, new Majik.Core.Stack.Stack(new EventBus()));
         var candidates = req.CandidateGatherer!(ctx);
 
         candidates.Should().Contain(tappedOpp);
@@ -223,7 +223,7 @@ public class HarbingerOfTheTidesFactoryTests
 
         // Bob's turn, End step — sorcery speed is NOT available to Alice.
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            activePlayer: _bob, 1, PhaseStateType.End, stack);
+            activePlayer: _bob, 1, StepStateType.End, stack);
 
         await flow.CastAsync(
             _alice, harbinger,

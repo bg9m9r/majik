@@ -112,7 +112,7 @@ public class RecklessRageFactoryTests
             allPlayers: new[] { _alice, _bob },
             activePlayer: _alice,
             turnNumber: 1,
-            currentPhase: PhaseStateType.PreCombatMain,
+            currentPhase: StepStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack());
 
         var def = RecklessRageFactory.BuildSpellDefinition(o => o!);

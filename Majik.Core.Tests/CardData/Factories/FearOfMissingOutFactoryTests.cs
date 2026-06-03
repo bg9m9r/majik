@@ -189,7 +189,7 @@ public class FearOfMissingOutFactoryTests
     {
         if (ta.TargetRequests == null || ta.TargetRequests.Count == 0) return;
         var ctx = new GameContext(active, new[] { active }, active, 1,
-            PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack(new EventBus()));
+            StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack(new EventBus()));
         var chosen = ta.TargetRequests
             .Select(req =>
             {

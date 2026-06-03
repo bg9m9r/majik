@@ -112,7 +112,7 @@ public class PrizedAmalgamTests
 
         // Now fire an End step — the delayed trigger should pick it up.
         var bus = GetEventBus(zones);
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(1,
             "delayed end-step trigger queued by the ETB resolution");

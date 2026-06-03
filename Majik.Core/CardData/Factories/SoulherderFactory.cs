@@ -183,7 +183,7 @@ public static class SoulherderFactory
         flickerTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: Triggers.OnStepBegin(owner, PhaseStateType.End),
+            condition: Triggers.OnStepBegin(owner, StepStateType.End),
             effects: new IEffect[] { flickerEffect },
             activeZones: new[] { ZoneType.Battlefield },
             targetRequests: new[]

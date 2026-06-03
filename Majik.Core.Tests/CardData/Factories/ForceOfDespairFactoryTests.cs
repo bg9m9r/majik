@@ -65,7 +65,7 @@ public class ForceOfDespairFactoryTests
         _alice.Zones.Hand.AddCard(blackFuel);
 
         var probe = new PitchAltCostProbe(PitchAltCostProbe.DefaultLookup);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, StepStateType.PreCombatMain, _stack);
 
         var candidates = probe.CandidatesFor(fod, _alice, ctx).ToList();
         candidates.Should().HaveCount(1);
@@ -158,7 +158,7 @@ public class ForceOfDespairFactoryTests
         var pitchCost = new PitchAlternativeCost(ManaColor.Black, pitchFuel, lifeCost: 0);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fod,

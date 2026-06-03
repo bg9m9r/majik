@@ -193,7 +193,7 @@ public static class KatakiWarsWageFactory
         var tax = new TriggeredAbility(
             source: bearer,
             controller: bearerController,
-            condition: Triggers.OnStepBegin(bearerController, PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(bearerController, StepStateType.Upkeep),
             effects: new IEffect[] { taxEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

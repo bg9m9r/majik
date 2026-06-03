@@ -65,7 +65,7 @@ namespace Majik.Core.CardData.Factories;
 ///   simply records that the card is in Voidwalker's exile pile;
 ///   removing it is the ability's payoff but does not stamp a
 ///   timer. Wiring an EOT cleanup mirrors the Snapcaster bus-handler
-///   pattern (<see cref="Events.IEventBus"/> + <see cref="StateMachine.PhaseStateType"/>.Cleanup)
+///   pattern (<see cref="Events.IEventBus"/> + <see cref="StateMachine.StepStateType"/>.Cleanup)
 ///   and is deferred until a cast-permission flag is added.
 /// - <b>Target selection on the activated ability</b>: oracle wording
 ///   ("Remove a void counter from a card exiled with Dauthi Voidwalker")

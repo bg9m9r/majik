@@ -45,7 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Card.GrantRuntimeExileCast"/> for the discarder, cost =
 ///   the exiled card's printed mana cost (the runtime grant surface
 ///   used by Ragavan / Light Up the Stage / Igneous Inspiration). The
-///   grant clears on the first <see cref="PhaseStateType.Cleanup"/>
+///   grant clears on the first <see cref="StepStateType.Cleanup"/>
 ///   <see cref="StepStartedEvent"/> seen on the supplied
 ///   <see cref="IEventBus"/> after the discard — that is the end of the
 ///   CURRENT turn (CR 514.2), matching the printed "this turn"
@@ -111,7 +111,7 @@ public static class ContainmentConstructFactory
     /// is registered so <see cref="CardMovedEvent"/> publications
     /// auto-queue it. When <paramref name="eventBus"/> is supplied, the
     /// "may play this turn" grant clears on the first
-    /// <see cref="PhaseStateType.Cleanup"/> step seen after the
+    /// <see cref="StepStateType.Cleanup"/> step seen after the
     /// discard (CR 514.2 — end of the current turn).
     /// </summary>
     public static Creature Create(
@@ -254,7 +254,7 @@ public static class ContainmentConstructFactory
         Action<StepStartedEvent>? handler = null;
         handler = (e) =>
         {
-            if (e.StepType != PhaseStateType.Cleanup) return;
+            if (e.StepType != StepStateType.Cleanup) return;
             if (ReferenceEquals(stampable.RuntimeExileCastAllowedCaster, controller))
             {
                 stampable.ClearRuntimeExileCast();

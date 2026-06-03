@@ -98,7 +98,7 @@ public class EerieInterludeFactoryTests : IDisposable
         a.Zone.Should().Be(ZoneType.Exile);
         b.Zone.Should().Be(ZoneType.Exile);
 
-        _bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         _triggers.PutPendingTriggersOnStack(_alice);
         while (_stack.Count > 0) _stack.Pop()!.Resolve();
 

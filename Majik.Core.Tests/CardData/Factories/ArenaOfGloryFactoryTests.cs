@@ -275,7 +275,7 @@ public class ArenaOfGloryFactoryTests : IDisposable
         UntapStepRestrictions.ShouldSkipUntap(land, alice).Should().BeTrue();
 
         // Controller's next Untap step fires → the one-shot exert skip lifts.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Untap, alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Untap, alice));
 
         UntapStepRestrictions.ShouldSkipUntap(land, alice).Should().BeFalse(
             "the exert skip is a one-shot — it lifts after the controller's next untap step");

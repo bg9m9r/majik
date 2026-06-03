@@ -261,19 +261,19 @@ public class MarchOfRecklessJoyFactoryTests
         top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
         // 1st Cleanup — caster's current turn. Grant must persist.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         top1.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "first cleanup belongs to caster's current turn — grant persists");
         top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "first cleanup belongs to caster's current turn — grant persists");
 
         // Non-caster Cleanup does not count.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _bob));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _bob));
         top1.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "Bob's cleanup is not caster's next turn — grant survives");
 
         // 2nd Cleanup belonging to Alice — her next turn. Grant clears.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         top1.RuntimeExileCastAllowedCaster.Should().BeNull(
             "second cleanup belonging to caster = end of caster's next turn — grant cleared");
         top2.RuntimeExileCastAllowedCaster.Should().BeNull(
@@ -295,8 +295,8 @@ public class MarchOfRecklessJoyFactoryTests
         top3.RuntimeExileCastAllowedCaster.Should().BeNull();
 
         // Fire both cleanups.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         top1.RuntimeExileCastAllowedCaster.Should().BeNull("grant cleared after next-turn cleanup");
         top2.RuntimeExileCastAllowedCaster.Should().BeNull("grant cleared after next-turn cleanup");

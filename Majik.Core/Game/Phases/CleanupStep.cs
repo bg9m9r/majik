@@ -11,13 +11,13 @@ namespace Majik.Core.Game.Phases;
 /// Cleanup step implementation.
 /// Discard to hand size, remove damage, end turn.
 /// </summary>
-public class CleanupStep : PhaseState
+public class CleanupStep : StepState
 {
     private readonly IEventBus? _eventBus;
     private readonly ZoneService? _zoneService;
 
     public CleanupStep(IEventBus? eventBus = null, ZoneService? zoneService = null) 
-        : base(PhaseStateType.Cleanup, eventBus)
+        : base(StepStateType.Cleanup, eventBus)
     {
         _eventBus = eventBus;
         _zoneService = zoneService;

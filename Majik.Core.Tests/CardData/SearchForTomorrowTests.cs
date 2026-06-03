@@ -255,13 +255,13 @@ public class SearchForTomorrowTests
         registry.TimeCountersOn(sft).Should().Be(2);
 
         // First upkeep: counter ticks from 2 → 1, card stays suspended.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         registry.IsTracked(sft).Should().BeTrue("still has 1 counter");
         ready.Should().BeNull("ready fires only when last counter is removed");
         registry.TimeCountersOn(sft).Should().Be(1);
 
         // Second upkeep: counter ticks from 1 → 0; ready callback fires.
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        _bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
         registry.IsTracked(sft).Should().BeFalse("all counters removed");
         ready.Should().NotBeNull("ready callback should have fired on last counter removal");
         sft.Zone.Should().Be(ZoneType.Exile, "still in exile until free cast moves it");
@@ -275,7 +275,7 @@ public class SearchForTomorrowTests
             "Suspend resolved (CR 702.62d)", ManaCost.Parse("0"));
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 2, PhaseStateType.Upkeep, stack);
+            _alice, 2, StepStateType.Upkeep, stack);
 
         var freeAgent = new ScriptedAgent();
         freeAgent.QueueMana(ManaPayment.Empty);

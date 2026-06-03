@@ -97,7 +97,7 @@ public class PriorityLoopAutoPassTests
         System.Func<GameContext, bool>? deadWindow = null,
         IEventBus? eventBus = null,
         System.Func<System.DateTime>? clock = null,
-        PhaseStateType phase = PhaseStateType.PreCombatMain)
+        StepStateType phase = StepStateType.PreCombatMain)
     {
         var agents = new System.Collections.Generic.Dictionary<Player, IPlayerAgent>
         {
@@ -237,7 +237,7 @@ public class PriorityLoopAutoPassTests
                 : new TestPrefs(),
             deadWindow: _ => true,
             clock: () => new System.DateTime(2026, 1, 1),
-            phase: PhaseStateType.PreCombatMain);
+            phase: StepStateType.PreCombatMain);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -261,7 +261,7 @@ public class PriorityLoopAutoPassTests
                 : new TestPrefs(),
             deadWindow: _ => true,
             clock: () => new System.DateTime(2026, 1, 1),
-            phase: PhaseStateType.PreCombatMain);
+            phase: StepStateType.PreCombatMain);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -283,7 +283,7 @@ public class PriorityLoopAutoPassTests
             },
             deadWindow: _ => true,
             clock: () => new System.DateTime(2026, 1, 1),
-            phase: PhaseStateType.PreCombatMain);
+            phase: StepStateType.PreCombatMain);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -309,7 +309,7 @@ public class PriorityLoopAutoPassTests
             deadWindow: _ => true,
             eventBus: _bus,
             clock: () => now,
-            phase: PhaseStateType.PreCombatMain);
+            phase: StepStateType.PreCombatMain);
 
         // Stamp the stack as just-mutated.
         var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1) { Owner = _alice, Zone = ZoneType.Battlefield };
@@ -339,7 +339,7 @@ public class PriorityLoopAutoPassTests
             deadWindow: _ => true,
             eventBus: _bus,
             clock: () => now,
-            phase: PhaseStateType.PreCombatMain);
+            phase: StepStateType.PreCombatMain);
 
         var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1) { Owner = _alice, Zone = ZoneType.Battlefield };
         var trig = new Majik.Core.Abilities.TriggeredAbility(
@@ -372,7 +372,7 @@ public class PriorityLoopAutoPassTests
             deadWindow: _ => true,
             eventBus: _bus,
             clock: () => now,
-            phase: PhaseStateType.PreCombatMain);
+            phase: StepStateType.PreCombatMain);
 
         var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1) { Owner = _alice, Zone = ZoneType.Battlefield };
         var trig = new Majik.Core.Abilities.TriggeredAbility(

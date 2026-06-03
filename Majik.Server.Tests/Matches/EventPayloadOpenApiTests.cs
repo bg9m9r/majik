@@ -30,7 +30,7 @@ public class EventPayloadOpenApiTests : IClassFixture<TestAppFactory>
         "PhaseStartedPayload",
         "PhaseEndedPayload",
         "GameStateChangedPayload",
-        "TurnStateChangedPayload",
+        "PhaseStateChangedPayload",
         "StepStartedPayload",
         "StepEndedPayload",
         "TurnStartedPayload",

@@ -154,19 +154,19 @@ public class RecklessImpulseTests
         top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
         // 1st Cleanup — Alice's current turn. Grant must persist.
-        bus.Publish(new Majik.Core.Events.StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new Majik.Core.Events.StepStartedEvent(StepStateType.Cleanup, _alice));
         top1.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "first cleanup belongs to caster's current turn — grant persists through EOT");
         top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "first cleanup belongs to caster's current turn — grant persists through EOT");
 
         // A cleanup on Bob's intervening turn does NOT count. Grant still alive.
-        bus.Publish(new Majik.Core.Events.StepStartedEvent(PhaseStateType.Cleanup, _bob));
+        bus.Publish(new Majik.Core.Events.StepStartedEvent(StepStateType.Cleanup, _bob));
         top1.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "Bob's cleanup is not 'your next turn' — Alice's grant survives");
 
         // 2nd Cleanup belonging to Alice — her next turn. Grant clears.
-        bus.Publish(new Majik.Core.Events.StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new Majik.Core.Events.StepStartedEvent(StepStateType.Cleanup, _alice));
         top1.RuntimeExileCastAllowedCaster.Should().BeNull(
             "second cleanup belonging to caster = end of caster's next turn — grant cleared");
         top2.RuntimeExileCastAllowedCaster.Should().BeNull(

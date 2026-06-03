@@ -92,7 +92,7 @@ public class MightOfOaksFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mo, MightOfOaksFactory.BuildDefinition(), agent, ctx);
         _resolver.ResolveTop(_stack);
@@ -114,7 +114,7 @@ public class MightOfOaksFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mo, MightOfOaksFactory.BuildDefinition(), agent, ctx);
         _resolver.ResolveTop(_stack);
@@ -144,7 +144,7 @@ public class MightOfOaksFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new object[] { dead });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mo, MightOfOaksFactory.BuildDefinition(), agent, ctx);
         _resolver.ResolveTop(_stack);

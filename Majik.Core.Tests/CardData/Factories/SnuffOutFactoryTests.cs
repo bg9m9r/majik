@@ -211,7 +211,7 @@ public class SnuffOutFactoryTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)goyf });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, stack);
 
         var altCost = new PayLifeIfControlSwampAlternativeCost(SnuffOutFactory.AlternativeLifeCost);
 

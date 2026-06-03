@@ -204,7 +204,7 @@ public static class OtherworldlyJourneyFactory
             source: target,
             controller: caster,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End && e.Timestamp > resolvedAt),
+                (e, _) => e.StepType == StepStateType.End && e.Timestamp > resolvedAt),
             effects: new IEffect[] { returnEffect });
 
         triggers.RegisterDelayed(delayed);

@@ -14,7 +14,7 @@ public sealed class GameContext
     public IReadOnlyList<Player> AllPlayers { get; }
     public Player ActivePlayer { get; }
     public int TurnNumber { get; }
-    public PhaseStateType? CurrentPhase { get; }
+    public StepStateType? CurrentPhase { get; }
     public Majik.Core.Stack.Stack Stack { get; }
 
     /// <summary>
@@ -34,7 +34,7 @@ public sealed class GameContext
         IReadOnlyList<Player> allPlayers,
         Player activePlayer,
         int turnNumber,
-        PhaseStateType? currentPhase,
+        StepStateType? currentPhase,
         Majik.Core.Stack.Stack stack,
         bool landPlayAvailable = true)
     {

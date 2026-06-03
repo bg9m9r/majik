@@ -269,7 +269,7 @@ public static class SplinterTwinFactory
                         source: aura,
                         controller: controller,
                         condition: new EventTriggerCondition<StepStartedEvent>(
-                            (e, _) => e.StepType == PhaseStateType.End
+                            (e, _) => e.StepType == StepStateType.End
                                       && e.Timestamp > resolvedAt),
                         effects: new IEffect[] { exileEffect });
 

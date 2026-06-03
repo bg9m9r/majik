@@ -231,7 +231,7 @@ public class EmrakulThePromisedEndFactoryTests
             allPlayers: new[] { _alice, _bob },
             activePlayer: _alice,
             turnNumber: 1,
-            currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack());
 
         var candidates = req.ResolveCandidates(ctx);

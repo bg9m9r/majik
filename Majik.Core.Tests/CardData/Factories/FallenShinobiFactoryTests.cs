@@ -265,7 +265,7 @@ public class FallenShinobiFactoryTests
         top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
         // Cleanup step fires — CR 514.2 / 514.3.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
 
         top1.RuntimeExileCastAllowedCaster.Should().BeNull("EOT cleanup clears the grant");
         top2.RuntimeExileCastAllowedCaster.Should().BeNull("EOT cleanup clears the grant");

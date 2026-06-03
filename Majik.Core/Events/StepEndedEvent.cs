@@ -11,14 +11,14 @@ public class StepEndedEvent : GameEvent
     /// <summary>
     /// The type of step that ended.
     /// </summary>
-    public PhaseStateType StepType { get; }
+    public StepStateType StepType { get; }
 
     /// <summary>
     /// The active player.
     /// </summary>
     public Player Player { get; }
 
-    public StepEndedEvent(PhaseStateType stepType, Player player) 
+    public StepEndedEvent(StepStateType stepType, Player player) 
         : base(EventType.StepEnded)
     {
         StepType = stepType;

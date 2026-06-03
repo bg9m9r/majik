@@ -26,7 +26,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>End-step quest-counter trigger (CR 500.4 / CR 603.1 / CR 603.4)</b>:
 ///   a <see cref="TriggeredAbility"/> over <see cref="StepStartedEvent"/>
 ///   gated on (<see cref="StepStartedEvent.StepType"/> ==
-///   <see cref="PhaseStateType.End"/>) AND
+///   <see cref="StepStateType.End"/>) AND
 ///   (<see cref="StepStartedEvent.Player"/> is NOT Bloodchief Ascension's
 ///   controller). Intervening-if (CR 603.4) checks the active end-step
 ///   player's <see cref="Player.LifeLostThisTurn"/> &gt;=
@@ -202,7 +202,7 @@ public static class BloodchiefAscensionFactory
         Enchantment card,
         Player owner)
     {
-        if (e.StepType != PhaseStateType.End) return false;
+        if (e.StepType != StepStateType.End) return false;
         var ctrl = card.Controller ?? owner;
         if (ReferenceEquals(e.Player, ctrl)) return false; // "each opponent's end step"
         return e.Player.LifeLostThisTurn >= LifeLostThreshold;

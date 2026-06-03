@@ -32,7 +32,7 @@ public class SpellCastFlowPermissionTests
         var sorc = new Sorcery("Divination", "2U") { Owner = _alice, Zone = ZoneType.Hand };
         _alice.Zones.Hand.AddCard(sorc);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            activePlayer: _bob, 1, PhaseStateType.PreCombatMain, _stack);
+            activePlayer: _bob, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
 
         var act = async () => await _flow.CastAsync(_alice, sorc,
@@ -49,7 +49,7 @@ public class SpellCastFlowPermissionTests
         var bolt = new Instant("Bolt", "R") { Owner = _alice, Zone = ZoneType.Hand };
         _alice.Zones.Hand.AddCard(bolt);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            activePlayer: _bob, 1, PhaseStateType.End, _stack);
+            activePlayer: _bob, 1, StepStateType.End, _stack);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
@@ -72,7 +72,7 @@ public class SpellCastFlowPermissionTests
 
         var creature = new Creature("Goblin Bear", "{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
         _alice.Zones.Library.AddCard(creature);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
 
         var act = async () => await _flow.CastAsync(_alice, creature,
@@ -97,7 +97,7 @@ public class SpellCastFlowPermissionTests
         Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
             new object(), _alice, Majik.Core.Rules.TopPlayFilter.Any);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
@@ -126,7 +126,7 @@ public class SpellCastFlowPermissionTests
         Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
             new object(), _alice, Majik.Core.Rules.TopPlayFilter.Creatures);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
@@ -154,7 +154,7 @@ public class SpellCastFlowPermissionTests
         Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
             new object(), _alice, Majik.Core.Rules.TopPlayFilter.Creatures);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
 
         var act = async () => await _flow.CastAsync(_alice, bolt,
@@ -187,7 +187,7 @@ public class SpellCastFlowPermissionTests
             .MandatoryTopCastAltCostFor(_alice, creature);
         alt.Should().NotBeNull();
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty); // alt mana cost is {0}
 
@@ -217,7 +217,7 @@ public class SpellCastFlowPermissionTests
         var creature = new Creature("Goblin Bear", "{2}{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
         _alice.Zones.Library.AddCard(creature);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
@@ -245,7 +245,7 @@ public class SpellCastFlowPermissionTests
         Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
             new object(), _alice, Majik.Core.Rules.TopPlayFilter.Any);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
 
         var act = async () => await _flow.CastAsync(_alice, buried,
@@ -267,7 +267,7 @@ public class SpellCastFlowPermissionTests
         agent.X = 3;
         agent.ManaCallback = c => promptedCost = c;
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, fireball,
             new SpellDefinition(

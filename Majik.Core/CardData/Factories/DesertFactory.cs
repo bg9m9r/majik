@@ -138,13 +138,13 @@ public static class DesertFactory
 
     /// <summary>
     /// CR 602.5b — "Activate only during the end of combat step." True iff the
-    /// supplied step is the <see cref="PhaseStateType.EndOfCombat"/> step.
+    /// supplied step is the <see cref="StepStateType.EndOfCombat"/> step.
     /// Public so bot policies / the action validator can gate the pinger's
     /// activation timing (mirrors <see cref="BarbarianRingFactory.IsThresholdActive"/>
     /// exposing its Threshold gate).
     /// </summary>
-    public static bool IsEndOfCombatStep(PhaseStateType step) =>
-        step == PhaseStateType.EndOfCombat;
+    public static bool IsEndOfCombatStep(StepStateType step) =>
+        step == StepStateType.EndOfCombat;
 
     /// <summary>
     /// CR 601.2c — candidate pool for "target attacking creature": every

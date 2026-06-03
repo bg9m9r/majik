@@ -253,7 +253,7 @@ public class NahiriTheHarbingerFactoryTests
         _alice.Zones.Battlefield.GetCards().Should().Contain(creature);
 
         // Fire the next end step — the delayed return trigger should queue.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().Be(1,
             "the delayed end-step return trigger is pending after the End step starts");
 

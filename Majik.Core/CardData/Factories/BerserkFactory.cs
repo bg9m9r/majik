@@ -40,7 +40,7 @@ namespace Majik.Core.CardData.Factories;
 ///      the listener is skipped (shape-only tests).
 ///   5. (Optional) Registers a <see cref="DelayedTriggeredAbility"/> on the
 ///      supplied <see cref="TriggerManager"/> that fires on the first
-///      <see cref="StepStartedEvent"/> with <see cref="PhaseStateType.End"/>
+///      <see cref="StepStartedEvent"/> with <see cref="StepStateType.End"/>
 ///      strictly after this resolution. When it fires, if the
 ///      <c>attacked</c> flag is set the target is destroyed
 ///      (CR 701.7 → <see cref="OracleSpellBinder.MoveToGraveyard"/> with
@@ -190,7 +190,7 @@ public static class BerserkFactory
             source: target,
             controller: target.Controller!,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End
+                (e, _) => e.StepType == StepStateType.End
                           && e.Timestamp > resolvedAt),
             effects: new IEffect[] { destroyEffect });
 

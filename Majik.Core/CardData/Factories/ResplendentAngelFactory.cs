@@ -45,7 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///       <see cref="WildernessReclamationFactory"/> shape: an
 ///       <see cref="EventTriggerCondition{T}"/> over
 ///       <see cref="StepStartedEvent"/> filtered to
-///       <see cref="PhaseStateType.End"/> only. (Contrast
+///       <see cref="StepStateType.End"/> only. (Contrast
 ///       <see cref="Abilities.Triggers.OnStepBegin"/>, which adds the
 ///       controller filter for "your end step".)
 ///     - The intervening-if "if you gained 5 or more life this turn"
@@ -226,7 +226,7 @@ public static class ResplendentAngelFactory
             source: card,
             controller: owner,
             condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == PhaseStateType.End),
+                (e, _) => e.StepType == StepStateType.End),
             effects: new IEffect[] { tokenEffect },
             activeZones: new[] { ZoneType.Battlefield });
 

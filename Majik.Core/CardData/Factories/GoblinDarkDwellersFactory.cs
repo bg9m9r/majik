@@ -161,7 +161,7 @@ public static class GoblinDarkDwellersFactory
                 Action<StepStartedEvent>? handler = null;
                 handler = e =>
                 {
-                    if (e.StepType != PhaseStateType.Cleanup) return;
+                    if (e.StepType != StepStateType.Cleanup) return;
                     // Only clear if it is still in the graveyard (uncast).
                     if (target.Zone == ZoneType.Graveyard) target.ClearRuntimeFlashback();
                     if (handler != null) eventBus.Unsubscribe(handler);

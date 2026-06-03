@@ -219,12 +219,12 @@ public class MishrasResearchDeskFactoryTests
         top.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
         // CR 514.2 — first controller-owned Cleanup (current turn): grant survives.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         top.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "the first cleanup is the current turn — 'until end of your NEXT turn'");
 
         // Second controller-owned Cleanup (the controller's next turn): clears.
-        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
         top.RuntimeExileCastAllowedCaster.Should().BeNull(
             "the grant clears at the end of the controller's next turn (CR 514.2)");
     }
@@ -283,7 +283,7 @@ public class MishrasResearchDeskFactoryTests
         foreach (var e in UnearthAbility(desk).Effects) e.Execute();
 
         // CR 702.85c — at the next end step the artifact is exiled.
-        bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
+        bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PendingCount.Should().BeGreaterThan(0,
             "the delayed end-step exile trigger fires at the next end step");
     }

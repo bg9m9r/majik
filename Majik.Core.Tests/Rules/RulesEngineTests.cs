@@ -166,7 +166,7 @@ public class RulesEngineTests
         var instant = new Instant("Lightning Bolt", "R");
 
         // Act
-        var result = _rulesEngine.CanCastInPhase(instant, PhaseStateType.CombatDamage, isStackEmpty: false);
+        var result = _rulesEngine.CanCastInPhase(instant, StepStateType.CombatDamage, isStackEmpty: false);
 
         // Assert
         result.Should().BeTrue(); // Instants can be cast anytime
@@ -179,7 +179,7 @@ public class RulesEngineTests
         var sorcery = new Sorcery("Fireball", "2RR");
 
         // Act
-        var result = _rulesEngine.CanCastInPhase(sorcery, PhaseStateType.PreCombatMain, isStackEmpty: true);
+        var result = _rulesEngine.CanCastInPhase(sorcery, StepStateType.PreCombatMain, isStackEmpty: true);
 
         // Assert
         result.Should().BeTrue();
@@ -192,7 +192,7 @@ public class RulesEngineTests
         var sorcery = new Sorcery("Fireball", "2RR");
 
         // Act
-        var result = _rulesEngine.CanCastInPhase(sorcery, PhaseStateType.CombatDamage, isStackEmpty: true);
+        var result = _rulesEngine.CanCastInPhase(sorcery, StepStateType.CombatDamage, isStackEmpty: true);
 
         // Assert
         result.Should().BeFalse();

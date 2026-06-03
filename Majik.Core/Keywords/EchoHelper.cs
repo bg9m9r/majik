@@ -65,7 +65,7 @@ public static class EchoHelper
         var trigger = new TriggeredAbility(
             source: permanent,
             controller: controller,
-            condition: Triggers.OnStepBegin(controller, PhaseStateType.Upkeep),
+            condition: Triggers.OnStepBegin(controller, StepStateType.Upkeep),
             effects: new IEffect[] { effect },
             interveningIf: () => owed.Pending,
             activeZones: new[] { ZoneType.Battlefield });

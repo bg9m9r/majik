@@ -180,13 +180,13 @@ public sealed class GameFacade : IDisposable
         prev.TrySetResult(true);
     }
     private int _currentTurn = 1;
-    private PhaseStateType _currentPhase = PhaseStateType.PreCombatMain;
+    private StepStateType _currentPhase = StepStateType.PreCombatMain;
     private Player? _currentActivePlayer;
     // Since Slice 3 the phase value already carries the precombat /
     // postcombat distinction (CR 505), so the wire/UI labels need no
     // disambiguation. The turn-level (phase) state is still tracked here,
-    // fed by TurnDriver's TurnStateChangedEvent, for turn-state consumers.
-    private TurnStateType? _currentTurnState;
+    // fed by TurnDriver's PhaseStateChangedEvent, for turn-state consumers.
+    private PhaseStateType? _currentTurnState;
 
     public Guid GameId { get; private set; } = Guid.NewGuid();
 
@@ -317,7 +317,7 @@ public sealed class GameFacade : IDisposable
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<PhaseStartedEvent>(e => { _currentPhase = e.PhaseType; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
-        _bus.Subscribe<TurnStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
+        _bus.Subscribe<PhaseStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
     }
 
     private PriorityLoop BuildPriorityLoop()
@@ -479,7 +479,7 @@ public sealed class GameFacade : IDisposable
             zoneService: _zones,
             agents: agents,
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.PreCombatMain,
+            phaseAccessor: () => StepStateType.PreCombatMain,
             // CR 305.2 — share the facade's per-turn land-drop counter so
             // PlayLandCommand submissions are gated on the same instance
             // a subsequent StartFullGameAsync run also uses.
@@ -1644,7 +1644,7 @@ public sealed class GameFacade : IDisposable
         var type = e.GetType().Name;
         // Snapshot the currently-tracked turn state for the payload builder.
         // Phase labels are already first-class (PreCombatMain / PostCombatMain)
-        // since Slice 3; turn state is carried for TurnStateChangedEvent and
+        // since Slice 3; turn state is carried for PhaseStateChangedEvent and
         // other turn-state consumers.
         var turnState = _currentTurnState;
 

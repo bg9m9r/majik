@@ -80,7 +80,7 @@ public sealed class SuspendedCardRegistry
         _eventBus = eventBus;
         eventBus.Subscribe<StepStartedEvent>(e =>
         {
-            if (e.StepType == PhaseStateType.Upkeep) TickUpkeep(e.Player);
+            if (e.StepType == StepStateType.Upkeep) TickUpkeep(e.Player);
         });
     }
 
