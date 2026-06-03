@@ -118,7 +118,11 @@ public class TriggerManager
     /// <summary>
     /// Register a delayed triggered ability (Rule 603.7). Identical to
     /// <see cref="RegisterTriggeredAbility"/> but the manager will
-    /// auto-unregister the ability after it fires.
+    /// auto-unregister the ability after it fires — UNLESS it is a
+    /// turn-scoped <see cref="RepeatingDelayedTriggeredAbility"/>
+    /// (CR 603.7e), which stays registered across fires and is torn down at
+    /// end-of-turn cleanup via
+    /// <see cref="ExpireTurnScopedDelayedTriggers"/>.
     /// </summary>
     public void RegisterDelayed(DelayedTriggeredAbility ability)
     {
@@ -128,6 +132,24 @@ public class TriggerManager
         }
 
         AddAbility(ability);
+    }
+
+    /// <summary>
+    /// CR 603.7e / CR 514.2 — remove every turn-scoped repeating delayed
+    /// triggered ability ("until end of turn, whenever X happens, do Y").
+    /// Called from <see cref="Majik.Core.Game.TurnDriver"/>'s cleanup step so
+    /// these abilities stop firing once the turn that created them ends. Any
+    /// instance the repeating trigger already queued this turn that has not yet
+    /// been put on the stack is also dropped from the pending queue.
+    /// </summary>
+    public void ExpireTurnScopedDelayedTriggers()
+    {
+        foreach (var ability in _abilities.OfType<RepeatingDelayedTriggeredAbility>().ToList())
+        {
+            RemoveAbility(ability);
+        }
+
+        _pending.RemoveAll(t => t is RepeatingDelayedTriggeredAbility);
     }
 
     /// <summary>
@@ -231,7 +253,13 @@ public class TriggerManager
 
             _pending.Add(ability);
 
-            if (ability is DelayedTriggeredAbility)
+            // CR 603.7 — a one-shot delayed trigger fires exactly once, so it
+            // auto-unregisters here. A turn-scoped REPEATING delayed trigger
+            // (CR 603.7e) STAYS registered and fires again every time its event
+            // recurs; it is torn down only at end-of-turn cleanup via
+            // ExpireTurnScopedDelayedTriggers.
+            if (ability is DelayedTriggeredAbility
+                and not RepeatingDelayedTriggeredAbility)
             {
                 RemoveAbility(ability);
             }

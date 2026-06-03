@@ -13,7 +13,7 @@ namespace Majik.Core.Abilities;
 /// Active in every zone by default — these abilities exist outside the
 /// permanent zone restriction of normal triggers (603.7d).
 /// </summary>
-public sealed class DelayedTriggeredAbility : TriggeredAbility
+public class DelayedTriggeredAbility : TriggeredAbility
 {
     private static readonly IReadOnlySet<ZoneType> AllZones =
         new HashSet<ZoneType>(Enum.GetValues<ZoneType>());

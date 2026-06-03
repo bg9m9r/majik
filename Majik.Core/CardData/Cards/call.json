@@ -1,0 +1,5 @@
+{
+  "name": "Call",
+  "types": ["Sorcery"],
+  "manaCost": "{4}{W}{U}"
+}

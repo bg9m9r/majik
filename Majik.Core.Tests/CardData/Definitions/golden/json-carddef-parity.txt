@@ -2596,6 +2596,105 @@
     "Green"
   ]
 }
+==== beck ====
+{
+  "name": "Beck",
+  "manaCost": "{G}{U}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green"
+  ]
+}
+==== beck-call ====
+{
+  "name": "Beck // Call",
+  "manaCost": "{G}{U}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green",
+    "White"
+  ]
+}
 ==== bedevil ====
 {
   "name": "Bedevil",
@@ -5021,6 +5120,55 @@
   "mdfc": null,
   "colors": [
     "Black"
+  ]
+}
+==== call ====
+{
+  "name": "Call",
+  "manaCost": "{4}{W}{U}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "White"
   ]
 }
 ==== canopy-vista ====

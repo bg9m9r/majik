@@ -1024,5 +1024,10 @@ public sealed class TurnDriver
         // 5. Per-turn replacement shields (Fog, "prevent next N damage")
         // expire alongside the continuous-effect layer.
         _replacements?.ExpireEndOfTurn();
+
+        // 6. CR 603.7e / CR 514.2 — turn-scoped REPEATING delayed triggers
+        // ("until end of turn, whenever X happens, do Y"; e.g. the Beck half
+        // of Beck // Call) stop existing once the turn that created them ends.
+        _triggerManager.ExpireTurnScopedDelayedTriggers();
     }
 }
