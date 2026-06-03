@@ -261,6 +261,112 @@ public class KaitoBaneOfNightmaresFactoryTests
         animate.IsActive().Should().BeFalse("only a creature while it has loyalty counters");
     }
 
+    // -----------------------------------------------------------------------
+    // +1 emblem anthem registers LIVE into the per-game service (CR 114 / 613.7c)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Plus1_RegistersLiveNinjaAnthem_WhenServiceWired()
+    {
+        var effects = new ContinuousEffectsService();
+
+        var kaito = KaitoBaneOfNightmaresFactory.Create(_alice, effects);
+        _alice.Zones.Battlefield.AddCard(kaito);
+        kaito.SetZone(ZoneType.Battlefield);
+
+        // A Ninja Alice controls, before the +1.
+        var ninja = new Creature("Ninja", "{1}{U}", 2, 2,
+            subtypes: new[] { CardSubtype.Ninja });
+        ninja.SetOwner(_alice); ninja.SetController(_alice);
+        ninja.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(ninja);
+        ninja.ActiveEffects = effects;
+
+        ninja.GetPower().Should().Be(2, "before the +1 there is no Ninja anthem");
+
+        kaito.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1).Activate();
+
+        // The emblem exists AND its anthem is live in the service.
+        _alice.Emblems.Should().HaveCount(1);
+        GetRegisteredEffects(effects).OfType<EmblemAnthemEffect>().Should().ContainSingle(
+            "the +1 emblem's \"Ninjas you control get +1/+1\" anthem auto-registers live");
+
+        ninja.GetPower().Should().Be(3, "the live emblem anthem now boosts Alice's Ninja");
+        ninja.GetToughness().Should().Be(3);
+    }
+
+    [Fact]
+    public void Plus1_AnthemDoesNotRegister_WhenNoServiceWired()
+    {
+        var kaito = KaitoBaneOfNightmaresFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(kaito);
+        kaito.SetZone(ZoneType.Battlefield);
+
+        kaito.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1).Activate();
+
+        // Without a service the emblem is still minted (structural), but no
+        // continuous effect to register — and no NRE.
+        _alice.Emblems.Should().HaveCount(1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Animated Kaito's 3/4 surfaces through Compute (CR 613.1c/613.7b, #1720)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Animation_AnimatedKaito_ComputesAs3_4NinjaCreature()
+    {
+        var effects = new ContinuousEffectsService();
+
+        var kaito = KaitoBaneOfNightmaresFactory.Create(
+            _alice,
+            opponentsResolver: null,
+            tapTargetResolver: null,
+            effects: effects,
+            isControllersTurn: () => true,
+            eventBus: null);
+        _alice.Zones.Battlefield.AddCard(kaito);
+        kaito.SetZone(ZoneType.Battlefield);
+
+        // During Alice's turn with loyalty > 0 ⇒ the Layer-4 Creature grant +
+        // Layer-7b 3/4 set-base are active; the #1720 creature-row upgrade
+        // re-seeds this Planeswalker instance as a creature row.
+        var chars = effects.Compute(kaito);
+
+        chars.Should().BeOfType<CreatureCharacteristics>(
+            "the Layer-4 Ninja-creature grant upgrades the row (CR 613.1c)");
+        chars.Types.Should().Contain(CardType.Creature);
+        chars.Types.Should().Contain(CardType.Planeswalker, "still a planeswalker (additive)");
+        chars.Subtypes.Should().Contain(CardSubtype.Ninja);
+
+        var cc = (CreatureCharacteristics)chars;
+        cc.Power.Should().Be(3, "Kaito's 3/4 set-base surfaces through Compute");
+        cc.Toughness.Should().Be(4);
+    }
+
+    [Fact]
+    public void Animation_KaitoNotAnimated_WhenNotControllersTurn_ComputesAsNonCreatureRow()
+    {
+        var effects = new ContinuousEffectsService();
+
+        var kaito = KaitoBaneOfNightmaresFactory.Create(
+            _alice,
+            opponentsResolver: null,
+            tapTargetResolver: null,
+            effects: effects,
+            isControllersTurn: () => false, // opponent's turn ⇒ not animated
+            eventBus: null);
+        _alice.Zones.Battlefield.AddCard(kaito);
+        kaito.SetZone(ZoneType.Battlefield);
+
+        var chars = effects.Compute(kaito);
+
+        chars.Should().NotBeOfType<CreatureCharacteristics>(
+            "outside your turn Kaito is not a creature (no P/T row)");
+        chars.Types.Should().NotContain(CardType.Creature);
+        chars.Types.Should().Contain(CardType.Planeswalker);
+    }
+
     private static IEnumerable<ContinuousEffect> GetRegisteredEffects(ContinuousEffectsService svc)
     {
         var field = typeof(ContinuousEffectsService).GetField(
