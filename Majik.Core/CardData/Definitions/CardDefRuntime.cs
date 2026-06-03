@@ -1102,6 +1102,7 @@ public static class CardDefRuntime
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainControlEffectDef control => BuildGainControlEffect(control, card, controller, targetRequestIndex, continuous),
             FightEffectDef fight => BuildFightEffect(fight, card, targetRequestIndex),
+            ExploreSelfEffectDef exploreSelf => BuildExploreSelfEffect(exploreSelf, card, controller),
             ExploreTargetEffectDef explore => BuildExploreTargetEffect(explore, card, targetRequestIndex),
             PumpTargetEffectDef pump => BuildPumpTargetEffect(pump, card, targetRequestIndex),
             GrantKeywordUntilEotTargetEffectDef grant => BuildGrantKeywordUntilEotTargetEffect(grant, card, targetRequestIndex),
@@ -1276,6 +1277,40 @@ public static class CardDefRuntime
                     Fx.MoveToExile(target);
                 }
                 return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildExploreSelfEffect(
+        ExploreSelfEffectDef def, ICard card, Player controller)
+    {
+        // CR 701.40 — the self explore verb. The exploring permanent is the
+        // ability's source; it explores Count times in sequence (Count: 2 =
+        // Jadelight Ranger's "explores, then it explores again"). The +1/+1
+        // counter (non-land branch, CR 701.40c) lands on the source itself, and
+        // a CreatureExploredEvent is published per explore so "Whenever a
+        // creature you control explores" payoffs fire (CR 701.40e). Resolution
+        // re-resolves the source's live controller (a control change since the
+        // ability was put on the stack carries, CR 701.40a). This is the
+        // declarative form of the shared ExploreEtb body (PR #2237) — the SAME
+        // ExploreAction primitive Seekers' Squire / Merfolk Branchwalker run.
+        var count = Math.Max(1, def.Count);
+        return new Effect(
+            count == 1 ? $"{card.Name}: explores" : $"{card.Name}: explores {count}x",
+            async ctx =>
+            {
+                var explorerController = (card as Permanent)?.Controller ?? controller;
+                for (var i = 0; i < count; i++)
+                {
+                    await Majik.Core.Keywords.ExploreAction.ExploreAsync(
+                        creature: card,
+                        controller: explorerController,
+                        agent: ctx.Agent ?? AgentRegistry.Get(explorerController),
+                        game: ctx.Game,
+                        replacements: null,
+                        eventBus: null,
+                        zones: ZoneServiceRegistry.Get(explorerController),
+                        ct: ctx.Ct).ConfigureAwait(false);
+                }
             });
     }
 
