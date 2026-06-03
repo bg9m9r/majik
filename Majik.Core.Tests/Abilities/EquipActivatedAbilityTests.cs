@@ -43,11 +43,13 @@ public class EquipActivatedAbilityTests : IDisposable
     public EquipActivatedAbilityTests()
     {
         ZeroEquipCostEffect.ResetForTests();
+        EquipCostReductionEffect.ResetForTests();
     }
 
     public void Dispose()
     {
         ZeroEquipCostEffect.ResetForTests();
+        EquipCostReductionEffect.ResetForTests();
     }
 
     // -----------------------------------------------------------------------
@@ -348,6 +350,103 @@ public class EquipActivatedAbilityTests : IDisposable
 
         _alice.AddManaToPool(ManaCost.Parse("{1}"));
         mana.CanPay(_alice).Should().BeTrue("{8} pays {8}");
+    }
+
+    // -----------------------------------------------------------------------
+    // Fervent-Champion-style per-target equip-cost reduction (CR 117.7)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void CostProvider_EquipTargetsReducerCreature_ReducesGenericPortion()
+    {
+        // Fervent Champion: an equip ability that TARGETS this creature costs
+        // {3} less. Stand up a creature with the reducer registered for it,
+        // then point an Equip {8} ability at that creature → effective {5}.
+        var champ = new Creature("Fervent Stand-In", "{R}", 1, 1)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(champ);
+        new EquipCostReductionEffect(source: champ, target: champ, eventBus: null).Attach();
+
+        var hammer = ColossusHammerFactory.Create(_alice); // Equip {8}
+        hammer.Zone = ZoneType.Battlefield;
+        _alice.Zones.Battlefield.AddCard(hammer);
+
+        var equip = hammer.Abilities.OfType<EquipActivatedAbility>().Single();
+        equip.SetChosenTargets(new[] { new object[] { champ } });
+
+        var mana = equip.Costs.OfType<ManaCostCost>().Single();
+
+        // {5} pays; {4} does not — proves printed {8} - {3} = {5}.
+        _alice.AddManaToPool(ManaCost.Parse("{4}"));
+        mana.CanPay(_alice).Should().BeFalse("{4} < reduced {5}");
+        _alice.AddManaToPool(ManaCost.Parse("{1}"));
+        mana.CanPay(_alice).Should().BeTrue("Equip {8} reduced by {3} = {5}");
+    }
+
+    [Fact]
+    public void CostProvider_EquipTargetsOtherCreature_KeepsPrintedCost()
+    {
+        // The reducer is keyed on a SPECIFIC creature ("that target THIS
+        // creature"). Targeting a different creature → no reduction.
+        var champ = new Creature("Fervent Stand-In", "{R}", 1, 1)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var other = new Creature("Grizzly Bears", "1G", 2, 2)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(champ);
+        _alice.Zones.Battlefield.AddCard(other);
+        new EquipCostReductionEffect(source: champ, target: champ, eventBus: null).Attach();
+
+        var jitte = UmezawasJitteFactory.Create(_alice); // Equip {2}
+        jitte.Zone = ZoneType.Battlefield;
+        _alice.Zones.Battlefield.AddCard(jitte);
+
+        var equip = jitte.Abilities.OfType<EquipActivatedAbility>().Single();
+        equip.SetChosenTargets(new[] { new object[] { other } });
+
+        var mana = equip.Costs.OfType<ManaCostCost>().Single();
+        _alice.AddManaToPool(ManaCost.Parse("{1}"));
+        mana.CanPay(_alice).Should().BeFalse(
+            "reducer keyed on champ; equipping a different creature pays the printed {2}");
+    }
+
+    [Fact]
+    public void CostProvider_Reduction_PreservesColoredPips_AndFloorsAtZero()
+    {
+        // Cori-Steel Cutter is Equip {1}{R}. Reduced by {3}: the {1} generic
+        // is removed (floor at 0), the {R} pip survives (CR 117.7c).
+        var champ = new Creature("Fervent Stand-In", "{R}", 1, 1)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(champ);
+        new EquipCostReductionEffect(source: champ, target: champ, eventBus: null).Attach();
+
+        var cori = CoriSteelCutterFactory.Create(_alice);
+        cori.Zone = ZoneType.Battlefield;
+        _alice.Zones.Battlefield.AddCard(cori);
+
+        var equip = cori.Abilities.OfType<EquipActivatedAbility>().Single();
+        equip.SetChosenTargets(new[] { new object[] { champ } });
+
+        var mana = equip.Costs.OfType<ManaCostCost>().Single();
+        // Only {R} needed — the {1} generic was reduced away.
+        _alice.AddManaToPool(ManaCost.Parse("{R}"));
+        mana.CanPay(_alice).Should().BeTrue(
+            "Equip {1}{R} - {3} = {R}: generic floored to 0, coloured pip preserved");
     }
 
     // -----------------------------------------------------------------------
