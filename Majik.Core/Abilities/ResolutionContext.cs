@@ -1,6 +1,8 @@
+using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Abilities;
 
@@ -32,6 +34,31 @@ public sealed record ResolutionContext(
         Array.Empty<IReadOnlyList<object>>();
 
     /// <summary>
+    /// CR 608.2g — LAST-KNOWN-information snapshot of each chosen target slot's
+    /// controller, captured at resolution START (before any effect mutates the
+    /// game). Keyed by slot index; only slots whose [0] pick was a
+    /// battlefield <see cref="Permanent"/> at resolution start are recorded
+    /// (with that permanent's controller), so a target that left in response
+    /// records nothing and any rider keyed on it fizzles (CR 608.2b).
+    ///
+    /// <para>
+    /// This exists for SHARED-SLOT riders on the ABILITY path — the "its
+    /// controller loses N life" half of a Vapor-Snag-style bounce, where the
+    /// host (bounce) runs FIRST in printed order and moves the shared target
+    /// off the battlefield, so a naive resolution-time controller read by the
+    /// rider would see the post-bounce zone. Reading this snapshot is the
+    /// ability-path analogue of the SPELL bridge's pre-host snapshot
+    /// (<c>CardDefRuntime.BuildLoseLifeRiderSnapshot</c>). Players target
+    /// themselves and need no snapshot.
+    /// </para>
+    /// </summary>
+    public IReadOnlyDictionary<int, Player> SharedSlotControllers { get; private init; } =
+        EmptySharedSlot;
+
+    private static readonly IReadOnlyDictionary<int, Player> EmptySharedSlot =
+        new Dictionary<int, Player>();
+
+    /// <summary>
     /// Context for the legacy synchronous execution path — no controller,
     /// agent, game or chosen targets. Used by <see cref="IEffect.Execute"/>
     /// and any caller that re-runs a self-contained sync effect without a
@@ -52,5 +79,33 @@ public sealed record ResolutionContext(
         GameContext? game,
         IReadOnlyList<IReadOnlyList<object>>? chosenTargets,
         CancellationToken ct = default)
-        => new(controller, agent, game, chosenTargets ?? EmptyTargets, ct);
+    {
+        var targets = chosenTargets ?? EmptyTargets;
+        return new(controller, agent, game, targets, ct)
+        {
+            SharedSlotControllers = SnapshotSharedSlotControllers(targets),
+        };
+    }
+
+    /// <summary>CR 608.2g — capture each chosen slot's controller NOW (resolution
+    /// start), while every still-legal targeted permanent is on the battlefield,
+    /// so a shared-slot rider that resolves AFTER its host moved the target reads
+    /// the pre-host controller. Only battlefield permanents are recorded.</summary>
+    private static IReadOnlyDictionary<int, Player> SnapshotSharedSlotControllers(
+        IReadOnlyList<IReadOnlyList<object>> targets)
+    {
+        Dictionary<int, Player>? snapshot = null;
+        for (var i = 0; i < targets.Count; i++)
+        {
+            var slot = targets[i];
+            if (slot.Count == 0) continue;
+            if (slot[0] is Permanent permanent
+                && permanent.Zone == ZoneType.Battlefield
+                && permanent.Controller is { } controller)
+            {
+                (snapshot ??= new Dictionary<int, Player>())[i] = controller;
+            }
+        }
+        return snapshot ?? EmptySharedSlot;
+    }
 }
