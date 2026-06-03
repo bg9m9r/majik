@@ -20,6 +20,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(AtBeginningOfYourUpkeepTriggerDef), "at_beginning_of_your_upkeep")]
 [JsonDerivedType(typeof(AtBeginningOfYourEndStepTriggerDef), "at_beginning_of_your_end_step")]
 [JsonDerivedType(typeof(WheneverAnotherCreatureEntersTriggerDef), "whenever_another_creature_enters")]
+[JsonDerivedType(typeof(WheneverAnotherCreatureDiesTriggerDef), "whenever_another_creature_dies")]
 [JsonDerivedType(typeof(DealsCombatDamageToPlayerSelfTriggerDef), "whenever_this_deals_combat_damage_to_a_player")]
 [JsonDerivedType(typeof(WheneverACreatureYouControlExploresTriggerDef), "whenever_a_creature_you_control_explores")]
 public abstract class TriggerDefinition
@@ -186,6 +187,77 @@ public sealed class WheneverAnotherCreatureEntersTriggerDef : TriggerDefinition
     /// <summary>Restrict to creatures entering under the trigger controller
     /// (CR 109.5). Default <c>false</c> = any creature entering.</summary>
     public bool YouControlOnly { get; set; }
+
+    /// <summary>
+    /// Optional subtype/tribal gate (CR 205.3 / 700.4) — only a creature whose
+    /// (printed) subtypes include this one fires the trigger. <c>null</c>/empty
+    /// = no subtype restriction. Parsed as
+    /// <see cref="Majik.Core.Cards.Types.CardSubtype"/>. Models the
+    /// "another Warrior you control enters" gate (Mardu Woe-Reaper).
+    /// </summary>
+    public string? Subtype { get; set; }
+
+    /// <summary>
+    /// When <c>true</c>, the source permanent's OWN entry also fires the
+    /// trigger (CR 603.6e), modelling the "this creature OR another [Warrior]
+    /// you control enters" wording (Mardu Woe-Reaper). Default <c>false</c> =
+    /// "ANOTHER creature" only (self excluded), the Soul Warden shape.
+    /// </summary>
+    public bool IncludeSelf { get; set; }
+}
+
+/// <summary>
+/// "Whenever another creature [you control] dies, …" (CR 603.6e / CR 700.4) —
+/// the aristocrat death-payoff mirror of
+/// <see cref="WheneverAnotherCreatureEntersTriggerDef"/>. Fires on a
+/// Battlefield → Graveyard move of a creature OTHER than this permanent, over
+/// <see cref="Majik.Core.Events.CardMovedEvent"/>. The "another creature"
+/// self-exclusion distinguishes it from <see cref="DiesSelfTriggerDef"/>.
+///
+/// <para>
+/// Optional, composable filters:
+/// <list type="bullet">
+///   <item><see cref="YouControlOnly"/> (CR 109.5) — restrict to a creature
+///   whose controller is the trigger's controller (resolved live so a control
+///   change carries the trigger). Models the Zulaport Cutthroat / Midnight
+///   Reaper "creature you control dies" family; <c>false</c> (default) = ANY
+///   creature dying (Blood Artist).</item>
+///   <item><see cref="NontokenOnly"/> (CR 111 / 700.4) — exclude token
+///   creatures (a token ceases to exist as an SBA after dying, CR 111.7).
+///   Models the Midnight Reaper "nontoken creature you control dies"
+///   shape.</item>
+///   <item><see cref="Subtype"/> — tribal gate; only a creature of the given
+///   subtype fires it.</item>
+/// </list>
+/// </para>
+///
+/// Overrides <see cref="TriggerDefinition.ActiveZones"/> to include the
+/// Graveyard so the ability is still observable after
+/// <see cref="Majik.Core.Zones.ZoneService"/> stamps the death — including the
+/// source's OWN death when <see cref="YouControlOnly"/> means the source
+/// counts (CR 603.6c — same posture as the hand-rolled Blood Artist /
+/// Zulaport Cutthroat factories).
+/// </summary>
+public sealed class WheneverAnotherCreatureDiesTriggerDef : TriggerDefinition
+{
+    private static readonly IReadOnlyList<ZoneType> BattlefieldAndGraveyard =
+        new[] { ZoneType.Battlefield, ZoneType.Graveyard };
+
+    /// <summary>Restrict to creatures whose controller is the trigger
+    /// controller (CR 109.5). Default <c>false</c> = any creature dying.</summary>
+    public bool YouControlOnly { get; set; }
+
+    /// <summary>Exclude token creatures (CR 111 / 111.7). Default
+    /// <c>false</c>.</summary>
+    public bool NontokenOnly { get; set; }
+
+    /// <summary>Optional subtype/tribal gate (CR 205.3). <c>null</c>/empty =
+    /// no subtype restriction. Parsed as
+    /// <see cref="Majik.Core.Cards.Types.CardSubtype"/>.</summary>
+    public string? Subtype { get; set; }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndGraveyard;
 }
 
 /// <summary>

@@ -884,6 +884,8 @@ public static class CardDefRuntime
                 BuildStepBeginTrigger(card, Majik.Core.StateMachine.PhaseStateType.End),
             WheneverAnotherCreatureEntersTriggerDef anotherEnters =>
                 BuildAnotherCreatureEntersTrigger(anotherEnters, card),
+            WheneverAnotherCreatureDiesTriggerDef anotherDies =>
+                BuildAnotherCreatureDiesTrigger(anotherDies, card),
             DealsCombatDamageToPlayerSelfTriggerDef =>
                 BuildDealsCombatDamageToPlayerSelfTrigger(card),
             WheneverACreatureYouControlExploresTriggerDef =>
@@ -942,11 +944,47 @@ public static class CardDefRuntime
         WheneverAnotherCreatureEntersTriggerDef def, ICard card)
     {
         var youControlOnly = def.YouControlOnly;
+        var includeSelf = def.IncludeSelf;
+        var subtype = ParseOptionalSubtype(def.Subtype);
         return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
         {
             if (e.ToZone != ZoneType.Battlefield) return false;
             if (!e.Card.HasType(CardType.Creature)) return false;
+            // "ANOTHER creature" excludes the source unless includeSelf models
+            // "this creature OR another …" (CR 603.6e — Mardu Woe-Reaper).
+            if (!includeSelf && ReferenceEquals(e.Card, card)) return false;
+            if (subtype is not null && !e.Card.HasSubtype(subtype.Value)) return false;
+            if (!youControlOnly) return true;
+            var controller = card.Controller;
+            return controller is not null
+                && ReferenceEquals(e.Card.Controller, controller);
+        });
+    }
+
+    /// <summary>
+    /// CR 603.6e / CR 700.4 — "Whenever another creature [you control] dies, …".
+    /// The aristocrat death-payoff mirror of
+    /// <see cref="BuildAnotherCreatureEntersTrigger"/>. Fires on a
+    /// <see cref="Majik.Core.Events.CardMovedEvent"/> Battlefield → Graveyard
+    /// of a creature OTHER than this permanent, with the optional youControlOnly
+    /// (CR 109.5, resolved live) / nontokenOnly (CR 111.7) / subtype (CR 205.3)
+    /// filters AND-composed — the same predicate the hand-rolled Blood Artist /
+    /// Zulaport Cutthroat / Midnight Reaper factories use.
+    /// </summary>
+    private static ITriggerCondition BuildAnotherCreatureDiesTrigger(
+        WheneverAnotherCreatureDiesTriggerDef def, ICard card)
+    {
+        var youControlOnly = def.YouControlOnly;
+        var nontokenOnly = def.NontokenOnly;
+        var subtype = ParseOptionalSubtype(def.Subtype);
+        return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+        {
+            if (e.FromZone != ZoneType.Battlefield) return false;
+            if (e.ToZone != ZoneType.Graveyard) return false;
+            if (!e.Card.HasType(CardType.Creature)) return false;
             if (ReferenceEquals(e.Card, card)) return false;
+            if (nontokenOnly && e.Card is Permanent { IsToken: true }) return false;
+            if (subtype is not null && !e.Card.HasSubtype(subtype.Value)) return false;
             if (!youControlOnly) return true;
             var controller = card.Controller;
             return controller is not null
@@ -1938,4 +1976,9 @@ public static class CardDefRuntime
         Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s)
             ? s
             : throw new ArgumentException($"Unknown card subtype '{raw}'.", nameof(raw));
+
+    /// <summary>Parse an optional subtype/tribal filter — <c>null</c> or empty
+    /// means "no subtype restriction" (returns <c>null</c>).</summary>
+    private static CardSubtype? ParseOptionalSubtype(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? null : ParseSubtype(raw);
 }
