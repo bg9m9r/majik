@@ -1,101 +1,99 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Conspicuous Snoop (Jumpstart, {R}).
+/// Named-card factory for Conspicuous Snoop (Jumpstart, {R}{R}).
 ///
-/// Creature — Goblin Rogue 1/1. Oracle text:
+/// Creature — Goblin Rogue 2/2. Oracle text:
 ///   "Play with the top card of your library revealed.
-///    You may cast the top card of your library if it's a Goblin card.
-///    Conspicuous Snoop has all activated abilities of the top card of
-///    your library if that card's a Goblin card. (You still pay their costs.)"
+///    You may cast Goblin spells from the top of your library.
+///    As long as the top card of your library is a Goblin card, this creature
+///    has all activated abilities of that card."
 ///
-/// ## Implemented (v1 — simplified)
-/// Snoop's full oracle interleaves three continuous effects that operate
-/// off the top card of the controller's library. The engine's existing
-/// continuous-effects layering, "play from a zone other than hand"
-/// permission system, and "copy abilities from another card" Layer 6
-/// primitives are not yet wired to the data side (no "may play from
-/// library" primitive exists today — confirmed via grep over
-/// Majik.Core/Rules + Majik.Core/Services). Rather than block Goblin
-/// tribal coverage on those infrastructure pieces, v1 ships the card
-/// shape with three <see cref="StaticAbility"/> entries describing the
-/// oracle text and a <see cref="LookAtTopOfLibrary"/> helper for the
-/// "revealed top of library" semantics. Each static ability carries its
-/// printed description so audits, dispatcher tests, and bot decision
-/// surfaces see Snoop as a three-rider Goblin lord without the live
-/// continuous-effect wiring.
+/// ## Implemented
+/// - <b>You may cast Goblin spells from the top of your library</b>
+///   (CR 601.3e): the bus-aware <see cref="Create(Player, IEventBus)"/> overload
+///   attaches a <see cref="LibraryTopPlayStaticEffect"/> registering a
+///   <see cref="TopPlayFilter.Creatures"/> + reveal-top grant whose
+///   <c>extraPredicate</c> demands the top card be a Goblin
+///   (<see cref="IsGoblinCard"/>), while Snoop is on the battlefield (revoked on
+///   leave, CR 603.6e). When the controller's top library card is a Goblin
+///   creature they may cast it from the library: the card goes onto the stack
+///   via <see cref="Majik.Core.Game.SpellCastFlow"/> (which moves a card from
+///   whatever zone it occupies onto the stack, stamps the "cast from library"
+///   sentinel, and now authorizes the cast against this grant, CR 601.3e).
+/// - <b>Card shape</b> with three description-only <see cref="StaticAbility"/>
+///   riders carrying their printed text (audit / dispatch / bot surfaces) plus
+///   the <see cref="LookAtTopOfLibrary"/> peek helper.
 ///
-/// What ships:
-/// - 1/1 Creature — Goblin Rogue at {R}, owner/controller wired.
-/// - Three description-only <see cref="StaticAbility"/> entries
-///   corresponding to the three oracle clauses. Each is active only on
-///   the battlefield (CR 604.1 — static abilities function while the
-///   permanent is on the battlefield).
-/// - <see cref="LookAtTopOfLibrary"/> helper exposes Snoop's "play with
-///   the top card of your library revealed" effect as a controller-side
-///   peek — returns the top card or null when the library is empty.
-///   Mirrors how other "top-card visibility" cards (Future Sight, Magus
-///   of the Future, Lurrus etiquette gates) expose the peek without
-///   plumbing it through an agent-prompt.
-///
-/// What's deferred (v1 gaps — documented):
-/// - <b>Top of library revealed</b>: today the engine doesn't publicly
-///   broadcast top-card visibility through the event bus / agent layer.
-///   The static ability description is wired so audits see it, but
-///   opponents' agents won't see Snoop's top card as a public reveal —
-///   only controller-side <see cref="LookAtTopOfLibrary"/> works.
-/// - <b>May cast top of library if Goblin</b>: there is no
-///   "MayPlayFromLibrary" primitive in the engine (verified via grep).
-///   This needs a cast-from-zone permission infrastructure pass (similar
-///   to <see cref="EscapeAlternativeCost"/>'s zone-of-origin gate, but
-///   for a continuous "permission to cast" rather than per-cast
-///   alternative-cost wiring). Same gap blocks Bolas's Citadel, Magus of
-///   the Future, Vivien, Champion of the Wilds, etc.
-/// - <b>Has all activated abilities of top if Goblin</b>: needs Layer 6
-///   <c>GrantAbilityEffect</c> dynamic-source plumbing — copy ability list
-///   from a non-self card and re-target each ability's <c>source</c> /
-///   <c>controller</c> to Snoop. Engine has <see cref="LordStaticEffect"/>
-///   for keyword grants (Goblin Warchief / Goblin Chieftain) but no
-///   activated-ability copy. Same gap blocks Vesuvan Doppelganger,
-///   Mirrorpool, etc.
-///
-/// Per the project's coverage-strategy memo, shipping the card shape with
-/// documented gaps unblocks downstream tribal coverage (Goblin lord audits
-/// can reference Snoop as present in the pool) while leaving the
-/// infrastructure work to a follow-up. Same posture as
-/// <see cref="GoblinPiledriverFactory"/>'s "live combat-attackers
-/// provider" deferral.
+/// ## Deferred (v1 gaps — documented)
+/// - <b>Top of library revealed</b> as an opponent-facing public reveal:
+///   modelled as the registry's reveal-top rider (controller-side); the engine
+///   doesn't yet broadcast top-card visibility to opponents.
+/// - <b>Has all activated abilities of the top Goblin card</b>: needs the Layer
+///   6 dynamic activated-ability-copy primitive (copy the ability list off a
+///   non-self card and re-source each to Snoop) — same gap as Vesuvan
+///   Doppelganger. Kept as a description-only rider.
+/// - <b>Noncreature Goblin spells</b> (e.g. a Goblin instant/sorcery on top):
+///   the grant is keyed on <see cref="TopPlayFilter.Creatures"/>, so it
+///   currently authorizes only creature Goblin cards (the common case). A
+///   Goblin noncreature on top is not yet castable from the top.
 /// </summary>
 [CardName("Conspicuous Snoop")]
 public static class ConspicuousSnoopFactory
 {
     public const string CardName = "Conspicuous Snoop";
-    public const string PrintedManaCost = "{R}";
-    public const int Power = 1;
-    public const int Toughness = 1;
+    public const string PrintedManaCost = "{R}{R}";
+    public const int Power = 2;
+    public const int Toughness = 2;
 
     public const string PlayRevealedDescription =
         "Play with the top card of your library revealed.";
 
     public const string MayCastGoblinDescription =
-        "You may cast the top card of your library if it's a Goblin card.";
+        "You may cast Goblin spells from the top of your library.";
 
     public const string CopyActivatedAbilitiesDescription =
-        "Conspicuous Snoop has all activated abilities of the top card of your library if that card's a Goblin card. (You still pay their costs.)";
+        "As long as the top card of your library is a Goblin card, this creature has all activated abilities of that card.";
 
     /// <summary>
-    /// Construct Conspicuous Snoop. The three oracle riders are attached
-    /// as description-only <see cref="StaticAbility"/> entries (active on
-    /// the battlefield only per CR 604.1) — see class doc for the v1
-    /// scope vs. deferred items.
+    /// Construct Conspicuous Snoop with no live bus wiring. The three oracle
+    /// riders are attached as description-only <see cref="StaticAbility"/>
+    /// entries (CR 604.1); the live "cast Goblin spells from the top" grant is
+    /// NOT registered (use the <see cref="Create(Player, IEventBus)"/> overload).
+    /// Suitable for shape / dispatch tests.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware build — the overload the production
+    /// <c>NamedCardFactory.CreateGeneratedWithEffects</c> dispatch invokes.
+    /// When <paramref name="continuousEffects"/> carries an event bus, the
+    /// cast-Goblin-spells-from-top grant is registered (and revoked) as Snoop
+    /// enters / leaves the battlefield. Mirrors Mystic Forge's production-routing
+    /// overload so the permission is genuinely live in a real match.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? continuousEffects)
+        => Create(owner, continuousEffects?.EventBus);
+
+    /// <summary>
+    /// Construct Conspicuous Snoop. The three oracle riders are attached as
+    /// description-only <see cref="StaticAbility"/> entries (active on the
+    /// battlefield only per CR 604.1). When <paramref name="eventBus"/> is
+    /// supplied, a <see cref="LibraryTopPlayStaticEffect"/> registers the
+    /// "may cast Goblin spells from the top, revealed" grant (CR 601.3e /
+    /// CR 715.4) while Snoop is on the battlefield. See class doc for the
+    /// deferred copy-abilities clause.
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -110,8 +108,7 @@ public static class ConspicuousSnoopFactory
         card.SetController(owner);
 
         // CR 604.1 — static abilities. Three riders, each with its printed
-        // description for audit / bot-surface visibility. No live
-        // continuous-effect wiring yet (see class doc). IsActiveCheck
+        // description for audit / bot-surface visibility. IsActiveCheck
         // defaults to "active on the battlefield" via StaticAbility's
         // permanent-on-battlefield convention.
         card.AddAbility(new StaticAbility(
@@ -129,8 +126,28 @@ public static class ConspicuousSnoopFactory
             controller: owner,
             description: CopyActivatedAbilitiesDescription));
 
+        // CR 601.3e / CR 715.4 — live "cast Goblin spells from the top,
+        // revealed" grant, battlefield-gated. A Creatures-filter grant whose
+        // extra predicate also demands the top card be a Goblin.
+        if (eventBus != null)
+        {
+            var lifecycle = new LibraryTopPlayStaticEffect(
+                source: card,
+                controller: owner,
+                filter: TopPlayFilter.Creatures,
+                eventBus: eventBus,
+                revealsTop: true,
+                extraPredicate: IsGoblinCard);
+            lifecycle.Attach();
+        }
+
         return card;
     }
+
+    /// <summary>True if <paramref name="card"/> is a Goblin card — the cast
+    /// gate for Snoop's "cast Goblin spells from the top" grant.</summary>
+    public static bool IsGoblinCard(ICard card) =>
+        card != null && card.HasSubtype(CardSubtype.Goblin);
 
     /// <summary>
     /// Helper exposing Snoop's "play with the top card of your library

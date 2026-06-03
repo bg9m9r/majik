@@ -61,6 +61,81 @@ public class SpellCastFlowPermissionTests
     }
 
     [Fact]
+    public async Task TopOfLibraryNonland_WithNoGrant_Throws()
+    {
+        // CR 601.3e — a spell may be cast from the top of the library ONLY
+        // while a continuous effect grants that permission. With no grant
+        // registered, attempting to cast the top library card must be rejected
+        // by SpellCastFlow (the cast-source authorization seam) — otherwise any
+        // caller could move an arbitrary library card to the stack.
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var creature = new Creature("Goblin Bear", "{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(creature);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+
+        var act = async () => await _flow.CastAsync(_alice, creature,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*top of your library*");
+        _stack.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TopOfLibraryNonland_WithMatchingGrant_CastsOntoStack()
+    {
+        // CR 601.3e — with an Any (Bolas's Citadel-style) grant registered for
+        // the controller, casting the top library card is authorized: it moves
+        // Library → Stack and is marked cast-from-library.
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var creature = new Creature("Goblin Bear", "{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(creature);
+        Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
+            new object(), _alice, Majik.Core.Rules.TopPlayFilter.Any);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var spell = await _flow.CastAsync(_alice, creature,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        _stack.Count.Should().Be(1);
+        creature.Zone.Should().Be(ZoneType.Stack);
+        spell.WasCastFromLibrary.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TopOfLibraryNonland_NotTheTopCard_Throws()
+    {
+        // CR 601.3e — only the TOP card is a legal cast source even under a
+        // grant. A nonland buried below the top is not castable.
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var topLand = new Sorcery("Filler", "{1}") { Owner = _alice, Zone = ZoneType.Library };
+        var buried = new Creature("Goblin Bear", "{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(topLand);  // top
+        _alice.Zones.Library.AddCard(buried);   // second
+        Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
+            new object(), _alice, Majik.Core.Rules.TopPlayFilter.Any);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+
+        var act = async () => await _flow.CastAsync(_alice, buried,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*top of your library*");
+    }
+
+    [Fact]
     public async Task XSpell_PromptsForX_PaysGenericOnTop()
     {
         var fireball = new Instant("Fireball", "R") { Owner = _alice, Zone = ZoneType.Hand };

@@ -302,6 +302,24 @@ public sealed class SpellCastFlow
             throw new InvalidOperationException($"Cannot cast {card.Name}: {reason}");
         }
 
+        // CR 601.3e — cast-from-top-of-library authorization. A spell is being
+        // cast from the library ONLY because a continuous effect granted that
+        // permission (Mystic Forge, Bolas's Citadel, Conspicuous Snoop, the
+        // Augur of Autumn Coven clause, Oracle of Mul Daya, …). Verify the live
+        // grant authorizes THIS card BEFORE any zone mutation, so an arbitrary
+        // library card can never be moved to the stack. Alt-cost casts carry
+        // their own zone permission (Suspend / Foretell move the card from
+        // Exile, not the library) and bypass this check; a plain library cast
+        // must be backed by a registered grant.
+        if (alternativeCost == null
+            && card.Zone == ZoneType.Library
+            && !Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(caster, card))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: no effect lets you cast it from the "
+                + "top of your library (CR 601.3e).");
+        }
+
         // Alternative cost legality check (CR 118.9 — zone restriction etc.).
         if (alternativeCost != null && !alternativeCost.CanCastFor(card, caster))
         {

@@ -33,6 +33,8 @@ public sealed class LibraryTopPlayStaticEffect
     private readonly TopPlayFilter _filter;
     private readonly bool _revealsTop;
     private readonly IEventBus? _eventBus;
+    private readonly Func<bool>? _activeCondition;
+    private readonly Func<ICard, bool>? _extraPredicate;
     private readonly Action<CardMovedEvent> _handler;
     private readonly object _token = new();
     private bool _attached;
@@ -50,18 +52,32 @@ public sealed class LibraryTopPlayStaticEffect
     /// null — Attach still syncs once against the source's current zone.</param>
     /// <param name="revealsTop">Whether the source also plays with the top card
     /// revealed (CR 715.4). Default true.</param>
+    /// <param name="activeCondition">Optional board-state gate that must hold
+    /// for the grant to be live, in ADDITION to the source being on the
+    /// battlefield — e.g. Augur of Autumn's Coven clause ("as long as you
+    /// control three or more creatures with different powers"). When supplied,
+    /// the lifecycle re-evaluates it on EVERY zone-move event (not just the
+    /// source's own), since other permanents entering / leaving can flip the
+    /// condition. Null means "no extra condition".</param>
+    /// <param name="extraPredicate">Optional per-card restriction passed through
+    /// to the registry grant — e.g. Conspicuous Snoop's "Goblin card" gate on
+    /// its creature-cast grant. Null means "no per-card restriction".</param>
     public LibraryTopPlayStaticEffect(
         Permanent source,
         Player controller,
         TopPlayFilter filter,
         IEventBus? eventBus,
-        bool revealsTop = true)
+        bool revealsTop = true,
+        Func<bool>? activeCondition = null,
+        Func<ICard, bool>? extraPredicate = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _filter = filter;
         _revealsTop = revealsTop;
         _eventBus = eventBus;
+        _activeCondition = activeCondition;
+        _extraPredicate = extraPredicate;
         _handler = OnEvent;
     }
 
@@ -91,17 +107,23 @@ public sealed class LibraryTopPlayStaticEffect
 
     private void OnEvent(CardMovedEvent e)
     {
-        // Only the source moving in/out of the battlefield changes the grant.
-        if (!ReferenceEquals(e.Card, _source)) return;
+        // The source moving in/out of the battlefield always changes the grant.
+        // When a board-state activeCondition gates the grant (Coven), ANY
+        // permanent's zone move can flip the condition, so re-sync on every
+        // move event in that case.
+        if (_activeCondition == null && !ReferenceEquals(e.Card, _source)) return;
         Sync();
     }
 
     private void Sync()
     {
-        if (_source.Zone == ZoneType.Battlefield)
+        var live = _source.Zone == ZoneType.Battlefield
+            && (_activeCondition == null || _activeCondition());
+        if (live)
         {
             if (_registered) return;
-            LibraryTopPlayPermissions.AddGrant(_token, _controller, _filter, _revealsTop);
+            LibraryTopPlayPermissions.AddGrant(
+                _token, _controller, _filter, _revealsTop, _extraPredicate);
             _registered = true;
         }
         else

@@ -82,8 +82,11 @@ public static class LibraryTopPlayPermissions
     /// <summary>Per-game store: the token-keyed grant list and its lock.</summary>
     public sealed class Store
     {
-        // Each entry: (token, controller, filter, revealsTop).
-        internal readonly List<(object Token, Player Controller, TopPlayFilter Filter, bool RevealsTop)> Grants = new();
+        // Each entry: (token, controller, filter, revealsTop, extraPredicate).
+        // extraPredicate (nullable) ANDs an extra per-card restriction on top of
+        // the type filter — e.g. Conspicuous Snoop's "Goblin card" subtype gate
+        // on its Creatures grant. Null means "no extra restriction".
+        internal readonly List<(object Token, Player Controller, TopPlayFilter Filter, bool RevealsTop, Func<ICard, bool>? ExtraPredicate)> Grants = new();
         internal readonly object Gate = new();
     }
 
@@ -101,9 +104,18 @@ public static class LibraryTopPlayPermissions
     /// (token, controller, filter) — re-registering does not add a duplicate.
     /// When <paramref name="revealsTop"/> is true the source also plays with the
     /// top card revealed (CR 715.4).
+    /// <para>
+    /// <paramref name="extraPredicate"/> (optional) ANDs an additional per-card
+    /// restriction on top of the type filter, used by the cast-side matcher
+    /// (<see cref="MayCastTopCard"/>): Conspicuous Snoop's "you may cast Goblin
+    /// spells from the top of your library" is a <see cref="TopPlayFilter.Creatures"/>
+    /// grant whose predicate also demands the card be a Goblin. Null means "no
+    /// extra restriction".
+    /// </para>
     /// </summary>
     public static void AddGrant(
-        object token, Player controller, TopPlayFilter filter, bool revealsTop = true)
+        object token, Player controller, TopPlayFilter filter, bool revealsTop = true,
+        Func<ICard, bool>? extraPredicate = null)
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(controller);
@@ -119,7 +131,7 @@ public static class LibraryTopPlayPermissions
                     return;
                 }
             }
-            store.Grants.Add((token, controller, filter, revealsTop));
+            store.Grants.Add((token, controller, filter, revealsTop, extraPredicate));
         }
     }
 
@@ -180,7 +192,11 @@ public static class LibraryTopPlayPermissions
             foreach (var g in store.Grants)
             {
                 if (!ReferenceEquals(g.Controller, controller)) continue;
-                if (Matches(g.Filter, card)) return true;
+                if (Matches(g.Filter, card)
+                    && (g.ExtraPredicate == null || g.ExtraPredicate(card)))
+                {
+                    return true;
+                }
             }
             return false;
         }
@@ -232,7 +248,11 @@ public static class LibraryTopPlayPermissions
             foreach (var g in store.Grants)
             {
                 if (!ReferenceEquals(g.Controller, controller)) continue;
-                if (MatchesCast(g.Filter, card)) return true;
+                if (MatchesCast(g.Filter, card)
+                    && (g.ExtraPredicate == null || g.ExtraPredicate(card)))
+                {
+                    return true;
+                }
             }
             return false;
         }
@@ -308,6 +328,11 @@ public static class LibraryTopPlayPermissions
     {
         TopPlayFilter.Artifacts => card.HasType(CardType.Artifact),
         TopPlayFilter.Colorless => Cards.CardColors.GetColors(card).Count == 0,
+        // Creature cards ARE cast (CR 601.1, unlike lands) — the Coven clause
+        // (Augur of Autumn) + Conspicuous Snoop's Goblin-creature grant cast a
+        // creature from the top. The extra predicate (set on the grant) narrows
+        // it further (e.g. "Goblin card" for Snoop).
+        TopPlayFilter.Creatures => card.HasType(CardType.Creature),
         TopPlayFilter.Any => true,
         // The land/creature PLAY filters do not, on their own, authorize a CAST
         // from the top — Courser's "play lands" clause never let you cast a
