@@ -222,9 +222,18 @@ public class CombatManager
 
         var declarationList = declarations.ToList();
 
-        // Validate all blockers
+        // Validate all blockers. The full attacker set + the defending
+        // player's untapped battlefield creatures are passed so the validator
+        // can enforce "all creatures able to block ~ do so" requirements
+        // (CR 509.1c — Lure / Breaker of Armies / Nemesis Mask family), not
+        // just per-block legality.
         var blocks = declarationList.Select(d => (d.Creature, d.Attacker)).ToList();
-        if (!_validator.IsValidBlockDeclaration(blocks, defendingPlayer))
+        var availableBlockers = defendingPlayer.Zones.Battlefield
+            .GetCards()
+            .OfType<Creature>()
+            .ToList();
+        if (!_validator.IsValidBlockDeclaration(
+                blocks, defendingPlayer, _currentCombat.Attackers, availableBlockers))
         {
             throw new InvalidPlayerActionException("Invalid blocker declaration");
         }

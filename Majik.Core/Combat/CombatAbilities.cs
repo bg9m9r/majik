@@ -83,6 +83,19 @@ public static class CombatAbilities
 
     public static bool CanBlockFlying(Creature c) => HasFlying(c) || HasReach(c);
 
+    /// <summary>
+    /// CR 509.1c / 509.1g — the "all creatures able to block this creature
+    /// do so" requirement (Lure / Breaker of Armies / Nemesis Mask family).
+    /// Returns true iff this attacker carries the
+    /// <c>"MustBeBlockedByAllAble"</c> marker — either as a printed
+    /// <see cref="KeywordAbility"/> (Breaker of Armies, inherent static) or
+    /// in the layer-computed keyword set (an Aura/Equipment grant). Consulted
+    /// at declare-blockers to force every creature able to block this
+    /// attacker (and not otherwise required elsewhere) to do so.
+    /// </summary>
+    public static bool MustBeBlockedByAllAble(Creature? c) =>
+        c != null && Has(c, "MustBeBlockedByAllAble");
+
     private static bool Has(Creature? creature, string keyword)
     {
         if (creature == null) return false;

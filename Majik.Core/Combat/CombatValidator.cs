@@ -269,4 +269,87 @@ public class CombatValidator
 
         return true;
     }
+
+    /// <summary>
+    /// Validate a block declaration AND enforce "must be blocked by all able"
+    /// requirements (CR 509.1c / 509.1g) — the Lure / Breaker of Armies /
+    /// Nemesis Mask family ("All creatures able to block ~ do so").
+    ///
+    /// In addition to the per-block legality checks of
+    /// <see cref="IsValidBlockDeclaration(IEnumerable{ValueTuple{Creature, Attacker}}, Player)"/>,
+    /// this overload consults the full set of declared <paramref name="attackers"/>
+    /// and the defending player's <paramref name="availableBlockers"/> to verify
+    /// that the declaration satisfies every must-block requirement.
+    ///
+    /// CR 509.1c: the defending player must declare blockers so that the
+    /// maximum number of these requirements is met. With the v1 single-flavour
+    /// requirement family, that reduces to: <b>every</b> creature the defending
+    /// player controls that <em>can legally</em> block a must-block attacker
+    /// must be assigned to block <em>some</em> must-block attacker it is able
+    /// to block (CR 509.1g — a creature satisfies the requirement by blocking
+    /// any one such attacker). A creature physically unable to block any
+    /// must-block attacker (tapped, evasion, "can't block", protection) is
+    /// exempt (CR 509.1c "able to block").
+    /// </summary>
+    public bool IsValidBlockDeclaration(
+        IEnumerable<(Creature blocker, Attacker attacker)> blocks,
+        Player defendingPlayer,
+        IEnumerable<Attacker> attackers,
+        IEnumerable<Creature> availableBlockers)
+    {
+        // Per-block legality first (also null-guards blocks / defendingPlayer).
+        if (!IsValidBlockDeclaration(blocks, defendingPlayer))
+        {
+            return false;
+        }
+        if (attackers == null || availableBlockers == null)
+        {
+            return false;
+        }
+
+        var mustBlockAttackers = attackers
+            .Where(a => a != null && CombatAbilities.MustBeBlockedByAllAble(a.Creature))
+            .ToList();
+
+        // No must-block requirement in play — legality is the only constraint.
+        if (mustBlockAttackers.Count == 0)
+        {
+            return true;
+        }
+
+        var blockList = blocks.ToList();
+
+        foreach (var creature in availableBlockers)
+        {
+            if (creature == null)
+            {
+                continue;
+            }
+
+            // CR 509.1c — only creatures ABLE to block a must-block attacker
+            // are compelled. A creature able to block at least one must-block
+            // attacker must be assigned to block one of them.
+            var canBlockSomeMustBlock = mustBlockAttackers
+                .Any(a => CanBlock(creature, a, defendingPlayer));
+            if (!canBlockSomeMustBlock)
+            {
+                continue;
+            }
+
+            // The creature must be assigned to block SOME must-block attacker
+            // it is able to block (CR 509.1g — satisfying any one of the
+            // requirements suffices; the engine never forces a single creature
+            // to block multiple attackers).
+            var satisfiesRequirement = blockList.Any(b =>
+                ReferenceEquals(b.blocker, creature)
+                && mustBlockAttackers.Any(a => ReferenceEquals(a, b.attacker)));
+
+            if (!satisfiesRequirement)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
