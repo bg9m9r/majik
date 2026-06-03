@@ -169,4 +169,74 @@ public class MdfcPermanentBackTests : IDisposable
         ((Permanent)harnfel).ActiveEffects.Should().NotBeNull(
             "DispatchCast wires ActiveEffects onto the permanent back so its body computes");
     }
+
+    // ------------------------------------------------------------------
+    // Harnfel's activated ability — "Discard a card: Exile the top two
+    // cards of your library. You may play those cards this turn."
+    // (CR 602.1 / 118.9 / 514.2) — temporary-play-permission-expiry.
+    // ------------------------------------------------------------------
+
+    private static Card LibraryCard(Player owner, string name, string cost = "{1}{R}")
+    {
+        var c = new Card(name, cost);
+        c.SetOwner(owner);
+        owner.Zones.Library.AddCard(c);
+        c.SetZone(ZoneType.Library);
+        return c;
+    }
+
+    [Fact]
+    public void Harnfel_HasDiscardExileTopTwoActivatedAbility()
+    {
+        var harnfel = BirgiGodOfStorytellingFactory.BuildHarnfel(_alice);
+
+        harnfel.Abilities.OfType<ActivatedAbility>().Should().ContainSingle()
+            .Which.Costs.Should().ContainSingle(c => c is Majik.Core.Costs.DiscardACardCost,
+                "the ability's cost is 'Discard a card'");
+    }
+
+    [Fact]
+    public void Harnfel_Activate_ExilesTopTwo_GrantsPlayThisTurn()
+    {
+        var harnfel = BirgiGodOfStorytellingFactory.BuildHarnfel(_alice);
+        var top1 = LibraryCard(_alice, "Top1", "{R}");
+        var top2 = LibraryCard(_alice, "Top2", "{1}{R}");
+        var top3 = LibraryCard(_alice, "Top3", "{2}{R}");
+
+        var ability = harnfel.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        _alice.Zones.Exile.GetCards().Should().Contain(new[] { top1, top2 });
+        _alice.Zones.Exile.GetCards().Should().NotContain(top3);
+        _alice.Zones.Library.GetCards().Should().Equal(new[] { top3 });
+
+        // Both exiled cards become legal cast sources from exile for Alice.
+        top1.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
+        top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
+        new Majik.Core.Costs.ExileCastAlternativeCost("harnfel", top1.RuntimeExileCastCost!)
+            .CanCastFor(top1, _alice).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Harnfel_PlayPermission_ExpiresAtEndOfTurn()
+    {
+        var bus = new EventBus();
+        var harnfel = BirgiGodOfStorytellingFactory.BuildHarnfel(_alice, bus);
+        var top1 = LibraryCard(_alice, "Top1", "{R}");
+        var top2 = LibraryCard(_alice, "Top2", "{1}{R}");
+
+        var ability = harnfel.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        top1.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
+        top2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
+
+        // "This turn" — the FIRST Cleanup the controller owns revokes BOTH
+        // grants under one shared subscription (CR 514.2).
+        bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
+
+        top1.RuntimeExileCastAllowedCaster.Should().BeNull(
+            "the play permission does not linger past 'this turn'");
+        top2.RuntimeExileCastAllowedCaster.Should().BeNull();
+    }
 }

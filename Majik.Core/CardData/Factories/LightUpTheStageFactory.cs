@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Events;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.StateMachine;
@@ -135,41 +136,24 @@ public static class LightUpTheStageFactory
                         {
                             // CR 118.9 — grant matches ExileCastAlternativeCost.
                             // Cost = printed mana cost ("you may play those
-                            // cards" with no alternate-cost rider).
-                            concrete.GrantRuntimeExileCast(caster, concrete.ManaCostValue);
+                            // cards" with no alternate-cost rider). Stamp only
+                            // (bus null) so one shared subscription expires the
+                            // whole batch.
+                            ExilePlayPermission.GrantUntil(
+                                concrete, caster, concrete.ManaCostValue,
+                                ExilePlayExpiry.EndOfYourNextTurn, eventBus: null);
                             stamped.Add(concrete);
                         }
                     }
 
-                    if (stamped.Count == 0 || eventBus == null) return;
+                    if (stamped.Count == 0) return;
 
-                    // CR 514.2 — schedule "until end of your next turn"
-                    // cleanup. Count Cleanup steps where the active player
-                    // is the caster. The cast resolves during caster's
-                    // turn (sorcery, CR 307.1) → first such Cleanup is
-                    // THIS turn's cleanup (grant must survive) and the
-                    // second is the caster's NEXT turn's cleanup (clear).
-                    var cleanupsSeen = 0;
-                    Action<StepStartedEvent>? handler = null;
-                    handler = (e) =>
-                    {
-                        if (e.StepType != PhaseStateType.Cleanup) return;
-                        if (!ReferenceEquals(e.Player, caster)) return;
-                        cleanupsSeen++;
-                        if (cleanupsSeen < 2) return;
-
-                        foreach (var s in stamped)
-                        {
-                            // Only clear the grant we set — if a different
-                            // effect re-stamped meanwhile we still revoke
-                            // (CR 514.2 — duration ends regardless of who
-                            // set the latest stamp). Mirrors Snapcaster /
-                            // Ragavan EOT clear.
-                            s.ClearRuntimeExileCast();
-                        }
-                        if (handler != null) eventBus.Unsubscribe(handler);
-                    };
-                    eventBus.Subscribe(handler);
+                    // CR 514.2 — "until end of your next turn" via the reusable
+                    // ExilePlayPermission scheduler: one shared revocation on
+                    // the caster's SECOND Cleanup (the first is this turn's).
+                    ExilePlayPermission.ScheduleRevocation(
+                        caster, ExilePlayExpiry.EndOfYourNextTurn, eventBus,
+                        () => { foreach (var s in stamped) s.ClearRuntimeExileCast(); });
                 }),
         };
     }

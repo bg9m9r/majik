@@ -2,10 +2,13 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.CardData.MDFCs;
+using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -19,9 +22,8 @@ namespace Majik.Core.CardData.Factories;
 ///    mana pool as steps and phases end.)"
 ///
 /// Back (Harnfel, Horn of Bounty) — Legendary Artifact, {4}{R}:
-///   "Whenever you discard a card, exile it. You may play that card this turn.
-///    {2}{R}, {T}, Discard a card: Exile the top two cards of your library.
-///    Until end of turn, you may play those cards."
+///   "Discard a card: Exile the top two cards of your library. You may play
+///    those cards this turn."
 ///
 /// ## MDFC infra (CR 712.3 / 712.4) — modal PERMANENT back (deferral #19/#3)
 ///
@@ -41,8 +43,16 @@ namespace Majik.Core.CardData.Factories;
 /// - Birgi front — Legendary Creature — God 3/3 at {2}{R}, with the
 ///   "whenever you cast a spell, add {R}" cast-trigger.
 /// - Harnfel back — Legendary Artifact at {4}{R}, cast-either-face castable
-///   back descriptor + the "whenever you discard a card, exile it; you may
-///   play it" discard-exile trigger.
+///   back descriptor + the "Discard a card: Exile the top two cards of your
+///   library. You may play those cards this turn." activated ability (CR
+///   602.1). The temporary play permission and its end-of-turn EXPIRY are now
+///   wired through the reusable <see cref="ExilePlayPermission"/> primitive
+///   (CR 118.9 / 514.2): each exiled card receives a runtime exile-cast grant
+///   consumed by <see cref="ExileCastAlternativeCost"/> +
+///   <see cref="Majik.Core.Game.SpellCastFlow"/>, and a single shared
+///   subscription revokes BOTH grants at the controller's next Cleanup step,
+///   so the authorization does not linger past "this turn". This closes the
+///   "temporary-play-this-card-permission-expiry" v1 deferral.
 ///
 /// ## Boast-twice static (CR 702.135c)
 /// - Birgi's "Creatures you control can boast twice during each of your turns
@@ -57,10 +67,10 @@ namespace Majik.Core.CardData.Factories;
 /// ## Deferred (v1 gaps, documented for v1-deferrals #19)
 /// - Birgi's "this mana doesn't empty" rider (mana-no-empty) is not modelled —
 ///   the trigger adds {R} to the pool only.
-/// - Harnfel's activated "{2}{R}, {T}, Discard a card: exile top two, you may
-///   play those cards" + the play-permission expiry are stubbed at the trigger
-///   level (the exile-on-discard rider) — the activated mill+play-window is a
-///   noted v1 gap.
+/// - Harnfel's "you may play those cards" play-as-a-LAND corner (CR 305.2) is
+///   not separately wired — the grant authorises CASTING the exiled cards
+///   (matching the impulse-draw family pattern in
+///   <see cref="RecklessImpulseFactory"/> / <see cref="LightUpTheStageFactory"/>).
 /// </summary>
 [CardName("Birgi, God of Storytelling")]
 public static class BirgiGodOfStorytellingFactory
@@ -139,12 +149,27 @@ public static class BirgiGodOfStorytellingFactory
         return birgi;
     }
 
+    /// <summary>How many cards Harnfel's activated ability exiles. (CR 602.1)</summary>
+    public const int CardsExiled = 2;
+
     /// <summary>
     /// Materialize Harnfel, Horn of Bounty — Legendary Artifact at {4}{R} with
-    /// the "whenever you discard a card, exile it; you may play it this turn"
-    /// trigger (the exile-on-discard rider). Owner / controller wired.
+    /// the "Discard a card: Exile the top two cards of your library. You may
+    /// play those cards this turn." activated ability (CR 602.1). Owner /
+    /// controller wired. The single-arg overload uses no live event bus, so the
+    /// play permission persists until cleared by hand (test path); use
+    /// <see cref="BuildHarnfel(Player, IEventBus?)"/> to schedule the
+    /// "this turn" expiry on a live bus.
     /// </summary>
-    public static Artifact BuildHarnfel(Player owner)
+    public static Artifact BuildHarnfel(Player owner) => BuildHarnfel(owner, eventBus: null);
+
+    /// <summary>
+    /// Materialize Harnfel with its activated ability, scheduling the temporary
+    /// play permission's end-of-turn expiry on <paramref name="eventBus"/> when
+    /// non-null. The exile move + grant + expiry route through the reusable
+    /// <see cref="ExilePlayPermission"/> primitive.
+    /// </summary>
+    public static Artifact BuildHarnfel(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -160,6 +185,87 @@ public static class BirgiGodOfStorytellingFactory
         harnfel.MdfcState = new MdfcState(FrontName, BackName);
         harnfel.MdfcState.Transform(); // mark back-face up (it IS Harnfel).
 
+        harnfel.AddAbility(BuildExileTopTwoAbility(harnfel, owner, eventBus));
+
         return harnfel;
+    }
+
+    /// <summary>
+    /// Build Harnfel's "Discard a card: Exile the top two cards of your
+    /// library. You may play those cards this turn." activated ability
+    /// (CR 602.1 / CR 118.9 / CR 514.2).
+    ///
+    /// <para>
+    /// Cost = <see cref="DiscardACardCost"/> (CR 117.1). On resolution: exile
+    /// the top two cards of the controller's library (CR 701.20), then stamp a
+    /// runtime exile-cast grant on each via <see cref="ExilePlayPermission"/>
+    /// for the controller's printed-mana-cost cast, and schedule a SINGLE
+    /// shared revocation at the controller's next Cleanup step ("this turn",
+    /// <see cref="ExilePlayExpiry.EndOfTurn"/>). The exiled cards become legal
+    /// cast sources from exile (consumed by
+    /// <see cref="ExileCastAlternativeCost"/> +
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/>) until that window closes.
+    /// </para>
+    ///
+    /// <para>
+    /// When <paramref name="eventBus"/> is null the bus is resolved at
+    /// resolution time from <see cref="EventBusRegistry"/> (the controller's
+    /// per-game bus) so a deck-loaded Harnfel on a live battlefield still
+    /// expires its grants; with neither, the grants linger until cleared by
+    /// hand (test path).
+    /// </para>
+    /// </summary>
+    public static ActivatedAbility BuildExileTopTwoAbility(
+        Artifact harnfel, Player owner, IEventBus? eventBus = null)
+    {
+        ArgumentNullException.ThrowIfNull(harnfel);
+        ArgumentNullException.ThrowIfNull(owner);
+
+        return new ActivatedAbility(
+            source: harnfel,
+            controller: owner,
+            costs: new ICost[] { new DiscardACardCost() },
+            effects: new IEffect[]
+            {
+                new Effect(
+                    $"{BackName}: exile top two, you may play those cards this turn",
+                    () =>
+                    {
+                        var controller = harnfel.Controller ?? owner;
+                        var stamped = new List<Card>(CardsExiled);
+                        for (var i = 0; i < CardsExiled; i++)
+                        {
+                            var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                            if (top == null) break; // library underflow — no SBA flag for exile
+                            if (top is not Card concrete) break;
+
+                            controller.Zones.Library.RemoveCard(concrete);
+                            controller.Zones.Exile.AddCard(concrete);
+                            concrete.SetZone(ZoneType.Exile);
+
+                            // CR 118.9 — "you may play those cards" with no
+                            // alternate-cost rider → the printed mana cost.
+                            // Grant WITHOUT scheduling per-card (bus passed null)
+                            // so we can revoke all under ONE shared subscription.
+                            ExilePlayPermission.GrantUntil(
+                                concrete, controller, concrete.ManaCostValue,
+                                ExilePlayExpiry.EndOfTurn, eventBus: null);
+                            stamped.Add(concrete);
+                        }
+
+                        if (stamped.Count == 0) return;
+
+                        // CR 514.2 — schedule the "this turn" expiry once for
+                        // the whole batch, on the controller's per-game bus when
+                        // no bus was supplied at build time.
+                        var bus = eventBus ?? EventBusRegistry.Get(controller);
+                        ExilePlayPermission.ScheduleRevocation(
+                            controller, ExilePlayExpiry.EndOfTurn, bus,
+                            () =>
+                            {
+                                foreach (var s in stamped) s.ClearRuntimeExileCast();
+                            });
+                    }),
+            });
     }
 }
