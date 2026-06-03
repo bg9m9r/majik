@@ -580,6 +580,28 @@ public sealed class GainControlEffectDef : EffectDefinition
     /// Default <c>true</c>.</summary>
     public bool GainsHaste { get; set; } = true;
 
+    /// <summary>
+    /// An OPTIONAL reflexive mana payment gating the whole control swap — the
+    /// "you may pay {cost}. If you do, gain control …" rider (CR 601.2b /
+    /// CR 603.4). <c>null</c> (the default) = the control change is mandatory
+    /// (Threaten / Zealous Conscripts). When set to a mana-cost string (e.g.
+    /// <c>"{1}{C}"</c>), at resolution the verb first prompts the controller's
+    /// agent yes/no; on "yes" it pays the cost via <see cref="Players.Player.PayMana"/>
+    /// and, only if the payment succeeds, performs the control swap + untap +
+    /// haste rider. Declining, or an unpayable cost, skips the entire "if you
+    /// do" clause (CR 601.2b — an optional cost that can't be paid isn't paid).
+    /// The target is still chosen as the ability goes on the stack (CR 603.3d),
+    /// regardless of whether the payment is later made.
+    ///
+    /// <para>Canonical case: Eldrazi Obligator — "When you cast this spell, you
+    /// may pay {1}{C}. If you do, gain control of target creature until end of
+    /// turn, untap that creature, and it gains haste until end of turn." The
+    /// dedicated colourless <c>{C}</c> pip folds into a generic pip in v1's pool
+    /// model (CR 107.4c — see <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>),
+    /// so <c>{1}{C}</c> is charged as two generic mana.</para>
+    /// </summary>
+    public string? OptionalManaCost { get; set; }
+
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
