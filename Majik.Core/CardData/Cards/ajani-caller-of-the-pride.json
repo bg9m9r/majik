@@ -1,0 +1,9 @@
+{
+  "name": "Ajani, Caller of the Pride",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Ajani"],
+  "manaCost": "{1}{W}{W}",
+  "loyalty": 4,
+  "abilities": []
+}
