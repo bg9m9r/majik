@@ -70,31 +70,69 @@ public static class PuresteelPaladinFactory
     public const string Cost = "{1}{W}";
 
     /// <summary>
-    /// Cost-provider hook for <see cref="EquipActivatedAbility"/>: consults
-    /// the <see cref="ZeroEquipCostEffect"/> registry for the equipment's
-    /// CURRENT controller and substitutes <see cref="ManaCost.Zero"/> when
-    /// any active Puresteel-Paladin-style zero-equip lifecycle owns that
-    /// controller. Otherwise returns the equipment's printed equip cost
-    /// (looked up from the ability the equipment carries).
+    /// Cost-provider hook for <see cref="EquipActivatedAbility"/>: the shared
+    /// equip-cost-modification seam consulted at activation / pay time. Layers
+    /// two static cost effects (CR 117.7 / 702.6c) over the printed equip cost:
+    ///
+    /// <list type="number">
+    ///   <item><description><b>Zero-equip override</b> — when any active
+    ///   Puresteel-Paladin-style <see cref="ZeroEquipCostEffect"/> lifecycle
+    ///   owns the equipment's CURRENT controller, the cost is floored to
+    ///   <see cref="ManaCost.Zero"/> regardless of the printed amount
+    ///   ("Equipment you control have equip {0}").</description></item>
+    ///   <item><description><b>Per-target reduction</b> — otherwise, the
+    ///   summed <see cref="EquipCostReductionEffect.ReductionForTarget"/> for
+    ///   the equip ability's chosen target creature ("Equip abilities you
+    ///   activate that target this creature cost {N} less" — Fervent Champion)
+    ///   is subtracted from the printed <i>generic</i> portion (CR 117.7c —
+    ///   coloured pips untouched, floor at zero).</description></item>
+    /// </list>
     ///
     /// <para>
     /// Wired as the default <c>costProvider</c> on every retrofitted
-    /// equipment factory; live game state alone gates whether the
-    /// override applies, so unequipped / Puresteel-less boards see the
+    /// equipment factory; live game state alone gates whether either effect
+    /// applies, so unequipped / Puresteel-less / Fervent-less boards see the
     /// printed cost.
     /// </para>
     /// </summary>
     public static Majik.Core.ValueObjects.ManaCost ZeroEquipCostProvider(Permanent source)
     {
         var ctrl = source.Controller ?? source.Owner;
-        var printed = source.Abilities
+        var equip = source.Abilities
             .OfType<EquipActivatedAbility>()
-            .FirstOrDefault()?.EquipCost
+            .FirstOrDefault();
+        var printed = equip?.EquipCost
             ?? Majik.Core.ValueObjects.ManaCost.Zero;
 
+        // (1) Puresteel-style zero override takes precedence — equip {0}.
         if (ctrl != null && ZeroEquipCostEffect.IsZeroEquipActiveFor(ctrl))
             return Majik.Core.ValueObjects.ManaCost.Zero;
-        return printed;
+
+        // (2) Fervent-Champion-style per-target reduction (CR 117.7). The
+        // reduction is keyed on the creature the equip ability targets, so we
+        // read the chosen target off the equip ability hung on the source. No
+        // chosen target (shape-only path / deterministic picker) → no
+        // reduction (the registry can't know which creature is being equipped
+        // until a target is chosen).
+        var reduction = ChosenTargetReduction(equip);
+        if (reduction <= 0) return printed;
+
+        var newGeneric = Math.Max(0, printed.Generic - reduction);
+        return printed.WithGeneric(newGeneric);
+    }
+
+    /// <summary>
+    /// Sum the <see cref="EquipCostReductionEffect"/> reductions registered for
+    /// the creature the equip ability currently targets. Returns 0 when no
+    /// equip ability, no chosen target, or no registered reducer applies.
+    /// </summary>
+    private static int ChosenTargetReduction(EquipActivatedAbility? equip)
+    {
+        if (equip == null) return 0;
+        if (equip.ChosenTargets.Count == 0) return 0;
+        if (equip.ChosenTargets[0].Count == 0) return 0;
+        if (equip.ChosenTargets[0][0] is not Creature target) return 0;
+        return EquipCostReductionEffect.ReductionForTarget(target);
     }
 
     /// <summary>
