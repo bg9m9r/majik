@@ -48,12 +48,33 @@ public static class TargetLegality
         if (!CanBeTargetedBy(target, caster)) return false;
         if (source == null) return true;
 
+        var opponentSource = !ReferenceEquals(target.Controller, caster);
         foreach (var c in EffectiveColorsOf(source))
         {
             if (Protection.HasProtectionFromColor(target, c)) return false;
+
+            // CR 702.11e — "hexproof from {colour}": like hexproof, it only
+            // restricts the creature's OPPONENTS. Sungold Sentinel's chosen-
+            // colour grant and Veil of Summer's "hexproof from blue and from
+            // black" land the keyword "Hexproof from {Colour}" on the
+            // creature; an opponent's matching-colour source can't target it.
+            if (opponentSource && Has(target, $"Hexproof from {ColorName(c)}")) return false;
         }
         return true;
     }
+
+    /// <summary>The display name for a colour as used in the
+    /// "Hexproof from {Colour}" keyword string. Casing is irrelevant — the
+    /// keyword set compares case-insensitively.</summary>
+    private static string ColorName(Majik.Core.ValueObjects.ManaColor c) => c switch
+    {
+        Majik.Core.ValueObjects.ManaColor.White => "White",
+        Majik.Core.ValueObjects.ManaColor.Blue => "Blue",
+        Majik.Core.ValueObjects.ManaColor.Black => "Black",
+        Majik.Core.ValueObjects.ManaColor.Red => "Red",
+        Majik.Core.ValueObjects.ManaColor.Green => "Green",
+        _ => "",
+    };
 
     /// <summary>
     /// CR 105.3 / 613.1e — the source's effective colour set: the Layer-5

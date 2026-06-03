@@ -63,6 +63,34 @@ public class TargetLegalityTests
     }
 
     [Fact]
+    public void HexproofFromRed_BlocksOpponentRedSpell_AllowsOpponentBlueSpell()
+    {
+        // CR 702.11e — "hexproof from [quality]" means the creature can't be
+        // the target of spells or abilities your OPPONENTS control that match
+        // that quality. A red source controlled by an opponent can't target;
+        // a blue one can.
+        var spec = new TargetSpec("creature").Creatures();
+        var bear = NewCreature("Bear", _bob);
+        bear.AddAbility(new KeywordAbility("Hexproof from Red", bear, _bob));
+
+        TargetLegality.IsLegal(spec, bear, _alice, sourceColor: "Red").Should().BeFalse();
+        TargetLegality.IsLegal(spec, bear, _alice, sourceColor: "Blue").Should().BeTrue();
+    }
+
+    [Fact]
+    public void HexproofFromRed_DoesNotBlockControllersOwnRedSpell()
+    {
+        // CR 702.11e — hexproof (colour-qualified or not) only restricts the
+        // creature's OPPONENTS; the controller may still target it with a red
+        // source.
+        var spec = new TargetSpec("creature").Creatures();
+        var bear = NewCreature("Bear", _bob);
+        bear.AddAbility(new KeywordAbility("Hexproof from Red", bear, _bob));
+
+        TargetLegality.IsLegal(spec, bear, _bob, sourceColor: "Red").Should().BeTrue();
+    }
+
+    [Fact]
     public void Enumerate_FindsAllLegalTargetsOnBattlefield()
     {
         var spec = new TargetSpec("creature").Creatures();
