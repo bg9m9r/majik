@@ -13,6 +13,5 @@ namespace Majik.Core.Cards.MultiFace;
 /// context with just the pieces they exercise.
 /// </summary>
 public sealed record FaceContext(
-    Majik.Core.Domain.Aggregates.Game? Game = null,
     ZoneService? ZoneService = null,
     Player? ActingPlayer = null);

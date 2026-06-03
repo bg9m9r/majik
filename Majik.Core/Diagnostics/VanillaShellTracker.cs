@@ -11,8 +11,7 @@ namespace Majik.Core.Diagnostics;
 /// hand turn after turn, but the operator only needs to be told once per
 /// game per card name.
 /// <para>
-/// Wiring: instantiate per <see cref="Majik.Core.Domain.Aggregates.Game"/>
-/// (or per <see cref="Majik.Core.Api.GameFacade"/>), inject into the bot
+/// Wiring: instantiate per <see cref="Majik.Core.Api.GameFacade"/>, inject into the bot
 /// strategy / heuristic agent, and call <see cref="Notice"/> at every
 /// decision point that touches a card. First call for a given card name
 /// emits an <see cref="UnimplementedCardEncounteredEvent"/> via the bus

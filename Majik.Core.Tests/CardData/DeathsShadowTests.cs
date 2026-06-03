@@ -34,7 +34,7 @@ public class DeathsShadowTests
     public DeathsShadowTests()
     {
         // Wire the effects service to the bus so its CR-613 memoization cache
-        // invalidates on game events (matches production GameDependencies).
+        // invalidates on game events (matches the live ContinuousEffectsService bus wiring).
         _effects = new ContinuousEffectsService(_bus);
         _zones = new ZoneService(_bus);
     }

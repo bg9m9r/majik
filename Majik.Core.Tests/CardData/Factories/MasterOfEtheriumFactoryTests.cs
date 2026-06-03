@@ -74,7 +74,7 @@ public class MasterOfEtheriumFactoryTests
         var bus = new EventBus();
         // Wire the service to the bus so the CR-613 memoization cache
         // invalidates on the CardMovedEvent each artifact entry fires
-        // (matches production GameDependencies).
+        // (matches the live ContinuousEffectsService bus wiring).
         var svc = new ContinuousEffectsService(bus);
         var zones = new ZoneService(bus);
 

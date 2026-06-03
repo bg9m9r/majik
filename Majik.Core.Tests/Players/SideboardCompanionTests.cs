@@ -3,7 +3,6 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
-using Majik.Core.Domain.Aggregates;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
@@ -74,29 +73,6 @@ public class SideboardCompanionTests
 
         // Bob's sideboard is independent.
         _bob.Sideboard.Count.Should().Be(0);
-    }
-
-    [Fact]
-    public void Game_RegisterCompanion_PlacesCardInOwnersSideboard()
-    {
-        var game = new Majik.Core.Domain.Aggregates.Game(_bus);
-        game.AddPlayer("Alice");
-        game.AddPlayer("Bob");
-        var alice = game.GetPlayer("Alice")!;
-        var bob = game.GetPlayer("Bob")!;
-
-        var lurrus = LurrusOfTheDreamDenFactory.Create(alice);
-        game.RegisterCompanion(alice, lurrus);
-
-        lurrus.Owner.Should().Be(alice);
-        lurrus.Controller.Should().Be(alice);
-        lurrus.Zone.Should().Be(ZoneType.Sideboard);
-        alice.Sideboard.ContainsCard(lurrus).Should().BeTrue();
-        bob.Sideboard.ContainsCard(lurrus).Should().BeFalse();
-
-        // Idempotent — second call with the same card is a no-op.
-        game.RegisterCompanion(alice, lurrus);
-        alice.Sideboard.Count.Should().Be(1);
     }
 
     // ── Runtime cast-from-outside ──────────────────────────────────────
@@ -230,15 +206,13 @@ public class SideboardCompanionTests
     [Fact]
     public async Task Lurrus_FullPipeline_RegisterCastFromOutsideAndCastNormally()
     {
-        // Wire up a full Game so we exercise RegisterCompanion + the
-        // ledger together with the spell-cast flow.
-        var game = new Majik.Core.Domain.Aggregates.Game(_bus);
-        game.AddPlayer("Alice");
-        game.AddPlayer("Bob");
-        var alice = game.GetPlayer("Alice")!;
-
+        // Exercise the once-per-game ledger together with the spell-cast flow.
+        // (Companion registration in the live engine is a GameFacade concern;
+        // here we place the card in the sideboard directly, as the cast flow sees it.)
+        var alice = _alice;
         var lurrus = LurrusOfTheDreamDenFactory.Create(alice, _bus);
-        game.RegisterCompanion(alice, lurrus);
+        lurrus.SetZone(ZoneType.Sideboard);
+        alice.Zones.Sideboard.AddCard(lurrus);
 
         lurrus.Zone.Should().Be(ZoneType.Sideboard);
         alice.Sideboard.ContainsCard(lurrus).Should().BeTrue();
@@ -246,7 +220,7 @@ public class SideboardCompanionTests
         // Pay the {3} tax + printed {W}{B} for the cast (total {3}{W}{B}).
         alice.AddManaToPool(ManaCost.Parse("{3}{W}{B}"));
 
-        var ctx = new GameContext(alice, new[] { alice, game.GetPlayer("Bob")! },
+        var ctx = new GameContext(alice, new[] { alice, _bob },
             alice, 1, StepStateType.PreCombatMain, _stack);
 
         // Step 1 — Companion tax + sideboard → hand.

@@ -45,7 +45,7 @@ public sealed class PlotFaceTransform : IFaceTransform
         // Real implementation will:
         //   1. ctx.ZoneService.MoveToZone(card, exile, ctx.ActingPlayer)
         //   2. card.GrantRuntimeExileCast(...)  // sorcery-speed, zero-cost
-        //   3. ctx.Game.EventBus.Publish(new CardPlottedEvent(card, ctx.ActingPlayer))
+        //   3. publish a CardPlottedEvent on the event bus
     }
 
     public void Revert(ICard card, FaceContext ctx)
