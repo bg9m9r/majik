@@ -583,4 +583,10 @@ public enum CardSubtype
     /// reprints), Lu Su, Wu Advisor-adjacent blue tempo lineage. CR 205.3m —
     /// flavour subtype with no inherent rules meaning.</summary>
     Jellyfish,
+
+    /// <summary>Villain creature subtype — Mob Lookout (Marvel's Spider-Man)
+    /// and the broader Villain lineage. CR 205.3m — flavour subtype with no
+    /// inherent rules meaning of its own (referenced by other cards' "another
+    /// Villain you control" triggers).</summary>
+    Villain,
 }
