@@ -36,7 +36,12 @@ public static class TargetFilters
     /// targets widely (the resolution-time guard still enforces the printed
     /// rule for the verbs that gate on type).
     /// </summary>
-    public static TargetRequest ToTargetRequest(string? filter, string verb, BotIntent intent = BotIntent.None)
+    /// <param name="optional">When <c>true</c>, declares the request with
+    /// <c>MinTargets: 0</c> — the "you MAY [verb] target …" shape (CR 603.3d /
+    /// CR 115.1b). The agent may decline by choosing no target, in which case
+    /// the dependent effect (and any linked "if you do" rider) does not happen.
+    /// Default <c>false</c> = a mandatory single target.</param>
+    public static TargetRequest ToTargetRequest(string? filter, string verb, BotIntent intent = BotIntent.None, bool optional = false)
     {
         var normalized = (filter ?? "").Trim().ToLowerInvariant();
         var (description, predicate) = Resolve(normalized, verb);
@@ -51,7 +56,7 @@ public static class TargetFilters
         var controlScope = ControlScopeOf(normalized);
         return new TargetRequest(
             Description: description,
-            MinTargets: 1,
+            MinTargets: optional ? 0 : 1,
             MaxTargets: 1,
             LegalCandidates: Array.Empty<object>(),
             Intent: intent,

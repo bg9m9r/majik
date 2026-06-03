@@ -21439,6 +21439,59 @@
     "Black"
   ]
 }
+==== mardu-woe-reaper ====
+{
+  "name": "Mardu Woe-Reaper",
+  "manaCost": "{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Human",
+    "Warrior"
+  ],
+  "power": 2,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== master-of-waves ====
 {
   "name": "Master of Waves",
