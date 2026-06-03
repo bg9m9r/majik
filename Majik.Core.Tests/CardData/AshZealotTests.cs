@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
@@ -13,13 +12,19 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for <see cref="AshZealotFactory"/> (Return to Ravnica, {R}{R}).
+/// Tests for Ash Zealot (Return to Ravnica, {R}{R}) — now shipped as a
+/// DECLARATIVE fileless card (<c>CardData/Cards/ash-zealot.json</c>), the
+/// canonical demonstration of the <c>whenever_a_player_casts_spell</c> trigger
+/// + <c>deal_damage_to_triggering_player</c> untargeted verb (the declarative
+/// lift of the former hand-rolled boxed-closure factory; v1-deferral
+/// "deal-damage-to-triggering-player-untargeted-verb").
+///
 /// Oracle: "First strike, haste. Whenever a player casts a spell from a
 /// graveyard, this creature deals 3 damage to that player."
 ///
 /// Covers:
 /// - Identity (Human Warrior 2/2, mana cost {R}{R}, First strike + Haste).
-/// - NamedCardFactory dispatch.
+/// - NamedCardFactory dispatch (now the generated fileless-JSON arm).
 /// - Trigger fires (and deals 3 to the caster) when a player casts a spell
 ///   from a graveyard — for ANY player (controller's own cast included).
 /// - Trigger does NOT fire on a spell cast from hand (the common case).
@@ -41,10 +46,23 @@ public class AshZealotTests
         return spell;
     }
 
-    private static void PlaceOnBattlefield(Player controller, Creature card)
+    /// <summary>Build the production fileless Ash Zealot for the given owner.</summary>
+    private Creature Build(Player owner) =>
+        (Creature)NamedCardFactory.Create("Ash Zealot", owner);
+
+    /// <summary>Build Ash Zealot, place it on the battlefield, and register its
+    /// graveyard-cast trigger with a live <see cref="TriggerManager"/> — the
+    /// production trigger registration the match driver performs.</summary>
+    private Creature BuildAndRegister(Player owner, TriggerManager triggers)
     {
-        controller.Zones.Battlefield.AddCard(card);
+        var card = Build(owner);
+        owner.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);
+        foreach (var trigger in card.Abilities.OfType<TriggeredAbility>())
+        {
+            triggers.RegisterTriggeredAbility(trigger);
+        }
+        return card;
     }
 
     // -------------------------------------------------------------------
@@ -54,7 +72,7 @@ public class AshZealotTests
     [Fact]
     public void AshZealot_Identity_HumanWarrior_2_2_AtCostRR_FirstStrikeHaste()
     {
-        var card = AshZealotFactory.Create(_alice);
+        var card = Build(_alice);
 
         card.Name.Should().Be("Ash Zealot");
         card.ManaCost.Should().Be("{R}{R}");
@@ -83,7 +101,7 @@ public class AshZealotTests
     [Fact]
     public void AshZealot_HasSingleTriggeredAbility()
     {
-        var card = AshZealotFactory.Create(_alice);
+        var card = Build(_alice);
         card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
 
@@ -98,8 +116,7 @@ public class AshZealotTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ashZealot = AshZealotFactory.Create(_alice, triggers);
-        PlaceOnBattlefield(_alice, ashZealot);
+        BuildAndRegister(_alice, triggers);
 
         // Bob flashes back / escapes a spell from his graveyard.
         bus.Publish(new SpellCastEvent(
@@ -122,8 +139,7 @@ public class AshZealotTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ashZealot = AshZealotFactory.Create(_alice, triggers);
-        PlaceOnBattlefield(_alice, ashZealot);
+        BuildAndRegister(_alice, triggers);
 
         bus.Publish(new SpellCastEvent(
             NewSpell(_alice, "Flashbacked Bolt", "{R}", fromGraveyard: true)));
@@ -142,8 +158,7 @@ public class AshZealotTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ashZealot = AshZealotFactory.Create(_alice, triggers);
-        PlaceOnBattlefield(_alice, ashZealot);
+        BuildAndRegister(_alice, triggers);
 
         // A normal cast from hand — Ash Zealot only punishes graveyard casts.
         bus.Publish(new SpellCastEvent(
@@ -156,7 +171,7 @@ public class AshZealotTests
     [Fact]
     public void Trigger_OnlyActiveOnBattlefield()
     {
-        var card = AshZealotFactory.Create(_alice);
+        var card = Build(_alice);
         var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);

@@ -24,6 +24,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PutCounterEffectDef), "put_counter")]
 [JsonDerivedType(typeof(DealDamageEffectDef), "deal_damage")]
+[JsonDerivedType(typeof(DealDamageToTriggeringPlayerEffectDef), "deal_damage_to_triggering_player")]
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
@@ -196,6 +197,38 @@ public sealed class DealDamageEffectDef : EffectDefinition
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(Target, $"deal {Amount} damage");
+}
+
+/// <summary>
+/// "[This] deals N damage to that player" — the <b>untargeted</b> trigger-payoff
+/// verb that punishes the TRIGGERING PLAYER (CR 119 / CR 603.3 "that player"),
+/// NOT a chosen any-target. Unlike <see cref="DealDamageEffectDef"/> (which
+/// announces a target the spell / ability declares via a
+/// <see cref="Majik.Core.Players.Agents.TargetRequest"/>), this verb reads the
+/// player the trigger already identified off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.TriggeringPlayer"/> — so it
+/// needs NO target slot and NO shared-slot rider. It MUST sit on a triggered
+/// ability whose trigger stamps the triggering player (currently
+/// <see cref="WheneverAPlayerCastsSpellTriggerDef"/>, which records the spell's
+/// caster as it matches).
+///
+/// <para>
+/// This is the declarative lift of the boxed-closure idiom the hand-rolled Ash
+/// Zealot ("Whenever a player casts a spell from a graveyard, this creature
+/// deals 3 damage to that player") and Eidolon of the Great Revel factories use:
+/// the trigger captures the caster, the resolve body deals damage to it. Routed
+/// through <see cref="Majik.Core.Primitives.Fx.DealDamage(object, int)"/> so the
+/// loss increments <see cref="Majik.Core.Players.Player.LifeLostThisTurn"/>
+/// (downstream Spectacle / Revolt / lifegain observers see it). When the context
+/// carries no triggering player (a non-triggered / mis-wired path) the effect is
+/// a clean no-op.
+/// </para>
+/// </summary>
+public sealed class DealDamageToTriggeringPlayerEffectDef : EffectDefinition
+{
+    /// <summary>Damage dealt to the triggering player (CR 119). Default 1
+    /// (Ash Zealot = 3, Eidolon of the Great Revel = 2).</summary>
+    public int Amount { get; set; } = 1;
 }
 
 /// <summary>

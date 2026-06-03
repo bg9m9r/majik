@@ -27,6 +27,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DealsCombatDamageToPlayerSelfTriggerDef), "whenever_this_deals_combat_damage_to_a_player")]
 [JsonDerivedType(typeof(WheneverACreatureYouControlExploresTriggerDef), "whenever_a_creature_you_control_explores")]
 [JsonDerivedType(typeof(StateWhenCountersGeTriggerDef), "state_when_counters_ge")]
+[JsonDerivedType(typeof(WheneverAPlayerCastsSpellTriggerDef), "whenever_a_player_casts_spell")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -421,4 +422,52 @@ public sealed class StateWhenCountersGeTriggerDef : TriggerDefinition
     /// <summary>The inclusive lower bound: the trigger fires on the rising
     /// edge of <c>count &gt;= Threshold</c> (CR 603.8). Mazemind Tome = 4.</summary>
     public int Threshold { get; set; }
+}
+
+/// <summary>
+/// "Whenever a player casts a spell[, …]" (CR 601.2 / 603.1) — the
+/// <b>any-player</b> cast trigger that identifies the SPELL'S CASTER as the
+/// "that player" the resolving effect punishes. Fires on a
+/// <see cref="Majik.Core.Domain.DomainEvents.SpellCastEvent"/> for ANY player's
+/// cast (CR 700.6 "a player" is unrestricted — the trigger's own controller's
+/// casts included; no controller scoping, unlike the "you cast" variant
+/// <see cref="WheneverYouCastSpellTriggerDef"/>).
+///
+/// <para>
+/// As it matches, the condition STAMPS the caster
+/// (<see cref="Majik.Core.Spells.ISpell.Controller"/>) onto the resolving
+/// ability via <see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>
+/// (CR 603.3 — the condition is evaluated before the ability goes on the stack,
+/// so the stamped player is the right "that player" at resolution). An
+/// untargeted <see cref="DealDamageToTriggeringPlayerEffectDef"/> in the same
+/// ability reads it back off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.TriggeringPlayer"/>. This
+/// is the declarative lift of the boxed-closure idiom the hand-rolled Ash
+/// Zealot / Eidolon of the Great Revel factories use.
+/// </para>
+///
+/// <para>
+/// Two optional, composable filters (AND-combined):
+/// <list type="bullet">
+///   <item><see cref="FromGraveyardOnly"/> (CR 113.5 / 601.2) — only a spell
+///   cast from a graveyard (Flashback / Escape / Disturb / "you may cast this
+///   from your graveyard" permission — read off
+///   <see cref="Majik.Core.Spells.Spell.WasCastFromGraveyard"/>). The Ash
+///   Zealot shape.</item>
+///   <item><see cref="MaxManaValue"/> (CR 202.3) — only a spell whose mana
+///   value is &lt;= this cap (X-spells fold in the stamped chosen-X via
+///   <see cref="Majik.Core.Cards.Card.PendingCastX"/>, else X = 0). Null = no
+///   cap. The Eidolon of the Great Revel shape (cap 3).</item>
+/// </list>
+/// </para>
+/// </summary>
+public sealed class WheneverAPlayerCastsSpellTriggerDef : TriggerDefinition
+{
+    /// <summary>Only a spell cast from a graveyard fires it (CR 113.5). Default
+    /// <c>false</c> = any spell cast.</summary>
+    public bool FromGraveyardOnly { get; set; }
+
+    /// <summary>Only a spell with mana value &lt;= this cap fires it (CR 202.3).
+    /// Null (default) = no cap.</summary>
+    public int? MaxManaValue { get; set; }
 }

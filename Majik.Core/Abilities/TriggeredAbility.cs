@@ -71,6 +71,30 @@ public class TriggeredAbility : ITriggeredAbility
     /// </summary>
     public IReadOnlyList<IReadOnlyList<object>> ChosenTargets => _chosenTargets;
 
+    /// <summary>
+    /// CR 603.3 — the player identified by THIS trigger's event as it was
+    /// evaluated (the "that player" / triggering player), captured by the
+    /// trigger condition the moment it matches and read back by an UNTARGETED
+    /// resolve effect that punishes the triggering player (e.g. Ash Zealot's
+    /// "deals 3 damage to that player"). This is the declarative analogue of the
+    /// boxed-closure idiom the hand-rolled Ash Zealot / Eidolon factories use:
+    /// the condition stamps it before the ability goes on the stack, so the
+    /// captured player is the correct "that player" by resolution time. Null
+    /// when no trigger has identified a player (or the slot was never used). The
+    /// slot is reused per-instance — the engine reuses one ability instance
+    /// across re-fires, so the same single-instance overwrite posture as the
+    /// hand-rolled boxed idiom applies (CR 603.3 — drained before re-evaluation
+    /// in the ordinary priority loop).
+    /// </summary>
+    public Player? TriggeringPlayer { get; private set; }
+
+    /// <summary>
+    /// Stamp the triggering player (CR 603.3) — called by a trigger condition as
+    /// it matches, so an untargeted "deal N damage to that player" effect can
+    /// read it at resolution off <see cref="ResolutionContext.TriggeringPlayer"/>.
+    /// </summary>
+    public void SetTriggeringPlayer(Player? player) => TriggeringPlayer = player;
+
     public TriggeredAbility(
         object source,
         Player controller,
@@ -202,7 +226,9 @@ public class TriggeredAbility : ITriggeredAbility
 
         _resolutionState = ResolutionState.Resolving();
 
-        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct);
+        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct)
+            with
+            { TriggeringPlayer = TriggeringPlayer };
 
         foreach (var effect in _effects)
         {

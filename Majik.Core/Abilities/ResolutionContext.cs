@@ -55,6 +55,20 @@ public sealed record ResolutionContext(
     public IReadOnlyDictionary<int, Player> SharedSlotControllers { get; private init; } =
         EmptySharedSlot;
 
+    /// <summary>
+    /// CR 603.3 — the "that player" / triggering player a TRIGGERED ability
+    /// identified from its event as it matched (e.g. the caster of the spell
+    /// that fired Ash Zealot's "Whenever a player casts a spell from a
+    /// graveyard, this creature deals 3 damage to that player"). Carried from
+    /// <see cref="TriggeredAbility.TriggeringPlayer"/> so an UNTARGETED resolve
+    /// effect (<see cref="Majik.Core.CardData.Definitions.DealDamageToTriggeringPlayerEffectDef"/>)
+    /// can punish the triggering player without a chosen <c>TargetRequest</c> —
+    /// the declarative analogue of the hand-rolled boxed-closure idiom. Null on
+    /// the spell / activated-ability paths (no triggering player) and when the
+    /// trigger never identified one.
+    /// </summary>
+    public Player? TriggeringPlayer { get; init; }
+
     private static readonly IReadOnlyDictionary<int, Player> EmptySharedSlot =
         new Dictionary<int, Player>();
 

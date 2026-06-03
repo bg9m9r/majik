@@ -947,9 +947,67 @@ public static class CardDefRuntime
                 BuildWheneverACreatureYouControlExploresTrigger(card),
             StateWhenCountersGeTriggerDef threshold =>
                 BuildStateWhenCountersGeTrigger(threshold, card),
+            WheneverAPlayerCastsSpellTriggerDef anyCast =>
+                BuildWheneverAPlayerCastsSpellTrigger(anyCast, card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    /// <summary>
+    /// CR 601.2 / 603.1 / 603.3 — "Whenever a player casts a spell[, …]". Fires
+    /// on a <see cref="Majik.Core.Domain.DomainEvents.SpellCastEvent"/> for ANY
+    /// player's cast (no controller scope — CR 700.6), optionally gated on the
+    /// spell being cast from a graveyard
+    /// (<see cref="WheneverAPlayerCastsSpellTriggerDef.FromGraveyardOnly"/>) and
+    /// on a mana-value cap
+    /// (<see cref="WheneverAPlayerCastsSpellTriggerDef.MaxManaValue"/>). As it
+    /// matches it STAMPS the spell's caster onto the resolving ability
+    /// (<see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>)
+    /// so an untargeted <see cref="DealDamageToTriggeringPlayerEffectDef"/> reads
+    /// it at resolution — the declarative analogue of the Ash Zealot / Eidolon
+    /// boxed-closure idiom.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverAPlayerCastsSpellTrigger(
+        WheneverAPlayerCastsSpellTriggerDef def, ICard card)
+    {
+        var fromGraveyardOnly = def.FromGraveyardOnly;
+        var maxManaValue = def.MaxManaValue;
+        return new EventTriggerCondition<Majik.Core.Domain.DomainEvents.SpellCastEvent>((e, ability) =>
+        {
+            var caster = e.Spell.Controller;
+            if (caster is null) return false;
+
+            // CR 113.5 / 601.2 — graveyard-cast gate (Flashback / Escape /
+            // Disturb / cast-from-graveyard permission).
+            if (fromGraveyardOnly
+                && (e.Spell is not Majik.Core.Spells.Spell s || !s.WasCastFromGraveyard))
+            {
+                return false;
+            }
+
+            // CR 202.3 — mana value cap. Reads the printed mana cost; an X-spell
+            // folds in the stamped chosen-X, else X = 0 (matches the hand-rolled
+            // Eidolon predicate).
+            if (maxManaValue is int cap)
+            {
+                var mv = 0;
+                if (e.Spell.Card is Card concrete)
+                {
+                    mv = concrete.ManaCostValue.TotalValue;
+                    if (concrete.PendingCastX is int x) mv += x;
+                }
+                if (mv > cap) return false;
+            }
+
+            // CR 603.3 — stamp "that player" (the caster) for the untargeted
+            // resolve effect to read at resolution.
+            if (ability is Majik.Core.Abilities.TriggeredAbility ta)
+            {
+                ta.SetTriggeringPlayer(caster);
+            }
+            return true;
+        });
+    }
 
     /// <summary>
     /// CR 603.8 — "When there are N or more [type] counters on this …".
@@ -1280,6 +1338,8 @@ public static class CardDefRuntime
         {
             PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements),
             DealDamageEffectDef damage => BuildDealDamageEffect(damage, card, targetRequestIndex),
+            DealDamageToTriggeringPlayerEffectDef trigDamage =>
+                BuildDealDamageToTriggeringPlayerEffect(trigDamage, card),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
@@ -2734,6 +2794,31 @@ public static class CardDefRuntime
             {
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
                 if (live != null) Fx.DealDamageAny(live, amount);
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildDealDamageToTriggeringPlayerEffect(
+        DealDamageToTriggeringPlayerEffectDef def, ICard card)
+    {
+        // CR 119 / CR 603.3 — UNTARGETED damage to "that player": the player the
+        // trigger identified (stamped onto the resolving ability by the
+        // whenever_a_player_casts_spell condition, surfaced here off
+        // ResolutionContext.TriggeringPlayer). No chosen TargetRequest is read —
+        // the declarative lift of the Ash Zealot / Eidolon boxed-closure idiom.
+        // Routed through Fx.DealDamage(player) so LifeLostThisTurn increments
+        // (downstream Spectacle / Revolt / lifegain observers see the loss). A
+        // null triggering player (mis-wired / non-triggered path) is a clean
+        // no-op.
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: deal {amount} damage to the triggering player",
+            ctx =>
+            {
+                if (ctx.TriggeringPlayer is { } player)
+                {
+                    Fx.DealDamage(player, amount);
+                }
                 return ValueTask.CompletedTask;
             });
     }
