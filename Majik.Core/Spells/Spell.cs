@@ -133,6 +133,25 @@ public class Spell : ISpell
     public bool WasCastFromLibrary { get; set; }
 
     /// <summary>
+    /// CR 601.2 / CR 113.5 — "cast from a graveyard" runtime sentinel on the
+    /// resolving spell. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the resolving spell's
+    /// source zone (the zone the card was in immediately before the stack
+    /// push) was <see cref="Majik.Core.Zones.ZoneType.Graveyard"/> — i.e. the
+    /// spell was cast via Flashback / Escape / Disturb / a "you may cast …
+    /// from your graveyard" permission (CR 702.34 / 702.138 / 702.143).
+    /// Read by graveyard-cast triggers that punish "whenever a player casts a
+    /// spell from a graveyard" (Ash Zealot) — the trigger reads it off the
+    /// live <see cref="Majik.Core.Domain.DomainEvents.SpellCastEvent"/>'s spell
+    /// synchronously, so no <see cref="Majik.Core.Cards.Card"/> mirror is
+    /// needed (the read happens at cast time, not after the card resolves).
+    ///
+    /// Defaults to <c>false</c> so hand-built test spells without an explicit
+    /// stamp are treated as non-graveyard casts.
+    /// </summary>
+    public bool WasCastFromGraveyard { get; set; }
+
+    /// <summary>
     /// CR 702.33b — "kicked" runtime sentinel on the resolving spell.
     /// Stamped <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/>
     /// when the cast layered a paid

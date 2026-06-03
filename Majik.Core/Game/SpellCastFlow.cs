@@ -881,6 +881,20 @@ public sealed class SpellCastFlow
                 concreteForLibraryCast.SetWasCastFromLibrary(true);
             }
         }
+
+        // CR 601.2 / CR 113.5 — strict "cast from a graveyard" sentinel for
+        // graveyard-cast punisher triggers (Ash Zealot's "whenever a player
+        // casts a spell from a graveyard"). Flashback / Escape / Disturb and
+        // any "you may cast this from your graveyard" permission all move the
+        // card Graveyard → Stack, so this single source-zone check covers the
+        // whole family. Read off the live spell at cast time (see
+        // SpellCastFlow's publish of SpellCastEvent), so no Card mirror is
+        // needed — unlike the hand/library sentinels there is no
+        // battlefield-side ETB consumer.
+        if (sourceZoneAtCast == ZoneType.Graveyard)
+        {
+            spell.WasCastFromGraveyard = true;
+        }
     }
 
     /// <summary>
