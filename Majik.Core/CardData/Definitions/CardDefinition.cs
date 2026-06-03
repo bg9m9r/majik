@@ -238,10 +238,16 @@ public sealed class ActivatedAbilityDefinition : AbilityDefinition
     {
         var costBuilders = Costs.Select(c => c.ToCost()).ToArray();
         // PLAN 01 (Slice F) — pair each effect's resolve-builder with the
-        // TargetRequest it targets through (null for untargeted effects).
+        // TargetRequest it targets through (null for untargeted effects). The
+        // spec's Build closure threads the live continuous-effects service to
+        // the effect at materialization time (gain_control / Threaten family on
+        // the ABILITY path); other verbs ignore it (byte-identical result).
         var effectSpecs = Effects
             .Select(e => new CardDefEffectSpec(
-                e.ToTargetRequest(), e.ToResolveEffect(), e.ToExtraTargetRequest()))
+                e.ToTargetRequest(),
+                (card, controller, replacements, index, continuous) =>
+                    e.ToResolveEffect(continuous)(card, controller, replacements, index),
+                e.ToExtraTargetRequest()))
             .ToArray();
         return new CardDefActivatedAbility(costBuilders, effectSpecs, SorcerySpeed);
     }
@@ -261,9 +267,17 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
     public override CardDefAbility ToCardDefAbility()
     {
         var triggerBuilder = Trigger.ToTrigger();
+        // The spec's Build closure threads the live continuous-effects service
+        // to the effect at materialization time, so an ETB / triggered
+        // gain_control (Zealous Conscripts) installs its CR 613
+        // TemporaryControlChangeEffect against the live service exactly as the
+        // spell path does. Non-control verbs ignore it (byte-identical result).
         var effectSpecs = Effects
             .Select(e => new CardDefEffectSpec(
-                e.ToTargetRequest(), e.ToResolveEffect(), e.ToExtraTargetRequest()))
+                e.ToTargetRequest(),
+                (card, controller, replacements, index, continuous) =>
+                    e.ToResolveEffect(continuous)(card, controller, replacements, index),
+                e.ToExtraTargetRequest()))
             .ToArray();
         // A leaves-the-battlefield trigger (e.g. dies_self) carries its own
         // active-zone override so the built TriggeredAbility stays observable

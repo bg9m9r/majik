@@ -68,7 +68,26 @@ public static class CardDefRuntime
     /// (<see cref="CardDefinitionFactory.Build(CardDefinition, Player, ReplacementBus?)"/>)
     /// routes through after <see cref="CardDefinition.ToCardDef"/>.
     /// </summary>
-    public static ICard Build(CardDef def, Player owner, ReplacementBus? replacements)
+    public static ICard Build(CardDef def, Player owner, ReplacementBus? replacements) =>
+        Build(def, owner, replacements, continuous: null);
+
+    /// <summary>
+    /// Materialize a card from a <see cref="CardDef"/>, threading both the
+    /// <see cref="ReplacementBus"/> (CR 614) and the live per-game
+    /// <see cref="ContinuousEffectsService"/> to its abilities. The continuous
+    /// service is consumed by ability-path verbs that register a CR 613
+    /// continuous effect at resolution — currently the <c>gain_control</c>
+    /// (Threaten / Zealous Conscripts) family, whose ETB / activated-ability
+    /// form installs a <see cref="Majik.Core.Effects.TemporaryControlChangeEffect"/>
+    /// + an until-EOT haste grant against this service. This is the ABILITY-path
+    /// analogue of the <paramref name="continuous"/> argument
+    /// <see cref="BuildSpellDefinitionFromEffects"/> already threads on the SPELL
+    /// path. Verbs that need neither service are byte-identical to the legacy
+    /// build (<c>null</c> is the no-op default).
+    /// </summary>
+    public static ICard Build(
+        CardDef def, Player owner, ReplacementBus? replacements,
+        ContinuousEffectsService? continuous)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(owner);
@@ -141,7 +160,7 @@ public static class CardDefRuntime
         // live card.
         foreach (var ability in def.Abilities)
         {
-            card.AddAbility(ability.Build(card, owner, replacements));
+            card.AddAbility(ability.Build(card, owner, replacements, continuous));
         }
 
         return card;
@@ -1599,16 +1618,27 @@ public static class CardDefRuntime
         GainControlEffectDef def, ICard card, Player controller, int targetRequestIndex,
         ContinuousEffectsService? continuous)
     {
-        // CR 613.2 / CR 514.2 — the Threaten / Act of Treason family. Reads the
-        // chosen creature off ChosenTargets at the reserved index and, until end
-        // of turn, swaps its real controller to the spell's controller via a
-        // TemporaryControlChangeEffect on the live continuous-effects service
-        // (control reverts at cleanup). Composes the standard Threaten rider:
-        // untap the creature (so it can attack) and grant it haste until end of
-        // turn (CR 302.6 — a creature whose control changed this turn is sick).
-        // CR 608.2b — an illegal target at resolution fizzles entirely. Without
-        // a live service (pure-shape test path) the control swap no-ops, like
-        // ArchmagesCharmFactory's single-arg posture.
+        // CR 613.2 / CR 514.2 — the Threaten / Act of Treason / Zealous
+        // Conscripts family. Reads the chosen PERMANENT off ChosenTargets at the
+        // reserved index and, until end of turn, swaps its real controller to
+        // the spell/ability controller via a TemporaryControlChangeEffect on the
+        // live continuous-effects service (control reverts at cleanup). Composes
+        // the standard Threaten rider: untap the permanent (so a stolen creature
+        // can attack) and — for a creature — grant it haste until end of turn
+        // (CR 302.6 — a permanent whose control changed this turn is sick).
+        //
+        // The target is a PERMANENT, not just a creature: Zealous Conscripts
+        // reads "gain control of target permanent" and can steal an artifact /
+        // enchantment / land / planeswalker. The control swap + untap apply to
+        // any permanent; the haste grant is a Layer-6 keyword grant that only
+        // applies to a creature (a non-creature can hold a haste marker harm-
+        // lessly but the engine's until-EOT keyword grant is creature-typed, so
+        // it is wired only for creatures — non-creatures need no haste anyway).
+        //
+        // CR 608.2b — an illegal target at resolution (the permanent has left
+        // the battlefield) fizzles entirely. Without a live service (pure-shape
+        // test path) the control swap no-ops, like ArchmagesCharmFactory's
+        // single-arg posture.
         var untap = def.Untap;
         var gainsHaste = def.GainsHaste;
         return new Effect(
@@ -1616,27 +1646,30 @@ public static class CardDefRuntime
             ctx =>
             {
                 if (continuous == null) return ValueTask.CompletedTask;
-                if (ChosenTargetAt(ctx, targetRequestIndex) is not Creature creature
-                    || creature.Zone != ZoneType.Battlefield)
+                if (ChosenTargetAt(ctx, targetRequestIndex) is not Permanent permanent
+                    || permanent.Zone != ZoneType.Battlefield)
                 {
                     return ValueTask.CompletedTask;
                 }
 
                 // CR 613.2 — only swap if we don't already control it.
-                if (!ReferenceEquals(creature.Controller, controller))
+                if (!ReferenceEquals(permanent.Controller, controller))
                 {
-                    continuous.Register(new TemporaryControlChangeEffect(creature, controller));
+                    continuous.Register(new TemporaryControlChangeEffect(permanent, controller));
                 }
 
-                // CR 701.21 — "Untap it."
-                if (untap && creature.IsTapped)
+                // CR 701.21 — "Untap that permanent."
+                if (untap && permanent.IsTapped)
                 {
-                    creature.Untap();
+                    permanent.Untap();
                 }
 
                 // "It gains haste until end of turn." (Layer 6 keyword grant,
                 // CR 514.2 expiry — reuses the shared until-EOT haste grant.)
-                if (gainsHaste)
+                // Only a creature can carry the engine's haste keyword grant;
+                // a stolen non-creature needs no haste (it has nothing to attack
+                // with), so the rider is creature-gated.
+                if (gainsHaste && permanent is Creature creature)
                 {
                     continuous.Register(new GrantKeywordUntilEndOfTurnEffect(creature, "Haste"));
                 }
