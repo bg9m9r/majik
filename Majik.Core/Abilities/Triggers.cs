@@ -168,6 +168,20 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 509.1h — "Whenever ~ blocks [a creature], …" — fires when
+    /// <paramref name="source"/> is among the blockers declared in a
+    /// <see cref="Majik.Core.Domain.DomainEvents.BlockersDeclaredEvent"/>
+    /// (Brimaz, King of Oreskos). The attacker being blocked is recovered from
+    /// the combat at resolution time.
+    /// </summary>
+    public static ITriggerCondition OnBlockSelf(Majik.Core.Cards.Creature source)
+    {
+        return new EventTriggerCondition<Majik.Core.Domain.DomainEvents.BlockersDeclaredEvent>(
+            (e, _) => e.Combat.GetAllBlockers()
+                .Any(b => ReferenceEquals(b.Creature, source)));
+    }
+
+    /// <summary>
     /// CR 614 / Zendikar — Landfall. "Whenever a land enters the battlefield
     /// under your control, …" Fires on CardMovedEvent → Battlefield where
     /// the card is a Land and its controller is <paramref name="controller"/>.
