@@ -167,14 +167,26 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
     /// </summary>
     internal IReadOnlyList<Majik.Core.Zones.ZoneType>? ActiveZones { get; }
 
+    /// <summary>
+    /// CR 601.2b / 603.4 — the generalized optional reflexive "you may pay
+    /// {cost}. If you do, …" mana rider on the WHOLE ability. <c>null</c> = the
+    /// effect list runs unconditionally. When set, the materialized effect array
+    /// is wrapped in a single gating effect (<see cref="OptionalManaRider"/>)
+    /// that prompts the controller's agent yes/no, pays the cost, and only then
+    /// runs the gated effects in order. Eldrazi Obligator is the canonical case.
+    /// </summary>
+    internal Majik.Core.ValueObjects.ManaCost? OptionalManaCost { get; }
+
     internal CardDefTriggeredAbility(
         Func<ICard, ITriggerCondition> triggerBuilder,
         IReadOnlyList<CardDefEffectSpec> effectSpecs,
-        IReadOnlyList<Majik.Core.Zones.ZoneType>? activeZones = null)
+        IReadOnlyList<Majik.Core.Zones.ZoneType>? activeZones = null,
+        Majik.Core.ValueObjects.ManaCost? optionalManaCost = null)
     {
         TriggerBuilder = triggerBuilder;
         EffectSpecs = effectSpecs;
         ActiveZones = activeZones;
+        OptionalManaCost = optionalManaCost;
     }
 
     internal override IAbility Build(
@@ -184,11 +196,18 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
         var condition = TriggerBuilder(card);
         var (effects, requests) = CardDefAbilityEffects.Materialize(
             EffectSpecs, card, controller, replacements, continuous);
+        // CR 601.2b / 603.4 — gate the whole effect list behind the optional
+        // reflexive payment when present. Target requests are returned unwrapped
+        // so the engine still collects targets as the trigger goes on the stack
+        // (CR 603.3d), independent of the later payment.
+        var resolveEffects = OptionalManaCost is { } cost
+            ? new IEffect[] { OptionalManaRider.Wrap(card, controller, cost, effects) }
+            : effects;
         return new TriggeredAbility(
             source: card,
             controller: controller,
             condition: condition,
-            effects: effects,
+            effects: resolveEffects,
             targetRequests: requests,
             activeZones: ActiveZones);
     }
