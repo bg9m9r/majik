@@ -111,6 +111,62 @@ public class SpellCastFlowPermissionTests
     }
 
     [Fact]
+    public async Task TopOfLibraryCreature_WithCreaturesGrant_CastsOntoStack()
+    {
+        // CR 601.3e — the Augur of Autumn Coven clause / Vivien-style "you may
+        // cast creature spells from the top of your library" registers a
+        // TopPlayFilter.Creatures grant. MayCastTopCard routes that grant through
+        // MatchesCast (creatures ARE cast, CR 601.1, unlike lands), so the cast
+        // flow authorizes a CREATURE on top: it moves Library → Stack and is
+        // marked cast-from-library.
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var creature = new Creature("Goblin Bear", "{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(creature);
+        Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
+            new object(), _alice, Majik.Core.Rules.TopPlayFilter.Creatures);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var spell = await _flow.CastAsync(_alice, creature,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        _stack.Count.Should().Be(1);
+        creature.Zone.Should().Be(ZoneType.Stack);
+        spell.WasCastFromLibrary.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TopOfLibraryNoncreature_WithCreaturesGrantOnly_Throws()
+    {
+        // CR 601.3e — a TopPlayFilter.Creatures grant (Augur Coven) authorizes
+        // ONLY creature top-casts: MatchesCast(Creatures, card) is false for a
+        // noncreature spell on top, so SpellCastFlow rejects casting an instant
+        // from the top even though a creature-only grant is live. A Coven player
+        // can't cast a Lightning Bolt off the top of their library.
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var bolt = new Instant("Lightning Bolt", "{R}") { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(bolt);
+        Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
+            new object(), _alice, Majik.Core.Rules.TopPlayFilter.Creatures);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+
+        var act = async () => await _flow.CastAsync(_alice, bolt,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*top of your library*");
+        _stack.Count.Should().Be(0);
+    }
+
+    [Fact]
     public async Task BolasTopCast_WithPayLifeAltCost_CastsForZeroMana_AndPaysLifeOnResolve()
     {
         // CR 118.9 / 116.3a — Bolas's Citadel: a spell cast from the top of the
