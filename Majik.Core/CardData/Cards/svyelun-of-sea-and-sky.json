@@ -1,0 +1,10 @@
+{
+  "name": "Svyelun of Sea and Sky",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Merfolk", "God"],
+  "manaCost": "{1}{U}{U}",
+  "power": 3,
+  "toughness": 4,
+  "abilities": []
+}
