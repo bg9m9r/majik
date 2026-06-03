@@ -1,11 +1,9 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
-using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
-using Majik.Core.Players.Agents;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -67,6 +65,10 @@ public static class BanishingLightFactory
 {
     public const string CardName = "Banishing Light";
     public const string PrintedManaCost = "{2}{W}";
+    public const string Slug = "banishing-light";
+
+    private static readonly CardDefinition Definition =
+        CardDefinitionLoader.FromEmbeddedResource(Slug);
 
     /// <summary>
     /// Construct Banishing Light with no runtime services. Both
@@ -90,142 +92,32 @@ public static class BanishingLightFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Enchantment(
-            CardName,
-            PrintedManaCost,
-            supertypes: null,
-            subtypes: null);
+        var built = CardDefinitionFactory.Build(Definition, owner);
+        if (built is not Enchantment card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as an Enchantment but got "
+                + $"'{built.GetType().Name}'.");
+        }
         card.SetOwner(owner);
         card.SetController(owner);
 
-        WireExileEnchantmentTriggers(card, owner, triggers);
+        // The declarative exile_until_leaves verb (banishing-light.json) already
+        // attached BOTH linked triggered abilities (ETB exile + LTB return) to
+        // the card shape at build time. When a live TriggerManager is supplied,
+        // register every triggered ability so the bus drives them — same posture
+        // as OblivionRingFactory. This is the declarative replacement for the
+        // former bespoke WireExileEnchantmentTriggers backbone; the whole
+        // Banishing Light family (Banishing Light / Conclave Tribunal / Cast Out
+        // / Borrowed Time / Detention Sphere) now rides the same closed verb.
+        if (triggers != null)
+        {
+            foreach (var ability in card.Abilities.OfType<ITriggeredAbility>())
+            {
+                triggers.RegisterTriggeredAbility(ability);
+            }
+        }
+
         return card;
-    }
-
-    /// <summary>
-    /// Shared wiring for the "exile target nonland permanent an
-    /// opponent controls until this leaves" ETB / LTB pair used by
-    /// Banishing Light AND <see cref="ConclaveTribunalFactory"/>
-    /// (identical oracle modulo Convoke + cost). Public so the sister
-    /// factory can call into it without duplicating the closure shape.
-    /// </summary>
-    /// <param name="card">The Banishing Light-shaped enchantment the
-    /// triggers are attached to.</param>
-    /// <param name="owner">Card owner / initial controller — used as
-    /// the trigger controller.</param>
-    /// <param name="triggers">Optional live
-    /// <see cref="TriggerManager"/> for bus-driven trigger firing.</param>
-    public static void WireExileEnchantmentTriggers(
-        Enchantment card,
-        Player owner,
-        TriggerManager? triggers)
-    {
-        ArgumentNullException.ThrowIfNull(card);
-        ArgumentNullException.ThrowIfNull(owner);
-
-        // Shared closure: ETB writes, LTB reads.
-        ICard? exiled = null;
-        Player? exiledOwner = null;
-
-        // ----------------------------------------------------------------
-        // ETB triggered ability — CR 603.6a / CR 701.21.
-        //   "When [this] enters, exile target nonland permanent an
-        //    opponent controls until [this] leaves the battlefield."
-        // ----------------------------------------------------------------
-        TriggeredAbility? etbTrigger = null;
-        var etbCondition = Triggers.OnEnterBattlefieldSelf(card);
-
-        var etbEffect = new Effect(
-            $"{card.Name}: exile target nonland permanent an opponent controls (CR 701.21)",
-            () =>
-            {
-                if (etbTrigger == null) return;
-                var chosen = etbTrigger.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-
-                if (chosen[0][0] is not Permanent target) return;
-
-                // CR 608.2b — illegal-on-resolution checks.
-                if (target.Zone != ZoneType.Battlefield) return;
-                if (target.HasType(CardType.Land)) return;
-                // CR 109.5 — must be an opponent's permanent at resolution.
-                if (ReferenceEquals(target.Controller, card.Controller ?? owner)) return;
-
-                // CR 701.21 — exile (Battlefield → Exile). Routed through
-                // the target's owner's zones — same posture as Skyclave
-                // Apparition.
-                var targetOwner = target.Owner;
-                if (targetOwner != null)
-                {
-                    targetOwner.Zones.Battlefield.RemoveCard(target);
-                    targetOwner.Zones.Exile.AddCard(target);
-                }
-                target.SetZone(ZoneType.Exile);
-
-                exiled = target;
-                exiledOwner = targetOwner;
-            });
-
-        etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: etbCondition,
-            effects: new IEffect[] { etbEffect },
-            interveningIf: null,
-            activeZones: new[] { ZoneType.Battlefield },
-            targetRequests: new[]
-            {
-                new TargetRequest(
-                    Description: "target nonland permanent an opponent controls",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
-            });
-
-        card.AddAbility(etbTrigger);
-        triggers?.RegisterTriggeredAbility(etbTrigger);
-
-        // ----------------------------------------------------------------
-        // LTB triggered ability — CR 603.6c / CR 603.10c.
-        //   "until [this] leaves the battlefield" — when this leaves,
-        //   return the exiled card to the battlefield under its owner's
-        //   control.
-        // ----------------------------------------------------------------
-        var ltbCondition = new EventTriggerCondition<CardMovedEvent>(
-            (e, _) => ReferenceEquals(e.Card, card)
-                      && e.FromZone == ZoneType.Battlefield);
-
-        var ltbEffect = new Effect(
-            $"{card.Name}: return the exiled card to the battlefield under its owner's control",
-            () =>
-            {
-                if (exiled == null || exiledOwner == null) return;
-                // CR 400.7 — if the exiled card has since left exile
-                // (extraction, processed by Eldrazi, etc.), skip.
-                if (exiled.Zone != ZoneType.Exile) return;
-
-                exiledOwner.Zones.Exile.RemoveCard(exiled);
-                exiledOwner.Zones.Battlefield.AddCard(exiled);
-                exiled.SetZone(ZoneType.Battlefield);
-                // CR 110.2 — "under its owner's control" maps Controller
-                // := Owner on the way back. ChangeController lives on
-                // the concrete Card type; every named-factory permanent
-                // is a Card subclass so the cast is safe.
-                if (exiled is Card returned) returned.ChangeController(exiledOwner);
-            });
-
-        var ltbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: ltbCondition,
-            effects: new IEffect[] { ltbEffect },
-            // CR 603.6d — LTB triggers see the permanent as it last
-            // existed on the battlefield (same "looks back" semantics
-            // used by Spell Queller, Skyclave Apparition).
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(ltbTrigger);
-        triggers?.RegisterTriggeredAbility(ltbTrigger);
     }
 }

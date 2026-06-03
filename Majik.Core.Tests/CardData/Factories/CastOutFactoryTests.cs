@@ -92,7 +92,7 @@ public class CastOutFactoryTests
         {
             new object[] { bobsCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobsCreature.Zone.Should().Be(ZoneType.Exile,
             "ETB exiles the targeted nonland permanent (CR 701.21)");
@@ -119,7 +119,7 @@ public class CastOutFactoryTests
         {
             new object[] { bobsLand },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobsLand.Zone.Should().Be(ZoneType.Battlefield,
             "lands are skipped by the printed 'nonland' filter (CR 608.2b)");
@@ -144,7 +144,7 @@ public class CastOutFactoryTests
         {
             new object[] { aliceCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         aliceCreature.Zone.Should().Be(ZoneType.Battlefield,
             "ETB ignores controller-side permanents ('an opponent controls', CR 109.5)");
@@ -169,12 +169,12 @@ public class CastOutFactoryTests
         {
             new object[] { bobsCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
         bobsCreature.Zone.Should().Be(ZoneType.Exile);
 
         var ltb = castOut.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         bobsCreature.Zone.Should().Be(ZoneType.Battlefield,
             "LTB returns the exiled card to the battlefield");
@@ -193,7 +193,7 @@ public class CastOutFactoryTests
 
         var ltb = castOut.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         _bob.Zones.Battlefield.GetCards().Should().BeEmpty();
     }

@@ -1,7 +1,7 @@
 {
-  "name": "Detention Sphere",
+  "name": "Cast Out",
   "types": ["Enchantment"],
-  "manaCost": "{1}{W}{U}",
+  "manaCost": "{3}{W}",
   "abilities": [
     {
       "kind": "triggered",
@@ -10,9 +10,7 @@
         {
           "type": "exile_until_leaves",
           "targetFilter": "nonland_permanent",
-          "opponentControlsOnly": false,
-          "sameNameGroup": true,
-          "optional": true
+          "opponentControlsOnly": true
         }
       ]
     }

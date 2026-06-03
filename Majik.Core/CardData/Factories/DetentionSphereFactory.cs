@@ -111,158 +111,20 @@ public static class DetentionSphereFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // Shared closure: ETB writes the exiled cards (paired with their
-        // owners); LTB reads them back.
-        var exiled = new List<(ICard Card, Player Owner)>();
-
-        // ----------------------------------------------------------------
-        // ETB triggered ability — CR 603.6a / CR 701.21.
-        //   "When this enchantment enters, you may exile target nonland
-        //    permanent not named Detention Sphere and all other permanents
-        //    with the same name as that permanent."
-        // ----------------------------------------------------------------
-        TriggeredAbility? etbTrigger = null;
-        var etbCondition = Triggers.OnEnterBattlefieldSelf(card);
-
-        var etbEffect = new Effect(
-            $"{CardName}: exile target nonland permanent (not named {CardName}) "
-            + "and all other permanents with the same name (CR 701.21)",
-            () =>
-            {
-                if (etbTrigger == null) return;
-                var chosen = etbTrigger.ChosenTargets;
-                // CR 603.5 — "you may"; declining (no target chosen) does
-                // nothing, so the LTB later returns nothing.
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-
-                if (chosen[0][0] is not Permanent target) return;
-
-                // CR 608.2b — illegal-on-resolution checks.
-                if (target.Zone != ZoneType.Battlefield) return;
-                if (target.HasType(CardType.Land)) return;
-                // "not named Detention Sphere" — the sphere never exiles a copy
-                // of itself.
-                if (string.Equals(target.Name, CardName, StringComparison.Ordinal)) return;
-
-                var targetName = target.Name;
-
-                // CR 201.2 — collect the target plus every permanent whose name
-                // matches, across every battlefield, controller-agnostic. The
-                // game's player set is reachable from any permanent's owner; we
-                // gather from each captured owner's battlefield. Snapshot first
-                // so the zone moves below don't disturb enumeration (mirrors the
-                // Echoing Truth / Maelstrom Pulse snapshot pattern).
-                var players = CollectPlayers(card, owner, target);
-                var toExile = players
-                    .SelectMany(p => p.Zones.Battlefield.GetCards())
-                    .OfType<Permanent>()
-                    .Where(perm => string.Equals(perm.Name, targetName, StringComparison.Ordinal))
-                    .ToList();
-
-                foreach (var perm in toExile)
-                {
-                    // CR 608.2b — a prior same-step move may have already pulled
-                    // this permanent off the battlefield.
-                    if (perm.Zone != ZoneType.Battlefield) continue;
-
-                    var permOwner = perm.Owner;
-                    if (permOwner == null) continue;
-
-                    // CR 701.21 — exile (Battlefield → Exile), routed through the
-                    // permanent's owner's zones (same posture as Banishing Light).
-                    permOwner.Zones.Battlefield.RemoveCard(perm);
-                    permOwner.Zones.Exile.AddCard(perm);
-                    perm.SetZone(ZoneType.Exile);
-
-                    exiled.Add((perm, permOwner));
-                }
-            });
-
-        etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: etbCondition,
-            effects: new IEffect[] { etbEffect },
-            interveningIf: null,
-            activeZones: new[] { ZoneType.Battlefield },
-            targetRequests: new[]
-            {
-                new TargetRequest(
-                    Description: "target nonland permanent not named Detention Sphere",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
-            });
-
-        card.AddAbility(etbTrigger);
-        triggers?.RegisterTriggeredAbility(etbTrigger);
-
-        // ----------------------------------------------------------------
-        // LTB triggered ability — CR 603.6c / CR 603.10c.
-        //   "When this enchantment leaves the battlefield, return the exiled
-        //    cards to the battlefield under their owner's control."
-        // ----------------------------------------------------------------
-        var ltbCondition = new EventTriggerCondition<CardMovedEvent>(
-            (e, _) => ReferenceEquals(e.Card, card)
-                      && e.FromZone == ZoneType.Battlefield);
-
-        var ltbEffect = new Effect(
-            $"{CardName}: return the exiled cards to the battlefield under their owner's control",
-            () =>
-            {
-                foreach (var (returned, returnedOwner) in exiled)
-                {
-                    // CR 400.7 — if the card has since left exile, skip it.
-                    if (returned.Zone != ZoneType.Exile) continue;
-
-                    returnedOwner.Zones.Exile.RemoveCard(returned);
-                    returnedOwner.Zones.Battlefield.AddCard(returned);
-                    returned.SetZone(ZoneType.Battlefield);
-                    // CR 110.2 — "under their owner's control" maps Controller
-                    // := Owner on the way back, per card.
-                    if (returned is Card card2) card2.ChangeController(returnedOwner);
-                }
-
-                exiled.Clear();
-            });
-
-        var ltbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: ltbCondition,
-            effects: new IEffect[] { ltbEffect },
-            // CR 603.6d — LTB triggers see the permanent as it last existed on
-            // the battlefield (same "looks back" semantics as Banishing Light).
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(ltbTrigger);
-        triggers?.RegisterTriggeredAbility(ltbTrigger);
-
-        return card;
-    }
-
-    /// <summary>
-    /// Gather the set of players whose battlefields the same-name sweep must
-    /// scan. The sphere's owner and the target's owner/controller are always
-    /// included; this covers the standard two-player game without needing a
-    /// live game reference (the JSON-built card shape carries none). Same
-    /// posture as the closed-over fallback in <see cref="EchoingTruthFactory"/>
-    /// for callers outside the full cast flow.
-    /// </summary>
-    private static IReadOnlyList<Player> CollectPlayers(
-        ICard sphere, Player sphereOwner, Permanent target)
-    {
-        var players = new List<Player>();
-        void Add(Player? p)
+        // The declarative exile_until_leaves verb (detention-sphere.json,
+        // sameNameGroup + optional) already attached BOTH linked triggered
+        // abilities (ETB same-name sweep + LTB return-all) to the card shape at
+        // build time. When a live TriggerManager is supplied, register every
+        // triggered ability so the bus drives them — same posture as
+        // OblivionRingFactory.
+        if (triggers != null)
         {
-            if (p != null && !players.Contains(p)) players.Add(p);
+            foreach (var ability in card.Abilities.OfType<ITriggeredAbility>())
+            {
+                triggers.RegisterTriggeredAbility(ability);
+            }
         }
 
-        Add(sphereOwner);
-        Add(sphere.Controller);
-        Add(target.Owner);
-        Add(target.Controller);
-        return players;
+        return card;
     }
 }

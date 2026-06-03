@@ -89,9 +89,10 @@ public static class TouchTheSpiritRealmFactory
     /// <summary>
     /// ETB "exile up to one target artifact or creature until this leaves" +
     /// the matching LTB return. Mirrors
-    /// <see cref="BanishingLightFactory.WireExileEnchantmentTriggers"/> but
-    /// with an optional ("up to one") target and an artifact-or-creature
-    /// filter with no controller restriction.
+    /// the declarative <see cref="Majik.Core.CardData.Definitions.ExileUntilLeavesEffectDef"/>
+    /// verb (the closed Banishing Light backbone) but with an optional ("up to
+    /// one") target and an artifact-or-creature filter with no controller
+    /// restriction.
     /// </summary>
     private static void WireEtbExileUntilLeaves(Enchantment card, Player owner, TriggerManager? triggers)
     {

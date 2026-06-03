@@ -1645,18 +1645,20 @@ public static class CardDefRuntime
         ExileUntilLeavesEffectDef def, ICard card, Player controller, int targetRequestIndex)
     {
         // ----------------------------------------------------------------
-        // Shared per-instance closure: ETB writes, LTB reads. One Banishing
-        // Light only ever exiles one card per ETB resolution (the printed
-        // "target" is singular); a fresh ICard identity on re-entry (CR 400.7)
-        // starts its own closure.
+        // Shared per-instance closure: ETB writes, LTB reads. The single-target
+        // Banishing Light / Oblivion Ring shape only ever captures one card per
+        // ETB resolution (the printed "target" is singular); the same-name
+        // Detention Sphere variant captures the whole sweep list. Both use the
+        // SAME list so the LTB return is uniform. A fresh ICard identity on
+        // re-entry (CR 400.7) starts its own closure.
         // ----------------------------------------------------------------
-        ICard? exiled = null;
-        Player? exiledOwner = null;
+        var exiled = new List<(ICard Card, Player Owner)>();
 
         var filter = def.TargetFilter;
         var opponentOnly = def.OpponentControlsOnly;
         var excludeSelf = def.ExcludeSelf;
         var maxMv = def.MaxManaValue;
+        var sameNameGroup = def.SameNameGroup;
 
         // CR 608.2b — the composed resolution-time legality re-check. Mirrors
         // the hand-rolled factories (BanishingLight / GlassCasket / PortableHole
@@ -1669,6 +1671,15 @@ public static class CardDefRuntime
             if (target.Zone != ZoneType.Battlefield) return false;
             if (!TargetFilters.Matches(filter, target)) return false;
             if (excludeSelf && ReferenceEquals(target, card)) return false;
+            // CR 109.5 — "not named [self]" (Detention Sphere). The same-name
+            // sweep must never be seeded by a copy of the source itself, so the
+            // target is excluded by NAME (not just reference) — a second copy of
+            // Detention Sphere on the battlefield is an illegal target too.
+            if (sameNameGroup
+                && string.Equals(target.Name, card.Name, StringComparison.Ordinal))
+            {
+                return false;
+            }
             if (opponentOnly)
             {
                 var sourceController = card.Controller ?? controller;
@@ -1694,33 +1705,27 @@ public static class CardDefRuntime
                       && e.FromZone == ZoneType.Battlefield);
 
         var ltbEffect = new Effect(
-            $"{card.Name}: return the exiled card to the battlefield under its owner's control (CR 610.3)",
+            $"{card.Name}: return the exiled card(s) to the battlefield under their owner's control (CR 610.3)",
             () =>
             {
-                if (exiled == null || exiledOwner == null) return;
-                // CR 603.6e / CR 400.7 — if the exiled card has since left exile
-                // (extraction, processed by Eldrazi, etc.), the linked return
-                // finds nothing. The ref is cleared after a successful return so
-                // a second LTB (a re-entered, then re-left source shares no
-                // closure; this guards a double-fire of the SAME instance).
-                if (exiled.Zone != ZoneType.Exile)
+                foreach (var (returnedCard, returnedOwner) in exiled)
                 {
-                    exiled = null;
-                    exiledOwner = null;
-                    return;
-                }
+                    // CR 603.6e / CR 400.7 — if a captured card has since left
+                    // exile (extraction, processed by Eldrazi, etc.), the linked
+                    // return finds nothing for it; skip.
+                    if (returnedCard.Zone != ZoneType.Exile) continue;
 
-                exiledOwner.Zones.Exile.RemoveCard(exiled);
-                exiledOwner.Zones.Battlefield.AddCard(exiled);
-                exiled.SetZone(ZoneType.Battlefield);
-                // CR 110.2 — "under its owner's control" maps Controller := Owner
-                // on the way back.
-                if (exiled is Card returned) returned.ChangeController(exiledOwner);
+                    returnedOwner.Zones.Exile.RemoveCard(returnedCard);
+                    returnedOwner.Zones.Battlefield.AddCard(returnedCard);
+                    returnedCard.SetZone(ZoneType.Battlefield);
+                    // CR 110.2 — "under its owner's control" maps Controller :=
+                    // Owner on the way back.
+                    if (returnedCard is Card returned) returned.ChangeController(returnedOwner);
+                }
 
                 // CR 603.6e — the "until" return happens once; clear so a
                 // subsequent LTB of the same instance no-ops.
-                exiled = null;
-                exiledOwner = null;
+                exiled.Clear();
             });
 
         var ltbTrigger = new TriggeredAbility(
@@ -1736,26 +1741,90 @@ public static class CardDefRuntime
         card.AddAbility(ltbTrigger);
 
         // ----------------------------------------------------------------
-        // ETB effect — CR 603.6a / CR 701.21. Exile the chosen target and
-        // record it + its owner for the linked LTB return.
+        // ETB effect — CR 603.6a / CR 701.21. Exile the chosen target (and, for
+        // the same-name variant, every permanent sharing its name) and record
+        // each card + its owner for the linked LTB return.
         // ----------------------------------------------------------------
         return new Effect(
             def.BuildEffectDescription(card.Name),
             ctx =>
             {
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
+                // CR 603.5 — a "you may" trigger whose controller declined (no
+                // target chosen) does nothing, so the LTB later returns nothing.
                 if (live is not Permanent target || !IsLegalTarget(target))
                 {
                     return ValueTask.CompletedTask;
                 }
 
-                var targetOwner = target.Owner;
-                Fx.MoveToExile(target);
+                if (!sameNameGroup)
+                {
+                    var targetOwner = target.Owner;
+                    Fx.MoveToExile(target);
+                    if (targetOwner != null) exiled.Add((target, targetOwner));
+                    return ValueTask.CompletedTask;
+                }
 
-                exiled = target;
-                exiledOwner = targetOwner;
+                // CR 201.2 — same-name sweep (Detention Sphere). Snapshot the
+                // target plus every other battlefield permanent sharing its
+                // name, controller-agnostic, BEFORE exiling so the zone moves
+                // don't disturb enumeration (mirrors the Echoing Truth /
+                // Maelstrom Pulse snapshot pattern). The collateral cards are
+                // not separately targeted (the spell has one target).
+                var targetName = target.Name;
+                var toExile = CollectSameNamePermanents(ctx, card, controller, target, targetName);
+                foreach (var perm in toExile)
+                {
+                    // CR 608.2b — a prior same-step move may have already pulled
+                    // this permanent off the battlefield.
+                    if (perm.Zone != ZoneType.Battlefield) continue;
+                    var permOwner = perm.Owner;
+                    if (permOwner == null) continue;
+
+                    Fx.MoveToExile(perm);
+                    exiled.Add((perm, permOwner));
+                }
                 return ValueTask.CompletedTask;
             });
+    }
+
+    /// <summary>
+    /// CR 201.2 — gather the chosen target plus every other battlefield
+    /// permanent whose name matches <paramref name="targetName"/>, across every
+    /// player's battlefield, controller-agnostic. Prefers the live
+    /// <see cref="Majik.Core.Game.GameContext.AllPlayers"/> set when the
+    /// resolution context carries a game; otherwise falls back to the
+    /// source/controller/target owners (the standard two-player shape the
+    /// pure-shape test path exercises — same posture as the legacy
+    /// DetentionSphere factory's closed-over fallback).
+    /// </summary>
+    private static IReadOnlyList<Permanent> CollectSameNamePermanents(
+        Majik.Core.Abilities.ResolutionContext ctx,
+        ICard source, Player controller, Permanent target, string targetName)
+    {
+        var players = new List<Player>();
+        void Add(Player? p)
+        {
+            if (p != null && !players.Contains(p)) players.Add(p);
+        }
+
+        if (ctx.Game != null)
+        {
+            foreach (var p in ctx.Game.AllPlayers) Add(p);
+        }
+        else
+        {
+            Add(controller);
+            Add(source.Controller);
+            Add(target.Owner);
+            Add(target.Controller);
+        }
+
+        return players
+            .SelectMany(p => p.Zones.Battlefield.GetCards())
+            .OfType<Permanent>()
+            .Where(perm => string.Equals(perm.Name, targetName, StringComparison.Ordinal))
+            .ToList();
     }
 
     private static IEffect BuildReturnToHandEffect(ReturnToHandEffectDef def, ICard card, int targetRequestIndex)

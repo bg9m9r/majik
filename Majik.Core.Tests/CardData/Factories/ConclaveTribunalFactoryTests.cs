@@ -15,10 +15,11 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Unit tests for <see cref="ConclaveTribunalFactory"/>.
 ///
 /// Conclave Tribunal is structurally Banishing Light + Convoke. The
-/// exile / return tests cover the shared
-/// <see cref="BanishingLightFactory.WireExileEnchantmentTriggers"/> path
-/// from the Tribunal entry point so a future change in the shared
-/// wiring can't silently break either card. Convoke wiring is asserted
+/// exile / return tests cover the shared declarative
+/// <see cref="Majik.Core.CardData.Definitions.ExileUntilLeavesEffectDef"/>
+/// verb (the closed Banishing Light backbone) from the Tribunal entry point so
+/// a future change in the shared verb can't silently break either card. Convoke
+/// wiring is asserted
 /// via the keyword-ability marker + <see cref="ConvokeAdditionalCost"/>
 /// build path (same shape as Chord of Calling's tests).
 /// </summary>
@@ -64,7 +65,7 @@ public class ConclaveTribunalFactoryTests
         {
             new object[] { bobsCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobsCreature.Zone.Should().Be(ZoneType.Exile);
         _bob.Zones.Exile.GetCards().Should().Contain(bobsCreature);
@@ -89,11 +90,11 @@ public class ConclaveTribunalFactoryTests
         {
             new object[] { bobsCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         var ltb = trib.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         bobsCreature.Zone.Should().Be(ZoneType.Battlefield);
         bobsCreature.Controller.Should().BeSameAs(_bob,

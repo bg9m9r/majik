@@ -2250,6 +2250,56 @@
     "White"
   ]
 }
+==== banishing-light ====
+{
+  "name": "Banishing Light",
+  "manaCost": "{2}{W}",
+  "primaryType": "Enchantment",
+  "cardTypes": [
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== bant-charm ====
 {
   "name": "Bant Charm",
@@ -4019,8 +4069,10 @@
       "list": []
     },
     "triggered": {
-      "count": 0,
-      "list": []
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
     },
     "static": {
       "count": 0,
@@ -5055,6 +5107,56 @@
     "triggered": {
       "count": 0,
       "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
+==== cast-out ====
+{
+  "name": "Cast Out",
+  "manaCost": "{3}{W}",
+  "primaryType": "Enchantment",
+  "cardTypes": [
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
     },
     "static": {
       "count": 0,
@@ -6494,6 +6596,56 @@
   "mdfc": null,
   "colors": [
     "Green",
+    "White"
+  ]
+}
+==== conclave-tribunal ====
+{
+  "name": "Conclave Tribunal",
+  "manaCost": "{4}{W}",
+  "primaryType": "Enchantment",
+  "cardTypes": [
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
     "White"
   ]
 }
@@ -8457,8 +8609,10 @@
       "list": []
     },
     "triggered": {
-      "count": 0,
-      "list": []
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
     },
     "static": {
       "count": 0,
@@ -32062,8 +32216,10 @@
       "list": []
     },
     "triggered": {
-      "count": 0,
-      "list": []
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
     },
     "static": {
       "count": 0,

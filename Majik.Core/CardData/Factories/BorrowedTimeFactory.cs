@@ -88,10 +88,19 @@ public static class BorrowedTimeFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // Printed text is the Banishing Light "exile target nonland permanent
-        // an opponent controls until this leaves" pair verbatim — delegate to
-        // the shared closure rather than duplicate it.
-        BanishingLightFactory.WireExileEnchantmentTriggers(card, owner, triggers);
+        // The declarative exile_until_leaves verb (borrowed-time.json) already
+        // attached BOTH linked triggered abilities (ETB exile + LTB return) to
+        // the card shape at build time. When a live TriggerManager is supplied,
+        // register every triggered ability so the bus drives them — same posture
+        // as OblivionRingFactory.
+        if (triggers != null)
+        {
+            foreach (var ability in card.Abilities.OfType<ITriggeredAbility>())
+            {
+                triggers.RegisterTriggeredAbility(ability);
+            }
+        }
+
         return card;
     }
 }

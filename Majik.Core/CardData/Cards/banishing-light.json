@@ -1,7 +1,7 @@
 {
-  "name": "Detention Sphere",
+  "name": "Banishing Light",
   "types": ["Enchantment"],
-  "manaCost": "{1}{W}{U}",
+  "manaCost": "{2}{W}",
   "abilities": [
     {
       "kind": "triggered",
@@ -10,9 +10,7 @@
         {
           "type": "exile_until_leaves",
           "targetFilter": "nonland_permanent",
-          "opponentControlsOnly": false,
-          "sameNameGroup": true,
-          "optional": true
+          "opponentControlsOnly": true
         }
       ]
     }
