@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -64,6 +65,7 @@ public static class GameRegistryScope
             LibraryTopPlayPermissions.PushScope(),
             ActivatedAbilityRestrictions.PushScope(),
             ControlPlayerRegistryProvider.PushScope(),
+            TriggerManagerRegistry.PushScope(),
             Majik.Core.Combat.AttackRestrictionRegistryProvider.PushScope(),
             AdditionalCombatRegistryProvider.PushScope(),
         };

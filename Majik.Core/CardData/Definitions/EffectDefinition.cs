@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ExileTargetEffectDef), "exile_target")]
 [JsonDerivedType(typeof(MayExileTargetCardThenGainLifeEffectDef), "may_exile_target_card_then_gain_life")]
 [JsonDerivedType(typeof(ExileUntilLeavesEffectDef), "exile_until_leaves")]
+[JsonDerivedType(typeof(ExileWithReturnEffectDef), "exile_with_return")]
 [JsonDerivedType(typeof(ReturnToHandEffectDef), "return_to_hand")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
 [JsonDerivedType(typeof(TapTargetEffectDef), "tap_target")]
@@ -448,6 +449,93 @@ public sealed class ExileUntilLeavesEffectDef : EffectDefinition
     /// place alongside the <see cref="TargetRequest"/> description.</summary>
     internal string BuildEffectDescription(string cardName) =>
         $"{cardName}: {BuildDescription()} (CR 701.21)";
+}
+
+/// <summary>
+/// "Exile target [filter] (any number). Return [it/them] to the battlefield
+/// under [its/their] owner's control at [a stated future moment]." — the
+/// SPELL-path flicker-with-delayed-return family (CR 701.21 exile +
+/// CR 603.7 delayed triggered ability + CR 614 "under its owner's control").
+///
+/// <para>
+/// This is the spell-anchored sibling of <see cref="ExileUntilLeavesEffectDef"/>:
+/// where <c>exile_until_leaves</c> sits on a permanent's ETB and returns the
+/// captured object when the SOURCE leaves the battlefield (a duration anchored
+/// to a permanent), <c>exile_with_return</c> exiles the chosen target(s)
+/// IMMEDIATELY and schedules a one-shot return at a stated moment (the next end
+/// step, or the next upkeep — CR 603.7 delayed trigger), with no anchoring
+/// permanent. It is the declarative form of the hand-rolled OtherworldlyJourney
+/// / Touch the Spirit Realm flicker spells, generalized to the "for many"
+/// multi-target case.
+/// </para>
+///
+/// <para>
+/// <b>For many</b> (the canonical Eerie Interlude shape — "exile any number of
+/// target creatures you control. Return those cards … at the beginning of the
+/// next end step"): the verb declares a SINGLE multi-target slot
+/// (<see cref="MinTargets"/> .. <see cref="MaxTargets"/>) and on resolution
+/// exiles the WHOLE batch, recording each card + its owner, then registers ONE
+/// delayed trigger that returns the entire batch together. The single-target
+/// shape (Otherworldly Journey) falls out of the same verb with
+/// <c>MinTargets: 1, MaxTargets: 1</c>.
+/// </para>
+///
+/// <para>
+/// The delayed return needs the live game's <see cref="Majik.Core.Abilities.TriggerManager"/>,
+/// which the declarative spell adapter
+/// (<see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>) does not pass
+/// as a parameter; the resolve closure reads it from
+/// <see cref="Majik.Core.Abilities.TriggerManagerRegistry"/> (the per-game
+/// ambient registry populated at game start, mirroring the EventBus /
+/// ZoneService registries). When no manager is registered (pure-shape /
+/// dispatcher-test paths) the exile still fires but the delayed return is
+/// skipped — the same two-mode posture as the hand-rolled flicker factories.
+/// </para>
+/// </summary>
+public sealed class ExileWithReturnEffectDef : EffectDefinition
+{
+    /// <summary>Base battlefield target filter (default
+    /// <c>"creature_you_control"</c> — Eerie Interlude / Otherworldly
+    /// Journey). The shared <see cref="TargetFilters"/> vocabulary applies,
+    /// including the control rider on <c>creature_you_control</c>.</summary>
+    public string TargetFilter { get; set; } = "creature_you_control";
+
+    /// <summary>Minimum targets. <c>0</c> = "any number" (declining is legal,
+    /// CR 115.1b — Eerie Interlude); <c>1</c> = mandatory single target
+    /// (Otherworldly Journey). Default 1.</summary>
+    public int MinTargets { get; set; } = 1;
+
+    /// <summary>Maximum targets. <c>1</c> = single target; a large value
+    /// models "any number of" (CR 601.2c). Default 1.</summary>
+    public int MaxTargets { get; set; } = 1;
+
+    /// <summary>
+    /// The stated return moment (CR 603.7). <c>"next_end_step"</c> (default,
+    /// the overwhelmingly common case — Eerie Interlude / Otherworldly Journey
+    /// / Long Road Home / Semester's End) fires on the first
+    /// <see cref="Majik.Core.Events.StepStartedEvent"/> with
+    /// <c>StepType == End</c> after resolution; <c>"next_upkeep"</c> fires on
+    /// the first <c>StepType == Upkeep</c> after resolution (the
+    /// beginning-of-next-upkeep flicker family).
+    /// </summary>
+    public string ReturnAt { get; set; } = "next_end_step";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest()
+    {
+        // Reuse the shared TargetFilters gatherer (it applies the
+        // control-scoped "you control" rider) but widen the cardinality to the
+        // declared Min..Max so "any number of target creatures you control"
+        // (Eerie Interlude) presents a multi-pick slot.
+        var baseRequest = TargetFilters.ToTargetRequest(
+            TargetFilter, "exile", Majik.Core.Cards.BotIntent.Protection,
+            optional: MinTargets <= 0);
+        return baseRequest with
+        {
+            MinTargets = System.Math.Max(0, MinTargets),
+            MaxTargets = System.Math.Max(1, MaxTargets),
+        };
+    }
 }
 
 /// <summary>

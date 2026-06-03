@@ -211,6 +211,12 @@ public sealed class GameDriver
             Majik.Core.Players.Agents.AgentRegistry.Set(kvp.Key, kvp.Value);
         }
 
+        // CR 603.7 — the live game's TriggerManager, so declarative spell verbs
+        // that schedule a one-shot delayed return (exile_with_return) can reach
+        // it at resolution without a parameter seam (mirrors the EventBus /
+        // ZoneService ambient registries above).
+        Majik.Core.Abilities.TriggerManagerRegistry.Set(_triggerManager);
+
         Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
         if (_eventBus is not null)
         {
