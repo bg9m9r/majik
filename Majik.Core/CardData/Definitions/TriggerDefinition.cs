@@ -22,6 +22,8 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(AtBeginningOfYourEndStepTriggerDef), "at_beginning_of_your_end_step")]
 [JsonDerivedType(typeof(WheneverAnotherCreatureEntersTriggerDef), "whenever_another_creature_enters")]
 [JsonDerivedType(typeof(WheneverAnotherCreatureDiesTriggerDef), "whenever_another_creature_dies")]
+[JsonDerivedType(typeof(WheneverAnotherPermanentDiesTriggerDef), "whenever_another_permanent_dies")]
+[JsonDerivedType(typeof(WheneverAnOpponentGainsLifeTriggerDef), "whenever_an_opponent_gains_life")]
 [JsonDerivedType(typeof(DealsCombatDamageToPlayerSelfTriggerDef), "whenever_this_deals_combat_damage_to_a_player")]
 [JsonDerivedType(typeof(WheneverACreatureYouControlExploresTriggerDef), "whenever_a_creature_you_control_explores")]
 [JsonDerivedType(typeof(StateWhenCountersGeTriggerDef), "state_when_counters_ge")]
@@ -293,6 +295,71 @@ public sealed class WheneverAnotherCreatureDiesTriggerDef : TriggerDefinition
     /// <inheritdoc />
     public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndGraveyard;
 }
+
+/// <summary>
+/// "Whenever another permanent [you control] dies, …" (CR 603.6e / CR 700.4) —
+/// the permanent-type-agnostic generalisation of
+/// <see cref="WheneverAnotherCreatureDiesTriggerDef"/>. Fires on a
+/// Battlefield → Graveyard move of a PERMANENT (any of creature / artifact /
+/// enchantment / land / planeswalker — CR 700.4 "dies" applies to creatures,
+/// but the broader "another permanent … is put into a graveyard from the
+/// battlefield" wording fires on any permanent type) OTHER than this
+/// permanent, over <see cref="Majik.Core.Events.CardMovedEvent"/>. The
+/// "another" self-exclusion distinguishes it from
+/// <see cref="DiesSelfTriggerDef"/>.
+///
+/// <para>
+/// Optional, composable filters (mirroring the creature variant):
+/// <list type="bullet">
+///   <item><see cref="YouControlOnly"/> (CR 109.5) — restrict to a permanent
+///   whose controller is the trigger's controller (resolved live so a control
+///   change carries the trigger); <c>false</c> (default) = ANY permanent
+///   dying.</item>
+///   <item><see cref="NontokenOnly"/> (CR 111 / 700.4) — exclude token
+///   permanents (a token ceases to exist as an SBA after dying, CR 111.7).</item>
+///   <item><see cref="Subtype"/> — tribal/land-type gate; only a permanent of
+///   the given subtype fires it.</item>
+/// </list>
+/// </para>
+///
+/// Overrides <see cref="TriggerDefinition.ActiveZones"/> to include the
+/// Graveyard so the ability is still observable after
+/// <see cref="Majik.Core.Zones.ZoneService"/> stamps the death (same posture as
+/// <see cref="WheneverAnotherCreatureDiesTriggerDef"/>).
+/// </summary>
+public sealed class WheneverAnotherPermanentDiesTriggerDef : TriggerDefinition
+{
+    private static readonly IReadOnlyList<ZoneType> BattlefieldAndGraveyard =
+        new[] { ZoneType.Battlefield, ZoneType.Graveyard };
+
+    /// <summary>Restrict to permanents whose controller is the trigger
+    /// controller (CR 109.5). Default <c>false</c> = any permanent dying.</summary>
+    public bool YouControlOnly { get; set; }
+
+    /// <summary>Exclude token permanents (CR 111 / 111.7). Default
+    /// <c>false</c>.</summary>
+    public bool NontokenOnly { get; set; }
+
+    /// <summary>Optional subtype/tribal gate (CR 205.3). <c>null</c>/empty =
+    /// no subtype restriction. Parsed as
+    /// <see cref="Majik.Core.Cards.Types.CardSubtype"/>.</summary>
+    public string? Subtype { get; set; }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndGraveyard;
+}
+
+/// <summary>
+/// "Whenever an opponent gains life, …" (CR 119.3 / CR 109.5) — the
+/// opponent-scoped mirror of <see cref="WheneverYouGainLifeTriggerDef"/>.
+/// Fires on a <see cref="Majik.Core.Events.LifeChangedEvent"/> for a player
+/// OTHER than the trigger's controller (every other player is an opponent,
+/// CR 102.2) where the life total strictly increased — the Kavu Predator /
+/// lifegain-punish family. Controller is resolved live (<c>card.Controller</c>)
+/// at fire time so a control change moves the trigger with the permanent
+/// (CR 109.5). No extra fields.
+/// </summary>
+public sealed class WheneverAnOpponentGainsLifeTriggerDef : TriggerDefinition { }
 
 /// <summary>
 /// "Whenever this creature deals combat damage to a player, …" (CR 510.2 /

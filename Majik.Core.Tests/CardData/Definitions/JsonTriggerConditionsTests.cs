@@ -1215,4 +1215,237 @@ public class JsonTriggerConditionsTests
         triggers.PendingCount.Should().Be(1,
             "the source counts as 'a creature you control', so its own explore fires it (CR 701.40e)");
     }
+
+    // ------------------------------------------------------------------
+    // whenever_another_permanent_dies — CR 603.6e / CR 700.4, over
+    // CardMovedEvent (Battlefield → Graveyard, self-excluded). The
+    // permanent-type-agnostic generalisation of whenever_another_creature_dies
+    // (no creature gate). Default any-controller; optional youControlOnly +
+    // nontokenOnly + subtype filters.
+    // ------------------------------------------------------------------
+
+    // ANY permanent (either player's, any type) dying fires it.
+    private const string AnotherPermanentDiesJson = """
+    {
+      "name": "Test Permanent Aristocrat",
+      "types": ["Creature"],
+      "manaCost": "1B",
+      "power": 0,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_permanent_dies" },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherPermanentDies_Fires_OnOtherCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherPermanentDiesJson, triggers);
+
+        var other = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        other.SetController(_alice);
+        bus.Publish(new CardMovedEvent(other, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "a creature is a permanent, so its death fires 'another permanent dies' (CR 700.4)");
+    }
+
+    [Fact]
+    public void AnotherPermanentDies_Fires_OnNoncreaturePermanent()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherPermanentDiesJson, triggers);
+
+        // The distinguishing case from whenever_another_creature_dies: a
+        // NONCREATURE permanent (an artifact, a land, an enchantment) dying
+        // ALSO fires this trigger — there is no creature gate (CR 700.4).
+        var artifact = new Artifact("Bauble", "0") { Owner = _alice };
+        artifact.SetController(_alice);
+        bus.Publish(new CardMovedEvent(artifact, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        var land = new Land("Forest") { Owner = _bob };
+        land.SetController(_bob);
+        bus.Publish(new CardMovedEvent(land, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(2,
+            "noncreature permanents (artifact, land) dying fire 'another permanent dies' too (CR 700.4)");
+    }
+
+    [Fact]
+    public void AnotherPermanentDies_DoesNotFire_ForSelf()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(AnotherPermanentDiesJson, triggers);
+
+        bus.Publish(new CardMovedEvent(card, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0,
+            "'ANOTHER permanent' excludes the source itself (CR 603.6e)");
+    }
+
+    [Fact]
+    public void AnotherPermanentDies_DoesNotFire_OnBounceToHand()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherPermanentDiesJson, triggers);
+
+        var other = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        other.SetController(_alice);
+        bus.Publish(new CardMovedEvent(other, ZoneType.Battlefield, ZoneType.Hand));
+
+        triggers.PendingCount.Should().Be(0, "leaving the battlefield to hand is not a death (CR 700.4)");
+    }
+
+    // youControlOnly + nontokenOnly scoping mirrors the creature variant.
+    private const string AnotherNontokenPermanentYouControlDiesJson = """
+    {
+      "name": "Test Nontoken Permanent Aristocrat",
+      "types": ["Creature"],
+      "manaCost": "2B",
+      "power": 2,
+      "toughness": 2,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_permanent_dies", "youControlOnly": true, "nontokenOnly": true },
+          "effects": [ { "type": "draw_card", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherPermanentDies_YouControlOnly_DoesNotFire_ForOpponentPermanent()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherNontokenPermanentYouControlDiesJson, triggers);
+
+        var enemyArtifact = new Artifact("Enemy Bauble", "0") { Owner = _bob };
+        enemyArtifact.SetController(_bob);
+        bus.Publish(new CardMovedEvent(enemyArtifact, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0,
+            "youControlOnly scope excludes opponents' permanents dying (CR 109.5)");
+    }
+
+    [Fact]
+    public void AnotherPermanentDies_NontokenOnly_DoesNotFire_ForToken()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherNontokenPermanentYouControlDiesJson, triggers);
+
+        var token = new Creature("Servo", "", 1, 1) { Owner = _alice };
+        token.SetController(_alice);
+        token.MarkAsToken();
+        bus.Publish(new CardMovedEvent(token, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0,
+            "nontokenOnly excludes a token permanent dying (CR 111.7)");
+    }
+
+    [Fact]
+    public void AnotherPermanentDies_YouControlOnly_Fires_ForOwnNontokenPermanent()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherNontokenPermanentYouControlDiesJson, triggers);
+
+        var ownEnchantment = new Enchantment("Aura", "1W") { Owner = _alice };
+        ownEnchantment.SetController(_alice);
+        bus.Publish(new CardMovedEvent(ownEnchantment, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "a nontoken permanent you control dying fires the youControlOnly trigger (CR 109.5)");
+    }
+
+    // ------------------------------------------------------------------
+    // whenever_an_opponent_gains_life — CR 119.3 / CR 109.5, over
+    // LifeChangedEvent (strict positive delta, NON-controller player). The
+    // opponent-scoped mirror of whenever_you_gain_life.
+    // ------------------------------------------------------------------
+
+    private const string OpponentGainsLifeJson = """
+    {
+      "name": "Test Lifegain Punisher",
+      "types": ["Creature"],
+      "manaCost": "1G",
+      "power": 2,
+      "toughness": 2,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_an_opponent_gains_life" },
+          "effects": [ { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void OpponentGainsLife_Fires_ForOpponentGain_AddsCounter()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(OpponentGainsLifeJson, triggers);
+
+        // Bob (an opponent of Alice, the controller) gains life — CR 109.5.
+        bus.Publish(new LifeChangedEvent(_bob, 20, 23));
+
+        triggers.PendingCount.Should().Be(1, "an OPPONENT gaining life fires the trigger (CR 119.3 / 109.5)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        card.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the put_counter self effect resolves once per opponent life-gain event");
+    }
+
+    [Fact]
+    public void OpponentGainsLife_DoesNotFire_ForControllerGain()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(OpponentGainsLifeJson, triggers);
+
+        // The controller's OWN life gain must NOT fire an "an opponent gains
+        // life" trigger (CR 109.5 — opponent = a player OTHER than you).
+        bus.Publish(new LifeChangedEvent(_alice, 20, 23));
+
+        triggers.PendingCount.Should().Be(0,
+            "the controller is not 'an opponent' of itself (CR 109.5)");
+    }
+
+    [Fact]
+    public void OpponentGainsLife_DoesNotFire_ForOpponentLifeLoss()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(OpponentGainsLifeJson, triggers);
+
+        // A non-positive delta (life LOSS) is not a gain (CR 119.3).
+        bus.Publish(new LifeChangedEvent(_bob, 20, 17));
+
+        triggers.PendingCount.Should().Be(0, "opponent life LOSS is not 'gains life' (CR 119.3)");
+    }
 }
