@@ -1,0 +1,8 @@
+{
+  "name": "Fortified Village",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
