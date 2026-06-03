@@ -100,17 +100,21 @@ public class ManaPool : IEquatable<ManaPool>
     }
 
     /// <summary>
-    /// Add colored mana to the pool.
+    /// Add colored mana to the pool. The optional <paramref name="generic"/>
+    /// restores units into the Generic bucket — used by the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> spend-restriction
+    /// gate to put back colorless ({C}) mana it temporarily withheld
+    /// (CR 106.1b — colorless mana is stored in the Generic bucket).
     /// </summary>
-    public ManaPool AddColored(int white = 0, int blue = 0, int black = 0, int red = 0, int green = 0)
+    public ManaPool AddColored(int white = 0, int blue = 0, int black = 0, int red = 0, int green = 0, int generic = 0)
     {
-        if (white < 0 || blue < 0 || black < 0 || red < 0 || green < 0)
+        if (white < 0 || blue < 0 || black < 0 || red < 0 || green < 0 || generic < 0)
         {
             throw new ArgumentException("Mana amounts cannot be negative");
         }
 
         return new ManaPool(
-            Generic,
+            Generic + generic,
             White + white,
             Blue + blue,
             Black + black,
@@ -120,22 +124,25 @@ public class ManaPool : IEquatable<ManaPool>
     }
 
     /// <summary>
-    /// Return a copy of this pool with the given colored counts removed
-    /// (clamped at zero). Generic is untouched. Used by the
+    /// Return a copy of this pool with the given counts removed (clamped at
+    /// zero). Used by the
     /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> spend-restriction
-    /// gate (CR 106.4) to model "this restricted colored mana is unavailable
-    /// for the current spend" without mutating the real pool — the gate then
-    /// checks whether the remaining (spendable) mana still covers the cost.
+    /// gate (CR 106.4) to model "this restricted mana is unavailable for the
+    /// current spend" without mutating the real pool — the gate then checks
+    /// whether the remaining (spendable) mana still covers the cost. The
+    /// optional <paramref name="generic"/> removes colorless ({C}) restricted
+    /// units, which live in the Generic bucket (Karn, Legacy Reforged's
+    /// "can't be spent to cast nonartifact spells" {C}; CR 106.1b).
     /// </summary>
-    public ManaPool RemoveColored(int white = 0, int blue = 0, int black = 0, int red = 0, int green = 0)
+    public ManaPool RemoveColored(int white = 0, int blue = 0, int black = 0, int red = 0, int green = 0, int generic = 0)
     {
-        if (white < 0 || blue < 0 || black < 0 || red < 0 || green < 0)
+        if (white < 0 || blue < 0 || black < 0 || red < 0 || green < 0 || generic < 0)
         {
             throw new ArgumentException("Mana amounts cannot be negative");
         }
 
         return new ManaPool(
-            Generic,
+            Math.Max(0, Generic - generic),
             Math.Max(0, White - white),
             Math.Max(0, Blue - blue),
             Math.Max(0, Black - black),

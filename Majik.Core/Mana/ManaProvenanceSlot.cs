@@ -64,16 +64,31 @@ public sealed class ManaProvenanceSlot
     /// </summary>
     public Action<ICard?>? OnSpent { get; }
 
+    /// <summary>
+    /// CR 500.4 exception — when <c>true</c>, this unit of mana does NOT empty
+    /// from the pool as steps and phases end ("Until end of turn, you don't
+    /// lose this mana as steps and phases end" — Karn, Legacy Reforged; CR
+    /// 106.4 / 500.4). The
+    /// <see cref="Majik.Core.Players.Player.EmptyManaPool(bool)"/> sweep keeps
+    /// a doesn't-empty slot (and its colored/colorless pool unit) floating on a
+    /// step/phase-boundary empty, and only clears it on the end-of-turn empty
+    /// (CR 514.2 — the "until end of turn" rider then lapses). <c>false</c> ⇒
+    /// vanilla mana that empties at every step/phase boundary.
+    /// </summary>
+    public bool DoesNotEmpty { get; }
+
     public ManaProvenanceSlot(
         object source,
         ManaColor color,
         Action<ICard?>? onSpent = null,
-        SpendRestriction? restriction = null)
+        SpendRestriction? restriction = null,
+        bool doesNotEmpty = false)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Color = color;
         OnSpent = onSpent;
         Restriction = restriction;
+        DoesNotEmpty = doesNotEmpty;
     }
 
     /// <summary>

@@ -376,12 +376,16 @@ public sealed class ManaPaymentResolver
         var blockedB = CountBlocked(payer, abilities, ValueObjects.ManaColor.Black, spellContext);
         var blockedR = CountBlocked(payer, abilities, ValueObjects.ManaColor.Red, spellContext);
         var blockedG = CountBlocked(payer, abilities, ValueObjects.ManaColor.Green, spellContext);
-        var hasBlocked = blockedW + blockedU + blockedB + blockedR + blockedG > 0;
+        // CR 106.1b — colorless ({C}) restricted units (Karn, Legacy Reforged's
+        // "can't be spent to cast nonartifact spells") live in the Generic
+        // pool bucket. Count + withhold them from Generic the same way.
+        var blockedC = CountBlocked(payer, abilities, ValueObjects.ManaColor.Colorless, spellContext);
+        var hasBlocked = blockedW + blockedU + blockedB + blockedR + blockedG + blockedC > 0;
         if (hasBlocked)
         {
             var spendable = simulated.RemoveColored(
                 white: blockedW, blue: blockedU, black: blockedB,
-                red: blockedR, green: blockedG);
+                red: blockedR, green: blockedG, generic: blockedC);
             var (_, canPaySpendable) = spendable.Pay(matchCost);
             if (!canPaySpendable)
             {
@@ -433,12 +437,12 @@ public sealed class ManaPaymentResolver
         // restored afterward and stays floating, its provenance slots intact.
         if (hasBlocked)
         {
-            payer.WithholdColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG);
+            payer.WithholdColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG, colorless: blockedC);
         }
         var ok = payer.PayMana(matchCost);
         if (hasBlocked)
         {
-            payer.RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG);
+            payer.RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG, colorless: blockedC);
         }
         if (!ok) return false;
 
@@ -489,6 +493,17 @@ public sealed class ManaPaymentResolver
         if (deltaB > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Black, deltaB, spentOn);
         if (deltaR > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Red,   deltaR, spentOn);
         if (deltaG > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Green, deltaG, spentOn);
+
+        // CR 106.1b — colorless ({C}) provenance slots (Karn, Legacy Reforged)
+        // live in the Generic pool bucket. The generic delta is the number of
+        // generic-bucket units the payment consumed; pop that many Colorless
+        // slots FIFO that the spend satisfies, firing their reactions. Untagged
+        // generic spends pop nothing (no Colorless slots present). The withheld
+        // restricted colorless (blockedC) was held back across PayMana, so a
+        // nonartifact spell never consumes Karn's {C} here.
+        var availableGeneric = poolBefore.Generic + produced.Sum(p => p.Generic);
+        var deltaC = availableGeneric - poolAfter.Generic;
+        if (deltaC > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Colorless, deltaC, spentOn);
 
         return true;
     }
