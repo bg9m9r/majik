@@ -13,6 +13,8 @@ namespace Majik.Core.Targeting;
 ///
 /// Honors untargetability keywords on creatures:
 ///   - Hexproof — can't be targeted by spells/abilities your opponents control
+///   - Hexproof from [colour] (CR 702.11e) — can't be targeted by your
+///     opponents' spells/abilities whose source is of that colour
 ///   - Shroud — can't be targeted at all
 ///   - Protection from X — can't be targeted by spells/abilities of X
 /// </summary>
@@ -54,6 +56,18 @@ public static class TargetLegality
 
             // Hexproof — opponents' spells/abilities can't target.
             if (HasKeyword(creature, "Hexproof")
+                && !ReferenceEquals(creature.Controller, caster))
+                return false;
+
+            // Hexproof from COLOR (CR 702.11e) — like hexproof, but only
+            // against opponents' sources matching the named colour. Sungold
+            // Sentinel's "gains hexproof from [chosen colour]" and Veil of
+            // Summer's "hexproof from blue and from black" land the keyword
+            // "Hexproof from {Colour}" on the creature; an opponent casting a
+            // matching-colour spell/ability can't target it, while a
+            // non-matching colour — and the controller's own spells — can.
+            if (sourceColor != null
+                && HasKeyword(creature, $"Hexproof from {sourceColor}")
                 && !ReferenceEquals(creature.Controller, caster))
                 return false;
 
