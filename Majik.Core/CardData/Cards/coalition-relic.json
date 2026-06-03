@@ -1,0 +1,5 @@
+{
+  "name": "Coalition Relic",
+  "types": ["Artifact"],
+  "manaCost": "{3}"
+}
