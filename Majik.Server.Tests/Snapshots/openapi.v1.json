@@ -804,11 +804,11 @@
           "extraPhaseAdded": {
             "$ref": "#/components/schemas/ExtraPhaseAddedPayload"
           },
+          "gameStateChanged": {
+            "$ref": "#/components/schemas/GameStateChangedPayload"
+          },
           "lifeChanged": {
             "$ref": "#/components/schemas/LifeChangedPayload"
-          },
-          "phaseChanged": {
-            "$ref": "#/components/schemas/PhaseChangedPayload"
           },
           "phaseEnded": {
             "$ref": "#/components/schemas/PhaseEndedPayload"
@@ -845,7 +845,7 @@
           "lifeChanged",
           "phaseStarted",
           "phaseEnded",
-          "phaseChanged",
+          "gameStateChanged",
           "turnStateChanged",
           "stepStarted",
           "stepEnded",
@@ -1456,6 +1456,24 @@
           "landInstanceId"
         ]
       },
+      "GameStateChangedPayload": {
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
       "GameStateDto": {
         "properties": {
           "activePlayerId": {
@@ -1731,24 +1749,6 @@
           "sideboard",
           "unknown",
           "warnings"
-        ],
-        "type": "object"
-      },
-      "PhaseChangedPayload": {
-        "properties": {
-          "from": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "to": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "from",
-          "to"
         ],
         "type": "object"
       },

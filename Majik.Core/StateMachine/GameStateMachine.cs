@@ -65,6 +65,10 @@ public class GameStateMachine : StateMachine<GameState>
 
     private void OnStateChanged(GameState? previous, GameState current)
     {
-        _eventBus?.Publish(new PhaseChangedEvent(previous?.Name, current.Name));
+        // Game-lifecycle channel only — typed GameStateChangedEvent. Must NOT
+        // emit on the phase/step channel: these are Initializing / Mulligan /
+        // Playing / GameOver, not CR-500 phases, and pushing their names into
+        // the wire phase label corrupted the portal's phase display.
+        _eventBus?.Publish(new GameStateChangedEvent(previous?.Type, current.Type));
     }
 }

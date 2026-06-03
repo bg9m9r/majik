@@ -34,7 +34,7 @@ public class EventPayloadCoverageTests
         nameof(LifeChangedEvent),
         "PhaseStartedEvent",
         "PhaseEndedEvent",
-        "PhaseChangedEvent",
+        "GameStateChangedEvent",
         "TurnStateChangedEvent",
         "StepStartedEvent",
         "StepEndedEvent",

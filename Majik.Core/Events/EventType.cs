@@ -8,6 +8,7 @@ public enum EventType
     // Game Events
     GameStarted,
     GameEnded,
+    GameStateChanged,
     TurnStarted,
     TurnEnded,
 

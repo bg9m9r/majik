@@ -664,17 +664,18 @@ public class EventPayloadTests
     }
 
     [Fact]
-    public void PhaseChangedEvent_EmitsRawPhaseLabelsVerbatim()
+    public void GameStateChangedEvent_EmitsLifecycleStateNamesVerbatim()
     {
-        // PhaseChangedEvent carries the PhaseState.Name strings, which are now
-        // already the first-class CR 505 labels — emitted verbatim.
-        var e = new PhaseChangedEvent(previousPhase: "Draw", currentPhase: PhaseLabelResolver.PreCombatMain);
+        // Game-lifecycle channel: from/to carry the GameStateType names
+        // (Initializing/Mulligan/Playing/GameOver), never CR-500 phase labels.
+        var e = new GameStateChangedEvent(
+            Majik.Core.StateMachine.GameStateType.Mulligan,
+            Majik.Core.StateMachine.GameStateType.Playing);
 
-        var payload = EventPayloadBuilder.Build(e, viewer: null,
-            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+        var payload = EventPayloadBuilder.Build(e);
 
-        payload.GetProperty("from").GetString().Should().Be("Draw");
-        payload.GetProperty("to").GetString().Should().Be(PhaseLabelResolver.PreCombatMain);
+        payload.GetProperty("from").GetString().Should().Be("Mulligan");
+        payload.GetProperty("to").GetString().Should().Be("Playing");
     }
 
     [Fact]
