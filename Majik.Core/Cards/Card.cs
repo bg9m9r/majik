@@ -441,6 +441,29 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 608.3 override — when an instant/sorcery's resolution instructs the
+    /// spell to return ITSELF to its owner's hand (Recross the Paths — "If you
+    /// win [the clash], return Recross the Paths to its owner's hand") instead
+    /// of the default move to the graveyard. Set DURING resolution by the
+    /// effect body (a clash-win branch) and consulted by
+    /// <see cref="Majik.Core.Services.StackResolver"/> when it picks the post-
+    /// resolution destination zone, so the spell card lands in hand rather than
+    /// the graveyard. Parallels <see cref="PendingCastX"/> as a per-cast
+    /// resolution sentinel; cleared post-resolve so a later cast starts clean.
+    /// </summary>
+    public bool ReturnToHandOnResolution { get; private set; }
+
+    /// <summary>Mark this spell to return to its owner's hand on resolution
+    /// (CR 608.3 override). Called by a resolution effect (Recross the Paths
+    /// clash-win branch).</summary>
+    public void MarkReturnToHandOnResolution() => ReturnToHandOnResolution = true;
+
+    /// <summary>Clear the return-to-hand-on-resolution sentinel. Called by the
+    /// post-resolution move once it has consumed the flag so a later cast (or
+    /// a recast from hand) doesn't reuse it.</summary>
+    public void ClearReturnToHandOnResolution() => ReturnToHandOnResolution = false;
+
+    /// <summary>
     /// CR 702.44 — distinct colors of mana actually spent to pay this
     /// card's cast cost (colored pips + colored mana used to satisfy
     /// generic). Stamped by

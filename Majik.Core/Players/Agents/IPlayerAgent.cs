@@ -306,6 +306,55 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// CR 701.32c — clash top-or-bottom decision. During a clash (CR 701.32),
+    /// each participating player reveals the top card of their library, then
+    /// chooses to leave that card on top of their library or put it on the
+    /// bottom. Returns <see langword="true"/> to keep the card on top,
+    /// <see langword="false"/> to put it on the bottom.
+    /// <para>
+    /// Only invoked when the player's library is non-empty (CR 701.32a — an
+    /// empty library reveals no card and the player makes no choice). The two
+    /// clashing players choose independently and the choices are made before
+    /// any card moves (CR 701.32b — "they're made simultaneously"); the engine
+    /// resolves both reveals, then prompts each chooser, then applies the
+    /// moves.
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a Yes/No prompt ("keep the revealed
+    /// card on top of your library?"), classified <see cref="BotIntent.None"/>
+    /// so the default heuristic answers "yes" — keep the card on top. This is
+    /// the library-preserving default (mirrors
+    /// <see cref="ChooseExploreKeepOnTopAsync"/> and Scry's all-on-top
+    /// posture), so a clashing card is not silently sent to the bottom.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect
+    /// closures (same sync-over-async wart as
+    /// <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<bool> ChooseClashTopOrBottomAsync(
+        GameContext? ctx,
+        ICard revealedCard,
+        CancellationToken ct = default)
+    {
+        // PLAN 01 (Slice C) shim — declarative YesNo "keep on top?". A
+        // non-empty result ("yes") keeps the card on top; an empty result
+        // ("no") puts it on the bottom. Mirrors ChooseExploreKeepOnTopAsync.
+        var label = revealedCard?.Name is { Length: > 0 } name
+            ? $"Keep {name} on top of your library? (clash)"
+            : "Keep the revealed card on top of your library? (clash)";
+        var req = new ChoiceRequest(
+            ChoiceKind.YesNo, label, Min: 0, Max: 1,
+            Candidates: Array.Empty<object>(),
+            Intent: BotIntent.None,
+            Optional: true);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0;
+    }
+
+    /// <summary>
     /// CR 701.19a — library search. The engine pre-filters
     /// <paramref name="candidates"/> down to the cards that satisfy the
     /// search predicate (kind, color, mana value, etc.); the agent picks
