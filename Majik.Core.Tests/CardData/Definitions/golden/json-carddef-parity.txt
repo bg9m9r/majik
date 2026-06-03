@@ -23799,6 +23799,61 @@
   "mdfc": null,
   "colors": []
 }
+==== mystic-snake ====
+{
+  "name": "Mystic Snake",
+  "manaCost": "{1}{G}{U}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Snake"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Flash"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green"
+  ]
+}
 ==== nahiri-the-harbinger ====
 {
   "name": "Nahiri, the Harbinger",

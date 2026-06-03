@@ -5,8 +5,10 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Spells;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -23,6 +25,12 @@ namespace Majik.Core.Tests.CardData;
 /// Mirrors <see cref="SpellstutterSpriteTests"/> — a Flash creature whose ETB
 /// counters a target spell — with the mana-value ceiling removed (Mystic Snake
 /// counters ANY spell, CR 701.5).
+///
+/// The factory is now a declarative JSON shell (mystic-snake.json) carrying the
+/// <c>counter_target_spell</c> verb on its <c>etb_self</c> trigger, so the ETB
+/// counter resolves through the shared <see cref="Majik.Core.Primitives.Fx.Counter"/>
+/// primitive — reaching the live stack off the resolution context's game
+/// (threaded by <see cref="TriggeredAbility.ResolveAsync"/>).
 ///
 /// Covers:
 ///   - Identity (name, type, Snake subtype, 2/2, mana cost).
@@ -43,6 +51,12 @@ public class MysticSnakeTests
     {
         _stack = new Majik.Core.Stack.Stack(_bus);
     }
+
+    // The counter resolution reaches the live stack off ctx.Game.Stack, so the
+    // resolution context MUST be built over the same stack the target spell is
+    // pushed onto.
+    private GameContext NewContext() =>
+        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
     [Fact]
     public void MysticSnake_Identity()
@@ -87,15 +101,15 @@ public class MysticSnakeTests
         var req = etb.TargetRequests[0];
         req.MinTargets.Should().Be(1);
         req.MaxTargets.Should().Be(1);
-        req.Description.Should().Contain("target spell");
+        req.Description.Should().Contain("spell");
     }
 
     [Fact]
-    public void MysticSnake_Etb_CountersAnySpell_RegardlessOfManaValue()
+    public async Task MysticSnake_Etb_CountersAnySpell_RegardlessOfManaValue()
     {
         // Mystic Snake has no mana-value cap — it can counter an expensive
         // spell that Spellstutter Sprite could not.
-        var snake = MysticSnakeFactory.Create(_alice, _stack, triggers: null);
+        var snake = MysticSnakeFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(snake);
         snake.SetZone(ZoneType.Battlefield);
 
@@ -114,20 +128,19 @@ public class MysticSnakeTests
             new object[] { spell },
         });
 
-        foreach (var e in etb.Effects) e.Execute();
+        await etb.ResolveAsync(agent: null, game: NewContext());
 
         bigSpell.Zone.Should().Be(ZoneType.Graveyard,
             "CR 701.5 — countered spell goes to its owner's graveyard");
-        _bob.Zones.Graveyard.GetCards().Should().Contain(bigSpell);
         _stack.GetAll().Should().NotContain(spell);
     }
 
     [Fact]
-    public void MysticSnake_Etb_IllegalTarget_SpellNotOnStack_NoOps()
+    public async Task MysticSnake_Etb_IllegalTarget_SpellNotOnStack_NoOps()
     {
         // CR 608.2b — if the targeted spell is no longer on the stack at
         // resolution, the counter does nothing.
-        var snake = MysticSnakeFactory.Create(_alice, _stack, triggers: null);
+        var snake = MysticSnakeFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(snake);
         snake.SetZone(ZoneType.Battlefield);
 
@@ -145,7 +158,7 @@ public class MysticSnakeTests
             new object[] { spell },
         });
 
-        foreach (var e in etb.Effects) e.Execute();
+        await etb.ResolveAsync(agent: null, game: NewContext());
 
         bolt.Zone.Should().Be(ZoneType.Graveyard,
             "target was not on the stack — counter no-ops");

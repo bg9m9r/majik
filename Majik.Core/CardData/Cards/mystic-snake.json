@@ -1,0 +1,18 @@
+{
+  "name": "Mystic Snake",
+  "manaCost": "{1}{G}{U}{U}",
+  "types": ["Creature"],
+  "subtypes": ["Snake"],
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["Flash"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "counter_target_spell" }
+      ]
+    }
+  ]
+}
