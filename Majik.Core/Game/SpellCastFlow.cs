@@ -844,6 +844,19 @@ public sealed class SpellCastFlow
             spell.CannotBeCountered = true;
         }
 
+        // CR 701.5b — controller-scoped "spells you control can't be countered"
+        // static (Destiny Spinner: creature + enchantment spells; the wider
+        // can't-be-countered cluster). Scan the caster's battlefield for a live
+        // UncounterableControllerStatic marker whose covered type set includes
+        // one of this spell's card types. Battlefield gating is enforced here
+        // (the marker only counts while its source permanent is on the caster's
+        // battlefield, CR 603-style), so an LTB'd source contributes nothing.
+        if (!spell.CannotBeCountered
+            && CasterControlsUncounterableStaticFor(caster, card))
+        {
+            spell.CannotBeCountered = true;
+        }
+
         // CR 701.59 — stamp Gift recipient + deliver the promised gift NOW
         // (v1 cast-time delivery — see IGiftClause xmldoc).
         if (giftRecipient != null && card is IGiftClause giftClauseForDelivery)
@@ -910,4 +923,30 @@ public sealed class SpellCastFlow
         card.Abilities
             .OfType<KeywordAbility>()
             .Any(k => string.Equals(k.Keyword, "Uncounterable", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// CR 701.5b helper — does <paramref name="caster"/> control a live
+    /// <see cref="UncounterableControllerStatic"/> marker that covers one of
+    /// the cast card's types? The marker is battlefield-gated: only permanents
+    /// currently in the caster's Battlefield zone contribute, so a source that
+    /// has since left the battlefield grants nothing. Mirrors
+    /// <see cref="HasUncounterableMarker"/> (per-card self marker) but scans the
+    /// controller's board rather than the spell itself, which is what makes
+    /// "spells you control can't be countered" controller-scoped.
+    /// </summary>
+    private static bool CasterControlsUncounterableStaticFor(Player caster, ICard card)
+    {
+        var spellTypes = card.CardTypes;
+        foreach (var permanent in caster.Zones.Battlefield.GetCards())
+        {
+            foreach (var marker in permanent.Abilities.OfType<UncounterableControllerStatic>())
+            {
+                if (marker.Covers(spellTypes))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
