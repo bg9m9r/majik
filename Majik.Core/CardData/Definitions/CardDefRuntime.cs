@@ -1103,10 +1103,31 @@ public static class CardDefRuntime
             TapSelfCostDef => BuildTapSelfCost(card),
             SacrificeSelfCostDef => BuildSacrificeSelfCost(card),
             SacrificeArtifactCostDef sa => Primitives.Costs.SacrificeAnArtifact(sa.Nontoken),
+            SacrificePermanentCostDef sp => BuildSacrificePermanentCost(sp),
             DiscardSelfCostDef => Primitives.Costs.DiscardSelf(card),
             _ => throw new NotSupportedException(
                 $"Cost '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    private static ICost BuildSacrificePermanentCost(SacrificePermanentCostDef def)
+    {
+        if (def.Token)
+            return Primitives.Costs.SacrificeAToken();
+
+        if (!string.IsNullOrWhiteSpace(def.Subtype))
+        {
+            if (!Enum.TryParse<Majik.Core.Cards.Types.CardSubtype>(
+                    def.Subtype, ignoreCase: true, out var subtype))
+            {
+                throw new NotSupportedException(
+                    $"SacrificePermanentCostDef.Subtype '{def.Subtype}' is not a known CardSubtype.");
+            }
+            return Primitives.Costs.SacrificeASubtype(subtype);
+        }
+
+        throw new NotSupportedException(
+            "SacrificePermanentCostDef requires exactly one filter: 'token': true OR 'subtype': \"<name>\".");
+    }
 
     private static ICost BuildTapSelfCost(ICard card)
     {
