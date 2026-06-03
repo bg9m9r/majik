@@ -78,6 +78,24 @@ public static class Costs
         => new SacrificeAnArtifactCost(excludeSource: null, requireNontoken: requireNontoken);
 
     /// <summary>
+    /// CR 111.8 / 701.16 — "Sacrifice a token" activation cost: sacrifice a
+    /// token permanent the controller controls (Fountainport's draw ability).
+    /// Routes through the generic <see cref="SacrificeFilteredCost"/> rail.
+    /// </summary>
+    public static ICost SacrificeAToken()
+        => SacrificeFilteredCost.ForToken();
+
+    /// <summary>
+    /// CR 701.16 — "Sacrifice a &lt;subtype&gt;" activation cost: sacrifice a
+    /// permanent with the given subtype the controller controls (Scavenger
+    /// Grounds — "Sacrifice a Desert"; Ramunap Ruins; etc.). Routes through
+    /// the generic <see cref="SacrificeFilteredCost"/> rail. The source can
+    /// pay itself when it has the subtype (CR 701.16).
+    /// </summary>
+    public static ICost SacrificeASubtype(Majik.Core.Cards.Types.CardSubtype subtype)
+        => SacrificeFilteredCost.ForSubtype(subtype);
+
+    /// <summary>
     /// CR 601.2f — a mana activation cost. <paramref name="manaCostString"/>
     /// accepts bracketed (<c>"{1}{R}"</c>) or unbracketed (<c>"1R"</c>)
     /// forms; an empty / whitespace string yields a zero cost. Mirrors the

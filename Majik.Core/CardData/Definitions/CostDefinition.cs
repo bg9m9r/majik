@@ -21,6 +21,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(TapSelfCostDef), "tap_self")]
 [JsonDerivedType(typeof(SacrificeSelfCostDef), "sacrifice_self")]
 [JsonDerivedType(typeof(SacrificeArtifactCostDef), "sacrifice_artifact")]
+[JsonDerivedType(typeof(SacrificePermanentCostDef), "sacrifice_permanent")]
 [JsonDerivedType(typeof(DiscardSelfCostDef), "discard_self")]
 public abstract class CostDefinition
 {
@@ -84,6 +85,38 @@ public sealed class SacrificeArtifactCostDef : CostDefinition
 {
     /// <summary>Exclude token artifacts from the picker (CR 111.8). Default false.</summary>
     public bool Nontoken { get; set; }
+}
+
+/// <summary>
+/// "Sacrifice a &lt;filtered&gt; permanent" — a generic non-mana activation
+/// cost (CR 117 / CR 701.16) that sacrifices ONE permanent the controller
+/// controls matching a filter (NOT necessarily this permanent). Routes
+/// through the generic <see cref="Majik.Core.Costs.SacrificeFilteredCost"/>
+/// rail. Distinct from <see cref="SacrificeSelfCostDef"/> (sacrifices the
+/// source) and the narrower <see cref="SacrificeArtifactCostDef"/>.
+///
+/// <para>Exactly one filter discriminator is set:</para>
+/// <list type="bullet">
+/// <item><see cref="Token"/> = true → "Sacrifice a token" (CR 111.8 —
+///   Fountainport).</item>
+/// <item><see cref="Subtype"/> = "Desert" → "Sacrifice a Desert" (CR 305.6 /
+///   701.16 — Scavenger Grounds). The string is parsed to a
+///   <see cref="Majik.Core.Cards.Types.CardSubtype"/>.</item>
+/// </list>
+///
+/// <para>The source IS eligible to pay itself when it matches the filter
+/// (CR 701.16 — Scavenger Grounds is a Desert).</para>
+/// </summary>
+public sealed class SacrificePermanentCostDef : CostDefinition
+{
+    /// <summary>"Sacrifice a token" filter (CR 111.8). Mutually exclusive
+    /// with <see cref="Subtype"/>.</summary>
+    public bool Token { get; set; }
+
+    /// <summary>"Sacrifice a &lt;subtype&gt;" filter — a
+    /// <see cref="Majik.Core.Cards.Types.CardSubtype"/> name
+    /// (e.g. "Desert"). Mutually exclusive with <see cref="Token"/>.</summary>
+    public string? Subtype { get; set; }
 }
 
 /// <summary>Discard this card — required for activated abilities that
