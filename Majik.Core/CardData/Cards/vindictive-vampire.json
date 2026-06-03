@@ -1,0 +1,18 @@
+{
+  "name": "Vindictive Vampire",
+  "types": ["Creature"],
+  "subtypes": ["Vampire"],
+  "manaCost": "{3}{B}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_another_creature_dies", "youControlOnly": true },
+      "effects": [
+        { "type": "deal_damage_each_opponent", "amount": 1 },
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
