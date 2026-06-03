@@ -1234,6 +1234,7 @@ public static class CardDefRuntime
             MayExileTargetCardThenGainLifeEffectDef mayExile =>
                 BuildMayExileTargetCardThenGainLifeEffect(mayExile, card, controller, targetRequestIndex),
             ExileUntilLeavesEffectDef exileUntil => BuildExileUntilLeavesEffect(exileUntil, card, controller, targetRequestIndex),
+            ExileWithReturnEffectDef exileReturn => BuildExileWithReturnEffect(exileReturn, card, controller, replacements, targetRequestIndex),
             ReturnToHandEffectDef bounce => BuildReturnToHandEffect(bounce, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
@@ -1868,6 +1869,128 @@ public static class CardDefRuntime
                 }
                 return ValueTask.CompletedTask;
             });
+    }
+
+    private static IEffect BuildExileWithReturnEffect(
+        ExileWithReturnEffectDef def, ICard card, Player controller,
+        ReplacementBus? replacements, int targetRequestIndex)
+    {
+        // CR 701.21 (exile) + CR 603.7 (delayed triggered ability) + CR 614
+        // ("under its owner's control"). The SPELL-path flicker-with-delayed-
+        // return verb: exile the chosen target(s) immediately and schedule ONE
+        // one-shot return at a stated future moment (next end step / next
+        // upkeep). This is the declarative generalization of the hand-rolled
+        // OtherworldlyJourney / Touch the Spirit Realm factories to the "for
+        // many" multi-target case (Eerie Interlude).
+        var filter = def.TargetFilter;
+        var returnStep = string.Equals(def.ReturnAt, "next_upkeep", StringComparison.OrdinalIgnoreCase)
+            ? Majik.Core.StateMachine.PhaseStateType.Upkeep
+            : Majik.Core.StateMachine.PhaseStateType.End;
+
+        return new Effect(
+            $"{card.Name}: exile target {filter}; return at {def.ReturnAt} under owner's control (CR 701.21 / 603.7 / 614)",
+            ctx =>
+            {
+                // CR 601.2c — read EVERY pick in the slot (the multi-target
+                // "any number of" batch), not just the first. The single-target
+                // shape is just a one-element batch.
+                var picks = AllChosenTargetsAt(ctx, targetRequestIndex);
+
+                // CR 608.2b — resolution-time legality re-check on each pick;
+                // record card + owner for the linked delayed return.
+                var exiled = new List<(ICard Card, Player Owner)>();
+                foreach (var pick in picks)
+                {
+                    if (pick is not Permanent perm) continue;
+                    if (perm.Zone != ZoneType.Battlefield) continue;
+                    if (!TargetFilters.Matches(filter, perm)) continue;
+                    var owner = perm.Owner;
+                    if (owner == null) continue;
+
+                    // CR 701.21 — prefer ZoneService so CardMovedEvent fires;
+                    // route to the card's OWNER's exile.
+                    var zones = ZoneServiceRegistry.Get(owner);
+                    if (zones != null)
+                    {
+                        zones.MoveCard(perm, ZoneType.Battlefield, ZoneType.Exile);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(perm);
+                        owner.Zones.Exile.AddCard(perm);
+                        perm.SetZone(ZoneType.Exile);
+                    }
+                    exiled.Add((perm, owner));
+                }
+
+                // CR 603.5 — a declined "any number" (empty batch) schedules no
+                // return.
+                if (exiled.Count == 0) return ValueTask.CompletedTask;
+
+                // CR 603.7 — schedule the one-shot delayed return. The live
+                // game's TriggerManager comes from the per-game ambient
+                // registry (the declarative spell adapter has no triggers
+                // parameter). Shape-only paths (no manager) skip the return —
+                // the exile still happened — matching the hand-rolled flicker
+                // factories' two-mode posture.
+                var triggers = TriggerManagerRegistry.Get();
+                if (triggers == null) return ValueTask.CompletedTask;
+
+                var resolvedAt = LogicalClockScope.Current.NextTimestamp();
+                var batch = exiled; // captured by the return closure
+
+                var returnEffect = new Effect(
+                    $"{card.Name}: return exiled card(s) to the battlefield under their owner's control (CR 603.7 / 614)",
+                    () =>
+                    {
+                        foreach (var (returnedCard, returnedOwner) in batch)
+                        {
+                            // CR 603.7 / CR 111.8 — only act on cards still in
+                            // exile (one may have left exile in the interim).
+                            if (returnedCard.Zone != ZoneType.Exile) continue;
+
+                            var zones = ZoneServiceRegistry.Get(returnedOwner);
+                            if (zones != null)
+                            {
+                                zones.MoveCard(returnedCard, ZoneType.Exile, ZoneType.Battlefield, returnedOwner);
+                            }
+                            else
+                            {
+                                returnedOwner.Zones.Exile.RemoveCard(returnedCard);
+                                returnedOwner.Zones.Battlefield.AddCard(returnedCard);
+                                returnedCard.SetZone(ZoneType.Battlefield);
+                            }
+                            // CR 614 — "under its owner's control".
+                            if (returnedCard is Card returned) returned.ChangeController(returnedOwner);
+                        }
+                    });
+
+                var delayed = new DelayedTriggeredAbility(
+                    source: card,
+                    controller: controller,
+                    condition: new EventTriggerCondition<Majik.Core.Events.StepStartedEvent>(
+                        (e, _) => e.StepType == returnStep && e.Timestamp > resolvedAt),
+                    effects: new IEffect[] { returnEffect });
+
+                triggers.RegisterDelayed(delayed);
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    /// <summary>
+    /// Read EVERY chosen pick in the slot at
+    /// <paramref name="targetRequestIndex"/> (the multi-target "any number of"
+    /// batch), or an empty list when the slot is missing / empty. The spell
+    /// adapter presents the whole slot at index 0 of the scoped context, so a
+    /// multi-target verb reads its full batch from there.
+    /// </summary>
+    private static IReadOnlyList<object> AllChosenTargetsAt(
+        Majik.Core.Abilities.ResolutionContext ctx, int targetRequestIndex)
+    {
+        if (targetRequestIndex < 0) return Array.Empty<object>();
+        var chosen = ctx.ChosenTargets;
+        if (targetRequestIndex >= chosen.Count) return Array.Empty<object>();
+        return chosen[targetRequestIndex];
     }
 
     /// <summary>
