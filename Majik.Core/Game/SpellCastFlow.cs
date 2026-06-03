@@ -265,6 +265,17 @@ public sealed class SpellCastFlow
         // so ActionValidator can gate the next cast attempt.
         Majik.Core.Rules.CastingRestrictions.ConsumeAdditionalSpellAllowance(caster);
 
+        // CR 605/616 / 601.3 — record a NONARTIFACT cast for the per-turn
+        // Canonist counter (Ethersworn Canonist: "Each player who has cast a
+        // nonartifact spell this turn can't cast additional nonartifact
+        // spells."). Tracked unconditionally so a Canonist that enters mid-turn
+        // correctly sees who has already cast a nonartifact spell; the
+        // battlefield gate lives in ActionValidator + the Canonist lifecycle.
+        if (!card.HasType(Cards.Types.CardType.Artifact))
+        {
+            Majik.Core.Rules.CastingRestrictions.RecordNonartifactSpellCast(caster);
+        }
+
         return spell;
     }
 

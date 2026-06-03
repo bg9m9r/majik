@@ -1,0 +1,9 @@
+{
+  "name": "Ethersworn Canonist",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}

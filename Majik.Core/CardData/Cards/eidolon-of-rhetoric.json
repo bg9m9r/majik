@@ -1,0 +1,9 @@
+{
+  "name": "Eidolon of Rhetoric",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Spirit"],
+  "manaCost": "{2}{W}",
+  "power": 1,
+  "toughness": 4,
+  "abilities": []
+}

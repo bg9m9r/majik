@@ -155,6 +155,26 @@ public static class CastingRestrictions
         // ConsumeAdditionalSpellAllowance. Cleared by the caller at end of turn
         // or via Clear in tests.
         internal readonly Dictionary<Guid, int> MaxAdditionalSpells = new();
+        // CR 605/616 — per-player count of NONARTIFACT spells each player has
+        // cast this turn. Always tracked (independent of any source being on
+        // the battlefield) so a source that enters mid-turn can still look back
+        // at "who has cast a nonartifact spell this turn" (CR 608.2 — a static
+        // gate reads the current game state, which includes earlier casts).
+        // SpellCastFlow increments the caster's bucket on every nonartifact
+        // cast via RecordNonartifactSpellCast; cleared at turn start by the
+        // caller (or via Clear in tests).
+        internal readonly Dictionary<Guid, int> NonartifactSpellsCastThisTurn = new();
+        // CR 601.3 — "Each player who has cast a nonartifact spell this turn
+        // can't cast additional nonartifact spells" (Ethersworn Canonist).
+        // Battlefield-gated SYMMETRIC active flag, keyed per (token, player) so
+        // multiple Canonists stack without trampling. A player is gated by this
+        // rail iff at least one entry targeting them exists AND they have
+        // already cast a nonartifact spell this turn (see
+        // IsRestrictedByCanonistNonartifact). The lifecycle binder registers an
+        // entry for every player while the source is on the battlefield and
+        // tears them down when it leaves; the per-turn nonartifact-cast counter
+        // above is the looked-back state that flips the gate on.
+        internal readonly List<(object Token, Player Player)> CanonistNonartifactEntries = new();
         internal readonly object Gate = new();
     }
 
@@ -984,6 +1004,157 @@ public static class CastingRestrictions
         lock (store.Gate) return store.NoncreatureXCostBlocks.Count > 0;
     }
 
+    // ---------------------------------------------------------------------
+    // CR 605/616 / 601.3 — Ethersworn Canonist nonartifact-spell-per-turn
+    // rail. Two pieces: (1) an always-on per-player counter of nonartifact
+    // spells cast this turn (the "has cast a nonartifact spell this turn"
+    // looked-back state), and (2) a battlefield-gated symmetric active flag
+    // (the Canonist itself). The validator combines them.
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Record that <paramref name="player"/> has cast a NONARTIFACT spell this
+    /// turn (CR 605/616). Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> after each successful
+    /// nonartifact cast. Tracked unconditionally (independent of any Canonist
+    /// being on the battlefield) so a Canonist entering mid-turn correctly sees
+    /// "this player has already cast a nonartifact spell this turn". Cleared at
+    /// turn start by the caller (or via <see cref="Clear"/> in tests).
+    /// </summary>
+    public static void RecordNonartifactSpellCast(Player player)
+    {
+        if (player == null) return;
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.NonartifactSpellsCastThisTurn[player.Id] =
+                store.NonartifactSpellsCastThisTurn.GetValueOrDefault(player.Id) + 1;
+        }
+    }
+
+    /// <summary>
+    /// True if <paramref name="player"/> has cast at least one nonartifact
+    /// spell this turn (CR 605/616). Read by
+    /// <see cref="IsRestrictedByCanonistNonartifact"/>.
+    /// </summary>
+    public static bool HasCastNonartifactSpellThisTurn(Player player)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            return store.NonartifactSpellsCastThisTurn.TryGetValue(player.Id, out var v)
+                && v > 0;
+        }
+    }
+
+    /// <summary>
+    /// Clear the per-player nonartifact-spell-cast counter for all players.
+    /// Called at turn start (CR 514.2 — the "this turn" tally refreshes); tests
+    /// may also call this directly via <see cref="Clear"/>.
+    /// </summary>
+    public static void ClearNonartifactSpellsCastThisTurn()
+    {
+        var store = Current;
+        lock (store.Gate) store.NonartifactSpellsCastThisTurn.Clear();
+    }
+
+    /// <summary>
+    /// Register the Ethersworn Canonist nonartifact-restriction for
+    /// <paramref name="player"/>, keyed by <paramref name="token"/> (CR 601.3 —
+    /// "Each player who has cast a nonartifact spell this turn can't cast
+    /// additional nonartifact spells."). Idempotent for the same (token,
+    /// player) pair. The restriction is SYMMETRIC — the lifecycle binder
+    /// registers an entry for every player while the source is on the
+    /// battlefield. A registered entry alone does NOT block a cast; the player
+    /// must also have already cast a nonartifact spell this turn
+    /// (<see cref="IsRestrictedByCanonistNonartifact"/>). Removed when the
+    /// source leaves the battlefield via
+    /// <see cref="RemoveCanonistNonartifactRestriction"/>.
+    /// </summary>
+    public static void AddCanonistNonartifactRestriction(object token, Player player)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.CanonistNonartifactEntries)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player))
+                {
+                    return;
+                }
+            }
+            store.CanonistNonartifactEntries.Add((token, player));
+        }
+    }
+
+    /// <summary>
+    /// Remove every Canonist nonartifact-restriction entry registered under
+    /// <paramref name="token"/> (across all players). Used when the source
+    /// permanent (Ethersworn Canonist) leaves the battlefield. Scoped by token,
+    /// so removing one Canonist does not tear down a second Canonist's entries.
+    /// </summary>
+    public static void RemoveCanonistNonartifactRestriction(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.CanonistNonartifactEntries.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if a Canonist-style nonartifact restriction is currently
+    /// registered against <paramref name="player"/> (CR 601.3 — Ethersworn
+    /// Canonist). Distinct from <see cref="IsRestrictedByCanonistNonartifact"/>:
+    /// this reports only that the source is on the battlefield and targeting
+    /// the player; it does NOT consult the per-turn nonartifact-cast counter.
+    /// </summary>
+    public static bool HasCanonistNonartifactRestriction(Player player)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.CanonistNonartifactEntries)
+            {
+                if (ReferenceEquals(entry.Player, player)) return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// True if <paramref name="player"/> is currently barred from casting an
+    /// ADDITIONAL nonartifact spell (CR 601.3 — Ethersworn Canonist). The gate
+    /// fires iff BOTH (a) a Canonist restriction is registered against the
+    /// player (the source is on the battlefield, symmetric) AND (b) the player
+    /// has already cast at least one nonartifact spell this turn. The caller
+    /// (<see cref="ActionValidator.ValidateCastSpell"/>) is responsible for
+    /// gating this check to NONARTIFACT candidate spells — an artifact spell is
+    /// never restricted by this rail (CR 605/616).
+    /// </summary>
+    public static bool IsRestrictedByCanonistNonartifact(Player player)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            var hasRestriction = false;
+            foreach (var entry in store.CanonistNonartifactEntries)
+            {
+                if (ReferenceEquals(entry.Player, player)) { hasRestriction = true; break; }
+            }
+            if (!hasRestriction) return false;
+            return store.NonartifactSpellsCastThisTurn.TryGetValue(player.Id, out var v)
+                && v > 0;
+        }
+    }
+
     /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
@@ -1004,6 +1175,8 @@ public static class CastingRestrictions
             store.NoncreatureXCostBlocks.Clear();
             store.NextSpellUncounterable.Clear();
             store.MaxAdditionalSpells.Clear();
+            store.NonartifactSpellsCastThisTurn.Clear();
+            store.CanonistNonartifactEntries.Clear();
         }
     }
 }
