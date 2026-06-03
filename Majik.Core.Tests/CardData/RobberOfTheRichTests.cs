@@ -8,6 +8,7 @@ using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -164,6 +165,52 @@ public class RobberOfTheRichTests
             "the runtime grant nominates Alice as the allowed caster");
         altCost.CanCastFor(pilfered, _bob).Should().BeFalse(
             "the card's owner cannot use the grant");
+    }
+
+    [Fact]
+    public void Robber_ExileCastGrant_CarriesSpendAsAnyColorPermission()
+    {
+        // CR 609.4b — Robber's grant additionally permits spending mana as
+        // though any color (deferral: spend-mana-as-any-color-permission).
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var zones = new ZoneService(bus);
+
+        _bob.Zones.Hand.AddCard(MakeCard("Forest", "", _bob));
+        _bob.Zones.Hand.AddCard(MakeCard("Island", "", _bob));
+
+        // A {G} card stolen — Alice has only off-color (e.g. red) mana, but
+        // the any-color permission lets her pay it.
+        var pilfered = MakeCard("Llanowar Elves", "G", _bob);
+        _bob.Zones.Library.AddCard(pilfered);
+        pilfered.SetZone(ZoneType.Library);
+
+        var robber = RobberOfTheRichFactory.Create(_alice, zones, triggers, bus);
+        _alice.Zones.Battlefield.AddCard(robber);
+        robber.SetZone(ZoneType.Battlefield);
+
+        bus.Publish(new CreatureAttacksEvent(robber, _bob));
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        pilfered.RuntimeExileCastSpendAsAnyColor.Should().BeTrue(
+            "Robber grants 'you may spend mana as though it were mana of any color'");
+
+        // Functional proof: Alice can pay the stolen {G} card's cost with a
+        // Mountain (red) thanks to the permission.
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        mountain.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var paid = resolver.Pay(
+            _alice,
+            pilfered.RuntimeExileCastCost!,
+            new ManaPayment(new[] { mountain }),
+            spendAsAnyColor: pilfered.RuntimeExileCastSpendAsAnyColor);
+
+        paid.Should().BeTrue(
+            "the any-color permission lets red mana pay a green pip (CR 609.4b)");
     }
 
     [Fact]

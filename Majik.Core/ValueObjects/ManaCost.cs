@@ -219,6 +219,35 @@ public class ManaCost : IEquatable<ManaCost>
     }
 
     /// <summary>
+    /// CR 609.4b — return a payment-equivalent cost where every <em>colored</em>
+    /// pip is collapsed into the generic component, so any single mana of any
+    /// color (or generic mana) can satisfy what was a colored requirement. This
+    /// is the read-side relaxation a "you may spend mana as though it were mana
+    /// of any color (or type)" permission (Robber of the Rich, Fist of Suns,
+    /// Cascading Cataracts) grants: the total mana value is unchanged, only the
+    /// color requirement is dropped (CR 106.6 — such permissions don't reduce
+    /// the cost, they widen which mana qualifies). Hybrid / Phyrexian pips are
+    /// preserved unchanged — those are handled by the prompt path, and a
+    /// "spend as any color" permission doesn't change how many mana / life they
+    /// demand, only the color the colored alternative accepts (out of scope for
+    /// this folded-cost shortcut; the colored pips it folds are the ones the
+    /// bucketed <see cref="Majik.Core.ValueObjects.ManaPool"/> color-matches).
+    /// </summary>
+    public ManaCost WithColoredFoldedToGeneric()
+    {
+        var coloredPips = White + Blue + Black + Red + Green;
+        if (coloredPips == 0)
+        {
+            return this;
+        }
+
+        return new ManaCost(
+            Generic + coloredPips,
+            white: 0, blue: 0, black: 0, red: 0, green: 0,
+            HasX, HybridPips, PhyrexianPips);
+    }
+
+    /// <summary>
     /// Convert to string representation.
     /// </summary>
     public override string ToString()

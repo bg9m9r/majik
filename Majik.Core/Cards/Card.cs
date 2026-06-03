@@ -200,18 +200,34 @@ public class Card : ICard
     public ValueObjects.ManaCost? RuntimeExileCastCost { get; private set; }
 
     /// <summary>
+    /// CR 609.4b — whether the runtime exile-cast grant also carries a "you may
+    /// spend mana as though it were mana of any color to cast that spell"
+    /// permission (Robber of the Rich). When <c>true</c>, the cast paying
+    /// <see cref="RuntimeExileCastCost"/> under this grant relaxes its colored
+    /// pips so any mana of any color (or generic) qualifies — the cost's mana
+    /// value is unchanged, only the color requirement is widened (CR 106.6).
+    /// Default <c>false</c> (Ragavan / Brazen Borrower etc. grant only the
+    /// cast permission, not the color substitution).
+    /// </summary>
+    public bool RuntimeExileCastSpendAsAnyColor { get; private set; }
+
+    /// <summary>
     /// Stamp an exile-cast grant on this card. <paramref name="allowedCaster"/>
     /// is the player who may cast (need not be the owner); <paramref name="cost"/>
     /// is the mana cost they pay (typically the card's printed cost).
-    /// Idempotent — later grants overwrite earlier ones. Cleared at EOT by
-    /// the granting effect's bookkeeping.
+    /// <paramref name="spendAsAnyColor"/> (CR 609.4b) additionally permits the
+    /// allowed caster to pay that cost as though the mana were any color (Robber
+    /// of the Rich). Idempotent — later grants overwrite earlier ones. Cleared
+    /// at EOT by the granting effect's bookkeeping.
     /// </summary>
-    public void GrantRuntimeExileCast(Player allowedCaster, ValueObjects.ManaCost cost)
+    public void GrantRuntimeExileCast(
+        Player allowedCaster, ValueObjects.ManaCost cost, bool spendAsAnyColor = false)
     {
         if (allowedCaster == null) throw new ArgumentNullException(nameof(allowedCaster));
         if (cost == null) throw new ArgumentNullException(nameof(cost));
         RuntimeExileCastAllowedCaster = allowedCaster;
         RuntimeExileCastCost = cost;
+        RuntimeExileCastSpendAsAnyColor = spendAsAnyColor;
     }
 
     /// <summary>Clear any runtime exile-cast grant on this card.</summary>
@@ -219,6 +235,7 @@ public class Card : ICard
     {
         RuntimeExileCastAllowedCaster = null;
         RuntimeExileCastCost = null;
+        RuntimeExileCastSpendAsAnyColor = false;
     }
 
     /// <summary>

@@ -156,6 +156,93 @@ public class ManaPaymentResolverTests
     }
 
     // -----------------------------------------------------------------------
+    // CR 609.4b — "spend mana as though it were mana of any color" permission
+    // (Robber of the Rich / Fist of Suns). A tagged cast may pay colored pips
+    // with mana of ANY color: the color requirement is relaxed, total cost
+    // unchanged.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Pay_SpendAsAnyColor_PaysColoredPip_WithWrongColorMana()
+    {
+        // {R} colored pip, but the only source is a Forest (green). Without the
+        // permission this fails (green can't pay a red pip); WITH it, green
+        // satisfies the red requirement.
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        forest.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var success = resolver.Pay(
+            _alice,
+            ManaCost.Parse("R"),
+            new ManaPayment(new[] { forest }),
+            spendAsAnyColor: true);
+
+        success.Should().BeTrue();
+        ((Permanent)forest).IsTapped.Should().BeTrue();
+        _alice.ManaPool.Total.Should().Be(0);
+    }
+
+    [Fact]
+    public void Pay_WithoutPermission_CannotPayColoredPip_WithWrongColorMana()
+    {
+        // Control: same setup, NO permission → green can't pay {R}.
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        forest.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var success = resolver.Pay(
+            _alice,
+            ManaCost.Parse("R"),
+            new ManaPayment(new[] { forest }));
+
+        success.Should().BeFalse();
+        ((Permanent)forest).IsTapped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Pay_SpendAsAnyColor_StillRequiresEnoughTotalMana()
+    {
+        // {R}{R} needs two mana — one Forest can't cover it even with the
+        // any-color permission (permission relaxes color, not amount; CR 106.6).
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        forest.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var success = resolver.Pay(
+            _alice,
+            ManaCost.Parse("RR"),
+            new ManaPayment(new[] { forest }),
+            spendAsAnyColor: true);
+
+        success.Should().BeFalse();
+        ((Permanent)forest).IsTapped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Pay_SpendAsAnyColor_PaysMultiColorCost_FromSingleColorSources()
+    {
+        // {W}{U}{B} paid entirely from three Forests — five-color fixing via
+        // the permission.
+        var f1 = NamedCardFactory.Create("Forest", _alice);
+        var f2 = NamedCardFactory.Create("Forest", _alice);
+        var f3 = NamedCardFactory.Create("Forest", _alice);
+        f1.SetZone(ZoneType.Battlefield);
+        f2.SetZone(ZoneType.Battlefield);
+        f3.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var success = resolver.Pay(
+            _alice,
+            ManaCost.Parse("WUB"),
+            new ManaPayment(new ICard[] { f1, f2, f3 }),
+            spendAsAnyColor: true);
+
+        success.Should().BeTrue();
+        _alice.ManaPool.Total.Should().Be(0);
+    }
+
+    // -----------------------------------------------------------------------
     // TryAutoSelectSources — portal "Auto-pay" (empty source list) support
     // -----------------------------------------------------------------------
 

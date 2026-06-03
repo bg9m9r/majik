@@ -57,17 +57,21 @@ namespace Majik.Core.CardData.Factories;
 ///        because the grant is stamped only when Robber (itself a Rogue)
 ///        attacks, that window is the remainder of the current turn, so the
 ///        EOT clear is the correct lifetime here.
-///
-/// ## Deferred (v1 gap — matches Agatha's Soul Cauldron posture)
 /// - <b>"You may spend mana as though it were mana of any color to cast that
-///   spell."</b> CR 609.4b / 118.x mana-payment substitution. There is no
-///   mana-color-substitute / mana-payment replacement infrastructure in the
-///   engine yet (the same gap Agatha's Soul Cauldron documents for its
-///   "spend mana as though it were mana of any color to activate" clause).
-///   The exile-cast grant carries the card's PRINTED mana cost; the caster
-///   must currently pay that cost with correctly-colored mana. The
-///   permission-to-cast layer (grant + alt cost) is fully wired — only the
-///   color-substitution convenience is deferred.
+///   spell."</b> (CR 609.4b — deferral: spend-mana-as-any-color-permission.)
+///   The runtime exile-cast grant now carries a
+///   <see cref="Card.RuntimeExileCastSpendAsAnyColor"/> flag (stamped via
+///   <see cref="Card.GrantRuntimeExileCast(Player, ValueObjects.ManaCost, bool)"/>
+///   with <c>spendAsAnyColor: true</c>). When the granted caster casts the
+///   exiled card under the matching
+///   <see cref="Majik.Core.Costs.ExileCastAlternativeCost"/>, the TurnDriver
+///   passes the permission to <see cref="Majik.Core.Costs.ManaPaymentResolver"/>,
+///   which folds the colored pips into generic
+///   (<see cref="ValueObjects.ManaCost.WithColoredFoldedToGeneric"/>) so any
+///   mana of any color qualifies — the cost's mana value is unchanged
+///   (CR 106.6), only the color requirement is widened.
+///
+/// ## Deferred (v1 gap)
 /// - <b>"During any turn you attacked with a Rogue."</b> v1 scopes the grant
 ///   to the turn Robber itself attacked (Robber is a Rogue, so the
 ///   precondition is always met when this trigger fires). A separate Rogue
@@ -182,7 +186,15 @@ public static class RobberOfTheRichFactory
                 // allowed caster; cost is the card's printed mana cost.
                 if (top is Card stampable)
                 {
-                    stampable.GrantRuntimeExileCast(caster, stampable.ManaCostValue);
+                    // CR 118.9 + CR 609.4b — grant the cast permission AND the
+                    // "spend mana as though it were mana of any color to cast
+                    // that spell" permission (deferral:
+                    // spend-mana-as-any-color-permission). TurnDriver consults
+                    // RuntimeExileCastSpendAsAnyColor when paying the
+                    // ExileCastAlternativeCost and folds the colored pips so any
+                    // mana qualifies.
+                    stampable.GrantRuntimeExileCast(
+                        caster, stampable.ManaCostValue, spendAsAnyColor: true);
 
                     // CR 514.2 — clear the grant on the first Cleanup step and
                     // unsubscribe. Skipped when no bus is wired (tests manage

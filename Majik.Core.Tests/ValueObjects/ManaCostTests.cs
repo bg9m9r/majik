@@ -148,4 +148,31 @@ public class ManaCostTests
         result.Should().Contain("3");
         result.Should().Contain("R");
     }
+
+    [Fact]
+    public void WithColoredFoldedToGeneric_FoldsColoredPipsIntoGeneric()
+    {
+        // CR 609.4b — {1}{W}{U}{B} → {4} (color requirement dropped, total
+        // mana value unchanged).
+        var cost = ManaCost.Parse("1WUB");
+
+        var folded = cost.WithColoredFoldedToGeneric();
+
+        folded.Generic.Should().Be(4);
+        folded.White.Should().Be(0);
+        folded.Blue.Should().Be(0);
+        folded.Black.Should().Be(0);
+        folded.TotalValue.Should().Be(cost.TotalValue);
+    }
+
+    [Fact]
+    public void WithColoredFoldedToGeneric_NoColoredPips_ReturnsSelf()
+    {
+        var cost = ManaCost.Parse("3");
+
+        var folded = cost.WithColoredFoldedToGeneric();
+
+        folded.Generic.Should().Be(3);
+        folded.TotalValue.Should().Be(3);
+    }
 }
