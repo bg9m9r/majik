@@ -219,6 +219,21 @@ public class Creature : Permanent
     public bool EvokeWasPaid { get; set; }
 
     /// <summary>
+    /// CR 702.152b — set by <see cref="Majik.Core.Costs.BlitzAlternativeCost"/>
+    /// when the spell was cast for its blitz cost. The three blitz riders added
+    /// to blitz creatures (CR 702.152c — gains haste; "when this creature dies,
+    /// draw a card"; and a delayed "sacrifice it at the beginning of the next
+    /// end step") all gate on this flag so a creature cast for its normal mana
+    /// cost (or returned to the battlefield some other way) gets none of them.
+    /// Tagged on the Creature object so it survives the Stack → Battlefield
+    /// transition (we set it during the alt-cost's <c>OnResolved</c>, which runs
+    /// before <see cref="Majik.Core.Services.StackResolver"/> moves the card to
+    /// the battlefield and fires the ETB <see cref="Majik.Core.Domain.DomainEvents.CardMovedEvent"/>).
+    /// Mirror of <see cref="EvokeWasPaid"/>.
+    /// </summary>
+    public bool BlitzWasPaid { get; set; }
+
+    /// <summary>
     /// CR 508.1a relaxation — set by effects that let a creature "attack this
     /// turn as though it didn't have defender" (Nivix Cyclops, Axebane
     /// Stag/Assault Formation family). When true, the Defender keyword's

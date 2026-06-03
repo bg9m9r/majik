@@ -133,6 +133,9 @@ public sealed class PayLifeAdditionalCost : IAdditionalCost
         _amount = amount;
     }
 
+    /// <summary>The amount of life paid on <see cref="Pay"/>.</summary>
+    public int Amount => _amount;
+
     public string Description => $"pay {_amount} life";
 
     public bool CanPay(Player caster) => caster != null && caster.LifeTotal >= _amount;
