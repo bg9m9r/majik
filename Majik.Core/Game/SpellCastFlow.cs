@@ -779,6 +779,19 @@ public sealed class SpellCastFlow
         // CR 118 — "no mana was spent" sentinel (Roiling Vortex, Eidolon).
         spell.WasFreeCast = totalCost.IsZero;
 
+        // CR 118.10 — total amount of mana spent to cast this spell (the mana
+        // value of the resolved totalCost). WasFreeCast is exactly this being
+        // zero. Stamp the magnitude on the spell handle AND mirror it onto the
+        // card so "if {N} or more mana was spent to cast it" payoffs (Prompto
+        // Argentum / Blazing Bomb / the Opus family) can read it off either
+        // the watched SpellCastEvent's spell or a battlefield-resident card.
+        var totalManaSpent = totalCost.TotalValue;
+        spell.TotalManaSpentThisCast = totalManaSpent;
+        if (card is Card concreteForTotalSpent)
+        {
+            concreteForTotalSpent.SetTotalManaSpentThisCast(totalManaSpent);
+        }
+
         // CR 702.138b — Escape sentinel (Uro's "sacrifice unless escaped").
         if (alternativeCost is EscapeAlternativeCost)
         {

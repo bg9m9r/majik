@@ -68,6 +68,31 @@ public class Spell : ISpell
     public bool WasFreeCast { get; set; }
 
     /// <summary>
+    /// CR 118.10 — "the amount of mana spent to cast this spell." The total
+    /// mana value of the cost actually paid for this cast: printed cost + X
+    /// (its chosen value, CR 107.3) + additional costs (Kicker pips) − cost
+    /// reductions (Delve / Convoke / Improvise / Affinity), i.e. the mana
+    /// value of the same resolved <c>totalCost</c> that drives
+    /// <see cref="WasFreeCast"/> (<see cref="WasFreeCast"/> is exactly this
+    /// being zero). Stamped by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> alongside
+    /// <see cref="WasFreeCast"/> and mirrored onto the underlying
+    /// <see cref="Majik.Core.Cards.Card.TotalManaSpentThisCast"/>.
+    ///
+    /// <para>This is the magnitude sibling of the per-color spent-count
+    /// ledger (<see cref="Majik.Core.Cards.Card.PendingCastColorCounts"/>):
+    /// the count ledger answers "how much of color X" (Adamant /
+    /// Sunburst / hybrid Incarnations); this answers "how much in total"
+    /// — the gate the Opus / Selfie-Shot / Adamant-total ("if {N} or more
+    /// mana was spent to cast it") payoffs read off the watched spell.
+    /// Convoke / Improvise pay with tapped creatures / artifacts, NOT mana,
+    /// so those reductions correctly lower this total (CR 118.10 — only
+    /// mana counts). Defaults to <c>0</c> so hand-built test spells without
+    /// an explicit stamp report "no mana spent".</para>
+    /// </summary>
+    public int TotalManaSpentThisCast { get; set; }
+
+    /// <summary>
     /// CR 702.138b — "escaped" runtime sentinel. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the cast used an
     /// <see cref="Majik.Core.Costs.EscapeAlternativeCost"/> alt-cost.

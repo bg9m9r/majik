@@ -582,6 +582,63 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 118.10 — "the amount of mana spent to cast this" (the TOTAL mana
+    /// value paid). Battlefield-side mirror of
+    /// <see cref="Majik.Core.Spells.Spell.TotalManaSpentThisCast"/>, stamped
+    /// by <see cref="Majik.Core.Game.SpellCastFlow"/> at the same point it
+    /// stamps <see cref="WasCast"/> / mirrors <see cref="WasFreeCast"/>, so a
+    /// battlefield-resident or ETB gate can read the magnitude without the
+    /// spell handle (parallel to <see cref="PendingCastColorCounts"/> being
+    /// the per-color mirror).
+    ///
+    /// <para>This is the total-amount sibling of the per-color
+    /// <see cref="SpentAtLeast(Majik.Core.ValueObjects.ManaColor,int)"/>
+    /// predicate — the "if {N} or more mana was spent to cast it" gate
+    /// (Prompto Argentum / Blazing Bomb / the Opus payoffs) reads it via
+    /// <see cref="SpentAtLeastTotal"/>. Defaults to <c>0</c> (no cast / no
+    /// mana spent).</para>
+    /// </summary>
+    public int TotalManaSpentThisCast { get; private set; }
+
+    /// <summary>Stamp the total mana spent for this card's cast. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> from the resolved cast
+    /// total (CR 118.10). Negative values are clamped to zero (a reduction
+    /// can never make the spent total negative).</summary>
+    public void SetTotalManaSpentThisCast(int total)
+    {
+        TotalManaSpentThisCast = total < 0 ? 0 : total;
+    }
+
+    /// <summary>Clear the stamped total-mana-spent magnitude. Mirrors
+    /// <see cref="ClearPendingCastColors"/> for any ETB consumer that has
+    /// finished reading the value, so a later non-cast battlefield entry
+    /// doesn't reuse it.</summary>
+    public void ClearTotalManaSpentThisCast()
+    {
+        TotalManaSpentThisCast = 0;
+    }
+
+    /// <summary>
+    /// Intervening-if predicate "≥<paramref name="amount"/> total mana was
+    /// spent to cast this" (CR 118.10 / CR 603.4) — the gate the "if {N} or
+    /// more mana was spent to cast it" payoffs read. Total-amount sibling of
+    /// <see cref="SpentAtLeast(Majik.Core.ValueObjects.ManaColor,int)"/>
+    /// (which gates on a single color's multiplicity). Reads
+    /// <see cref="TotalManaSpentThisCast"/>; returns false when no mana was
+    /// spent (free cast / no cast).
+    /// </summary>
+    /// <param name="amount">Required total, must be ≥ 1 (asking for "at least
+    /// 0" is degenerate and surfaces a caller mistake).</param>
+    public bool SpentAtLeastTotal(int amount)
+    {
+        if (amount < 1)
+            throw new ArgumentOutOfRangeException(
+                nameof(amount), amount, "amount must be ≥ 1.");
+
+        return TotalManaSpentThisCast >= amount;
+    }
+
+    /// <summary>
     /// CR 113.5 / CR 400.7 — persistent "this permanent was cast"
     /// marker. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Game.SpellCastFlow"/> at the moment the
