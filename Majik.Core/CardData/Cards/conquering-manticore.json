@@ -1,0 +1,24 @@
+{
+  "name": "Conquering Manticore",
+  "types": ["Creature"],
+  "subtypes": ["Manticore"],
+  "manaCost": "{4}{R}{R}",
+  "power": 5,
+  "toughness": 5,
+  "keywords": ["Flying"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "gain_control",
+          "targetFilter": "creature_you_dont_control",
+          "duration": "end_of_turn",
+          "untap": true,
+          "gainsHaste": true
+        }
+      ]
+    }
+  ]
+}
