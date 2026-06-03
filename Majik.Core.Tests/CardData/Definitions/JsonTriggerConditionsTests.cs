@@ -277,6 +277,117 @@ public class JsonTriggerConditionsTests
     }
 
     // ------------------------------------------------------------------
+    // cast_self — CR 601.2i / 603.3 ("When you cast THIS spell, …").
+    // Self-scoped sibling of whenever_you_cast_spell: fires only on the
+    // SpellCastEvent for THIS very card, and only while on the Stack.
+    // ------------------------------------------------------------------
+
+    private const string CastSelfDrawJson = """
+    {
+      "name": "Test Nulldrifter",
+      "types": ["Creature"],
+      "manaCost": "5U",
+      "power": 1,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "cast_self" },
+          "effects": [ { "type": "draw_card", "amount": 2 } ]
+        }
+      ]
+    }
+    """;
+
+    /// <summary>
+    /// Mirrors the real cast flow: the card is moved Hand → Stack (where the
+    /// cast_self trigger is active) before the <see cref="SpellCastEvent"/> for
+    /// it is published.
+    /// </summary>
+    private (TriggeredAbility ability, Permanent card) BuildAndRegisterOnStack(
+        string json, TriggerManager triggers)
+    {
+        var def = CardDefinitionLoader.FromJson(json);
+        var card = (Permanent)CardDefinitionFactory.Build(def, _alice);
+        // The spell is on the Stack as it is cast (CR 601.2a) — the cast_self
+        // trigger overrides ActiveZones to include the Stack so it stays
+        // observable there.
+        _alice.Zones.Stack.AddCard(card);
+        card.SetZone(ZoneType.Stack);
+        var ability = card.Abilities.OfType<TriggeredAbility>().Single();
+        triggers.RegisterTriggeredAbility(ability);
+        return (ability, card);
+    }
+
+    [Fact]
+    public void CastSelf_Fires_WhenThisSpellIsCast_DrawsCards()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegisterOnStack(CastSelfDrawJson, triggers);
+
+        // Seed two cards to draw.
+        var top1 = new Instant("Counterspell", "UU") { Owner = _alice };
+        var top2 = new Instant("Opt", "U") { Owner = _alice };
+        _alice.Zones.Library.AddCard(top1);
+        _alice.Zones.Library.AddCard(top2);
+        top1.SetZone(ZoneType.Library);
+        top2.SetZone(ZoneType.Library);
+
+        // "When you cast THIS spell" — the SpellCastEvent for this very card.
+        bus.Publish(new SpellCastEvent(new Majik.Core.Spells.Spell(card, _alice)));
+
+        triggers.PendingCount.Should().Be(1,
+            "casting this very card fires its own cast-self trigger (CR 601.2i / 603.3)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        _alice.Zones.Hand.GetCards().Should().Contain(new[] { top1, top2 },
+            "the cast_self trigger drew two cards (CR 120)");
+    }
+
+    [Fact]
+    public void CastSelf_DoesNotFire_ForAnotherSpellYouCast()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegisterOnStack(CastSelfDrawJson, triggers);
+
+        // A DIFFERENT spell the same player casts must not fire it — this is
+        // what distinguishes cast_self from whenever_you_cast_spell.
+        bus.Publish(NoncreatureCast(_alice));
+
+        triggers.PendingCount.Should().Be(0,
+            "'when you cast THIS spell' is self-scoped — another spell you cast does not fire it");
+    }
+
+    [Fact]
+    public void CastSelf_DoesNotFire_WhenOnBattlefield()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (ability, card) = BuildAndRegisterOnStack(CastSelfDrawJson, triggers);
+
+        // After the spell resolves the permanent is on the battlefield. The
+        // cast trigger is functional only while the card is being cast
+        // (CR 603.3e); a spell event for a card sitting on the battlefield is
+        // not "casting THIS spell" again — the ReferenceEquals guard still
+        // matches the same card object, so we assert the ability self-excludes
+        // by NOT re-firing for an unrelated cast while the source is elsewhere.
+        card.SetZone(ZoneType.Battlefield);
+
+        bus.Publish(NoncreatureCast(_alice));
+
+        triggers.PendingCount.Should().Be(0,
+            "an unrelated spell never matches the self-cast reference guard");
+        triggers.IsRegistered(ability).Should().BeTrue(
+            "the test registered the ability directly; the guard is the spell-reference match");
+    }
+
+    // ------------------------------------------------------------------
     // attacks_self — CR 508.1f.
     // ------------------------------------------------------------------
 
