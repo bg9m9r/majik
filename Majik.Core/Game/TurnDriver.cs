@@ -721,10 +721,26 @@ public sealed class TurnDriver
                     payment = autoPayment;
                 }
             }
+            // CR 609.4b — "you may spend mana as though it were mana of any
+            // color to cast that spell" (Robber of the Rich). When the cast is
+            // happening under a runtime exile-cast grant that carries the
+            // any-color permission, AND this is that exile-cast (the alt cost is
+            // the ExileCastAlternativeCost reading the same grant), relax the
+            // colored pips so any mana qualifies (deferral:
+            // spend-mana-as-any-color-permission).
+            var spendAsAnyColor =
+                cast.AlternativeCost is Majik.Core.Costs.ExileCastAlternativeCost
+                && castCard is Majik.Core.Cards.Card grantCard
+                && grantCard.RuntimeExileCastSpendAsAnyColor
+                && ReferenceEquals(grantCard.RuntimeExileCastAllowedCaster, actor);
+
             // CR 106.4 — pass the cast card as the "spent on" context so
             // slot-level mana provenance (Arena of Glory's exert haste rider,
             // deferral #1) can react to "if THAT mana is spent on THIS spell".
-            if (!manaResolver.Pay(actor, cost, payment, spentOn: castCard, out _, out var colorCounts))
+            if (!manaResolver.Pay(
+                    actor, cost, payment,
+                    spentOn: castCard, spendAsAnyColor,
+                    out _, out var colorCounts))
             {
                 RotateHand(castCard, "Pay failed");
                 return;

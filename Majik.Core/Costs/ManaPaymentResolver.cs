@@ -33,6 +33,21 @@ public sealed class ManaPaymentResolver
         Pay(payer, cost, payment, out _);
 
     /// <summary>
+    /// CR 609.4b — overload carrying the "you may spend mana as though it were
+    /// mana of any color" permission (Robber of the Rich's stolen-card cast,
+    /// Fist of Suns, Cascading Cataracts). When
+    /// <paramref name="spendAsAnyColor"/> is <c>true</c>, every colored pip of
+    /// <paramref name="cost"/> is treated as a generic requirement for the
+    /// purposes of color matching, payability and the actual spend — so any
+    /// mana of any color (and any generic) qualifies (CR 106.6 — the
+    /// permission widens which mana satisfies the cost; it does NOT reduce the
+    /// cost's mana value). The Sunburst colors-spent ledger still reports the
+    /// real colors of mana consumed.
+    /// </summary>
+    public bool Pay(Player payer, ManaCost cost, ManaPayment payment, bool spendAsAnyColor) =>
+        Pay(payer, cost, payment, spentOn: null, spendAsAnyColor, out _, out _);
+
+    /// <summary>
     /// Portal "Auto-pay" support. The portal's mana-cost prompt offers an
     /// Auto-pay button that returns a <see cref="ManaPayment"/> with an EMPTY
     /// source list, meaning "tap my untapped lands for me". Greedily selects
@@ -221,7 +236,7 @@ public sealed class ManaPaymentResolver
         ManaPayment payment,
         out IReadOnlyList<ValueObjects.ManaColor> colorsSpent,
         out IReadOnlyDictionary<ValueObjects.ManaColor, int> colorCounts) =>
-        Pay(payer, cost, payment, spentOn: null, out colorsSpent, out colorCounts);
+        Pay(payer, cost, payment, spentOn: null, spendAsAnyColor: false, out colorsSpent, out colorCounts);
 
     /// <summary>
     /// Slot-level mana-provenance overload (CR 106.4 — deferral #1). Identical
@@ -243,6 +258,28 @@ public sealed class ManaPaymentResolver
         ManaPayment payment,
         Cards.ICard? spentOn,
         out IReadOnlyList<ValueObjects.ManaColor> colorsSpent,
+        out IReadOnlyDictionary<ValueObjects.ManaColor, int> colorCounts) =>
+        Pay(payer, cost, payment, spentOn, spendAsAnyColor: false, out colorsSpent, out colorCounts);
+
+    /// <summary>
+    /// Full overload — slot-level provenance (CR 106.4, deferral #1) PLUS the
+    /// CR 609.4b "spend mana as though it were mana of any color" permission
+    /// (deferral: spend-mana-as-any-color-permission). When
+    /// <paramref name="spendAsAnyColor"/> is set, the cost's colored pips are
+    /// folded into generic (<see cref="ManaCost.WithColoredFoldedToGeneric"/>)
+    /// for every color-sensitive step — the per-source greedy ability pick, the
+    /// payability simulation and the real spend — so any color of mana (or
+    /// generic) qualifies. The Sunburst colors-spent / count ledger is computed
+    /// from the actual per-color pool delta, so it still reports the true
+    /// colors of mana consumed (unaffected by the permission).
+    /// </summary>
+    public bool Pay(
+        Player payer,
+        ManaCost cost,
+        ManaPayment payment,
+        Cards.ICard? spentOn,
+        bool spendAsAnyColor,
+        out IReadOnlyList<ValueObjects.ManaColor> colorsSpent,
         out IReadOnlyDictionary<ValueObjects.ManaColor, int> colorCounts)
     {
         colorsSpent = Array.Empty<ValueObjects.ManaColor>();
@@ -250,6 +287,13 @@ public sealed class ManaPaymentResolver
         if (payer == null) throw new ArgumentNullException(nameof(payer));
         if (cost == null) throw new ArgumentNullException(nameof(cost));
         if (payment == null) throw new ArgumentNullException(nameof(payment));
+
+        // CR 609.4b — under a "spend as though any color" permission the colored
+        // pips become color-agnostic generic requirements. Fold once; all the
+        // color-sensitive steps below (greedy ability pick, payability sim,
+        // actual PayMana) consume this relaxed cost. The Sunburst delta uses
+        // the player's pool buckets, so the reported colors-spent stay accurate.
+        var matchCost = spendAsAnyColor ? cost.WithColoredFoldedToGeneric() : cost;
 
         // Pick the best ability per source given the cost. Dual / any-colour
         // lands (Sacred Foundry, Mox Opal) bind multiple ManaAbility options;
@@ -260,8 +304,8 @@ public sealed class ManaPaymentResolver
         // when no coloured need matches.
         var remaining = new Dictionary<char, int>
         {
-            ['W'] = cost.White, ['U'] = cost.Blue, ['B'] = cost.Black,
-            ['R'] = cost.Red,   ['G'] = cost.Green,
+            ['W'] = matchCost.White, ['U'] = matchCost.Blue, ['B'] = matchCost.Black,
+            ['R'] = matchCost.Red,   ['G'] = matchCost.Green,
         };
         var abilities = new List<IManaAbility>(payment.Sources.Count);
         foreach (var src in payment.Sources)
@@ -308,7 +352,7 @@ public sealed class ManaPaymentResolver
             simulated = simulated.Add(ab.ManaGenerated);
         }
 
-        var (_, canPay) = simulated.Pay(cost);
+        var (_, canPay) = simulated.Pay(matchCost);
         if (!canPay)
         {
             return false;
@@ -338,7 +382,7 @@ public sealed class ManaPaymentResolver
             var spendable = simulated.RemoveColored(
                 white: blockedW, blue: blockedU, black: blockedB,
                 red: blockedR, green: blockedG);
-            var (_, canPaySpendable) = spendable.Pay(cost);
+            var (_, canPaySpendable) = spendable.Pay(matchCost);
             if (!canPaySpendable)
             {
                 return false;
@@ -391,7 +435,7 @@ public sealed class ManaPaymentResolver
         {
             payer.WithholdColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG);
         }
-        var ok = payer.PayMana(cost);
+        var ok = payer.PayMana(matchCost);
         if (hasBlocked)
         {
             payer.RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG);
