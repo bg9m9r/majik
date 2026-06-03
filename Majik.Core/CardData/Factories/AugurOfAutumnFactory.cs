@@ -44,18 +44,21 @@ namespace Majik.Core.CardData.Factories;
 ///     creatures with different powers). Gates the "cast creature spells from
 ///     the top" rider once cast-from-zone permission exists.
 ///
+/// - <b>Coven — cast creature spells from the top</b> (CR 601.3e): a second
+///   <see cref="LibraryTopPlayStaticEffect"/> registers a
+///   <see cref="TopPlayFilter.Creatures"/> grant gated by the Coven condition
+///   (<see cref="HasCoven"/>) as an <c>activeCondition</c>, so the cast-creature
+///   permission is live only while Augur is on the battlefield AND the
+///   controller has three or more creatures with different powers. The lifecycle
+///   re-evaluates Coven on every zone move (other creatures entering / leaving
+///   flip it). When live, the controller may cast a creature from the top of
+///   their library — the card goes onto the stack via
+///   <see cref="Majik.Core.Game.SpellCastFlow"/>, which now authorizes the cast
+///   against this grant (CR 601.3e).
+///
 /// ## Deferred (v1 gaps — documented)
-/// - <b>Cast creature spells from the top (Coven-gated)</b>: lands are PLAYED
-///   (the land-play path already moves a land from any zone), but casting a
-///   nonland spell from the library needs a continuous "permission to cast from
-///   a zone other than hand" primitive that the spell-cast flow consults. That
-///   cast-from-top wiring is not yet built (same gap as Bolas's Citadel, Vivien
-///   (Champion of the Wilds), Conspicuous Snoop), so the creature clause is
-///   description-only for now. The <see cref="TopPlayFilter.Creatures"/> filter
-///   exists in the registry ready for that surface to consult.
-/// - <b>Coven as a live conditional grant</b>: <see cref="HasCoven"/> evaluates
-///   the condition on demand, but it is not wired as a continuous static
-///   ability that toggles the cast-from-top permission as the board changes.
+/// - <b>"Look at the top card any time"</b> is modelled as the registry's
+///   reveal-top rider (controller-side peek), not a separate hidden-peek UI.
 /// </summary>
 [CardName("Augur of Autumn")]
 public static class AugurOfAutumnFactory
@@ -82,6 +85,20 @@ public static class AugurOfAutumnFactory
     /// Suitable for shape / dispatch tests.
     /// </summary>
     public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware build — the overload the production
+    /// <c>NamedCardFactory.CreateGeneratedWithEffects</c> dispatch invokes.
+    /// When <paramref name="continuousEffects"/> carries an event bus, the
+    /// play-lands-from-top grant AND the Coven cast-creatures-from-top grant are
+    /// registered (and revoked / re-evaluated) as Augur enters / leaves the
+    /// battlefield and as the Coven board condition flips. Mirrors Mystic
+    /// Forge's production-routing overload so the permission is genuinely live in
+    /// a real match (not the test-only <see cref="Create(Player, IEventBus)"/>
+    /// bus overload).
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? continuousEffects)
+        => Create(owner, continuousEffects?.EventBus);
 
     /// <summary>
     /// Construct Augur of Autumn. Identity comes from the embedded JSON
@@ -119,17 +136,29 @@ public static class AugurOfAutumnFactory
             description: CovenCastFromTopDescription));
 
         // CR 601.3e / CR 305.6 / CR 715.4 — live "may play lands from the top,
-        // revealed" grant, battlefield-gated. The Coven creature clause stays
-        // description-only pending cast-from-top wiring (see class doc).
+        // revealed" grant, battlefield-gated.
         if (eventBus != null)
         {
-            var lifecycle = new LibraryTopPlayStaticEffect(
+            var landLifecycle = new LibraryTopPlayStaticEffect(
                 source: card,
                 controller: owner,
                 filter: TopPlayFilter.Lands,
                 eventBus: eventBus,
                 revealsTop: true);
-            lifecycle.Attach();
+            landLifecycle.Attach();
+
+            // CR 601.3e — Coven clause: "you may cast creature spells from the
+            // top of your library" while you control three or more creatures
+            // with different powers. A Creatures-filter grant gated by the
+            // Coven activeCondition (re-evaluated on every zone move).
+            var covenLifecycle = new LibraryTopPlayStaticEffect(
+                source: card,
+                controller: owner,
+                filter: TopPlayFilter.Creatures,
+                eventBus: eventBus,
+                revealsTop: false,
+                activeCondition: () => HasCoven(owner));
+            covenLifecycle.Attach();
         }
 
         return card;

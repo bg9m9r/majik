@@ -170,4 +170,52 @@ public class AugurOfAutumnFactoryTests
         var alice = new Player("Alice", 20);
         AugurOfAutumnFactory.HasCoven(alice).Should().BeFalse();
     }
+
+    // ------------------------------------------------------------------
+    // CR 601.3e — Coven clause: "you may cast creature spells from the top of
+    // your library" while you control three or more creatures with different
+    // powers. The bus-aware build registers a Creatures grant gated by the
+    // Coven condition (re-evaluated on every zone move).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Coven_Active_TopCreature_IsCastableFromTop()
+    {
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+        var bus = new Majik.Core.Events.EventBus();
+        var alice = new Player("Alice", 20);
+
+        var augur = AugurOfAutumnFactory.Create(alice, bus);
+        augur.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(augur);
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(augur, ZoneType.Hand, ZoneType.Battlefield));
+
+        // No Coven yet — a top creature is NOT castable.
+        var topCreature = new Creature("Hill Giant", "{3}{R}", 3, 3);
+        topCreature.SetOwner(alice);
+        alice.Zones.Library.AddCard(topCreature);
+        topCreature.SetZone(ZoneType.Library);
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, topCreature)
+            .Should().BeFalse("Coven is not yet active");
+
+        // Establish Coven: three creatures with different powers (Augur=2,
+        // plus a 4 and a 5).
+        foreach (var (name, pow) in new[] { ("Four", 4), ("Five", 5) })
+        {
+            var c = MakeCreature(alice, name, pow);
+            alice.Zones.Battlefield.AddCard(c);
+            c.SetZone(ZoneType.Battlefield);
+            bus.Publish(new Majik.Core.Events.CardMovedEvent(c, ZoneType.Hand, ZoneType.Battlefield));
+        }
+
+        AugurOfAutumnFactory.HasCoven(alice).Should().BeTrue();
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, topCreature)
+            .Should().BeTrue("with Coven active, the top creature is castable from the top");
+
+        // A land is never cast (CR 601.1) even under the Coven creature grant.
+        var land = new Land("Forest", subtypes: new[] { CardSubtype.Forest });
+        land.SetOwner(alice);
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, land)
+            .Should().BeFalse("a land is played, not cast");
+    }
 }

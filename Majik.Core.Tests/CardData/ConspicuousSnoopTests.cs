@@ -35,17 +35,17 @@ public class ConspicuousSnoopTests
     private readonly Player _alice = new("Alice", 20);
 
     [Fact]
-    public void ConspicuousSnoop_Is_GoblinRogueCreature_1_1_AtCostR()
+    public void ConspicuousSnoop_Is_GoblinRogueCreature_2_2_AtCostRR()
     {
         var snoop = ConspicuousSnoopFactory.Create(_alice);
 
         snoop.Name.Should().Be("Conspicuous Snoop");
-        snoop.ManaCost.Should().Be("{R}");
+        snoop.ManaCost.Should().Be("{R}{R}");
         snoop.HasType(CardType.Creature).Should().BeTrue();
         snoop.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         snoop.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
-        snoop.BasePower.Should().Be(1);
-        snoop.BaseToughness.Should().Be(1);
+        snoop.BasePower.Should().Be(2);
+        snoop.BaseToughness.Should().Be(2);
         snoop.Owner.Should().BeSameAs(_alice);
         snoop.Controller.Should().BeSameAs(_alice);
     }
@@ -59,8 +59,8 @@ public class ConspicuousSnoopTests
         card.Name.Should().Be("Conspicuous Snoop");
         card.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         card.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
+        ((Creature)card).BasePower.Should().Be(2);
+        ((Creature)card).BaseToughness.Should().Be(2);
         card.Abilities.OfType<StaticAbility>().Should().HaveCount(3,
             "three oracle riders are wired as description-only static abilities");
     }
@@ -150,5 +150,85 @@ public class ConspicuousSnoopTests
         var alice = new Player("Alice", 20);
         ConspicuousSnoopFactory.IsTopOfLibraryGoblin(alice).Should().BeFalse(
             "no top card = no Goblin");
+    }
+
+    // ------------------------------------------------------------------
+    // CR 601.3e — "You may cast Goblin spells from the top of your library."
+    // The bus-aware build registers a Creatures-filter grant gated by an
+    // "is Goblin card" predicate while Snoop is on the battlefield.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void OnBattlefield_GoblinOnTop_IsCastableFromTop()
+    {
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+        var bus = new Majik.Core.Events.EventBus();
+        var alice = new Player("Alice", 20);
+
+        var snoop = ConspicuousSnoopFactory.Create(alice, bus);
+        snoop.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(snoop);
+
+        var goblin = new Creature("Goblin Guide", "{R}", 2, 2,
+            subtypes: new[] { CardSubtype.Goblin });
+        goblin.SetOwner(alice);
+        alice.Zones.Library.AddCard(goblin);
+        goblin.SetZone(ZoneType.Library);
+
+        // Nudge the lifecycle to sync (mirrors the source moving in).
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(snoop, ZoneType.Library, ZoneType.Battlefield));
+
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, goblin)
+            .Should().BeTrue("a Goblin card on top is castable while Snoop is out");
+    }
+
+    [Fact]
+    public void OnBattlefield_NonGoblinOnTop_NotCastableFromTop()
+    {
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+        var bus = new Majik.Core.Events.EventBus();
+        var alice = new Player("Alice", 20);
+
+        var snoop = ConspicuousSnoopFactory.Create(alice, bus);
+        snoop.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(snoop);
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(snoop, ZoneType.Library, ZoneType.Battlefield));
+
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2,
+            subtypes: new[] { CardSubtype.Bear });
+        bear.SetOwner(alice);
+        alice.Zones.Library.AddCard(bear);
+        bear.SetZone(ZoneType.Library);
+
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, bear)
+            .Should().BeFalse("only a Goblin card on top is castable");
+    }
+
+    [Fact]
+    public void LeavingBattlefield_RevokesCastGrant()
+    {
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+        var bus = new Majik.Core.Events.EventBus();
+        var alice = new Player("Alice", 20);
+
+        var snoop = ConspicuousSnoopFactory.Create(alice, bus);
+        snoop.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(snoop);
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(snoop, ZoneType.Library, ZoneType.Battlefield));
+
+        var goblin = new Creature("Goblin Guide", "{R}", 2, 2,
+            subtypes: new[] { CardSubtype.Goblin });
+        goblin.SetOwner(alice);
+        alice.Zones.Library.AddCard(goblin);
+        goblin.SetZone(ZoneType.Library);
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, goblin).Should().BeTrue();
+
+        // Snoop leaves — CR 603.6e revokes the grant.
+        alice.Zones.Battlefield.RemoveCard(snoop);
+        snoop.SetZone(ZoneType.Graveyard);
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(snoop, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(alice, goblin)
+            .Should().BeFalse("the grant is revoked once Snoop leaves the battlefield");
     }
 }
