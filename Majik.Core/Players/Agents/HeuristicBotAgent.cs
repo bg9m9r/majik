@@ -191,6 +191,22 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
             .ToList();
 
+        // CR 601.3e — Mystic Forge / Bolas's Citadel grant "you may cast
+        // [artifact / colorless / any] spells from the top of your library".
+        // When an active grant makes the top library card a legal cast source,
+        // enumerate it as a printed-cost bid using the same machinery as an
+        // in-hand spell. Played from the library; SpellCastFlow already moves a
+        // card from whatever zone it occupies onto the stack and stamps the
+        // "cast from library" sentinel.
+        var topCast = Rules.LibraryTopPlayPermissions.CastableSpellFromTop(ctx.Self);
+        if (topCast != null
+            && IsCastableSpell(topCast)
+            && (sorceryWindow || IsInstantSpeed(topCast))
+            && !_failedThisTurn.Contains(topCast.InstanceId))
+        {
+            pool.Add(topCast);
+        }
+
         var bids = new List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)>();
         foreach (var card in pool)
         {
@@ -230,7 +246,14 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         // pipeline (includes SpellCostIncreaseAbility riders from each
         // player's battlefield).
         var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self, ctx.AllPlayers);
-        var inHand = card.Zone == ZoneType.Hand;
+        // CR 601.3e — a card the controller may cast from the top of their
+        // library (Mystic Forge / Bolas's Citadel) is paid with its printed
+        // cost, same as an in-hand spell — so route it through the in-hand bid
+        // path even though it is in the Library zone.
+        var castableFromTop = card.Zone == ZoneType.Library
+            && ReferenceEquals(
+                Rules.LibraryTopPlayPermissions.CastableSpellFromTop(ctx.Self), card);
+        var inHand = card.Zone == ZoneType.Hand || castableFromTop;
 
         var altBids = EnumerateAlternativeCostBids(ctx, card);
 

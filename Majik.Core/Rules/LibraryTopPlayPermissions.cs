@@ -19,8 +19,19 @@ public enum TopPlayFilter
     /// Vivien (Champion of the Wilds)-style creature top-play.</summary>
     Creatures,
 
+    /// <summary>Artifact cards only — Mystic Forge's "you may cast artifact
+    /// spells … from the top of your library" clause. A CAST filter (the card
+    /// goes onto the stack via <see cref="Majik.Core.Game.SpellCastFlow"/>),
+    /// distinct from the play-as-a-land filters above.</summary>
+    Artifacts,
+
+    /// <summary>Colorless cards only — Mystic Forge's "… and colorless spells"
+    /// clause (CR 105.2c — a card with no colors). A CAST filter.</summary>
+    Colorless,
+
     /// <summary>Any card — Bolas's Citadel / Vizier-of-the-Menagerie-adjacent
-    /// "play the top card" effects.</summary>
+    /// "play the top card" effects. Covers both the land-play and the
+    /// nonland-cast capabilities.</summary>
     Any,
 }
 
@@ -190,6 +201,59 @@ public static class LibraryTopPlayPermissions
     }
 
     /// <summary>
+    /// CR 601.3e — true if <paramref name="card"/> is currently the top card of
+    /// <paramref name="controller"/>'s library AND a registered grant lets that
+    /// controller <b>cast</b> it from the top (Mystic Forge: artifact / colorless
+    /// spells; Bolas's Citadel: any nonland spell). This is the CAST analogue of
+    /// <see cref="MayPlayTopCard"/>, which only answers the land-PLAY half.
+    ///
+    /// <para>
+    /// Lands are never "cast" (CR 601.1 — a land is <i>played</i>, not cast), so
+    /// a land on top is never castable here even under an <see
+    /// cref="TopPlayFilter.Any"/> grant — use <see cref="MayPlayTopCard"/> /
+    /// <see cref="PlayableLandFromTop"/> for the land-play half. The spell-cast
+    /// path itself (<see cref="Majik.Core.Game.SpellCastFlow"/>) already moves a
+    /// card from whatever zone it occupies onto the stack and stamps the
+    /// "cast from library" sentinel; this method is the zone-source-legality
+    /// surface the agent / validators consult to know the top card is a legal
+    /// cast source.
+    /// </para>
+    /// </summary>
+    public static bool MayCastTopCard(Player controller, ICard card)
+    {
+        if (controller == null || card == null) return false;
+        // CR 601.1 — lands are played, not cast.
+        if (card.HasType(CardType.Land)) return false;
+        if (!ReferenceEquals(TopOfLibrary(controller), card)) return false;
+
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var g in store.Grants)
+            {
+                if (!ReferenceEquals(g.Controller, controller)) continue;
+                if (MatchesCast(g.Filter, card)) return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The top card of <paramref name="controller"/>'s library if they currently
+    /// have an active cast-from-top grant whose filter covers it (and it is a
+    /// nonland spell) — i.e. the spell they may cast from the top. Returns null
+    /// otherwise. Convenience for the agent's cast enumeration (parallels
+    /// <see cref="PlayableLandFromTop"/> on the play side).
+    /// </summary>
+    public static ICard? CastableSpellFromTop(Player controller)
+    {
+        if (controller == null) return null;
+        var top = TopOfLibrary(controller);
+        if (top == null) return null;
+        return MayCastTopCard(controller, top) ? top : null;
+    }
+
+    /// <summary>
     /// True if any active grant for <paramref name="controller"/> reveals the
     /// top card of their library (CR 715.4). When true the top card is public
     /// information (bot / UI may surface it).
@@ -229,6 +293,26 @@ public static class LibraryTopPlayPermissions
         TopPlayFilter.Lands => card.HasType(CardType.Land),
         TopPlayFilter.Creatures => card.HasType(CardType.Creature),
         TopPlayFilter.Any => true,
+        // Artifacts / Colorless are cast-only filters — they never make a card
+        // PLAYABLE-as-a-land (MayPlayTopCard); they only authorize casting
+        // (MayCastTopCard). A play-side query against them never matches.
+        _ => false,
+    };
+
+    // CR 601.3e cast-side matcher (MayCastTopCard). Distinct from Matches: an
+    // Any grant casts any NONLAND spell (the land-vs-cast split is enforced by
+    // MayCastTopCard's CR 601.1 land guard before this is reached). The
+    // Artifacts / Colorless filters key off card type / colour (CR 105.2c —
+    // a card with no colours is colourless).
+    private static bool MatchesCast(TopPlayFilter filter, ICard card) => filter switch
+    {
+        TopPlayFilter.Artifacts => card.HasType(CardType.Artifact),
+        TopPlayFilter.Colorless => Cards.CardColors.GetColors(card).Count == 0,
+        TopPlayFilter.Any => true,
+        // The land/creature PLAY filters do not, on their own, authorize a CAST
+        // from the top — Courser's "play lands" clause never let you cast a
+        // creature. (A creature top-play grant is a PLAY permission for the
+        // Coven clause, not a cast permission.)
         _ => false,
     };
 }

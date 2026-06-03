@@ -91,6 +91,18 @@ public sealed class ContinuousEffectsService
         _eventBus.SubscribeAll(_busHandler);
     }
 
+    /// <summary>
+    /// The engine <see cref="IEventBus"/> this service was wired to, or null
+    /// when constructed without one. Exposed so a factory routed through the
+    /// production effects-aware overload (<c>Create(Player,
+    /// ContinuousEffectsService)</c>) can reach the live bus to drive a
+    /// bus-lifecycle static (e.g. <see
+    /// cref="LibraryTopPlayStaticEffect"/>'s battlefield enter/leave grant)
+    /// without a separately-threaded bus parameter the source-generated
+    /// dispatch doesn't supply.
+    /// </summary>
+    public IEventBus? EventBus => _eventBus;
+
     private void OnBusEvent(GameEvent _)
     {
         // Any game event can shift an external CDA input (graveyard contents,
