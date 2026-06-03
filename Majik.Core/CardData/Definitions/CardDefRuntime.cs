@@ -759,6 +759,27 @@ public static class CardDefRuntime
                         Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
                     });
 
+            case ResolveEffectKind.ReturnToHand:
+                return new Effect(
+                    $"{def.Name}: return {step.Target} to its owner's hand",
+                    () =>
+                    {
+                        // CR 701.20 — "return ... to its owner's hand"
+                        // (Unsummon / Disperse / Repeal shape). Routes through
+                        // the shared Fx.BounceToHand primitive, threading the
+                        // live ZoneService when supplied so LTB/ETB events fire
+                        // and replacement effects can rewrite the move; shape-
+                        // only tests pass null and Fx falls back to raw zone
+                        // moves. Direct mirror of the DestroyTarget arm above.
+                        // CR 608.2b — illegal-target check at resolution: a
+                        // null pick or a permanent no longer on the battlefield
+                        // fizzles cleanly.
+                        var live = targetResolver(chosenTarget);
+                        if (live is not Permanent permanent) return;
+                        if (permanent.Zone != ZoneType.Battlefield) return;
+                        Fx.BounceToHand(permanent, zones);
+                    });
+
             case ResolveEffectKind.Mill:
                 return new Effect(
                     $"{def.Name}: mill {step.IntArg}",

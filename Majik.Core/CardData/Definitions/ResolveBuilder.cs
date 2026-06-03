@@ -72,6 +72,7 @@ public enum ResolveEffectKind
     DealDamage,
     PumpUntilEndOfTurn,
     DestroyTarget,
+    ReturnToHand,
     Mill,
     DrawCards,
     GainLife,
@@ -165,6 +166,23 @@ public sealed class ResolveBuilder
     {
         _effects.Add(new ResolveEffect(
             ResolveEffectKind.DestroyTarget, 0, 0, kind, null));
+        return this;
+    }
+
+    /// <summary>Return a target permanent to its owner's hand
+    /// (Unsummon / Disperse / Repeal shape — CR 701.20). Finalize with
+    /// <see cref="TargetedEffect.To"/>; the convenience overload below
+    /// presets the target kind.</summary>
+    public TargetedEffect ReturnToHand() =>
+        new TargetedEffect(this, ResolveEffectKind.ReturnToHand, 0, 0);
+
+    /// <summary>Convenience — return-to-hand with the target kind baked in.
+    /// Equivalent to <c>ReturnToHand().To(kind)</c>. Mirrors the
+    /// <see cref="DestroyTarget(TargetKind)"/> shortcut.</summary>
+    public ResolveBuilder ReturnToHand(TargetKind kind)
+    {
+        _effects.Add(new ResolveEffect(
+            ResolveEffectKind.ReturnToHand, 0, 0, kind, null));
         return this;
     }
 
@@ -345,6 +363,8 @@ public sealed class TokenBuilder
     public ResolveBuilder AddMana(string mana) => _parent.AddMana(mana);
     /// <summary>Proxy <see cref="ResolveBuilder.DestroyTarget(TargetKind)"/>.</summary>
     public ResolveBuilder DestroyTarget(TargetKind kind) => _parent.DestroyTarget(kind);
+    /// <summary>Proxy <see cref="ResolveBuilder.ReturnToHand(TargetKind)"/>.</summary>
+    public ResolveBuilder ReturnToHand(TargetKind kind) => _parent.ReturnToHand(kind);
 
     private void Mutate(Func<TokenBlueprint, TokenBlueprint> mutator)
     {

@@ -352,6 +352,70 @@ public class CardDefTests
     }
 
     [Fact]
+    public void ReturnToHand_DslShape_EmitsReturnToHandStep()
+    {
+        // Disperse-shape: return target nonland permanent to its owner's hand.
+        // The convenience overload bakes in the target kind (mirrors the
+        // DestroyTarget(kind) shortcut).
+        CardDef def = CardDef
+            .Instant("Disperse", "{1}{U}")
+            .Resolve(c => c.ReturnToHand(TargetKind.Permanent));
+
+        def.ResolveBody!.Effects[0].Kind.Should().Be(ResolveEffectKind.ReturnToHand);
+        def.ResolveBody.Effects[0].Target.Should().Be(TargetKind.Permanent);
+    }
+
+    [Fact]
+    public void ReturnToHand_DslTargetedShape_ClosesWithTo()
+    {
+        // Unsummon-shape via the .To(...) form rather than the shortcut.
+        CardDef def = CardDef
+            .Instant("Unsummon", "{U}")
+            .Resolve(c => c.ReturnToHand().To(TargetKind.Creature));
+
+        def.ResolveBody!.Effects[0].Kind.Should().Be(ResolveEffectKind.ReturnToHand);
+        def.ResolveBody.Effects[0].Target.Should().Be(TargetKind.Creature);
+    }
+
+    [Fact]
+    public void Resolve_ReturnToHand_MovesCreatureToOwnersHand()
+    {
+        // CR 701.20 — Unsummon-shape: bounce target creature to its owner's
+        // hand. Mirror of Resolve_DestroyTarget_MovesCreatureToGraveyard.
+        CardDef def = CardDef
+            .Instant("Unsummon", "{U}")
+            .Resolve(c => c.ReturnToHand(TargetKind.Creature));
+
+        var target = new Creature("Bear", "{1}{G}", 2, 2);
+        target.SetOwner(_bob); target.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(target);
+        target.SetZone(global::Majik.Core.Zones.ZoneType.Battlefield);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: target);
+        effects[0].Execute();
+
+        target.Zone.Should().Be(global::Majik.Core.Zones.ZoneType.Hand);
+        _bob.Zones.Hand.GetCards().Should().Contain(target);
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(target);
+    }
+
+    [Fact]
+    public void Resolve_ReturnToHand_NullTarget_Fizzles()
+    {
+        // CR 608.2b — a null/illegal pick fizzles cleanly (no throw).
+        CardDef def = CardDef
+            .Instant("Unsummon", "{U}")
+            .Resolve(c => c.ReturnToHand(TargetKind.Creature));
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: null);
+        var act = () => effects[0].Execute();
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
     public void Resolve_PumpUntilEndOfTurn_RegistersLayer7c()
     {
         CardDef def = CardDef
