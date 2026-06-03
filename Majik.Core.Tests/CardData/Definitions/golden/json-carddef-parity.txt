@@ -41930,6 +41930,58 @@
     "Black"
   ]
 }
+==== vindictive-vampire ====
+{
+  "name": "Vindictive Vampire",
+  "manaCost": "{3}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Vampire"
+  ],
+  "power": 2,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect\u002BEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== vineglimmer-snarl ====
 {
   "name": "Vineglimmer Snarl",

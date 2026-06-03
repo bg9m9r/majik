@@ -1049,20 +1049,26 @@ public static class CardDefRuntime
     /// of a creature OTHER than this permanent, with the optional youControlOnly
     /// (CR 109.5, resolved live) / nontokenOnly (CR 111.7) / subtype (CR 205.3)
     /// filters AND-composed — the same predicate the hand-rolled Blood Artist /
-    /// Zulaport Cutthroat / Midnight Reaper factories use.
+    /// Zulaport Cutthroat / Midnight Reaper factories use. When
+    /// <see cref="WheneverAnotherCreatureDiesTriggerDef.IncludeSelf"/> is set the
+    /// source's OWN death also fires it (CR 603.6c — "this creature OR another
+    /// creature dies", Cordial Vampire).
     /// </summary>
     private static ITriggerCondition BuildAnotherCreatureDiesTrigger(
         WheneverAnotherCreatureDiesTriggerDef def, ICard card)
     {
         var youControlOnly = def.YouControlOnly;
         var nontokenOnly = def.NontokenOnly;
+        var includeSelf = def.IncludeSelf;
         var subtype = ParseOptionalSubtype(def.Subtype);
         return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
         {
             if (e.FromZone != ZoneType.Battlefield) return false;
             if (e.ToZone != ZoneType.Graveyard) return false;
             if (!e.Card.HasType(CardType.Creature)) return false;
-            if (ReferenceEquals(e.Card, card)) return false;
+            // "ANOTHER creature" excludes the source unless includeSelf models
+            // "this creature OR another creature dies" (CR 603.6c).
+            if (!includeSelf && ReferenceEquals(e.Card, card)) return false;
             if (nontokenOnly && e.Card is Permanent { IsToken: true }) return false;
             if (subtype is not null && !e.Card.HasSubtype(subtype.Value)) return false;
             if (!youControlOnly) return true;
@@ -1088,12 +1094,15 @@ public static class CardDefRuntime
     {
         var youControlOnly = def.YouControlOnly;
         var nontokenOnly = def.NontokenOnly;
+        var includeSelf = def.IncludeSelf;
         var subtype = ParseOptionalSubtype(def.Subtype);
         return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
         {
             if (e.FromZone != ZoneType.Battlefield) return false;
             if (e.ToZone != ZoneType.Graveyard) return false;
-            if (ReferenceEquals(e.Card, card)) return false;
+            // "ANOTHER permanent" excludes the source unless includeSelf models
+            // "this permanent OR another permanent dies" (CR 603.6c).
+            if (!includeSelf && ReferenceEquals(e.Card, card)) return false;
             if (nontokenOnly && e.Card is Permanent { IsToken: true }) return false;
             if (subtype is not null && !e.Card.HasSubtype(subtype.Value)) return false;
             if (!youControlOnly) return true;

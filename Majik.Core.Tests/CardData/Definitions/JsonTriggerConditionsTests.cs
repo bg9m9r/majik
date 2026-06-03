@@ -1050,6 +1050,111 @@ public class JsonTriggerConditionsTests
         triggers.PendingCount.Should().Be(1, "a nontoken creature you control dying fires it");
     }
 
+    // subtype/tribal filter on whenever_another_creature_dies — the
+    // "whenever another [subtype] you control dies" aristocrat shape. Mirrors
+    // the subtype gate already exercised on whenever_another_creature_enters.
+    private const string AnotherVampireDiesJson = """
+    {
+      "name": "Test Vampire Aristocrat",
+      "types": ["Creature"],
+      "manaCost": "1B",
+      "power": 1,
+      "toughness": 1,
+      "subtypes": ["Vampire"],
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_dies", "subtype": "Vampire" },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureDies_SubtypeFilter_Fires_ForMatchingSubtype()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherVampireDiesJson, triggers);
+
+        var vampire = new Creature("Vampire Token", "1B", 2, 2, subtypes: new[] { CardSubtype.Vampire }) { Owner = _alice };
+        vampire.SetController(_alice);
+        bus.Publish(new CardMovedEvent(vampire, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1, "a Vampire dying fires the subtype-gated death trigger (CR 205.3)");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_SubtypeFilter_DoesNotFire_ForNonMatchingSubtype()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherVampireDiesJson, triggers);
+
+        var bear = new Creature("Bear", "1G", 2, 2, subtypes: new[] { CardSubtype.Bear }) { Owner = _alice };
+        bear.SetController(_alice);
+        bus.Publish(new CardMovedEvent(bear, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0, "a non-Vampire creature dying does not fire the subtype-gated trigger");
+    }
+
+    // includeSelf on whenever_another_creature_dies — "this creature OR another
+    // creature dies" (CR 603.6c — Cordial Vampire). Without includeSelf the
+    // source's own death is excluded (see AnotherCreatureDies_DoesNotFire_ForSelf).
+    private const string ThisOrAnotherCreatureDiesJson = """
+    {
+      "name": "Test Cordial Vampire",
+      "types": ["Creature"],
+      "manaCost": "BB",
+      "power": 2,
+      "toughness": 2,
+      "subtypes": ["Vampire"],
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_dies", "includeSelf": true },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureDies_IncludeSelf_Fires_ForOwnDeath()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(ThisOrAnotherCreatureDiesJson, triggers);
+
+        // includeSelf → the source's OWN death fires it ("this creature OR
+        // another creature dies", CR 603.6c). The ActiveZones override keeps the
+        // ability observable from the Graveyard after the death stamp.
+        bus.Publish(new CardMovedEvent(card, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "includeSelf lets the source's own death fire ('this creature or another creature dies', Cordial Vampire)");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_IncludeSelf_AlsoFires_ForOtherCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(ThisOrAnotherCreatureDiesJson, triggers);
+
+        var other = new Creature("Bear", "1G", 2, 2) { Owner = _bob };
+        other.SetController(_bob);
+        bus.Publish(new CardMovedEvent(other, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "includeSelf still fires for ANOTHER creature dying — 'this creature OR another' is a union");
+    }
+
     // ------------------------------------------------------------------
     // subtype/tribal filter on whenever_another_creature_enters — the
     // Mardu Woe-Reaper "or another Warrior you control enters" shape.
@@ -1375,6 +1480,54 @@ public class JsonTriggerConditionsTests
 
         triggers.PendingCount.Should().Be(1,
             "a nontoken permanent you control dying fires the youControlOnly trigger (CR 109.5)");
+    }
+
+    // includeSelf on whenever_another_permanent_dies — "this permanent OR
+    // another permanent dies" (CR 603.6c).
+    private const string ThisOrAnotherPermanentDiesJson = """
+    {
+      "name": "Test Self-Counting Permanent",
+      "types": ["Enchantment"],
+      "manaCost": "2B",
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_permanent_dies", "includeSelf": true },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherPermanentDies_IncludeSelf_Fires_ForOwnDeath()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(ThisOrAnotherPermanentDiesJson, triggers);
+
+        // includeSelf → the source permanent's OWN death fires it (CR 603.6c).
+        bus.Publish(new CardMovedEvent(card, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "includeSelf lets the source permanent's own death fire ('this permanent or another permanent dies')");
+    }
+
+    [Fact]
+    public void AnotherPermanentDies_Default_DoesNotFire_ForOwnDeath()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(AnotherPermanentDiesJson, triggers);
+
+        // Default (no includeSelf) excludes the source's own death — the
+        // 'ANOTHER permanent' self-exclusion (CR 603.6c).
+        bus.Publish(new CardMovedEvent(card, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0,
+            "'ANOTHER permanent' excludes the source's own death without includeSelf");
     }
 
     // ------------------------------------------------------------------

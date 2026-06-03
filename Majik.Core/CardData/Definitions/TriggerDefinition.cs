@@ -292,6 +292,16 @@ public sealed class WheneverAnotherCreatureDiesTriggerDef : TriggerDefinition
     /// <see cref="Majik.Core.Cards.Types.CardSubtype"/>.</summary>
     public string? Subtype { get; set; }
 
+    /// <summary>
+    /// When <c>true</c>, the source permanent's OWN death also fires the
+    /// trigger (CR 603.6c), modelling the "this creature OR another creature
+    /// dies" wording (Cordial Vampire, Mournwillow). Default <c>false</c> =
+    /// "ANOTHER creature" only (self excluded), the Blood Artist / Zulaport
+    /// Cutthroat shape. Mirrors
+    /// <see cref="WheneverAnotherCreatureEntersTriggerDef.IncludeSelf"/>.
+    /// </summary>
+    public bool IncludeSelf { get; set; }
+
     /// <inheritdoc />
     public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndGraveyard;
 }
@@ -344,6 +354,15 @@ public sealed class WheneverAnotherPermanentDiesTriggerDef : TriggerDefinition
     /// no subtype restriction. Parsed as
     /// <see cref="Majik.Core.Cards.Types.CardSubtype"/>.</summary>
     public string? Subtype { get; set; }
+
+    /// <summary>
+    /// When <c>true</c>, the source permanent's OWN death also fires the
+    /// trigger (CR 603.6c), modelling the "this permanent OR another permanent
+    /// dies" wording. Default <c>false</c> = "ANOTHER permanent" only (self
+    /// excluded). Mirrors
+    /// <see cref="WheneverAnotherCreatureEntersTriggerDef.IncludeSelf"/>.
+    /// </summary>
+    public bool IncludeSelf { get; set; }
 
     /// <inheritdoc />
     public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndGraveyard;
