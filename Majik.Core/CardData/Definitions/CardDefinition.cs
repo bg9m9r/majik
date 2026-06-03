@@ -276,7 +276,7 @@ public sealed class ActivatedAbilityDefinition : AbilityDefinition
                 e.ToTargetRequest(),
                 (card, controller, replacements, index, continuous) =>
                     e.ToResolveEffect(continuous)(card, controller, replacements, index),
-                e.ToExtraTargetRequest(),
+                e.ToExtraTargetRequests(),
                 e.SharesPreviousTargetSlot))
             .ToArray();
         return new CardDefActivatedAbility(costBuilders, effectSpecs, SorcerySpeed);
@@ -329,7 +329,7 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
                 e.ToTargetRequest(),
                 (card, controller, replacements, index, continuous) =>
                     e.ToResolveEffect(continuous)(card, controller, replacements, index),
-                e.ToExtraTargetRequest(),
+                e.ToExtraTargetRequests(),
                 e.SharesPreviousTargetSlot))
             .ToArray();
         // CR 601.2b / 603.4 — the generalized optional reflexive "you may pay

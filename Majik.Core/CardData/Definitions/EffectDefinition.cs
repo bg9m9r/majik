@@ -133,25 +133,28 @@ public abstract class EffectDefinition
     public virtual bool SharesPreviousTargetSlot => false;
 
     /// <summary>
-    /// A SECOND target slot this effect declares, immediately following its
-    /// primary <see cref="ToTargetRequest"/>, or <c>null</c> for the common
-    /// single-target / untargeted case (the default). The only verb that needs
-    /// two own target slots is <see cref="FightEffectDef"/> in its
-    /// <c>source: "target"</c> mode — "target creature you control fights
+    /// ADDITIONAL target slots this effect declares, in order, immediately
+    /// following its primary <see cref="ToTargetRequest"/> — or an EMPTY list
+    /// for the common single-target / untargeted case (the default). A two-slot
+    /// verb returns one extra request, a three-slot verb returns two, and so on
+    /// (N-slot). The canonical two-slot case is <see cref="FightEffectDef"/> in
+    /// its <c>source: "target"</c> mode — "target creature you control fights
     /// target creature you don't control" (CR 701.12) — where the FIGHTER and
     /// the OTHER creature are two distinct targets the spell announces.
     ///
     /// <para>
-    /// When non-null, <see cref="ToTargetRequest"/> MUST also be non-null (the
-    /// extra slot is the second of an ordered pair), and at resolution the
+    /// When non-empty, <see cref="ToTargetRequest"/> MUST also be non-null (the
+    /// extra slots are the 2nd..Nth of an ordered run), and at resolution the
     /// effect reads its primary pick at <c>targetRequestIndex</c> and its extra
-    /// pick at <c>targetRequestIndex + 1</c>. Both the ability materializer
-    /// (<see cref="CardDefAbilityEffects.Materialize"/>) and the spell bridge
+    /// picks at <c>targetRequestIndex + 1 … targetRequestIndex + N</c>. Both the
+    /// ability materializer (<see cref="CardDefAbilityEffects.Materialize"/>) and
+    /// the spell bridge
     /// (<see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>) append the
-    /// extra request right after the primary so the two slots are contiguous.
+    /// extra requests right after the primary so the whole run is contiguous.
     /// </para>
     /// </summary>
-    public virtual Majik.Core.Players.Agents.TargetRequest? ToExtraTargetRequest() => null;
+    public virtual System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Agents.TargetRequest> ToExtraTargetRequests() =>
+        System.Array.Empty<Majik.Core.Players.Agents.TargetRequest>();
 }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -731,11 +734,15 @@ public sealed class FightEffectDef : EffectDefinition
                 TargetFilter, "fight", Majik.Core.Cards.BotIntent.Removal);
 
     /// <inheritdoc />
-    public override Majik.Core.Players.Agents.TargetRequest? ToExtraTargetRequest() =>
+    public override System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Agents.TargetRequest> ToExtraTargetRequests() =>
         IsTargetSource
-            ? TargetFilters.ToTargetRequest(
-                TargetFilter, "fight", Majik.Core.Cards.BotIntent.Removal)
-            : null;
+            // The OTHER creature is the one extra slot following the fighter.
+            ? new[]
+            {
+                TargetFilters.ToTargetRequest(
+                    TargetFilter, "fight", Majik.Core.Cards.BotIntent.Removal),
+            }
+            : System.Array.Empty<Majik.Core.Players.Agents.TargetRequest>();
 }
 
 /// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>
