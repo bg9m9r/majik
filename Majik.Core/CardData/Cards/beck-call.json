@@ -1,0 +1,7 @@
+{
+  "name": "Beck // Call",
+  "types": ["Sorcery"],
+  "manaCost": "{G}{U}",
+  "colors": ["G", "U", "W"],
+  "abilities": []
+}
