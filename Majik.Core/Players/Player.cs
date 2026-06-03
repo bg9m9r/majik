@@ -593,7 +593,8 @@ public class Player
         ValueObjects.ManaCost mana,
         object? provenanceSource = null,
         Action<Cards.ICard?>? onSpent = null,
-        Mana.SpendRestriction? restriction = null)
+        Mana.SpendRestriction? restriction = null,
+        bool doesNotEmpty = false)
     {
         if (mana == null)
         {
@@ -607,20 +608,33 @@ public class Player
 
         _manaPool = _manaPool.Add(mana);
 
-        // CR 106.4 — a colored unit is provenance-stamped when it has a
-        // reaction-firing source (Arena of Glory's exert haste rider) OR a
-        // spend-restriction rider (Ancient Ziggurat's "creature spell only").
-        // Either alone records a slot; restriction-only slots let the payment
-        // resolver gate the spend without any OnSpent callback. When only a
-        // restriction is present we fall back to `this` as the slot source.
-        if (provenanceSource != null || restriction != null)
+        // CR 106.4 — a unit is provenance-stamped when it has a reaction-firing
+        // source (Arena of Glory's exert haste rider), a spend-restriction
+        // rider (Ancient Ziggurat's "creature spell only"; Karn's "nonartifact
+        // spells can't"), OR a CR 500.4 doesn't-empty rider (Karn's "you don't
+        // lose this mana as steps and phases end"). Any one alone records a
+        // slot. When only a restriction / doesn't-empty flag is present we fall
+        // back to `this` as the slot source.
+        if (provenanceSource != null || restriction != null || doesNotEmpty)
         {
             var source = provenanceSource ?? (object)this;
-            AddProvenanceSlots(source, ValueObjects.ManaColor.White, mana.White, onSpent, restriction);
-            AddProvenanceSlots(source, ValueObjects.ManaColor.Blue, mana.Blue, onSpent, restriction);
-            AddProvenanceSlots(source, ValueObjects.ManaColor.Black, mana.Black, onSpent, restriction);
-            AddProvenanceSlots(source, ValueObjects.ManaColor.Red, mana.Red, onSpent, restriction);
-            AddProvenanceSlots(source, ValueObjects.ManaColor.Green, mana.Green, onSpent, restriction);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.White, mana.White, onSpent, restriction, doesNotEmpty);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Blue, mana.Blue, onSpent, restriction, doesNotEmpty);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Black, mana.Black, onSpent, restriction, doesNotEmpty);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Red, mana.Red, onSpent, restriction, doesNotEmpty);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Green, mana.Green, onSpent, restriction, doesNotEmpty);
+            // CR 106.1b — colorless ({C}) mana is stored in the Generic pool
+            // bucket but, unlike generic-cost pips, is a real produced unit
+            // that can carry a spend-restriction or doesn't-empty rider (Karn,
+            // Legacy Reforged adds {C} that can't pay nonartifact spells and
+            // doesn't empty). Tag those as ManaColor.Colorless slots so the
+            // payment gate and the EmptyManaPool sweep can find them. Plain
+            // generic pips (covered-cost mana) are never tagged — only a
+            // colorless unit produced WITH a rider records a slot.
+            if (restriction != null || doesNotEmpty)
+            {
+                AddProvenanceSlots(source, ValueObjects.ManaColor.Colorless, mana.Generic, onSpent, restriction, doesNotEmpty);
+            }
         }
     }
 
@@ -629,11 +643,12 @@ public class Player
         ValueObjects.ManaColor color,
         int count,
         Action<Cards.ICard?>? onSpent,
-        Mana.SpendRestriction? restriction = null)
+        Mana.SpendRestriction? restriction = null,
+        bool doesNotEmpty = false)
     {
         for (var i = 0; i < count; i++)
         {
-            _manaProvenance.Add(new Mana.ManaProvenanceSlot(source, color, onSpent, restriction));
+            _manaProvenance.Add(new Mana.ManaProvenanceSlot(source, color, onSpent, restriction, doesNotEmpty));
         }
     }
 
@@ -750,29 +765,76 @@ public class Player
     /// generic pip). Pair with <see cref="RestoreColoredMana"/> — the withheld
     /// mana stays floating with its restriction slots intact. Clamped at zero.
     /// </summary>
-    public void WithholdColoredMana(int white, int blue, int black, int red, int green)
+    public void WithholdColoredMana(int white, int blue, int black, int red, int green, int colorless = 0)
     {
-        _manaPool = _manaPool.RemoveColored(white, blue, black, red, green);
+        _manaPool = _manaPool.RemoveColored(white, blue, black, red, green, generic: colorless);
     }
 
     /// <summary>
     /// CR 106.4 — restore mana previously held back by
     /// <see cref="WithholdColoredMana"/> after a payment, again without
-    /// touching the provenance ledger (the slots were never removed).
+    /// touching the provenance ledger (the slots were never removed). The
+    /// <paramref name="colorless"/> count restores withheld colorless ({C})
+    /// restricted mana into the Generic bucket (Karn, Legacy Reforged).
     /// </summary>
-    public void RestoreColoredMana(int white, int blue, int black, int red, int green)
+    public void RestoreColoredMana(int white, int blue, int black, int red, int green, int colorless = 0)
     {
-        _manaPool = _manaPool.AddColored(white, blue, black, red, green);
+        _manaPool = _manaPool.AddColored(white, blue, black, red, green, generic: colorless);
     }
 
     /// <summary>
     /// Empty the mana pool (happens at end of steps/phases per Rule 500.4).
     /// All slot-level mana provenance (CR 106.4) dies with the floating mana.
+    ///
+    /// <para>CR 500.4 exception: a unit of mana flagged
+    /// <see cref="Mana.ManaProvenanceSlot.DoesNotEmpty"/> ("Until end of turn,
+    /// you don't lose this mana as steps and phases end" — Karn, Legacy
+    /// Reforged) survives a STEP/PHASE-boundary empty (<paramref name="endOfTurn"/>
+    /// = <c>false</c>): its pool unit and provenance slot are retained. The
+    /// END-OF-TURN empty (<paramref name="endOfTurn"/> = <c>true</c>, the
+    /// default) clears everything — the "until end of turn" rider then lapses
+    /// (CR 514.2).</para>
     /// </summary>
-    public void EmptyManaPool()
+    /// <param name="endOfTurn"><c>true</c> (default) ⇒ the cleanup/end-of-turn
+    /// empty: every floating unit clears, doesn't-empty rider included.
+    /// <c>false</c> ⇒ a step/phase-boundary empty: doesn't-empty mana is
+    /// retained.</param>
+    public void EmptyManaPool(bool endOfTurn = true)
     {
-        _manaPool = _manaPool.EmptyPool();
+        if (endOfTurn || _manaProvenance.All(s => !s.DoesNotEmpty))
+        {
+            // End of turn, OR no protected mana floating — full empty (fast
+            // path identical to the legacy behaviour).
+            _manaPool = _manaPool.EmptyPool();
+            _manaProvenance.Clear();
+            return;
+        }
+
+        // Step/phase boundary with at least one doesn't-empty unit floating.
+        // Retain exactly those units (and their provenance slots); empty the
+        // rest. Rebuild the pool from the surviving slots so the bucket counts
+        // stay in lock-step with the ledger (CR 500.4 exception). Colorless
+        // ({C}) survivors map back into the Generic pool bucket (CR 106.1b).
+        var survivors = _manaProvenance.Where(s => s.DoesNotEmpty).ToList();
         _manaProvenance.Clear();
+        _manaProvenance.AddRange(survivors);
+
+        int w = 0, u = 0, b = 0, r = 0, g = 0, generic = 0;
+        foreach (var slot in survivors)
+        {
+            switch (slot.Color)
+            {
+                case ValueObjects.ManaColor.White: w++; break;
+                case ValueObjects.ManaColor.Blue: u++; break;
+                case ValueObjects.ManaColor.Black: b++; break;
+                case ValueObjects.ManaColor.Red: r++; break;
+                case ValueObjects.ManaColor.Green: g++; break;
+                default: generic++; break; // Colorless → Generic bucket
+            }
+        }
+        _manaPool = ValueObjects.ManaPool.Empty
+            .AddColored(white: w, blue: u, black: b, red: r, green: g)
+            .AddGeneric(generic);
     }
 
     public override string ToString()
