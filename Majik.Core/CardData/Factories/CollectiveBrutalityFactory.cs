@@ -119,16 +119,17 @@ public static class CollectiveBrutalityFactory
         ArgumentNullException.ThrowIfNull(targetResolver);
 
         // CR 601.2c — one target request per mode that takes a target. All
-        // three modes are targeted; MinTargets = 0 so unchosen modes don't
-        // gate the cast.
+        // three modes are targeted; MinTargets = 0 so UNCHOSEN modes don't
+        // gate the cast, but PrintedMinTargets = 1 means a CHOSEN mode demands
+        // a legal target or the whole cast is illegal and rewinds (CR 601.2c).
         var targetRequests = new[]
         {
             // Mode 0 — target opponent (reveal + discard).
-            new TargetRequest("target opponent", 0, 1, Array.Empty<object>(), BotIntent.HandHate),
+            new TargetRequest("target opponent", 0, 1, Array.Empty<object>(), BotIntent.HandHate, PrintedMinTargets: 1),
             // Mode 1 — target creature (-2/-2).
-            new TargetRequest("target creature", 0, 1, Array.Empty<object>(), BotIntent.Removal),
+            new TargetRequest("target creature", 0, 1, Array.Empty<object>(), BotIntent.Removal, PrintedMinTargets: 1),
             // Mode 2 — target opponent (drain).
-            new TargetRequest("target opponent", 0, 1, Array.Empty<object>(), BotIntent.LoseLife),
+            new TargetRequest("target opponent", 0, 1, Array.Empty<object>(), BotIntent.LoseLife, PrintedMinTargets: 1),
         };
 
         return new SpellDefinition(

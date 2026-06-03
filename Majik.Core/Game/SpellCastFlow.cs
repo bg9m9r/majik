@@ -515,21 +515,33 @@ public sealed class SpellCastFlow
     /// gathering candidate pools against the live ctx. Throws when the agent
     /// can't pick enough legal targets (cast is illegal).
     /// <para>
-    /// CR 700.2d — for a multi-mode spell whose target requests are
-    /// index-aligned with its modes (one request per printed mode), only the
-    /// CHOSEN modes are prompted for targets; unchosen modes keep an empty
-    /// slot so per-mode index lookups in the EffectFactory stay aligned. When
-    /// the request/mode counts don't line up (e.g. Cryptic Command, whose two
-    /// requests cover only the first two of four modes) the whole request list
-    /// is collected, preserving the legacy behaviour.
+    /// CR 700.2d — for a MODAL spell (single- or multi-mode) whose target
+    /// requests are index-aligned with its modes (one request per printed
+    /// mode), only the CHOSEN modes are prompted for targets; unchosen modes
+    /// keep an empty slot so per-mode index lookups in the EffectFactory stay
+    /// aligned. When the request/mode counts don't line up (e.g. Cryptic
+    /// Command, whose two requests cover only the first two of four modes) the
+    /// whole request list is collected, preserving the legacy behaviour.
+    /// </para>
+    /// <para>
+    /// CR 601.2c — a chosen mode's request has its minimum raised to its
+    /// PRINTED minimum (<see cref="Targeting.TargetRequest.AsChosenMode"/>):
+    /// the per-mode requests carry <c>MinTargets = 0</c> so an UNCHOSEN mode
+    /// never gates the cast, but once a targeted mode IS chosen it demands its
+    /// printed minimum (typically 1) — so an escalate-paid (or single-mode)
+    /// targeted mode with no legal target makes the whole cast illegal and
+    /// rewinds, instead of silently no-opping on resolution.
     /// </para></summary>
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
         SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent,
         IReadOnlyList<int> chosenModes, CancellationToken ct)
     {
-        // CR 700.2d — mode-aware target collection for index-aligned multi-mode
-        // spells. Prompt only the chosen modes' slots; fill the rest empty.
-        if (definition.IsMultiMode
+        // CR 700.2d — mode-aware target collection for index-aligned modal
+        // spells (single- OR multi-mode). Prompt only the chosen modes' slots;
+        // fill the rest empty. Single-mode "Choose one" charms route here too
+        // (chosenModes carries the single scalar pick), so a chosen targeted
+        // charm mode with no legal target is illegal per CR 601.2c.
+        if (definition.Modes.Count > 0
             && definition.TargetRequests.Count == definition.Modes.Count
             && chosenModes.Count > 0)
         {
@@ -542,8 +554,10 @@ public sealed class SpellCastFlow
                     perMode.Add(Array.Empty<object>());
                     continue;
                 }
+                // CR 601.2c — a CHOSEN mode demands its printed minimum; an
+                // agent that can't supply it makes the whole cast illegal.
                 var oneSlot = await Targeting.TargetCollection.CollectAsync(
-                    new[] { definition.TargetRequests[i] },
+                    new[] { definition.TargetRequests[i].AsChosenMode() },
                     card, ctx, agent, throwOnInsufficient: true, ct);
                 perMode.Add(oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>());
             }

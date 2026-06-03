@@ -17,6 +17,20 @@ namespace Majik.Core.Players.Agents;
 /// invoke it with the live <see cref="GameContext"/> just before prompting
 /// and merge the result into <see cref="LegalCandidates"/>.
 /// </para>
+///
+/// <para>
+/// <see cref="PrintedMinTargets"/> (default = <see cref="MinTargets"/>) is the
+/// PRINTED minimum a chosen mode demands (CR 601.2c). For a modal spell whose
+/// per-mode requests carry <see cref="MinTargets"/> = 0 so UNCHOSEN modes don't
+/// gate the cast, this field records the minimum that mode actually requires
+/// once it IS chosen ("Target creature gets −2/−2" → 1). The modal
+/// target-collection path in <c>SpellCastFlow</c> raises a chosen mode's
+/// effective minimum to this value via <see cref="AsChosenMode"/>, so an
+/// escalate-paid (or single-mode) targeted mode with no legal target makes the
+/// whole cast illegal and rewinds (CR 601.2c), rather than no-opping on
+/// resolution. For non-modal requests it equals <see cref="MinTargets"/> and is
+/// inert.
+/// </para>
 /// </summary>
 public sealed record TargetRequest(
     string Description,
@@ -24,8 +38,27 @@ public sealed record TargetRequest(
     int MaxTargets,
     IReadOnlyList<object> LegalCandidates,
     BotIntent Intent = BotIntent.None,
-    Func<GameContext, IReadOnlyList<object>>? CandidateGatherer = null)
+    Func<GameContext, IReadOnlyList<object>>? CandidateGatherer = null,
+    int? PrintedMinTargets = null)
 {
+    /// <summary>
+    /// CR 601.2c — the PRINTED minimum this request demands when its mode is
+    /// chosen. Defaults to <see cref="MinTargets"/> when not explicitly set,
+    /// so the existing non-modal target requests are unaffected.
+    /// </summary>
+    public int EffectiveChosenMinTargets => PrintedMinTargets ?? MinTargets;
+
+    /// <summary>
+    /// CR 601.2c — return a copy of this request with <see cref="MinTargets"/>
+    /// raised to <see cref="EffectiveChosenMinTargets"/>, used by the modal
+    /// target-collection path to enforce the printed minimum of a CHOSEN mode.
+    /// When the printed minimum is not greater than the current minimum the
+    /// request is returned unchanged.
+    /// </summary>
+    public TargetRequest AsChosenMode() =>
+        EffectiveChosenMinTargets > MinTargets
+            ? this with { MinTargets = EffectiveChosenMinTargets }
+            : this;
     /// <summary>
     /// Materialize the live candidate pool for this request. Returns the
     /// union of <see cref="LegalCandidates"/> and any objects produced by
