@@ -100,6 +100,9 @@ public static class SagaBinder
             "The Legend of Roku"
                 or "The Legend of Roku // Avatar Roku"
                 => MakeRokuChapterHandler(perm, zones, triggers, eventBus, rokuColorChoice),
+            "The Restoration of Eiganjo"
+                or "The Restoration of Eiganjo // Architect of Restoration"
+                => MakeEiganjoChapterHandler(perm, zones, triggers, eventBus),
             _ => _ => { /* generic saga — no-op effect, state still ticks */ },
         };
 
@@ -566,6 +569,200 @@ public static class SagaBinder
             controller.Zones.Library.RemoveCard(avatar);
             avatar.SetZone(ZoneType.Battlefield);
             controller.Zones.Battlefield.AddCard(avatar);
+        }
+    }
+
+    /// <summary>
+    /// The Restoration of Eiganjo (NEO, {2}{W}) // Architect of Restoration.
+    /// I — Search your library for a basic Plains card, reveal it, put it into
+    ///     your hand, then shuffle (CR 701.19a / 701.20a).
+    /// II — You may discard a card. When you do, return target permanent card
+    ///     with mana value 2 or less from your graveyard to the battlefield
+    ///     tapped (CR 701.7 discard + reflexive "when you do"). The discard is
+    ///     agent-driven; declining honours the "you may" and the reflexive
+    ///     reanimation never fires.
+    /// III — Exile this Saga, then return it transformed (Architect of
+    ///     Restoration, CR 714.4 / 712.4) via
+    ///     <see cref="ArchitectOfRestorationFactory"/>; the
+    ///     <see cref="SagaState"/> is cleared so the generic Saga-sacrifice SBA
+    ///     (CR 704.5r) does not fire on the transformed creature.
+    /// </summary>
+    private static Action<int> MakeEiganjoChapterHandler(
+        Permanent perm,
+        ZoneService? zones,
+        Majik.Core.Abilities.TriggerManager? triggers,
+        IEventBus? eventBus) => chapter =>
+    {
+        var controller = perm.Controller ?? perm.Owner!;
+        switch (chapter)
+        {
+            case 1:
+                EiganjoTutorBasicPlains(controller, zones);
+                break;
+            case 2:
+                EiganjoDiscardThenReanimate(controller, zones);
+                break;
+            case 3:
+                EiganjoTransform(perm, controller, zones, eventBus, triggers);
+                break;
+        }
+    };
+
+    /// <summary>Eiganjo chapter I — CR 701.19a / 701.20a. Search the
+    /// controller's library for a basic Plains card (CR 305.6 — Basic supertype
+    /// + Land card type + Plains subtype), put it into hand, then shuffle once.
+    /// v1 deterministic picker — first matching basic Plains by library order
+    /// (same posture as <see cref="UrzasSagaTutorArtifact"/>). Routes the move
+    /// through <see cref="ZoneService.MoveCard"/> when available.</summary>
+    private static void EiganjoTutorBasicPlains(Player controller, ZoneService? zones)
+    {
+        var pick = controller.Zones.Library.GetCards()
+            .FirstOrDefault(c =>
+                c.HasType(CardType.Land) &&
+                c.HasSupertype(CardSupertype.Basic) &&
+                c.HasSubtype(CardSubtype.Plains));
+
+        if (pick != null)
+        {
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Hand, controller);
+            }
+            else
+            {
+                controller.Zones.Library.RemoveCard(pick);
+                controller.Zones.Hand.AddCard(pick);
+                pick.SetZone(ZoneType.Hand);
+            }
+        }
+        // CR 701.20a — shuffle regardless of whether anything was found.
+        LibraryShuffle.ShuffleLibrary(controller, "restoration-of-eiganjo");
+    }
+
+    /// <summary>Eiganjo chapter II — CR 701.7 + reflexive trigger. "You may
+    /// discard a card. When you do, return target permanent card with mana
+    /// value 2 or less from your graveyard to the battlefield tapped." The
+    /// optional discard is resolved via the controller's agent (declining
+    /// honours the "you may" and the reflexive "when you do" never fires —
+    /// no reanimation). When a card IS discarded, the deterministic v1 picker
+    /// returns the first eligible permanent card (mv ≤ 2) from the graveyard
+    /// to the battlefield tapped (CR 110.5 — enters tapped via
+    /// <see cref="Permanent.Tap"/> after ETB).</summary>
+    private static void EiganjoDiscardThenReanimate(Player controller, ZoneService? zones)
+    {
+        var hand = controller.Zones.Hand.GetCards().ToList();
+        Card? discard = null;
+        if (hand.Count > 0)
+        {
+            var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+            // No agent → safe "may" opt-out (never auto-discards). With an
+            // agent, declining (null) honours the "you may".
+            discard = agent?
+                .ChooseFromHandAsync(controller, hand, Majik.Core.Cards.BotIntent.Discard)
+                .GetAwaiter().GetResult() as Card;
+        }
+
+        if (discard == null) return; // "you may" declined → "when you do" never fires.
+
+        controller.Zones.Hand.RemoveCard(discard);
+        controller.Zones.Graveyard.AddCard(discard);
+        discard.SetZone(ZoneType.Graveyard);
+
+        // Reflexive "when you do" — return target permanent card with mana value
+        // 2 or less from the graveyard to the battlefield tapped. v1 picks the
+        // first eligible card by graveyard order (same posture as Urza's III
+        // tutor). The just-discarded card is itself eligible only if it is a
+        // permanent card with mv ≤ 2 — exclude it so the reanimation targets a
+        // pre-existing graveyard card, matching the typical board state, but
+        // still allow it as a fallback.
+        EiganjoReanimateFromGraveyard(controller, zones, justDiscarded: discard);
+    }
+
+    /// <summary>Reflexive reanimation — return the first permanent card with
+    /// mana value 2 or less in <paramref name="controller"/>'s graveyard to the
+    /// battlefield tapped (CR 110.5). The just-discarded card is considered last
+    /// so a pre-existing graveyard permanent is preferred. Routes through
+    /// <see cref="ZoneService.MoveCard"/> when available so ETB triggers fire
+    /// (CR 603.6a).</summary>
+    private static void EiganjoReanimateFromGraveyard(
+        Player controller, ZoneService? zones, Card justDiscarded)
+    {
+        // CR 110.4a — a "permanent card" is a card whose card type can enter
+        // the battlefield (a Permanent in this engine's hierarchy). v1 picks the
+        // first eligible (mv ≤ 2) permanent card by graveyard order.
+        bool Eligible(ICard c) =>
+            c is Permanent &&
+            ManaCost.Parse(c.ManaCost).TotalValue <= 2;
+
+        var pick = controller.Zones.Graveyard.GetCards()
+            .Where(c => !ReferenceEquals(c, justDiscarded))
+            .FirstOrDefault(Eligible)
+            ?? (Eligible(justDiscarded) ? justDiscarded : null);
+
+        if (pick is not Permanent perm) return;
+
+        if (zones != null)
+        {
+            zones.MoveCard(pick, ZoneType.Graveyard, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Graveyard.RemoveCard(pick);
+            controller.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            pick.SetController(controller);
+        }
+
+        // CR 110.5 — "returns to the battlefield tapped."
+        perm.Tap();
+    }
+
+    /// <summary>Eiganjo chapter III — CR 714.4 / 712.4. "Exile this Saga, then
+    /// return it transformed." Exile the Restoration front face, flip the
+    /// <see cref="MdfcState"/>, and mint Architect of Restoration (back face)
+    /// on the battlefield under the same controller via
+    /// <see cref="ArchitectOfRestorationFactory"/>. Mirrors
+    /// <see cref="RokuTransform"/>.</summary>
+    private static void EiganjoTransform(
+        Permanent perm,
+        Player controller,
+        ZoneService? zones,
+        IEventBus? eventBus,
+        Majik.Core.Abilities.TriggerManager? triggers)
+    {
+        // CR 714.4 — clear the Saga state first so the SBA can't sacrifice the
+        // permanent we're about to exile + transform.
+        perm.SagaState = null;
+        if (perm.MdfcState != null && !perm.MdfcState.IsBackFace)
+            perm.MdfcState.Transform();
+
+        // Exile the Restoration front face.
+        if (zones != null)
+        {
+            zones.MoveCardTo(perm, ZoneType.Exile, controller);
+        }
+        else
+        {
+            controller.Zones.Battlefield.RemoveCard(perm);
+            controller.Zones.Exile.AddCard(perm);
+            perm.SetZone(ZoneType.Exile);
+        }
+
+        // Return it transformed — Architect of Restoration (back face) onto the
+        // battlefield under the same controller.
+        var architect = ArchitectOfRestorationFactory.Create(controller, zones, triggers);
+
+        architect.SetZone(ZoneType.Library); // sentinel for ZoneService.MoveCardTo's from-check
+        controller.Zones.Library.AddCard(architect);
+        if (zones != null)
+        {
+            zones.MoveCardTo(architect, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(architect);
+            architect.SetZone(ZoneType.Battlefield);
+            controller.Zones.Battlefield.AddCard(architect);
         }
     }
 
