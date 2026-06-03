@@ -1715,15 +1715,44 @@ public static class CardDefRuntime
         // single-arg posture.
         var untap = def.Untap;
         var gainsHaste = def.GainsHaste;
+        // CR 601.2b / 603.4 — the optional reflexive "you may pay {cost}. If you
+        // do, …" rider (Eldrazi Obligator). Parsed once at build time; null when
+        // the control change is mandatory (Threaten / Zealous Conscripts).
+        var optionalCost = string.IsNullOrWhiteSpace(def.OptionalManaCost)
+            ? null
+            : Majik.Core.ValueObjects.ManaCost.Parse(def.OptionalManaCost);
+        var cardName = card.Name;
         return new Effect(
-            $"{card.Name}: gain control of target {def.TargetFilter} until end of turn",
-            ctx =>
+            $"{card.Name}: gain control of target {def.TargetFilter} until end of turn"
+                + (optionalCost != null ? $" (may pay {def.OptionalManaCost})" : ""),
+            async ctx =>
             {
-                if (continuous == null) return ValueTask.CompletedTask;
+                if (continuous == null) return;
                 if (ChosenTargetAt(ctx, targetRequestIndex) is not Permanent permanent
                     || permanent.Zone != ZoneType.Battlefield)
                 {
-                    return ValueTask.CompletedTask;
+                    return;
+                }
+
+                // CR 601.2b — the optional reflexive payment. Prompt the agent
+                // yes/no; on "yes" attempt the {cost} payment via the shared
+                // Player.PayMana primitive. A decline OR an unpayable cost skips
+                // the ENTIRE "if you do" clause (control swap + untap + haste) —
+                // CR 601.2b, an optional cost that can't be paid isn't paid.
+                if (optionalCost != null)
+                {
+                    var agent = ctx.Agent
+                        ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                    var wantsToPay = agent != null
+                        && await agent.ChooseYesNoAsync(
+                                ctx.Game,
+                                $"Pay {optionalCost} to gain control of {permanent.Name}?",
+                                cardName,
+                                ctx.Ct)
+                            .ConfigureAwait(false);
+                    if (!wantsToPay) return;
+                    if (!controller.ManaPool.CanPay(optionalCost)) return;
+                    if (!controller.PayMana(optionalCost)) return;
                 }
 
                 // CR 613.2 — only swap if we don't already control it.
@@ -1747,8 +1776,6 @@ public static class CardDefRuntime
                 {
                     continuous.Register(new GrantKeywordUntilEndOfTurnEffect(creature, "Haste"));
                 }
-
-                return ValueTask.CompletedTask;
             });
     }
 

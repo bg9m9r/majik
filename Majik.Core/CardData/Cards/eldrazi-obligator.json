@@ -1,0 +1,24 @@
+{
+  "name": "Eldrazi Obligator",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "cast_self" },
+      "effects": [
+        {
+          "type": "gain_control",
+          "targetFilter": "creature",
+          "duration": "end_of_turn",
+          "untap": true,
+          "gainsHaste": true,
+          "optionalManaCost": "{1}{C}"
+        }
+      ]
+    }
+  ]
+}
