@@ -166,6 +166,37 @@ public class ZoneService
                     Majik.Core.Counters.CounterType.PlusOnePlusOne,
                     intent.PlusOneCountersOnEnter);
             }
+            // CR 614.1d — generic (non-+1/+1) "enters with N counters"
+            // channel: charge counters (Everflowing Chalice), mining,
+            // page, etc. accumulated by EntersWithCountersReplacement.
+            // Applied at the same point as the +1/+1 channel so the
+            // permanent enters WITH the counters (CR 122) rather than a
+            // trigger placing them afterwards.
+            if (intent.CountersOnEnter.Count > 0)
+            {
+                foreach (var (counterType, amount) in intent.CountersOnEnter)
+                {
+                    if (amount > 0)
+                    {
+                        permanent.Counters.Add(counterType, amount);
+                    }
+                }
+            }
+            // CR 400.7 / CR 702.32c — the permanent becomes a new object as it
+            // enters the battlefield, so the cast-time kicker / multikicker
+            // tally is consumed HERE, after any CR 614.1d "enters with a
+            // counter for each time it was kicked" replacement has read it
+            // (Everflowing Chalice). Clearing the sentinel at battlefield entry
+            // — rather than as a resolution effect that runs BEFORE the move —
+            // keeps the kick count alive long enough for the enters-with
+            // replacement and guarantees a later blink / token copy enters with
+            // zero. Instant / sorcery kicked spells never reach this point;
+            // SpellCastFlow clears their sentinel as a resolution effect.
+            if (fromZone == ZoneType.Stack && card is Card kickedPermanent
+                && (kickedPermanent.WasKicked || kickedPermanent.TimesKicked > 0))
+            {
+                kickedPermanent.ClearWasKicked();
+            }
         }
         else if (finalToZone is ZoneType.Hand or ZoneType.Library
                  or ZoneType.Graveyard or ZoneType.Exile

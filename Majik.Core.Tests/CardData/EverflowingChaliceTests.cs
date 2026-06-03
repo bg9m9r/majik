@@ -6,7 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
-using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -31,27 +31,34 @@ namespace Majik.Core.Tests.CardData;
 ///
 /// Coverage:
 ///   - Identity (Artifact, {0}) + NamedCardFactory dispatch.
-///   - ETB places N charge counters where N = times kicked (CR 702.32c).
+///   - CR 614.1d replacement: enters WITH N charge counters where N = times
+///     kicked (no ETB trigger / separate event — the counters are on the
+///     artifact the instant it lands).
 ///   - {T}: Add {C} per charge counter — taps for {C}{C} with two counters,
 ///     for nothing with zero.
-///   - Cast-pipeline integration: multikick ×2 → TimesKicked == 2 → enters
-///     with 2 charge counters; multikick ×0 → 0 counters.
-///   - Mana-bounded: insufficient mana for the requested kick count fails.
+///   - End-to-end cast pipeline: multikick ×2 → enters with 2 charge counters
+///     → taps for {C}{C}; multikick ×0 → 0 counters, taps for nothing;
+///     mana-bounded ×3 fails.
+///   - CR 400.7 — the kicker sentinel is cleared after resolution so a blink /
+///     token copy enters with zero.
 /// </summary>
 public class EverflowingChaliceTests
 {
     private readonly EventBus _bus = new();
+    private readonly ReplacementBus _replacements = new();
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly SpellCastFlow _flow;
     private readonly ZoneService _zones;
+    private readonly StackResolver _resolver;
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
 
     public EverflowingChaliceTests()
     {
         _stack = new Majik.Core.Stack.Stack(_bus);
-        _zones = new ZoneService(_bus);
+        _zones = new ZoneService(_bus, _replacements);
         _flow = new SpellCastFlow(_stack, _zones, _bus);
+        _resolver = new StackResolver(_bus, _zones);
     }
 
     // -----------------------------------------------------------------------
@@ -82,62 +89,75 @@ public class EverflowingChaliceTests
     }
 
     [Fact]
-    public void EverflowingChalice_HasOneManaAbility_AndOneEtbTrigger()
+    public void EverflowingChalice_HasOneManaAbility_AndNoEtbTrigger()
     {
+        // CR 614.1d — the "enters with charge counters" clause is a
+        // replacement effect, not a triggered ability, so the chalice carries
+        // exactly one (mana) ability and no ETB trigger.
         var chalice = EverflowingChaliceFactory.Create(_alice);
 
         chalice.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        chalice.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
+        chalice.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
     }
 
     // -----------------------------------------------------------------------
-    // ETB — charge counter for each time kicked
+    // CR 614.1d — enters WITH a charge counter for each time kicked
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Etb_KickedTwice_PlacesTwoChargeCounters()
+    public void Etb_KickedTwice_EntersWithTwoChargeCounters()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
+        chalice.SetZone(ZoneType.Stack);
+        _alice.Zones.Stack.AddCard(chalice);
         // Simulate a multikicker ×2 cast having stamped the count.
         chalice.SetTimesKicked(2);
 
-        _alice.Zones.Battlefield.AddCard(chalice);
-        chalice.SetZone(ZoneType.Battlefield);
-
-        FireEtb(chalice);
+        _zones.MoveCard(chalice, ZoneType.Stack, ZoneType.Battlefield, controller: _alice);
 
         chalice.Counters.Count(CounterType.Charge).Should().Be(2,
-            "the chalice enters with a charge counter for each time it was kicked (CR 702.32c)");
+            "the chalice enters WITH a charge counter for each time it was kicked (CR 614.1d / CR 702.32c)");
     }
 
     [Fact]
-    public void Etb_NotKicked_PlacesZeroChargeCounters()
+    public void Etb_NotKicked_EntersWithZeroChargeCounters()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
+        chalice.SetZone(ZoneType.Stack);
+        _alice.Zones.Stack.AddCard(chalice);
         // TimesKicked defaults to 0 (cast without paying the multikicker).
 
-        _alice.Zones.Battlefield.AddCard(chalice);
-        chalice.SetZone(ZoneType.Battlefield);
-
-        FireEtb(chalice);
+        _zones.MoveCard(chalice, ZoneType.Stack, ZoneType.Battlefield, controller: _alice);
 
         chalice.Counters.Count(CounterType.Charge).Should().Be(0,
             "a multikicker paid zero times = zero charge counters");
     }
 
     [Fact]
-    public void Etb_ClearsKickCount_SoBlinkDoesNotReuseIt()
+    public void Etb_KickedTwice_NoEtbTriggerWindow_CountersPresentOnLanding()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
-        chalice.SetTimesKicked(2);
-        _alice.Zones.Battlefield.AddCard(chalice);
-        chalice.SetZone(ZoneType.Battlefield);
+        // Regression guard for the correctness upgrade: with the replacement
+        // shape there is no window where the chalice is on the battlefield with
+        // the wrong count. We assert the counters are present the instant the
+        // CardMovedEvent fires (i.e. during ETB observation), not afterwards.
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
+        chalice.SetZone(ZoneType.Stack);
+        _alice.Zones.Stack.AddCard(chalice);
+        chalice.SetTimesKicked(3);
 
-        FireEtb(chalice);
+        int observedAtEtb = -1;
+        _bus.Subscribe<CardMovedEvent>(e =>
+        {
+            if (ReferenceEquals(e.Card, chalice) && e.ToZone == ZoneType.Battlefield)
+            {
+                observedAtEtb = chalice.Counters.Count(CounterType.Charge);
+            }
+        });
 
-        // CR 400.7 — the cast-time tally is consumed by the ETB so a later
-        // blink / token copy of this object enters with zero.
-        chalice.TimesKicked.Should().Be(0);
+        _zones.MoveCard(chalice, ZoneType.Stack, ZoneType.Battlefield, controller: _alice);
+
+        observedAtEtb.Should().Be(3,
+            "the charge counters are on the chalice the moment it enters — CR 614.1d replacement, not an after-the-fact trigger");
     }
 
     // -----------------------------------------------------------------------
@@ -178,13 +198,13 @@ public class EverflowingChaliceTests
     }
 
     // -----------------------------------------------------------------------
-    // Cast-pipeline integration — Multikicker through SpellCastFlow
+    // End-to-end cast pipeline — Multikicker through SpellCastFlow + resolver
     // -----------------------------------------------------------------------
 
     [Fact]
     public async Task Cast_MultikickedTwice_StampsTimesKicked2_AndDrainsFourMana()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
         chalice.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(chalice);
 
@@ -210,7 +230,7 @@ public class EverflowingChaliceTests
     [Fact]
     public async Task Cast_MultikickedTwice_EntersWithTwoChargeCounters_TapsForTwoColorless()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
         chalice.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(chalice);
         _alice.AddManaToPool(ManaCost.Parse("{4}"));
@@ -221,11 +241,13 @@ public class EverflowingChaliceTests
             _alice, chalice, ChaliceSpellDef(), agent, ctx,
             additionalCosts: new[] { EverflowingChaliceFactory.BuildAdditionalCost(chalice, times: 2) });
 
-        // Resolve onto the battlefield + fire the ETB.
-        ResolveToBattlefield(chalice);
-        FireEtb(chalice);
+        // Resolve the chalice off the stack through the real resolver — the
+        // CR 614.1d replacement fires during the Stack → Battlefield move.
+        await _resolver.ResolveTopAsync(_stack, agentLookup: _ => agent, game: ctx);
 
-        chalice.Counters.Count(CounterType.Charge).Should().Be(2);
+        chalice.Zone.Should().Be(ZoneType.Battlefield);
+        chalice.Counters.Count(CounterType.Charge).Should().Be(2,
+            "enters WITH two charge counters via the CR 614.1d replacement");
 
         var mana = chalice.Abilities.OfType<ManaAbility>().Single();
         mana.Activate().TotalValue.Should().Be(2);
@@ -234,7 +256,7 @@ public class EverflowingChaliceTests
     [Fact]
     public async Task Cast_NotKicked_EntersWithZeroChargeCounters_TapsForNothing()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
         chalice.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(chalice);
         // No mana — but multikicker ×0 needs none.
@@ -245,12 +267,11 @@ public class EverflowingChaliceTests
             _alice, chalice, ChaliceSpellDef(), agent, ctx,
             additionalCosts: new[] { EverflowingChaliceFactory.BuildAdditionalCost(chalice, times: 0) });
 
-        chalice.TimesKicked.Should().Be(0);
         spell.WasKicked.Should().BeFalse();
 
-        ResolveToBattlefield(chalice);
-        FireEtb(chalice);
+        await _resolver.ResolveTopAsync(_stack, agentLookup: _ => agent, game: ctx);
 
+        chalice.Zone.Should().Be(ZoneType.Battlefield);
         chalice.Counters.Count(CounterType.Charge).Should().Be(0);
         chalice.Abilities.OfType<ManaAbility>().Single().Activate().TotalValue.Should().Be(0);
     }
@@ -258,7 +279,7 @@ public class EverflowingChaliceTests
     [Fact]
     public async Task Cast_MultikickedThrice_RequiresSixMana_FailsWhenShort()
     {
-        var chalice = EverflowingChaliceFactory.Create(_alice);
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
         chalice.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(chalice);
 
@@ -278,6 +299,27 @@ public class EverflowingChaliceTests
         _alice.ManaPool.IsEmpty.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Cast_MultikickedTwice_ClearsKickCountAfterResolution_SoBlinkEntersWithZero()
+    {
+        var chalice = EverflowingChaliceFactory.Create(_alice, _replacements);
+        chalice.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(chalice);
+        _alice.AddManaToPool(ManaCost.Parse("{4}"));
+
+        var (agent, ctx) = ScriptedCast();
+
+        await _flow.CastAsync(
+            _alice, chalice, ChaliceSpellDef(), agent, ctx,
+            additionalCosts: new[] { EverflowingChaliceFactory.BuildAdditionalCost(chalice, times: 2) });
+
+        await _resolver.ResolveTopAsync(_stack, agentLookup: _ => agent, game: ctx);
+
+        // CR 400.7 — the cast-time tally is consumed so a later blink / token
+        // copy of this object enters with zero charge counters.
+        chalice.TimesKicked.Should().Be(0);
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
@@ -292,23 +334,12 @@ public class EverflowingChaliceTests
     }
 
     /// <summary>Minimal permanent SpellDefinition — Everflowing Chalice's
-    /// printed body is empty (its behaviour is the ETB + mana ability on the
-    /// permanent), so the EffectFactory yields no effects.</summary>
+    /// printed body is empty (its behaviour is the ETB replacement + mana
+    /// ability on the permanent), so the EffectFactory yields no effects.</summary>
     private static SpellDefinition ChaliceSpellDef() =>
         new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
             TargetRequests: Array.Empty<TargetRequest>(),
             EffectFactory: _ => Array.Empty<IEffect>());
-
-    private void ResolveToBattlefield(Artifact chalice) =>
-        _zones.MoveCard(chalice, chalice.Zone, ZoneType.Battlefield, controller: _alice);
-
-    private static void FireEtb(Artifact chalice)
-    {
-        var etb = chalice.Abilities.OfType<TriggeredAbility>()
-            .Single(t => t.IsTriggered(
-                new CardMovedEvent(chalice, ZoneType.Stack, ZoneType.Battlefield)));
-        foreach (var e in etb.Effects) e.Execute();
-    }
 }
