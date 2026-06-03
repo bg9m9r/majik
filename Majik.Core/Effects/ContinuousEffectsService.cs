@@ -104,6 +104,32 @@ public sealed class ContinuousEffectsService
     /// </summary>
     public IEventBus? EventBus => _eventBus;
 
+    /// <summary>
+    /// CR 110.2 / 700.6 / 611.2c — the game's live player roster, supplied by
+    /// the production game graph (<c>GameFacade</c> / <c>Game</c>) so a factory
+    /// routed through the effects-aware overload (<c>Create(Player,
+    /// ContinuousEffectsService)</c>) can build a WHOLE-BATTLEFIELD candidate
+    /// gatherer for a controller-scoped group ability-grant
+    /// (<see cref="GrantAbilityToGroupStaticEffect"/>) WITHOUT a separately
+    /// threaded players parameter the source-generated dispatch doesn't supply.
+    ///
+    /// <para>This is what makes the controlled-but-not-owned cross-battlefield
+    /// case correct in a real match: a permanent the source's controller
+    /// controls but an opponent OWNS (stolen via Threaten / Mindslaver /
+    /// Persuasion) lives in the OWNER's battlefield zone collection, so a
+    /// gatherer that walks only the controller's own battlefield zone misses
+    /// it. With this roster available, the group static enumerates EVERY
+    /// player's battlefield and filters by effective <see cref="Permanent.Controller"/>
+    /// (<see cref="BattlefieldGroupGatherer.WholeBattlefield"/>), picking up the
+    /// stolen permanent and excluding one the controller owns but no longer
+    /// controls.</para>
+    ///
+    /// <para>Null when the service was built outside a full game graph (pure
+    /// card-shape / unit tests) — factories then fall back to the controller's
+    /// own battlefield zone, the legacy #2322 behaviour.</para>
+    /// </summary>
+    public Func<IEnumerable<Player>?>? PlayersProvider { get; set; }
+
     private void OnBusEvent(GameEvent e)
     {
         // Any game event can shift an external CDA input (graveyard contents,

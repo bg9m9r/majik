@@ -130,6 +130,16 @@ public class Game
         _combatManager = dependencies.CombatManager;
         _stateChecker = null; // Will be initialized after game starts
         TurnNumber = 0;
+
+        // CR 110.2 / 700.6 / 611.2c — give the continuous-effects service the
+        // live player roster so a controller-scoped group ability-grant
+        // (Chromatic Lantern / Kataki, built via the effects-aware factory
+        // overload) enumerates BOTH battlefields and filters by effective
+        // controller — picking up a permanent the source's controller controls
+        // but an opponent owns (it lives in the owner's battlefield zone).
+        // The provider reads the live list, so players added after construction
+        // are included.
+        dependencies.ContinuousEffects.PlayersProvider = () => _players;
     }
 
     /// <summary>
