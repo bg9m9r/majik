@@ -556,6 +556,54 @@ public sealed class SpellCastFlow
         SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent,
         IReadOnlyList<int> chosenModes, CancellationToken ct)
     {
+        // CR 700.2d / CR 601.2c — mode-aware target collection for SPARSE
+        // modal spells: the targeted modes are a SUBSET of the printed modes
+        // and each targeting request carries an explicit ModeIndex tying it to
+        // its printed mode (e.g. Cryptic Command — four modes, only modes 0 and
+        // 1 are targeted). Collect a target ONLY for a chosen targeted mode,
+        // raising its minimum to the printed minimum so a chosen targeted mode
+        // with no legal target makes the whole cast illegal and rewinds, rather
+        // than silently no-opping on resolution. The returned slots are keyed by
+        // ModeIndex (sized to cover the highest mode index) so the EffectFactory's
+        // per-mode Targets[ModeIndex] lookups stay aligned. This generalizes the
+        // escalate/Charm rewind (CR 601.2c) to the index-misaligned Cryptic /
+        // Command family.
+        if (definition.Modes.Count > 0
+            && definition.TargetRequests.Count > 0
+            && definition.TargetRequests.All(r => r.ModeIndex.HasValue)
+            && chosenModes.Count > 0)
+        {
+            var chosenModeSet = new HashSet<int>(chosenModes);
+            var slotCount = definition.Modes.Count;
+            var perModeSparse = new IReadOnlyList<object>[slotCount];
+            for (var s = 0; s < slotCount; s++)
+            {
+                perModeSparse[s] = Array.Empty<object>();
+            }
+
+            foreach (var request in definition.TargetRequests)
+            {
+                var modeIdx = request.ModeIndex!.Value;
+                if (modeIdx < 0 || modeIdx >= slotCount) continue;
+                if (!chosenModeSet.Contains(modeIdx)) continue;
+
+                // CR 601.2c — a CHOSEN targeted mode demands its printed
+                // minimum; an agent that can't supply it makes the whole cast
+                // illegal (throwOnInsufficient rewinds the cast).
+                var oneSlot = await Targeting.TargetCollection.CollectAsync(
+                    new[] { request.AsChosenMode() },
+                    card, ctx, agent, throwOnInsufficient: true, ct);
+                perModeSparse[modeIdx] = oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>();
+            }
+
+            var sparseList = new List<IReadOnlyList<object>>(perModeSparse);
+            if (card is Card concreteSparse)
+            {
+                concreteSparse.SetPendingCastTargets(sparseList);
+            }
+            return sparseList;
+        }
+
         // CR 700.2d — mode-aware target collection for index-aligned modal
         // spells (single- OR multi-mode). Prompt only the chosen modes' slots;
         // fill the rest empty. Single-mode "Choose one" charms route here too

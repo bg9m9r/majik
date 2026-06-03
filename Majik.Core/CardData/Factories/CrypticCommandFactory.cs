@@ -98,24 +98,32 @@ public static class CrypticCommandFactory
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(targetResolver);
 
-        // CR 601.2c — target requests are emitted for every mode that
-        // takes a target, regardless of whether that mode was chosen at
-        // declare time. The caster only fills slots for chosen modes;
-        // unchosen modes' slots arrive as empty lists. (The cast flow's
-        // MinTargets gate is at 0 here so missing modes don't blow up.)
+        // CR 601.2c — target requests are emitted for the modes that take a
+        // target, each tied to its printed mode index (ModeIndex) so the
+        // sparse-modal target-collection path in SpellCastFlow only prompts a
+        // chosen targeted mode. MinTargets stays 0 (an UNCHOSEN targeted mode
+        // never gates the cast) but PrintedMinTargets = 1 raises the minimum to
+        // 1 once that mode IS chosen — so a chosen "Counter target spell" /
+        // "Return target permanent" with no legal target makes the WHOLE cast
+        // illegal and rewinds, instead of no-opping on resolution (CR 601.2c).
         // Modes 2 and 3 are non-targeted — they have no TargetRequest.
         var targetRequests = new[]
         {
             // Mode 0 — counter target spell.
-            new TargetRequest("target spell", 0, 1, Array.Empty<object>(), BotIntent.Counter),
+            new TargetRequest("target spell", 0, 1, Array.Empty<object>(),
+                BotIntent.Counter, PrintedMinTargets: 1, ModeIndex: ModeCounter),
             // Mode 1 — return target permanent to its owner's hand.
-            new TargetRequest("target permanent", 0, 1, Array.Empty<object>(), BotIntent.Bounce),
+            new TargetRequest("target permanent", 0, 1, Array.Empty<object>(),
+                BotIntent.Bounce, PrintedMinTargets: 1, ModeIndex: ModeBounce),
         };
 
         return new SpellDefinition(
             Modes: Modes,
             HasVariableX: false,
             TargetRequests: targetRequests,
+            // CR 700.2d — "Choose two —": exactly two distinct modes.
+            MinModes: PickCount,
+            MaxModes: PickCount,
             ModeIntents: new[]
             {
                 BotIntent.Counter,
