@@ -182,6 +182,72 @@ public class SungoldSentinelFactoryTests
         BlockLegality.CanBlock(blueBlocker, sentinel, out _).Should().BeTrue();
     }
 
+    // ── Agent-driven colour choice (CR 601.2c) ─────────────────────────────
+
+    [Fact]
+    public async Task SungoldSentinel_CovenAbility_PromptsAgentForColour_NotHardcodedWhite()
+    {
+        // CR 601.2c — "Choose a color" is an agent decision. The Coven grant
+        // effect must route through the controller's agent, NOT a hardcoded
+        // white, so a player who picks RED gets a red hexproof-from + can't-be-
+        // blocked-by grant (and white creatures are unaffected).
+        var svc = new ContinuousEffectsService();
+        var sentinel = SungoldSentinelFactory.Create(_alice, svc);
+        sentinel.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(sentinel);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        // Pick RED from the offered colour list.
+        agent.QueueChoice(cands => cands
+            .Where(o => o is ManaColor c && c == ManaColor.Red)
+            .Take(1).ToList());
+
+        var coven = sentinel.Abilities.OfType<ActivatedAbility>().Single();
+        var game = new Majik.Core.Game.GameContext(
+            _alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, currentPhase: null, stack: new Majik.Core.Stack.Stack());
+        var ctx = ResolutionContext.For(
+            _alice, agent, game, chosenTargets: null);
+        foreach (var effect in coven.Effects)
+        {
+            await effect.ExecuteAsync(ctx);
+        }
+
+        // RED was chosen → a red source can't target / block; blue is fine.
+        var redBlocker = new Creature("Goblin", "{R}", 2, 2)
+        { Owner = _bob, Controller = _bob, Zone = ZoneType.Battlefield };
+        var blueBlocker = new Creature("Drake", "{U}", 2, 2)
+        { Owner = _bob, Controller = _bob, Zone = ZoneType.Battlefield };
+        BlockLegality.CanBlock(redBlocker, sentinel, out _).Should().BeFalse();
+        BlockLegality.CanBlock(blueBlocker, sentinel, out _).Should().BeTrue();
+
+        var spec = new TargetSpec("creature").Creatures();
+        TargetLegality.IsLegal(spec, sentinel, _bob, sourceColor: "Red").Should().BeFalse();
+        TargetLegality.IsLegal(spec, sentinel, _bob, sourceColor: "White").Should().BeTrue();
+    }
+
+    // ── Coven gate wired as the live CanActivate predicate (CR 602.5c) ─────
+
+    [Fact]
+    public void SungoldSentinel_CovenAbility_CanActivateNow_FollowsCovenGate()
+    {
+        var svc = new ContinuousEffectsService();
+        var sentinel = SungoldSentinelFactory.Create(_alice, svc);
+        sentinel.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(sentinel);
+
+        var coven = sentinel.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Only Sungold on the battlefield → one distinct power → no Coven.
+        coven.CanActivateNow().Should().BeFalse(
+            "the Coven 'activate only if' rider gates the ability.");
+
+        // Add two more distinct powers → Coven active → ability activatable.
+        AddCreature(_alice, "P1", 1);
+        AddCreature(_alice, "P2", 2);
+        coven.CanActivateNow().Should().BeTrue();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private void AddCreature(Player owner, string name, int power)
