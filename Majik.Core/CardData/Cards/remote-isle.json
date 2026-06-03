@@ -1,0 +1,7 @@
+{
+  "name": "Remote Isle",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}
