@@ -1,0 +1,8 @@
+{
+  "name": "Conclave Mentor",
+  "types": ["Creature"],
+  "subtypes": ["Centaur", "Cleric"],
+  "manaCost": "{G}{W}",
+  "power": 2,
+  "toughness": 2
+}
