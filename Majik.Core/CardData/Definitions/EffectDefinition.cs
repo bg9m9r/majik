@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
 [JsonDerivedType(typeof(ExileTargetEffectDef), "exile_target")]
+[JsonDerivedType(typeof(MayExileTargetCardThenGainLifeEffectDef), "may_exile_target_card_then_gain_life")]
 [JsonDerivedType(typeof(ExileUntilLeavesEffectDef), "exile_until_leaves")]
 [JsonDerivedType(typeof(ReturnToHandEffectDef), "return_to_hand")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
@@ -288,6 +289,41 @@ public sealed class ExileTargetEffectDef : EffectDefinition
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
             TargetFilter, "exile", Majik.Core.Cards.BotIntent.Removal);
+}
+
+/// <summary>
+/// "You may exile target [filter]. If you do, you gain N life." (CR 603.6e /
+/// CR 701.21 exile / CR 119.3 lifegain) — the Mardu Woe-Reaper payoff. The
+/// optional ("may") single-target slot is declared with
+/// <c>MinTargets: 0</c> so declining chooses no target; on resolution, if a
+/// LEGAL target is present (re-checked per CR 608.2b) it is exiled and the
+/// ability's controller then gains <see cref="Amount"/> life. If the "may" is
+/// declined (no target) — or the chosen target is illegal at resolution — the
+/// exile does not happen, so the linked "If you do" lifegain does not happen
+/// either (the two are one indivisible resolution branch, CR 603.6e).
+///
+/// <para>
+/// <see cref="TargetFilter"/> reuses the shared <see cref="TargetFilters"/>
+/// vocabulary; <c>creature_card_in_graveyard</c> selects a creature card in a
+/// graveyard (the printed Mardu Woe-Reaper filter), and the same verb works
+/// for any battlefield / graveyard filter the gatherer + CR 608.2b re-check
+/// already cover.
+/// </para>
+/// </summary>
+public sealed class MayExileTargetCardThenGainLifeEffectDef : EffectDefinition
+{
+    /// <summary>The filter string for the optional target (default
+    /// <c>creature_card_in_graveyard</c> — Mardu Woe-Reaper).</summary>
+    public string TargetFilter { get; set; } = "creature_card_in_graveyard";
+
+    /// <summary>Life gained when the exile actually happens (CR 119.3).
+    /// Default 1.</summary>
+    public int Amount { get; set; } = 1;
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "exile", Majik.Core.Cards.BotIntent.Removal, optional: true);
 }
 
 /// <summary>

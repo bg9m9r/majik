@@ -1134,6 +1134,8 @@ public static class CardDefRuntime
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
             ExileTargetEffectDef exile => BuildExileTargetEffect(exile, card, targetRequestIndex),
+            MayExileTargetCardThenGainLifeEffectDef mayExile =>
+                BuildMayExileTargetCardThenGainLifeEffect(mayExile, card, controller, targetRequestIndex),
             ExileUntilLeavesEffectDef exileUntil => BuildExileUntilLeavesEffect(exileUntil, card, controller, targetRequestIndex),
             ReturnToHandEffectDef bounce => BuildReturnToHandEffect(bounce, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
@@ -1314,6 +1316,35 @@ public static class CardDefRuntime
                 if (live is ICard target && TargetFilters.Matches(filter, target))
                 {
                     Fx.MoveToExile(target);
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildMayExileTargetCardThenGainLifeEffect(
+        MayExileTargetCardThenGainLifeEffectDef def, ICard card, Player controller, int targetRequestIndex)
+    {
+        // CR 603.6e / CR 701.21 / CR 119.3 — "you may exile target [filter]. If
+        // you do, you gain N life." (Mardu Woe-Reaper). The optional target slot
+        // is declared with MinTargets: 0 (the "may"), so a declined exile leaves
+        // ChosenTargets empty / null at the reserved index. On resolution we
+        // re-check the SAME filter predicate (CR 608.2b via TargetFilters.Matches)
+        // — a declined OR illegal target means the exile does NOT happen, and the
+        // LINKED "If you do" lifegain does not happen either (one indivisible
+        // resolution branch). When a legal target is present it is exiled
+        // (Fx.MoveToExile handles the graveyard source zone) and the controller
+        // then gains N life.
+        var filter = def.TargetFilter;
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: may exile target {filter}, then gain {amount} life",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is ICard target && TargetFilters.Matches(filter, target))
+                {
+                    Fx.MoveToExile(target);
+                    controller.GainLife(amount);
                 }
                 return ValueTask.CompletedTask;
             });

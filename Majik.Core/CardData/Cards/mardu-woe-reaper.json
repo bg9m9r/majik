@@ -1,0 +1,26 @@
+{
+  "name": "Mardu Woe-Reaper",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": {
+        "type": "whenever_another_creature_enters",
+        "youControlOnly": true,
+        "subtype": "Warrior",
+        "includeSelf": true
+      },
+      "effects": [
+        {
+          "type": "may_exile_target_card_then_gain_life",
+          "targetFilter": "creature_card_in_graveyard",
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}
