@@ -39,6 +39,14 @@ public static class TargetLegality
         // self-mill, etc.) is unaffected.
         if (candidate is Player playerCandidate)
         {
+            // CR 702.18 — player-level SHROUD (Solitary Confinement). Unlike
+            // hexproof, shroud blocks ALL targeting, INCLUDING the player's
+            // own spells and abilities (CR 702.18a — no controller exception).
+            if (Majik.Core.Rules.PlayerStaticAbilities.HasShroud(playerCandidate))
+            {
+                return false;
+            }
+
             if (Majik.Core.Rules.PlayerStaticAbilities.HasHexproof(playerCandidate)
                 && !ReferenceEquals(playerCandidate, caster))
             {

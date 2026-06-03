@@ -52,7 +52,7 @@ public class ActionValidator
         return CheckCastTimingGates(action)
             ?? CheckCastZoneGates(action)
             ?? CheckCastRestrictionGates(action)
-            ?? CheckPlayerHexproofGate(action.Player, action.Targets)
+            ?? CheckPlayerTargetGate(action.Player, action.Targets, action.Card)
             ?? ValidationResult.Valid();
     }
 
@@ -264,24 +264,62 @@ public class ActionValidator
         return null;
     }
 
-    /// <summary>CR 702.11 / 113.5 — player-hexproof gate. Reject when any
-    /// player target has hexproof and isn't the source player. Self-
-    /// targeting is explicitly allowed (hexproof only blocks opponents).
-    /// Shared between <see cref="ValidateCastSpell"/> and
+    /// <summary>CR 702.11 / 702.16 / 702.18 / 113.5 — player-target
+    /// untargetability gate. Reject when any player target:
+    /// <list type="bullet">
+    ///   <item>has SHROUD (CR 702.18) — can't be targeted at ALL, including
+    ///         by its own controller (Solitary Confinement); OR</item>
+    ///   <item>has HEXPROOF (CR 702.11) and isn't the source player —
+    ///         opponents can't target it (Leyline of Sanctity); OR</item>
+    ///   <item>has PROTECTION FROM the source's card type (CR 702.16) — a
+    ///         spell/ability whose source is of that type can't target it
+    ///         (Serra's Emissary). Independent of who controls the source.</item>
+    /// </list>
+    /// <paramref name="source"/> is the spell card / ability-source card whose
+    /// card types drive the protection check; null skips the protection arm
+    /// (hexproof / shroud are still enforced). Shared between
+    /// <see cref="ValidateCastSpell"/> and
     /// <see cref="ValidateActivateAbility"/>.</summary>
-    private static ValidationResult? CheckPlayerHexproofGate(
-        Player? sourcePlayer, IReadOnlyList<object>? targets)
+    private static ValidationResult? CheckPlayerTargetGate(
+        Player? sourcePlayer, IReadOnlyList<object>? targets, Cards.ICard? source)
     {
         if (targets == null || sourcePlayer == null) return null;
         foreach (var target in targets)
         {
-            if (target is Player targetPlayer
-                && targetPlayer.HasHexproof
+            if (target is not Player targetPlayer) continue;
+
+            // CR 702.18 — shroud blocks all targeting, even self-targeting.
+            if (targetPlayer.HasShroud)
+            {
+                return ValidationResult.Invalid(
+                    $"{targetPlayer.Name} has shroud",
+                    new RuleViolation("702.18", "player-shroud"));
+            }
+
+            // CR 702.11 — hexproof only blocks opponents' targeting.
+            if (targetPlayer.HasHexproof
                 && !ReferenceEquals(targetPlayer, sourcePlayer))
             {
                 return ValidationResult.Invalid(
                     $"{targetPlayer.Name} has hexproof",
                     new RuleViolation("702.11", "player-hexproof"));
+            }
+
+            // CR 702.16 — protection from the source's card type, from any
+            // controller (Serra's Emissary's player half). A source that is
+            // (say) an Instant can't target a player with "protection from
+            // instants".
+            if (source != null)
+            {
+                foreach (var type in source.CardTypes)
+                {
+                    if (targetPlayer.HasProtectionFromCardType(type))
+                    {
+                        return ValidationResult.Invalid(
+                            $"{targetPlayer.Name} has protection from {type}",
+                            new RuleViolation("702.16", "player-protection-from-card-type"));
+                    }
+                }
             }
         }
         return null;
@@ -340,8 +378,11 @@ public class ActionValidator
                 new RuleViolation("307.5", "activate-only-as-a-sorcery"));
         }
 
-        // CR 702.11 / 113.5 — player-hexproof gate (shared with cast path).
-        return CheckPlayerHexproofGate(action.Player, action.Targets)
+        // CR 702.11 / 702.16 / 702.18 / 113.5 — player-target untargetability
+        // gate (shared with cast path). The ability's source card drives the
+        // protection-from-card-type arm.
+        return CheckPlayerTargetGate(
+                action.Player, action.Targets, action.Ability.Source as Cards.ICard)
             ?? ValidationResult.Valid();
     }
 

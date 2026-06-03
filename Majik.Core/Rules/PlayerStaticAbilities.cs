@@ -40,6 +40,19 @@ public static class PlayerStaticAbilities
         // Each entry: (token, player). A player has hexproof while at least
         // one entry targeting them exists.
         internal readonly List<(object Token, Player Player)> Hexproof = new();
+
+        // CR 702.18 — player-level SHROUD (Solitary Confinement's "You have
+        // shroud"). Like hexproof, but blocks ALL targeting (including the
+        // player's own spells/abilities), not just opponents'.
+        internal readonly List<(object Token, Player Player)> Shroud = new();
+
+        // CR 702.16 — player-level PROTECTION FROM A CARD TYPE (Serra's
+        // Emissary's "You ... have protection from the chosen card type").
+        // Each entry pairs the source token with the protected player and the
+        // chosen card type; a player has protection from a type while any
+        // entry naming both survives.
+        internal readonly List<(object Token, Player Player, Cards.Types.CardType Type)> ProtectionFromCardType = new();
+
         internal readonly object Gate = new();
     }
 
@@ -110,10 +123,133 @@ public static class PlayerStaticAbilities
         }
     }
 
+    // ── CR 702.18 — player-level SHROUD ──────────────────────────────────────
+
+    /// <summary>
+    /// Register a shroud grant on <paramref name="player"/>, keyed by
+    /// <paramref name="token"/> (Solitary Confinement's "You have shroud").
+    /// Idempotent for the same (token, player) pair. Unlike hexproof, shroud
+    /// blocks ALL targeting — including the player's own spells/abilities
+    /// (CR 702.18a).
+    /// </summary>
+    public static void AddShroud(object token, Player player)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.Shroud)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player))
+                {
+                    return;
+                }
+            }
+            store.Shroud.Add((token, player));
+        }
+    }
+
+    /// <summary>Remove every shroud grant registered under
+    /// <paramref name="token"/>. Used when the source leaves the
+    /// battlefield (or the until-end-of-turn grant expires).</summary>
+    public static void RemoveShroud(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.Shroud.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>True if at least one registered grant currently gives
+    /// <paramref name="player"/> player-shroud (CR 702.18).</summary>
+    public static bool HasShroud(Player player)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.Shroud)
+            {
+                if (ReferenceEquals(entry.Player, player)) return true;
+            }
+            return false;
+        }
+    }
+
+    // ── CR 702.16 — player-level PROTECTION FROM A CARD TYPE ──────────────────
+
+    /// <summary>
+    /// Register a "protection from <paramref name="type"/>" grant on
+    /// <paramref name="player"/>, keyed by <paramref name="token"/> (Serra's
+    /// Emissary's player half). Idempotent for the same (token, player, type)
+    /// triple — re-registering the same chosen type does not add a duplicate.
+    /// A single source granting protection from two different types (rare)
+    /// registers two entries under the same token.
+    /// </summary>
+    public static void AddProtectionFromCardType(object token, Player player, Cards.Types.CardType type)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.ProtectionFromCardType)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player)
+                    && entry.Type == type)
+                {
+                    return;
+                }
+            }
+            store.ProtectionFromCardType.Add((token, player, type));
+        }
+    }
+
+    /// <summary>Remove every protection-from-card-type grant registered under
+    /// <paramref name="token"/> (across all players / types).</summary>
+    public static void RemoveProtectionFromCardType(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.ProtectionFromCardType.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>True if at least one registered grant currently gives
+    /// <paramref name="player"/> player-level protection from
+    /// <paramref name="type"/> (CR 702.16). A spell/ability whose source is of
+    /// that card type can't target the player; combat/spell damage from such a
+    /// source is prevented.</summary>
+    public static bool HasProtectionFromCardType(Player player, Cards.Types.CardType type)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.ProtectionFromCardType)
+            {
+                if (ReferenceEquals(entry.Player, player) && entry.Type == type) return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
         var store = Current;
-        lock (store.Gate) store.Hexproof.Clear();
+        lock (store.Gate)
+        {
+            store.Hexproof.Clear();
+            store.Shroud.Clear();
+            store.ProtectionFromCardType.Clear();
+        }
     }
 }
