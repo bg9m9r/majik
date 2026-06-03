@@ -137,6 +137,13 @@ public class CombatValidator
             if (Majik.Core.Rules.Protection.HasProtectionFromColor(attacker, c))
                 return true;
         }
+
+        // CR 702.16e / 205.3 — protection from a creature SUBTYPE (Baneslayer
+        // Angel — "protection from Demons and from Dragons") also forbids the
+        // block. Reads the blocker's EFFECTIVE subtypes (Layer-4).
+        if (Majik.Core.Rules.Protection.HasProtectionFromSubtype(attacker, blocker))
+            return true;
+
         return false;
     }
 

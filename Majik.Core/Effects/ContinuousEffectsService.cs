@@ -821,6 +821,24 @@ public sealed class ContinuousEffectsService
     }
 
     /// <summary>
+    /// CR 205.3 / CR 613.1d — the EFFECTIVE subtype set of a permanent after
+    /// the Layer-4 type-changing pass. Mirrors <see cref="EffectiveSupertypes"/>
+    /// and the <c>Compute(perm).Colors</c> read behind
+    /// <see cref="Permanent.GetEffectiveColors"/>: it runs the full layer
+    /// pipeline and returns the resulting subtype set, so a granted creature
+    /// type (Changeling printed-subtype stamping, a "becomes a Dragon" Layer-4
+    /// effect) is honoured. Read by protection-from-subtype
+    /// (<see cref="Majik.Core.Rules.Protection.HasProtectionFromSubtype"/>) so a
+    /// creature animated into a Demon/Dragon is correctly blocked by
+    /// Baneslayer Angel's protection.
+    /// </summary>
+    public IReadOnlySet<Majik.Core.Cards.Types.CardSubtype> EffectiveSubtypes(Permanent perm)
+    {
+        if (perm == null) throw new ArgumentNullException(nameof(perm));
+        return Compute(perm).Subtypes;
+    }
+
+    /// <summary>
     /// CR 613.1f / 613.8 — the EFFECTIVE keyword set of a creature after the
     /// Layer-6 (ability-adding/removing) pass, computed WITHOUT running the
     /// Layer-7 P/T pass. Used by keyword-gated anthems
