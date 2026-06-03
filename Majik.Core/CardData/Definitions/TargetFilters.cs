@@ -268,6 +268,59 @@ public static class TargetFilters
         return p.HasType(CardType.Land) && !p.HasSupertype(CardSupertype.Basic);
     }
 
+    /// <summary>
+    /// CR 701.5 — build the 1..1 "counter target [type] spell" request. Unlike
+    /// the battlefield/graveyard filters, the candidate pool is the live STACK:
+    /// the gatherer scans <see cref="GameContext.Stack"/> for every
+    /// <see cref="Majik.Core.Spells.ISpell"/> that matches the optional type
+    /// rider (a spell can only target ANOTHER object on the stack — the
+    /// resolving counterspell is itself the top object and is excluded). The
+    /// same <see cref="SpellMatches"/> predicate gates the CR 608.2b resolution
+    /// re-check, so a target that has left the stack or changed type fizzles
+    /// cleanly.
+    /// </summary>
+    public static TargetRequest SpellOnStackRequest(bool noncreature, bool creature)
+    {
+        var qualifier = noncreature ? "noncreature " : creature ? "creature " : "";
+        return new TargetRequest(
+            Description: $"counter target {qualifier}spell",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Counter,
+            CandidateGatherer: ctx => GatherSpellsOnStack(ctx, noncreature, creature));
+    }
+
+    private static IReadOnlyList<object> GatherSpellsOnStack(
+        GameContext ctx, bool noncreature, bool creature)
+    {
+        var result = new List<object>();
+        foreach (var obj in ctx.Stack.GetAll())
+        {
+            if (obj is Majik.Core.Spells.ISpell spell && SpellMatches(noncreature, creature, spell))
+            {
+                result.Add(spell);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// CR 608.2b — does <paramref name="target"/> still satisfy the counter
+    /// verb's type rider at resolution? A non-spell (the chosen object left the
+    /// stack and is no longer an <see cref="Majik.Core.Spells.ISpell"/>) never
+    /// matches. The <paramref name="noncreature"/> / <paramref name="creature"/>
+    /// gates mirror the bespoke Negate / Essence Scatter resolution checks.
+    /// </summary>
+    public static bool SpellMatches(bool noncreature, bool creature, object? target)
+    {
+        if (target is not Majik.Core.Spells.ISpell spell) return false;
+        var isCreature = spell.Card.HasType(CardType.Creature);
+        if (noncreature && isCreature) return false;
+        if (creature && !isCreature) return false;
+        return true;
+    }
+
     private static bool OnBattlefield(ICard card) => card.Zone == ZoneType.Battlefield;
 
     private static bool InGraveyard(ICard card) => card.Zone == ZoneType.Graveyard;

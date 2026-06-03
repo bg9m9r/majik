@@ -591,4 +591,118 @@ public class JsonSpellEffectsTests
         def.TargetRequests[0].MinTargets.Should().Be(1);
         def.TargetRequests[0].MaxTargets.Should().Be(1);
     }
+
+    // ── counter_target_spell (CR 701.5) ──────────────────────────────────────
+
+    // Counter resolution reaches the live stack off ctx.Game.Stack, so the
+    // resolver must thread the live GameContext (the prod PriorityLoop does;
+    // the no-arg ResolveTop overload passes null and the counter no-ops).
+    private async Task CastAndResolveWithGame(Instant card, SpellDefinition def, object? chosen)
+    {
+        var agent = new ScriptedAgent();
+        if (chosen != null) agent.QueueTargets(new[] { chosen });
+        else agent.QueueTargets(System.Array.Empty<object>());
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = NewContext();
+        await _flow.CastAsync(_alice, card, def, agent, ctx, alternativeCost: null);
+        await _resolver.ResolveTopAsync(_stack, game: ctx);
+    }
+
+    private Majik.Core.Spells.Spell BobCasts(Card spellCard)
+    {
+        spellCard.SetOwner(_bob);
+        spellCard.SetController(_bob);
+        var spell = new Majik.Core.Spells.Spell(spellCard, _bob);
+        _stack.Push(spell);
+        return spell;
+    }
+
+    [Fact]
+    public async Task CounterTargetSpell_CountersChosenSpell_ToGraveyard()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Cancel",
+            new EffectDefinition[] { new CounterTargetSpellEffectDef() });
+
+        var bolt = new Instant("Lightning Bolt", "{R}");
+        var bobSpell = BobCasts(bolt);
+
+        var card = CastInstant("Cancel", "{1}{U}{U}");
+        await CastAndResolveWithGame(card, def, bobSpell);
+
+        bolt.Zone.Should().Be(ZoneType.Graveyard, "the countered spell goes to its owner's graveyard (CR 701.5)");
+        _stack.GetAll().Should().NotContain(bobSpell);
+    }
+
+    [Fact]
+    public async Task CounterTargetSpell_AndGainLife_ResolvesBothClauses()
+    {
+        // Absorb shape — counter target spell, THEN gain 3 life (CR 608.2c).
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Absorb",
+            new EffectDefinition[]
+            {
+                new CounterTargetSpellEffectDef(),
+                new GainLifeSelfEffectDef { Amount = 3 },
+            });
+
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        var bobSpell = BobCasts(bear);
+
+        var card = CastInstant("Absorb", "{W}{U}{U}");
+        await CastAndResolveWithGame(card, def, bobSpell);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard, "Absorb counters ANY target spell (no type rider)");
+        _alice.LifeTotal.Should().Be(23, "the lifegain rider resolves alongside the counter (CR 119.3)");
+    }
+
+    [Fact]
+    public async Task CounterTargetSpell_Noncreature_DoesNotCounterCreatureSpell()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Negate",
+            new EffectDefinition[] { new CounterTargetSpellEffectDef { Noncreature = true } });
+
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        var bobSpell = BobCasts(bear);
+
+        var card = CastInstant("Negate", "{1}{U}");
+        await CastAndResolveWithGame(card, def, bobSpell);
+
+        // CR 608.2b — a creature spell is an illegal target for the noncreature
+        // rider; the counter does nothing and the creature spell stays.
+        bear.Zone.Should().NotBe(ZoneType.Graveyard, "the noncreature rider gates creature spells out");
+        _stack.GetAll().Should().Contain(bobSpell);
+    }
+
+    [Fact]
+    public async Task CounterTargetSpell_Creature_CountersOnlyCreatureSpell()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Essence Scatter",
+            new EffectDefinition[] { new CounterTargetSpellEffectDef { Creature = true } });
+
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        var bobSpell = BobCasts(bear);
+
+        var card = CastInstant("Essence Scatter", "{1}{U}");
+        await CastAndResolveWithGame(card, def, bobSpell);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard, "the creature rider counters a creature spell (CR 701.5)");
+    }
+
+    [Fact]
+    public void CounterTargetSpell_DeclaresSingleSpellTargetRequest()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Cancel",
+            new EffectDefinition[] { new CounterTargetSpellEffectDef() });
+
+        def.TargetRequests.Should().HaveCount(1);
+        def.TargetRequests[0].MinTargets.Should().Be(1);
+        def.TargetRequests[0].MaxTargets.Should().Be(1);
+        def.TargetRequests[0].Description.Should().Contain("spell");
+        def.TargetRequests[0].Intent.Should().Be(Majik.Core.Cards.BotIntent.Counter);
+    }
 }

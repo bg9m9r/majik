@@ -50,6 +50,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(GrantKeywordUntilEotTargetEffectDef), "grant_keyword_until_eot_target")]
 [JsonDerivedType(typeof(BecomesArtifactTargetEffectDef), "becomes_artifact_target")]
 [JsonDerivedType(typeof(DamageAndTapEachFlyerOpponentsControlEffectDef), "damage_and_tap_each_flyer_opponents_control")]
+[JsonDerivedType(typeof(CounterTargetSpellEffectDef), "counter_target_spell")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -1143,4 +1144,57 @@ public sealed class DamageAndTapEachFlyerOpponentsControlEffectDef : EffectDefin
 
     // No ToTargetRequest override — this is an untargeted group effect
     // (CR 608.2), so the owning ability reserves no target slot.
+}
+
+/// <summary>
+/// "Counter target [type] spell" (CR 701.5) — the declarative counter verb. The
+/// mirror of the bespoke counterspell factories (Negate / Dispel / Exclude) and
+/// the prod <c>CounterTargetSpellTemplate</c> onto the shared
+/// <see cref="Majik.Core.Primitives.Fx.Counter"/> primitive, now folded into the
+/// <see cref="EffectDefinition"/> union so a composite counterspell ("Counter
+/// target spell. You gain N life." / "Counter target spell. Draw a card.") is
+/// expressed by composing this verb with the existing untargeted riders
+/// (<see cref="GainLifeSelfEffectDef"/> / <see cref="DrawCardEffectDef"/>)
+/// through <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/> — no
+/// bespoke resolve closure and no dropped rider clause.
+///
+/// <para>
+/// Unlike the battlefield-targeted verbs, the target lives on the STACK, so the
+/// verb declares a 1..1 <see cref="TargetRequest"/> whose
+/// <see cref="Majik.Core.Players.Agents.TargetRequest.CandidateGatherer"/> scans
+/// <see cref="Majik.Core.Game.GameContext.Stack"/> for the legal
+/// <see cref="Majik.Core.Spells.ISpell"/>s (matching any type rider below), and
+/// at resolution reaches the live stack off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.Game"/> to remove the chosen
+/// spell. CR 701.5b — an uncounterable spell survives the attempt (the shared
+/// <see cref="Majik.Core.Primitives.Fx.Counter"/> gates on
+/// <see cref="Majik.Core.CardData.OracleSpellBinder.RemoveFromStack"/>'s veto).
+/// CR 608.2b — if the chosen spell has left the stack, or no longer matches the
+/// printed type rider, at resolution the counter fizzles cleanly.
+/// </para>
+///
+/// <para>The optional printed type riders (mutually-exclusive in practice):
+/// <list type="bullet">
+///   <item><see cref="Noncreature"/> — "counter target noncreature spell"
+///   (Negate / Dovin's Veto). Creature spells are gated out at choose-time and
+///   re-checked at resolution.</item>
+///   <item><see cref="Creature"/> — "counter target creature spell" (Essence
+///   Scatter / Exclude). Only creature spells are legal.</item>
+/// </list>
+/// With neither rider the verb counters ANY target spell (Absorb / Cancel /
+/// Counterspell — the plain "counter target spell" form).</para>
+/// </summary>
+public sealed class CounterTargetSpellEffectDef : EffectDefinition
+{
+    /// <summary>"counter target NONCREATURE spell" — Negate / Dovin's Veto.
+    /// Default <c>false</c>.</summary>
+    public bool Noncreature { get; set; }
+
+    /// <summary>"counter target CREATURE spell" — Essence Scatter / Exclude.
+    /// Default <c>false</c>.</summary>
+    public bool Creature { get; set; }
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.SpellOnStackRequest(Noncreature, Creature);
 }
