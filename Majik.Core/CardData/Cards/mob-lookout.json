@@ -1,0 +1,17 @@
+{
+  "name": "Mob Lookout",
+  "manaCost": "{1}{U/B}",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rogue", "Villain"],
+  "power": 0,
+  "toughness": 3,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "connive_target", "amount": 1, "targetFilter": "creature_you_control" }
+      ]
+    }
+  ]
+}

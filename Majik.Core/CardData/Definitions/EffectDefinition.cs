@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DealDamageEachOpponentEffectDef), "deal_damage_each_opponent")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
+[JsonDerivedType(typeof(ConniveTargetEffectDef), "connive_target")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
 [JsonDerivedType(typeof(GainControlEffectDef), "gain_control")]
 [JsonDerivedType(typeof(FightEffectDef), "fight")]
@@ -1002,6 +1003,59 @@ public sealed class MillThenPickFirstMatchingToHandEffectDef : EffectDefinition
 public sealed class ConniveSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Target creature you control connives [N]" (CR 701.50) — the targeted
+/// connive verb. The declarative serialization of the Connive keyword action
+/// onto the shared <see cref="Majik.Core.Keywords.ConniveAction.ApplyN"/>
+/// primitive (<see cref="Majik.Core.Primitives.Fx.Connive"/>) — the SAME sink
+/// the source-form <see cref="ConniveSelfEffectDef"/> uses, but with the chosen
+/// creature (read off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> at the
+/// reserved index) as the conniving creature instead of the source. At
+/// resolution the connived creature's controller draws
+/// <see cref="Amount"/> card(s), then discards <see cref="Amount"/> card(s) (the
+/// discard pick routes through the controller's agent — CR 701.50a), placing a
+/// +1/+1 counter on the connived creature for each NONLAND card discarded
+/// (counter placement via <see cref="Majik.Core.Counters.CountersService"/>
+/// inside <see cref="Majik.Core.Keywords.ConniveAction"/>).
+///
+/// <para>
+/// CR 608.2b — an illegal target at resolution (the chosen creature has left the
+/// battlefield since the ability / spell was put on the stack, or no longer
+/// matches the <see cref="TargetFilter"/> predicate) fizzles cleanly: no
+/// connive. Connive is run under the connived creature's OWN controller
+/// (CR 701.50a — a control change since announcement carries here), mirroring
+/// the <see cref="ExploreTargetEffectDef"/> posture.
+/// </para>
+///
+/// <para>
+/// Canonical case: Mob Lookout — "When this creature enters, target creature you
+/// control connives." (<see cref="Amount"/> = 1). Mob Lookout (<c>Mob Lookout
+/// connives</c> being the SELF form) targets ANOTHER creature, so the schema
+/// gap was specifically the TARGETED connive verb. The fixed-X cluster (Mob
+/// Lookout, Mechanical Mobster, Scorpion Seething Striker) is covered; a
+/// DYNAMIC X tied to a turn-scoped count (Spymaster's Vault — "X = creatures
+/// died this turn"; Raffine — "X = attacking creatures") still needs a
+/// count-source descriptor and stays hand-rolled.
+/// </para>
+///
+/// <see cref="TargetFilter"/> defaults to <c>"creature_you_control"</c> (every
+/// printed targeted-connive effect today says "creature you control").
+/// </summary>
+public sealed class ConniveTargetEffectDef : EffectDefinition
+{
+    /// <summary>Number of connives (default 1; the "connive N" form).</summary>
+    public int Amount { get; set; } = 1;
+
+    /// <summary>Target filter (default <c>"creature_you_control"</c>).</summary>
+    public string TargetFilter { get; set; } = "creature_you_control";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "connive", Majik.Core.Cards.BotIntent.Buff);
 }
 
 /// <summary>

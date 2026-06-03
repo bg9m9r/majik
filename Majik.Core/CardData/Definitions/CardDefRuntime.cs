@@ -1310,6 +1310,7 @@ public static class CardDefRuntime
             DealDamageEachOpponentEffectDef dmgEach => BuildDealDamageEachOpponentEffect(dmgEach, card),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
+            ConniveTargetEffectDef conniveTarget => BuildConniveTargetEffect(conniveTarget, card, targetRequestIndex),
             AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
             CounterTargetSpellEffectDef counter => BuildCounterTargetSpellEffect(counter, card, targetRequestIndex),
             SearchLibraryEffectDef search => BuildSearchLibraryEffect(search, card, controller),
@@ -1343,6 +1344,36 @@ public static class CardDefRuntime
             {
                 if (card is not Creature creature) return;
                 Fx.Connive(creature, amount);
+            });
+    }
+
+    private static IEffect BuildConniveTargetEffect(
+        ConniveTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.50 — the targeted connive verb. Reads the chosen creature off
+        // ChosenTargets at the reserved index and connives it N times under ITS
+        // controller (CR 701.50a — the discard pick + the +1/+1 counter per
+        // nonland discarded belong to the connived creature's controller; a
+        // control change since announcement carries here). CR 608.2b — an
+        // illegal target at resolution (the chosen creature has left the
+        // battlefield, or no longer matches the filter) fizzles cleanly: no
+        // connive. The shared ConniveAction primitive (Fx.Connive) is the SAME
+        // body connive_self runs — the agent-driven discard sink + CountersService
+        // counter placement — so the targeted verb is pure schema wiring.
+        var amount = def.Amount;
+        var filter = def.TargetFilter;
+        return new Effect(
+            $"{card.Name}: target {filter} connives {amount}",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Creature target
+                    && target.Zone == ZoneType.Battlefield
+                    && TargetFilters.Matches(filter, target))
+                {
+                    Fx.Connive(target, amount);
+                }
+                return ValueTask.CompletedTask;
             });
     }
 
