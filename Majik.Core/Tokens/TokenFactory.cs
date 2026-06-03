@@ -209,10 +209,28 @@ public static class TokenFactory
         };
         // CR 111.10 — Treasure tokens are colourless artifacts.
         token.SetTokenColors(Array.Empty<ManaColor>());
+        // "{T}, Sacrifice this artifact: Add one mana of any color." — bound as
+        // five ManaAbility options (one per colour) so the bot's mana picker can
+        // satisfy any colour pip. Each option uses a DYNAMIC Func<ManaCost>
+        // generator instead of a fixed cost so a Goldspan-style continuous
+        // static (Treasures you control add TWO mana of any one color) can
+        // modify production at activation time without re-binding these
+        // abilities on every board change. The generator multiplies the printed
+        // ONE pip of THIS colour by
+        // TreasureManaModifierStaticAbility.ManaMultiplierFor(controller) — 1
+        // when no modifier is in play (vanilla Treasure), 2 under Goldspan
+        // (CR 611.2 — the modifier replaces "one mana" with "two mana of any one
+        // color"; both pips are the same colour the option produces).
         foreach (var color in new[] { "W", "U", "B", "R", "G" })
         {
+            var pip = color;
             token.AddAbility(new ManaAbility(token, controller,
-                Majik.Core.ValueObjects.ManaCost.Parse(color)));
+                manaGenerator: () => BuildTreasureMana(pip, controller),
+                canActivateCheck: null,
+                // Inspection seed = the printed ONE pip of this colour, so the
+                // bot's mana picker / UI see the colour before activation; the
+                // generator still applies the live Goldspan multiplier on tap.
+                printedManaGenerated: ManaCost.Parse(pip)));
         }
         PutOnBattlefield(token, controller, zones);
         return token;
@@ -426,6 +444,22 @@ public static class TokenFactory
     }
 
     /// <summary>"{2}, Sacrifice this artifact: Draw a card." — Clue ability.</summary>
+    /// <summary>
+    /// Build the <see cref="ManaCost"/> a Treasure's single-colour mana option
+    /// produces right now. The printed Treasure adds ONE pip of
+    /// <paramref name="pip"/>; under a Goldspan-style modifier the controller
+    /// controls (<see cref="TreasureManaModifierStaticAbility.ManaMultiplierFor"/>)
+    /// the option adds N pips of that SAME colour ("two mana of any one color",
+    /// CR 611.2). Evaluated at activation time (CR 605.1) so the live board
+    /// decides the amount — no re-binding of the Treasure's abilities when a
+    /// modifier enters or leaves.
+    /// </summary>
+    private static ManaCost BuildTreasureMana(string pip, Player controller)
+    {
+        var multiplier = TreasureManaModifierStaticAbility.ManaMultiplierFor(controller);
+        return ManaCost.Parse(string.Concat(Enumerable.Repeat($"{{{pip}}}", multiplier)));
+    }
+
     private static ActivatedAbility BuildClueDrawAbility(Artifact source, Player controller)
     {
         var costs = new ICost[]
