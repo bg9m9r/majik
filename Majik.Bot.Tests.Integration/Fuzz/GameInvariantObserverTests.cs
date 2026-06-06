@@ -48,4 +48,40 @@ public class GameInvariantObserverTests
 
         observer.Violations.Should().NotContain(v => v.Kind == "ZoneIntegrity");
     }
+
+    [Fact]
+    public void Result_BothPlayersAlive_AndNoWinner_NotFlaggedUntilCapKnown()
+    {
+        var (alice, bob, bus) = NewGame();
+        var observer = new GameInvariantObserver(bus, new[] { alice, bob }, () => 0);
+
+        // Natural completion with a winner: clean.
+        observer.RunFinalChecks(turn: 5, phase: "End", winnerName: "Alice", reachedTurnCap: false);
+
+        observer.Violations.Should().NotContain(v => v.Kind == "SingleResult");
+    }
+
+    [Fact]
+    public void Result_NoWinner_NotAtCap_IsFlagged()
+    {
+        var (alice, bob, bus) = NewGame();
+        var observer = new GameInvariantObserver(bus, new[] { alice, bob }, () => 0);
+
+        // Game ended with no winner and we did NOT hit the cap → engine ended a game with no result.
+        observer.RunFinalChecks(turn: 5, phase: "End", winnerName: null, reachedTurnCap: false);
+
+        observer.Violations.Should().Contain(v => v.Kind == "SingleResult");
+    }
+
+    [Fact]
+    public void Result_NoWinner_AtCap_FlaggedSuspiciousNotHard()
+    {
+        var (alice, bob, bus) = NewGame();
+        var observer = new GameInvariantObserver(bus, new[] { alice, bob }, () => 0);
+
+        observer.RunFinalChecks(turn: 30, phase: "End", winnerName: null, reachedTurnCap: true);
+
+        observer.Violations.Should().Contain(v => v.Kind == "TurnCapReached");
+        observer.Violations.Should().NotContain(v => v.Kind == "SingleResult");
+    }
 }
