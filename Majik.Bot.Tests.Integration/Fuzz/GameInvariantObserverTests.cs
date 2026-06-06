@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -148,5 +149,92 @@ public class GameInvariantObserverTests
         observer.RunFinalChecks(turn: 1, phase: "Main", winnerName: "Alice");
 
         observer.Violations.Should().NotContain(v => v.Kind == "OrphanedTrigger");
+    }
+
+    // ── Torpor Orb / ETB-suppression tests (Fix 3) ──────────────────────────
+    // These tests verify that IsCreatureEtbTrigger correctly mirrors the engine
+    // predicate so that suppression (etbSuppressionCount > 0) silences
+    // OrphanedTrigger false-positives for creature-ETB triggers.
+
+    /// <summary>
+    /// A trigger condition that matches a <see cref="CardMovedEvent"/> where the
+    /// moved card is a creature entering the battlefield — identical to the
+    /// Torpor Orb suppression predicate in TriggerManager (CR 603.3).
+    /// </summary>
+    private sealed class CreatureEtbCondition : ITriggerCondition
+    {
+        public Type EventType => typeof(CardMovedEvent);
+        public bool Matches(GameEvent e, ITriggeredAbility ability)
+            => e is CardMovedEvent moved
+               && moved.ToZone == ZoneType.Battlefield
+               && moved.Card.HasType(CardType.Creature);
+    }
+
+    [Fact]
+    public void ClassA_CreatureEtbTrigger_WithSuppression_IsNotFlagged()
+    {
+        // Arrange: suppression count = 1 (Torpor Orb is on the battlefield).
+        var (alice, bob, bus) = NewGame();
+        var observer = new GameInvariantObserver(bus, new[] { alice, bob }, () => 1);
+
+        // A creature card on the battlefield with an ETB-matching triggered ability.
+        var creature = new Creature("Soul Warden", "{W}", power: 1, toughness: 1);
+        creature.SetOwner(alice);
+        creature.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(creature);
+
+        var ability = new TriggeredAbility(
+            source: creature, controller: alice, condition: new CreatureEtbCondition(),
+            activeZones: new[] { ZoneType.Battlefield });
+        creature.AddAbility(ability);
+
+        // A second creature enters the battlefield — fires the ETB event.
+        var entering = new Creature("Wandering Knight", "{1}{W}", power: 2, toughness: 2);
+        entering.SetOwner(alice);
+        var etbEvent = new CardMovedEvent(entering, ZoneType.Hand, ZoneType.Battlefield);
+
+        // Publish the triggering event WITHOUT a TriggeredAbilityTriggeredEvent —
+        // the engine suppressed it under Torpor Orb, so no fire event is emitted.
+        bus.Publish(etbEvent);
+
+        observer.RunFinalChecks(turn: 1, phase: "Main", winnerName: "Alice");
+
+        // With suppression active the observer must NOT flag this as orphaned.
+        observer.Violations.Should().NotContain(
+            v => v.Kind == "OrphanedTrigger",
+            "the trigger is suppressed by Torpor Orb (etbSuppressionCount = 1)");
+    }
+
+    [Fact]
+    public void ClassA_CreatureEtbTrigger_WithoutSuppression_IsFlagged()
+    {
+        // Arrange: suppression count = 0 (no Torpor Orb).
+        var (alice, bob, bus) = NewGame();
+        var observer = new GameInvariantObserver(bus, new[] { alice, bob }, () => 0);
+
+        var creature = new Creature("Soul Warden", "{W}", power: 1, toughness: 1);
+        creature.SetOwner(alice);
+        creature.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(creature);
+
+        var ability = new TriggeredAbility(
+            source: creature, controller: alice, condition: new CreatureEtbCondition(),
+            activeZones: new[] { ZoneType.Battlefield });
+        creature.AddAbility(ability);
+
+        var entering = new Creature("Wandering Knight", "{1}{W}", power: 2, toughness: 2);
+        entering.SetOwner(alice);
+        var etbEvent = new CardMovedEvent(entering, ZoneType.Hand, ZoneType.Battlefield);
+
+        // Publish the triggering event WITHOUT a TriggeredAbilityTriggeredEvent —
+        // simulates the engine failing to fire the trigger (no suppression in play).
+        bus.Publish(etbEvent);
+
+        observer.RunFinalChecks(turn: 1, phase: "Main", winnerName: "Alice");
+
+        // Without suppression the observer MUST flag this as an orphaned trigger.
+        observer.Violations.Should().Contain(
+            v => v.Kind == "OrphanedTrigger" && v.Detail.Contains("Soul Warden"),
+            "the trigger fired with no suppression active and no TriggeredAbilityTriggeredEvent");
     }
 }

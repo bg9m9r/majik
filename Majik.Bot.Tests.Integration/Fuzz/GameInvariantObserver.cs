@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -74,6 +75,27 @@ public sealed class GameInvariantObserver : IDisposable
             return;
         }
 
+        // CLASS A DETECTOR — two structural assumptions:
+        //
+        // 1. Subscription ordering: this observer subscribes to the EventBus AFTER
+        //    TriggerManager (which subscribes in its ctor, called from GameFacade.Create).
+        //    Because EventBus dispatches in subscribe order, any TriggeredAbilityTriggeredEvent
+        //    that TriggerManager publishes for the current triggering event arrives in this
+        //    same dispatch — before we reach the expected-computation block below.
+        //    That is why _fired is already populated for the triggering event when we compute
+        //    _expected entries.
+        //
+        // 2. Blind spot — delayed triggered abilities (CR 603.7): delayed triggers are
+        //    registered directly in TriggerManager._pending at scheduling time, not via
+        //    card.Abilities. EnumerateLiveAbilities walks card.Abilities, so delayed
+        //    triggers are invisible to this observer. This produces false-NEGATIVES (missed
+        //    orphans) for delayed triggers, never false-positives. That is acceptable for
+        //    a missing-trigger audit.
+        //
+        // NOTE: OrphanedTrigger violations are timestamped at trigger-evaluation time
+        // (_lastTurn/_lastPhase), not at RunFinalChecks time, so the turn/phase on the
+        // violation may differ from the args passed to RunFinalChecks.
+
         // Record the abilities that SHOULD fire for this event, evaluated now (zone state is current).
         var expectedAbilities = new List<ITriggeredAbility>();
         int suppression = _etbSuppressionCount();
@@ -98,9 +120,16 @@ public sealed class GameInvariantObserver : IDisposable
                         yield return ab;
     }
 
-    // Best-effort: a creature ETB is a CardMovedEvent into the battlefield of a creature card.
-    // Returns false (suppression is rare in fixture decks and IsCreatureEtbTrigger is conservative).
-    private static bool IsCreatureEtbTrigger(GameEvent e) => false;
+    // Mirrors the engine's own suppression predicate in TriggerManager.EvaluateTriggers
+    // (see TriggerManager.cs ~lines 241-244). A creature-ETB trigger is any CardMovedEvent
+    // whose destination is the battlefield and whose card has the Creature type (CR 603.3).
+    // Previously this returned false (anti-conservative: would over-report orphans under
+    // Torpor Orb). Using the real predicate keeps the observer in sync with the engine so
+    // that suppressed triggers are correctly excluded from the expected set.
+    private static bool IsCreatureEtbTrigger(GameEvent e)
+        => e is CardMovedEvent moved
+           && moved.ToZone == ZoneType.Battlefield
+           && moved.Card.HasType(CardType.Creature);
 
     /// <summary>End-of-game structural invariants.</summary>
     public void RunFinalChecks(int turn, string phase, string? winnerName = null, bool reachedTurnCap = false)
