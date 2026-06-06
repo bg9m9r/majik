@@ -38,6 +38,7 @@ public static class FuzzGameRunner
         bool reachedCap = false;
         string? winner = null;
         int turns = 0;
+        InvariantViolation? crashViolation = null;
 
         using var cts = new CancellationTokenSource(timeout);
         try
@@ -53,10 +54,19 @@ public static class FuzzGameRunner
         {
             timedOut = true;
         }
+        catch (System.Exception ex)
+        {
+            // Engine threw an unhandled exception — capture as a crash violation.
+            // The seed alone fully reproduces the run; the snapshot dump below also fires.
+            crashViolation = new InvariantViolation(
+                "EngineCrash",
+                $"{ex.GetType().Name}: {ex.Message}",
+                turns, "GameEnd");
+        }
 
         observer.RunFinalChecks(turn: turns, phase: "GameEnd", winnerName: winner, reachedTurnCap: reachedCap);
 
-        if (observer.Violations.Count > 0 || timedOut)
+        if (observer.Violations.Count > 0 || timedOut || crashViolation is not null)
         {
             try
             {
@@ -74,6 +84,10 @@ public static class FuzzGameRunner
             }
         }
 
-        return new FuzzResult(seed, deckA, deckB, turns, winner, timedOut, reachedCap, observer.Violations.ToList());
+        var allViolations = observer.Violations.ToList();
+        if (crashViolation is not null)
+            allViolations.Insert(0, crashViolation);
+
+        return new FuzzResult(seed, deckA, deckB, turns, winner, timedOut, reachedCap, allViolations);
     }
 }
