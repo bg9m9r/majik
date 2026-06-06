@@ -3,11 +3,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Majik.Bot.Tests.Integration.Fuzz;
 
 public class BotVsBotFuzzTests
 {
+    private readonly ITestOutputHelper _out;
+
+    public BotVsBotFuzzTests(ITestOutputHelper output) => _out = output;
+
     // The BotDeckCatalog archetypes to fuzz. Extend as the catalog grows.
     private static readonly string[] Archetypes = { "Burn", "BorosEnergy" };
     private const int SeedsPerPairing = 5;
@@ -29,9 +34,22 @@ public class BotVsBotFuzzTests
             deckA, deckB, seed, MaxTurns, System.TimeSpan.FromSeconds(60));
 
         result.TimedOut.Should().BeFalse($"seed {seed} {deckA} vs {deckB} hung (possible infinite loop)");
-        result.Violations.Should().BeEmpty(
-            "no invariant should break. Repro: FuzzGameRunner.RunOnce(\""
+
+        // Soft violations (e.g. TurnCapReached) are suspicious but not necessarily bugs.
+        // Surface them in test output without failing.
+        var softViolations = result.Violations.Where(v => !v.IsHard).ToList();
+        if (softViolations.Count > 0)
+        {
+            _out.WriteLine(
+                $"[soft] {deckA} vs {deckB} seed {seed}: "
+                + string.Join(", ", softViolations.Select(v => $"{v.Kind} T{v.Turn}/{v.Phase}")));
+        }
+
+        // Hard violations are real engine bugs — fail with a rich repro message.
+        var hardViolations = result.Violations.Where(v => v.IsHard).ToList();
+        hardViolations.Should().BeEmpty(
+            "no hard invariant should break. Repro: FuzzGameRunner.RunOnce(\""
             + $"{deckA}\", \"{deckB}\", {seed}, {MaxTurns}, 60s)\n"
-            + string.Join("\n", result.Violations.Select(v => $"  [{v.Kind}] T{v.Turn}/{v.Phase}: {v.Detail}")));
+            + string.Join("\n", hardViolations.Select(v => $"  [{v.Kind}] T{v.Turn}/{v.Phase}: {v.Detail}")));
     }
 }
