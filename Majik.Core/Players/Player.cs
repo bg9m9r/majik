@@ -569,11 +569,13 @@ public class Player
             LifeLostThisTurn += amount;
         }
 
-        // Check if player has lost
-        if (_lifeTotal.HasLost)
-        {
-            _hasLost = true;
-        }
+        // CR 704.5a / 104.3a / 119.4 — a player with 0-or-less life loses
+        // the game as a STATE-BASED ACTION, not instantaneously inside the
+        // life change. We deliberately do NOT set _hasLost here: paying life
+        // as a cost (Sunbaked Canyon / Sacred Foundry) can bring a player to
+        // or below 0 mid-payment, and the cast/payment must still complete.
+        // The loss is applied by PlayerLifeCheck (the SBA loop) the next time
+        // SBAs are checked, which keys off the life total — not _hasLost.
     }
 
     /// <summary>

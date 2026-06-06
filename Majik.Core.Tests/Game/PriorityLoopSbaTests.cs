@@ -51,12 +51,14 @@ public class PriorityLoopSbaTests
         var bob = new Player("Bob", 20);
         var priority = new PriorityManager(new List<Player> { alice, bob }, stack, _bus, triggers);
 
-        // Bob took lethal — he is at 0 life and already flagged lost (LoseLife
-        // marks the loss; the SBA sweep would also mark it). He is the ACTIVE
-        // player, so the round would offer him priority first.
+        // Bob took lethal — he is at 0 life. Per CR 704.5a loss is a STATE-
+        // BASED action, so LoseLife does NOT eagerly flag him lost; the SBA
+        // sweep that PriorityLoop runs before granting priority is what marks
+        // him. He is the ACTIVE player, so the round would offer him priority
+        // first if SBAs weren't checked first.
         bob.LoseLife(20);
         bob.LifeTotal.Should().Be(0);
-        bob.HasLost.Should().BeTrue();
+        bob.HasLost.Should().BeFalse();
 
         var sba = new StateBasedActions(_bus, zones, triggers);
 
@@ -117,7 +119,7 @@ public class PriorityLoopSbaTests
         var players = new List<Player> { alice, bob, carol };
         var priority = new PriorityManager(players, stack, _bus, triggers);
 
-        bob.LoseLife(20); // Bob is dead-on-priority (HasLost already true).
+        bob.LoseLife(20); // Bob is at 0 life; the SBA sweep marks him lost.
 
         var sba = new StateBasedActions(_bus, zones, triggers);
 

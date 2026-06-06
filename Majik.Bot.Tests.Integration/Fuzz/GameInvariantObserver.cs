@@ -152,6 +152,16 @@ public sealed class GameInvariantObserver : IDisposable
 
         if (winnerName is null)
         {
+            // CR 104.4a — a game with no single winner is a legal DRAW when
+            // every player has lost simultaneously (e.g. two Burn decks whose
+            // last damage / life-payment SBA sweep takes BOTH players to 0 in
+            // the same CR 704.4 check). That is a real outcome, not an engine
+            // bug, so it must not trip the SingleResult invariant. The
+            // invariant exists to catch the genuine fault: the engine ending a
+            // game with no winner while a player is STILL ALIVE.
+            if (_players.All(p => p.HasLost))
+                return;
+
             _violations.Add(new InvariantViolation(
                 "SingleResult",
                 "Game ended with no winner and the turn cap was not reached.",

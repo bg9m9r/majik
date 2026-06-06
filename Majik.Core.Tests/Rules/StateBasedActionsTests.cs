@@ -35,9 +35,9 @@ public class StateBasedActionsTests
         // Arrange
         var player = new Player("Alice", 20);
         player.LoseLife(20);
-        // Note: Player.LoseLife already sets HasLost when life reaches 0
-        // So we need to reset it to test SBA
-        player.HasLost = false;
+        // CR 704.5a — LoseLife to 0 does NOT set HasLost; loss is the SBA.
+        // The player is at 0 life but still in the game until SBAs run below.
+        player.HasLost.Should().BeFalse();
         var players = new List<Player> { player };
         var cards = new List<ICard>();
 

@@ -96,7 +96,8 @@ public class ExquisiteBloodFactoryTests
         var eb = ExquisiteBloodFactory.Create(_alice);
         eb.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(eb);
-        _alice.LoseLife(20);
+        // Alice has formally lost the game (CR 704.5a — loss is the SBA).
+        _alice.MarkLost();
         _alice.HasLost.Should().BeTrue();
 
         var trigger = eb.Abilities.OfType<TriggeredAbility>().First();
