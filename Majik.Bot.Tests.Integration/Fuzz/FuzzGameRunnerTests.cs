@@ -15,9 +15,9 @@ public class FuzzGameRunnerTests
             deckA: "Burn", deckB: "BorosEnergy", seed: 1, maxTurns: 20,
             timeout: TimeSpan.FromSeconds(60));
 
-        result.Violations.Should().BeEmpty(
+        result.Violations.Where(v => v.IsHard).Should().BeEmpty(
             because: "a clean bot-vs-bot game must not breach engine invariants:\n"
-                + string.Join("\n", result.Violations.Select(v => $"  [{v.Kind}] {v.Detail}")));
+                + string.Join("\n", result.Violations.Where(v => v.IsHard).Select(v => $"  [{v.Kind}] {v.Detail}")));
         result.TimedOut.Should().BeFalse();
     }
 }

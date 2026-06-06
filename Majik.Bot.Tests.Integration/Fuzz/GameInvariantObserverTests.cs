@@ -151,6 +151,24 @@ public class GameInvariantObserverTests
         observer.Violations.Should().NotContain(v => v.Kind == "OrphanedTrigger");
     }
 
+    [Fact]
+    public void Result_AllPlayersLost_LegalDraw_NotFlagged()
+    {
+        // CR 104.4a — when all players lose simultaneously (e.g. both players
+        // reach 0 life in the same SBA sweep) the game is a legal draw.
+        // The SingleResult invariant must NOT fire in this case.
+        var (alice, bob, bus) = NewGame();
+        var observer = new GameInvariantObserver(bus, new[] { alice, bob }, () => 0);
+
+        alice.MarkLost();
+        bob.MarkLost();
+
+        observer.RunFinalChecks(turn: 14, phase: "GameEnd", winnerName: null, reachedTurnCap: false);
+
+        observer.Violations.Should().NotContain(v => v.Kind == "SingleResult",
+            "a simultaneous-loss draw is a legal outcome per CR 104.4a and must not be flagged");
+    }
+
     // ── Torpor Orb / ETB-suppression tests (Fix 3) ──────────────────────────
     // These tests verify that IsCreatureEtbTrigger correctly mirrors the engine
     // predicate so that suppression (etbSuppressionCount > 0) silences
