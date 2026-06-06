@@ -4,6 +4,7 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Rules;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -45,6 +46,13 @@ public sealed class PriorityLoop
     // unaware of the wire command types.
     private readonly Func<GameContext, bool>? _isPassOnlyDeadWindow;
     private readonly Func<DateTime> _clock;
+    // CR 704.4 — the SBA coordinator the loop runs before granting priority.
+    // Optional: when null (legacy ctor sites / focused unit tests that don't
+    // care about loss / death checks) the loop falls back to its pre-704.4
+    // behaviour and offers priority without an SBA sweep. Wired by TurnDriver
+    // (the live full-game path) so the SAME coordinator GameDriver uses at turn
+    // boundaries also runs before every priority grant.
+    private readonly StateBasedActions? _stateBasedActions;
     // Stack-mutation event subscriptions held so the loop can detach on
     // its way out. TurnDriver constructs a fresh PriorityLoop per round
     // and the bus outlives every one of them — without unsubscribe,
@@ -76,8 +84,10 @@ public sealed class PriorityLoop
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         IEventBus? eventBus = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        StateBasedActions? stateBasedActions = null)
     {
+        _stateBasedActions = stateBasedActions;
         _castDispatcher = castDispatcher;
         _activateDispatcher = activateDispatcher;
         _manaAbilityDispatcher = manaAbilityDispatcher;
@@ -149,8 +159,35 @@ public sealed class PriorityLoop
             var actionCount = 0;
             while (!_priority.AllPlayersPassed && !ct.IsCancellationRequested)
             {
+                // CR 704.4 — before the appropriate player gets priority, the
+                // game checks state-based actions, performs all that apply, and
+                // repeats until none remain. CheckStateBasedActions is itself a
+                // fixed-point loop (CR 704.4), so one call settles the state.
+                // Running it here closes the gap where a lethal spell resolved,
+                // a player hit 0 life, but they were offered priority anyway and
+                // could attempt to act (and drive mana into a lost player's pool).
+                if (RunStateBasedActionsBeforePriority())
+                {
+                    // The game ended (only one or zero players un-lost). Stop the
+                    // priority loop cleanly; GameDriver's turn-loop survivor-count
+                    // check declares the winner. We do NOT invent a new game-end
+                    // mechanism here — we simply yield control back up the stack.
+                    return;
+                }
+
                 var current = _priority.CurrentPlayer
                     ?? throw new InvalidOperationException("No current priority holder");
+
+                // CR 704.4 / CR 800.4a — a player who lost to the SBA sweep above
+                // must not be offered priority. Skip them by passing on their
+                // behalf so priority rotation reaches the next live player. (The
+                // game-continues case: e.g. a 3-player game where one opponent
+                // died but two remain.)
+                if (current.HasLost)
+                {
+                    _priority.PassPriority();
+                    continue;
+                }
 
                 var agent = _agents[current];
                 var ctx = MakeContext(current, activePlayer);
@@ -234,6 +271,53 @@ public sealed class PriorityLoop
                 MakeContext(activePlayer, activePlayer),
                 ct).ConfigureAwait(false);
             // Loop back: start a fresh priority round with active player.
+        }
+    }
+
+    /// <summary>
+    /// CR 704.4 — run state-based actions until stable, then report whether the
+    /// game has ended (one or zero players remain un-lost). Returns <c>true</c>
+    /// when the priority loop should stop and hand control back to the turn loop
+    /// so the normal game-over path declares the winner; <c>false</c> when the
+    /// game continues (no SBA wired, or it ran and 2+ players remain alive).
+    ///
+    /// <para><see cref="StateBasedActions.CheckStateBasedActions"/> is itself a
+    /// fixed-point loop (it repeats its check set until a pass changes nothing),
+    /// so a single call settles the state per CR 704.4. We add an outer safety
+    /// bound anyway: the live-player count is monotonically non-increasing across
+    /// sweeps, so this terminates quickly, but a future infinite-SBA regression
+    /// must be loud (throw), not a silent hang.</para>
+    /// </summary>
+    private bool RunStateBasedActionsBeforePriority()
+    {
+        if (_stateBasedActions == null) return false;
+
+        const int kSbaSweepLimit = 100;
+        var sweeps = 0;
+        while (true)
+        {
+            if (++sweeps > kSbaSweepLimit)
+            {
+                throw new InvalidOperationException(
+                    $"State-based actions did not stabilise after {kSbaSweepLimit} sweeps " +
+                    "before priority (CR 704.4) — suspected infinite-SBA regression.");
+            }
+
+            var aliveBefore = _players.Count(p => !p.HasLost);
+            // CR 704.4 — gather every player's battlefield as the card universe
+            // the checks operate over (mirrors GameDriver's turn-boundary call).
+            _stateBasedActions.CheckStateBasedActions(
+                _players,
+                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList());
+            var aliveAfter = _players.Count(p => !p.HasLost);
+
+            // CR 104.2 — one (or zero) players left un-lost ends the game.
+            if (aliveAfter <= 1) return true;
+
+            // CheckStateBasedActions is internally fixed-point; once a sweep
+            // leaves the live-player count unchanged the state is stable enough
+            // for priority. (A further sweep would be a no-op.)
+            if (aliveAfter == aliveBefore) return false;
         }
     }
 

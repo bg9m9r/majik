@@ -909,7 +909,12 @@ public sealed class TurnDriver
             autoPassPrefsProvider: _autoPassPrefsProvider,
             isPassOnlyDeadWindow: _isPassOnlyDeadWindow,
             eventBus: _eventBus,
-            clock: _clock);
+            clock: _clock,
+            // CR 704.4 — the SAME SBA coordinator GameDriver runs at turn
+            // boundaries, so the loop checks state-based actions (loss / death /
+            // etc.) before granting priority and ends the game cleanly when a
+            // lethal spell drops a player to 0 mid-round.
+            stateBasedActions: _sba);
 
         try
         {
