@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Majik.Bot.Decks;
-using Majik.Bot.Tests.Integration.Helpers;
 using Majik.Core.Abilities;
 using Majik.Core.Api;
 using Majik.Core.CardData;
@@ -10,7 +9,7 @@ using Majik.Core.Zones;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Majik.Bot.Tests.Integration.Decks;
+namespace Majik.Bot.Tests.Decks;
 
 /// <summary>
 /// Faithful static coverage audit for every card in every bot deck (mainboard +
@@ -27,6 +26,12 @@ namespace Majik.Bot.Tests.Integration.Decks;
 /// horizon lands whose land binders run only on the live path). Because lands
 /// ARE bound by <c>OracleLandActivatedAbilityBinder</c> here, fetchlands etc.
 /// are no longer detected as shells.</para>
+///
+/// <para>This audit lives in <c>Majik.Bot.Tests</c> (the CI-gated bot suite) so
+/// the gate actually blocks PRs — <c>Majik.Bot.Tests.Integration</c> is omitted
+/// from CI as supplementary/flaky. Because <c>DeckLoader.LoadReal</c> lives in
+/// the Integration project, the typed-shell materialization is replicated here
+/// in <see cref="MaterializeReal"/> (it uses only <c>Majik.Core</c> types).</para>
 ///
 /// <para>The gate (<see cref="BotDeckCards_HaveNoUnregisteredGaps"/>) fails on
 /// drift versus <see cref="KnownPartialImplementations"/>; the report
@@ -82,11 +87,11 @@ public class BotDeckImplementationAuditTests
             var facade = GameFacade.Create(
                 aliceName: $"{archetype}-A",
                 bobName: $"{archetype}-B",
-                aliceDeck: DeckLoader.LoadReal(archetype, Repo),
+                aliceDeck: LoadReal(archetype),
                 bobDeck: System.Array.Empty<ICard>(),
                 cardRepo: Repo);
 
-            facade.PopulateSideboard(facade.Alice, DeckLoader.LoadRealSideboard(archetype, Repo));
+            facade.PopulateSideboard(facade.Alice, LoadRealSideboard(archetype));
 
             var libraryCards = facade.Alice.Zones.GetZone(ZoneType.Library).GetCards();
             var sideboardCards = facade.Alice.Zones.Sideboard.GetCards();
@@ -238,4 +243,75 @@ public class BotDeckImplementationAuditTests
             + "Run PrintPerDeckHealth for the full picture.\n"
             + string.Join("\n", failures));
     }
+
+    // ---------------------------------------------------------------------
+    // Local typed-shell materialization.
+    //
+    // DeckLoader.LoadReal / LoadRealSideboard live in the Integration project
+    // (not referenced from this CI-gated project), so the shell-build logic is
+    // replicated here verbatim. It uses only Majik.Core types — abilities are
+    // NOT bound here; they are bound when the shells run through
+    // GameFacade.Create with a cardRepo (the same binder/factory chain
+    // production uses).
+    // ---------------------------------------------------------------------
+
+    private static IReadOnlyList<ICard> LoadReal(string archetype)
+        => BotDeckCatalog.Get(archetype).Select(MaterializeReal).ToList();
+
+    private static IReadOnlyList<ICard> LoadRealSideboard(string archetype)
+        => BotDeckCatalog.GetSideboard(archetype).Select(MaterializeReal).ToList();
+
+    private static ICard MaterializeReal(string name)
+    {
+        var entity = Repo.GetByName(name)
+            ?? throw new InvalidOperationException(
+                $"bot-deck card not in embedded seed: '{name}'");
+
+        var parsed = TypeLineParser.Parse(entity.TypeLine);
+        var manaCost = entity.ManaCost ?? "";
+
+        ICard card = PickPrimaryType(parsed.Types) switch
+        {
+            CardType.Creature => new Creature(
+                entity.Name, manaCost,
+                ParseStat(entity.Power), ParseStat(entity.Toughness),
+                parsed.Supertypes, parsed.Subtypes),
+            CardType.Land => new Land(entity.Name, parsed.Supertypes, parsed.Subtypes),
+            CardType.Instant => new Instant(entity.Name, manaCost),
+            CardType.Sorcery => new Sorcery(entity.Name, manaCost),
+            CardType.Enchantment => new Enchantment(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
+            CardType.Artifact => new Artifact(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
+            CardType.Planeswalker => new Planeswalker(
+                entity.Name, manaCost,
+                startingLoyalty: entity.Loyalty ?? 0,
+                parsed.Supertypes, parsed.Subtypes),
+            _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
+        };
+
+        // CR 202.2c — stamp the printed color indicator (Dryad Arbor et al.)
+        // so the shell mirrors the server loader before GameFacade rebinds.
+        if (card is Card concrete)
+        {
+            var colors = CardColors.ParseScryfallColors(entity.Colors);
+            if (colors.Count > 0) concrete.SetColorIndicator(colors);
+        }
+
+        return card;
+    }
+
+    private static CardType? PickPrimaryType(IReadOnlyList<CardType> types)
+    {
+        foreach (var p in new[]
+        {
+            CardType.Creature, CardType.Land, CardType.Instant, CardType.Sorcery,
+            CardType.Enchantment, CardType.Artifact, CardType.Planeswalker,
+        })
+        {
+            if (types.Contains(p)) return p;
+        }
+        return null;
+    }
+
+    private static int ParseStat(string? s)
+        => int.TryParse(s, out var v) ? v : 0;
 }
