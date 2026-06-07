@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Bot.Decks;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
+using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
@@ -39,7 +40,13 @@ public class BotDeckImplementationAuditTests
     private static readonly HashSet<string> TriggerHeuristicAllowlist =
         new(StringComparer.Ordinal)
         {
-            // Seeded in Task 3 from the first audit run.
+            // The "Whenever this creature becomes the target of a spell an
+            // opponent controls, counter that spell unless its controller
+            // discards a card" line is the templated wording of the WARD
+            // keyword (CR 702.21), implemented by RealitySmasherFactory as a
+            // KeywordAbility("Ward") + a bound WardEffect — not a separate
+            // unimplemented triggered ability. Heuristic false positive.
+            "Reality Smasher",
         };
 
     /// <summary>Raw detection result, ignoring the registry.</summary>
@@ -78,10 +85,31 @@ public class BotDeckImplementationAuditTests
         || c.HasType(CardType.Enchantment) || c.HasType(CardType.Planeswalker)
         || c.HasType(CardType.Land);
 
+    /// <summary>
+    /// Materialize a card the way the LIVE engine does. Production
+    /// (<c>GameFacade.BuildDeckCard</c>, <c>RouteThroughNamedFactories</c>
+    /// default true) routes NON-LAND cards that have a real <c>[CardName]</c>
+    /// factory through <see cref="NamedCardFactory"/> — so a card whose bespoke
+    /// abilities live only in its factory (e.g. Emry's ETB mill) is fully live
+    /// in a real match even though the bare binder chain alone produces a shell.
+    /// Lands are NEVER routed (their factories omit fetch/enters-tapped and
+    /// defer to the binder chain), so they build via the binder chain here too.
+    /// Detecting against the bare <c>ScryfallCardFactory.Create</c> would
+    /// mis-flag ~130 working cards as Stubs; mirroring the routing keeps the
+    /// baseline truthful — only cards that genuinely do nothing in play remain.
+    /// </summary>
+    private static ICard BuildAsLiveEngine(string name)
+    {
+        var shell = Factory.Create(name, Dummy);
+        if (!shell.HasType(CardType.Land) && ImplementedCardNames.HasRealFactory(name))
+            return NamedCardFactory.Create(name, Dummy);
+        return shell;
+    }
+
     /// <summary>Pure detection — does NOT consult the registry.</summary>
     private static RawSignal DetectRaw(string name)
     {
-        var card = Factory.Create(name, Dummy);
+        var card = BuildAsLiveEngine(name);
         if (card.IsVanillaShell) return RawSignal.Stub;
 
         var entity = Repo.GetByName(name);
@@ -134,5 +162,43 @@ public class BotDeckImplementationAuditTests
                 _out.WriteLine($"  [{status}] {n} — {reason}");
             }
         }
+    }
+
+    [Fact]
+    public void BotDeckCards_HaveNoUnregisteredGaps()
+    {
+        var botDeckNames = AllBotDeckCardNames();
+        var newGaps = new List<string>();
+        var stale = new List<string>();
+
+        foreach (var name in botDeckNames)
+        {
+            var raw = DetectRaw(name);
+            var known = KnownPartialImplementations.TryGet(name, out var gap);
+
+            // A detected gap that nobody recorded → fail (implement it, or
+            // register it with a reason if the gap is intentional).
+            if (raw != RawSignal.None && !known)
+            {
+                newGaps.Add(raw == RawSignal.Stub
+                    ? $"{name}: does nothing (vanilla shell) — implement, or register as Stub"
+                    : $"{name}: oracle implies a trigger but none is bound — implement, "
+                      + "register as a gap, or allowlist the heuristic false positive");
+            }
+
+            // A registry Stub entry that is no longer a shell → fail (clean it up).
+            if (known && gap.Severity == CardGapSeverity.Stub && raw != RawSignal.Stub)
+            {
+                stale.Add($"{name}: registered as Stub but is no longer a vanilla shell "
+                    + "— remove or downgrade the registry entry");
+            }
+        }
+
+        var failures = newGaps.Concat(stale).ToList();
+        failures.Should().BeEmpty(
+            "bot-deck cards must be implemented or have their gap recorded in "
+            + "KnownPartialImplementations / the trigger-heuristic allowlist. "
+            + "Run PrintPerDeckHealth for the full picture.\n"
+            + string.Join("\n", failures));
     }
 }
