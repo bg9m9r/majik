@@ -93,6 +93,133 @@ public class OracleLandActivatedAbilityBinderTests
     }
 
     // -------------------------------------------------------------------
+    // "an" article fetchlands (vowel-leading first basic) — CR 701.19a.
+    // Polluted Delta / Scalding Tarn are worded "Search your library for an
+    // Island or ...". The regex must accept both "a" and "an".
+    // -------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Polluted Delta", "Island", "Swamp")]
+    [InlineData("Scalding Tarn", "Island", "Mountain")]
+    public void Bind_AnArticleFetchLand_AttachesFetchAbility(
+        string cardName, string subtypeA, string subtypeB)
+    {
+        var fetch = new Land(cardName) { Owner = _alice, Controller = _alice };
+        var entity = new CardEntity
+        {
+            Name = cardName,
+            TypeLine = "Land",
+            // Real seed wording: "an Island or ..." with "Sacrifice this land".
+            OracleText = $"{{T}}, Pay 1 life, Sacrifice this land: Search your library for an " +
+                         $"{subtypeA} or {subtypeB} card, put it onto the battlefield, then shuffle.",
+        };
+
+        var bound = OracleLandActivatedAbilityBinder.Bind(fetch, entity, _alice);
+
+        bound.Should().BeTrue();
+        var ab = fetch.Abilities.OfType<ActivatedAbility>().Single();
+        ab.Costs.Should().HaveCount(3);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.PayLife);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice);
+        ab.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Bind_AnArticleFetchLand_EffectMovesMatchingBasic()
+    {
+        var fetch = new Land("Polluted Delta") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(fetch);
+
+        var swamp = new Land("Swamp", subtypes: new[] { CardSubtype.Swamp })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(swamp);
+
+        var entity = new CardEntity
+        {
+            Name = "Polluted Delta",
+            TypeLine = "Land",
+            OracleText = "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Swamp card, " +
+                         "put it onto the battlefield, then shuffle.",
+        };
+
+        OracleLandActivatedAbilityBinder.Bind(fetch, entity, _alice);
+        fetch.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Library.GetCards().Should().NotContain(swamp);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(swamp);
+        swamp.Zone.Should().Be(ZoneType.Battlefield);
+    }
+
+    // -------------------------------------------------------------------
+    // Prismatic Vista — "Search your library for a basic land card"
+    // (one "basic land card", not two named basics). CR 205.4a.
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void Bind_PrismaticVista_AttachesFetchAbility_WithThreeCosts()
+    {
+        var fetch = new Land("Prismatic Vista") { Owner = _alice, Controller = _alice };
+
+        var bound = OracleLandActivatedAbilityBinder.Bind(fetch, PrismaticVistaEntity(), _alice);
+
+        bound.Should().BeTrue();
+        var ab = fetch.Abilities.OfType<ActivatedAbility>().Single();
+        ab.Costs.Should().HaveCount(3);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.PayLife);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice);
+        ab.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Bind_PrismaticVista_EffectFetchesAnyBasicLand()
+    {
+        var fetch = new Land("Prismatic Vista") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(fetch);
+
+        // A basic Forest (Basic supertype + Forest subtype).
+        var forest = new Land("Forest",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(forest);
+
+        OracleLandActivatedAbilityBinder.Bind(fetch, PrismaticVistaEntity(), _alice);
+        fetch.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Library.GetCards().Should().NotContain(forest);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(forest);
+        forest.Zone.Should().Be(ZoneType.Battlefield);
+    }
+
+    [Fact]
+    public void Bind_PrismaticVista_DoesNotFetchNonBasicLand()
+    {
+        var fetch = new Land("Prismatic Vista") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(fetch);
+
+        // A nonbasic dual land with Forest subtype but NO Basic supertype.
+        var dual = new Land("Stomping Ground",
+            subtypes: new[] { CardSubtype.Mountain, CardSubtype.Forest })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(dual);
+
+        OracleLandActivatedAbilityBinder.Bind(fetch, PrismaticVistaEntity(), _alice);
+        fetch.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Library.GetCards().Should().Contain(dual,
+            because: "Prismatic Vista only fetches BASIC lands (CR 205.4a)");
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(dual);
+    }
+
+    // -------------------------------------------------------------------
     // Effect execution — library search + zone move
     // -------------------------------------------------------------------
 
@@ -304,6 +431,15 @@ public class OracleLandActivatedAbilityBinderTests
         Name = "Misty Rainforest",
         TypeLine = "Land",
         OracleText = "{T}, Pay 1 life, Sacrifice Misty Rainforest: Search your library for a Forest or Island card, " +
+                     "put it onto the battlefield, then shuffle.",
+    };
+
+    private static CardEntity PrismaticVistaEntity() => new()
+    {
+        Name = "Prismatic Vista",
+        TypeLine = "Land",
+        // Real seed wording (verified via EmbeddedCardRepository).
+        OracleText = "{T}, Pay 1 life, Sacrifice this land: Search your library for a basic land card, " +
                      "put it onto the battlefield, then shuffle.",
     };
 
