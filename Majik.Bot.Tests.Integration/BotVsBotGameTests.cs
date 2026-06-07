@@ -4,6 +4,8 @@ using Majik.Bot.Decks;
 using Majik.Bot.Tests.Integration.Helpers;
 using Majik.Core.Api;
 using Majik.Core.CardData;
+using Majik.Core.Diagnostics;
+using Majik.Core.Events;
 using Xunit;
 
 namespace Majik.Bot.Tests.Integration;
@@ -64,13 +66,37 @@ public class BotVsBotGameTests
             bobDeck:   DeckLoader.LoadReal(archetype, Repo),
             cardRepo:  Repo);
 
-        facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, new BotConfig(archetype, RandomSeed: 1)));
-        facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   new BotConfig(archetype, RandomSeed: 2)));
+        // Runtime coverage hook: capture every vanilla-shell card the bots
+        // actually encounter. The facade's bus isn't directly subscribable for
+        // raw GameEvents, so use the VanillaShellTracker + shared-bus pattern.
+        var encountered = new List<string>();
+        var sharedBus = new EventBus();
+        sharedBus.Subscribe<UnimplementedCardEncounteredEvent>(e =>
+        {
+            lock (encountered) encountered.Add(e.CardName);
+        });
+        var aliceTracker = new VanillaShellTracker(sharedBus, _ => { });
+        var bobTracker = new VanillaShellTracker(sharedBus, _ => { });
+
+        facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice,
+            new BotConfig(archetype, RandomSeed: 1, VanillaShellTracker: aliceTracker)));
+        facade.ReplaceBobAgent(new BotPlayerAgent(facade.Bob,
+            new BotConfig(archetype, RandomSeed: 2, VanillaShellTracker: bobTracker)));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await facade.StartFullGameAsync(maxTurns: 20, ct: cts.Token);
         await facade.FullGameTask!;
         facade.FullGameTask!.IsCompletedSuccessfully.Should().BeTrue(
             $"the '{archetype}' mirror match must run to the turn cap without crashing");
+
+        // Any shell the bot drew must be a recorded gap — an UNregistered shell
+        // surfacing in real play is exactly what we want to catch.
+        var unregistered = encountered
+            .Distinct(StringComparer.Ordinal)
+            .Where(n => !KnownPartialImplementations.TryGet(n, out _))
+            .ToList();
+        unregistered.Should().BeEmpty(
+            $"every vanilla-shell card the '{archetype}' bots encountered must be "
+            + "in KnownPartialImplementations: " + string.Join(", ", unregistered));
     }
 }
