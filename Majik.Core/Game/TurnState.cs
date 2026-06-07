@@ -1,6 +1,7 @@
 using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
+using System.Collections.Generic;
 
 namespace Majik.Core.Game;
 
@@ -344,6 +345,88 @@ public sealed class TurnState
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Simulation-only: copy all per-turn tallies from <paramref name="src"/>
+    /// into this (empty) TurnState, remapping player Guid keys and card/permanent
+    /// references via the provided maps.
+    ///
+    /// <para>Player.Id is NOT preserved across <see cref="Majik.Core.Players.Player.CloneEmpty"/>;
+    /// the clone gets a fresh Guid. Therefore every dictionary key that was an
+    /// original player's Id must be translated to the clone's Id, using
+    /// <paramref name="playerMap"/> (original Player → clone Player).</para>
+    ///
+    /// <para>Reference sets that hold <see cref="Permanent"/> / <see cref="ICard"/>
+    /// are remapped through <paramref name="cardMap"/> (InstanceId → cloned ICard).</para>
+    /// </summary>
+    internal void CopyFrom(
+        TurnState src,
+        IReadOnlyDictionary<Guid, ICard> cardMap,
+        IReadOnlyDictionary<Player, Player> playerMap)
+    {
+        // Build a fast original-Id → clone-Id lookup.
+        var idRemap = new Dictionary<Guid, Guid>(playerMap.Count);
+        foreach (var (orig, clone) in playerMap)
+            idRemap[orig.Id] = clone.Id;
+
+        // ── Scalar globals ───────────────────────────────────────────────────
+        CreaturesDiedThisTurn = src.CreaturesDiedThisTurn;
+        PermanentsLeftBattlefieldThisTurn = src.PermanentsLeftBattlefieldThisTurn;
+
+        // ── Guid-keyed integer dictionaries — remap keys ─────────────────────
+        CopyRemapIntDict(src._creaturesDiedByController,  _creaturesDiedByController,  idRemap);
+        CopyRemapIntDict(src._permanentsLeftByController, _permanentsLeftByController, idRemap);
+        CopyRemapIntDict(src._cardsDrawnByPlayer,         _cardsDrawnByPlayer,         idRemap);
+        CopyRemapIntDict(src._spellsCastByPlayer,         _spellsCastByPlayer,         idRemap);
+        CopyRemapIntDict(src._landsEnteredByController,   _landsEnteredByController,   idRemap);
+        CopyRemapIntDict(src._cyclesByPlayer,             _cyclesByPlayer,             idRemap);
+        CopyRemapIntDict(src._discardsByPlayer,           _discardsByPlayer,           idRemap);
+
+        // ── Spell colours (Guid → HashSet<ManaColor>) ────────────────────────
+        foreach (var (origId, colors) in src._spellColorsCastByPlayer)
+        {
+            var mappedId = idRemap.TryGetValue(origId, out var cId) ? cId : origId;
+            _spellColorsCastByPlayer[mappedId] = new HashSet<ManaColor>(colors);
+        }
+
+        // ── Permanents entered this turn — remap by InstanceId ───────────────
+        foreach (var perm in src._permanentsEnteredThisTurn)
+        {
+            if (cardMap.TryGetValue(perm.InstanceId, out var clonedCard)
+                && clonedCard is Permanent clonedPerm)
+            {
+                _permanentsEnteredThisTurn.Add(clonedPerm);
+            }
+            // If the permanent isn't in cardMap (e.g. token gone), skip.
+        }
+
+        // ── Permanents moved to graveyard (Guid → HashSet<ICard>) ────────────
+        foreach (var (origOwnerId, cards) in src._permanentsToGraveyardByController)
+        {
+            var mappedOwnerId = idRemap.TryGetValue(origOwnerId, out var cId) ? cId : origOwnerId;
+            var clonedSet = new HashSet<ICard>();
+            foreach (var card in cards)
+            {
+                if (card is Card c && cardMap.TryGetValue(c.InstanceId, out var clonedCard2))
+                    clonedSet.Add(clonedCard2);
+                // else skip (card not tracked in cardMap)
+            }
+            if (clonedSet.Count > 0)
+                _permanentsToGraveyardByController[mappedOwnerId] = clonedSet;
+        }
+    }
+
+    private static void CopyRemapIntDict(
+        Dictionary<Guid, int> src,
+        Dictionary<Guid, int> dst,
+        Dictionary<Guid, Guid> idRemap)
+    {
+        foreach (var (origId, count) in src)
+        {
+            var mappedId = idRemap.TryGetValue(origId, out var cId) ? cId : origId;
+            dst[mappedId] = count;
+        }
     }
 
     /// <summary>

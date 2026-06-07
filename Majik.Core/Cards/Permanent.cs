@@ -385,6 +385,77 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// Simulation copy constructor. Chains to <see cref="Card(Card)"/> for the
+    /// base state, then copies Permanent-level runtime state.
+    /// Tap state, counters, summoning sickness, and attachment links are copied
+    /// here as shallow scalars. <see cref="ActiveEffects"/> is intentionally
+    /// left null — the cloned game does not wire up the layer service
+    /// (simulation reads base characteristics directly).
+    /// </summary>
+    protected Permanent(Permanent src) : base(src)
+    {
+        // permanent runtime state copied here (Task 4 will expand counters/tap)
+        _isTapped = src._isTapped;
+        _hasSummoningSickness = src._hasSummoningSickness;
+        _enteredBattlefieldTimestamp = src._enteredBattlefieldTimestamp;
+        IsToken = src.IsToken;
+        IsFaceDown = src.IsFaceDown;
+        LoyaltyAbilityActivatedThisTurn = src.LoyaltyAbilityActivatedThisTurn;
+        AdditionalLandPlaysGranted = src.AdditionalLandPlaysGranted;
+        WasDealtDamageThisTurn = src.WasDealtDamageThisTurn;
+        _transientLoyalty = src._transientLoyalty;
+        _regenerationShields = src._regenerationShields;
+        // Counters: deep-copy each per-type count from the source bag into this
+        // permanent's own (already-initialised) CounterCollection.
+        foreach (var (type, n) in src.Counters.All)
+        {
+            Counters.Add(type, n);
+        }
+        // ActiveEffects: left null — cloned game does not wire up the layer service.
+        // BattleState / SagaState / ClassState: complex attached trackers — skipped for sim v1.
+        // AttachedTo / _attachments: re-linked in a later pass (Task 5).
+        // _imprintedCards: re-linked in a later pass (Task 5).
+        Counters.OnMutated = () => ActiveEffects?.BumpGeneration();
+    }
+
+    /// <summary>
+    /// Simulation pass-2c override: re-links Controller/Owner (via base), then
+    /// re-links attachment references through the card remap table so that
+    /// cloned permanents point at each other instead of at originals.
+    /// <para>
+    /// Sets backing fields directly (bypassing <see cref="AttachTo"/> event
+    /// hooks) because <see cref="Permanent.ActiveEffects"/> is null on all
+    /// cloned permanents — no cache bump is needed.
+    /// </para>
+    /// </summary>
+    internal override void RelinkReferences(
+        Card src,
+        IReadOnlyDictionary<Guid, ICard> cards,
+        IReadOnlyDictionary<Player, Player> players)
+    {
+        base.RelinkReferences(src, cards, players);
+        var sp = (Permanent)src;
+
+        // Re-link AttachedTo: if the source permanent was attached to something,
+        // point this clone at the cloned host.
+        if (sp.AttachedTo is { } host && cards.TryGetValue(host.InstanceId, out var clonedHost))
+        {
+            AttachedTo = (Permanent)clonedHost;
+        }
+
+        // Re-link _attachments: rebuild the attachments list by looking up each
+        // source attachment in the card map. preserves: AttachedTo → _attachments mirror.
+        _attachments.Clear();
+        foreach (var attached in sp._attachments)
+        {
+            if (cards.TryGetValue(attached.InstanceId, out var clonedAttached))
+            {
+                _attachments.Add((Permanent)clonedAttached);
+            }
+        }
+    }
+
+    /// <summary>
     /// Mark this permanent as having entered the battlefield.
     /// Called when the permanent enters the battlefield.
     /// </summary>

@@ -15,6 +15,15 @@ public class Land : Permanent
     {
     }
 
+    /// <summary>Simulation copy constructor. Chains through
+    /// <see cref="Permanent(Permanent)"/> for all base + Permanent runtime
+    /// state. <see cref="Land"/> has no additional mutable runtime fields.
+    /// </summary>
+    protected Land(Land src) : base(src) { }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new Land(this);
+
     /// <summary>
     /// Check if the land can be tapped for mana.
     /// For now, all lands can be tapped. Mana abilities will be added in future.

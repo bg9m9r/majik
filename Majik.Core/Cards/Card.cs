@@ -82,6 +82,36 @@ public class Card : ICard
         }
     }
 
+    /// <summary>
+    /// Simulation pass-2c: re-link reference fields (Owner, Controller, and
+    /// runtime cast-grant caster pointers) through the remap tables produced by
+    /// <see cref="GameStateCloner"/>. Called on every cloned card after all cards
+    /// have been cloned into zones so both maps are fully populated. Overridden
+    /// by <see cref="Permanent"/> to also re-link attachment references.
+    /// </summary>
+    internal virtual void RelinkReferences(
+        Card src,
+        IReadOnlyDictionary<Guid, ICard> cards,
+        IReadOnlyDictionary<Player, Player> players)
+    {
+        if (src.Owner is { } o && players.TryGetValue(o, out var co))
+            Owner = co;
+        if (src.Controller is { } c && players.TryGetValue(c, out var cc))
+            Controller = cc;   // internal setter — ActiveEffects is null on clones, so no cache bump
+
+        // Relink exile-cast grant: the copy-ctor copies the player ref as-is; here
+        // we remap it to the cloned player so ReferenceEquals checks in
+        // ExileCastAlternativeCost succeed against the cloned caster, not the original.
+        // Preserves companion fields (cost, spendAsAnyColor).
+        if (src.RuntimeExileCastAllowedCaster is { } exA && players.TryGetValue(exA, out var cExA))
+            GrantRuntimeExileCast(cExA, src.RuntimeExileCastCost!, src.RuntimeExileCastSpendAsAnyColor);
+
+        // Relink graveyard-non-owner-cast grant: same pattern as above.
+        // Preserves companion fields (cost, anyTypeMana).
+        if (src.RuntimeGraveyardNonOwnerCastAllowedCaster is { } gyA && players.TryGetValue(gyA, out var cGyA))
+            GrantRuntimeGraveyardNonOwnerCast(cGyA, src.RuntimeGraveyardNonOwnerCastCost!, src.RuntimeGraveyardNonOwnerCastAnyTypeMana);
+    }
+
     public ZoneType Zone
     {
         get => _zone;
@@ -1380,6 +1410,94 @@ public class Card : ICard
             _subtypes.AddRange(subtypes);
         }
     }
+
+    /// <summary>
+    /// Simulation copy constructor. Creates a new Card object that:
+    ///   - preserves the SAME <see cref="InstanceId"/> (so attachment / stack
+    ///     re-linking by InstanceId works in later passes);
+    ///   - shares all static DEFINITION data (Name, ManaCost, types, abilities,
+    ///     RestrictedCastZones) by reference — no re-parsing;
+    ///   - copies all scalar / immutable RUNTIME state (zone flags, cast
+    ///     sentinels, runtime grants, pending stamps).
+    /// Owner and Controller are deliberately NOT copied here; they must be
+    /// re-linked through the PlayerMap in a later pass (the clone player
+    /// objects are different instances from the originals).
+    /// </summary>
+    protected Card(Card src)
+    {
+        // Overwrite the InstanceId that the field initialiser just minted so
+        // the clone carries the SAME stable identity as the original.
+        InstanceId = src.InstanceId;
+
+        // -- definition data: shared by reference (immutable after construction) --
+        Name = src.Name;
+        ManaCost = src.ManaCost;
+        ManaCostValue = src.ManaCostValue;
+        // Share the read-only lists directly — they are definition data and are
+        // never mutated after card construction in production code.
+        _cardTypes.AddRange(src._cardTypes);
+        _supertypes.AddRange(src._supertypes);
+        _subtypes.AddRange(src._subtypes);
+        _abilities.AddRange(src._abilities);           // abilities are shared refs
+        _restrictedCastZones.AddRange(src._restrictedCastZones);
+
+        // -- scalar runtime state --
+        _zone = src._zone;
+        // Owner / Controller re-linked later via PlayerMap pass.
+        _controller = null;
+
+        IsVanillaShell = src.IsVanillaShell;
+        IsDevoid = src.IsDevoid;
+        ColorIndicator = src.ColorIndicator;           // immutable list ref
+        TokenColorsOverride = src.TokenColorsOverride; // immutable list ref
+        AdventureSpec = src.AdventureSpec;             // definition ref
+        // MdfcState is complex (has callbacks); skip for sim — Task N.
+
+        // cast sentinels
+        WasCast = src.WasCast;
+        WasCastForEscape = src.WasCastForEscape;
+        WasCastFromSuspend = src.WasCastFromSuspend;
+        WasCastFromHand = src.WasCastFromHand;
+        WasCastFromLibrary = src.WasCastFromLibrary;
+        WasPlacedFromLibrary = src.WasPlacedFromLibrary;
+        WasKicked = src.WasKicked;
+        TimesKicked = src.TimesKicked;
+        WasBargained = src.WasBargained;
+        WasOffspringPaid = src.WasOffspringPaid;
+        WasCastForSurge = src.WasCastForSurge;
+        HasGiftPromised = src.HasGiftPromised;
+
+        // runtime grants (immutable value-object refs or scalars)
+        RuntimeFlashbackCost = src.RuntimeFlashbackCost;
+        RuntimeGraveyardCastCost = src.RuntimeGraveyardCastCost;
+        RuntimeExileCastAllowedCaster = src.RuntimeExileCastAllowedCaster;
+        RuntimeExileCastCost = src.RuntimeExileCastCost;
+        RuntimeExileCastSpendAsAnyColor = src.RuntimeExileCastSpendAsAnyColor;
+        RuntimeGraveyardNonOwnerCastAllowedCaster = src.RuntimeGraveyardNonOwnerCastAllowedCaster;
+        RuntimeGraveyardNonOwnerCastCost = src.RuntimeGraveyardNonOwnerCastCost;
+        RuntimeGraveyardNonOwnerCastAnyTypeMana = src.RuntimeGraveyardNonOwnerCastAnyTypeMana;
+        RuntimeEscapeCost = src.RuntimeEscapeCost;
+        RuntimeEscapeExileCount = src.RuntimeEscapeExileCount;
+        MayPlayFromGraveyard = src.MayPlayFromGraveyard;
+
+        // pending cast stamps
+        PendingDelveExiledCount = src.PendingDelveExiledCount;
+        Intensity = src.Intensity;
+        PendingCastX = src.PendingCastX;
+        ReturnToHandOnResolution = src.ReturnToHandOnResolution;
+        PendingCastColors = src.PendingCastColors;
+        PendingCastColorCounts = src.PendingCastColorCounts;
+        TotalManaSpentThisCast = src.TotalManaSpentThisCast;
+        PendingCastTargets = src.PendingCastTargets;
+    }
+
+    /// <summary>
+    /// Clone this card for sandbox simulation. Returns a new object with the
+    /// same <see cref="InstanceId"/>, shared definition data, and copied runtime
+    /// state. Concrete subclasses override this to include their own state.
+    /// </summary>
+    internal virtual Card CloneForSim() => throw new NotSupportedException(
+        $"{GetType().Name} does not yet implement CloneForSim(). Add a copy constructor.");
 
     /// <summary>
     /// CR 601.2a / CR 117.6 — zones from which this card can't be cast as
