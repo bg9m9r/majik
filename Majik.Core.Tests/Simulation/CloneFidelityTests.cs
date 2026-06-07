@@ -95,6 +95,29 @@ public sealed class CloneFidelityTests
     }
 
     [Fact]
+    public void Clone_RelinksControllerAndAttachments_ToClones()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        var aura = new Enchantment("Holy Strength", "{W}");
+        bear.ChangeOwner(alice); aura.ChangeOwner(alice);
+        bear.ChangeController(alice); aura.ChangeController(alice);
+        alice.Zones.Battlefield.AddCard(bear);
+        alice.Zones.Battlefield.AddCard(aura);
+        aura.AttachTo(bear);
+
+        var cloned = GameStateCloner.Clone(new[] { alice });
+        var cAlice = cloned.PlayerFor(alice);
+        var cBear = (Creature)cloned.CardMap[bear.InstanceId];
+        var cAura = (Permanent)cloned.CardMap[aura.InstanceId];
+
+        cBear.Controller.Should().BeSameAs(cAlice);           // points at CLONE player
+        cBear.Owner.Should().BeSameAs(cAlice);
+        cAura.AttachedTo.Should().BeSameAs(cBear);            // attachment remapped to clone
+        cBear.Attachments.Should().ContainSingle().Which.Should().BeSameAs(cAura);
+    }
+
+    [Fact]
     public void Clone_PreservesRuntimeTypeForEachCardType()
     {
         // Arrange: one of each concrete card type in a zone.

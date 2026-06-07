@@ -419,6 +419,43 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// Simulation pass-2c override: re-links Controller/Owner (via base), then
+    /// re-links attachment references through the card remap table so that
+    /// cloned permanents point at each other instead of at originals.
+    /// <para>
+    /// Sets backing fields directly (bypassing <see cref="AttachTo"/> event
+    /// hooks) because <see cref="Permanent.ActiveEffects"/> is null on all
+    /// cloned permanents — no cache bump is needed.
+    /// </para>
+    /// </summary>
+    internal override void RelinkReferences(
+        Card src,
+        IReadOnlyDictionary<Guid, ICard> cards,
+        IReadOnlyDictionary<Player, Player> players)
+    {
+        base.RelinkReferences(src, cards, players);
+        var sp = (Permanent)src;
+
+        // Re-link AttachedTo: if the source permanent was attached to something,
+        // point this clone at the cloned host.
+        if (sp.AttachedTo is { } host && cards.TryGetValue(host.InstanceId, out var clonedHost))
+        {
+            AttachedTo = (Permanent)clonedHost;
+        }
+
+        // Re-link _attachments: rebuild the attachments list by looking up each
+        // source attachment in the card map. preserves: AttachedTo → _attachments mirror.
+        _attachments.Clear();
+        foreach (var attached in sp._attachments)
+        {
+            if (cards.TryGetValue(attached.InstanceId, out var clonedAttached))
+            {
+                _attachments.Add((Permanent)clonedAttached);
+            }
+        }
+    }
+
+    /// <summary>
     /// Mark this permanent as having entered the battlefield.
     /// Called when the permanent enters the battlefield.
     /// </summary>

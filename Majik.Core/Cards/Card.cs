@@ -82,6 +82,24 @@ public class Card : ICard
         }
     }
 
+    /// <summary>
+    /// Simulation pass-2c: re-link reference fields (Owner, Controller) through
+    /// the remap tables produced by <see cref="GameStateCloner"/>. Called on
+    /// every cloned card after all cards have been cloned into zones so both
+    /// maps are fully populated. Overridden by <see cref="Permanent"/> to also
+    /// re-link attachment references.
+    /// </summary>
+    internal virtual void RelinkReferences(
+        Card src,
+        IReadOnlyDictionary<Guid, ICard> cards,
+        IReadOnlyDictionary<Player, Player> players)
+    {
+        if (src.Owner is { } o && players.TryGetValue(o, out var co))
+            Owner = co;
+        if (src.Controller is { } c && players.TryGetValue(c, out var cc))
+            Controller = cc;   // internal setter — ActiveEffects is null on clones, so no cache bump
+    }
+
     public ZoneType Zone
     {
         get => _zone;

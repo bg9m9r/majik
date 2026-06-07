@@ -21,6 +21,7 @@ public static class GameStateCloner
     {
         var playerMap = new Dictionary<Player, Player>();
         var cardMap = new Dictionary<Guid, ICard>();
+        var originalById = new Dictionary<Guid, Card>();   // InstanceId → original Card (for Pass 2c)
 
         // Pass 1: empty player shells (life/name copied; zones empty).
         foreach (var p in players)
@@ -30,7 +31,7 @@ public static class GameStateCloner
         }
 
         // Pass 2a: clone cards into zones, preserving InstanceId and order.
-        // No cross-reference re-linking yet (controller, attachments — Task 5).
+        // Build originalById in parallel so Pass 2c can look up originals cheaply.
         foreach (var p in players)
         {
             var clonePlayer = playerMap[p];
@@ -38,11 +39,22 @@ public static class GameStateCloner
             {
                 foreach (var card in p.Zones.GetZone(zoneType).GetCards())
                 {
-                    var cc = ((Card)card).CloneForSim();
+                    var src = (Card)card;
+                    originalById[src.InstanceId] = src;
+                    var cc = src.CloneForSim();
                     cardMap[cc.InstanceId] = cc;
                     clonePlayer.Zones.GetZone(zoneType).AddCard(cc);
                 }
             }
+        }
+
+        // Pass 2c: re-link reference fields (Owner, Controller, AttachedTo,
+        // _attachments) through the remap tables — so every reference on a
+        // cloned object points at the CLONE, never the original.
+        foreach (var (instanceId, clonedCard) in cardMap)
+        {
+            var src = originalById[instanceId];
+            ((Card)clonedCard).RelinkReferences(src, cardMap, playerMap);
         }
 
         return new ClonedGame
