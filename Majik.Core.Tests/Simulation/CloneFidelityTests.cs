@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.Simulation;
 using Majik.Core.ValueObjects;
@@ -8,6 +9,23 @@ namespace Majik.Core.Tests.Simulation;
 
 public sealed class CloneFidelityTests
 {
+    [Fact]
+    public void Clone_CopiesCardsIntoZones_PreservingInstanceIdAndOrder()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Grizzly Bears", manaCost: "{1}{G}", power: 2, toughness: 2);
+        bear.ChangeOwner(alice);
+        alice.Zones.Battlefield.AddCard(bear);
+
+        var cloned = GameStateCloner.Clone(new[] { alice });
+        var cAlice = cloned.PlayerFor(alice);
+
+        var cBear = cAlice.Zones.Battlefield.GetCards().Single();   // real zone-read accessor
+        cBear.Should().NotBeSameAs(bear);
+        cBear.InstanceId.Should().Be(bear.InstanceId);
+        cBear.Name.Should().Be("Grizzly Bears");
+        cloned.CardMap[bear.InstanceId].Should().BeSameAs(cBear);
+    }
     [Fact]
     public void Clone_CopiesLife_AndIsIndependent()
     {

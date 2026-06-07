@@ -385,6 +385,34 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// Simulation copy constructor. Chains to <see cref="Card(Card)"/> for the
+    /// base state, then copies Permanent-level runtime state.
+    /// Tap state, counters, summoning sickness, and attachment links are copied
+    /// here as shallow scalars. <see cref="ActiveEffects"/> is intentionally
+    /// left null — the cloned game does not wire up the layer service
+    /// (simulation reads base characteristics directly).
+    /// </summary>
+    protected Permanent(Permanent src) : base(src)
+    {
+        // permanent runtime state copied here (Task 4 will expand counters/tap)
+        _isTapped = src._isTapped;
+        _hasSummoningSickness = src._hasSummoningSickness;
+        _enteredBattlefieldTimestamp = src._enteredBattlefieldTimestamp;
+        IsToken = src.IsToken;
+        IsFaceDown = src.IsFaceDown;
+        LoyaltyAbilityActivatedThisTurn = src.LoyaltyAbilityActivatedThisTurn;
+        AdditionalLandPlaysGranted = src.AdditionalLandPlaysGranted;
+        WasDealtDamageThisTurn = src.WasDealtDamageThisTurn;
+        _transientLoyalty = src._transientLoyalty;
+        _regenerationShields = src._regenerationShields;
+        // ActiveEffects: left null — cloned game does not wire up the layer service.
+        // BattleState / SagaState / ClassState: complex attached trackers — skipped for sim v1.
+        // AttachedTo / _attachments: re-linked in a later pass (Task 5).
+        // _imprintedCards: re-linked in a later pass (Task 5).
+        Counters.OnMutated = () => ActiveEffects?.BumpGeneration();
+    }
+
+    /// <summary>
     /// Mark this permanent as having entered the battlefield.
     /// Called when the permanent enters the battlefield.
     /// </summary>
