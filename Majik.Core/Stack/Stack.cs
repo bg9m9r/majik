@@ -139,6 +139,10 @@ public class Stack
                 controller: clonedController,
                 targets: remappedTargets);
 
+            // Preserve the original Spell.Id so snapshot equality holds:
+            // the stack DTO emits spell.Id as the stack-object key.
+            clonedSpell.Id = spell.Id;
+
             // Copy boolean stamps (each defaults to false on a fresh Spell, so
             // only set when the original had it set).
             if (spell.WasFreeCast)         clonedSpell.WasFreeCast         = true;

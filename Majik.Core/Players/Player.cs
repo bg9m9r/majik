@@ -23,7 +23,7 @@ public class Player
     /// PLAN 08 — per-game deterministic id when a game scope is installed;
     /// falls back to <see cref="Guid.NewGuid"/> for scope-less construction.
     /// </summary>
-    public Guid Id { get; } = Majik.Core.Game.DeterministicIdScope.NewId();
+    public Guid Id { get; internal set; } = Majik.Core.Game.DeterministicIdScope.NewId();
 
     /// <summary>
     /// The player's name.
@@ -848,6 +848,11 @@ public class Player
     {
         // preserves: Name, LifeTotal
         var clone = new Player(Name, startingLife: LifeTotal);
+
+        // ── Identity ─────────────────────────────────────────────────────────
+        // Preserve the original's stable Id so snapshot equality holds:
+        // Player.Id is the key emitted into PlayerDto and GameStateDto.
+        clone.Id = Id;
 
         // ── Scalar counters ──────────────────────────────────────────────────
         // PoisonCounters has internal set — assign directly.
