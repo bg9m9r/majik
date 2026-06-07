@@ -812,6 +812,26 @@ public sealed class GameFacade : IDisposable
         shell.SetOwner(owner);
         BindCardAbilities(shell, owner, cardRepo, replacements, effects,
             triggers, zones, eventBus);
+
+        // Stamp IsVanillaShell ONLY on the non-routed binder-chain path. A card
+        // built through its [CardName] factory (the routed return above) is
+        // implemented by definition — its behaviour may live in off-card
+        // effects (continuous / replacement / CDA registered on a live service,
+        // not as card.Abilities), which the classifier cannot see, so stamping
+        // there false-flags cards like Blood Moon / Wild Nacatl / Pithing
+        // Needle. Only lands + factory-less cards reach here, where the card is
+        // fully bound and the classification is authoritative. Uses the same
+        // shared classifier as ScryfallCardFactory.Create.
+        if (cardRepo != null)
+        {
+            var entity = cardRepo.GetByName(shell.Name);
+            if (entity != null
+                && Majik.Core.CardData.VanillaShellClassifier.IsLikelyVanillaShell(shell, entity))
+            {
+                (shell as Majik.Core.Cards.Card)?.MarkAsVanillaShell();
+            }
+        }
+
         return shell;
     }
 

@@ -36,6 +36,18 @@ internal static class DeckLoader
         return names.Select(n => MaterializeReal(n, repo)).ToList();
     }
 
+    /// <summary>
+    /// Same as <see cref="LoadReal"/> but for the archetype's SIDEBOARD
+    /// (wishboard) list — materializes <c>BotDeckCatalog.GetSideboard</c>
+    /// names into real typed shells via the identical materialization path,
+    /// so the audit can run them through <c>GameFacade.PopulateSideboard</c>.
+    /// </summary>
+    public static IReadOnlyList<ICard> LoadRealSideboard(string archetype, ICardRepository repo)
+    {
+        var names = Majik.Bot.Decks.BotDeckCatalog.GetSideboard(archetype);
+        return names.Select(n => MaterializeReal(n, repo)).ToList();
+    }
+
     private static ICard MaterializeReal(string name, ICardRepository repo)
     {
         var entity = repo.GetByName(name)
