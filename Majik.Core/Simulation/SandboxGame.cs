@@ -15,12 +15,50 @@ namespace Majik.Core.Simulation;
 /// <summary>
 /// A detached, runnable copy of a game for bot search. Clones live state via
 /// <see cref="GameStateCloner"/>, then builds the SAME subsystem stack that
-/// <see cref="Majik.Core.Api.GameFacade"/> builds (GameFacade.cs:280-286) over
-/// the cloned players and a FRESH <see cref="EventBus"/> — deliberately omitting
-/// the IO subscribers GameFacade adds at lines 288-312 (BridgeEvent / RemoteAgent /
+/// <see cref="Majik.Core.Api.GameFacade"/> builds (mirrors GameFacade's
+/// subsystem-construction block; omits its IO-wiring / SignalR-bridge block)
+/// over the cloned players and a FRESH <see cref="EventBus"/> — deliberately
+/// omitting the IO subscribers GameFacade adds (BridgeEvent / RemoteAgent /
 /// SignalR). Mutations inside the sandbox fire triggers and SBAs (game logic) but
 /// never reach any client, and NEVER touch the original live objects.
 /// </summary>
+/// <remarks>
+/// <para><b>Phase-0 fidelity limitations — things the sandbox does NOT mirror perfectly:</b></para>
+/// <list type="bullet">
+///   <item>
+///     <description>
+///       <b>Continuous effects do NOT apply.</b> Cloned permanents have
+///       <c>ActiveEffects == null</c>, so layer/anthem/lord/CDA effects are
+///       invisible — a 2/2 under a +1/+1 anthem evaluates as 2/2 in-sim.
+///       Base characteristics only; no computed P/T or granted abilities.
+///     </description>
+///   </item>
+///   <item>
+///     <description>
+///       <b>Library order is re-shuffled on run.</b>
+///       <see cref="GameDriver.RunGameAsync"/> shuffles libraries at start,
+///       so a sandbox run does NOT preserve known top-of-library order from
+///       the cloned position; bots must not rely on known draws across the
+///       clone boundary.
+///     </description>
+///   </item>
+///   <item>
+///     <description>
+///       <b>Stack abilities are dropped.</b> <see cref="Majik.Core.Stack.Stack.CloneFrom"/>
+///       drops activated/triggered abilities (closures can't be remapped);
+///       only <see cref="Majik.Core.Spells.Spell"/> objects clone.
+///     </description>
+///   </item>
+///   <item>
+///     <description>
+///       <b>Several state groups are not cloned</b> (see
+///       <c>MutableFieldTripwireTests</c> SKIPPED-DEFER allow-list):
+///       MDFC back-face state, face-down intrinsic abilities, battle/saga/class
+///       state, player Ring state, and player Replacements.
+///     </description>
+///   </item>
+/// </list>
+/// </remarks>
 public sealed class SandboxGame
 {
     /// <summary>The sandbox-local event bus. No BridgeEvent / IO subscribers.</summary>
@@ -45,7 +83,8 @@ public sealed class SandboxGame
     /// <summary>
     /// Build a <see cref="SandboxGame"/> from live player state. Clones every
     /// player and their zones via <see cref="GameStateCloner"/>, wires the SAME
-    /// subsystem stack that <c>GameFacade</c> wires (mirroring GameFacade.cs:280-286),
+    /// subsystem stack that <c>GameFacade</c> wires (mirrors GameFacade's
+    /// subsystem-construction block; omits its IO-wiring / SignalR-bridge block),
     /// and returns a fully constructed, runnable sandbox.
     ///
     /// <para>
@@ -70,7 +109,7 @@ public sealed class SandboxGame
         // --- Clone -----------------------------------------------------------
         var cloned = GameStateCloner.Clone(livePlayers, liveStack, liveTurnState);
 
-        // --- Fresh subsystems (mirror GameFacade.cs:280-286) -----------------
+        // --- Fresh subsystems (mirrors GameFacade's subsystem-construction block) ---
         // A brand-new EventBus: no BridgeEvent subscription, no SignalR wiring.
         var bus = new EventBus();
         var replacements = new ReplacementBus();
@@ -94,7 +133,7 @@ public sealed class SandboxGame
             agents[clonePlayer] = agentFactory(clonePlayer);
         }
 
-        // --- GameDriver (mirror GameFacade.StartFullGameAsync:1053-1088) ------
+        // --- GameDriver (mirrors GameFacade's game-driver construction block) ------
         var driver = new GameDriver(
             players: cloned.Players,
             agents: agents,

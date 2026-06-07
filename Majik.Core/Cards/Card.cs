@@ -83,11 +83,11 @@ public class Card : ICard
     }
 
     /// <summary>
-    /// Simulation pass-2c: re-link reference fields (Owner, Controller) through
-    /// the remap tables produced by <see cref="GameStateCloner"/>. Called on
-    /// every cloned card after all cards have been cloned into zones so both
-    /// maps are fully populated. Overridden by <see cref="Permanent"/> to also
-    /// re-link attachment references.
+    /// Simulation pass-2c: re-link reference fields (Owner, Controller, and
+    /// runtime cast-grant caster pointers) through the remap tables produced by
+    /// <see cref="GameStateCloner"/>. Called on every cloned card after all cards
+    /// have been cloned into zones so both maps are fully populated. Overridden
+    /// by <see cref="Permanent"/> to also re-link attachment references.
     /// </summary>
     internal virtual void RelinkReferences(
         Card src,
@@ -98,6 +98,18 @@ public class Card : ICard
             Owner = co;
         if (src.Controller is { } c && players.TryGetValue(c, out var cc))
             Controller = cc;   // internal setter — ActiveEffects is null on clones, so no cache bump
+
+        // Relink exile-cast grant: the copy-ctor copies the player ref as-is; here
+        // we remap it to the cloned player so ReferenceEquals checks in
+        // ExileCastAlternativeCost succeed against the cloned caster, not the original.
+        // Preserves companion fields (cost, spendAsAnyColor).
+        if (src.RuntimeExileCastAllowedCaster is { } exA && players.TryGetValue(exA, out var cExA))
+            GrantRuntimeExileCast(cExA, src.RuntimeExileCastCost!, src.RuntimeExileCastSpendAsAnyColor);
+
+        // Relink graveyard-non-owner-cast grant: same pattern as above.
+        // Preserves companion fields (cost, anyTypeMana).
+        if (src.RuntimeGraveyardNonOwnerCastAllowedCaster is { } gyA && players.TryGetValue(gyA, out var cGyA))
+            GrantRuntimeGraveyardNonOwnerCast(cGyA, src.RuntimeGraveyardNonOwnerCastCost!, src.RuntimeGraveyardNonOwnerCastAnyTypeMana);
     }
 
     public ZoneType Zone

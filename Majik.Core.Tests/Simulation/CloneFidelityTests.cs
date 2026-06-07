@@ -178,6 +178,36 @@ public sealed class CloneFidelityTests
     }
 
     [Fact]
+    public void Clone_RelinksRuntimeExileCastAllowedCaster_ToClone()
+    {
+        // Arrange: alice grants exile-cast permission on a card to bob (Ragavan style).
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bolt = new Instant("Lightning Bolt", "{R}");
+        bolt.ChangeOwner(alice);
+        alice.Zones.Exile.AddCard(bolt);
+
+        // Grant: bob may cast the card from exile for {R}.
+        var cost = ManaCost.Parse("{R}");
+        bolt.GrantRuntimeExileCast(bob, cost, spendAsAnyColor: false);
+
+        // Act: clone with both players.
+        var cloned = GameStateCloner.Clone(new[] { alice, bob });
+        var cBob = cloned.PlayerFor(bob);
+        var cBolt = (Instant)cloned.CardMap[bolt.InstanceId];
+
+        // Assert: the cloned card's allowed caster is the CLONED bob, not the original.
+        cBolt.RuntimeExileCastAllowedCaster.Should().BeSameAs(cBob,
+            "RelinkReferences must remap the exile-cast allowed caster to the cloned player");
+        cBolt.RuntimeExileCastAllowedCaster.Should().NotBeSameAs(bob,
+            "the original player reference must not survive the clone boundary");
+
+        // Companion fields must be preserved.
+        cBolt.RuntimeExileCastCost.Should().Be(cost);
+        cBolt.RuntimeExileCastSpendAsAnyColor.Should().BeFalse();
+    }
+
+    [Fact]
     public void Clone_CopiesStackObjects_TargetingClones()
     {
         var alice = new Player("Alice", 20);

@@ -57,21 +57,4 @@ public sealed class CounterCollection
     public IReadOnlyDictionary<CounterType, int> All => _counts;
 
     public bool HasAny => _counts.Values.Any(n => n > 0);
-
-    /// <summary>
-    /// Simulation deep-copy. Returns a new <see cref="CounterCollection"/>
-    /// with the same per-type counts as this one. The copy's
-    /// <see cref="OnMutated"/> hook is left null; the caller (e.g.
-    /// <see cref="Majik.Core.Cards.Permanent"/>'s simulation copy constructor)
-    /// is responsible for wiring it.
-    /// </summary>
-    internal CounterCollection Copy()
-    {
-        var copy = new CounterCollection();
-        foreach (var (type, n) in _counts)
-        {
-            copy._counts[type] = n;
-        }
-        return copy;
-    }
 }
