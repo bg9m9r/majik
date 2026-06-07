@@ -18,7 +18,8 @@ namespace Majik.Bot;
 /// used for tie-breaks. Same seed + same engine state = same decision.</para>
 ///
 /// <para><c>Strategy</c> selects the <see cref="IBotStrategy"/> implementation:
-/// <c>"heuristic"</c> in v1; <c>"mcts"</c> reserved for v2.</para>
+/// <c>"heuristic"</c> uses the pure-heuristic strategy; <c>"mcts"</c> uses
+/// MCTS-backed combat search with heuristic fallback for all other prompts.</para>
 ///
 /// <para><c>DecisionSink</c> optional. When non-null, EV-scored policies
 /// (PriorityPolicy, ActivatedAbilityPolicy via priority pump, CombatSearch)

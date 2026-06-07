@@ -1,4 +1,5 @@
 using Majik.Bot.Heuristic;
+using Majik.Bot.Search;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -25,7 +26,7 @@ public sealed class BotPlayerAgent : IPlayerAgent
         _strategy = config.Strategy switch
         {
             "heuristic" => new HeuristicStrategy(config),
-            "mcts"      => throw new NotImplementedException("MCTS strategy reserved for v2."),
+            "mcts"      => new SearchStrategy(config),
             _ => throw new ArgumentException($"Unknown strategy: {config.Strategy}", nameof(config)),
         };
     }
