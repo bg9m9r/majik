@@ -60,49 +60,6 @@ public class BotDeckImplementationAuditTests
             "Reality Smasher",
         };
 
-    /// <summary>
-    /// VANILLA-SHELL heuristic false positives. The shared
-    /// <see cref="VanillaShellClassifier"/> flags a permanent as a shell when it
-    /// has no entries in <c>card.Abilities</c> yet has printed oracle text. That
-    /// heuristic does NOT see card behaviour implemented as a CONTINUOUS /
-    /// REPLACEMENT / characteristic-defining effect (registered against the
-    /// ContinuousEffectsService / ReplacementBus on ETB), because those live
-    /// off-card, not in <c>card.Abilities</c>. Such cards DO work in real play —
-    /// they are not stubs — so they are allowlisted here rather than recorded as
-    /// a gap in <see cref="KnownPartialImplementations"/> (which the portal may
-    /// surface as "partial coverage").
-    ///
-    /// <para>KNOWN LIMITATION (follow-up): because <c>GameFacade.BuildDeckCard</c>
-    /// now stamps <c>IsVanillaShell</c> via the same classifier, the in-play
-    /// <c>VanillaShellTracker</c> will also mis-flag these cards. Teaching the
-    /// classifier about off-card effects is the directed follow-up; until then
-    /// this allowlist is the audit-side guard.</para>
-    /// </summary>
-    private static readonly HashSet<string> VanillaShellHeuristicAllowlist =
-        new(StringComparer.Ordinal)
-        {
-            // RetypeLandsStaticEffect (Layer 4 land retype) — works in play; the
-            // effect registers against the CES on ETB, nothing on card.Abilities.
-            "Blood Moon",
-            "Magus of the Moon",
-            "Harbinger of the Seas",
-            // LandSubtypeSelfPumpStaticEffect (CDA self-pump while a land-subtype
-            // condition holds) — registered against the CES, off-card.
-            "Wild Nacatl",
-            // Activated-ability suppression statics registered into
-            // ActivatedAbilityRestrictions via a CES lifecycle — off-card.
-            "Cursed Totem",
-            "Pithing Needle",
-            // LaboratoryManiacDrawReplacement — an IReplacementEffect registered
-            // on the ReplacementBus, not a card ability.
-            "Laboratory Maniac",
-            // AllosaurusRiderCdaLifecycle — characteristic-defining ability via a
-            // CES lifecycle, off-card.
-            "Allosaurus Rider",
-            // GrantAbilityToGroupStaticEffect via a CES lifecycle — off-card.
-            "Kataki, War's Wage",
-        };
-
     /// <summary>Detection result for one distinct card name.</summary>
     private enum RawSignal { None, Stub, MissingTrigger }
 
@@ -182,7 +139,13 @@ public class BotDeckImplementationAuditTests
         if (!LiveCards.TryGetValue(name, out var card))
             return RawSignal.None; // not a bot-deck card (shouldn't happen for callers)
 
-        if (card.IsVanillaShell && !VanillaShellHeuristicAllowlist.Contains(name))
+        // GameFacade.BuildDeckCard now stamps IsVanillaShell ONLY on the
+        // non-routed binder-chain path (lands + factory-less cards). Routed
+        // (factory-backed) cards are implemented by definition — even when
+        // their behaviour lives in off-card continuous / replacement / CDA
+        // effects the classifier can't see — so they are never stamped and no
+        // allowlist is needed here.
+        if (card.IsVanillaShell)
             return RawSignal.Stub;
 
         var entity = Repo.GetByName(name);

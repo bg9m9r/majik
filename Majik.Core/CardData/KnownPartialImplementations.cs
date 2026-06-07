@@ -85,8 +85,8 @@ public static class KnownPartialImplementations
                 "Skip-draw, max-hand-size-5 and graveyard-replacement statics work; the 'At the beginning of your end step, you may pay any amount of life: draw that many cards' triggered ability is not bound."),
             ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,
                 "Aura attaches (Enchant Forest); the 'Whenever enchanted Forest is tapped for mana, add an additional mana of the chosen color' triggered ability isn't wired on the routed build because the 'As this Aura enters, choose a color' prompt is deferred engine-wide."),
-            ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Stub,
-                "Planeswalker routed through GristFactory in production: the factory builds shape/types only and its [+1]/[-2]/[-5] loyalty abilities are wired by OracleLoyaltyAbilityBinder, but the routed deck-build path deliberately skips the loyalty binder — so the live card has no working abilities (does nothing in play). The 'isn't on the battlefield → 1/1 Insect' CDA is also a deferred conditional."),
+            ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,
+                "Loyalty abilities dropped on routed planeswalker build; CDA deferred."),
         };
 
     /// <summary>True when <paramref name="name"/> has a recorded gap.</summary>
