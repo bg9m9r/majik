@@ -90,15 +90,37 @@ public sealed class SearchAgent : IPlayerAgent
     private const int TopKAttackers = 8;
 
     /// <summary>
+    /// Optional rollout strategy. When non-null and the script is exhausted,
+    /// decisions are forwarded to this strategy (rollout mode) rather than
+    /// pausing for a <see cref="SupplyMove"/> call. Capture mode is used when
+    /// this is null (original A3 behaviour).
+    /// </summary>
+    private readonly IBotStrategy? _rolloutStrategy;
+
+    /// <summary>
     /// Construct a <see cref="SearchAgent"/> for the given cloned seat.
     /// The fallback is built internally; optionally supply a pre-loaded
     /// script for tree-path replay.
     /// </summary>
     public SearchAgent(Player seat, IEnumerable<SimMove>? script = null)
+        : this(seat, script, rolloutStrategy: null)
+    {
+    }
+
+    /// <summary>
+    /// Internal constructor that also accepts a rollout strategy. Called by
+    /// <see cref="EngineSimulator"/> to wire rollout mode without exposing the
+    /// internal <see cref="IBotStrategy"/> type on the public API.
+    /// </summary>
+    internal SearchAgent(
+        Player seat,
+        IEnumerable<SimMove>? script,
+        IBotStrategy? rolloutStrategy)
     {
         _seat = seat ?? throw new ArgumentNullException(nameof(seat));
         _fallback = new DeterministicBotAgent();
         _script = script != null ? new Queue<SimMove>(script) : new Queue<SimMove>();
+        _rolloutStrategy = rolloutStrategy;
     }
 
     // ── Search-side API ───────────────────────────────────────────────────────
@@ -126,8 +148,10 @@ public sealed class SearchAgent : IPlayerAgent
 
     /// <summary>
     /// Core suspend/resume handler. If the script still has moves, pops and
-    /// returns immediately. Otherwise publishes the decision to the search loop
-    /// and suspends until <see cref="SupplyMove"/> is called.
+    /// returns immediately. If a rollout strategy is configured, delegates
+    /// the decision to that strategy (plays out without pausing). Otherwise
+    /// publishes the decision to the search loop and suspends until
+    /// <see cref="SupplyMove"/> is called.
     ///
     /// Sequencing: the TCS pair is rotated BEFORE the previous decision TCS
     /// is completed (not after), so that by the time the search-side continuation
@@ -141,6 +165,13 @@ public sealed class SearchAgent : IPlayerAgent
         {
             // Script replay — no pause, engine continues uninterrupted.
             return _script.Dequeue();
+        }
+
+        // Rollout mode: script exhausted and a strategy was provided — use it
+        // to pick a move without pausing the engine.
+        if (_rolloutStrategy != null)
+        {
+            return PickRolloutMove(decision);
         }
 
         // Capture mode:
@@ -162,6 +193,37 @@ public sealed class SearchAgent : IPlayerAgent
         return await moveTcs.Task.ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Picks a rollout move from the decision's legal moves using the rollout
+    /// strategy as a tie-breaker signal. Simply selects the first non-empty
+    /// attack / non-pass move when available, mirroring the heuristic spirit
+    /// of the rollout strategy without needing a full GameContext here (we don't
+    /// have one at this call site). For attacker decisions, any all-out move is
+    /// preferred; for blockers the first move suffices; priority always passes.
+    /// </summary>
+    private SimMove PickRolloutMove(SimDecision decision)
+    {
+        return decision.Kind switch
+        {
+            SimDecisionKind.DeclareAttackers =>
+                // Prefer all-out attack, then any attack, then pass.
+                decision.LegalMoves.FirstOrDefault(m => m.IsAllOutAttack)
+                ?? decision.LegalMoves.FirstOrDefault(m => !m.IsEmptyAttack)
+                ?? decision.LegalMoves[0],
+
+            SimDecisionKind.DeclareBlockers =>
+                // Use greedy block (first non-empty plan) when available.
+                decision.LegalMoves.FirstOrDefault(m => m.BlockPlan?.Blockers.Count > 0)
+                ?? decision.LegalMoves[0],
+
+            SimDecisionKind.Priority =>
+                // Always pass in rollout (priority enumeration is B1 scope).
+                decision.LegalMoves.First(m => m.IsPass),
+
+            _ => decision.LegalMoves[0]
+        };
+    }
+
     // ── Intercepted decision methods ──────────────────────────────────────────
 
     /// <inheritdoc/>
@@ -170,6 +232,11 @@ public sealed class SearchAgent : IPlayerAgent
         IReadOnlyList<Creature> eligibleAttackers,
         CancellationToken ct = default)
     {
+        // Rollout mode short-circuit: script empty + strategy set → delegate to
+        // the heuristic strategy with the live context (no pause, no TCS).
+        if (_script.Count == 0 && _rolloutStrategy != null)
+            return _rolloutStrategy.PickAttackers(ctx, _seat, eligibleAttackers);
+
         // Build legal attacker-subset moves. Always include the empty-attack
         // move (pass) first.
         var moves = BuildAttackerMoves(ctx, eligibleAttackers);
@@ -177,10 +244,55 @@ public sealed class SearchAgent : IPlayerAgent
 
         var chosen = await DecideAsync(decision, ct).ConfigureAwait(false);
 
-        // Materialize the CombatPlan. The move must carry a plan; if somehow
-        // it doesn't (shouldn't happen with correct search code) fall through
-        // to no-attack as a safe default.
-        return chosen.CombatPlan ?? CombatPlan.None;
+        // Materialize the CombatPlan. The scripted plan may reference
+        // creatures from a different sandbox (e.g., the Advance sandbox
+        // that was used to generate the move list). Re-map the plan to
+        // THIS sandbox's creatures via InstanceId, which is stable across
+        // clones (GameStateCloner preserves InstanceId).
+        var rawPlan = chosen.CombatPlan;
+        if (rawPlan == null || rawPlan.Attackers.Count == 0)
+            return CombatPlan.None;
+
+        return RemapCombatPlan(rawPlan, eligibleAttackers, ctx);
+    }
+
+    /// <summary>
+    /// Re-maps a <see cref="CombatPlan"/> from a foreign sandbox to the
+    /// current sandbox by matching <see cref="Creature.InstanceId"/> against
+    /// <paramref name="eligibleAttackers"/> (current-sandbox creatures) and
+    /// finding the current-sandbox defender via <c>ctx.AllPlayers</c> by Id.
+    /// Any attacker not found in the current sandbox (or with a foreign
+    /// defender reference) is silently dropped — this is safe because the
+    /// cloner preserves InstanceId so a matching attacker WILL be found if
+    /// the creature is still on the battlefield.
+    /// </summary>
+    private static CombatPlan RemapCombatPlan(
+        CombatPlan foreignPlan,
+        IReadOnlyList<Creature> eligibleAttackers,
+        GameContext ctx)
+    {
+        // Build a lookup from InstanceId to current-sandbox creature.
+        var byId = eligibleAttackers.ToDictionary(c => c.InstanceId);
+
+        var remapped = new List<AttackerDeclaration>(foreignPlan.Attackers.Count);
+        foreach (var decl in foreignPlan.Attackers)
+        {
+            if (!byId.TryGetValue(decl.Attacker.InstanceId, out var localAttacker))
+                continue; // creature not in this sandbox (shouldn't happen, but safe)
+
+            // Find the defender by Player.Id in ctx.AllPlayers.
+            object? defender = decl.DefendingPlayerOrPlaneswalker switch
+            {
+                Player p => ctx.AllPlayers.FirstOrDefault(cp => cp.Id == p.Id),
+                _ => null // planeswalkers not supported in this simplification
+            };
+            if (defender == null)
+                defender = ctx.AllPlayers.First(p => !ReferenceEquals(p, ctx.Self));
+
+            remapped.Add(new AttackerDeclaration(localAttacker, defender));
+        }
+
+        return remapped.Count == 0 ? CombatPlan.None : new CombatPlan(remapped);
     }
 
     /// <inheritdoc/>
@@ -190,6 +302,10 @@ public sealed class SearchAgent : IPlayerAgent
         IReadOnlyList<Creature> eligibleBlockers,
         CancellationToken ct = default)
     {
+        // Rollout mode short-circuit.
+        if (_script.Count == 0 && _rolloutStrategy != null)
+            return _rolloutStrategy.PickBlockers(ctx, _seat, attackers, eligibleBlockers);
+
         var moves = BuildBlockerMoves(ctx, attackers, eligibleBlockers);
         var decision = new SimDecision(SimDecisionKind.DeclareBlockers, moves);
 
@@ -202,12 +318,30 @@ public sealed class SearchAgent : IPlayerAgent
     /// <remarks>
     /// Priority enumeration is Pass-only in Task A3. Full enumeration (spell
     /// casts, land plays, activated abilities) is Task B1.
+    ///
+    /// Priority decisions do NOT consume script moves — the script is keyed
+    /// on substantive decisions (DeclareAttackers / DeclareBlockers). A
+    /// Priority call while the script is non-empty means we are still
+    /// replaying the path to a target node; we auto-pass so that combat /
+    /// main-phase decisions can be reached without consuming the scripted
+    /// non-Priority move prematurely.
     /// </remarks>
     public async Task<PriorityAction> ChoosePriorityActionAsync(
         GameContext ctx,
         CancellationToken ct = default)
     {
-        // Pass-only for now (Task B1 will enumerate spells/lands/abilities).
+        // Rollout mode short-circuit: delegate to strategy.
+        // Strategy picks the best priority action without pausing.
+        if (_script.Count == 0 && _rolloutStrategy != null)
+            return _rolloutStrategy.PickPriorityAction(ctx, _seat);
+
+        // If the script is non-empty, the next move in the script is for a
+        // DeclareAttackers or DeclareBlockers decision, NOT for Priority.
+        // Auto-pass so we don't consume the script move prematurely.
+        if (_script.Count > 0)
+            return PriorityAction.Pass;
+
+        // Pass-only capture mode for now (Task B1 will enumerate spells/lands/abilities).
         var passMove = SimMove.FromPriorityAction(PriorityAction.Pass);
         var decision = new SimDecision(
             SimDecisionKind.Priority,
