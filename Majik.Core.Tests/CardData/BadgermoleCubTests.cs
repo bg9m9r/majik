@@ -109,8 +109,9 @@ public class BadgermoleCubTests
         var chars = svc.Compute(forest);
         chars.Should().BeOfType<CreatureCharacteristics>();
         chars.Types.Should().Contain(CardType.Creature);
-        chars.Types.Should().Contain(CardType.Land, "still a land (CR 701.59a)");
-        chars.Subtypes.Should().Contain(CardSubtype.Elemental);
+        chars.Types.Should().Contain(CardType.Land, "still a land");
+        chars.Subtypes.Should().NotContain(CardSubtype.Elemental,
+            "Earthbend grants no creature subtype — 'becomes a 0/0 creature'");
         chars.Keywords.Should().Contain("Haste");
 
         var cc = (CreatureCharacteristics)chars;
