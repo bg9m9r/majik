@@ -37,39 +37,28 @@ public static class KnownPartialImplementations
                 "Ability-grant static deferred (closure re-home blocker, v1-deferrals #5); "
                 + "real targeting + Legendary supertype done (#2497)."),
 
-            // --- Seeded from the first BotDeckImplementationAuditTests run ---
-            // (audit materializes cards via the LIVE engine path: non-land
-            // factory-backed cards route through their [CardName] factory, so
-            // these are the cards that genuinely do nothing in real play.)
+            // --- Re-derived from the faithful BotDeckImplementationAuditTests
+            // run (cards built via the real GameFacade.Create + PopulateSideboard
+            // path, full binder set incl. OracleLandActivatedAbilityBinder +
+            // live services). These are the cards that genuinely do nothing in
+            // real play. NOTE: most fetchlands are NOW implemented — the land
+            // binder runs on the faithful path — so only the ones the binder's
+            // regex still misses remain Stubs.
 
-            // Fetchlands — no [CardName] factory and the binder chain does not
-            // bind the "{T}, Pay 1 life, Sacrifice: search a typed land" fetch
-            // activated ability, so they build as a do-nothing land. Lands are
-            // never routed through named factories (GameFacade), so this gap is
-            // real in production. See MEMORY: fetchland-resolution is a known
-            // engine gap.
-            ["Arid Mesa"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Bloodstained Mire"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Flooded Strand"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Marsh Flats"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Misty Rainforest"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
+            // Fetchlands whose first fetched basic begins with a VOWEL ("an
+            // Island ...") — OracleLandActivatedAbilityBinder's FetchLand regex
+            // requires literal " a <Basic> " (consonant article), so it fails to
+            // match "an Island", leaving these as do-nothing lands. The 8
+            // consonant-article fetchlands (Arid Mesa, Bloodstained Mire,
+            // Flooded Strand, Marsh Flats, Misty Rainforest, Verdant Catacombs,
+            // Windswept Heath, Wooded Foothills) ARE bound and are no longer
+            // gaps — they were removed from this registry.
             ["Polluted Delta"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
+                "Fetchland: OracleLandActivatedAbilityBinder's regex requires a consonant-article 'a <Basic>' and so misses 'an Island or Swamp' — fetch ability not bound, vanilla land in play."),
             ["Scalding Tarn"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Verdant Catacombs"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Windswept Heath"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
-            ["Wooded Foothills"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: sacrifice-to-search activated ability not bound by the binder chain (no factory; lands aren't routed) — vanilla land in play."),
+                "Fetchland: OracleLandActivatedAbilityBinder's regex requires a consonant-article 'a <Basic>' and so misses 'an Island or Mountain' — fetch ability not bound, vanilla land in play."),
             ["Prismatic Vista"] = new CardGap(CardGapSeverity.Stub,
-                "Basic-fetch land: has a PrismaticVistaFactory but lands are never routed through named factories, and the binder chain doesn't bind the fetch ability — vanilla land in play."),
+                "Basic-fetch land: oracle says 'a basic land card', not two named basics, so OracleLandActivatedAbilityBinder (which keys off named basics) doesn't bind it; lands aren't routed through PrismaticVistaFactory either — vanilla land in play."),
 
             // Horizon Canopy cycle (pain-mana + sac-to-draw). The binder chain
             // binds neither the pain mana ability nor the sac-to-draw activated
@@ -96,6 +85,8 @@ public static class KnownPartialImplementations
                 "Skip-draw, max-hand-size-5 and graveyard-replacement statics work; the 'At the beginning of your end step, you may pay any amount of life: draw that many cards' triggered ability is not bound."),
             ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,
                 "Aura attaches (Enchant Forest); the 'Whenever enchanted Forest is tapped for mana, add an additional mana of the chosen color' triggered ability isn't wired on the routed build because the 'As this Aura enters, choose a color' prompt is deferred engine-wide."),
+            ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Stub,
+                "Planeswalker routed through GristFactory in production: the factory builds shape/types only and its [+1]/[-2]/[-5] loyalty abilities are wired by OracleLoyaltyAbilityBinder, but the routed deck-build path deliberately skips the loyalty binder — so the live card has no working abilities (does nothing in play). The 'isn't on the battlefield → 1/1 Insect' CDA is also a deferred conditional."),
         };
 
     /// <summary>True when <paramref name="name"/> has a recorded gap.</summary>

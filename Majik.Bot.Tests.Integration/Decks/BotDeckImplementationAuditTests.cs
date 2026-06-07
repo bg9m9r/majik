@@ -1,0 +1,278 @@
+using FluentAssertions;
+using Majik.Bot.Decks;
+using Majik.Bot.Tests.Integration.Helpers;
+using Majik.Core.Abilities;
+using Majik.Core.Api;
+using Majik.Core.CardData;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Zones;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Majik.Bot.Tests.Integration.Decks;
+
+/// <summary>
+/// Faithful static coverage audit for every card in every bot deck (mainboard +
+/// sideboard). Builds each archetype through the REAL
+/// <see cref="GameFacade.Create"/> + <see cref="GameFacade.PopulateSideboard"/>
+/// path — the exact binder/factory chain production uses, with live services
+/// (TriggerManager / ZoneService / EventBus / ContinuousEffects) and the
+/// named-factory routing for non-land cards — then reads the now-authoritative
+/// <see cref="ICard.IsVanillaShell"/> flag that <c>GameFacade.BuildDeckCard</c>
+/// stamps via the shared <see cref="VanillaShellClassifier"/>.
+///
+/// <para>This supersedes the prior unit-level audit (which built cards via the
+/// bare <see cref="ScryfallCardFactory"/> and so false-flagged fetchlands /
+/// horizon lands whose land binders run only on the live path). Because lands
+/// ARE bound by <c>OracleLandActivatedAbilityBinder</c> here, fetchlands etc.
+/// are no longer detected as shells.</para>
+///
+/// <para>The gate (<see cref="BotDeckCards_HaveNoUnregisteredGaps"/>) fails on
+/// drift versus <see cref="KnownPartialImplementations"/>; the report
+/// (<see cref="PrintPerDeckHealth"/>) prints a per-deck breakdown.</para>
+///
+/// <para>Class D (silent-wrong-but-complete impls, e.g. a keyword that grants
+/// the wrong subtype) is NOT covered here — those need per-keyword golden tests
+/// (see <c>EarthbendActionTests</c> as the seed example).</para>
+/// </summary>
+public class BotDeckImplementationAuditTests
+{
+    private readonly ITestOutputHelper _out;
+    public BotDeckImplementationAuditTests(ITestOutputHelper output) => _out = output;
+
+    // Built once for the whole class — the seed is ~22k rows.
+    private static readonly EmbeddedCardRepository Repo = new();
+
+    /// <summary>Class-B heuristic false positives: oracle text leads with
+    /// When/Whenever/At, but the "trigger" is actually a keyword / replacement /
+    /// Ward phrasing, not an <see cref="ITriggeredAbility"/>. Real gaps go in
+    /// <see cref="KnownPartialImplementations"/>, NOT here.</summary>
+    private static readonly HashSet<string> TriggerHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // The "Whenever this creature becomes the target of a spell an
+            // opponent controls, counter that spell unless its controller
+            // discards a card" line is the templated wording of the WARD
+            // keyword (CR 702.21), implemented by RealitySmasherFactory as a
+            // KeywordAbility("Ward") + a bound WardEffect — not a separate
+            // unimplemented triggered ability. Heuristic false positive.
+            "Reality Smasher",
+        };
+
+    /// <summary>
+    /// VANILLA-SHELL heuristic false positives. The shared
+    /// <see cref="VanillaShellClassifier"/> flags a permanent as a shell when it
+    /// has no entries in <c>card.Abilities</c> yet has printed oracle text. That
+    /// heuristic does NOT see card behaviour implemented as a CONTINUOUS /
+    /// REPLACEMENT / characteristic-defining effect (registered against the
+    /// ContinuousEffectsService / ReplacementBus on ETB), because those live
+    /// off-card, not in <c>card.Abilities</c>. Such cards DO work in real play —
+    /// they are not stubs — so they are allowlisted here rather than recorded as
+    /// a gap in <see cref="KnownPartialImplementations"/> (which the portal may
+    /// surface as "partial coverage").
+    ///
+    /// <para>KNOWN LIMITATION (follow-up): because <c>GameFacade.BuildDeckCard</c>
+    /// now stamps <c>IsVanillaShell</c> via the same classifier, the in-play
+    /// <c>VanillaShellTracker</c> will also mis-flag these cards. Teaching the
+    /// classifier about off-card effects is the directed follow-up; until then
+    /// this allowlist is the audit-side guard.</para>
+    /// </summary>
+    private static readonly HashSet<string> VanillaShellHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // RetypeLandsStaticEffect (Layer 4 land retype) — works in play; the
+            // effect registers against the CES on ETB, nothing on card.Abilities.
+            "Blood Moon",
+            "Magus of the Moon",
+            "Harbinger of the Seas",
+            // LandSubtypeSelfPumpStaticEffect (CDA self-pump while a land-subtype
+            // condition holds) — registered against the CES, off-card.
+            "Wild Nacatl",
+            // Activated-ability suppression statics registered into
+            // ActivatedAbilityRestrictions via a CES lifecycle — off-card.
+            "Cursed Totem",
+            "Pithing Needle",
+            // LaboratoryManiacDrawReplacement — an IReplacementEffect registered
+            // on the ReplacementBus, not a card ability.
+            "Laboratory Maniac",
+            // AllosaurusRiderCdaLifecycle — characteristic-defining ability via a
+            // CES lifecycle, off-card.
+            "Allosaurus Rider",
+            // GrantAbilityToGroupStaticEffect via a CES lifecycle — off-card.
+            "Kataki, War's Wage",
+        };
+
+    /// <summary>Detection result for one distinct card name.</summary>
+    private enum RawSignal { None, Stub, MissingTrigger }
+
+    /// <summary>Report-facing status (raw signal overlaid with the registry).</summary>
+    private enum Status { Ok, Stub, Partial, MissingTrigger }
+
+    /// <summary>
+    /// Build EVERY distinct bot-deck card (mainboard + sideboard, all
+    /// archetypes) through the real <see cref="GameFacade"/> path ONCE and
+    /// return the fully-bound live <see cref="ICard"/> per name. Building each
+    /// archetype's deck + sideboard with a fresh facade mirrors production;
+    /// the first live instance seen for a name wins (identical across decks).
+    /// </summary>
+    private static IReadOnlyDictionary<string, ICard> BuildAllLiveCards()
+    {
+        var byName = new Dictionary<string, ICard>(StringComparer.Ordinal);
+
+        foreach (var archetype in BotDeckCatalog.Archetypes)
+        {
+            var facade = GameFacade.Create(
+                aliceName: $"{archetype}-A",
+                bobName: $"{archetype}-B",
+                aliceDeck: DeckLoader.LoadReal(archetype, Repo),
+                bobDeck: System.Array.Empty<ICard>(),
+                cardRepo: Repo);
+
+            facade.PopulateSideboard(facade.Alice, DeckLoader.LoadRealSideboard(archetype, Repo));
+
+            var libraryCards = facade.Alice.Zones.GetZone(ZoneType.Library).GetCards();
+            var sideboardCards = facade.Alice.Zones.Sideboard.GetCards();
+
+            foreach (var card in libraryCards.Concat(sideboardCards))
+            {
+                if (!byName.ContainsKey(card.Name)) byName[card.Name] = card;
+            }
+        }
+
+        return byName;
+    }
+
+    // Built once — the live-engine build of every archetype is expensive.
+    private static readonly IReadOnlyDictionary<string, ICard> LiveCards = BuildAllLiveCards();
+
+    private static IReadOnlyList<string> AllBotDeckCardNames()
+    {
+        var names = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var archetype in BotDeckCatalog.Archetypes)
+        {
+            foreach (var n in BotDeckCatalog.Get(archetype)) names.Add(n);
+            foreach (var n in BotDeckCatalog.GetSideboard(archetype)) names.Add(n);
+        }
+        return names.ToList();
+    }
+
+    private static bool OracleImpliesTrigger(string? oracle)
+    {
+        if (string.IsNullOrWhiteSpace(oracle)) return false;
+        foreach (var raw in oracle.Split('\n'))
+        {
+            var line = raw.TrimStart();
+            if (line.StartsWith("When ", StringComparison.Ordinal)
+                || line.StartsWith("Whenever ", StringComparison.Ordinal)
+                || line.StartsWith("At ", StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsPermanent(ICard c)
+        => c.HasType(CardType.Creature) || c.HasType(CardType.Artifact)
+        || c.HasType(CardType.Enchantment) || c.HasType(CardType.Planeswalker)
+        || c.HasType(CardType.Land);
+
+    /// <summary>Pure detection on the live-built card — does NOT consult the registry.</summary>
+    private static RawSignal DetectRaw(string name)
+    {
+        if (!LiveCards.TryGetValue(name, out var card))
+            return RawSignal.None; // not a bot-deck card (shouldn't happen for callers)
+
+        if (card.IsVanillaShell && !VanillaShellHeuristicAllowlist.Contains(name))
+            return RawSignal.Stub;
+
+        var entity = Repo.GetByName(name);
+        if (entity != null
+            && IsPermanent(card)
+            && OracleImpliesTrigger(entity.OracleText)
+            && !card.Abilities.OfType<ITriggeredAbility>().Any()
+            && !TriggerHeuristicAllowlist.Contains(name))
+            return RawSignal.MissingTrigger;
+
+        return RawSignal.None;
+    }
+
+    /// <summary>Report status: registry overlay over the raw signal.</summary>
+    private static Status ReportStatus(string name)
+    {
+        if (KnownPartialImplementations.TryGet(name, out var gap))
+            return gap.Severity == CardGapSeverity.Stub ? Status.Stub : Status.Partial;
+
+        return DetectRaw(name) switch
+        {
+            RawSignal.Stub => Status.Stub,
+            RawSignal.MissingTrigger => Status.MissingTrigger,
+            _ => Status.Ok,
+        };
+    }
+
+    [Fact]
+    public void PrintPerDeckHealth()
+    {
+        foreach (var archetype in BotDeckCatalog.Archetypes)
+        {
+            var names = BotDeckCatalog.Get(archetype)
+                .Concat(BotDeckCatalog.GetSideboard(archetype))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(n => n, StringComparer.Ordinal)
+                .ToList();
+
+            var problems = names
+                .Select(n => (Name: n, Status: ReportStatus(n)))
+                .Where(x => x.Status != Status.Ok)
+                .ToList();
+
+            _out.WriteLine($"=== {BotDeckCatalog.DisplayName(archetype)} "
+                + $"({problems.Count}/{names.Count} flagged) ===");
+            foreach (var (n, status) in problems)
+            {
+                var reason = KnownPartialImplementations.TryGet(n, out var gap)
+                    ? gap.Reason : "(detected — not yet registered)";
+                _out.WriteLine($"  [{status}] {n} — {reason}");
+            }
+        }
+    }
+
+    [Fact]
+    public void BotDeckCards_HaveNoUnregisteredGaps()
+    {
+        var botDeckNames = AllBotDeckCardNames();
+        var newGaps = new List<string>();
+        var stale = new List<string>();
+
+        foreach (var name in botDeckNames)
+        {
+            var raw = DetectRaw(name);
+            var known = KnownPartialImplementations.TryGet(name, out var gap);
+
+            // A detected gap that nobody recorded → fail (implement it, or
+            // register it with a reason if the gap is intentional).
+            if (raw != RawSignal.None && !known)
+            {
+                newGaps.Add(raw == RawSignal.Stub
+                    ? $"{name}: does nothing (vanilla shell) — implement, or register as Stub"
+                    : $"{name}: oracle implies a trigger but none is bound — implement, "
+                      + "register as a gap, or allowlist the heuristic false positive");
+            }
+
+            // A registry Stub entry that is a bot-deck card but no longer a
+            // shell → fail (clean it up).
+            if (known && gap.Severity == CardGapSeverity.Stub && raw != RawSignal.Stub)
+            {
+                stale.Add($"{name}: registered as Stub but is no longer a vanilla shell "
+                    + "— remove or downgrade the registry entry");
+            }
+        }
+
+        var failures = newGaps.Concat(stale).ToList();
+        failures.Should().BeEmpty(
+            "bot-deck cards must be implemented or have their gap recorded in "
+            + "KnownPartialImplementations / the trigger-heuristic allowlist. "
+            + "Run PrintPerDeckHealth for the full picture.\n"
+            + string.Join("\n", failures));
+    }
+}
