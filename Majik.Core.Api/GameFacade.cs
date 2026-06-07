@@ -695,40 +695,6 @@ public sealed class GameFacade : IDisposable
         ZoneService? zones = null,
         IEventBus? eventBus = null)
     {
-        var result = BuildDeckCardCore(shell, owner, cardRepo, replacements, effects,
-            routeThroughNamedFactories, triggers, zones, eventBus);
-
-        // Set IsVanillaShell on the REAL deck-build path so coverage gaps
-        // surface in real play (the in-play VanillaShellTracker can finally
-        // fire for binder-chain shells). This was previously set only by
-        // ScryfallCardFactory.Create — a path that omits the land/loyalty
-        // binders + live services, so it false-flagged fetchlands etc. Here
-        // the card is fully bound, so the classification is authoritative.
-        // Uses the same shared classifier as ScryfallCardFactory.Create.
-        if (cardRepo != null)
-        {
-            var classifyEntity = cardRepo.GetByName(shell.Name);
-            if (classifyEntity != null
-                && Majik.Core.CardData.VanillaShellClassifier.IsLikelyVanillaShell(result, classifyEntity))
-            {
-                (result as Majik.Core.Cards.Card)?.MarkAsVanillaShell();
-            }
-        }
-
-        return result;
-    }
-
-    private static ICard BuildDeckCardCore(
-        ICard shell,
-        Player owner,
-        ICardRepository? cardRepo,
-        ReplacementBus replacements,
-        ContinuousEffectsService effects,
-        bool routeThroughNamedFactories,
-        TriggerManager? triggers = null,
-        ZoneService? zones = null,
-        IEventBus? eventBus = null)
-    {
         // CR 712.3 / 712.4 — Modal Double-Faced Card: real cast-either-face
         // (deferral #3). The seed stores MDFCs under the composite name
         // "Front // Back"; the per-face factories register only their face
@@ -846,6 +812,26 @@ public sealed class GameFacade : IDisposable
         shell.SetOwner(owner);
         BindCardAbilities(shell, owner, cardRepo, replacements, effects,
             triggers, zones, eventBus);
+
+        // Stamp IsVanillaShell ONLY on the non-routed binder-chain path. A card
+        // built through its [CardName] factory (the routed return above) is
+        // implemented by definition — its behaviour may live in off-card
+        // effects (continuous / replacement / CDA registered on a live service,
+        // not as card.Abilities), which the classifier cannot see, so stamping
+        // there false-flags cards like Blood Moon / Wild Nacatl / Pithing
+        // Needle. Only lands + factory-less cards reach here, where the card is
+        // fully bound and the classification is authoritative. Uses the same
+        // shared classifier as ScryfallCardFactory.Create.
+        if (cardRepo != null)
+        {
+            var entity = cardRepo.GetByName(shell.Name);
+            if (entity != null
+                && Majik.Core.CardData.VanillaShellClassifier.IsLikelyVanillaShell(shell, entity))
+            {
+                (shell as Majik.Core.Cards.Card)?.MarkAsVanillaShell();
+            }
+        }
+
         return shell;
     }
 
