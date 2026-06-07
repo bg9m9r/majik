@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Counters;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Simulation;
+using Majik.Core.Targeting;
 using Majik.Core.ValueObjects;
 using Xunit;
 
@@ -173,5 +175,43 @@ public sealed class CloneFidelityTests
             .Which.Should().BeOfType<Instant>();
         gy.Should().ContainSingle(c => c.InstanceId == sorcery.InstanceId)
             .Which.Should().BeOfType<Sorcery>();
+    }
+
+    [Fact]
+    public void Clone_CopiesStackObjects_TargetingClones()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bolt = new Instant("Lightning Bolt", "{R}");
+        bolt.ChangeOwner(alice);
+        alice.Zones.Hand.AddCard(bolt);
+
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+
+        // Build spell targeting Bob (a Player target) and push onto the stack.
+        var spell = new Majik.Core.Spells.Spell(bolt, alice, new[] { Target.Player(bob) });
+        stack.Push(spell);
+
+        var cloned = GameStateCloner.Clone(new[] { alice, bob }, stack);
+
+        // The cloned stack must carry exactly one object.
+        cloned.Stack.Should().NotBeNull();
+        cloned.Stack!.Count.Should().Be(1);
+
+        // The top of the cloned stack must be a Spell.
+        var top = cloned.Stack.Top as Majik.Core.Spells.Spell;
+        top.Should().NotBeNull();
+
+        // The spell's source card must be the CLONE of bolt (not the original).
+        top!.Card.Should().BeSameAs(cloned.CardMap[bolt.InstanceId]);
+
+        // The spell's controller must be the CLONE of alice.
+        top.Controller.Should().BeSameAs(cloned.PlayerFor(alice));
+
+        // The spell's target must be the CLONE of bob (retargeted to the clone).
+        top.Targets.Should().HaveCount(1);
+        var targetPlayer = ((Target)top.Targets[0]).GetPlayer();
+        targetPlayer.Should().BeSameAs(cloned.PlayerFor(bob));
     }
 }
