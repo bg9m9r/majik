@@ -278,6 +278,12 @@ public static class IntoTheFloodMawFactory
     {
         public IntoTheFloodMawCard(string name, string manaCost) : base(name, manaCost) { }
 
+        /// <summary>Simulation copy constructor. No extra runtime fields.</summary>
+        private IntoTheFloodMawCard(IntoTheFloodMawCard src) : base(src) { }
+
+        /// <inheritdoc cref="Majik.Core.Cards.Card.CloneForSim"/>
+        internal override Majik.Core.Cards.Card CloneForSim() => new IntoTheFloodMawCard(this);
+
         /// <inheritdoc />
         public string Description => GiftDescription;
 

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Cards;
+using Majik.Core.Counters;
 using Majik.Core.Players;
 using Majik.Core.Simulation;
 using Majik.Core.ValueObjects;
@@ -62,5 +63,92 @@ public sealed class CloneFidelityTests
         // Independence: mutating the clone must not touch the original.
         c.GainEnergy(10);
         alice.EnergyCounters.Should().Be(3);
+    }
+
+    [Fact]
+    public void Clone_CopiesPermanentBoardState()
+    {
+        // Arrange: a creature with tap state, damage, a counter, and no summoning sickness.
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Grizzly Bears", manaCost: "{1}{G}", power: 2, toughness: 2);
+        bear.ChangeOwner(alice);
+        bear.ClearSummoningSickness();          // clear the default sick flag
+        alice.Zones.Battlefield.AddCard(bear);
+        bear.Tap();                             // IsTapped = true
+        bear.TakeDamage(1);                     // Damage = 1
+        bear.Counters.Add(CounterType.PlusOnePlusOne, 1); // one +1/+1 counter
+
+        // Act: clone
+        var cloned = GameStateCloner.Clone(new[] { alice });
+        var cAlice = cloned.PlayerFor(alice);
+        var cBear = (Creature)cAlice.Zones.Battlefield.GetCards().Single();
+
+        // Assert: clone carries the board state
+        cBear.IsTapped.Should().BeTrue();
+        cBear.Damage.Should().Be(1);
+        cBear.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1);
+        cBear.HasSummoningSickness.Should().BeFalse();
+
+        // Independence: mutating the clone must not touch the original
+        cBear.Untap();
+        bear.IsTapped.Should().BeTrue("original must remain tapped after cloning");
+    }
+
+    [Fact]
+    public void Clone_PreservesRuntimeTypeForEachCardType()
+    {
+        // Arrange: one of each concrete card type in a zone.
+        var alice = new Player("Alice", 20);
+
+        var creature = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        creature.ChangeOwner(alice);
+        alice.Zones.Battlefield.AddCard(creature);
+
+        var land = new Land("Forest");
+        land.ChangeOwner(alice);
+        alice.Zones.Battlefield.AddCard(land);
+
+        var artifact = new Artifact("Sol Ring", "{1}");
+        artifact.ChangeOwner(alice);
+        alice.Zones.Battlefield.AddCard(artifact);
+
+        var enchantment = new Enchantment("Glorious Anthem", "{1}{W}{W}");
+        enchantment.ChangeOwner(alice);
+        alice.Zones.Battlefield.AddCard(enchantment);
+
+        var planeswalker = new Planeswalker("Liliana of the Veil", "{1}{B}{B}", startingLoyalty: 3);
+        planeswalker.ChangeOwner(alice);
+        alice.Zones.Battlefield.AddCard(planeswalker);
+
+        var instant = new Instant("Lightning Bolt", "{R}");
+        instant.ChangeOwner(alice);
+        alice.Zones.Graveyard.AddCard(instant);
+
+        var sorcery = new Sorcery("Cultivate", "{2}{G}");
+        sorcery.ChangeOwner(alice);
+        alice.Zones.Graveyard.AddCard(sorcery);
+
+        // Act
+        var cloned = GameStateCloner.Clone(new[] { alice });
+        var cAlice = cloned.PlayerFor(alice);
+
+        var bf = cAlice.Zones.Battlefield.GetCards().ToList();
+        var gy = cAlice.Zones.Graveyard.GetCards().ToList();
+
+        // Assert: type preservation
+        bf.Should().ContainSingle(c => c.InstanceId == creature.InstanceId)
+            .Which.Should().BeOfType<Creature>();
+        bf.Should().ContainSingle(c => c.InstanceId == land.InstanceId)
+            .Which.Should().BeOfType<Land>();
+        bf.Should().ContainSingle(c => c.InstanceId == artifact.InstanceId)
+            .Which.Should().BeOfType<Artifact>();
+        bf.Should().ContainSingle(c => c.InstanceId == enchantment.InstanceId)
+            .Which.Should().BeOfType<Enchantment>();
+        bf.Should().ContainSingle(c => c.InstanceId == planeswalker.InstanceId)
+            .Which.Should().BeOfType<Planeswalker>();
+        gy.Should().ContainSingle(c => c.InstanceId == instant.InstanceId)
+            .Which.Should().BeOfType<Instant>();
+        gy.Should().ContainSingle(c => c.InstanceId == sorcery.InstanceId)
+            .Which.Should().BeOfType<Sorcery>();
     }
 }

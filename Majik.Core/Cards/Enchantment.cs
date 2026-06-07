@@ -19,4 +19,13 @@ public class Enchantment : Permanent
         : base(name, manaCost, new[] { CardType.Enchantment }, supertypes, subtypes)
     {
     }
+
+    /// <summary>Simulation copy constructor. Chains through
+    /// <see cref="Permanent(Permanent)"/> for all base + Permanent runtime
+    /// state. <see cref="Enchantment"/> has no additional mutable runtime fields.
+    /// </summary>
+    protected Enchantment(Enchantment src) : base(src) { }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new Enchantment(this);
 }

@@ -45,6 +45,21 @@ public class Planeswalker : Permanent
         Loyalty = startingLoyalty;
     }
 
+    /// <summary>Simulation copy constructor. Chains through
+    /// <see cref="Permanent(Permanent)"/> for base + Permanent runtime state,
+    /// then copies <see cref="Planeswalker"/>-specific runtime state (current
+    /// loyalty, which may differ from <see cref="StartingLoyalty"/>).
+    /// </summary>
+    protected Planeswalker(Planeswalker src) : base(src)
+    {
+        // preserves: StartingLoyalty (definition), _loyalty (runtime — current loyalty may differ)
+        StartingLoyalty = src.StartingLoyalty;
+        _loyalty = src._loyalty;
+    }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new Planeswalker(this);
+
     /// <summary>
     /// Add loyalty counters to the planeswalker.
     /// </summary>

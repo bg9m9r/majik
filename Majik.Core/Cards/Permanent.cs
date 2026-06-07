@@ -405,6 +405,12 @@ public class Permanent : Card
         WasDealtDamageThisTurn = src.WasDealtDamageThisTurn;
         _transientLoyalty = src._transientLoyalty;
         _regenerationShields = src._regenerationShields;
+        // Counters: deep-copy each per-type count from the source bag into this
+        // permanent's own (already-initialised) CounterCollection.
+        foreach (var (type, n) in src.Counters.All)
+        {
+            Counters.Add(type, n);
+        }
         // ActiveEffects: left null — cloned game does not wire up the layer service.
         // BattleState / SagaState / ClassState: complex attached trackers — skipped for sim v1.
         // AttachedTo / _attachments: re-linked in a later pass (Task 5).

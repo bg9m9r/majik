@@ -70,6 +70,21 @@ public sealed class ManifestedCreature : Creature
         MarkFaceDown();
     }
 
+    /// <summary>Simulation copy constructor. Chains through
+    /// <see cref="Creature(Creature)"/> for base + Creature + Permanent runtime
+    /// state, then preserves the <see cref="UnderlyingCard"/> reference (shared
+    /// by reference — card definitions are immutable). The face-down status is
+    /// already carried by <see cref="Permanent.IsFaceDown"/> via the base copy.
+    /// </summary>
+    private ManifestedCreature(ManifestedCreature src) : base(src)
+    {
+        // preserves: UnderlyingCard (shared reference — immutable definition)
+        UnderlyingCard = src.UnderlyingCard;
+    }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new ManifestedCreature(this);
+
     /// <summary>
     /// CR 708.6 — turn this manifested permanent face-up. Legal only
     /// when the underlying card is a <see cref="Creature"/>
