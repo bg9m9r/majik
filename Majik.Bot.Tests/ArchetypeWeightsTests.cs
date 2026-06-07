@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Bot.Decks;
 using Majik.Bot.Evaluation;
 using Xunit;
 
@@ -28,9 +29,25 @@ public class ArchetypeWeightsTests
     }
 
     [Fact]
-    public void Unknown_Throws()
+    public void Untuned_FallsBackToNeutralDefault()
     {
-        var act = () => ArchetypeWeights.ForArchetype("Mystery");
-        act.Should().Throw<ArgumentException>().WithMessage("*Mystery*");
+        // An archetype without a bespoke table must NOT throw — it is still a
+        // selectable bot (see ForArchetype docs). It resolves to the neutral
+        // Default baseline.
+        ArchetypeWeights.ForArchetype("Mystery").Should().BeSameAs(ArchetypeWeights.Default);
+    }
+
+    [Fact]
+    public void EveryCatalogArchetype_ResolvesToWeights_WithoutThrowing()
+    {
+        // Regression guard: every archetype surfaced to the bot picker
+        // (GET /matches/archetypes) and accepted by MatchService must resolve
+        // to a usable weight table, or selecting that bot crashes match
+        // creation in HeuristicStrategy's ctor.
+        foreach (var archetype in BotDeckCatalog.Archetypes)
+        {
+            var act = () => ArchetypeWeights.ForArchetype(archetype);
+            act.Should().NotThrow($"'{archetype}' is a selectable bot archetype");
+        }
     }
 }
