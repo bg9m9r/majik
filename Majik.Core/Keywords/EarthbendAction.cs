@@ -106,12 +106,23 @@ public static class EarthbendAction
 
         // Step 3 — delayed triggered ability: "When [land] dies or is exiled,
         // return it to the battlefield tapped under its owner's control."
-        // (CR 701.59c / CR 603.6a). activeZones includes Graveyard and Exile
-        // so the trigger stays registered after the zone change.
+        // This is a ONE-SHOT delayed trigger (CR 603.7a): it fires exactly
+        // once, the next time THIS animated land dies or is exiled, then is
+        // gone. A returned land is a fresh permanent — plain (the animate
+        // effect self-prunes when the land leaves the battlefield), with no
+        // standing return trigger. Modelled as a DelayedTriggeredAbility so
+        // the TriggerManager auto-unregisters it after it fires.
         var owner = land.Owner ?? controller;
 
+        DelayedTriggeredAbility? returnTrigger = null;
         var returnEffect = new Effect("Earthbend — return to battlefield tapped", () =>
         {
+            // Detach the one-shot from the land's ability list so a later
+            // zone change of the (now plain) returned land can't re-register
+            // and re-fire it via SyncCardRegistration. TriggerManager already
+            // dropped it from its own set when it fired (CR 603.7a).
+            if (returnTrigger != null) land.RemoveAbility(returnTrigger);
+
             if (land.Zone == ZoneType.Graveyard)
             {
                 owner.Zones.Graveyard.RemoveCard(land);
@@ -129,18 +140,17 @@ public static class EarthbendAction
             land.SetZone(ZoneType.Battlefield);
             land.SetController(owner);
             land.MarkEnteredBattlefield();
-            land.Tap(); // CR 701.59c — returns tapped.
+            land.Tap(); // returns tapped.
         });
 
-        var returnTrigger = new TriggeredAbility(
+        returnTrigger = new DelayedTriggeredAbility(
             land,
             owner,
             condition: new EventTriggerCondition<CardMovedEvent>((e, _) =>
                 ReferenceEquals(e.Card, land)
                 && e.FromZone == ZoneType.Battlefield
                 && (e.ToZone == ZoneType.Graveyard || e.ToZone == ZoneType.Exile)),
-            effects: new IEffect[] { returnEffect },
-            activeZones: new[] { ZoneType.Battlefield, ZoneType.Graveyard, ZoneType.Exile });
+            effects: new IEffect[] { returnEffect });
 
         land.AddAbility(returnTrigger);
     }

@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -18,13 +19,15 @@ namespace Majik.Core.CardData.Factories;
 ///    {T}: Exile target card from a graveyard. When a creature card is
 ///    exiled this way, put a +1/+1 counter on target creature you control."
 ///
-/// ## Implemented (v1)
-/// - Correct name, type (Artifact), mana cost ({2}), owner/controller.
-/// - <b>{T}: Exile target card from a graveyard</b> activated ability:
-///   v1 auto-selects the first card from the controller's graveyard and
-///   exiles it. If the exiled card is a creature card, a +1/+1 counter is
-///   placed on the first creature the controller controls on the battlefield.
-///   (Full targeting deferred — see below.)
+/// ## Implemented
+/// - Correct name, type (Legendary Artifact), mana cost ({2}), owner/controller.
+/// - <b>{T}: Exile target card from a graveyard</b> activated ability with
+///   real targeting: "target card from a graveyard" ranges over EVERY
+///   player's graveyard, and "target creature you control" is collected as
+///   the optional counter recipient. On resolution the chosen card is exiled
+///   from whichever graveyard holds it; if it is a creature card it is
+///   imprinted (CR 702.49) and the chosen creature you control gets a +1/+1
+///   counter.
 /// - <b>Static: mana-colour-substitution</b> (CR 609.4b): "you may spend mana
 ///   as though it were mana of any color to activate abilities of creatures
 ///   you control" is wired as a
@@ -37,22 +40,19 @@ namespace Majik.Core.CardData.Factories;
 ///   mana component of a creature's activated ability accepts any colour. The
 ///   mana value is unchanged (CR 106.6) — only which mana qualifies widens.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Graveyard targeting</b>: "target card from a graveyard" should
-///   prompt for any card in any graveyard (all players). v1 auto-picks from
-///   the controller's own graveyard only. Deferred until target-selection
-///   prompts support graveyard-range filtering.
-/// - <b>+1/+1 counter targeting</b>: "target creature you control" for the
-///   counter placement should prompt the controller. v1 auto-picks the first
-///   creature on the controller's battlefield. Deferred alongside graveyard
-///   targeting.
+/// ## Deferred
 /// - <b>Static: ability-grant via imprint</b>: "creatures you control with
 ///   +1/+1 counters … have all activated abilities of all creature cards
-///   exiled" — imprint <em>storage</em> is wired (CR 702.49;
-///   <see cref="Majik.Core.Cards.Permanent.ImprintedCards"/>). The layer-6
-///   continuous effect that actually grants those abilities to battlefield
-///   creatures is deferred until the layer-6 ability-grant subsystem is in
-///   place.
+///   exiled with Agatha's Soul Cauldron" — imprint <em>storage</em> is wired
+///   (CR 702.49; <see cref="Majik.Core.Cards.Permanent.ImprintedCards"/>),
+///   but the layer-6 grant is NOT. The group-grant primitive
+///   (<see cref="Majik.Core.Effects.GrantAbilityToGroupStaticEffect"/>) exists,
+///   but it needs an <c>abilityFactory</c> that rebuilds each imprinted
+///   creature's activated abilities re-homed to the bearer. The engine's
+///   abilities are closures over their original source card (tap costs +
+///   effect bodies capture it), so re-homing an ARBITRARY imprinted card's
+///   abilities to a different creature is not generally sound — deferred until
+///   abilities carry a declarative, re-source-able form.
 /// </summary>
 [CardName("Agatha's Soul Cauldron")]
 public static class AgathasSoulCauldronFactory
@@ -95,46 +95,86 @@ public static class AgathasSoulCauldronFactory
         // When a creature card is exiled this way, put a +1/+1 counter on
         // target creature you control.
         //
-        // CR 605 — not a mana ability; goes on the stack.
-        // v1: auto-selects first card from controller's graveyard; if it is
-        // a creature card, bumps first creature on controller's battlefield.
-        // Full targeting deferred (see xmldoc above).
+        // CR 605 — not a mana ability; goes on the stack. Targets are
+        // collected by the activation flow (CR 602.2b): "target card from a
+        // graveyard" ranges over EVERY player's graveyard; the optional
+        // "target creature you control" is the counter recipient (collected
+        // up front — MinTargets 0 so the ability is still activatable when
+        // the controller has no creatures or exiles a non-creature card).
         // ----------------------------------------------------------------
+        ActivatedAbility? tapAbility = null;
+
         var exileEffect = new Effect(
-            "Agatha's Soul Cauldron: exile from graveyard, then counter if creature",
+            "Agatha's Soul Cauldron: exile target card from a graveyard, then counter if creature",
             () =>
             {
-                var target = owner.Zones.Graveyard.GetCards().FirstOrDefault();
-                if (target == null) return; // graveyard empty — no-op
+                if (tapAbility == null) return;
+                var chosen = tapAbility.ChosenTargets;
+                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (chosen[0][0] is not ICard target) return;
 
-                owner.Zones.Graveyard.RemoveCard(target);
-                owner.Zones.Exile.AddCard(target);
+                // CR 608.2b — the card must still be in a graveyard at
+                // resolution. Exile it from whichever graveyard holds it.
+                var gyOwner = target.Owner;
+                if (gyOwner == null || target.Zone != ZoneType.Graveyard) return;
+
+                gyOwner.Zones.Graveyard.RemoveCard(target);
+                gyOwner.Zones.Exile.AddCard(target);
                 target.SetZone(ZoneType.Exile);
 
                 if (target.HasType(CardType.Creature))
                 {
                     // CR 702.49 — imprint: record this creature card on the
-                    // Cauldron so the ability-grant static ability can reference
-                    // it later (layer-6 grant deferred; storage wired here).
+                    // Cauldron so the ability-grant static can reference it
+                    // (layer-6 grant deferred; storage wired here).
                     cauldron.AddImprinted(target);
 
-                    // Put a +1/+1 counter on target creature you control.
-                    // v1: auto-picks the first creature on the battlefield.
-                    var creatureToBuff = owner.Zones.Battlefield
-                        .GetCards()
-                        .OfType<Creature>()
-                        .FirstOrDefault();
-
-                    creatureToBuff?.Counters.Add(
-                        Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
+                    // "put a +1/+1 counter on target creature you control" —
+                    // the recipient chosen up front (request index 1). No-op
+                    // when none was chosen (no legal creature).
+                    if (chosen.Count > 1 && chosen[1].Count > 0
+                        && chosen[1][0] is Creature recipient)
+                    {
+                        recipient.Counters.Add(
+                            Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
+                    }
                 }
             });
 
-        var tapAbility = new ActivatedAbility(
+        tapAbility = new ActivatedAbility(
             source: cauldron,
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(cauldron) },
-            effects: new IEffect[] { exileEffect });
+            effects: new IEffect[] { exileEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "exile target card from a graveyard",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.None,
+                    // "a graveyard" — any player's graveyard (CR 109 / 400.3).
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Graveyard.GetCards())
+                        .Cast<object>()
+                        .ToList()),
+                new TargetRequest(
+                    Description: "target creature you control (counter recipient)",
+                    MinTargets: 0,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.None,
+                    // "creature you control" — the Cauldron controller's creatures.
+                    CandidateGatherer: ctx =>
+                    {
+                        var controller = cauldron.Controller ?? owner;
+                        return controller.Zones.Battlefield.GetCards()
+                            .OfType<Creature>()
+                            .Cast<object>()
+                            .ToList();
+                    }),
+            });
 
         cauldron.AddAbility(tapAbility);
 
