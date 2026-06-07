@@ -10,6 +10,32 @@
 
 ---
 
+## REVISION (2026-06-07): proper-fix build path
+
+Execution surfaced a two-build-path asymmetry that invalidates the original
+detection approach (Tasks 2–3 below). Superseding decision (user-approved):
+
+- The engine builds deck cards via `GameFacade` (real play), which runs the full
+  binder set incl. `OracleLandActivatedAbilityBinder`/`OracleLoyaltyAbilityBinder`
+  and live services — but **never sets `IsVanillaShell`**. `ScryfallCardFactory.Create`
+  sets the flag but omits those land binders + services, so building the audit on
+  it false-flags fetchlands / horizon lands as "does nothing".
+- **Fix:** extract the vanilla-shell classifier to a shared
+  `Majik.Core/CardData/VanillaShellClassifier.cs` and set `IsVanillaShell` in
+  BOTH `ScryfallCardFactory.Create` AND `GameFacade.BuildDeckCard`. This makes
+  the flag authoritative in real play too (so the in-play `VanillaShellTracker`
+  finally fires for binder-chain shells).
+- **Audit** builds each deck via the real `GameFacade.Create` + `PopulateSideboard`
+  path and reads the now-authoritative `IsVanillaShell` flag — no reimplementation
+  of routing. It therefore lives in `Majik.Bot.Tests.Integration` (which already
+  references `Majik.Core.Api` + has `DeckLoader.LoadReal` + the runtime hook).
+
+The tasks below are kept for history; the implementer follows the revised
+approach via direct instruction. `KnownPartialImplementations` (Task 1) and its
+test are unchanged; the registry baseline is re-derived under the faithful build.
+
+---
+
 ## File structure
 
 - `Majik.Core/CardData/KnownPartialImplementations.cs` — **new**. Prod registry: `CardGapSeverity` enum, `CardGap` record, `ByName` dict, `TryGet`.
