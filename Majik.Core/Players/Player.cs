@@ -836,6 +836,27 @@ public class Player
             .AddColored(white: w, blue: u, black: b, red: r, green: g, colorless: colorless);
     }
 
+    // ── Simulation support ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sim-only: a new Player carrying this player's scalar runtime state
+    /// (life, name) but with empty zones. Zone contents and reference
+    /// fields are populated by <see cref="Simulation.GameStateCloner"/> in
+    /// later passes.
+    /// </summary>
+    internal Player CloneEmpty()
+    {
+        var clone = new Player(Name, startingLife: LifeTotal);
+        return clone;
+    }
+
+    /// <summary>
+    /// Sim/test-only: set the life total directly, bypassing event
+    /// publication. Use <see cref="GainLife"/> / <see cref="LoseLife"/>
+    /// for in-game changes.
+    /// </summary>
+    internal void SetLifeTotal(int value) => LifeTotal = value;
+
     public override string ToString()
     {
         return $"{Name} ({_lifeTotal.Value} life, {_manaPool} mana)";
