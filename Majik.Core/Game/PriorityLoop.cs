@@ -316,32 +316,41 @@ public sealed class PriorityLoop
     /// Slice 5a — server-side auto-pass gate. Returns <c>true</c> (with
     /// <see cref="PriorityAction.Pass"/>) when ALL of the following hold:
     /// <list type="number">
-    ///   <item>A priority-kinds builder is wired AND it returns exactly
-    ///         <c>[PassPriorityCommand]</c> for this priority moment
-    ///         (the engine has narrowed to a "dead" window — no lands,
-    ///         no castable spells, no activatable abilities). Belt and
-    ///         braces with the agent's own narrowing: the kinds builder
-    ///         is the single source of truth so the engine and the
-    ///         portal can't disagree about which windows are dead.</item>
     ///   <item>A prefs provider is wired AND it returns a non-null
     ///         <see cref="IAutoPassPrefsView"/> for the current priority
     ///         holder (bot seats return null → never auto-pass; bots
     ///         drive themselves through ChoosePriorityActionAsync).</item>
     ///   <item><see cref="IAutoPassPrefsView.FullControl"/> is false —
     ///         the human is NOT holding the Full Control modifier.</item>
+    ///   <item>There is a REASON to auto-pass — either:
+    ///         <list type="bullet">
+    ///           <item><b>own-top</b>: the current player controls the top
+    ///                 object of the stack (their own spell / ability /
+    ///                 trigger). CR 117's default is to not respond to your
+    ///                 own object. Fires even on a non-dead window, so an
+    ///                 untapped land's mana ability no longer forces the
+    ///                 caster to manually pass their own spell.</item>
+    ///           <item><b>dead window</b>: the priority-kinds builder
+    ///                 returns exactly <c>[PassPriorityCommand]</c> (no
+    ///                 lands / castable spells / activatable abilities).
+    ///                 Single source of truth with the portal's pass-only
+    ///                 detection.</item>
+    ///         </list></item>
     ///   <item>No phase stop is configured for the active side at the
     ///         current wire phase label. Semantics match the portal's
     ///         <c>shouldAutoPass</c>: <c>"mine"</c> means stop on the
     ///         viewer's own turn; <c>"theirs"</c> on the opponent's.</item>
     ///   <item>We're past the stack-display window
     ///         (<see cref="AutoPassConstants.StackMutationDisplayMs"/>)
-    ///         after the most recent stack mutation. Gives the user a
-    ///         beat to register a freshly-landed trigger or spell
-    ///         before it resolves silently.</item>
+    ///         after the most recent stack mutation — EXCEPT on the own-top
+    ///         path, which is exempt (the player put the object there
+    ///         themselves; the opponent still gets their own display
+    ///         window). Gives the user a beat to register a freshly-landed
+    ///         trigger or spell they did not initiate before it resolves
+    ///         silently.</item>
     /// </list>
-    /// All five must be true for the agent to be skipped. A miss on any
-    /// falls through to the normal <see cref="IPlayerAgent.ChoosePriorityActionAsync"/>
-    /// path.
+    /// A miss on any falls through to the normal
+    /// <see cref="IPlayerAgent.ChoosePriorityActionAsync"/> path.
     ///
     /// <para>Concurrency: the prefs read is a snapshot. A user toggling
     /// FullControl while a window is being evaluated may see at most one
@@ -352,13 +361,7 @@ public sealed class PriorityLoop
     {
         autoAction = PriorityAction.Pass;
 
-        if (_isPassOnlyDeadWindow == null) return false;
         if (_autoPassPrefsProvider == null) return false;
-
-        // Gate 1 — engine-narrowed dead window. The predicate is supplied
-        // by Majik.Core.Api (PriorityKinds) so PriorityLoop stays unaware
-        // of the wire command types.
-        if (!_isPassOnlyDeadWindow(ctx)) return false;
 
         // Gate 2 — prefs available for this seat (bot seats return null).
         var prefs = _autoPassPrefsProvider(current);
@@ -366,6 +369,24 @@ public sealed class PriorityLoop
 
         // Gate 3 — Full Control suppresses every auto-pass.
         if (prefs.FullControl) return false;
+
+        // Gate 1 — there must be a reason to auto-pass. Two qualify:
+        //   (a) own-top: the current player controls the top object of the
+        //       stack — their own spell / activated ability / trigger. CR
+        //       117's default is to NOT respond to your own object; only
+        //       Full Control (Gate 3, above) surfaces it. This fires even
+        //       when the window is not "dead": an untapped land keeps a
+        //       mana ability legal, which would otherwise defeat the
+        //       dead-window gate after every cast and force the caster to
+        //       manually pass their own spell.
+        //   (b) dead window: the engine narrowed the kinds to PassPriority
+        //       only (no lands / castable spells / activatable abilities).
+        //       Predicate supplied by Majik.Core.Api (PriorityKinds) so
+        //       PriorityLoop stays unaware of the wire command types.
+        var ownsTopOfStack = ctx.Stack.Top is { } top
+            && ReferenceEquals(top.Controller, current);
+        var deadWindow = _isPassOnlyDeadWindow != null && _isPassOnlyDeadWindow(ctx);
+        if (!ownsTopOfStack && !deadWindow) return false;
 
         // Gate 4 — phase stop on the active side at the current phase.
         // PhaseStops keys are wire phase labels (StepStateType.ToString()
@@ -388,11 +409,20 @@ public sealed class PriorityLoop
 
         // Gate 5 — stack-display window. AutoPassConstants.StackMutationDisplayMs
         // after the last stack mutation, suppress to give the user a beat
-        // to register the change before it resolves silently.
-        var elapsed = _clock() - _lastStackMutatedAt;
-        if (elapsed < TimeSpan.FromMilliseconds(AutoPassConstants.StackMutationDisplayMs))
+        // to register the change before it resolves silently. EXEMPT the
+        // own-top path: the player put that object on the stack themselves,
+        // so there is nothing new for them to register — and the opponent
+        // still gets their own full display window when priority reaches
+        // them. Without this exemption the freshly-cast object would always
+        // sit inside the window and re-prompt the caster (the very friction
+        // this path removes).
+        if (!ownsTopOfStack)
         {
-            return false;
+            var elapsed = _clock() - _lastStackMutatedAt;
+            if (elapsed < TimeSpan.FromMilliseconds(AutoPassConstants.StackMutationDisplayMs))
+            {
+                return false;
+            }
         }
 
         return true;

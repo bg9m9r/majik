@@ -387,6 +387,134 @@ public class PriorityLoopAutoPassTests
     }
 
     // -------------------------------------------------------------------
+    // Own-top-of-stack auto-pass — the player who controls the top object
+    // of the stack (their own spell / activated ability / trigger) should
+    // auto-pass on it by default (CR 117 "don't respond to your own
+    // object"), even when the window is NOT dead (e.g. an untapped land
+    // keeps a mana ability legal). Only Full Control / a phase stop
+    // surfaces the prompt.
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// Push a no-op object the given player controls onto the stack so
+    /// <c>ctx.Stack.Top.Controller</c> resolves to that player.
+    /// </summary>
+    private void PushOwnedStackObject(Player controller)
+    {
+        var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1)
+        {
+            Owner = controller,
+            Zone = ZoneType.Battlefield,
+        };
+        var trig = new Majik.Core.Abilities.TriggeredAbility(
+            permanent, controller,
+            Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(permanent),
+            effects: System.Array.Empty<Majik.Core.Abilities.IEffect>());
+        _stack.Push(trig);
+    }
+
+    [Fact]
+    public async Task OwnTopOfStack_DefaultPrefs_AutoPasses_EvenWhenWindowNotDead()
+    {
+        // Alice controls the top of the stack (she just cast/activated it).
+        // The window is NOT dead (deadWindow only fires on an empty stack —
+        // mirrors an untapped land keeping a mana ability legal). She must
+        // still auto-pass her own object; Bob (not the controller) is
+        // prompted so he can respond.
+        var alice = new CountingAgent();
+        var bob = new CountingAgent();
+        var loop = NewLoop(alice, bob,
+            prefs: _ => new TestPrefs(),
+            deadWindow: ctx => ctx.Stack.IsEmpty,
+            clock: () => new System.DateTime(2026, 1, 1));
+
+        PushOwnedStackObject(_alice);
+
+        await loop.RunUntilRoundEndsAsync(_alice);
+
+        alice.PromptCount.Should().Be(0,
+            "Alice controls the top of stack → auto-pass her own object despite the non-dead window");
+        bob.PromptCount.Should().Be(1,
+            "Bob does not control the top object → he is prompted so he can respond, then passes");
+        _stack.IsEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task OwnTopOfStack_FullControl_PromptsAgent()
+    {
+        // Full Control means the player WANTS to respond to their own
+        // spells/effects → never auto-pass the own-top window.
+        var alice = new CountingAgent();
+        var bob = new CountingAgent();
+        var loop = NewLoop(alice, bob,
+            prefs: _ => new TestPrefs { FullControl = true },
+            deadWindow: ctx => ctx.Stack.IsEmpty,
+            clock: () => new System.DateTime(2026, 1, 1));
+
+        PushOwnedStackObject(_alice);
+
+        await loop.RunUntilRoundEndsAsync(_alice);
+
+        alice.PromptCount.Should().BeGreaterThan(0,
+            "Full Control surfaces the prompt on Alice's own stack object");
+    }
+
+    [Fact]
+    public async Task OpponentTopOfStack_DoesNotAutoPassViaOwnPath()
+    {
+        // The top object is controlled by Bob; Alice does NOT control it,
+        // so the own-top path must not fire for her — she is prompted so
+        // she can respond to the opponent's spell/effect.
+        var alice = new CountingAgent();
+        var bob = new CountingAgent();
+        var loop = NewLoop(alice, bob,
+            prefs: _ => new TestPrefs(),
+            deadWindow: ctx => ctx.Stack.IsEmpty,
+            clock: () => new System.DateTime(2026, 1, 1));
+
+        PushOwnedStackObject(_bob);
+
+        await loop.RunUntilRoundEndsAsync(_alice);
+
+        alice.PromptCount.Should().Be(1,
+            "the top object is the opponent's → Alice is prompted so she can respond");
+        bob.PromptCount.Should().Be(0,
+            "Bob controls the top object → he auto-passes his own object");
+    }
+
+    [Fact]
+    public async Task OwnTopOfStack_AutoPasses_EvenWithinStackDisplayWindow()
+    {
+        // The display window (Gate 5) gives a player a beat to register a
+        // stack change they did NOT initiate. For your OWN top-of-stack
+        // object you just put it there — no beat needed; the opponent still
+        // gets their own display window when priority reaches them. So the
+        // own-top auto-pass is exempt from Gate 5.
+        var alice = new CountingAgent();
+        var bob = new CountingAgent();
+        var now = new System.DateTime(2026, 1, 1);
+
+        var loop = NewLoop(alice, bob,
+            prefs: _ => new TestPrefs(),
+            deadWindow: _ => false, // never a dead window → own-top is the only auto-pass reason
+            eventBus: _bus,         // subscribe so the push below stamps _lastStackMutatedAt
+            clock: () => now,
+            phase: StepStateType.PreCombatMain);
+
+        PushOwnedStackObject(_alice); // stamps the display window at `now`
+
+        // Clock stays at `now` → round 1 is INSIDE the display window.
+        await loop.RunUntilRoundEndsAsync(_alice);
+
+        // With the Gate-5 exemption Alice auto-passes her own object in
+        // round 1 and is prompted only in the trailing empty-stack round
+        // (count 1). Without the exemption she would be prompted in round 1
+        // too (count 2).
+        alice.PromptCount.Should().Be(1,
+            "Alice's own-top auto-pass is exempt from the stack-display window");
+    }
+
+    // -------------------------------------------------------------------
     // Bus subscription hygiene
     // -------------------------------------------------------------------
 
