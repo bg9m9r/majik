@@ -1,12 +1,11 @@
 using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
+using Majik.Bot.Search;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
-using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
-using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -173,105 +172,84 @@ public class PriorityPolicy
     };
 
     /// <summary>
-    /// Enumerate legal main-phase priority actions paired with the
-    /// projected post-action BoardEval score. Projection is a closed-form
-    /// delta over the same components <see cref="BoardEval"/> sums — no
-    /// engine mutation. Sorcery-speed actions (PlayLand / non-Instant
-    /// CastSpell) are gated on CR 116.2a (active player, Main, empty
-    /// stack). PlayLand is also gated on CR 305.2 (one land per turn) —
-    /// approximated here by "no land already entered this turn", which
-    /// the bot tracks indirectly via the engine's land-drop check; v1
-    /// just offers the action and lets the engine reject if illegal.
+    /// Enumerate legal main-phase priority actions paired with the projected
+    /// post-action BoardEval score. Legality is delegated to
+    /// <see cref="LegalActionEnumerator.ForPriority"/> (single source of
+    /// truth shared with the bot search). Policy-level state filters
+    /// (<see cref="_landProposedThisTurn"/>, <see cref="_abilityFiredThisTurn"/>)
+    /// are applied here to prevent re-proposal spin loops; the resulting
+    /// filtered set is then scored via <see cref="ProjectAction"/>.
+    ///
+    /// <para>
+    /// Projection is a closed-form delta over the same components
+    /// <see cref="BoardEval"/> sums — no engine mutation. Sorcery-speed
+    /// actions (PlayLand / non-Instant CastSpell) are gated on CR 116.2a
+    /// (active player, Main, empty stack). PlayLand is also gated on CR 305.2
+    /// (one land per turn) — approximated here by "no land already entered
+    /// this turn", which the bot tracks indirectly via the engine's land-drop
+    /// check; v1 just offers the action and lets the engine reject if illegal.
+    /// </para>
     /// </summary>
     private IEnumerable<(PriorityAction action, double projected)>
         EnumerateCandidates(GameContext ctx, Player self, double current)
     {
-        var sorceryWindow = ctx.ActivePlayer == self
-            && ctx.CurrentPhase is { } phase && phase.IsMain()
-            && ctx.Stack.Count == 0;
-
-        if (sorceryWindow)
+        // Delegate legality enumeration to the shared enumerator (spec §10.3).
+        // LegalActionEnumerator.ForPriority always includes Pass; we skip it
+        // here because Pick() adds Pass unconditionally as the baseline.
+        foreach (var action in LegalActionEnumerator.ForPriority(ctx, self))
         {
-            foreach (var bid in EnumerateLandDropBids(self, current))
-                yield return bid;
-        }
+            if (action is PriorityAction.PassAction) continue;
 
-        if (ctx.ActivePlayer == self)
-        {
-            foreach (var bid in EnumerateCastSpellBids(self, sorceryWindow, current))
-                yield return bid;
-        }
+            // Policy-level anti-spin: suppress re-proposal of a land drop or
+            // activated ability that was already proposed this turn.
+            if (action is PriorityAction.PlayLand && _landProposedThisTurn)
+                continue;
+            if (action is PriorityAction.ActivateAbility aa
+                && _abilityFiredThisTurn.Contains(aa.Ability.Id))
+                continue;
 
-        // CR 602 — activated abilities of permanents we control. Mana
-        // abilities are excluded (the ManaPaymentResolver fires them as part
-        // of paying a cost). ActivatedAbilityPolicy projects an EV delta;
-        // negative-delta activations stay below `current` and the outer
-        // argmax falls through to Pass.
-        foreach (var (action, projected) in EnumerateActivatedAbilities(ctx, self, current))
-        {
+            var projected = ProjectAction(action, ctx, self, current);
             yield return (action, projected);
         }
     }
 
-    /// <summary>CR 305.2 — playing a land is a free special action. Credit
-    /// the mana-source gain without deducting hand size since the card
-    /// converts into a long-term battlefield asset.</summary>
-    private IEnumerable<(PriorityAction action, double projected)>
-        EnumerateLandDropBids(Player self, double current)
-    {
-        // Already used our land drop this turn (CR 305.2) — stop offering so
-        // the priority pump can't loop on a land the engine will reject.
-        if (_landProposedThisTurn) yield break;
-        var landInHand = self.Zones.Hand.GetCards().OfType<Land>().FirstOrDefault();
-        if (landInHand == null) yield break;
-        var projected = current + _weights.ManaSources * 1;
-        yield return (new PriorityAction.PlayLand(landInHand), projected);
-    }
-
-    /// <summary>Enumerate affordable cast-spell bids from hand. Sorcery-
-    /// speed cards are gated on <paramref name="sorceryWindow"/>; vanilla
-    /// shells are noticed (one-shot WARN + bus event) before the bid yields
-    /// so the bot's -CMC penalty surfaces in diagnostics.</summary>
-    private IEnumerable<(PriorityAction action, double projected)>
-        EnumerateCastSpellBids(Player self, bool sorceryWindow, double current)
-    {
-        var manaAvailable = UntappedManaSources(self);
-        foreach (var card in self.Zones.Hand.GetCards())
+    /// <summary>
+    /// Score a single legal action as a projected post-action BoardEval score.
+    /// Dispatches to the per-action-type projection helpers.
+    /// </summary>
+    private double ProjectAction(
+        PriorityAction action, GameContext ctx, Player self, double current)
+        => action switch
         {
-            if (card is Land) continue;
-            if (!IsInstantSpeed(card) && !sorceryWindow) continue;
+            PriorityAction.PlayLand =>
+                // CR 305.2 — playing a land is a free special action. Credit
+                // the mana-source gain without deducting hand size since the
+                // card converts into a long-term battlefield asset.
+                current + _weights.ManaSources * 1,
 
-            var cmc = ApproxCmc(card);
-            if (cmc > manaAvailable) continue;
+            PriorityAction.CastSpell cs =>
+                ScoreCastSpell(cs.Card, self, current),
 
-            if (card.IsVanillaShell)
-            {
-                _vanillaTracker?.Notice(card, self, "castable-spell enumeration");
-            }
+            PriorityAction.ActivateAbility aa =>
+                // CR 602 — activated abilities. Mana abilities are already
+                // excluded by LegalActionEnumerator; only non-mana activations
+                // reach here.
+                current + ActivatedAbilityPolicy.ProjectActivateDelta(
+                    aa.Ability, ctx, self, _weights),
 
-            var projected = current + ProjectCastDelta(card);
-            yield return (new PriorityAction.CastSpell(card, Array.Empty<object>()), projected);
-        }
-    }
+            _ => current // conservative: treat unknown action types as neutral
+        };
 
-    private IEnumerable<(PriorityAction action, double projected)>
-        EnumerateActivatedAbilities(GameContext ctx, Player self, double current)
+    /// <summary>
+    /// Score a CastSpell action. Fires the vanilla-tracker notice (one-shot
+    /// WARN + bus event) so the bot's -CMC penalty surfaces in diagnostics,
+    /// then delegates to <see cref="ProjectCastDelta"/>.
+    /// </summary>
+    private double ScoreCastSpell(ICard card, Player self, double current)
     {
-        foreach (var card in self.Zones.Battlefield.GetCards())
-        {
-            foreach (var ability in card.Abilities.OfType<IActivatedAbility>())
-            {
-                if (ability is IManaAbility) continue;
-                if (_abilityFiredThisTurn.Contains(ability.Id)) continue;
-                if (!ability.Costs.All(cost => cost.CanPay(self))) continue;
-
-                var delta = ActivatedAbilityPolicy.ProjectActivateDelta(
-                    ability, ctx, self, _weights);
-                yield return (
-                    new PriorityAction.ActivateAbility(ability, Array.Empty<object>()),
-                    current + delta);
-            }
-        }
+        if (card.IsVanillaShell)
+            _vanillaTracker?.Notice(card, self, "castable-spell enumeration");
+        return current + ProjectCastDelta(card);
     }
 
     /// <summary>
@@ -344,12 +322,4 @@ public class PriorityPolicy
     private static int UntappedManaSources(Player self)
         => self.Zones.Battlefield.GetCards().OfType<Land>().Count(l => !l.IsTapped);
 
-    /// <summary>Instant-speed cast eligibility — Instants, and Flash
-    /// permanents (CR 702.8). Mirrors <see cref="Majik.Core.Players.Agents.HeuristicBotAgent"/>.</summary>
-    private static bool IsInstantSpeed(ICard c)
-    {
-        if (c.HasType(CardType.Instant)) return true;
-        return c.Abilities.OfType<Majik.Core.Abilities.KeywordAbility>().Any(k =>
-            string.Equals(k.Keyword, "Flash", StringComparison.OrdinalIgnoreCase));
-    }
 }
