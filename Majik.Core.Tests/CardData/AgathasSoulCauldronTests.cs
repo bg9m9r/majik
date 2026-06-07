@@ -15,17 +15,37 @@ namespace Majik.Core.Tests.CardData;
 /// Unit tests for <see cref="AgathasSoulCauldronFactory"/>.
 ///
 /// Covers:
-/// - Card identity (name, Artifact type)
+/// - Card identity (name, Legendary Artifact type)
 /// - Owner and controller assignment
 /// - Activated ability shape: single Tap cost
-/// - Exile effect: moves first graveyard card to Exile zone
-/// - Counter effect: when exiled card is a creature, +1/+1 counter on first battlefield creature
+/// - Exile effect: exiles the CHOSEN target from whichever graveyard holds it
+///   (any player's graveyard)
+/// - Counter effect: when exiled card is a creature, +1/+1 counter on the
+///   CHOSEN "creature you control"
 /// - Counter effect: no counter when exiled card is not a creature
-/// - Effect is a no-op when graveyard is empty
+/// - Imprint storage (CR 702.49)
+/// - Mana-colour substitution static (CR 609.4b)
 /// </summary>
 public class AgathasSoulCauldronTests
 {
     private readonly Player _alice = new("Alice", 20);
+
+    /// <summary>Resolve the Cauldron's {T} ability with explicit chosen
+    /// targets, mirroring what the activation flow does before the effect
+    /// runs: request 0 = the card to exile, request 1 = the optional counter
+    /// recipient.</summary>
+    private static void Resolve(ActivatedAbility ability, ICard exileTarget, Creature? recipient = null)
+    {
+        ability.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { exileTarget },
+            recipient != null ? new object[] { recipient } : System.Array.Empty<object>(),
+        });
+        foreach (var effect in ability.Effects) effect.Execute();
+    }
+
+    private static ActivatedAbility TapAbility(Artifact cauldron)
+        => cauldron.Abilities.OfType<ActivatedAbility>().Single();
 
     // -----------------------------------------------------------------------
     // Card identity
@@ -75,14 +95,14 @@ public class AgathasSoulCauldronTests
         var c = AgathasSoulCauldronFactory.Create(_alice);
 
         c.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "only the {T}: exile ability is wired in v1");
+            "only the {T}: exile ability is an activated ability");
     }
 
     [Fact]
     public void AgathasSoulCauldron_TapAbility_HasSingleTapCost()
     {
         var c = AgathasSoulCauldronFactory.Create(_alice);
-        var ability = c.Abilities.OfType<ActivatedAbility>().Single();
+        var ability = TapAbility(c);
 
         ability.Costs.Should().HaveCount(1, "only a tap cost");
         ability.Costs.OfType<AdditionalCost>()
@@ -90,42 +110,79 @@ public class AgathasSoulCauldronTests
                 "the {T} cost");
     }
 
+    [Fact]
+    public void AgathasSoulCauldron_TapAbility_DeclaresGraveyardAndCreatureTargets()
+    {
+        var c = AgathasSoulCauldronFactory.Create(_alice);
+        var ability = TapAbility(c);
+
+        ability.TargetRequests.Should().HaveCount(2);
+        ability.TargetRequests[0].Description.Should().Contain("graveyard");
+        ability.TargetRequests[0].MinTargets.Should().Be(1, "must exile a card");
+        ability.TargetRequests[1].Description.Should().Contain("creature you control");
+        ability.TargetRequests[1].MinTargets.Should().Be(0,
+            "the counter recipient is optional — non-creature exile / no creatures");
+    }
+
     // -----------------------------------------------------------------------
     // Exile effect — card movement
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void AgathasSoulCauldron_ExileEffect_MovesFirstGraveyardCardToExile()
+    public void AgathasSoulCauldron_ExileEffect_MovesChosenGraveyardCardToExile()
     {
         var alice = new Player("Alice", 20);
         var card = new Card("Dead Card", "");
+        card.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
+        Resolve(TapAbility(cauldron), card);
 
         alice.Zones.Exile.GetCards().Should().Contain(card,
-            "the exile effect moves the graveyard card to exile");
+            "the exile effect moves the chosen graveyard card to exile");
         alice.Zones.Graveyard.GetCards().Should().NotContain(card,
             "the card is removed from the graveyard");
         card.Zone.Should().Be(ZoneType.Exile);
     }
 
     [Fact]
-    public void AgathasSoulCauldron_ExileEffect_EmptyGraveyard_IsNoOp()
+    public void AgathasSoulCauldron_ExileEffect_NoTargetChosen_IsNoOp()
     {
         var alice = new Player("Alice", 20);
-        // Graveyard intentionally empty
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
+        var ability = TapAbility(cauldron);
 
+        // No targets set (e.g. empty graveyard — nothing legal to choose).
         var act = () => { foreach (var effect in ability.Effects) effect.Execute(); };
 
-        act.Should().NotThrow("empty graveyard is a no-op");
+        act.Should().NotThrow("no chosen target is a no-op");
         alice.Zones.Exile.GetCards().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AgathasSoulCauldron_ExileEffect_CanExileFromAnyGraveyard()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        // The card to exile sits in BOB's graveyard — "a graveyard", not just
+        // the controller's own.
+        var bobsCard = new Creature("Bob's Bear", "1G", 2, 2);
+        bobsCard.SetOwner(bob);
+        bob.Zones.Graveyard.AddCard(bobsCard);
+        bobsCard.SetZone(ZoneType.Graveyard);
+
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        Resolve(TapAbility(cauldron), bobsCard);
+
+        bob.Zones.Exile.GetCards().Should().Contain(bobsCard,
+            "the card is exiled from its owner's graveyard, even an opponent's");
+        bob.Zones.Graveyard.GetCards().Should().NotContain(bobsCard);
+        cauldron.ImprintedCards.Should().Contain(bobsCard,
+            "an exiled creature card is imprinted regardless of whose graveyard it came from");
     }
 
     // -----------------------------------------------------------------------
@@ -133,28 +190,34 @@ public class AgathasSoulCauldronTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void AgathasSoulCauldron_ExileEffect_CreatureCard_AddsCounterToFirstBattlefieldCreature()
+    public void AgathasSoulCauldron_ExileEffect_CreatureCard_AddsCounterToChosenCreature()
     {
         var alice = new Player("Alice", 20);
 
-        // Put a creature card in the graveyard.
         var deadCreature = new Creature("Dead Bear", "1G", 2, 2);
         deadCreature.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(deadCreature);
         deadCreature.SetZone(ZoneType.Graveyard);
 
-        // Put a creature on the battlefield to receive the counter.
-        var liveCreature = new Creature("Live Bear", "1G", 2, 2);
-        liveCreature.SetOwner(alice);
-        alice.Zones.Battlefield.AddCard(liveCreature);
-        liveCreature.SetZone(ZoneType.Battlefield);
+        // Two creatures on the battlefield; the counter must go to the CHOSEN
+        // one, not just "the first".
+        var bystander = new Creature("Bystander", "1G", 2, 2);
+        bystander.SetOwner(alice);
+        alice.Zones.Battlefield.AddCard(bystander);
+        bystander.SetZone(ZoneType.Battlefield);
+
+        var chosen = new Creature("Chosen Bear", "1G", 2, 2);
+        chosen.SetOwner(alice);
+        alice.Zones.Battlefield.AddCard(chosen);
+        chosen.SetZone(ZoneType.Battlefield);
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
+        Resolve(TapAbility(cauldron), deadCreature, recipient: chosen);
 
-        liveCreature.Counters.Count(CounterType.PlusOnePlusOne)
-            .Should().Be(1, "a creature card was exiled so the battlefield creature gains +1/+1");
+        chosen.Counters.Count(CounterType.PlusOnePlusOne)
+            .Should().Be(1, "the chosen creature-you-control gains the +1/+1 counter");
+        bystander.Counters.Count(CounterType.PlusOnePlusOne)
+            .Should().Be(0, "the unchosen creature is untouched");
     }
 
     [Fact]
@@ -162,43 +225,41 @@ public class AgathasSoulCauldronTests
     {
         var alice = new Player("Alice", 20);
 
-        // Put a non-creature card in the graveyard.
         var instant = new Instant("Shock", "R");
         instant.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(instant);
         instant.SetZone(ZoneType.Graveyard);
 
-        // Put a creature on the battlefield.
         var liveCreature = new Creature("Live Bear", "1G", 2, 2);
         liveCreature.SetOwner(alice);
         alice.Zones.Battlefield.AddCard(liveCreature);
         liveCreature.SetZone(ZoneType.Battlefield);
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
+        // Even if a recipient is offered, a non-creature exile places no counter.
+        Resolve(TapAbility(cauldron), instant, recipient: liveCreature);
 
         liveCreature.Counters.Count(CounterType.PlusOnePlusOne)
             .Should().Be(0, "a non-creature card was exiled — no counter placed");
     }
 
     [Fact]
-    public void AgathasSoulCauldron_ExileEffect_CreatureCard_NoBattlefieldCreature_DoesNotThrow()
+    public void AgathasSoulCauldron_ExileEffect_CreatureCard_NoRecipientChosen_DoesNotThrow()
     {
         var alice = new Player("Alice", 20);
 
-        // Creature card in graveyard, nothing on battlefield.
         var deadCreature = new Creature("Dead Bear", "1G", 2, 2);
         deadCreature.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(deadCreature);
         deadCreature.SetZone(ZoneType.Graveyard);
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
 
-        var act = () => { foreach (var effect in ability.Effects) effect.Execute(); };
+        var act = () => Resolve(TapAbility(cauldron), deadCreature);
 
-        act.Should().NotThrow("no creature to buff is silently handled");
+        act.Should().NotThrow("no recipient to buff is silently handled");
+        cauldron.ImprintedCards.Should().Contain(deadCreature,
+            "the creature is still exiled + imprinted even without a counter recipient");
     }
 
     // -----------------------------------------------------------------------
@@ -215,8 +276,7 @@ public class AgathasSoulCauldronTests
         bear.SetZone(ZoneType.Graveyard);
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
+        Resolve(TapAbility(cauldron), bear);
 
         cauldron.ImprintedCards.Should().Contain(bear,
             "exiling a creature card via the Cauldron imprints it (CR 702.49)");
@@ -232,11 +292,38 @@ public class AgathasSoulCauldronTests
         land.SetZone(ZoneType.Graveyard);
 
         var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
+        Resolve(TapAbility(cauldron), land);
 
         cauldron.ImprintedCards.Should().NotContain(land,
             "only creature cards are imprinted; non-creature cards are not");
+    }
+
+    [Fact]
+    public void AgathasSoulCauldron_ExilingMultipleCreatures_ImprintsAll()
+    {
+        var alice = new Player("Alice", 20);
+
+        var bear1 = new Creature("Bear 1", "1G", 2, 2);
+        bear1.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear1);
+        bear1.SetZone(ZoneType.Graveyard);
+
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        var ability = TapAbility(cauldron);
+
+        Resolve(ability, bear1);
+
+        var bear2 = new Creature("Bear 2", "1G", 2, 2);
+        bear2.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear2);
+        bear2.SetZone(ZoneType.Graveyard);
+
+        Resolve(ability, bear2);
+
+        cauldron.ImprintedCards.Should().HaveCount(2)
+            .And.Contain(bear1)
+            .And.Contain(bear2,
+                "each creature card exiled via the Cauldron is independently imprinted");
     }
 
     // -----------------------------------------------------------------------
@@ -295,35 +382,5 @@ public class AgathasSoulCauldronTests
         ManaColorSubstitutionPermission
             .PlayerMaySpendAnyColorFor(alice, ManaSpendPurpose.ActivateCreatureAbilities)
             .Should().BeFalse("a static ability only applies from the battlefield (CR 604.1)");
-    }
-
-    [Fact]
-    public void AgathasSoulCauldron_ExilingMultipleCreatures_ImprintsAll()
-    {
-        var alice = new Player("Alice", 20);
-
-        var bear1 = new Creature("Bear 1", "1G", 2, 2);
-        bear1.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(bear1);
-        bear1.SetZone(ZoneType.Graveyard);
-
-        var cauldron = AgathasSoulCauldronFactory.Create(alice);
-        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
-
-        // First activation.
-        foreach (var effect in ability.Effects) effect.Execute();
-
-        var bear2 = new Creature("Bear 2", "1G", 2, 2);
-        bear2.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(bear2);
-        bear2.SetZone(ZoneType.Graveyard);
-
-        // Second activation.
-        foreach (var effect in ability.Effects) effect.Execute();
-
-        cauldron.ImprintedCards.Should().HaveCount(2)
-            .And.Contain(bear1)
-            .And.Contain(bear2,
-                "each creature card exiled via the Cauldron is independently imprinted");
     }
 }

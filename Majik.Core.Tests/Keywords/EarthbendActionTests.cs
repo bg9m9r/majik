@@ -198,7 +198,40 @@ public class EarthbendActionTests
     }
 
     /// <summary>
-    /// CR 701.59c — when the earthbended land is exiled, the trigger fires
+    /// The return-tapped trigger is ONE-SHOT (CR 603.7a): it fires the first
+    /// time the animated land dies, returns it once, and is then gone. A
+    /// second death must NOT return the (now plain) land again.
+    /// </summary>
+    [Fact]
+    public void EarthbendedLand_ReturnTrigger_FiresExactlyOnce()
+    {
+        var stack  = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones  = new ZoneService(_bus);
+
+        var forest = MakeForest();
+        EarthbendAction.Apply(_alice, 1);
+        triggers.BindCard(forest);
+
+        // First death → returns once.
+        zones.MoveCardTo(forest, ZoneType.Graveyard);
+        triggers.PendingCount.Should().Be(1);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+        forest.Zone.Should().Be(ZoneType.Battlefield);
+
+        // The one-shot must be gone from the land's ability list.
+        forest.Abilities.OfType<TriggeredAbility>()
+              .Should().BeEmpty("the one-shot return trigger detaches after firing");
+
+        // Second death → must NOT queue another return.
+        zones.MoveCardTo(forest, ZoneType.Graveyard);
+        triggers.PendingCount.Should().Be(0,
+            "the return trigger already fired once and is gone (CR 603.7a)");
+    }
+
+    /// <summary>
+    /// When the earthbended land is exiled, the trigger fires
     /// and returns it to the battlefield tapped.
     /// </summary>
     [Fact]

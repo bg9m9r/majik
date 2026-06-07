@@ -93,6 +93,12 @@ public class FactoryRoutingTests
         liveBear.SetZone(ZoneType.Battlefield);
 
         var tap = cauldron.Abilities.OfType<ActivatedAbility>().Single();
+        // Real targeting: request 0 = card to exile, request 1 = counter recipient.
+        tap.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { deadBear },
+            new object[] { liveBear },
+        });
         foreach (var e in tap.Effects) e.Execute();
 
         alice.Zones.Exile.GetCards().Should().Contain(deadBear, "the {T} ability exiles a graveyard card");
