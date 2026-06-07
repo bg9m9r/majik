@@ -82,4 +82,11 @@ public sealed class SimMove
         };
         return new SimMove(key, action);
     }
+
+    /// <summary>
+    /// Creates a minimal SimMove with only a key set — for use in unit tests
+    /// that exercise tree/MCTS logic without a real engine.
+    /// </summary>
+    internal static SimMove ForTest(string key) =>
+        new SimMove(key, CombatPlan.None, isAllOut: false);
 }
