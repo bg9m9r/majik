@@ -48,6 +48,15 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void AgathasSoulCauldron_IsLegendary()
+    {
+        var c = AgathasSoulCauldronFactory.Create(_alice);
+
+        c.Supertypes.Should().Contain(CardSupertype.Legendary,
+            "Agatha's Soul Cauldron is a Legendary Artifact (legend rule, CR 704.5j)");
+    }
+
+    [Fact]
     public void AgathasSoulCauldron_OwnerAndControllerAreSet()
     {
         var c = AgathasSoulCauldronFactory.Create(_alice);

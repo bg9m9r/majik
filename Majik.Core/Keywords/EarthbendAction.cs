@@ -10,20 +10,20 @@ using Majik.Core.Zones;
 namespace Majik.Core.Keywords;
 
 /// <summary>
-/// CR 701.59 — Earthbend N (Bloomburrow).
+/// Earthbend N (Avatar: The Last Airbender).
 ///
-/// Full rules text:
-///   1. Target land you control becomes a 0/0 Elemental creature with haste
-///      that's still a land (CR 701.59a).
-///   2. Put N +1/+1 counters on it (CR 701.59b) — so Earthbend N → an N/N.
+/// Full rules text (keyword reminder):
+///   1. Target land you control becomes a 0/0 creature with haste that's
+///      still a land (no creature subtype).
+///   2. Put N +1/+1 counters on it — so Earthbend N → an N/N.
 ///   3. When that land dies or is exiled, return it to the battlefield
-///      tapped under its owner's control (CR 701.59c).
+///      tapped under its owner's control.
 ///
 /// The animate-land half (step 1) is a proper CR 613 continuous effect via
 /// <see cref="AnimateLandEffect"/> when a <see cref="ContinuousEffectsService"/>
-/// is supplied: Layer 4 adds <see cref="CardType.Creature"/> +
-/// <see cref="CardSubtype.Elemental"/> (the printed Land type stays — "still a
-/// land"), Layer 7b sets base P/T 0/0, Layer 6 grants Haste. The service's
+/// is supplied: Layer 4 adds <see cref="CardType.Creature"/> (the printed Land
+/// type stays — "still a land"; no creature subtype is granted),
+/// Layer 7b sets base P/T 0/0, Layer 6 grants Haste. The service's
 /// creature-row upgrade (a Layer-4 Creature grant on a non-creature permanent)
 /// makes the 0/0 base + the +1/+1 counters surface as an N/N through
 /// <see cref="ContinuousEffectsService.Compute(Permanent)"/> and therefore
@@ -88,9 +88,12 @@ public static class EarthbendAction
             // characteristics (it may not have been wired — lands skip the
             // creature ActiveEffects hookup in the prod binder).
             land.ActiveEffects ??= ces;
+            // CR — Earthbend grants the Creature type only, with NO creature
+            // subtype ("becomes a 0/0 creature with haste that's still a
+            // land"). subtype: null adds Creature but no Elemental/etc.
             AnimateLandEffect.Register(
                 ces, land,
-                subtype: CardSubtype.Elemental,
+                subtype: null,
                 basePower: 0,
                 baseToughness: 0,
                 grantsHaste: true,

@@ -10,7 +10,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Agatha's Soul Cauldron (Wilds of Eldraine).
 ///
-/// Artifact — {2}. Oracle text:
+/// Legendary Artifact — {2}. Oracle text:
 ///   "You may spend mana as though it were mana of any color to activate
 ///    abilities of creatures you control.
 ///    Creatures you control with +1/+1 counters on them have all activated
@@ -65,7 +65,13 @@ public static class AgathasSoulCauldronFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var cauldron = new Artifact("Agatha's Soul Cauldron", "{2}");
+        // Legendary Artifact — the printed supertype must be set here: the
+        // routed prod build path (NamedCardFactory.Create + OverlayAdditiveBinders)
+        // overlays only keyword/mana/ETB binders, NOT supertypes, so a factory
+        // that omits Legendary would lose the legend rule (CR 704.5j).
+        var cauldron = new Artifact(
+            "Agatha's Soul Cauldron", "{2}",
+            supertypes: new[] { CardSupertype.Legendary });
         cauldron.SetOwner(owner);
         cauldron.SetController(owner);
 

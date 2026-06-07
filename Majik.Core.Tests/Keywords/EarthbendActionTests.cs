@@ -54,10 +54,11 @@ public class EarthbendActionTests
 
         var chars = svc.Compute(forest);
         chars.Should().BeOfType<CreatureCharacteristics>("the Creature grant upgrades the row");
-        chars.Types.Should().Contain(CardType.Creature, "Earthbend grants the Creature type (CR 701.59a)");
+        chars.Types.Should().Contain(CardType.Creature, "Earthbend grants the Creature type");
         chars.Types.Should().Contain(CardType.Land, "the land retains its Land type (still a land)");
-        chars.Subtypes.Should().Contain(CardSubtype.Elemental, "Earthbend makes it an Elemental (CR 701.59a)");
-        chars.Keywords.Should().Contain("Haste", "Earthbend grants Haste (CR 702.10)");
+        chars.Subtypes.Should().NotContain(CardSubtype.Elemental,
+            "Earthbend grants NO creature subtype — real text is 'becomes a 0/0 creature', not Elemental");
+        chars.Keywords.Should().Contain("Haste", "Earthbend grants Haste");
 
         var cc = (CreatureCharacteristics)chars;
         cc.Power.Should().Be(1, "0/0 base + one +1/+1 counter = 1/1");

@@ -29,7 +29,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TargetRequest"/> for "target land you control". On
 ///   resolution it routes the chosen land through
 ///   <see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>
-///   — the land gets a +1/+1 counter and is animated into a 0/0 Elemental
+///   — the land gets a +1/+1 counter and is animated into a 0/0
 ///   creature with haste that's still a land (so a 1/1 with the counter,
 ///   surfacing through the layer system's creature-row upgrade). The live
 ///   <see cref="ContinuousEffectsService"/> is read from this card's
