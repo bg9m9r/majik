@@ -22,11 +22,16 @@ public static class VanillaShellClassifier
     /// <summary>
     /// Inspect the built card + its source row and decide whether it's a
     /// "vanilla shell" — see <see cref="ICard.IsVanillaShell"/>. The check
-    /// is split: permanents need an attached ability OR keyword-only text;
-    /// instants/sorceries need a compiled template (the runtime binder is
-    /// not consulted here — too expensive on every Create — but coverage
-    /// in practice is &gt;99% gated through the compiled table for the
-    /// SpellBound tier).
+    /// is split by card kind:
+    /// <list type="bullet">
+    ///   <item>Instants/sorceries are NEVER flagged here — the compiled
+    ///   spell-template cache was removed, so this classifier no longer
+    ///   inspects them; the live resolver clears the flag at cast time when a
+    ///   template walk binds.</item>
+    ///   <item>Permanents are flagged only when they have NO abilities AND
+    ///   have non-empty oracle text (printed rules the engine isn't
+    ///   enforcing). True vanilla bodies (empty oracle text) are not flagged.</item>
+    /// </list>
     /// </summary>
     public static bool IsLikelyVanillaShell(ICard card, CardEntity entity)
     {
