@@ -840,13 +840,47 @@ public class Player
 
     /// <summary>
     /// Sim-only: a new Player carrying this player's scalar runtime state
-    /// (life, name) but with empty zones. Zone contents and reference
-    /// fields are populated by <see cref="Simulation.GameStateCloner"/> in
-    /// later passes.
+    /// (life, counters, mana pool, flag bits) but with empty zones.
+    /// Zone contents and reference fields are populated by
+    /// <see cref="Simulation.GameStateCloner"/> in later passes.
     /// </summary>
     internal Player CloneEmpty()
     {
+        // preserves: Name, LifeTotal
         var clone = new Player(Name, startingLife: LifeTotal);
+
+        // ── Scalar counters ──────────────────────────────────────────────────
+        // PoisonCounters has internal set — assign directly.
+        clone.PoisonCounters = PoisonCounters;
+        // EnergyCounters has private set — CommitCounters is internal and writes
+        // the right field (no replacement bus in a sim shell; guard omitted).
+        clone.EnergyCounters = EnergyCounters;
+        // _otherCounters: copy all generic player-counter entries (Experience, etc.)
+        foreach (var (type, count) in _otherCounters)
+            clone._otherCounters[type] = count;
+
+        // ── Mana pool ────────────────────────────────────────────────────────
+        // ManaPool is an immutable value object — safe to assign directly.
+        clone._manaPool = _manaPool;
+        // _manaProvenance: List<ManaProvenanceSlot> — copy into a NEW list.
+        // Slots are records (source refs are kept as-is; sim doesn't need them
+        // independently mutable at slot level).
+        clone._manaProvenance.AddRange(_manaProvenance);
+
+        // ── Boolean / flag bits ──────────────────────────────────────────────
+        clone._hasLost = _hasLost;
+        clone.TriedToDrawFromEmptyLibrary = TriedToDrawFromEmptyLibrary;
+        clone.LifeLostThisTurn = LifeLostThisTurn;
+        clone.WasDealtDamageThisTurn = WasDealtDamageThisTurn;
+        clone.CompanionUsedThisGame = CompanionUsedThisGame;
+        clone._hasCitysBlessing = _hasCitysBlessing;
+
+        // ── Emblems ──────────────────────────────────────────────────────────
+        // Emblem definitions are immutable — share by reference in the new list.
+        clone._emblems.AddRange(_emblems);
+
+        // Ring / Replacements: later task (reference-bearing)
+
         return clone;
     }
 
