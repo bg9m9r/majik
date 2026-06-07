@@ -212,6 +212,21 @@ public sealed class GameFacade : IDisposable
     public Player Bob => _bob;
 
     /// <summary>
+    /// Test-only: the live spell stack for this facade. Exposed as internal so
+    /// simulation tests (SandboxParityTests) can pass it to
+    /// <see cref="Majik.Core.Simulation.SandboxGame.From"/> when building a
+    /// mid-game sandbox from a live facade state.
+    /// </summary>
+    internal Majik.Core.Stack.Stack LiveStack => _stack;
+
+    /// <summary>
+    /// Test-only: the live per-turn state tally. Exposed as internal so
+    /// simulation tests (SandboxParityTests) can pass it to
+    /// <see cref="Majik.Core.Simulation.SandboxGame.From"/>.
+    /// </summary>
+    internal Majik.Core.Game.TurnState? LiveTurnState => null; // TurnDriver owns TurnState; facade tracks only PhaseStateType. Pass null — acceptable for sandbox seeding.
+
+    /// <summary>
     /// True when the seat with this id is driven by a HUMAN agent — i.e. its
     /// effective agent is still the wire-facing <see cref="RemoteAgent"/> (a
     /// seat whose prompts come over the wire and are answered by
