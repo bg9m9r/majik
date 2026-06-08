@@ -480,8 +480,186 @@ public class OracleLandActivatedAbilityBinderTests
     }
 
     // -------------------------------------------------------------------
+    // Sac-fetch basic onto the battlefield TAPPED — Evolving Wilds,
+    // Terramorphic Expanse, Fabled Passage. Cost is {T} + Sacrifice only
+    // (NO "Pay 1 life", unlike the fetchland / Prismatic Vista cycle).
+    // -------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Evolving Wilds")]
+    [InlineData("Terramorphic Expanse")]
+    public void Bind_SacFetchTappedLand_AttachesAbility_TapAndSacrificeOnly_NoPayLife(string name)
+    {
+        var land = new Land(name) { Owner = _alice, Controller = _alice };
+
+        var bound = OracleLandActivatedAbilityBinder.Bind(land, SacFetchTappedEntity(name), _alice);
+
+        bound.Should().BeTrue();
+        var ab = land.Abilities.OfType<ActivatedAbility>().Single();
+        ab.Costs.Should().HaveCount(2, because: "the cost is {T} + Sacrifice with no Pay 1 life");
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice);
+        ab.Costs.OfType<AdditionalCost>().Should().NotContain(c => c.CostType == AdditionalCostType.PayLife);
+        ab.Effects.Should().HaveCount(1);
+    }
+
+    [Theory]
+    [InlineData("Evolving Wilds")]
+    [InlineData("Terramorphic Expanse")]
+    public void Bind_SacFetchTappedLand_EffectFetchesBasicTapped_AndSacrificesSelf_AndShuffles(string name)
+    {
+        var land = new Land(name) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(land);
+
+        var forest = new Land("Forest",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(forest);
+
+        OracleLandActivatedAbilityBinder.Bind(land, SacFetchTappedEntity(name), _alice);
+        land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        // Fetched basic moved to battlefield, tapped.
+        _alice.Zones.Library.GetCards().Should().NotContain(forest);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(forest);
+        forest.Zone.Should().Be(ZoneType.Battlefield);
+        forest.IsTapped.Should().BeTrue(because: "the basic enters the battlefield tapped");
+
+        // Self-sacrifice — the sac-fetch land left the battlefield to its
+        // owner's graveyard.
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(land);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(land);
+        land.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void Bind_SacFetchTappedLand_OnlyFetchesBasicLands()
+    {
+        var land = new Land("Evolving Wilds") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(land);
+
+        var dual = new Land("Stomping Ground",
+            subtypes: new[] { CardSubtype.Mountain, CardSubtype.Forest })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(dual);
+
+        OracleLandActivatedAbilityBinder.Bind(land, SacFetchTappedEntity("Evolving Wilds"), _alice);
+        land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Library.GetCards().Should().Contain(dual,
+            because: "only BASIC lands are fetchable (CR 205.4a)");
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(dual);
+    }
+
+    [Fact]
+    public void Bind_FabledPassage_AttachesAbility_TapAndSacrificeOnly()
+    {
+        var land = new Land("Fabled Passage") { Owner = _alice, Controller = _alice };
+
+        var bound = OracleLandActivatedAbilityBinder.Bind(land, FabledPassageEntity(), _alice);
+
+        bound.Should().BeTrue();
+        var ab = land.Abilities.OfType<ActivatedAbility>().Single();
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap);
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice);
+        ab.Costs.OfType<AdditionalCost>().Should().NotContain(c => c.CostType == AdditionalCostType.PayLife);
+        ab.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Bind_FabledPassage_UntapsFetchedLand_WhenControllerControlsFourOrMoreLands()
+    {
+        var land = new Land("Fabled Passage") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(land);
+
+        // Three other lands already on the battlefield; Fabled Passage itself is
+        // sacrificed (does not count), the fetched land is the 4th -> untaps.
+        for (var i = 0; i < 3; i++)
+        {
+            _alice.Zones.Battlefield.AddCard(
+                new Land("Plains", supertypes: new[] { CardSupertype.Basic }, subtypes: new[] { CardSubtype.Plains })
+                {
+                    Owner = _alice, Controller = _alice,
+                });
+        }
+
+        var forest = new Land("Forest",
+            supertypes: new[] { CardSupertype.Basic }, subtypes: new[] { CardSubtype.Forest })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(forest);
+
+        OracleLandActivatedAbilityBinder.Bind(land, FabledPassageEntity(), _alice);
+        land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Battlefield.GetCards().Should().Contain(forest);
+        forest.IsTapped.Should().BeFalse(
+            because: "you control four or more lands, so the fetched land is untapped");
+    }
+
+    [Fact]
+    public void Bind_FabledPassage_LeavesFetchedLandTapped_WhenControllerControlsFewerThanFourLands()
+    {
+        var land = new Land("Fabled Passage") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(land);
+
+        // No other lands. Fabled Passage is sacrificed; the fetched land is the
+        // only land -> 1 < 4 -> stays tapped.
+        var forest = new Land("Forest",
+            supertypes: new[] { CardSupertype.Basic }, subtypes: new[] { CardSubtype.Forest })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(forest);
+
+        OracleLandActivatedAbilityBinder.Bind(land, FabledPassageEntity(), _alice);
+        land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Battlefield.GetCards().Should().Contain(forest);
+        forest.IsTapped.Should().BeTrue(
+            because: "fewer than four lands -> the fetched land stays tapped");
+    }
+
+    [Fact]
+    public void Bind_SacFetchTappedLand_EmptyLibrary_DoesNotThrow()
+    {
+        var land = new Land("Evolving Wilds") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(land);
+        OracleLandActivatedAbilityBinder.Bind(land, SacFetchTappedEntity("Evolving Wilds"), _alice);
+
+        var ab = land.Abilities.OfType<ActivatedAbility>().Single();
+        var act = () => ab.Resolve();
+        act.Should().NotThrow(because: "no basic in library is a legal fizzle");
+    }
+
+    // -------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------
+
+    private static CardEntity SacFetchTappedEntity(string name) => new()
+    {
+        Name = name,
+        TypeLine = "Land",
+        // Real seed wording (verified via EmbeddedCardRepository).
+        OracleText = "{T}, Sacrifice this land: Search your library for a basic land card, " +
+                     "put it onto the battlefield tapped, then shuffle.",
+    };
+
+    private static CardEntity FabledPassageEntity() => new()
+    {
+        Name = "Fabled Passage",
+        TypeLine = "Land",
+        // Real seed wording (verified via EmbeddedCardRepository).
+        OracleText = "{T}, Sacrifice this land: Search your library for a basic land card, " +
+                     "put it onto the battlefield tapped, then shuffle. " +
+                     "Then if you control four or more lands, untap that land.",
+    };
 
     private static CardEntity HorizonLandEntity(string name) => new()
     {
