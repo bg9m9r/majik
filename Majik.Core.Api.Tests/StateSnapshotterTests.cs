@@ -265,4 +265,64 @@ public class StateSnapshotterTests
 
         dto.Seq.Should().Be(42);
     }
+
+    // -----------------------------------------------------------------------
+    // CR 702.49 — ImprintedCards on the snapshot. A permanent that imprints
+    // cards (e.g. Agatha's Soul Cauldron) carries those exiled-with cards as
+    // nested shallow snapshots so a client can render them UNDER it. A permanent
+    // with no imprints carries an empty list.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Snapshot_PermanentWithImprints_CarriesImprintedCards()
+    {
+        var alice = new Player("Alice", 20);
+
+        // A creature card sitting in exile, imprinted on the Cauldron.
+        var imprinted = new Creature("Imprinted Dork", "G", 1, 1) { Owner = alice };
+        alice.Zones.Exile.AddCard(imprinted);
+        imprinted.SetZone(ZoneType.Exile);
+
+        // The Cauldron on Alice's battlefield, with the imprint link recorded.
+        var cauldron = Majik.Core.CardData.Factories.AgathasSoulCauldronFactory.Create(alice);
+        cauldron.AddImprinted(imprinted);
+        imprinted.SetExiledWith(cauldron.InstanceId);
+        alice.Zones.Battlefield.AddCard(cauldron);
+        cauldron.SetZone(ZoneType.Battlefield);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cauldronDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == cauldron.InstanceId);
+
+        cauldronDto.ImprintedCards.Should().NotBeNull()
+            .And.ContainSingle("the Cauldron carries its one imprinted card");
+        var nested = cauldronDto.ImprintedCards!.Single();
+        nested.InstanceId.Should().Be(imprinted.InstanceId);
+        nested.Name.Should().Be("Imprinted Dork");
+        // Shallow: an imprinted card's own ImprintedCards is empty (no recursion).
+        nested.ImprintedCards.Should().NotBeNull().And.BeEmpty();
+    }
+
+    [Fact]
+    public void Snapshot_NonImprintingPermanent_HasEmptyImprintedCards()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var bearDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == bear.InstanceId);
+
+        bearDto.ImprintedCards.Should().NotBeNull().And.BeEmpty(
+            "a permanent that imprints nothing carries an empty ImprintedCards list");
+    }
 }

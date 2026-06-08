@@ -86,6 +86,23 @@ public interface ICard
     bool IsVanillaShell { get; }
 
     /// <summary>
+    /// CR 702.49 — the <see cref="InstanceId"/> of the permanent this card was
+    /// exiled "with" (imprinted on), or <c>null</c> when not linked. See
+    /// <see cref="Card.ExiledWith"/>.
+    /// </summary>
+    Guid? ExiledWith { get; }
+
+    /// <summary>Link this card to the permanent (by <see cref="InstanceId"/>)
+    /// it was exiled "with" (CR 702.49). See
+    /// <see cref="Card.SetExiledWith"/>.</summary>
+    void SetExiledWith(Guid? permanentId);
+
+    /// <summary>Clear the imprint back-link (CR 702.49) — the card stays in its
+    /// zone but is no longer linked to any permanent. See
+    /// <see cref="Card.ClearExiledWith"/>.</summary>
+    void ClearExiledWith();
+
+    /// <summary>
     /// Attach an ability to this card.
     /// </summary>
     void AddAbility(IAbility ability);

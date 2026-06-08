@@ -207,7 +207,14 @@ public static class AgathasSoulCauldronFactory
                             && ReferenceEquals(p.Controller, cauldron.Controller)
                             && p.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne) > 0,
                 abilityFactory: bearer => BuildGrantedAbilities(cauldron, bearer, lookup),
-                membershipProvider: membership);
+                membershipProvider: membership,
+                // CR 702.49 — when the Cauldron LEAVES the battlefield, detach
+                // the imprint linkage: the imprinted cards STAY in exile (they
+                // do NOT return) but lose their back-link, so a client no longer
+                // renders them under the (now-gone) Cauldron and a fresh Cauldron
+                // does not pick them up. The grant itself is already revoked by
+                // the lifecycle before this fires.
+                onLeaveBattlefield: () => DetachImprints(cauldron));
             grantLifecycle.Attach();
         }
 
@@ -239,8 +246,11 @@ public static class AgathasSoulCauldronFactory
                 if (target.HasType(CardType.Creature))
                 {
                     // CR 702.49 — imprint: record this creature card on the
-                    // Cauldron so the ability-grant static can reference it.
+                    // Cauldron so the ability-grant static can reference it, and
+                    // set the card-side back-link to THIS Cauldron instance so a
+                    // client can render the exiled card under it.
                     cauldron.AddImprinted(target);
+                    target.SetExiledWith(cauldron.InstanceId);
 
                     // CR 611.2c — the set of granted abilities just changed
                     // (a new imprinted creature) although no member entered /
@@ -362,6 +372,26 @@ public static class AgathasSoulCauldronFactory
             }
         }
         return granted;
+    }
+
+    /// <summary>
+    /// CR 702.49 leave-the-battlefield teardown for the imprint linkage. When
+    /// the Cauldron leaves the battlefield the exiled cards STAY in exile (they
+    /// do NOT return — leaving them where they are is correct), but they lose
+    /// their link to the Cauldron: clear each imprinted card's
+    /// <see cref="Card.ExiledWith"/> back-link, then clear the Cauldron's own
+    /// imprint list. After this, the cards are plain exile — no client renders
+    /// them under the gone Cauldron, and a fresh Cauldron (a different instance
+    /// with its own empty imprint list + its own per-instance grant) never
+    /// grants their abilities.
+    /// </summary>
+    private static void DetachImprints(Artifact cauldron)
+    {
+        foreach (var imprinted in cauldron.ImprintedCards)
+        {
+            imprinted.ClearExiledWith();
+        }
+        cauldron.ClearImprinted();
     }
 
     // Lazily-constructed embedded card pool: building it loads ~22k rows, so do

@@ -101,9 +101,27 @@ public static class StateSnapshotter
     /// outside this assembly must use the zone-level <see cref="Snapshot"/>
     /// entry point.
     /// </summary>
-    internal static CardSnapshotDto SnapshotCard(ICard card)
+    internal static CardSnapshotDto SnapshotCard(ICard card) =>
+        SnapshotCard(card, includeImprints: true);
+
+    /// <param name="includeImprints">When true, populate
+    /// <see cref="CardSnapshotDto.ImprintedCards"/> from
+    /// <see cref="Permanent.ImprintedCards"/> (CR 702.49) — the cards exiled
+    /// "with" this permanent, so a client renders them UNDER it. False on the
+    /// nested pass so the snapshot stays SHALLOW (an imprinted card never
+    /// carries its own imprints).</param>
+    private static CardSnapshotDto SnapshotCard(ICard card, bool includeImprints)
     {
         var f = BuildPermanentFields(card);
+
+        IReadOnlyList<CardSnapshotDto> imprinted = System.Array.Empty<CardSnapshotDto>();
+        if (includeImprints && card is Permanent perm && perm.ImprintedCards.Count > 0)
+        {
+            imprinted = perm.ImprintedCards
+                .Select(c => SnapshotCard(c, includeImprints: false))
+                .ToList();
+        }
+
         return new CardSnapshotDto(
             InstanceId: card.InstanceId,
             Name: card.Name,
@@ -115,7 +133,8 @@ public static class StateSnapshotter
             SummoningSickness: f.SummoningSickness,
             Abilities: f.Abilities,
             ProducedManaColors: f.ProducedManaColors,
-            Counters: f.Counters);
+            Counters: f.Counters,
+            ImprintedCards: imprinted);
     }
 
     /// <summary>

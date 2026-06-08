@@ -850,4 +850,138 @@ public class AgathasSoulCauldronTests
             "no broken ability is emitted for bespoke / ridered / unmodellable-cost shapes; "
             + "the binder skips what it cannot soundly rebuild");
     }
+
+    // -----------------------------------------------------------------------
+    // CR 702.49 — imprint LINKAGE (ExiledWith back-link) + leave-the-battlefield
+    // DETACH. An imprinted card is linked to the Cauldron instance it was exiled
+    // with so a client can render it UNDER the Cauldron; when the Cauldron leaves
+    // the battlefield the card STAYS in exile (does NOT return) but loses the
+    // link (plain exile). A fresh Cauldron never grants the first's exiles.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Imprint_LinksExiledCreatureToThatCauldronInstance()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        manaDork.ExiledWith.Should().BeNull("not yet exiled with anything");
+
+        Resolve(TapAbility(cauldron), manaDork);
+
+        manaDork.ExiledWith.Should().Be(cauldron.InstanceId,
+            "the imprinted creature is linked to THIS Cauldron instance so a client " +
+            "renders it under it (CR 702.49)");
+        cauldron.ImprintedCards.Should().Contain(manaDork);
+    }
+
+    [Fact]
+    public void CauldronLeavesBattlefield_ImprintsDetach_StayInExileWithNullLink()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        // A bearer with a +1/+1 counter so the grant is observably active.
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+        Resolve(TapAbility(cauldron), manaDork);
+
+        // Sanity: linked + granted while the Cauldron is on the battlefield.
+        manaDork.ExiledWith.Should().Be(cauldron.InstanceId);
+        manaDork.Zone.Should().Be(ZoneType.Exile);
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen).Should().NotBeEmpty();
+
+        // Cauldron leaves play.
+        zones.MoveCard(cauldron, ZoneType.Battlefield, ZoneType.Graveyard, alice);
+        effects.Prune();
+
+        // The imprinted card STAYS in exile — it does NOT return.
+        manaDork.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted card stays in exile when the Cauldron leaves — it does not return");
+        alice.Zones.Exile.GetCards().Should().Contain(manaDork);
+        // …but it is now PLAIN exile — the link is cleared.
+        manaDork.ExiledWith.Should().BeNull(
+            "the imprint back-link detaches when the Cauldron leaves the battlefield (CR 702.49)");
+        // …and the Cauldron's own imprint list is cleared.
+        cauldron.ImprintedCards.Should().BeEmpty("the Cauldron's imprint state is reset on leave");
+        // …and the grant is gone.
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen).Should().BeEmpty(
+            "with the Cauldron gone the granted ability is lost (CR 613.6e)");
+    }
+
+    [Fact]
+    public void SecondCauldron_DoesNotGrantAbilitiesFromAPriorCauldronsExiles()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+        var oracle = OracleStub(("Llanowar Stub", "{T}: Add {G}."));
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // First Cauldron: imprint the dork, then leave the battlefield.
+        var first = GrantingCauldron(alice, effects, bus, oracle);
+        alice.Zones.Library.AddCard(first);
+        zones.MoveCard(first, ZoneType.Library, ZoneType.Battlefield, alice);
+        Resolve(TapAbility(first), manaDork);
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen).Should().NotBeEmpty(
+            "first Cauldron grants its own exile's ability");
+
+        zones.MoveCard(first, ZoneType.Battlefield, ZoneType.Graveyard, alice);
+        effects.Prune();
+        manaDork.ExiledWith.Should().BeNull("detached when the first Cauldron left");
+
+        // A NEW Cauldron enters — a different instance with its own empty imprint
+        // list. It must NOT grant the dork's ability (the dork was exiled with
+        // the FIRST Cauldron, not this one).
+        var second = GrantingCauldron(alice, effects, bus, oracle);
+        alice.Zones.Library.AddCard(second);
+        zones.MoveCard(second, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        second.ImprintedCards.Should().BeEmpty(
+            "a fresh Cauldron has its own empty imprint list");
+        manaDork.ExiledWith.Should().NotBe(second.InstanceId,
+            "the dork is not linked to the new Cauldron");
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen).Should().BeEmpty(
+            "a new Cauldron does NOT grant abilities from a previous Cauldron's exiles");
+    }
 }

@@ -33,6 +33,7 @@ public sealed class GrantAbilityToGroupLifecycle
     private readonly Func<Permanent, IReadOnlyList<IAbility>> _abilityFactory;
     private readonly Func<IEnumerable<Permanent>> _membershipProvider;
     private readonly TriggerManager? _triggers;
+    private readonly Action? _onLeaveBattlefield;
     private readonly Action<CardMovedEvent> _handler;
     private GrantAbilityToGroupStaticEffect? _registered;
     private bool _attached;
@@ -58,6 +59,13 @@ public sealed class GrantAbilityToGroupLifecycle
     /// activated / mana group-grant family (Chromatic Lantern, Cryptolith
     /// Rite), where the granted abilities surface purely through the bearer's
     /// <see cref="Card.Abilities"/> list.</param>
+    /// <param name="onLeaveBattlefield">Optional teardown callback invoked
+    /// exactly when the source LEAVES the battlefield (the registered grant
+    /// transitions from active → revoked). Fires once per leave, after the
+    /// grant is unregistered, and NOT for a source that was never on the
+    /// battlefield. Used by Agatha's Soul Cauldron to detach its imprint
+    /// back-links (CR 702.49): the imprinted cards stay in exile but lose their
+    /// link to the (now-gone) Cauldron — they do NOT return.</param>
     public GrantAbilityToGroupLifecycle(
         Permanent source,
         ContinuousEffectsService layers,
@@ -65,7 +73,8 @@ public sealed class GrantAbilityToGroupLifecycle
         Func<Permanent, bool> scope,
         Func<Permanent, IReadOnlyList<IAbility>> abilityFactory,
         Func<IEnumerable<Permanent>> membershipProvider,
-        TriggerManager? triggers = null)
+        TriggerManager? triggers = null,
+        Action? onLeaveBattlefield = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _effects = layers ?? throw new ArgumentNullException(nameof(layers));
@@ -74,6 +83,7 @@ public sealed class GrantAbilityToGroupLifecycle
         _abilityFactory = abilityFactory ?? throw new ArgumentNullException(nameof(abilityFactory));
         _membershipProvider = membershipProvider ?? throw new ArgumentNullException(nameof(membershipProvider));
         _triggers = triggers;
+        _onLeaveBattlefield = onLeaveBattlefield;
         _handler = OnEvent;
     }
 
@@ -137,9 +147,14 @@ public sealed class GrantAbilityToGroupLifecycle
             _effects.Register(_registered);
             _registered.Sync();
         }
-        else if (!shouldBeActive)
+        else if (!shouldBeActive && _registered != null)
         {
+            // The source just LEFT the battlefield (was active, now isn't).
+            // Revoke every bearer, then run the leave-the-battlefield teardown
+            // (e.g. Agatha's imprint-link detach). The order matters only in
+            // that the grant is gone before any client re-snapshots.
             Unregister();
+            _onLeaveBattlefield?.Invoke();
         }
     }
 
