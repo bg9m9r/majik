@@ -185,6 +185,19 @@ public static class InventorsApprenticeFactory
             chars.Power += ArtifactBonusPower;
             chars.Toughness += ArtifactBonusToughness;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="ArtifactSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The artifact-controls predicate reads clonedSource.Controller live.
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new ArtifactSelfPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

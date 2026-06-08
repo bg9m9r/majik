@@ -284,4 +284,15 @@ public sealed class MasterOfEtheriumLordEffect : ContinuousEffect
         chars.Power += 1;
         chars.Toughness += 1;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="MasterOfEtheriumLordEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// All filtering reads clonedSource.Controller live (correctly remapped).
+    /// preserves: nothing scalar; source → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new MasterOfEtheriumLordEffect(clonedSource);
 }

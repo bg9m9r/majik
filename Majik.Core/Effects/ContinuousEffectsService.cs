@@ -177,6 +177,13 @@ public sealed class ContinuousEffectsService
         _generation++;
     }
 
+    /// <summary>
+    /// Sim-only: the list of currently-registered effects.  Exposed so the
+    /// <see cref="Majik.Core.Simulation.GameStateCloner"/> can walk the live effects
+    /// and re-register sim-cloneable ones on a fresh service for the sandbox.
+    /// </summary>
+    internal IReadOnlyList<ContinuousEffect> RegisteredEffects => _effects;
+
     public void Register(ContinuousEffect effect)
     {
         if (effect == null) throw new ArgumentNullException(nameof(effect));

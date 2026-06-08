@@ -353,7 +353,7 @@ public sealed class GameFacade : IDisposable
         var castFlow = new SpellCastFlow(_stack, _zones, _bus);
         var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects);
 
-        async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
+        async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
             var isPermanent = cast.Card.HasType(Majik.Core.Cards.Types.CardType.Creature)
                 || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
@@ -363,7 +363,7 @@ public sealed class GameFacade : IDisposable
             {
                 // No spell-def resolver in this facade — skip non-permanent
                 // casts rather than waste the card.
-                return;
+                return false; // not committed: non-permanent with no resolver
             }
 
             var agent = agents[actor];
@@ -395,7 +395,12 @@ public sealed class GameFacade : IDisposable
                 // Cancelled sentinel. Spell stays in hand, nothing fires.
                 if (payment.IsCancelled)
                 {
-                    return;
+                    // CR 601.2 / CR 727 — player explicitly cancelled. The cast
+                    // is abandoned but priority is NOT forced-passed (the human
+                    // made a deliberate choice; they remain the priority holder so
+                    // they can choose again). Return true so PriorityLoop keeps
+                    // the current player rather than calling PassPriority().
+                    return true;
                 }
 
                 // Portal "Auto-pay" — empty (non-cancelled) source list means
@@ -411,7 +416,7 @@ public sealed class GameFacade : IDisposable
             }
             if (!manaResolver.Pay(actor, cost, payment))
             {
-                return;
+                return false; // not committed: mana payment failed
             }
 
             try
@@ -427,7 +432,9 @@ public sealed class GameFacade : IDisposable
             {
                 // Swallow — same posture as TurnDriver. Failure leaves the
                 // card in hand; bot/agent memo prevents re-proposing.
+                return false; // not committed: CastAsync threw
             }
+            return true; // committed: spell put on the stack
         }
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)

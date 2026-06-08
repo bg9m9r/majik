@@ -228,6 +228,17 @@ public sealed class KaheeraAnthemEffect : ContinuousEffect
         // CR 702.20 — granted Vigilance.
         chars.Keywords.Add("Vigilance");
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="KaheeraAnthemEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// All filtering reads clonedSource.Controller live (correctly remapped).
+    /// preserves: nothing scalar; source → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new KaheeraAnthemEffect(clonedSource);
 }
 
 /// <summary>

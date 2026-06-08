@@ -680,7 +680,7 @@ public sealed class TurnDriver
         // resolver falls back to printed mana abilities.
         var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects);
 
-        async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
+        async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
             static void RotateHand(ICard card, string reason)
             {
@@ -729,7 +729,7 @@ public sealed class TurnDriver
                             phase: _currentPhase,
                             stackEmpty: _stack.IsEmpty,
                             effects: _continuousEffects);
-                        return;
+                        return true; // committed: land played
                     }
 
                     // CR 712.3 — back spell face: swap the cast object to a
@@ -779,7 +779,7 @@ public sealed class TurnDriver
             if (resolved == null && !isPermanent)
             {
                 RotateHand(castCard, "no SpellDef for instant/sorcery");
-                return;
+                return false; // not committed: no definition, card stays in hand
             }
             def = resolved
                 ?? Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
@@ -826,7 +826,13 @@ public sealed class TurnDriver
                 // in hand. No SpellCastEvent, no priority change.
                 if (payment.IsCancelled)
                 {
-                    return;
+                    // CR 601.2 / CR 727 — player explicitly cancelled the cast at
+                    // the cost-payment prompt. Nothing has been paid; spell stays
+                    // in hand. Return true so PriorityLoop keeps the current player
+                    // rather than force-passing (a deliberate cancel is not a
+                    // silent failure — the player chose this outcome and may choose
+                    // a different action next).
+                    return true;
                 }
 
                 // Portal "Auto-pay": the mana-cost prompt's Auto-pay button
@@ -866,7 +872,7 @@ public sealed class TurnDriver
                     out _, out var colorCounts))
             {
                 RotateHand(castCard, "Pay failed");
-                return;
+                return false; // not committed: mana payment failed
             }
 
             // CR 702.44b — stamp the per-color spent ledger on this cast so
@@ -898,7 +904,9 @@ public sealed class TurnDriver
             catch (InvalidOperationException ex)
             {
                 RotateHand(castCard, $"CastAsync threw: {ex.Message}");
+                return false; // not committed: CastAsync threw
             }
+            return true; // committed: spell put on the stack
         }
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)

@@ -274,6 +274,20 @@ public static class BlackbloomRogueFactory
             chars.Power += BonusPower;
             chars.Toughness += BonusToughness;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="OpponentGraveyardSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The allPlayers resolver is rebound to <paramref name="clonedPlayers"/> so the
+        /// opponent-graveyard check walks the CLONED players' graveyards, not the live game.
+        /// preserves: _allPlayersResolver → clonedPlayers; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new OpponentGraveyardSelfPumpStaticEffect(clonedCreature, clonedPlayers)
+                : null;
     }
 
     // -----------------------------------------------------------------------

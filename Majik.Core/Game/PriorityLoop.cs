@@ -30,7 +30,7 @@ public sealed class PriorityLoop
     private readonly Func<int> _turnNumberAccessor;
     private readonly Func<StepStateType?> _phaseAccessor;
     private readonly LandDropTracker _landDropTracker;
-    private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task>? _castDispatcher;
+    private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
     private readonly Action<Player, PriorityAction.ActivateManaAbility>? _manaAbilityDispatcher;
     // Slice 5a — server-side auto-pass plumbing. All three are optional;
@@ -70,7 +70,7 @@ public sealed class PriorityLoop
         Func<int> turnNumberAccessor,
         Func<StepStateType?> phaseAccessor,
         LandDropTracker landDropTracker,
-        Func<Player, PriorityAction.CastSpell, GameContext, Task>? castDispatcher = null,
+        Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? castDispatcher = null,
         Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null,
         Action<Player, PriorityAction.ActivateManaAbility>? manaAbilityDispatcher = null,
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
@@ -283,8 +283,11 @@ public sealed class PriorityLoop
                 if (_castDispatcher == null)
                     throw new InvalidOperationException(
                         "PriorityLoop received CastSpell but no castDispatcher was supplied.");
-                await _castDispatcher(actor, cast, ctx).ConfigureAwait(false);
-                break;
+                // Fix 2 — castDispatcher now returns bool: true = cast committed,
+                // false = silently failed (mana payment rejected, card rotated back
+                // to hand). Propagate false so ApplyActionAsync returns false and
+                // the caller forces PassPriority() instead of spinning the cap.
+                return await _castDispatcher(actor, cast, ctx).ConfigureAwait(false);
             case PriorityAction.ActivateAbility activate:
                 if (_activateDispatcher == null)
                     throw new InvalidOperationException(

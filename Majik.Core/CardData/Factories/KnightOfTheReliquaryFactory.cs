@@ -308,6 +308,19 @@ public static class KnightOfTheReliquaryFactory
             chars.Power += n;
             chars.Toughness += n;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="LandsInGraveyardPumpEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The graveyard count reads clonedSource.Controller live (correctly remapped).
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new LandsInGraveyardPumpEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

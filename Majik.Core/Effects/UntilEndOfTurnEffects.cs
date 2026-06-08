@@ -14,9 +14,24 @@ public sealed class PumpUntilEndOfTurnEffect : ContinuousEffect
     { _target = target; _p = p; _t = t; }
     public override Layer Layer => Layer.PT_Modify;
     public override bool ExpiresAtEndOfTurn => true;
+    // Sim-only: the cloner routes this effect to the cloned _target permanent.
+    // Source is intentionally NOT overridden — see BecomesPTEffect for rationale.
+    internal override Permanent? SimAnchorPermanent => _target;
     public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
     public override void Apply(CreatureCharacteristics chars)
     { chars.Power += _p; chars.Toughness += _t; }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="PumpUntilEndOfTurnEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: _p, _t; target → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new PumpUntilEndOfTurnEffect(clonedCreature, _p, _t)
+            : null;
 }
 
 /// <summary>

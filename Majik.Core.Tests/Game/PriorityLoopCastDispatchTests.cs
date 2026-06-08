@@ -30,7 +30,7 @@ public class PriorityLoopCastDispatchTests
 
         var dispatcherCalled = false;
         var castFlow = new SpellCastFlow(stack, zones, _bus);
-        Func<Player, PriorityAction.CastSpell, GameContext, Task> dispatcher = async (player, cast, ctx) =>
+        Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>> dispatcher = async (player, cast, ctx) =>
         {
             dispatcherCalled = true;
             var sub = new ScriptedAgent();
@@ -38,6 +38,7 @@ public class PriorityLoopCastDispatchTests
             await castFlow.CastAsync(player, cast.Card,
                 SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
                 sub, ctx);
+            return true; // committed
         };
 
         var aliceAgent = new ScriptedAgent();

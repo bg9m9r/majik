@@ -38,6 +38,22 @@ public class PriorityPolicy
     private bool _landProposedThisTurn;
     private bool _lastWasLandProposal;
 
+    /// <summary>
+    /// Fix 1 — anti-spin memo for spell casts. Tracks InstanceIds of cards
+    /// we proposed to cast this turn. When a proposed cast silently fails
+    /// (mana payment rejected → card rotated back to hand), re-proposing the
+    /// same card each priority round spins the loop to the 500-action cap.
+    ///
+    /// Suppression check: if the card's InstanceId is in this set AND the card
+    /// is still in hand (the previous cast didn't actually move it), skip it.
+    /// A SUCCESSFUL cast removes the card from hand, so that card's InstanceId
+    /// naturally clears from consideration (it's no longer in hand).
+    ///
+    /// Reset on turn boundary alongside the activated-ability memo.
+    /// </summary>
+    private readonly HashSet<Guid> _castProposedThisTurn = new();
+    private Guid? _lastCastProposed;
+
     public PriorityPolicy(ArchetypeWeights weights)
         : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null) { }
 
@@ -56,13 +72,15 @@ public class PriorityPolicy
 
     public virtual PriorityAction Pick(GameContext ctx, Player self)
     {
-        // Turn-boundary reset for the activated-ability memo.
+        // Turn-boundary reset for the activated-ability, land-drop, and cast memos.
         if (ctx.TurnNumber != _abilityMemoTurn)
         {
             _abilityFiredThisTurn.Clear();
             _lastAbilityProposed = null;
             _landProposedThisTurn = false;
             _lastWasLandProposal = false;
+            _castProposedThisTurn.Clear();
+            _lastCastProposed = null;
             _abilityMemoTurn = ctx.TurnNumber;
         }
         // If our previous proposal hasn't left the activation stream (e.g.
@@ -82,6 +100,18 @@ public class PriorityPolicy
         {
             _landProposedThisTurn = true;
             _lastWasLandProposal = false;
+        }
+        // Fix 1 — conservative posture for spell casts. If we proposed a cast
+        // last time and we're being asked again, AND the card is still in hand
+        // (i.e. the cast silently failed / was rotated back), mark that card's
+        // InstanceId as already-proposed so EnumerateCandidates suppresses it.
+        // We track via _lastCastProposed; the "still in hand" gate lives in
+        // EnumerateCandidates so a SUCCESSFUL cast (card leaves hand) naturally
+        // clears the suppression — the InstanceId won't be in hand any more.
+        if (_lastCastProposed is Guid prevCast)
+        {
+            _castProposedThisTurn.Add(prevCast);
+            _lastCastProposed = null;
         }
 
         var current = BoardEval.Score(ctx, self, _weights);
@@ -111,6 +141,14 @@ public class PriorityPolicy
         else if (best is PriorityAction.PlayLand)
         {
             _lastWasLandProposal = true;
+        }
+        else if (best is PriorityAction.CastSpell cs)
+        {
+            // Fix 1 — record that we proposed this card's cast. On the NEXT
+            // Pick() call the "commit" block above will add it to
+            // _castProposedThisTurn, and EnumerateCandidates will suppress
+            // re-proposal while the card remains in hand.
+            _lastCastProposed = cs.Card.InstanceId;
         }
 
         EmitDecision(ctx, self, best, bestScore, candidates);
@@ -200,12 +238,21 @@ public class PriorityPolicy
         {
             if (action is PriorityAction.PassAction) continue;
 
-            // Policy-level anti-spin: suppress re-proposal of a land drop or
-            // activated ability that was already proposed this turn.
+            // Policy-level anti-spin: suppress re-proposal of a land drop,
+            // activated ability, or spell cast that was already proposed this turn.
             if (action is PriorityAction.PlayLand && _landProposedThisTurn)
                 continue;
             if (action is PriorityAction.ActivateAbility aa
                 && _abilityFiredThisTurn.Contains(aa.Ability.Id))
+                continue;
+            // Fix 1 — suppress re-proposing a CastSpell whose card is still
+            // in hand after a previous failed proposal this turn. A successful
+            // cast removes the card from hand, so the card's InstanceId won't
+            // appear in hand and this check becomes moot (the LegalActionEnumerator
+            // won't enumerate it again).
+            if (action is PriorityAction.CastSpell castAction
+                && _castProposedThisTurn.Contains(castAction.Card.InstanceId)
+                && self.Zones.Hand.GetCards().Any(c => c.InstanceId == castAction.Card.InstanceId))
                 continue;
 
             var projected = ProjectAction(action, ctx, self, current);

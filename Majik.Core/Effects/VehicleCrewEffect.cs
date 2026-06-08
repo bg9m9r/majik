@@ -29,6 +29,9 @@ public sealed class VehicleCrewEffect : ContinuousEffect
 
     public override Layer Layer => Layer.PT_SetBase;
     public override bool ExpiresAtEndOfTurn => true;
+    // Sim-only: the cloner routes this effect to the cloned vehicle permanent.
+    // Source is intentionally NOT overridden — see BecomesPTEffect for rationale.
+    internal override Permanent? SimAnchorPermanent => _vehicle;
     public override bool AppliesTo(Creature creature) => ReferenceEquals(creature, _vehicle);
 
     public override void Apply(CreatureCharacteristics chars)
@@ -36,4 +39,16 @@ public sealed class VehicleCrewEffect : ContinuousEffect
         chars.Power = _power;
         chars.Toughness = _toughness;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="VehicleCrewEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: _power, _toughness; vehicle → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedVehicle
+            ? new VehicleCrewEffect(clonedVehicle, _power, _toughness)
+            : null;
 }
