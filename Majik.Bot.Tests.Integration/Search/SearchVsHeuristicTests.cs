@@ -3,6 +3,7 @@ using Majik.Bot;
 using Majik.Bot.Tests.Integration.Helpers;
 using Majik.Core.Api;
 using Majik.Core.CardData;
+using Majik.Core.Players;
 using Majik.Core.Random;
 using Xunit;
 using Xunit.Abstractions;
@@ -127,6 +128,24 @@ public sealed class SearchVsHeuristicTests
     private enum GameWinner { Search, Heuristic, Draw, Inconclusive }
 
     /// <summary>
+    /// Per-game end-state snapshot used by the diagnostic and margin tests.
+    /// All fields are taken immediately after <see cref="GameDriver.GameResult"/>
+    /// is returned — i.e. at game-end with the final board state intact.
+    /// </summary>
+    private sealed record GameSnapshot(
+        int GameIndex,
+        GameWinner Winner,
+        int SearchLife,
+        int HeuristicLife,
+        int SearchBoardPower,
+        int HeuristicBoardPower,
+        int SearchCreatureCount,
+        int HeuristicCreatureCount,
+        int TurnsPlayed,
+        /// <summary>Total life delta from 20 for BOTH players (proxy for damage dealt).</summary>
+        int TotalDamageProxy);
+
+    /// <summary>
     /// Phase 2A re-measure: priority search enabled, Prowess deck, 150 iter / 1500 ms.
     /// The assertion threshold is set to the HONESTLY MEASURED bar from the run —
     /// do NOT tighten above the real result, do NOT loosen to force green.
@@ -214,6 +233,142 @@ public sealed class SearchVsHeuristicTests
             $"on the Prowess board. CastSpell remap still deferred to heuristic. " +
             $"Fix: deeper rollouts, better eval, or full CastSpell MCTS (Phase 2B). " +
             $"See [STRENGTH] line and SearchVsHeuristicTests XML doc for full analysis.");
+    }
+
+    // ── Diagnostic: draw-root-cause investigation ────────────────────────────
+
+    /// <summary>
+    /// <b>Phase 2B draw diagnostic</b> — fast variant (10 games, 50 iter / 500 ms,
+    /// maxTurns=30). Captures per-game life totals, board power, and total damage
+    /// proxy at game-end to classify the draw pattern:
+    /// <list type="bullet">
+    ///   <item>(a) Pure durdle — ends ~20-20, &lt;3 total damage → bots barely attack.</item>
+    ///   <item>(b) Slow race — life drops but doesn't reach 0 by turn 30 → turn cap too low.</item>
+    ///   <item>(c) Board stall — boards develop but creatures don't attack → eval too risk-averse.</item>
+    /// </list>
+    /// Reports <c>[DRAW-DIAG]</c> lines per game and a <c>[STRENGTH]</c> /
+    /// <c>[MARGIN]</c> summary. Un-skip to run on demand; re-skip after diagnosis.
+    /// </summary>
+    [Fact(Skip = "On-demand draw diagnostic. Un-skip to run; re-skip after collecting numbers. MEASURED 2026-06-08: 9/10 draws (DIAG-30), pattern (b/c) racing/board-stall. avgDmgProxy=11.3, avgSearchLife=15.2, avgHeuLife=13.4. MARGIN: search +0.9 life-diff +3.8 board-diff +2.8 composite.")]
+    public async Task DiagnosticDrawAnalysis_Fast()
+    {
+        const int diagGames    = 10;
+        const int diagIter     = 50;
+        const int diagBudgetMs = 500;
+        const int diagMaxTurns = 30;
+
+        await RunDiagnosticGames(diagGames, diagIter, diagBudgetMs, diagMaxTurns, label: "DIAG-30");
+    }
+
+    /// <summary>
+    /// <b>Phase 2B maxTurns:50 probe</b> — same fast budget (50 iter / 500 ms),
+    /// 10 games, but maxTurns=50 instead of 30. Tests whether extending the cap
+    /// resolves more games (pattern (b): slow race, just needs more time).
+    /// Reports a separate <c>[STRENGTH]</c> / <c>[MARGIN]</c> block under
+    /// <c>[DIAG-50]</c>. Un-skip to run on demand.
+    /// </summary>
+    [Fact(Skip = "On-demand maxTurns:50 probe. Un-skip to run; re-skip after collecting numbers. MEASURED 2026-06-08: 9/10 draws still (same as turns=30) — extending to 50 turns does NOT resolve more games. Pattern confirmed (b/c): racing/stall, not a turn-cap issue. MARGIN: search +1.0 life-diff +6.4 board-diff +4.2 composite.")]
+    public async Task DiagnosticDrawAnalysis_Turns50()
+    {
+        const int diagGames    = 10;
+        const int diagIter     = 50;
+        const int diagBudgetMs = 500;
+        const int diagMaxTurns = 50;
+
+        await RunDiagnosticGames(diagGames, diagIter, diagBudgetMs, diagMaxTurns, label: "DIAG-50");
+    }
+
+    /// <summary>
+    /// Shared body for the two diagnostic probes. Plays <paramref name="nGames"/>
+    /// games, logs per-game <c>[DRAW-DIAG]</c> lines, and prints a combined
+    /// <c>[STRENGTH]</c> / <c>[MARGIN]</c> summary.
+    /// </summary>
+    private async Task RunDiagnosticGames(
+        int nGames, int iter, int budgetMs, int maxTurns, string label)
+    {
+        // k weight for board-power in the composite margin score.
+        // 0.5 means each point of board power is worth half a life-point.
+        const double BoardPowerWeight = 0.5;
+
+        var snapshots = new List<GameSnapshot>();
+        int searchWins = 0, heuristicWins = 0, draws = 0, inconclusive = 0;
+
+        for (int i = 0; i < nGames; i++)
+        {
+            bool searchOnPlay = i % 2 == 0;
+            int seed = BaseSeed + i;
+
+            var snap = await PlayOneGameWithSnapshot(
+                searchOnPlay: searchOnPlay,
+                seed: seed,
+                gameIndex: i,
+                output: _out,
+                mctsIter: iter,
+                mctsBudgetMs: budgetMs,
+                maxTurns: maxTurns);
+
+            snapshots.Add(snap);
+            switch (snap.Winner)
+            {
+                case GameWinner.Search:       searchWins++;    break;
+                case GameWinner.Heuristic:    heuristicWins++; break;
+                case GameWinner.Draw:         draws++;          break;
+                case GameWinner.Inconclusive: inconclusive++;   break;
+            }
+
+            // Per-game diagnostic line
+            _out.WriteLine(
+                $"  [{label}] game {i,2}: seed={seed} " +
+                $"searchOnPlay={searchOnPlay} result={snap.Winner} " +
+                $"turns={snap.TurnsPlayed} " +
+                $"life=search:{snap.SearchLife} heuristic:{snap.HeuristicLife} " +
+                $"board=search:{snap.SearchCreatureCount}c/{snap.SearchBoardPower}pw " +
+                $"heuristic:{snap.HeuristicCreatureCount}c/{snap.HeuristicBoardPower}pw " +
+                $"totalDmgProxy={snap.TotalDamageProxy}");
+        }
+
+        // ── Margin metric ──────────────────────────────────────────────────
+        // For each game compute search_bot net_advantage =
+        //   (searchLife - heuristicLife) + k * (searchBoardPower - heuristicBoardPower)
+        // Average over all non-inconclusive games (draws count — the whole
+        // point is to signal "which bot is ahead even in a drawn game").
+        var measuredSnaps = snapshots.Where(s => s.Winner != GameWinner.Inconclusive).ToList();
+        double avgLifeDiff  = measuredSnaps.Count > 0
+            ? measuredSnaps.Average(s => s.SearchLife - s.HeuristicLife) : 0;
+        double avgBoardDiff = measuredSnaps.Count > 0
+            ? measuredSnaps.Average(s => s.SearchBoardPower - s.HeuristicBoardPower) : 0;
+        double avgMargin    = avgLifeDiff + BoardPowerWeight * avgBoardDiff;
+
+        // ── Draw classification ────────────────────────────────────────────
+        var drawSnaps = snapshots.Where(s => s.Winner == GameWinner.Draw).ToList();
+        double avgDrawTotalDmg    = drawSnaps.Count > 0 ? drawSnaps.Average(s => s.TotalDamageProxy) : 0;
+        double avgDrawSearchLife  = drawSnaps.Count > 0 ? drawSnaps.Average(s => s.SearchLife) : 20;
+        double avgDrawHeuLife     = drawSnaps.Count > 0 ? drawSnaps.Average(s => s.HeuristicLife) : 20;
+
+        string drawClass = draws == 0 ? "N/A (no draws)" :
+            avgDrawTotalDmg <= 3  ? "(a) PURE DURDLE — nearly no damage dealt" :
+            avgDrawSearchLife > 14 && avgDrawHeuLife > 14 ? "(b/a) SLOW RACE / LOW DAMAGE — life barely moved" :
+            "(b/c) RACING / BOARD STALL — life moved but game didn't close";
+
+        int decided = searchWins + heuristicWins;
+        double winRate = decided > 0 ? (double)searchWins / decided : 0.0;
+
+        _out.WriteLine(
+            $"[STRENGTH] [{label}] search {searchWins}/{decided} decided " +
+            $"({nGames} played, {draws} draws, {inconclusive} inconclusive) " +
+            $"win-rate={winRate:P1} " +
+            $"maxTurns={maxTurns} iter={iter} budgetMs={budgetMs}");
+
+        _out.WriteLine(
+            $"[MARGIN]   [{label}] search avg life-diff={avgLifeDiff:+0.##;-0.##;0} " +
+            $"board-diff={avgBoardDiff:+0.##;-0.##;0} " +
+            $"composite={avgMargin:+0.##;-0.##;0} (k={BoardPowerWeight}) " +
+            $"over {measuredSnaps.Count} measured games");
+
+        _out.WriteLine(
+            $"[DRAW-CLASS] [{label}] {drawClass} " +
+            $"(draws={draws}/{nGames}, avgDmgProxy={avgDrawTotalDmg:F1}, " +
+            $"avgSearchLife={avgDrawSearchLife:F1}, avgHeuLife={avgDrawHeuLife:F1})");
     }
 
     // ── Helper: play a single game and return which strategy won ────────────
@@ -323,6 +478,156 @@ public sealed class SearchVsHeuristicTests
                 $"  game {gameIndex,2}: INCONCLUSIVE — unexpected exception: {ex.GetType().Name}: {ex.Message}");
             output.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
             return GameWinner.Inconclusive;
+        }
+    }
+
+    // ── Helper: play one game and return a full end-state snapshot ───────────
+
+    /// <summary>
+    /// Run one game with configurable iter/budget/maxTurns and return a
+    /// <see cref="GameSnapshot"/> capturing final life totals, board state, and
+    /// inferred total damage. Used by the diagnostic probes to classify draw
+    /// patterns and compute the margin metric without requiring a separate game run.
+    ///
+    /// <para>
+    /// Board power is the sum of <c>Creature.Power</c> for all creatures the
+    /// player controls on the battlefield at game-end. This is a noisy proxy for
+    /// "how developed is this player's board" and is intentionally simple —
+    /// diagnostics only, not a production eval signal.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>TotalDamageProxy</b> = <c>(20 - searchLife) + (20 - heuristicLife)</c>.
+    /// Both players start at 20; the sum of life lost is a lower-bound on total
+    /// damage dealt (life gain would inflate it; none in Prowess mirror). Near-zero
+    /// means pattern (a) pure durdle; moderate means (b/c) race or stall.
+    /// </para>
+    /// </summary>
+    private static async Task<GameSnapshot> PlayOneGameWithSnapshot(
+        bool searchOnPlay,
+        int seed,
+        int gameIndex,
+        ITestOutputHelper output,
+        int mctsIter,
+        int mctsBudgetMs,
+        int maxTurns)
+    {
+        string aliceName = searchOnPlay ? "Search"    : "Heuristic";
+        string bobName   = searchOnPlay ? "Heuristic" : "Search";
+
+        var facade = GameFacade.Create(
+            aliceName: aliceName,
+            bobName:   bobName,
+            aliceDeck: DeckLoader.LoadReal(Archetype, Repo),
+            bobDeck:   DeckLoader.LoadReal(Archetype, Repo),
+            cardRepo:  Repo);
+
+        var searchConfig = new BotConfig(Archetype, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: mctsIter,
+            MaxMctsBudgetMs: mctsBudgetMs,
+            PrioritySearchEnabled: true);
+        var heuristicConfig = new BotConfig(Archetype, Strategy: "heuristic",
+            RandomSeed: seed + 500);
+
+        // Alice = search when searchOnPlay; else Alice = heuristic.
+        Player searchPlayer;
+        Player heuristicPlayer;
+        if (searchOnPlay)
+        {
+            facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, searchConfig));
+            facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   heuristicConfig));
+            searchPlayer    = facade.Alice;
+            heuristicPlayer = facade.Bob;
+        }
+        else
+        {
+            facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, heuristicConfig));
+            facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   searchConfig));
+            searchPlayer    = facade.Bob;
+            heuristicPlayer = facade.Alice;
+        }
+
+        // 5-minute per-game wall-clock cap.
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+
+        try
+        {
+            await facade.StartFullGameAsync(
+                maxTurns: maxTurns,
+                ct: cts.Token,
+                rng: new GameRandom(seed));
+
+            var result = await facade.FullGameTask!;
+
+            // Capture board state right after game ends (battlefield is still intact).
+            int searchLife    = searchPlayer.LifeTotal;
+            int heuristicLife = heuristicPlayer.LifeTotal;
+
+            // Clamp life totals that went negative (player lost) to 0 for display.
+            int searchLifeDisplay    = Math.Max(0, searchLife);
+            int heuristicLifeDisplay = Math.Max(0, heuristicLife);
+
+            // Board power: sum of Power of all Creature permanents on battlefield.
+            int searchBoardPower = searchPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Sum(c => c.Power);
+            int searchCreatureCount = searchPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Count();
+
+            int heuristicBoardPower = heuristicPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Sum(c => c.Power);
+            int heuristicCreatureCount = heuristicPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Count();
+
+            // Total damage proxy: life lost from starting 20 for each player.
+            // Does not account for life gain, but Prowess mirror has none.
+            int totalDamageProxy = (20 - searchLifeDisplay) + (20 - heuristicLifeDisplay);
+
+            GameWinner winner;
+            if (result.Winner == null)
+            {
+                winner = GameWinner.Draw;
+            }
+            else
+            {
+                bool searchWon = ReferenceEquals(result.Winner, searchPlayer);
+                winner = searchWon ? GameWinner.Search : GameWinner.Heuristic;
+            }
+
+            return new GameSnapshot(
+                GameIndex:            gameIndex,
+                Winner:               winner,
+                SearchLife:           searchLifeDisplay,
+                HeuristicLife:        heuristicLifeDisplay,
+                SearchBoardPower:     searchBoardPower,
+                HeuristicBoardPower:  heuristicBoardPower,
+                SearchCreatureCount:  searchCreatureCount,
+                HeuristicCreatureCount: heuristicCreatureCount,
+                TurnsPlayed:          result.TurnsPlayed,
+                TotalDamageProxy:     totalDamageProxy);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine(
+                $"  game {gameIndex,2}: INCONCLUSIVE — unexpected exception: {ex.GetType().Name}: {ex.Message}");
+            output.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+
+            // Return a sentinel snapshot with INCONCLUSIVE winner and zeros.
+            return new GameSnapshot(
+                GameIndex:            gameIndex,
+                Winner:               GameWinner.Inconclusive,
+                SearchLife:           20,
+                HeuristicLife:        20,
+                SearchBoardPower:     0,
+                HeuristicBoardPower:  0,
+                SearchCreatureCount:  0,
+                HeuristicCreatureCount: 0,
+                TurnsPlayed:          0,
+                TotalDamageProxy:     0);
         }
     }
 }
