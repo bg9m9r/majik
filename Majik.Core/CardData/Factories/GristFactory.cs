@@ -37,19 +37,18 @@ namespace Majik.Core.CardData.Factories;
 /// because a <c>Create(Player)</c> overload exists, so the loyalty abilities are
 /// present in prod (not only in the fluent shape-only path).
 ///
-/// ## CDA — 1/1 Insect off the battlefield (V1 simplification)
+/// ## CDA — 1/1 Insect off the battlefield (fully modelled)
 /// The oracle's characteristic-defining ability ("As long as Grist isn't on the
 /// battlefield, it's a 1/1 Insect creature in addition to its other types",
-/// CR 604.3) is approximated, not fully modelled. Grist is constructed as a
-/// Planeswalker with <see cref="CardType.Creature"/> added UNCONDITIONALLY plus
-/// the Insect subtype, so creature-search tutors (Green Sun's Zenith, Chord of
-/// Calling) find Grist in the library — the practical reason the CDA matters.
-/// The conditional "only while not on the battlefield" half (a CDA that toggles
-/// the Creature type off once Grist enters, and stamps a 1/1 body in other
-/// zones) needs a zone-conditional layer-4/7b CDA primitive the engine doesn't
-/// have — CDAs today only apply on the battlefield (Tarmogoyf / Death's Shadow).
-/// That conditional toggle is the remaining deferred surface (see
-/// <see cref="KnownPartialImplementations"/>).
+/// CR 604.3) is implemented as a zone-conditional CDA via
+/// <see cref="Card.SetOffBattlefieldCharacteristics"/>: off the battlefield Grist
+/// gains the <see cref="CardType.Creature"/> type, the Insect subtype, and a 1/1
+/// body; on the battlefield it is ONLY a Planeswalker (no creature type, no
+/// body). <see cref="Card.HasType"/> / <see cref="Card.HasSubtype"/> report the
+/// granted characteristics in every zone except the battlefield, so creature
+/// tutors (Green Sun's Zenith, Chord of Calling), reanimation, delirium, and
+/// graveyard-creature-matters all see Grist where the CDA applies — and stop
+/// seeing it the instant Grist resolves onto the battlefield.
 ///
 /// ## Loyalty abilities — implemented (V1)
 /// - <b>+1: Create a 1/1 black and green Insect token, then mill a card. If an
@@ -104,12 +103,11 @@ public static class GristFactory
     public static CardDef Define() => CardDef
         .Planeswalker(CardName, Cost, loyalty: StartingLoyalty)
         .WithSupertype(CardSupertype.Legendary)
-        .WithSubtypes(CardSubtype.Grist, CardSubtype.Insect)
-        // V1 CDA approximation: add Creature type unconditionally so tutors like
-        // Green Sun's Zenith can target Grist in all zones (CR 115.4 / 106.5a).
-        // The conditional "only while not on the battlefield" toggle is the
-        // deferred surface (see class xmldoc / KnownPartialImplementations).
-        .WithType(CardType.Creature);
+        // Grist (the planeswalker subtype) is printed and present in every zone.
+        // The Insect subtype + Creature type are NOT printed on the battlefield —
+        // they come from the zone-conditional CDA, applied in Create(...) via
+        // SetOffBattlefieldCharacteristics (CR 604.3).
+        .WithSubtype(CardSubtype.Grist);
 
     /// <summary>
     /// Construct Grist with no resolvers / zone service wired — the +1 still
@@ -151,6 +149,18 @@ public static class GristFactory
         ArgumentNullException.ThrowIfNull(owner);
 
         var grist = (Planeswalker)CardDefRuntime.Build(Define(), owner);
+
+        // CR 604.3 — "As long as Grist isn't on the battlefield, it's a 1/1
+        // Insect creature in addition to its other types." A zone-conditional
+        // characteristic-defining ability: off the battlefield Grist gains the
+        // Creature type + Insect subtype and a 1/1 body (so reanimation, "creature
+        // card" tutors like Green Sun's Zenith, delirium, and graveyard-creature
+        // matters all see it); on the battlefield it is ONLY a Planeswalker.
+        grist.SetOffBattlefieldCharacteristics(
+            types: new[] { CardType.Creature },
+            subtypes: new[] { CardSubtype.Insect },
+            power: 1,
+            toughness: 1);
 
         // -- +1: Create a 1/1 black and green Insect creature token, then mill a
         //    card. If an Insect card was milled this way, put a loyalty counter

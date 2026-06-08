@@ -20,6 +20,16 @@ public class Card : ICard
     private readonly List<IAbility> _abilities = new();
     private readonly List<ZoneType> _restrictedCastZones = new();
 
+    // CR 604.3 — off-battlefield characteristic-defining ability. Null for the
+    // overwhelming majority of cards; populated only by named-card factories
+    // whose CDA grants extra types / a body ONLY while the card is not on the
+    // battlefield (e.g. Grist, the Hunger Tide). Kept null-by-default so the
+    // hot HasType / HasSubtype path is unaffected for normal cards. These are
+    // definition data — set once at construction, never mutated afterwards —
+    // so the simulation copy-ctor shares them by reference.
+    private HashSet<CardType>? _offBattlefieldTypes;
+    private HashSet<CardSubtype>? _offBattlefieldSubtypes;
+
     // PLAN 08 — per-game deterministic id (portal's `cardId`). Reseeded from
     // the ambient DeterministicIdSource when a game scope is installed; falls
     // back to Guid.NewGuid() for scope-less direct construction (unit tests).
@@ -1441,6 +1451,13 @@ public class Card : ICard
         _abilities.AddRange(src._abilities);           // abilities are shared refs
         _restrictedCastZones.AddRange(src._restrictedCastZones);
 
+        // CR 604.3 off-battlefield CDA — definition data, never mutated after
+        // construction; share the sets by reference (same posture as _cardTypes).
+        _offBattlefieldTypes = src._offBattlefieldTypes;
+        _offBattlefieldSubtypes = src._offBattlefieldSubtypes;
+        OffBattlefieldPower = src.OffBattlefieldPower;
+        OffBattlefieldToughness = src.OffBattlefieldToughness;
+
         // -- scalar runtime state --
         _zone = src._zone;
         // Owner / Controller re-linked later via PlayerMap pass.
@@ -1631,9 +1648,66 @@ public class Card : ICard
         }
     }
 
+    /// <summary>
+    /// CR 604.3 — power this card has while it is NOT on the battlefield, as a
+    /// consequence of an off-battlefield characteristic-defining ability (e.g.
+    /// Grist, the Hunger Tide is a 1/1 in every zone except the battlefield).
+    /// Null when the card has no such off-battlefield body (the common case).
+    /// Consumers that read a card's P/T off the battlefield should prefer this
+    /// when set and the card is off the battlefield; on the battlefield it is
+    /// ignored (Grist is only a Planeswalker there, with no creature body).
+    /// </summary>
+    public int? OffBattlefieldPower { get; private set; }
+
+    /// <summary>CR 604.3 — toughness companion to <see cref="OffBattlefieldPower"/>.</summary>
+    public int? OffBattlefieldToughness { get; private set; }
+
+    /// <summary>
+    /// CR 604.3 — declare the characteristics this card gains ONLY while it is
+    /// not on the battlefield (a zone-conditional characteristic-defining
+    /// ability). Used by named-card factories such as
+    /// <see cref="Majik.Core.CardData.Factories.GristFactory"/> ("As long as
+    /// Grist isn't on the battlefield, it's a 1/1 Insect creature in addition to
+    /// its other types"). The granted types/subtypes are reported by
+    /// <see cref="HasType"/> / <see cref="HasSubtype"/> in every zone except the
+    /// battlefield; the optional power/toughness are exposed via
+    /// <see cref="OffBattlefieldPower"/> / <see cref="OffBattlefieldToughness"/>
+    /// for the same zones. This is a printed characteristic (CDA), not a
+    /// continuous effect, so it lives on the card rather than the layer system —
+    /// CDAs that depend on a card's zone apply in all zones (CR 604.3), unlike
+    /// ordinary continuous effects which only function on the battlefield.
+    ///
+    /// <para>General by design (any off-battlefield CDA card could reuse it) but
+    /// only Grist uses it today. Idempotent-ish: a second call replaces the
+    /// previously declared characteristics.</para>
+    /// </summary>
+    /// <param name="types">Card types granted off the battlefield (e.g. Creature).</param>
+    /// <param name="subtypes">Subtypes granted off the battlefield (e.g. Insect).</param>
+    /// <param name="power">Power off the battlefield, if the CDA stamps a body.</param>
+    /// <param name="toughness">Toughness off the battlefield, if the CDA stamps a body.</param>
+    public void SetOffBattlefieldCharacteristics(
+        IEnumerable<CardType>? types = null,
+        IEnumerable<CardSubtype>? subtypes = null,
+        int? power = null,
+        int? toughness = null)
+    {
+        _offBattlefieldTypes = types is null ? null : new HashSet<CardType>(types);
+        _offBattlefieldSubtypes = subtypes is null ? null : new HashSet<CardSubtype>(subtypes);
+        OffBattlefieldPower = power;
+        OffBattlefieldToughness = toughness;
+    }
+
     public bool HasType(CardType type)
     {
-        return _cardTypes.Contains(type);
+        if (_cardTypes.Contains(type)) return true;
+        // CR 604.3 — a characteristic-defining ability that grants extra types
+        // only while the card is NOT on the battlefield (e.g. Grist, the Hunger
+        // Tide: "As long as Grist isn't on the battlefield, it's a 1/1 Insect
+        // creature in addition to its other types"). The common path (no
+        // off-battlefield characteristics) is unaffected — the null check below
+        // short-circuits before any further work.
+        var offBf = _offBattlefieldTypes;
+        return offBf != null && _zone != ZoneType.Battlefield && offBf.Contains(type);
     }
 
     public bool HasSupertype(CardSupertype supertype)
@@ -1643,7 +1717,11 @@ public class Card : ICard
 
     public bool HasSubtype(CardSubtype subtype)
     {
-        return _subtypes.Contains(subtype);
+        if (_subtypes.Contains(subtype)) return true;
+        // CR 604.3 — see HasType. Off-battlefield CDAs may also grant subtypes
+        // (Grist is an Insect off the battlefield). Same cheap short-circuit.
+        var offSub = _offBattlefieldSubtypes;
+        return offSub != null && _zone != ZoneType.Battlefield && offSub.Contains(subtype);
     }
 
     public override string ToString()
