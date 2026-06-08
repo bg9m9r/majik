@@ -1,11 +1,19 @@
 using System.Linq;
+using System.Threading.Tasks;
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
+using Majik.Core.Spells;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -202,5 +210,134 @@ public class BaralChiefOfComplianceTests
             "Bob's Baral doesn't reduce Alice's spells — 'spells you cast' is " +
             "scoped to the controller of the reducer permanent");
         effective.Blue.Should().Be(2);
+    }
+
+    // ------------------------------------------------------------------
+    // Counter → loot trigger (CR 603.1):
+    //   "Whenever a spell or ability you control counters a spell, you may
+    //    draw a card. If you do, discard a card."
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Baral_HasCounterLootTrigger()
+    {
+        var b = BaralChiefOfComplianceFactory.Create(_alice);
+
+        b.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
+            "the counter → loot trigger is attached");
+    }
+
+    [Fact]
+    public async Task Baral_WhenYourSpellCountersAnOpponentSpell_LootsOne()
+    {
+        // Full counter flow: Alice's Counterspell (resolving via the
+        // StackResolver) counters Bob's spell. Alice's Baral sees its
+        // controller's counter and loots 1 (draw a card, then discard one).
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var resolver = new Majik.Core.Services.StackResolver(bus);
+
+        var baral = BaralChiefOfComplianceFactory.Create(_alice);
+        PutOnBattlefield(_alice, baral);
+        triggers.BindCard(baral);
+
+        // Give Alice a library card to draw + a hand card to discard so the
+        // loot can resolve fully.
+        var libraryCard = new Instant("Opt", "{U}");
+        libraryCard.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(libraryCard);
+        libraryCard.SetZone(ZoneType.Library);
+
+        var handCard = new Sorcery("Divination", "{2}{U}");
+        handCard.SetOwner(_alice);
+        _alice.Zones.Hand.AddCard(handCard);
+        handCard.SetZone(ZoneType.Hand);
+
+        // Bob's spell on the stack (the target to be countered).
+        var bobBolt = new Instant("Lightning Bolt", "{R}");
+        bobBolt.SetOwner(_bob);
+        bobBolt.SetController(_bob);
+        bobBolt.SetZone(ZoneType.Stack);
+        var bobSpell = new Majik.Core.Spells.Spell(bobBolt, _bob);
+        stack.Push(bobSpell);
+
+        // Alice's Counterspell on top of the stack — resolving it counters
+        // Bob's spell. We model the Counterspell as a Spell whose resolution
+        // calls Fx.Counter; here we use the canonical CounterTargetSpell from
+        // the named Counterspell factory shape by resolving an effect.
+        var counterCard = new Instant("Counterspell", "{U}{U}");
+        counterCard.SetOwner(_alice);
+        counterCard.SetController(_alice);
+        counterCard.SetZone(ZoneType.Stack);
+        var counterSpell = new Majik.Core.Spells.Spell(
+            counterCard, _alice,
+            effects: new IEffect[]
+            {
+                new Effect("counter target spell", () => Fx.Counter(stack, bobSpell)),
+            });
+        stack.Push(counterSpell);
+
+        // Resolve the top object (Alice's Counterspell). During its resolution
+        // it counters Bob's spell, which fires Baral's trigger onto the stack.
+        await resolver.ResolveTopAsync(stack, agentLookup: _ => null);
+        triggers.PutPendingTriggersOnStack(_alice);
+        await resolver.ResolveAllAsync(stack, agentLookup: _ => null);
+
+        bobBolt.Zone.Should().Be(ZoneType.Graveyard, "Bob's spell was countered");
+        // Loot resolved: Alice drew Opt (now in hand or discarded) and
+        // discarded one card. Net hand size is unchanged (1 in, 1 out), and
+        // exactly one card sits in her graveyard.
+        _alice.Zones.Graveyard.GetCards().Should().HaveCount(1,
+            "the loot discarded exactly one card");
+        _alice.Zones.Library.GetCards().Should().BeEmpty(
+            "the loot drew the only library card");
+    }
+
+    [Fact]
+    public void Baral_WhenOpponentCountersASpell_DoesNotLoot()
+    {
+        // Bob's counter (countering controller = Bob) must NOT trigger
+        // Alice's Baral. Drive the event directly to isolate the predicate.
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        var baral = BaralChiefOfComplianceFactory.Create(_alice);
+        PutOnBattlefield(_alice, baral);
+        triggers.BindCard(baral);
+
+        var some = new Instant("Some Spell", "{U}");
+        some.SetOwner(_alice);
+        some.SetController(_alice);
+        var counteredSpell = new Majik.Core.Spells.Spell(some, _alice);
+
+        // A counter controlled by BOB.
+        bus.Publish(new SpellCounteredEvent(counteredSpell, _bob));
+
+        triggers.PendingCount.Should().Be(0,
+            "an opponent's counter does not trigger Alice's Baral");
+    }
+
+    [Fact]
+    public void Baral_WhenYourCounter_TriggerGoesPending()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        var baral = BaralChiefOfComplianceFactory.Create(_alice);
+        PutOnBattlefield(_alice, baral);
+        triggers.BindCard(baral);
+
+        var some = new Instant("Some Spell", "{R}");
+        some.SetOwner(_bob);
+        some.SetController(_bob);
+        var counteredSpell = new Majik.Core.Spells.Spell(some, _bob);
+
+        bus.Publish(new SpellCounteredEvent(counteredSpell, _alice));
+
+        triggers.PendingCount.Should().Be(1,
+            "a counter Alice controls triggers her Baral");
     }
 }
