@@ -66,7 +66,7 @@ public static class KnownPartialImplementations
             ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,
                 "Aura attaches (Enchant Forest); the 'Whenever enchanted Forest is tapped for mana, add an additional mana of the chosen color' triggered ability isn't wired on the routed build because the 'As this Aura enters, choose a color' prompt is deferred engine-wide."),
             ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,
-                "Loyalty abilities dropped on routed planeswalker build; CDA deferred."),
+                "CDA (1/1 Insect off-battlefield) deferred; loyalty abilities now bound. The +1 (Insect token + mill loop + loyalty counters) and −5 (each opponent loses life per creature card in graveyard) are fully implemented; the −2 sacrifice/destroy runs deterministically through resolvers (no agent target prompt — same loyalty-ability gap as Koth/Liliana). The CDA's conditional 'creature only while not on the battlefield' toggle needs a zone-conditional layer-4/7b CDA primitive the engine lacks (CDAs apply on-battlefield only today); Creature type is added unconditionally so creature tutors still find Grist."),
         };
 
     /// <summary>True when <paramref name="name"/> has a recorded gap.</summary>
