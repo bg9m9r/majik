@@ -72,8 +72,6 @@ public static class KnownPartialImplementations
             // Lands are never routed through named factories, so their bespoke
             // factory triggers (if any) don't run in play; the binder chain
             // doesn't bind these triggers either.
-            ["Bojuka Bog"] = new CardGap(CardGapSeverity.Partial,
-                "Mana ability + enters-tapped work; the 'When this land enters, exile target player's graveyard' triggered ability is not bound (lands aren't routed)."),
             ["Sanctum of Ugin"] = new CardGap(CardGapSeverity.Partial,
                 "Colorless mana ability works; the 'Whenever you cast a colorless spell with mana value 7+' sacrifice-to-tutor triggered ability is not bound (lands aren't routed)."),
 

@@ -76,6 +76,13 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex EtbGraveyardToLibraryBottom = new(
         @"target\s+player\s+puts\s+all\s+the\s+cards\s+from\s+their\s+graveyard\s+on\s+the\s+bottom\s+of\s+their\s+library\s+in\s+a\s+random\s+order",
         RegexOptions.IgnoreCase);
+    // "exile target player's graveyard" — Bojuka Bog (Worldwake / MH2 reprint),
+    // a LAND whose only prod binding path is this binder (lands aren't routed
+    // through named factories). CR 406.6 — exiling a graveyard moves every card
+    // in it to the exile zone. CR 608.2b — empty graveyard is a clean no-op.
+    private static readonly Regex ExileTargetPlayersGraveyard = new(
+        @"exile\s+target\s+player'?s\s+graveyard",
+        RegexOptions.IgnoreCase);
     private static readonly Regex AnotherCreatureEnters = new(
         @"whenever another creature you control enters\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
@@ -480,6 +487,34 @@ public static class OracleTriggeredAbilityBinder
                 }
                 // TODO: shuffle for true random order once ZoneService exposes
                 // a Shuffle method (CR 701.19c).
+            });
+        }
+
+        // "exile target player's graveyard" — Bojuka Bog (CR 406.6). v1
+        // simplification mirrors the EtbGraveyardToLibraryBottom branch above:
+        // target is the first opponent found in allPlayers; falls back to the
+        // controller when no opponent is available (e.g. the prod
+        // GameFacade.BindCardAbilities call passes only the controller).
+        // CR 608.2b — empty graveyard is a clean no-op. Real player-choice
+        // targeting awaits the agent prompt system (deferred engine-wide for
+        // binder-bound triggers — same posture as Endurance).
+        if (ExileTargetPlayersGraveyard.IsMatch(effectText))
+        {
+            var players = allPlayers;
+            yield return new Effect("exile target player's graveyard", () =>
+            {
+                Player? target = null;
+                if (players != null)
+                    target = players.FirstOrDefault(p => !ReferenceEquals(p, controller));
+                target ??= controller;
+
+                var gyCards = target.Zones.Graveyard.GetCards().ToList();
+                foreach (var c in gyCards)
+                {
+                    target.Zones.Graveyard.RemoveCard(c);
+                    target.Zones.Exile.AddCard(c);
+                    c.SetZone(ZoneType.Exile);
+                }
             });
         }
 
