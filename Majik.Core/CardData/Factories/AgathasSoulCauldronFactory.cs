@@ -70,42 +70,55 @@ namespace Majik.Core.CardData.Factories;
 ///   grant (CR 613.6e).
 ///
 /// - <b>Static: ability-grant via imprint (NON-mana activated abilities)</b>
-///   (CR 613.1f / 702.49): the common, soundly-reconstructable non-mana
-///   activated-ability shapes of imprinted creatures are now ALSO re-homed to
-///   each bearer, via the card-identity-agnostic
-///   <see cref="Majik.Core.CardData.OracleActivatedAbilityBinder"/> (the
-///   non-mana sibling of <see cref="Majik.Core.CardData.OracleManaBinder.ParseTapManaCosts"/>).
-///   Each is rebuilt as a FRESH <see cref="ActivatedAbility"/> sourced on the
-///   bearer — the cost taps/sacrifices the bearer and the effect references the
-///   bearer ("this creature" = bearer):
+///   (CR 613.1f / 702.49). Two complementary mechanisms re-home an imprinted
+///   creature's non-mana activated abilities to each bearer, every granted
+///   ability sourced on the bearer (cost taps/sacrifices the bearer; the effect
+///   acts on the bearer — "this creature" = bearer):
 ///   <list type="bullet">
-///     <item><b>firebreathing / self-pump</b> — "{cost}: This creature gets
-///       +X/+Y until end of turn" → bearer's
-///       <see cref="Majik.Core.Effects.PumpUntilEndOfTurnEffect"/> (Layer 7c);</item>
-///     <item><b>pinger</b> — "{cost}: This creature deals N damage to any
-///       target / target creature / target player" →
-///       <see cref="Majik.Core.Primitives.Fx.DealDamageAny(object,int,Creature)"/>
-///       with the bearer as damage source;</item>
-///     <item><b>sacrifice-self pinger</b> — "Sacrifice this creature: It deals
-///       N damage to …" → same, cost is
-///       <see cref="Majik.Core.Costs.AdditionalCost.Sacrifice(Permanent,Majik.Core.Events.IEventBus)"/>(bearer).</item>
+///     <item><b>PRIMARY — RebindTo the REAL ability</b> (CR 707.2). For each
+///       imprinted creature, its ACTUAL
+///       <see cref="ActivatedAbility"/>s (everything except mana abilities) are
+///       re-homed via <see cref="ActivatedAbility.RebindTo"/>, which re-sources
+///       the costs (Stage 1) and reuses the real effect objects. This covers
+///       WHATEVER abilities the card actually has — not just oracle-parseable
+///       shapes — so it generalises far past the firebreathing/pinger/sac set.
+///       It runs ONLY for abilities the build path marked
+///       <see cref="ActivatedAbility.RebindSafe"/> = true, i.e. those whose
+///       every effect reads its source/subject off the live
+///       <see cref="Majik.Core.Abilities.ResolutionContext"/> rather than a
+///       captured permanent. All DATA-DRIVEN (CardDef/JSON) activated abilities
+///       qualify: their self-source verbs (pump / connive / explore) were
+///       migrated to read <see cref="Majik.Core.Abilities.ResolutionContext.Source"/>,
+///       and the rest are scoped to the controller or to chosen targets.</item>
+///     <item><b>FALLBACK — oracle-rebuild</b> via
+///       <see cref="Majik.Core.CardData.OracleActivatedAbilityBinder"/> (the
+///       non-mana sibling of
+///       <see cref="Majik.Core.CardData.OracleManaBinder.ParseTapManaCosts"/>).
+///       Used ONLY when RebindTo produced nothing for a card — i.e. the
+///       creature's real abilities are bespoke <c>[CardName]</c>-factory
+///       closures (not <see cref="ActivatedAbility.RebindSafe"/>) or it carries
+///       no engine-built ability at all (oracle-text-only). It reconstructs the
+///       soundly-rebuildable shapes from oracle text: firebreathing / self-pump
+///       ("{cost}: This creature gets +X/+Y until end of turn"), pinger
+///       ("{cost}: This creature deals N damage to …"), and sacrifice-self
+///       pinger ("Sacrifice this creature: It deals N damage to …"). Cost
+///       grammar: any ", "-separated list of generic / coloured mana pips and
+///       {T}.</item>
 ///   </list>
-///   Cost grammar handled: any ", "-separated list of generic / coloured mana
-///   pips and {T} (so "{2}:", "{T}:", "{R}, {T}:" all rebuild).
 ///
 /// ## Deferred (precise remaining gap)
-/// - <b>Bespoke non-mana activated abilities of imprinted creatures</b> that
-///   are NOT in the soundly-reconstructable set — tutors, token makers, modal /
-///   "choose one" abilities, anthem-style grants, "{T}: Draw", loyalty-style,
-///   abilities with unmodellable cost tokens ({X}, energy {E}, snow {S},
-///   Phyrexian, "Pay N life", "Discard a card"), "Activate only …" riders, and
-///   restricted damage targets ("target attacking creature", "creature
-///   defending player controls"). These are unbounded and not generally
-///   reconstructable from oracle text without per-card work, so the binder
-///   SKIPS them rather than emit a broken ability re-homed to the wrong source.
-///   A correct partial beats a broken "all"; closing the residual fully waits
-///   on a re-bindable ability model where every activated ability carries a
-///   declarative, re-source-able representation. Tracked: v1-deferrals.
+/// - <b>Bespoke <c>[CardName]</c>-factory activated abilities</b> whose effect
+///   closures still capture the original card (so they are NOT
+///   <see cref="ActivatedAbility.RebindSafe"/>) AND whose oracle text is outside
+///   the fallback's soundly-reconstructable set (firebreathing / pinger /
+///   sac-pinger). For such an imprinted creature the grant emits nothing for
+///   those abilities rather than re-home a closure that would tap/affect the
+///   EXILED card. As more bespoke effects migrate to read
+///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> (and their
+///   factory marks the ability <see cref="ActivatedAbility.RebindSafe"/>), the
+///   RebindTo path covers them automatically. The residual is now confined to
+///   un-migrated bespoke-factory closures — every data-driven activated ability
+///   is covered. A correct partial beats a broken "all". Tracked: v1-deferrals.
 /// </summary>
 [CardName("Agatha's Soul Cauldron")]
 public static class AgathasSoulCauldronFactory
@@ -357,18 +370,53 @@ public static class AgathasSoulCauldronFactory
             var entity = oracleLookup(imprinted.Name);
             var oracleText = entity?.OracleText;
 
-            // MANA slice — "{T}: Add …" re-homed to the bearer.
+            // MANA slice — "{T}: Add …" re-homed to the bearer. (Mana abilities
+            // are IManaAbility, not ActivatedAbility, so they are NOT picked up
+            // by the RebindTo pass below; they keep their oracle-rebuild path,
+            // which reconstructs them soundly against the bearer.)
             foreach (var manaCost in OracleManaBinder.ParseTapManaCosts(oracleText))
             {
                 granted.Add(new ManaAbility(bearer, controller, manaCost));
             }
 
-            // NON-mana slice — firebreathing / pinger / sac-pinger re-homed to
-            // the bearer. Unparseable bespoke abilities are skipped.
-            foreach (var ability in OracleActivatedAbilityBinder.RebuildActivatedAbilities(
-                         oracleText, bearer, controller))
+            // ----------------------------------------------------------------
+            // NON-mana activated abilities.
+            //
+            // STAGE 2/3 — PREFER re-homing the imprinted creature's REAL
+            // activated abilities via ActivatedAbility.RebindTo (CR 707.2): this
+            // covers WHATEVER abilities the card actually has, not just the
+            // oracle-parseable shapes, and reuses the real effect objects. It is
+            // only sound when the ability re-sources itself, which the
+            // ActivatedAbility.RebindSafe flag asserts (data-driven CardDef
+            // abilities, whose self-source verbs read ResolutionContext.Source).
+            // We rebind those and remember which oracle clauses they cover so the
+            // oracle-rebuild fallback below does not ALSO emit a duplicate.
+            // ----------------------------------------------------------------
+            var rebound = imprinted.Abilities
+                .OfType<ActivatedAbility>()
+                .Where(a => a is not IManaAbility && a.RebindSafe)
+                .Select(a => a.RebindTo(bearer, controller))
+                .ToList();
+
+            var anyRebound = rebound.Count > 0;
+            granted.AddRange(rebound);
+
+            // FALLBACK — for imprinted creatures whose real abilities are NOT
+            // RebindSafe (bespoke [CardName]-factory closures that capture the
+            // exiled card) or that carry no engine-built abilities at all (e.g.
+            // a card loaded oracle-text-only), reconstruct the soundly-rebuildable
+            // non-mana shapes — firebreathing / pinger / sac-pinger — from oracle
+            // text, re-homed to the bearer. We only run this when RebindTo
+            // produced nothing for this card, so a CardDef creature is granted
+            // its real ability exactly once (no double-grant), while a bespoke /
+            // oracle-only creature still gets the parseable partial.
+            if (!anyRebound)
             {
-                granted.Add(ability);
+                foreach (var ability in OracleActivatedAbilityBinder.RebuildActivatedAbilities(
+                             oracleText, bearer, controller))
+                {
+                    granted.Add(ability);
+                }
             }
         }
         return granted;
