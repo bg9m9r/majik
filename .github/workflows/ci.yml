@@ -9,14 +9,17 @@ on:
 
 jobs:
   build-test:
-    # Pinned to GitHub-hosted. The gated suite is fast (~1.6min build+test locally),
-    # but this job is TIME-CAPPED, and the self-hosted pool (small ephemeral 4-core
-    # Docker runners) is contended by the card-shipping loop + concurrent PRs — under
-    # contention a ~1.6min suite stretches past the 12min cap and the gate fails as a
-    # timeout (not a real failure), ejecting unrelated PRs. A reliable gate must not
-    # share the contended pool; keep self-hosted for the card-shipping POOL elsewhere.
-    runs-on: ubuntu-latest
-    timeout-minutes: 12  # healthy run is ~3-5min; fail fast so a flaky hang frees the runner instead of hogging it
+    # Dual-pool: alternate each run between the self-hosted pool and GitHub-hosted
+    # by run-number parity, so combined concurrency sustains a wider card-shipping POOL.
+    # NB: GitHub Actions expressions have NO modulo operator, so parity is by last digit.
+    runs-on: ${{ (endsWith(github.run_number, '0') || endsWith(github.run_number, '2') || endsWith(github.run_number, '4') || endsWith(github.run_number, '6') || endsWith(github.run_number, '8')) && 'self-hosted' || 'ubuntu-latest' }}
+    # 20min, not 12: the gate is fast locally (~1.6min on many cores) but on the actual
+    # runners it legitimately needs more — the GitHub-hosted fallback is 2-core (the
+    # ~24k-test suite + the FORCED-SEQUENTIAL Server.Tests WebApplicationFactory hosts
+    # take ~13-15min there), and the self-hosted 4-core pool spikes past 12min under
+    # card-loop contention. 12min was too tight on both and failed real runs as
+    # timeouts (not real failures), ejecting unrelated PRs. 20min covers both paths.
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v6
