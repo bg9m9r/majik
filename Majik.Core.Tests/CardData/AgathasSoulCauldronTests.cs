@@ -383,4 +383,274 @@ public class AgathasSoulCauldronTests
             .PlayerMaySpendAnyColorFor(alice, ManaSpendPurpose.ActivateCreatureAbilities)
             .Should().BeFalse("a static ability only applies from the battlefield (CR 604.1)");
     }
+
+    // -----------------------------------------------------------------------
+    // CR 613.1f / 702.49 — ability-grant static (MANA-ability slice)
+    //
+    // "Creatures you control with +1/+1 counters on them have all activated
+    //  abilities of all creature cards exiled with Agatha's Soul Cauldron."
+    //
+    // The sound, implemented portion: an imprinted creature's "{T}: Add …"
+    // mana ability is RE-HOMED to each qualifying bearer — built fresh against
+    // the bearer as source, so it taps the bearer (never the exiled card) and
+    // adds to the bearer-controller's pool. Re-homing is done by parsing the
+    // imprinted card's oracle text; tests inject the oracle lookup so a
+    // synthetic creature can carry "{T}: Add {G}" without the full seed.
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// A stub oracle lookup mapping a card name → a CardEntity with the given
+    /// oracle text. Lets the grant re-home a synthetic imprinted creature's
+    /// mana ability without loading the embedded seed.
+    /// </summary>
+    private static System.Func<string, Majik.Core.CardData.CardEntity?> OracleStub(
+        params (string name, string oracle)[] entries)
+    {
+        var map = entries.ToDictionary(
+            e => e.name,
+            e => new Majik.Core.CardData.CardEntity { Name = e.name, OracleText = e.oracle },
+            System.StringComparer.OrdinalIgnoreCase);
+        return name => map.TryGetValue(name, out var e) ? e : null;
+    }
+
+    private static bool ProducesGreen(IManaAbility a) => a.ManaGenerated.Green == 1;
+
+    /// <summary>Build a fully-wired Cauldron with an injected oracle lookup.</summary>
+    private static Artifact GrantingCauldron(
+        Player owner,
+        Majik.Core.Effects.ContinuousEffectsService effects,
+        Majik.Core.Events.IEventBus bus,
+        System.Func<string, Majik.Core.CardData.CardEntity?> oracleLookup,
+        System.Func<System.Collections.Generic.IEnumerable<Player>?>? roster = null)
+        => AgathasSoulCauldronFactory.Create(owner, effects, bus, roster, oracleLookup);
+
+    [Fact]
+    public void Grant_BearerWithCounter_GainsImprintedCreaturesManaAbility_HomedToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature card: "{T}: Add {G}." (in Alice's graveyard).
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        // A creature with a +1/+1 counter already on the battlefield.
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        bearer.ClearSummoningSickness();
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Imprint the mana dork.
+        Resolve(TapAbility(cauldron), manaDork);
+
+        // The bearer now has a re-homed mana ability.
+        var granted = bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen).ToList();
+        granted.Should().NotBeEmpty(
+            "a bearer with a +1/+1 counter gains the imprinted creature's {T}: Add {G} ability");
+
+        var ability = granted[0];
+        ability.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card (closure source)");
+
+        // Activating it taps the BEARER and adds {G} to Alice's pool; the exiled
+        // card is untouched.
+        ability.CanActivate().Should().BeTrue("the bearer is untapped + not summoning sick");
+        var produced = ability.Activate();
+        produced.Green.Should().Be(1, "activating the re-homed ability adds {G}");
+        bearer.IsTapped.Should().BeTrue("the re-homed {T} ability taps the BEARER");
+        manaDork.IsTapped.Should().BeFalse(
+            "the exiled imprinted card is never tapped — re-home is sound");
+    }
+
+    [Fact]
+    public void Grant_CreatureWithoutCounter_DoesNotGainAbilities()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        // No +1/+1 counter on this creature.
+        var plain = new Creature("Plain Bear", "1G", 2, 2);
+        plain.SetOwner(alice);
+        plain.ChangeController(alice);
+        alice.Zones.Library.AddCard(plain);
+        zones.MoveCard(plain, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), manaDork);
+
+        plain.Abilities.OfType<IManaAbility>().Where(ProducesGreen)
+            .Should().BeEmpty(
+                "the grant only applies to creatures you control WITH +1/+1 counters");
+    }
+
+    [Fact]
+    public void Grant_CreatureGainsCounterAfterImprint_PicksUpAbility()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        // A creature that will RECEIVE the +1/+1 counter from the Cauldron's
+        // own {T} ability — it starts with no counter.
+        var recipient = new Creature("Future Bearer", "1G", 2, 2);
+        recipient.SetOwner(alice);
+        recipient.ChangeController(alice);
+        recipient.ClearSummoningSickness();
+        alice.Zones.Library.AddCard(recipient);
+        zones.MoveCard(recipient, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Imprint the dork AND drop the +1/+1 counter on the recipient in one
+        // resolution — exactly the card's own play pattern.
+        Resolve(TapAbility(cauldron), manaDork, recipient: recipient);
+
+        recipient.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1);
+        recipient.Abilities.OfType<IManaAbility>().Where(ProducesGreen)
+            .Should().NotBeEmpty(
+                "after gaining a +1/+1 counter the creature joins the group and gains the ability (CR 611.2c)");
+    }
+
+    [Fact]
+    public void Grant_CauldronLeavesBattlefield_RevokesGrant()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+        Resolve(TapAbility(cauldron), manaDork);
+
+        // Sanity: granted while on the battlefield.
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen)
+            .Should().NotBeEmpty();
+
+        // Cauldron leaves play — the grant is revoked (CR 613.6e).
+        zones.MoveCard(cauldron, ZoneType.Battlefield, ZoneType.Graveyard, alice);
+        effects.Prune();
+
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen)
+            .Should().BeEmpty("with the Cauldron gone the granted ability is lost (CR 613.6e)");
+    }
+
+    [Fact]
+    public void Grant_NonCreatureImprintContributesNothing()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // An instant in the graveyard (not a creature) with mana-ability-shaped
+        // text — it must NOT be imprinted, so nothing is granted.
+        var notACreature = new Instant("Manamorphose Stub", "1G");
+        notACreature.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(notACreature);
+        notACreature.SetZone(ZoneType.Graveyard);
+
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Manamorphose Stub", "{T}: Add {G}.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), notACreature);
+
+        cauldron.ImprintedCards.Should().NotContain(notACreature,
+            "only creature cards are imprinted");
+        bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen)
+            .Should().BeEmpty("a non-creature imprint grants nothing");
+    }
+
+    [Fact]
+    public void Grant_AppliesToCreatureYouControlButOpponentOwns()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var manaDork = new Creature("Llanowar Stub", "G", 1, 1);
+        manaDork.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(manaDork);
+        manaDork.SetZone(ZoneType.Graveyard);
+
+        // Bob owns the creature; it enters under Bob, then Alice steals control.
+        // It physically lives in Bob's battlefield zone but Alice controls it.
+        var stolen = new Creature("Stolen Bear", "1G", 2, 2);
+        stolen.SetOwner(bob);
+        stolen.ChangeController(bob);
+        stolen.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        bob.Zones.Library.AddCard(stolen);
+        zones.MoveCard(stolen, ZoneType.Library, ZoneType.Battlefield, bob);
+        stolen.ChangeController(alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Llanowar Stub", "{T}: Add {G}.")),
+            roster: () => new[] { alice, bob });
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), manaDork);
+
+        stolen.Abilities.OfType<IManaAbility>().Where(ProducesGreen)
+            .Should().NotBeEmpty(
+                "a creature Alice controls but Bob owns is one of 'creatures you control' " +
+                "and gains the ability, even living in Bob's battlefield zone (CR 110.2 / 700.6)");
+    }
 }

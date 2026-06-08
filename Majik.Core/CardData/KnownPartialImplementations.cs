@@ -34,8 +34,14 @@ public static class KnownPartialImplementations
         {
             ["Agatha's Soul Cauldron"] = new CardGap(
                 CardGapSeverity.Partial,
-                "Ability-grant static deferred (closure re-home blocker, v1-deferrals #5); "
-                + "real targeting + Legendary supertype done (#2497)."),
+                "Ability-grant static partially implemented: the MANA-ability slice is granted "
+                + "(an imprinted creature's '{T}: Add …' is re-homed to each +1/+1-countered "
+                + "creature you control, sourced on the bearer — taps the bearer, not the exiled "
+                + "card). Still deferred: NON-mana activated abilities of imprinted creatures "
+                + "('{2}: this gets +1/+1', '{T}: deal 1 damage', etc.) — no general re-source-able "
+                + "oracle→activated-ability binder exists, so an arbitrary creature's non-mana "
+                + "ability can't be soundly rebuilt against a new source. Targeting + Legendary "
+                + "supertype + mana-colour-substitution done (#2497)."),
 
             // --- Re-derived from the faithful BotDeckImplementationAuditTests
             // run (cards built via the real GameFacade.Create + PopulateSideboard
