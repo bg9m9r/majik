@@ -80,6 +80,29 @@ public class KilnFiendFactoryTests
             .Should().ContainSingle("the cast trigger wires when a ContinuousEffectsService is supplied");
     }
 
+    /// <summary>
+    /// PROD-PATH regression guard. The production GameFacade routed build calls
+    /// <see cref="NamedCardFactory.Create(string, Player, ContinuousEffectsService?)"/>
+    /// (the effects-aware dispatch). If that dispatch does not route to Kiln
+    /// Fiend's effects-aware overload, the card is built shape-only and the
+    /// +3/+0 cast trigger is inert in real play. Mirrors the dispatch the
+    /// effects-aware NamedCardFactory entrypoint uses.
+    /// </summary>
+    [Fact]
+    public void EffectsAwareDispatch_WiresCastTrigger_OnProdPath()
+    {
+        var effects = new ContinuousEffectsService();
+
+        var built = NamedCardFactory.Create("Kiln Fiend", _alice, effects);
+
+        built.Should().BeOfType<Creature>();
+        built.Abilities.OfType<TriggeredAbility>()
+            .Should().ContainSingle(
+                "the prod effects-aware dispatch must route through Kiln Fiend's "
+                + "Create(Player, ContinuousEffectsService) overload so the cast "
+                + "trigger is wired in live matches (not shape-only)");
+    }
+
     // -----------------------------------------------------------------------
     // +3/+0 pump
     // -----------------------------------------------------------------------
