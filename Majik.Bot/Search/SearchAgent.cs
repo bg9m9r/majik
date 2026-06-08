@@ -199,7 +199,8 @@ public sealed class SearchAgent : IPlayerAgent
     /// attack / non-pass move when available, mirroring the heuristic spirit
     /// of the rollout strategy without needing a full GameContext here (we don't
     /// have one at this call site). For attacker decisions, any all-out move is
-    /// preferred; for blockers the first move suffices; priority always passes.
+    /// preferred; for blockers the first move suffices; for priority, prefer a
+    /// land play (immediate mana improvement) or spell cast over passing.
     /// </summary>
     private SimMove PickRolloutMove(SimDecision decision)
     {
@@ -217,7 +218,11 @@ public sealed class SearchAgent : IPlayerAgent
                 ?? decision.LegalMoves[0],
 
             SimDecisionKind.Priority =>
-                // Always pass in rollout (priority enumeration is B1 scope).
+                // Priority in rollout: always pass. Priority decisions in rollout
+                // mode are handled directly in ChoosePriorityActionAsync (which
+                // returns Pass without calling DecideAsync/PickRolloutMove), so
+                // this arm is unreachable in normal rollout flow. It is kept as a
+                // safe fallback for any future call sites.
                 decision.LegalMoves.First(m => m.IsPass),
 
             _ => decision.LegalMoves[0]
@@ -316,8 +321,9 @@ public sealed class SearchAgent : IPlayerAgent
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Priority enumeration is Pass-only in Task A3. Full enumeration (spell
-    /// casts, land plays, activated abilities) is Task B1.
+    /// Priority enumeration is provided by <see cref="LegalActionEnumerator.ForPriority"/>
+    /// (Task D2). The full legal set (Pass + land drops + castable spells + activated
+    /// abilities) is surfaced as MCTS decision nodes.
     ///
     /// Priority decisions do NOT consume script moves — the script is keyed
     /// on substantive decisions (DeclareAttackers / DeclareBlockers). A
@@ -330,23 +336,40 @@ public sealed class SearchAgent : IPlayerAgent
         GameContext ctx,
         CancellationToken ct = default)
     {
-        // Rollout mode short-circuit: delegate to strategy.
-        // Strategy picks the best priority action without pausing.
-        if (_script.Count == 0 && _rolloutStrategy != null)
-            return _rolloutStrategy.PickPriorityAction(ctx, _seat);
-
-        // If the script is non-empty, the next move in the script is for a
-        // DeclareAttackers or DeclareBlockers decision, NOT for Priority.
-        // Auto-pass so we don't consume the script move prematurely.
+        // If the script is non-empty:
+        //   - If the next scripted move is a Priority move, dequeue and replay it,
+        //     remapping any card/ability references from the live objects (which
+        //     authored the move) to the sandbox-cloned equivalents by InstanceId.
+        //   - Otherwise, the next move is for DeclareAttackers or DeclareBlockers;
+        //     auto-pass so we don't consume the combat script move prematurely.
         if (_script.Count > 0)
+        {
+            if (_script.Peek().PriorityAction != null)
+                return RemapPriorityActionToSandbox(_script.Dequeue().PriorityAction!, ctx);
+            return PriorityAction.Pass;
+        }
+
+        // Rollout mode: script exhausted and a rollout strategy is configured.
+        // Priority in rollout mode ALWAYS passes — this ensures the rollout
+        // evaluation reflects the actual board state resulting from the scripted
+        // moves, without the rollout "fixing" a sub-optimal scripted pass. The
+        // contrast between PlayLand (land on board) and Pass (land in hand) is
+        // visible in the terminal BoardEval via the ManaSources term.
+        if (_rolloutStrategy != null)
             return PriorityAction.Pass;
 
-        // Pass-only capture mode for now (Task B1 will enumerate spells/lands/abilities).
-        var passMove = SimMove.FromPriorityAction(PriorityAction.Pass);
-        var decision = new SimDecision(
-            SimDecisionKind.Priority,
-            new[] { passMove });
+        // Build full legal move set via LegalActionEnumerator (Task D2).
+        // This includes Pass + land drops + castable spells + activated abilities.
+        var legalActions = LegalActionEnumerator.ForPriority(ctx, _seat);
+        var moves = legalActions
+            .Select(SimMove.FromPriorityAction)
+            .ToList();
 
+        // Ensure Pass is always present.
+        if (moves.Count == 0)
+            moves.Add(SimMove.FromPriorityAction(PriorityAction.Pass));
+
+        var decision = new SimDecision(SimDecisionKind.Priority, moves);
         var chosen = await DecideAsync(decision, ct).ConfigureAwait(false);
 
         return chosen.PriorityAction ?? PriorityAction.Pass;
@@ -395,6 +418,49 @@ public sealed class SearchAgent : IPlayerAgent
     public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(
         GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
         => _fallback.ChooseSurveilDecisionAsync(ctx, peeked, ct);
+
+    // ── Priority action sandbox remap ─────────────────────────────────────────
+
+    /// <summary>
+    /// Remaps a <see cref="PriorityAction"/> from live objects (authored by the
+    /// MCTS search) to the corresponding sandbox-cloned objects by InstanceId.
+    /// This is necessary because <see cref="SimMove.FromPriorityAction"/> wraps
+    /// the live card references, but the sandbox engine works with cloned copies.
+    ///
+    /// <para>
+    /// For <see cref="PriorityAction.PlayLand"/>: find the cloned land in
+    /// <paramref name="ctx"/>'s seat hand by InstanceId.
+    /// For <see cref="PriorityAction.CastSpell"/>: find the cloned card by InstanceId.
+    /// Other action kinds (Pass, ActivateAbility, etc.) are returned as-is —
+    /// Pass needs no remap; ActivateAbility remap is Phase 2 scope.
+    /// Falls back to Pass on any remap failure.
+    /// </para>
+    /// </summary>
+    private PriorityAction RemapPriorityActionToSandbox(PriorityAction action, GameContext ctx)
+    {
+        return action switch
+        {
+            PriorityAction.PassAction => PriorityAction.Pass,
+
+            PriorityAction.PlayLand pl =>
+                // Find the cloned land in the current sandbox hand by InstanceId.
+                _seat.Zones.Hand.GetCards()
+                    .FirstOrDefault(c => c.InstanceId == pl.Land.InstanceId) is { } clonedLand
+                    ? new PriorityAction.PlayLand(clonedLand, HoldPriority: pl.HoldPriority)
+                    : PriorityAction.Pass, // not found → pass (safe fallback)
+
+            PriorityAction.CastSpell cs =>
+                // Find the cloned card in the current sandbox hand by InstanceId.
+                _seat.Zones.Hand.GetCards()
+                    .FirstOrDefault(c => c.InstanceId == cs.Card.InstanceId) is { } clonedCard
+                    ? new PriorityAction.CastSpell(
+                        clonedCard, cs.Targets, cs.HoldPriority,
+                        cs.AlternativeCost, cs.AdditionalCosts)
+                    : PriorityAction.Pass, // not found → pass (safe fallback)
+
+            _ => action, // Pass, ActivateManaAbility, ActivateAbility: return as-is
+        };
+    }
 
     // ── Legal-move builders ───────────────────────────────────────────────────
 

@@ -162,10 +162,132 @@ internal sealed class SearchStrategy : IBotStrategy
         return best;
     }
 
-    // ── All other decisions — delegate to heuristic ────────────────────────────
+    // ── Priority decisions — MCTS-backed (Task D2) ────────────────────────────
 
+    /// <summary>
+    /// Selects a priority action using MCTS when there are real choices;
+    /// short-circuits to Pass when only Pass is legal (avoids wasted search).
+    ///
+    /// <para>
+    /// <b>InstanceId remap:</b> The MCTS search operates over sandbox clones.
+    /// The chosen <see cref="SimMove"/> carries a <see cref="PriorityAction"/>
+    /// that references cloned objects. This method remaps them back to the
+    /// LIVE objects by InstanceId before returning.
+    /// </para>
+    ///
+    /// <para>
+    /// Supported with full remap: <c>PlayLand</c>, <c>Pass</c>.
+    /// <c>CastSpell</c> and <c>ActivateAbility</c> fall back to the inner
+    /// heuristic when found as the chosen action (Phase 1 scope — complex
+    /// targeting / ability remaps deferred).
+    /// </para>
+    /// </summary>
     public PriorityAction PickPriorityAction(GameContext ctx, Player self)
-        => _heuristic.PickPriorityAction(ctx, self);
+    {
+        // Step 1 — enumerate legal actions.
+        var legal = LegalActionEnumerator.ForPriority(ctx, self);
+
+        // Step 2 — short-circuit: if only Pass is legal (or empty), return Pass.
+        if (legal.Count <= 1)
+            return PriorityAction.Pass;
+
+        // Step 3 — build SimState and run MCTS.
+        // CurrentPhase is StepStateType (fine-grained step). Convert to
+        // PhaseStateType (coarse phase) for SimState. Default to PreCombatMain.
+        var phase = ctx.CurrentPhase?.ToPhaseStateType() ?? PhaseStateType.PreCombatMain;
+
+        SimState root;
+        try
+        {
+            root = SimState.Capture(
+                livePlayers: ctx.AllPlayers,
+                activePlayer: ctx.ActivePlayer,
+                turnNumber: ctx.TurnNumber,
+                phase: phase,
+                searchedSeat: self);
+        }
+        catch
+        {
+            return _heuristic.PickPriorityAction(ctx, self);
+        }
+
+        SimMove chosen;
+        try
+        {
+            chosen = _mcts.Search(root);
+        }
+        catch
+        {
+            // Any search failure → fall back to heuristic for correctness.
+            return _heuristic.PickPriorityAction(ctx, self);
+        }
+
+        // Step 4 — map the chosen SimMove back to a LIVE PriorityAction by InstanceId.
+        return RemapPriorityAction(chosen, ctx, self);
+    }
+
+    /// <summary>
+    /// Remaps a <see cref="SimMove"/>'s <see cref="PriorityAction"/> from
+    /// sandbox-cloned objects to the LIVE engine objects by InstanceId.
+    /// Falls back to heuristic on any remap failure.
+    /// </summary>
+    private PriorityAction RemapPriorityAction(SimMove chosen, GameContext ctx, Player self)
+    {
+        var action = chosen.PriorityAction;
+        if (action == null)
+            return _heuristic.PickPriorityAction(ctx, self);
+
+        return action switch
+        {
+            PriorityAction.PassAction =>
+                // Pass needs no remap.
+                PriorityAction.Pass,
+
+            PriorityAction.PlayLand pl =>
+                // Find the live land in self's hand by InstanceId.
+                RemapPlayLand(pl, ctx, self),
+
+            PriorityAction.CastSpell =>
+                // CastSpell remap deferred to Phase 2 (complex target remap).
+                // Fall back to heuristic for correctness.
+                _heuristic.PickPriorityAction(ctx, self),
+
+            PriorityAction.ActivateAbility =>
+                // ActivateAbility remap deferred to Phase 2 (ability lookup
+                // by source InstanceId is non-trivial).
+                // Fall back to heuristic for correctness.
+                _heuristic.PickPriorityAction(ctx, self),
+
+            _ =>
+                // Unknown/unexpected action kind → heuristic fallback.
+                _heuristic.PickPriorityAction(ctx, self),
+        };
+    }
+
+    /// <summary>
+    /// Remaps a <see cref="PriorityAction.PlayLand"/> from the sandbox clone
+    /// to the live land in self's hand by InstanceId. Falls back to heuristic
+    /// if the land is not found (shouldn't happen for a legal move).
+    /// </summary>
+    private PriorityAction RemapPlayLand(
+        PriorityAction.PlayLand sandboxAction,
+        GameContext ctx,
+        Player self)
+    {
+        var liveLand = self.Zones.Hand.GetCards()
+            .FirstOrDefault(c => c.InstanceId == sandboxAction.Land.InstanceId);
+
+        if (liveLand == null)
+        {
+            // InstanceId not found — sandbox state diverged. Fall back to heuristic.
+            return _heuristic.PickPriorityAction(ctx, self);
+        }
+
+        // preserves: liveLand (remapped), HoldPriority (from sandbox action)
+        return new PriorityAction.PlayLand(liveLand, HoldPriority: sandboxAction.HoldPriority);
+    }
+
+    // ── All other decisions — delegate to heuristic ────────────────────────────
 
     public MulliganDecision PickMulligan(IReadOnlyList<ICard> hand, int mulligansTaken)
         => _heuristic.PickMulligan(hand, mulligansTaken);
