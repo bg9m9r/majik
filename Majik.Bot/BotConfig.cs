@@ -42,6 +42,26 @@ namespace Majik.Bot;
 /// HeuristicStrategy blocking call at every MCTS node does not dominate
 /// search time. This field is only consulted by <see cref="Search.EngineSimulator"/>;
 /// it has no effect on the live (top-level) BotPlayerAgent.</para>
+///
+/// <para><c>MaxMctsIterations</c> overrides the default MCTS iteration cap
+/// (200) when <c>Strategy="mcts"</c>. Use a small value (e.g. 50) in integration
+/// tests to keep the test suite runtime reasonable. A null value uses the
+/// production default.</para>
+///
+/// <para><c>MaxMctsBudgetMs</c> overrides the wall-clock budget per MCTS call
+/// (default 1500 ms) when <c>Strategy="mcts"</c>. Use a small value (e.g. 200)
+/// in integration tests so that each priority decision finishes quickly. The
+/// search will still run up to <c>MaxMctsIterations</c> iterations but will
+/// cut off early if the budget is exhausted. A null value uses the production
+/// default.</para>
+///
+/// <para><c>PrioritySearchEnabled</c> controls whether the MCTS search is
+/// used for priority decisions when <c>Strategy="mcts"</c>. Default true
+/// (search is used). Set to false in tests to skip the priority MCTS and
+/// use the inner heuristic instead — useful when the priority MCTS sandbox
+/// games are slow (e.g., because the sandbox heuristic hits the priority-loop
+/// safety on unimplemented cards). The combat search (DeclareAttackers /
+/// DeclareBlockers) is unaffected by this flag.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -50,4 +70,7 @@ public sealed record BotConfig(
     string Strategy = "heuristic",
     IBotDecisionSink? DecisionSink = null,
     VanillaShellTracker? VanillaShellTracker = null,
-    int? SimCombatBudgetMs = null);
+    int? SimCombatBudgetMs = null,
+    int? MaxMctsIterations = null,
+    int? MaxMctsBudgetMs = null,
+    bool PrioritySearchEnabled = true);

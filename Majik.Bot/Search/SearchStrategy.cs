@@ -35,6 +35,7 @@ internal sealed class SearchStrategy : IBotStrategy
     private readonly HeuristicStrategy _heuristic;
     private readonly Mcts _mcts;
     private readonly ArchetypeWeights _weights;
+    private readonly bool _prioritySearchEnabled;
 
     /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
@@ -48,8 +49,8 @@ internal sealed class SearchStrategy : IBotStrategy
     /// </para>
     /// </summary>
     private static MctsConfig ConfigFrom(BotConfig bot) => new(
-        MaxIterations: 200,
-        MaxMillis: 1500,
+        MaxIterations: bot.MaxMctsIterations ?? 200,
+        MaxMillis: bot.MaxMctsBudgetMs ?? 1500,
         DepthTurns: 1,
         ExplorationC: 1.41);
 
@@ -58,6 +59,7 @@ internal sealed class SearchStrategy : IBotStrategy
         ArgumentNullException.ThrowIfNull(config);
         _heuristic = new HeuristicStrategy(config);
         _weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
+        _prioritySearchEnabled = config.PrioritySearchEnabled;
         var sim = new EngineSimulator(_weights);
         _mcts = new Mcts(sim, ConfigFrom(config));
     }
@@ -195,6 +197,12 @@ internal sealed class SearchStrategy : IBotStrategy
     /// </summary>
     public PriorityAction PickPriorityAction(GameContext ctx, Player self)
     {
+        // Short-circuit: if priority MCTS is disabled, delegate to the inner heuristic.
+        // Used in tests where sandbox games hit the priority-loop-safety limit,
+        // making each MCTS call prohibitively slow (e.g., unimplemented Burn cards).
+        if (!_prioritySearchEnabled)
+            return _heuristic.PickPriorityAction(ctx, self);
+
         // Step 1 — enumerate legal actions.
         var legal = LegalActionEnumerator.ForPriority(ctx, self);
 
