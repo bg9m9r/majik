@@ -1,3 +1,4 @@
+using Majik.Bot.Combat;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
 using Majik.Core.Abilities;
@@ -33,6 +34,7 @@ internal sealed class SearchStrategy : IBotStrategy
 {
     private readonly HeuristicStrategy _heuristic;
     private readonly Mcts _mcts;
+    private readonly ArchetypeWeights _weights;
 
     /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
@@ -55,8 +57,8 @@ internal sealed class SearchStrategy : IBotStrategy
     {
         ArgumentNullException.ThrowIfNull(config);
         _heuristic = new HeuristicStrategy(config);
-        var weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
-        var sim = new EngineSimulator(weights);
+        _weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
+        var sim = new EngineSimulator(_weights);
         _mcts = new Mcts(sim, ConfigFrom(config));
     }
 
@@ -128,6 +130,21 @@ internal sealed class SearchStrategy : IBotStrategy
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Block decisions are evaluated via direct combat-outcome scoring over the
+    /// enriched candidate set produced by <see cref="SearchAgent.BuildBlockerMoves"/>
+    /// (accessible via <see cref="BlockCombatEval"/>), rather than full MCTS.
+    ///
+    /// Rationale: MCTS block search would require the sandbox's opponent agent
+    /// (DeterministicBotAgent) to actually declare attackers so the engine reaches
+    /// a DeclareBlockers node — but DeterministicBotAgent always passes, so the
+    /// sandbox never surfaces that decision. A direct combat-projection evaluator
+    /// over the enumerated candidates is correct, fast, and deterministic.
+    ///
+    /// The evaluator is lethal-aware: a plan that lets all-attacker power through
+    /// when it would kill the defender is scored as <c>double.MinValue</c> so
+    /// chump blocks (even losing the blocker) beat taking lethal damage.
+    /// </remarks>
     public BlockPlan PickBlockers(
         GameContext ctx,
         Player self,
@@ -137,46 +154,12 @@ internal sealed class SearchStrategy : IBotStrategy
         if (attackers.Count == 0 || eligible.Count == 0)
             return BlockPlan.None;
 
-        var root = SimState.Capture(
-            livePlayers: ctx.AllPlayers,
-            activePlayer: ctx.ActivePlayer,
-            turnNumber: ctx.TurnNumber,
-            phase: PhaseStateType.Combat,
-            searchedSeat: self);
+        // Enumerate the enriched candidate set (includes chump, trade, gang blocks).
+        var candidates = BlockCombatEval.EnumeratePlans(attackers, eligible);
 
-        SimMove chosen;
-        try
-        {
-            chosen = _mcts.Search(root);
-        }
-        catch
-        {
-            return _heuristic.PickBlockers(ctx, self, attackers, eligible);
-        }
-
-        if (chosen.BlockPlan == null || chosen.BlockPlan.Blockers.Count == 0)
-            return BlockPlan.None;
-
-        // ── InstanceId remap ─────────────────────────────────────────────────
-        // Map sandbox blockers + their assigned sandbox attackers back to live
-        // objects using InstanceId.
-        var liveBlockerById = eligible.ToDictionary(c => c.InstanceId);
-        var liveAttackerById = attackers.ToDictionary(c => c.InstanceId);
-
-        var remapped = new List<BlockerDeclaration>(chosen.BlockPlan.Blockers.Count);
-        foreach (var decl in chosen.BlockPlan.Blockers)
-        {
-            if (!liveBlockerById.TryGetValue(decl.Blocker.InstanceId, out var liveBlocker)
-                || !liveAttackerById.TryGetValue(decl.Attacker.InstanceId, out var liveAttacker))
-            {
-                // Remap failed — fall back to heuristic.
-                return _heuristic.PickBlockers(ctx, self, attackers, eligible);
-            }
-
-            remapped.Add(new BlockerDeclaration(liveBlocker, liveAttacker));
-        }
-
-        return remapped.Count == 0 ? BlockPlan.None : new BlockPlan(remapped);
+        // Score each candidate and pick the best.
+        var best = BlockCombatEval.PickBest(candidates, attackers, self.LifeTotal, _weights);
+        return best;
     }
 
     // ── All other decisions — delegate to heuristic ────────────────────────────

@@ -439,24 +439,113 @@ public sealed class SearchAgent : IPlayerAgent
         return moves;
     }
 
+    // ── Block-move enumeration cap ────────────────────────────────────────────
+    // Single-blocker-per-attacker assignments: O(attackers × blockers).
+    // Gang-block pairs (two blockers on one attacker): O(attackers × C(blockers,2)).
+    // The cap below limits the total produced so the legal-move list stays tractable
+    // even on large boards. 50 is generous: 2 attackers × 5 blockers = 10 singles +
+    // 2 × C(5,2) = 20 pairs + 1 no-block = 31 — well under the cap. The greedy plan
+    // is always included so the search always has at least one "smart" option.
+    private const int MaxBlockMoves = 50;
+
+    /// <summary>
+    /// Enumerate a bounded, diverse set of legal block assignments for MCTS:
+    ///
+    /// <list type="number">
+    ///   <item>No-block (always first).</item>
+    ///   <item>
+    ///     Every 1-to-1 assignment (each eligible blocker on each attacker),
+    ///     including chump blocks (blocker dies) and trades — not only hard-blocks
+    ///     where the blocker survives. This is the key enrichment over the old
+    ///     greedy-only enumeration.
+    ///   </item>
+    ///   <item>
+    ///     A bounded set of 2-blocker gang assignments (two blockers on the same
+    ///     attacker), useful for trading a small gang into a large attacker.
+    ///     Gang blocks are enumerated attacker-by-attacker, pair-by-pair, and
+    ///     stop as soon as <see cref="MaxBlockMoves"/> is reached.
+    ///   </item>
+    ///   <item>
+    ///     The greedy CombatPolicy plan as a heuristic "smart" anchor — always
+    ///     included when non-empty (it may already appear from the 1-to-1 sweep
+    ///     but is de-duplicated by Key).
+    ///   </item>
+    /// </list>
+    ///
+    /// De-duplication is by <see cref="SimMove.Key"/> to avoid feeding the same
+    /// plan to MCTS under two different nodes.
+    ///
+    /// Cap: <see cref="MaxBlockMoves"/>. Enumeration terminates once the cap is
+    /// reached, so the number of options is always bounded regardless of board size.
+    /// </summary>
     private static List<SimMove> BuildBlockerMoves(
         GameContext ctx,
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> eligibleBlockers)
     {
-        // Start with "no block" (always legal).
-        var moves = new List<SimMove> { SimMove.FromBlockPlan(BlockPlan.None) };
+        // Start with "no block" (always legal and always first).
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var moves = new List<SimMove>();
 
-        // Use CombatPolicy's greedy block-picker as a representative single move.
-        // Full block enumeration is a task-B1 concern (block enumeration is O(n^m));
-        // here we surface one heuristic block plan so the search has a non-trivial
-        // alternative to no-block without blowing up the legal-move count.
-        if (attackers.Count > 0 && eligibleBlockers.Count > 0)
+        void TryAdd(SimMove m)
         {
-            var policy = new CombatPolicy(ArchetypeWeights.Default);
-            var greedyPlan = policy.PickBlockers(ctx, ctx.Self, attackers, eligibleBlockers);
-            if (greedyPlan.Blockers.Count > 0)
-                moves.Add(SimMove.FromBlockPlan(greedyPlan));
+            if (moves.Count < MaxBlockMoves && seen.Add(m.Key))
+                moves.Add(m);
+        }
+
+        TryAdd(SimMove.FromBlockPlan(BlockPlan.None));
+
+        if (attackers.Count == 0 || eligibleBlockers.Count == 0)
+            return moves;
+
+        // ── 1-to-1 assignments: every eligible blocker on every attacker ─────
+        // Includes chump blocks (blocker dies) and trades — not just hard-blocks.
+        // This is the primary enrichment: the old greedy-only enumerator only added
+        // survive-filtered blocks; here ANY assignment is explored.
+        foreach (var att in attackers)
+        {
+            foreach (var blk in eligibleBlockers)
+            {
+                var plan = new BlockPlan(new[] { new BlockerDeclaration(blk, att) });
+                TryAdd(SimMove.FromBlockPlan(plan));
+                if (moves.Count >= MaxBlockMoves) goto done;
+            }
+        }
+
+        // ── 2-blocker gang assignments (one attacker, two blockers) ──────────
+        // Enumerate blocker pairs for each attacker. Useful when two small
+        // blockers can gang-kill a large attacker that neither can handle alone.
+        // Bounded: at most C(eligibleBlockers.Count, 2) pairs per attacker.
+        foreach (var att in attackers)
+        {
+            for (int i = 0; i < eligibleBlockers.Count; i++)
+            {
+                for (int j = i + 1; j < eligibleBlockers.Count; j++)
+                {
+                    var plan = new BlockPlan(new[]
+                    {
+                        new BlockerDeclaration(eligibleBlockers[i], att),
+                        new BlockerDeclaration(eligibleBlockers[j], att),
+                    });
+                    TryAdd(SimMove.FromBlockPlan(plan));
+                    if (moves.Count >= MaxBlockMoves) goto done;
+                }
+            }
+        }
+
+        done:
+
+        // ── Greedy CombatPolicy plan as heuristic anchor ─────────────────────
+        // Always include the greedy plan (if non-empty) so the search has at
+        // least one "smart" heuristic option even when the cap is reached.
+        // De-duplication via seen ensures no double-counting.
+        var policy = new CombatPolicy(ArchetypeWeights.Default);
+        var greedyPlan = policy.PickBlockers(ctx, ctx.Self, attackers, eligibleBlockers);
+        if (greedyPlan.Blockers.Count > 0)
+        {
+            var greedyMove = SimMove.FromBlockPlan(greedyPlan);
+            if (seen.Add(greedyMove.Key))
+                moves.Add(greedyMove);
         }
 
         return moves;
