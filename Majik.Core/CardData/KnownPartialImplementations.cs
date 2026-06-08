@@ -68,7 +68,7 @@ public static class KnownPartialImplementations
             // Non-land factory-backed cards (routed in production) whose factory
             // builds part of the card but not the implied triggered ability.
             ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,
-                "CDA (1/1 Insect off-battlefield) deferred; loyalty abilities now bound. The +1 (Insect token + mill loop + loyalty counters) and −5 (each opponent loses life per creature card in graveyard) are fully implemented; the −2 sacrifice/destroy runs deterministically through resolvers (no agent target prompt — same loyalty-ability gap as Koth/Liliana). The CDA's conditional 'creature only while not on the battlefield' toggle needs a zone-conditional layer-4/7b CDA primitive the engine lacks (CDAs apply on-battlefield only today); Creature type is added unconditionally so creature tutors still find Grist."),
+                "Loyalty abilities + zone-conditional CDA bound; only the −2 target-prompt gap remains. The CDA ('As long as Grist isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types', CR 604.3) is fully modelled via Card.SetOffBattlefieldCharacteristics — off the battlefield Grist is a 1/1 Insect creature (tutors/reanimation/delirium see it); on the battlefield it is only a Planeswalker. The +1 (Insect token + mill loop + loyalty counters) and −5 (each opponent loses life per creature card in graveyard) are fully implemented; the −2 sacrifice/destroy runs deterministically through resolvers (no agent target prompt — same loyalty-ability gap as Koth/Liliana). That −2 prompt is the only residual."),
         };
 
     /// <summary>True when <paramref name="name"/> has a recorded gap.</summary>

@@ -36,6 +36,8 @@ public sealed class MutableFieldTripwireTests
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)
             "_mdfcState",                           // SKIPPED-DEFER: complex, has lambda callbacks — see Task 8 concern
+            "_offBattlefieldTypes",                 // SHARED-IMMUT (off-battlefield CDA def — shared by ref in copy-ctor)
+            "_offBattlefieldSubtypes",              // SHARED-IMMUT (off-battlefield CDA def — shared by ref in copy-ctor)
             "_restrictedCastZones",                 // COPIED (AddRange — definition)
             "_subtypes",                            // COPIED (AddRange — definition)
             "_supertypes",                          // COPIED (AddRange — definition)
@@ -53,6 +55,8 @@ public sealed class MutableFieldTripwireTests
             "ManaCostValue",                        // SHARED-IMMUT (immutable value object)
             "MayPlayFromGraveyard",                 // COPIED (MayPlayFromGraveyard = src.MayPlayFromGraveyard)
             "Name",                                 // SHARED-IMMUT (definition string)
+            "OffBattlefieldPower",                  // COPIED (OffBattlefieldPower = src.OffBattlefieldPower — off-battlefield CDA def)
+            "OffBattlefieldToughness",              // COPIED (OffBattlefieldToughness = src.OffBattlefieldToughness — off-battlefield CDA def)
             "Owner",                                // COPIED (null initially; re-linked via RelinkReferences)
             "PendingCastColorCounts",               // COPIED (immutable dict ref)
             "PendingCastColors",                    // COPIED (immutable list ref)
