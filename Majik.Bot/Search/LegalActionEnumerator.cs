@@ -42,9 +42,13 @@ internal static class LegalActionEnumerator
             && ctx.CurrentPhase is { } phase && phase.IsMain()
             && ctx.Stack.Count == 0;
 
-        // CR 305.2 — land play (sorcery speed). Offer the first land in hand;
-        // the engine enforces the one-land-per-turn limit.
-        if (sorceryWindow)
+        // CR 305.2 — land play (sorcery speed). Use ctx.LandPlayAvailable, which
+        // is the authoritative per-turn-cap + phase + turn gate computed by the
+        // priority loop's LandDropTracker. This prevents the MCTS priority search
+        // from offering PlayLand on the opponent's turn, outside main, or after
+        // the land drop is already used — all of which the engine rejects, causing
+        // a spin loop (54k+ rejected PlayLand calls in Phase 2A measurement).
+        if (ctx.LandPlayAvailable)
         {
             var landInHand = self.Zones.Hand.GetCards().OfType<Land>().FirstOrDefault();
             if (landInHand != null)

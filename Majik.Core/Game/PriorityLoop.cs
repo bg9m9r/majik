@@ -155,6 +155,19 @@ public sealed class PriorityLoop
                 var current = _priority.CurrentPlayer
                     ?? throw new InvalidOperationException("No current priority holder");
 
+                // CR 800.4a — a player who has lost the game can no longer take
+                // any actions. Skip their priority window with a forced pass so the
+                // loop doesn't offer (and execute) a cast/ability for a player
+                // whose _hasLost flag is already set. Without this guard, a bot
+                // that runs MCTS search on behalf of a lost player can return a
+                // CastSpell action → DispatchCast pays mana →
+                // Player.AddManaToPool throws "Cannot add mana after losing".
+                if (current.HasLost)
+                {
+                    _priority.PassPriority();
+                    continue;
+                }
+
                 var agent = _agents[current];
                 var ctx = MakeContext(current, activePlayer);
 

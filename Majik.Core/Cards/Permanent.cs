@@ -453,6 +453,36 @@ public class Permanent : Card
                 _attachments.Add((Permanent)clonedAttached);
             }
         }
+
+        // Re-link ManaAbility.Source: the copy-ctor shares ability refs by
+        // reference (_abilities.AddRange). Any ManaAbility whose Source is the
+        // original live permanent would tap the LIVE permanent when activated in
+        // the sandbox, corrupting live game state across MCTS iterations (the
+        // live land becomes tapped after each sandbox run, so subsequent
+        // iterations can no longer pay the mana cost). Replace such abilities
+        // with new instances bound to THIS clone so sandbox taps stay local.
+        // ManaAbility.CloneForSim returns null for non-simple-shape abilities
+        // (dynamic generators, additional-cost payers, etc.); those keep the
+        // original ref — a known limitation tracked for future work.
+        var manaAbilitiesToRelink = Abilities
+            .OfType<Majik.Core.Abilities.ManaAbility>()
+            .Where(ma => ReferenceEquals(ma.Source, src))
+            .ToList();
+        foreach (var old in manaAbilitiesToRelink)
+        {
+            var ctrl = old.Controller != null && players.TryGetValue(old.Controller, out var cp)
+                ? cp
+                : old.Controller;
+            if (ctrl == null) continue; // no controller to bind — keep original
+            var replacement = old.CloneForSim(this, ctrl);
+            if (replacement != null)
+            {
+                RemoveAbility(old);
+                AddAbility(replacement);
+            }
+            // else: keep original (complex ability shape; live-source tap is a
+            // known limitation until those shapes are sim-clonable too).
+        }
     }
 
     /// <summary>

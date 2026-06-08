@@ -203,6 +203,13 @@ internal sealed class SearchStrategy : IBotStrategy
         if (!_prioritySearchEnabled)
             return _heuristic.PickPriorityAction(ctx, self);
 
+        // Defensive guard: if the player has already lost, do not launch search.
+        // The engine's PriorityLoop now skips lost players before reaching this
+        // method (CR 800.4a fix), but this guard provides an additional safety
+        // layer in case the strategy is called from another code path or tests.
+        if (self.HasLost)
+            return PriorityAction.Pass;
+
         // Step 1 — enumerate legal actions.
         var legal = LegalActionEnumerator.ForPriority(ctx, self);
 
@@ -266,10 +273,16 @@ internal sealed class SearchStrategy : IBotStrategy
                 // Find the live land in self's hand by InstanceId.
                 RemapPlayLand(pl, ctx, self),
 
-            PriorityAction.CastSpell =>
-                // CastSpell remap deferred to Phase 2 (complex target remap).
-                // Fall back to heuristic for correctness.
-                _heuristic.PickPriorityAction(ctx, self),
+            PriorityAction.CastSpell cs =>
+                // Remap the sandbox card to the LIVE card by InstanceId.
+                // LegalActionEnumerator always creates CastSpell with empty
+                // targets (Array.Empty<object>()); the PriorityLoop's cast
+                // dispatcher (TurnDriver.DispatchCast) prompts the agent for
+                // targets at cast time via ChooseTargetsAsync — so we do not
+                // need to remap targets here. For safety, if targets are
+                // non-empty (future extension) we fall through to heuristic
+                // for any target that cannot be remapped.
+                RemapCastSpell(cs, ctx, self),
 
             PriorityAction.ActivateAbility =>
                 // ActivateAbility remap deferred to Phase 2 (ability lookup
@@ -284,15 +297,133 @@ internal sealed class SearchStrategy : IBotStrategy
     }
 
     /// <summary>
+    /// Remaps a <see cref="PriorityAction.CastSpell"/> from the sandbox clone
+    /// to the live card in <paramref name="self"/>'s hand by InstanceId.
+    ///
+    /// <para>
+    /// <b>Target remap:</b> <see cref="LegalActionEnumerator.ForPriority"/> always
+    /// emits <c>CastSpell</c> with <c>Array.Empty&lt;object&gt;()</c> targets.
+    /// The live engine's cast dispatcher (<c>TurnDriver.DispatchCast</c>) then
+    /// calls <see cref="IPlayerAgent.ChooseTargetsAsync"/> to gather real targets
+    /// at cast time, delegated to <see cref="SearchStrategy.PickTargets"/> (which
+    /// calls the inner heuristic's <see cref="Heuristic.TargetPolicy"/>). So we
+    /// pass through the empty target list as-is — target selection happens
+    /// naturally post-cast, not here.
+    /// </para>
+    ///
+    /// <para>
+    /// If targets were non-empty (possible in a future extension where the
+    /// enumerator pre-selects targets), we attempt a best-effort remap:
+    ///   • <see cref="Majik.Core.Cards.Permanent"/> / <see cref="ICard"/>: match
+    ///     by <c>InstanceId</c> across all live zones (hand + battlefield of both players).
+    ///   • <see cref="Player"/>: match by <c>Player.Id</c>.
+    ///   • Unknown type: fall back to heuristic for safety.
+    /// </para>
+    ///
+    /// <para>Falls back to heuristic if the live card is not found in hand.</para>
+    /// </summary>
+    private PriorityAction RemapCastSpell(
+        PriorityAction.CastSpell sandboxAction,
+        GameContext ctx,
+        Player self)
+    {
+        // Find the live card in self's hand by InstanceId.
+        var liveCard = self.Zones.Hand.GetCards()
+            .FirstOrDefault(c => c.InstanceId == sandboxAction.Card.InstanceId);
+
+        if (liveCard == null)
+        {
+            // InstanceId not found — sandbox state diverged or card left hand.
+            // Fall back to heuristic for correctness.
+            return _heuristic.PickPriorityAction(ctx, self);
+        }
+
+        // Fast path: no targets to remap (the common case — LegalActionEnumerator
+        // always creates CastSpell with empty targets).
+        if (sandboxAction.Targets.Count == 0)
+        {
+            // preserves: liveCard (remapped by InstanceId), HoldPriority, AlternativeCost, AdditionalCosts
+            return new PriorityAction.CastSpell(
+                liveCard,
+                Array.Empty<object>(),
+                sandboxAction.HoldPriority,
+                sandboxAction.AlternativeCost,
+                sandboxAction.AdditionalCosts);
+        }
+
+        // Non-empty targets: attempt best-effort remap by InstanceId / Player.Id.
+        // Build lookup maps for live objects across all zones of all players.
+        var liveCardsById = ctx.AllPlayers
+            .SelectMany(p =>
+                p.Zones.Hand.GetCards()
+                    .Concat(p.Zones.Battlefield.GetCards())
+                    .Concat(p.Zones.Graveyard.GetCards()))
+            .GroupBy(c => c.InstanceId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var livePlayersById = ctx.AllPlayers.ToDictionary(p => p.Id);
+
+        var remappedTargets = new List<object>(sandboxAction.Targets.Count);
+        foreach (var target in sandboxAction.Targets)
+        {
+            switch (target)
+            {
+                case ICard targetCard:
+                    if (liveCardsById.TryGetValue(targetCard.InstanceId, out var liveTarget))
+                        remappedTargets.Add(liveTarget);
+                    else
+                        // Target not found in live zones — fall back to heuristic.
+                        return _heuristic.PickPriorityAction(ctx, self);
+                    break;
+                case Player targetPlayer:
+                    if (livePlayersById.TryGetValue(targetPlayer.Id, out var livePlayer))
+                        remappedTargets.Add(livePlayer);
+                    else
+                        return _heuristic.PickPriorityAction(ctx, self);
+                    break;
+                default:
+                    // Unknown target type — can't remap safely. Fall back to heuristic.
+                    return _heuristic.PickPriorityAction(ctx, self);
+            }
+        }
+
+        // preserves: liveCard, remappedTargets, HoldPriority, AlternativeCost, AdditionalCosts
+        return new PriorityAction.CastSpell(
+            liveCard,
+            remappedTargets,
+            sandboxAction.HoldPriority,
+            sandboxAction.AlternativeCost,
+            sandboxAction.AdditionalCosts);
+    }
+
+    /// <summary>
     /// Remaps a <see cref="PriorityAction.PlayLand"/> from the sandbox clone
     /// to the live land in self's hand by InstanceId. Falls back to heuristic
-    /// if the land is not found (shouldn't happen for a legal move).
+    /// if the land is not found or if the live context does not permit a land play.
+    ///
+    /// <para>
+    /// The live-context check (<c>ctx.LandPlayAvailable</c>) is critical: the MCTS
+    /// sandbox may generate PlayLand actions in a sandbox turn where the searched
+    /// player IS active and in a main phase, even if the LIVE game is in a priority
+    /// window where a land play is illegal (e.g. opponent's turn, combat step, or
+    /// the land drop has already been used this live turn). Without this guard, the
+    /// MCTS returns PlayLand and the live PriorityLoop rejects it ~50k times per
+    /// 20-game run — a spin loop that saturates the priority action cap and forces
+    /// nearly every game to a draw by turn cap.
+    /// </para>
     /// </summary>
     private PriorityAction RemapPlayLand(
         PriorityAction.PlayLand sandboxAction,
         GameContext ctx,
         Player self)
     {
+        // Guard: live context must allow a land play. If not, the MCTS suggested
+        // a land play that is valid in the SANDBOX turn but invalid in the LIVE
+        // game (wrong phase, opponent's turn, or drop already used). Fall back to
+        // heuristic so the live engine doesn't reject and re-prompt endlessly.
+        if (!ctx.LandPlayAvailable)
+            return _heuristic.PickPriorityAction(ctx, self);
+
         var liveLand = self.Zones.Hand.GetCards()
             .FirstOrDefault(c => c.InstanceId == sandboxAction.Land.InstanceId);
 
