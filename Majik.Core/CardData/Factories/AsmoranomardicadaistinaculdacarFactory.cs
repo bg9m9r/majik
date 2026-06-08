@@ -2,107 +2,127 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Asmoranomardicadaistinaculdacar (Modern Horizons
-/// 2, {B}{R}{G}). The longest-name legendary in Magic.
+/// 2). The longest-name card in Magic.
 ///
-/// Legendary Creature — Human Shaman 4/4. Oracle text:
-///   "You may look at the top card of your library any time.
-///    You may cast Food spells from the top of your library.
-///    {T}: Search your library for a Food card, reveal it, put it into
-///    your hand, then shuffle. Activate only as a sorcery."
+/// Verified seed identity (<c>EmbeddedCardRepository.GetByName</c>):
+///   <b>Legendary Creature — Human Wizard, 3/3, mana cost {0} (empty).</b>
+/// Oracle text:
+///   "As long as you've discarded a card this turn, you may pay {B/R} to
+///    cast this spell.
+///    When Asmoranomardicadaistinaculdacar enters, you may search your
+///    library for a card named The Underworld Cookbook, reveal it, put it
+///    into your hand, then shuffle.
+///    Sacrifice two Foods: Target creature deals 6 damage to itself."
+///
+/// NOTE: this factory previously shipped a FICTIONAL card (a 4/4 Human
+/// Shaman {B}{R}{G} with a Food-tutor {T} ability and two never-printed
+/// static abilities). That implementation has been replaced wholesale with
+/// the real MH2 card verified against the embedded seed.
 ///
 /// ## Implemented (v1)
 ///
-/// - Legendary Creature — Human Shaman 4/4, mana cost {B}{R}{G},
-///   owner / controller stamped (CR 205.4a — supertype Legendary; CR 704.5j
-///   legend rule SBA fires automatically once two copies share the
-///   battlefield).
-/// - <b>{T}: tutor a Food card to hand. Activate only as a sorcery.</b>
-///   <see cref="ActivatedAbility"/> (CR 602.1) with a single
-///   <see cref="AdditionalCost.Tap"/> cost and the <c>sorcerySpeed: true</c>
-///   rider (CR 117.1a / CR 307.5 — <see cref="Rules.ActionValidator"/>
-///   rejects activations outside the controller's main phase or with a
-///   non-empty stack). Resolution body filters the controller's library to
-///   <see cref="CardSubtype.Food"/> artifact cards (CR 205.3 — Food is an
-///   artifact subtype), consults the controller's agent for a pick (via
-///   <see cref="IPlayerAgent.ChooseLibraryPickAsync"/>) with a
-///   first-candidate deterministic fallback when no agent is registered,
-///   moves the picked card Library → Hand, then shuffles (CR 701.20a).
-///   Empty-candidate / null-pick path is a clean no-op (CR 701.19a permits
-///   declining to find).
+/// - <b>Identity</b>: 0-cost (empty mana cost) Legendary Creature — Human
+///   Wizard, 3/3 (CR 205.4a — Legendary supertype; CR 704.5j legend rule
+///   SBA fires automatically once two copies share the battlefield).
+///
+/// - <b>ETB tutor (CR 603.6a)</b>: "When Asmoranomardicadaistinaculdacar
+///   enters, you may search your library for a card named The Underworld
+///   Cookbook, reveal it, put it into your hand, then shuffle." Searches
+///   the controller's library for a card whose name is exactly
+///   <see cref="TutorTargetName"/>, consults the registered
+///   <see cref="IPlayerAgent"/> (CR 701.19a — "you may" + the search may
+///   fail to find, both legal), moves the pick Library → Hand via the
+///   <see cref="ZoneServiceRegistry"/> (event-firing path; direct fallback
+///   when no service is registered), then shuffles ONCE (CR 701.20a). Same
+///   posture as <see cref="BorderlandRangerFactory"/>'s ETB basic-land
+///   tutor. The printed "reveal it" UI signal is a no-op in v1 (same gap
+///   as every tutor factory) — the card still reaches the hand so the
+///   observable game state is correct.
+///
+/// - <b>"Sacrifice two Foods: Target creature deals 6 damage to itself."
+///   (CR 602.1 activated ability)</b>: cost is sacrificing two artifacts
+///   that are Foods (CR 205.3 — Food is an artifact subtype; CR 701.16a —
+///   sacrifice). A 1..1 "target creature" <see cref="TargetRequest"/>
+///   (Intent: <see cref="BotIntent.Removal"/>). On resolution the TARGET
+///   deals 6 damage to itself (CR 119.3 — the source of the damage is the
+///   target creature, not Asmoran — relevant for lifelink / "damage dealt
+///   by" triggers on the target). Routed through
+///   <see cref="Fx.DealDamage"/>. The cost requires the controller to
+///   actually control two Foods — <see cref="CanSacrificeTwoFoods"/> /
+///   <see cref="BuildSacrificeTwoFoodsCosts"/> return the two
+///   <see cref="AdditionalCost.Sacrifice"/> costs only when two Foods are
+///   available; with fewer than two, the ability cannot be activated
+///   (CR 602.5e / 601.2g — unpayable cost ⇒ activation illegal).
+///
+/// - <b>Alternative cast cost (CR 118.9)</b>: "As long as you've discarded
+///   a card this turn, you may pay {B/R} to cast this spell." Modelled by
+///   <see cref="DiscardedThisTurnAlternativeCost"/> (built via
+///   <see cref="BuildAlternativeCost"/>), gated on
+///   <see cref="TurnState.DiscardsByPlayer"/> &gt; 0 — the same per-turn
+///   discard counter Hollow One reads. Supplied to
+///   <c>SpellCastFlow.CastAsync</c>'s <c>alternativeCost</c> parameter by
+///   the caller (same caller-supplied posture as Voltage Surge / the rest
+///   of the alt-cost family); the cast flow's generic alt-cost machinery
+///   enforces <see cref="DiscardedThisTurnAlternativeCost.CanCastFor"/>.
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// The two static abilities are NOT yet wired — both require primitives
-/// the engine doesn't ship yet:
-///
-/// - <b>"You may look at the top card of your library any time."</b>
-///   Needs a <see cref="StaticAbility"/> that grants the controller a
-///   permanent "look at top" permission (CR 702.91 / similar to Lurking
-///   Predators, Magus of the Future). Existing
-///   <see cref="Effects.ContinuousEffectsService"/> doesn't model the
-///   hidden-information permission slot — adding it requires plumbing
-///   through <see cref="Players.Player.Zones.Library"/>'s reveal surface
-///   and the agent's hidden-information view. Asmoran ships without it;
-///   bot evaluation treats the library as opaque (no peek bonus).
-///
-/// - <b>"You may cast Food spells from the top of your library."</b>
-///   Needs a cast-from-zone alternative (CR 117.7c) gated on
-///   (a) the card being on top of the library and (b) the card being a
-///   Food card. Closest sibling primitive is
-///   <see cref="Majik.Core.Costs.CastFromExileAlternativeCost"/> + a
-///   conspiracy-style "permission to cast from non-hand zone" hook used
-///   by <see cref="Majik.Core.CardData.Factories.ConspicuousSnoopFactory"/>
-///   for top-of-library casts of Goblins. Adapting that infrastructure to
-///   Asmoran needs a Food-subtype predicate + the "top of library" gate
-///   to live on Asmoran's static ability. Deferred. Bot evaluation will
-///   not attempt to cast a Food from the top of the library; Asmoran will
-///   typically pair with Underworld Cookbook + Witch's Oven where the
-///   tutor + token-creation engine still functions without the cast-from-
-///   library grant.
-///
-/// Both static abilities are surfaced as <see cref="KeywordAbility"/>
-/// markers with descriptive keyword names so the card's
-/// <see cref="ICard.Abilities"/> collection still advertises the printed
-/// shape (helps the bot's oracle-aware scorers + makes the gap easy to
-/// spot in factory diagnostics). The marker is a no-op behaviourally —
-/// CombatAbilities + the engine's keyword interpreters do not consume
-/// these custom strings.
+/// - <b>Bot alt-cost probe</b>: no
+///   <see cref="AlternativeCostProbeRegistry"/> entry for the discard-gated
+///   {B/R} cost yet — same posture as Voltage Surge's optional-sacrifice
+///   probe. The bot EV layer can still opt in by building the cost via
+///   <see cref="BuildAlternativeCost"/> and layering it onto the cast.
+/// - <b>Reveal step</b>: the ETB tutor moves the Cookbook Library → Hand
+///   without publishing a reveal event — same gap as every tutor factory.
 /// </summary>
 [CardName("Asmoranomardicadaistinaculdacar")]
 public static class AsmoranomardicadaistinaculdacarFactory
 {
     public const string CardName = "Asmoranomardicadaistinaculdacar";
-    public const string PrintedManaCost = "{B}{R}{G}";
-    public const int Power = 4;
-    public const int Toughness = 4;
 
-    /// <summary>Descriptive marker for the "may look at top card of
-    /// library" static ability (CR 702.x). Behaviourally a no-op at v1;
-    /// see factory xmldoc for the deferred primitive.</summary>
-    public const string MayLookAtTopOfLibraryMarker =
-        "You may look at the top card of your library any time.";
+    /// <summary>Empty / {0} mana cost — Asmoran is a free spell normally
+    /// uncastable without the discard-gated {B/R} alternative.</summary>
+    public const string PrintedManaCost = "";
 
-    /// <summary>Descriptive marker for the "may cast Food spells from the
-    /// top of your library" static ability (CR 117.7c). Behaviourally a
-    /// no-op at v1; see factory xmldoc for the deferred primitive.</summary>
-    public const string MayCastFoodFromLibraryMarker =
-        "You may cast Food spells from the top of your library.";
+    public const int Power = 3;
+    public const int Toughness = 3;
+
+    /// <summary>The exact card name the ETB tutor searches for.</summary>
+    public const string TutorTargetName = "The Underworld Cookbook";
+
+    /// <summary>The mana cost paid via the discard-gated alternative
+    /// (CR 118.9). A single hybrid {B/R} pip.</summary>
+    public const string AlternativeManaCost = "{B/R}";
+
+    /// <summary>Damage the target creature deals to itself.</summary>
+    public const int SelfDamage = 6;
 
     /// <summary>
     /// Construct Asmoranomardicadaistinaculdacar owned and controlled by
-    /// <paramref name="owner"/>. The tutor-to-hand activated ability is
-    /// attached; the two static abilities ship as descriptive
-    /// <see cref="KeywordAbility"/> markers (see factory xmldoc).
+    /// <paramref name="owner"/> with NO trigger-manager wiring. Suitable
+    /// for shape / dispatcher tests.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, triggers: null);
+
+    /// <summary>
+    /// Construct Asmoranomardicadaistinaculdacar with optional
+    /// <see cref="TriggerManager"/> wiring. When <paramref name="triggers"/>
+    /// is supplied, the ETB tutor trigger is registered so the relevant
+    /// <c>CardMovedEvent</c> places it on the stack automatically
+    /// (CR 603.3).
+    /// </summary>
+    public static Creature Create(Player owner, TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -112,91 +132,177 @@ public static class AsmoranomardicadaistinaculdacarFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Shaman });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Wizard });
 
         card.SetOwner(owner);
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Descriptive static-ability markers — see factory xmldoc for the
-        // primitive gaps that block real wiring. Surfaced as
-        // KeywordAbility markers so card.Abilities still advertises the
-        // printed shape (matches how Insolent Neonate / Slickshot Show-Off
-        // surface their printed keyword markers).
+        // ETB trigger (CR 603.6a):
+        //   "When Asmoranomardicadaistinaculdacar enters, you may search
+        //    your library for a card named The Underworld Cookbook, reveal
+        //    it, put it into your hand, then shuffle."
         // ----------------------------------------------------------------
-        card.AddAbility(new KeywordAbility(MayLookAtTopOfLibraryMarker, card, owner));
-        card.AddAbility(new KeywordAbility(MayCastFoodFromLibraryMarker, card, owner));
-
-        // ----------------------------------------------------------------
-        // {T}: Search your library for a Food card, reveal it, put it
-        // into your hand, then shuffle. Activate only as a sorcery.
-        // CR 602.1 — activated ability. CR 117.1a / 307.5 — sorcery-speed
-        // restriction via ActivatedAbility's `sorcerySpeed: true` rider
-        // (enforced by ActionValidator). CR 701.19a — search consults
-        // agent; CR 701.20a — shuffle after the search.
-        // ----------------------------------------------------------------
-        var tutorEffect = new Effect(
-            $"{CardName}: tutor a Food card to hand",
+        var etbEffect = new Effect(
+            $"{CardName}: tutor {TutorTargetName} -> hand, then shuffle",
             ctx =>
             {
                 var controller = card.Controller ?? owner;
-                return ResolveFoodTutorAsync(controller, ctx);
+                return TutorCookbookToHandAsync(controller, ctx);
             });
 
-        var ability = new ActivatedAbility(
+        var etbTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            costs: new ICost[] { AdditionalCost.Tap(card) },
-            effects: new IEffect[] { tutorEffect },
-            sorcerySpeed: true);
+            condition: Triggers.OnEnterBattlefieldSelf(card),
+            effects: new IEffect[] { etbEffect },
+            activeZones: new[] { ZoneType.Battlefield });
 
-        card.AddAbility(ability);
+        card.AddAbility(etbTrigger);
+        triggers?.RegisterTriggeredAbility(etbTrigger);
+
+        // ----------------------------------------------------------------
+        // Activated ability (CR 602.1):
+        //   "Sacrifice two Foods: Target creature deals 6 damage to itself."
+        // Cost = sacrifice two Food artifacts (CR 205.3 / 701.16a).
+        // 1..1 "target creature" TargetRequest. On resolution the TARGET
+        // deals 6 damage to itself (CR 119.3 — source is the target).
+        // ----------------------------------------------------------------
+        ActivatedAbility? sacAbility = null;
+        var sacEffect = new Effect(
+            $"{CardName}: target creature deals {SelfDamage} damage to itself",
+            () =>
+            {
+                if (sacAbility != null
+                    && sacAbility.ChosenTargets.Count > 0
+                    && sacAbility.ChosenTargets[0].Count > 0
+                    && sacAbility.ChosenTargets[0][0] is Creature target)
+                {
+                    // CR 119.3 — the target creature is the SOURCE of the
+                    // damage and the recipient: it deals 6 to itself.
+                    Fx.DealDamage(target, SelfDamage);
+                }
+            });
+
+        sacAbility = new ActivatedAbility(
+            source: card,
+            controller: owner,
+            costs: BuildSacrificeTwoFoodsCosts(owner),
+            effects: new IEffect[] { sacEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal),
+            });
+
+        card.AddAbility(sacAbility);
 
         return card;
     }
 
     /// <summary>
-    /// Shared resolve body for the {T} activation. Filters
-    /// <paramref name="controller"/>'s library to Food-subtyped artifact
-    /// cards (CR 205.3); agent-driven pick with first-candidate fallback
-    /// (matches WorldlyTutorFactory's posture); moves Library → Hand and
-    /// shuffles (CR 701.20a).
+    /// Build the discard-gated {B/R} alternative cast cost (CR 118.9).
+    /// Caller supplies the live <see cref="TurnState"/> so
+    /// <see cref="DiscardedThisTurnAlternativeCost.CanCastFor"/> can read
+    /// the caster's discard count; pass the returned instance into
+    /// <c>SpellCastFlow.CastAsync</c>'s <c>alternativeCost</c> parameter.
     /// </summary>
-    private static async ValueTask ResolveFoodTutorAsync(Player controller, ResolutionContext ctx)
+    public static DiscardedThisTurnAlternativeCost BuildAlternativeCost(TurnState turnState)
     {
-        bool Pred(ICard c) =>
-            c.HasType(CardType.Artifact) && c.HasSubtype(CardSubtype.Food);
+        ArgumentNullException.ThrowIfNull(turnState);
+        return new DiscardedThisTurnAlternativeCost(
+            AlternativeManaCost,
+            discardCountOf: turnState.DiscardsByPlayer);
+    }
 
-        var candidates = controller.Zones.Library.GetCards().Where(Pred).ToList();
-        if (candidates.Count == 0)
+    /// <summary>
+    /// The two Foods the controller would sacrifice to activate the
+    /// "Sacrifice two Foods" ability, or an empty list when the controller
+    /// controls fewer than two Foods (CR 602.5e — the activation is then
+    /// illegal). A Food is an artifact with the Food subtype (CR 205.3).
+    /// Deterministic first-two selection (same posture as the rest of the
+    /// sacrifice-cost factory family — real agent-driven sacrifice
+    /// prompting awaits the ITarget pipeline).
+    /// </summary>
+    public static IReadOnlyList<Permanent> FindTwoFoods(Player controller)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        return controller.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(c => c.HasType(CardType.Artifact) && c.HasSubtype(CardSubtype.Food))
+            .Take(2)
+            .ToList();
+    }
+
+    /// <summary>True when <paramref name="controller"/> controls at least
+    /// two Foods (the "Sacrifice two Foods" cost is payable).</summary>
+    public static bool CanSacrificeTwoFoods(Player controller) =>
+        FindTwoFoods(controller).Count == 2;
+
+    /// <summary>
+    /// Build the sacrifice costs for the activated ability: two
+    /// <see cref="AdditionalCost.Sacrifice"/> costs over the controller's
+    /// first two Foods. Returns an empty array when fewer than two Foods
+    /// are available — the resulting ability is uncostable, so it can't be
+    /// activated (CR 602.5e).
+    /// </summary>
+    private static ICost[] BuildSacrificeTwoFoodsCosts(Player controller)
+    {
+        var foods = FindTwoFoods(controller);
+        if (foods.Count < 2) return Array.Empty<ICost>();
+        return new ICost[]
         {
-            // CR 701.19a — no Food card found. Still shuffle (per the
-            // printed oracle's "then shuffle" clause executing
-            // unconditionally) so the search information is washed out.
-            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "asmoran-tutor");
-            return;
+            AdditionalCost.Sacrifice(foods[0]),
+            AdditionalCost.Sacrifice(foods[1]),
+        };
+    }
+
+    /// <summary>
+    /// Search <paramref name="player"/>'s library for a card named
+    /// <see cref="TutorTargetName"/>, consult the agent (which may decline;
+    /// deterministic first-match fallback when no agent), move the pick
+    /// Library → Hand, then shuffle once (CR 701.20a). Same posture as
+    /// <see cref="BorderlandRangerFactory"/>'s ETB basic-land tutor.
+    /// </summary>
+    private static async ValueTask TutorCookbookToHandAsync(Player player, ResolutionContext ctx)
+    {
+        bool IsTarget(ICard c) =>
+            string.Equals(c.Name, TutorTargetName, StringComparison.Ordinal);
+
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
+
+        var candidates = player.Zones.Library.GetCards().Where(IsTarget).ToList();
+        ICard? pick = null;
+        if (candidates.Count > 0)
+        {
+            pick = agent != null
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates,
+                        $"{TutorTargetName} to put into your hand")
+                    .ConfigureAwait(false)
+                : candidates[0];
         }
 
-        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
-        ICard? pick = agent != null
-            ? await agent.ChooseLibraryPickAsync(
-                ctx.Game,
-                candidates,
-                "Food card")
-                .ConfigureAwait(false)
-            : candidates[0];
-
-        if (pick == null)
+        if (pick != null)
         {
-            // CR 701.19a — agent may decline to find. Still shuffle.
-            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "asmoran-tutor");
-            return;
+            var zones = ZoneServiceRegistry.Get(player);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Hand, player);
+            }
+            else
+            {
+                player.Zones.Library.RemoveCard(pick);
+                player.Zones.Hand.AddCard(pick);
+                pick.SetZone(ZoneType.Hand);
+            }
         }
 
-        controller.Zones.Library.RemoveCard(pick);
-        controller.Zones.Hand.AddCard(pick);
-        pick.SetZone(ZoneType.Hand);
-        // CR 701.20a — shuffle after the search.
-        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "asmoran-tutor");
+        // CR 701.20a — shuffle once after the search, even when zero cards
+        // were found (the search still happened).
+        LibraryShuffle.ShuffleLibrary(player, "asmoran-tutor");
     }
 }
