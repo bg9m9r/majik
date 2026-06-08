@@ -100,7 +100,47 @@ public sealed class EngineSimulator : ISearchSimulator
 
     // ── Implementation ────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Executes <paramref name="work"/> with <see cref="SynchronizationContext.Current"/>
+    /// set to <c>null</c>, then restores the original context on exit.
+    ///
+    /// <para>
+    /// <b>Why this is needed:</b> the engine is fully async internally
+    /// (TurnDriver, PriorityLoop, CombatFlow all use <c>async Task</c>).  When
+    /// <see cref="AdvanceCore"/> or <see cref="RolloutCore"/> is called from an
+    /// xUnit test worker (which installs <c>MaxConcurrencySyncContext</c>) the
+    /// state-machine continuations of those async methods capture xUnit's context
+    /// at their first suspension.  On completion — driven inline by
+    /// <see cref="SearchAgent.SupplyMove"/> — the continuation is posted to
+    /// xUnit's context queue.  If all xUnit worker threads are already blocked
+    /// (waiting at <c>GetResult()</c>) the posted item never runs → deadlock.
+    ///
+    /// Clearing the context before <see cref="SandboxGame.ResumeAsync"/> ensures
+    /// that every <c>await</c> in the engine chain captures <c>null</c>.  With a
+    /// null context and a thread-pool thread as completing thread,
+    /// <c>AwaitTaskContinuation.IsValidLocationForInlining()</c> returns <c>true</c>
+    /// and continuations execute <i>inline</i> on the search thread — no thread-pool
+    /// slot needed, no scheduler post, no starvation on 1–2 cores.
+    /// </para>
+    ///
+    /// <para>
+    /// The context is restored in a <c>finally</c> block so the caller's thread
+    /// (e.g. the xUnit worker) gets its original context back after the search
+    /// step completes.
+    /// </para>
+    /// </summary>
+    private static T WithNullSyncContext<T>(Func<T> work)
+    {
+        var prev = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(null);
+        try   { return work(); }
+        finally { SynchronizationContext.SetSynchronizationContext(prev); }
+    }
+
     private SimDecision AdvanceCore(SimState root, IReadOnlyList<SimMove> pathFromRoot)
+        => WithNullSyncContext(() => AdvanceCoreUnsafe(root, pathFromRoot));
+
+    private SimDecision AdvanceCoreUnsafe(SimState root, IReadOnlyList<SimMove> pathFromRoot)
     {
         var cts = new CancellationTokenSource();
 
@@ -178,6 +218,9 @@ public sealed class EngineSimulator : ISearchSimulator
     }
 
     private double RolloutCore(SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns)
+        => WithNullSyncContext(() => RolloutCoreUnsafe(root, pathFromRoot, depthTurns));
+
+    private double RolloutCoreUnsafe(SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns)
     {
         SearchAgent? searchAgent = null;
         var rolloutStrategy = new HeuristicStrategy(new BotConfig(

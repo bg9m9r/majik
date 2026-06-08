@@ -66,9 +66,31 @@ public sealed class SearchAgent : IPlayerAgent
     private readonly Queue<SimMove> _script;
 
     // ── TCS pair ─────────────────────────────────────────────────────────────
-    // RunContinuationsAsynchronously on BOTH is essential: prevents the engine
-    // continuation from running inline on the search thread and vice-versa,
-    // which would deadlock because one thread holds the async pump the other needs.
+    // _decisionReady uses RunContinuationsAsynchronously: prevents any await-
+    // based consumer of NextDecisionAsync() from running its continuation
+    // inline on the engine thread and potentially re-entering the engine
+    // before it has fully suspended. EngineSimulator uses blocking GetResult(),
+    // not await, so this flag does not affect the search loop's unblocking —
+    // GetResult() uses a kernel wait handle that fires the moment TrySetResult
+    // is called, regardless of RunContinuationsAsynchronously.
+    //
+    // _moveSupplied does NOT use RunContinuationsAsynchronously: when
+    // EngineSimulator.AdvanceCore calls SupplyMove(), the engine's await-
+    // continuation of moveTcs.Task runs INLINE on the search thread. The
+    // engine advances synchronously (through completed awaits) until the next
+    // DecideAsync capture, which completes the next _decisionReady TCS inline
+    // and suspends at the subsequent _moveSupplied. This eliminates the thread-
+    // pool dependency entirely: the search loop never needs a free pool thread
+    // to unblock GetResult() — the engine drives itself forward on the search
+    // thread between SupplyMove and the next WhenAny. Without this change, a
+    // RunContinuationsAsynchronously _moveSupplied posts the engine continuation
+    // to the pool; if all pool threads are blocked (parallel tests on 1-2 cores)
+    // that continuation never runs → GetResult() deadlocks.
+    //
+    // Safety: inline continuation of _moveSupplied is safe because SupplyMove is
+    // called from the search loop when it is NOT blocked at GetResult(). The
+    // engine runs synchronously until the next _moveSupplied await, then
+    // suspends cleanly. No circular inline-deadlock.
     //
     // SEQUENCING INVARIANT:
     //   _decisionReady is swapped to a fresh pending TCS BEFORE the previous one
@@ -77,11 +99,28 @@ public sealed class SearchAgent : IPlayerAgent
     //   never a stale completed one. (If we completed first and reset second the
     //   search side would race and see the already-completed task again.)
 
-    private TaskCompletionSource<SimDecision> _decisionReady = New<SimDecision>();
-    private TaskCompletionSource<SimMove> _moveSupplied = New<SimMove>();
+    private TaskCompletionSource<SimDecision> _decisionReady = NewAsync<SimDecision>();
+    private TaskCompletionSource<SimMove> _moveSupplied = NewSync<SimMove>();
 
-    private static TaskCompletionSource<T> New<T>() =>
+    /// <summary>
+    /// TCS whose continuations are posted to the thread pool (not run inline).
+    /// Used for <c>_decisionReady</c>: prevents any <c>await</c>-based consumer
+    /// of <see cref="NextDecisionAsync"/> from running its continuation inline on
+    /// the engine thread before the engine has fully suspended.
+    /// </summary>
+    private static TaskCompletionSource<T> NewAsync<T>() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// TCS whose continuations run inline on the completing thread (no
+    /// <see cref="TaskCreationOptions.RunContinuationsAsynchronously"/>).
+    /// Used for <c>_moveSupplied</c>: when <see cref="SupplyMove"/> calls
+    /// <c>TrySetResult</c>, the engine's <c>await moveTcs.Task</c> continuation
+    /// resumes synchronously on the search thread. This eliminates the
+    /// thread-pool dependency that caused deadlock under pool starvation on
+    /// machines with 1–2 available cores.
+    /// </summary>
+    private static TaskCompletionSource<T> NewSync<T>() => new();
 
     // ── CombatSearch topology cap (mirrors CombatSearch.TopKAttackers) ───────
     // Bound the attacker-subset enumeration to the same cap used by the
@@ -178,8 +217,8 @@ public sealed class SearchAgent : IPlayerAgent
         // 1. Swap in fresh TCS FIRST (so NextDecisionAsync returns the new
         //    pending task the moment the search side re-enters the loop).
         var decisionTcs = _decisionReady;
-        _decisionReady = New<SimDecision>();
-        var moveTcs = New<SimMove>();
+        _decisionReady = NewAsync<SimDecision>();
+        var moveTcs = NewSync<SimMove>();
         _moveSupplied = moveTcs;
 
         // 2. Signal the search loop with the completed decision.
