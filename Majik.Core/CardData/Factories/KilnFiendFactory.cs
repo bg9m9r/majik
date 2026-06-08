@@ -66,6 +66,24 @@ public static class KilnFiendFactory
         Create(owner, effects: null, triggers: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (via <see cref="NamedCardFactory.Create(string,
+    /// Player, Majik.Core.Effects.ContinuousEffectsService?)"/>). The source
+    /// generator only recognises a two-parameter <c>Create(Player,
+    /// ContinuousEffectsService)</c> as the effects-aware overload, so this
+    /// shape is required for the cast-pump trigger to be wired in live matches
+    /// — without it the routed build fell through to the shape-only
+    /// <see cref="Create(Player)"/> and the trigger was inert. No
+    /// <see cref="TriggerManager"/> is needed here: the live manager auto-binds
+    /// any card carrying an <see cref="ITriggeredAbility"/> on its first zone
+    /// crossing (battlefield entry). Forwards to the canonical overload with a
+    /// null trigger manager. Mirrors the lord/anthem factories' effects-aware
+    /// posture.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects, triggers: null);
+
+    /// <summary>
     /// Construct Kiln Fiend with optional effects service + trigger manager.
     /// When <paramref name="effects"/> is supplied the cast-trigger pump is
     /// built; when <paramref name="triggers"/> is supplied that trigger is
