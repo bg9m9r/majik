@@ -258,6 +258,93 @@ public class OracleTriggeredAbilityBinderTests
     }
 
     [Fact]
+    public void Bind_BojukaBog_EtbExilesTargetPlayersGraveyard()
+    {
+        // CR 603.6a — Bojuka Bog is a LAND, so the only prod binding path is
+        // OracleTriggeredAbilityBinder. "When ~ enters, exile target player's
+        // graveyard." With an opponent present, the v1 deterministic target is
+        // the first opponent; every card in that graveyard is exiled.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var goyf = new Creature("Tarmogoyf", "1G", 0, 1) { Owner = _bob, Controller = _bob };
+        var drc = new Creature("Dragon's Rage Channeler", "R", 3, 3) { Owner = _bob, Controller = _bob };
+        goyf.SetZone(ZoneType.Graveyard);
+        drc.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(goyf);
+        _bob.Zones.Graveyard.AddCard(drc);
+
+        var allPlayers = new List<Player> { _alice, _bob };
+
+        var bog = new Majik.Core.Cards.Land("Bojuka Bog") { Owner = _alice, Controller = _alice };
+        bog.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bog);
+
+        var entity = new CardEntity
+        {
+            Name = "Bojuka Bog",
+            TypeLine = "Land",
+            OracleText = "Bojuka Bog enters tapped.\nWhen Bojuka Bog enters, exile target player's graveyard.\n{T}: Add {B}.",
+        };
+        var bound = OracleTriggeredAbilityBinder.Bind(bog, entity, _alice, allPlayers).ToList();
+        bound.Should().ContainSingle("the ETB exile-graveyard trigger must bind");
+        foreach (var ab in bound) bog.AddAbility(ab);
+        triggers.BindCard(bog);
+
+        zones.MoveCardTo(bog, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _bob.Zones.Graveyard.GetCards().Should().BeEmpty(
+            "every card in the target player's graveyard is exiled");
+        _bob.Zones.Exile.GetCards().Should().Contain(new[] { goyf, drc });
+        goyf.Zone.Should().Be(ZoneType.Exile);
+        drc.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    [Fact]
+    public void Bind_BojukaBog_Etb_FallsBackToController_WhenNoOpponents()
+    {
+        // Prod call site passes only the controller (no allPlayers). With no
+        // opponent available the v1 deterministic fallback exiles the
+        // controller's own graveyard — mirrors the Endurance fallback.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var ponder = new Creature("Snapcaster Mage", "1U", 2, 1) { Owner = _alice, Controller = _alice };
+        ponder.SetZone(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.AddCard(ponder);
+
+        var bog = new Majik.Core.Cards.Land("Bojuka Bog") { Owner = _alice, Controller = _alice };
+        bog.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bog);
+
+        var entity = new CardEntity
+        {
+            Name = "Bojuka Bog",
+            TypeLine = "Land",
+            OracleText = "Bojuka Bog enters tapped.\nWhen Bojuka Bog enters, exile target player's graveyard.\n{T}: Add {B}.",
+        };
+        // No allPlayers — exactly the prod GameFacade.BindCardAbilities call shape.
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(bog, entity, _alice))
+        {
+            bog.AddAbility(ab);
+        }
+        triggers.BindCard(bog);
+
+        zones.MoveCardTo(bog, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.Zones.Graveyard.GetCards().Should().BeEmpty(
+            "with no opponents, the controller's own graveyard is the fallback target");
+        _alice.Zones.Exile.GetCards().Should().Contain(ponder);
+        ponder.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    [Fact]
     public void GoblinGuide_Attack_RevealsTop_LandToDefenderHand()
     {
         var stack = new Majik.Core.Stack.Stack(_bus);
