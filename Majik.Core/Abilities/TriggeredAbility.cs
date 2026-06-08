@@ -234,9 +234,23 @@ public class TriggeredAbility : ITriggeredAbility
             with
             { TriggeringPlayer = TriggeringPlayer };
 
-        foreach (var effect in _effects)
+        // Attribute any counter performed during this ability's resolution to
+        // its controller — "a spell or ability you control counters a spell"
+        // (Baral, Chief of Compliance). Mystic Snake / Voidslime counter their
+        // target as part of resolving here. Restored afterward.
+        var stack = game?.Stack;
+        var previousResolutionController = stack?.CurrentResolutionController;
+        if (stack is not null) stack.CurrentResolutionController = Controller;
+        try
         {
-            await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            foreach (var effect in _effects)
+            {
+                await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (stack is not null) stack.CurrentResolutionController = previousResolutionController;
         }
 
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);

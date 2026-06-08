@@ -36,6 +36,37 @@ public class Stack
     }
 
     /// <summary>
+    /// The controller of the stack object that is CURRENTLY resolving, set by
+    /// the resolution entry points (<see cref="Majik.Core.Services.StackResolver"/>,
+    /// <see cref="Majik.Core.Abilities.TriggeredAbility.ResolveAsync"/>,
+    /// <see cref="Majik.Core.Abilities.ActivatedAbility.ResolveAsync"/>) for the
+    /// duration of that object's resolution. Read by
+    /// <see cref="PublishSpellCountered"/> so a "counter" effect run during
+    /// resolution can attribute the counter to "a spell or ability you
+    /// control" (Baral, Chief of Compliance) without every counter caller
+    /// having to thread the countering controller explicitly. Null when no
+    /// object is mid-resolution.
+    /// </summary>
+    public Player? CurrentResolutionController { get; set; }
+
+    /// <summary>
+    /// CR 701.5 — announce that <paramref name="spell"/> was countered. Fires
+    /// <see cref="Majik.Core.Domain.DomainEvents.SpellCounteredEvent"/> on the
+    /// stack's event bus, attributing the counter to
+    /// <see cref="CurrentResolutionController"/> (the controller of the
+    /// spell/ability that is resolving and performed the counter). Called from
+    /// the single counter chokepoint
+    /// (<see cref="Majik.Core.CardData.OracleSpellBinder.RemoveFromStack"/>).
+    /// </summary>
+    internal void PublishSpellCountered(Majik.Core.Spells.ISpell spell)
+    {
+        if (spell is null) return;
+        _eventBus?.Publish(
+            new Majik.Core.Domain.DomainEvents.SpellCounteredEvent(
+                spell, CurrentResolutionController));
+    }
+
+    /// <summary>
     /// Add an object to the top of the stack.
     /// </summary>
     public void Push(IStackObject stackObject)

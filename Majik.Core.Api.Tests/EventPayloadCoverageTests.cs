@@ -80,6 +80,7 @@ public class EventPayloadCoverageTests
         "PriorityReceivedEvent",
         "StackClearedEvent",
         "StateBasedActionExecutedEvent",
+        "SpellCounteredEvent",
         "SurveilEvent",
         "SuspendCounterDrainedEvent",
         "TargetsChosenEvent",

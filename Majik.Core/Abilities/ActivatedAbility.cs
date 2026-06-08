@@ -246,10 +246,23 @@ public class ActivatedAbility : IActivatedAbility
         var rc = ResolutionContext.For(
             Controller, agent, game, _chosenTargets, ct, source: Source as Cards.Permanent);
 
-        // Resolution logic (Rule 608) — await each effect in order.
-        foreach (var effect in _effects)
+        // Attribute any counter performed during this ability's resolution to
+        // its controller — "a spell or ability you control counters a spell"
+        // (Baral, Chief of Compliance). Restored afterward.
+        var stack = game?.Stack;
+        var previousResolutionController = stack?.CurrentResolutionController;
+        if (stack is not null) stack.CurrentResolutionController = Controller;
+        try
         {
-            await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            // Resolution logic (Rule 608) — await each effect in order.
+            foreach (var effect in _effects)
+            {
+                await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (stack is not null) stack.CurrentResolutionController = previousResolutionController;
         }
 
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
