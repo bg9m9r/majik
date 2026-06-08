@@ -69,22 +69,43 @@ namespace Majik.Core.CardData.Factories;
 ///   pick up the new card's abilities; removing the Cauldron revokes every
 ///   grant (CR 613.6e).
 ///
+/// - <b>Static: ability-grant via imprint (NON-mana activated abilities)</b>
+///   (CR 613.1f / 702.49): the common, soundly-reconstructable non-mana
+///   activated-ability shapes of imprinted creatures are now ALSO re-homed to
+///   each bearer, via the card-identity-agnostic
+///   <see cref="Majik.Core.CardData.OracleActivatedAbilityBinder"/> (the
+///   non-mana sibling of <see cref="Majik.Core.CardData.OracleManaBinder.ParseTapManaCosts"/>).
+///   Each is rebuilt as a FRESH <see cref="ActivatedAbility"/> sourced on the
+///   bearer — the cost taps/sacrifices the bearer and the effect references the
+///   bearer ("this creature" = bearer):
+///   <list type="bullet">
+///     <item><b>firebreathing / self-pump</b> — "{cost}: This creature gets
+///       +X/+Y until end of turn" → bearer's
+///       <see cref="Majik.Core.Effects.PumpUntilEndOfTurnEffect"/> (Layer 7c);</item>
+///     <item><b>pinger</b> — "{cost}: This creature deals N damage to any
+///       target / target creature / target player" →
+///       <see cref="Majik.Core.Primitives.Fx.DealDamageAny(object,int,Creature)"/>
+///       with the bearer as damage source;</item>
+///     <item><b>sacrifice-self pinger</b> — "Sacrifice this creature: It deals
+///       N damage to …" → same, cost is
+///       <see cref="Majik.Core.Costs.AdditionalCost.Sacrifice(Permanent,Majik.Core.Events.IEventBus)"/>(bearer).</item>
+///   </list>
+///   Cost grammar handled: any ", "-separated list of generic / coloured mana
+///   pips and {T} (so "{2}:", "{T}:", "{R}, {T}:" all rebuild).
+///
 /// ## Deferred (precise remaining gap)
-/// - <b>NON-mana activated abilities of imprinted creatures</b> ("{2}: this
-///   gets +1/+1", "{T}: deal 1 damage", "{B}, {T}, Sacrifice a creature: …",
-///   loyalty-style, etc.) are NOT granted. The blocker is real, not laziness:
-///   re-homing requires rebuilding an arbitrary creature's activated ability
-///   against a NEW source, and the engine has no general, source-parameterised
-///   oracle binder for non-mana activated abilities. The only producers are
-///   (a) the land-only <see cref="Majik.Core.CardData.OracleLandActivatedAbilityBinder"/>
-///   and (b) bespoke per-card factory closures that capture a specific card —
-///   neither is re-source-able. <see cref="ManaAbility"/> alone is cleanly
-///   reconstructable from oracle text (it is parameterised by source +
-///   ManaCost), so only the mana slice is grantable today. A sound general
-///   grant of the rest waits on a declarative, re-source-able representation of
-///   non-mana activated abilities (a general oracle→activated-ability binder,
-///   the same gap that keeps Isochron Scepter / Horizon-land sac abilities
-///   partial). Tracked: v1-deferrals.
+/// - <b>Bespoke non-mana activated abilities of imprinted creatures</b> that
+///   are NOT in the soundly-reconstructable set — tutors, token makers, modal /
+///   "choose one" abilities, anthem-style grants, "{T}: Draw", loyalty-style,
+///   abilities with unmodellable cost tokens ({X}, energy {E}, snow {S},
+///   Phyrexian, "Pay N life", "Discard a card"), "Activate only …" riders, and
+///   restricted damage targets ("target attacking creature", "creature
+///   defending player controls"). These are unbounded and not generally
+///   reconstructable from oracle text without per-card work, so the binder
+///   SKIPS them rather than emit a broken ability re-homed to the wrong source.
+///   A correct partial beats a broken "all"; closing the residual fully waits
+///   on a re-bindable ability model where every activated ability carries a
+///   declarative, re-source-able representation. Tracked: v1-deferrals.
 /// </summary>
 [CardName("Agatha's Soul Cauldron")]
 public static class AgathasSoulCauldronFactory
@@ -287,12 +308,27 @@ public static class AgathasSoulCauldronFactory
     /// <summary>
     /// Build the abilities granted to one <paramref name="bearer"/> by the
     /// imprint static: for EACH creature card imprinted on
-    /// <paramref name="cauldron"/>, re-home that card's "{T}: Add …" mana
-    /// abilities to the bearer (CR 613.1f / 605.1a). A re-homed
-    /// <see cref="ManaAbility"/> is sourced on the bearer, so it taps the bearer
-    /// and adds to the bearer-controller's pool — never the exiled card. Non-mana
-    /// activated abilities are not produced here (see the type doc's Deferred
-    /// note); the engine has no re-source-able representation of them.
+    /// <paramref name="cauldron"/>, re-home that card's activated abilities to
+    /// the bearer (CR 613.1f / 605.1a). Two re-source-able binders run against
+    /// the imprinted card's oracle text:
+    /// <list type="bullet">
+    ///   <item><b>MANA abilities</b> — "{T}: Add …" via
+    ///     <see cref="OracleManaBinder.ParseTapManaCosts"/>; rebuilt as fresh
+    ///     <see cref="ManaAbility"/> instances sourced on the bearer.</item>
+    ///   <item><b>NON-mana activated abilities</b> — firebreathing / self-pump
+    ///     ("{cost}: This creature gets +X/+Y until end of turn"), pingers
+    ///     ("{cost}: This creature deals N damage to …"), and sacrifice-self
+    ///     pingers ("Sacrifice this creature: It deals N damage to …") via
+    ///     <see cref="OracleActivatedAbilityBinder.RebuildActivatedAbilities"/>;
+    ///     rebuilt as fresh <see cref="ActivatedAbility"/> instances whose cost
+    ///     taps/sacrifices the BEARER and whose effect references the BEARER
+    ///     ("this creature" = bearer).</item>
+    /// </list>
+    /// Every granted ability is sourced on the bearer, so it acts on the bearer
+    /// (taps/sacrifices/pumps the bearer; mana goes to the bearer-controller's
+    /// pool) — never the exiled card. Bespoke activated abilities the
+    /// <see cref="OracleActivatedAbilityBinder"/> can't soundly rebuild are
+    /// SKIPPED, not emitted broken (see its soundness boundary).
     /// </summary>
     private static IReadOnlyList<IAbility> BuildGrantedAbilities(
         Artifact cauldron,
@@ -310,9 +346,19 @@ public static class AgathasSoulCauldronFactory
 
             var entity = oracleLookup(imprinted.Name);
             var oracleText = entity?.OracleText;
+
+            // MANA slice — "{T}: Add …" re-homed to the bearer.
             foreach (var manaCost in OracleManaBinder.ParseTapManaCosts(oracleText))
             {
                 granted.Add(new ManaAbility(bearer, controller, manaCost));
+            }
+
+            // NON-mana slice — firebreathing / pinger / sac-pinger re-homed to
+            // the bearer. Unparseable bespoke abilities are skipped.
+            foreach (var ability in OracleActivatedAbilityBinder.RebuildActivatedAbilities(
+                         oracleText, bearer, controller))
+            {
+                granted.Add(ability);
             }
         }
         return granted;

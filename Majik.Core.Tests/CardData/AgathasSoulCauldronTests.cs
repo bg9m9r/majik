@@ -653,4 +653,201 @@ public class AgathasSoulCauldronTests
                 "a creature Alice controls but Bob owns is one of 'creatures you control' " +
                 "and gains the ability, even living in Bob's battlefield zone (CR 110.2 / 700.6)");
     }
+
+    // -----------------------------------------------------------------------
+    // CR 613.1f / 702.49 — ability-grant static (NON-mana activated-ability
+    // slice). An imprinted creature's firebreathing / pinger / sac-pinger is
+    // RE-HOMED to each qualifying bearer via OracleActivatedAbilityBinder —
+    // built fresh against the bearer as source, so the cost taps/sacrifices the
+    // BEARER and the effect references the BEARER ("this creature" = bearer).
+    // -----------------------------------------------------------------------
+
+    /// <summary>Granted non-mana activated abilities on a bearer (i.e. the
+    /// re-homed firebreathing / pinger abilities, excluding mana abilities).</summary>
+    private static System.Collections.Generic.List<ActivatedAbility> GrantedActivated(Creature bearer)
+        => bearer.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+
+    /// <summary>Wire a bearer creature onto the battlefield with a +1/+1 counter
+    /// and an effects service so granted self-pump can be observed via P/T.</summary>
+    private static Creature SeatedBearer(
+        Player owner,
+        Majik.Core.Effects.ContinuousEffectsService effects,
+        Majik.Core.Services.ZoneService zones,
+        int power = 2, int toughness = 2)
+    {
+        var bearer = new Creature("Counter Bear", "1G", power, toughness);
+        bearer.SetOwner(owner);
+        bearer.ChangeController(owner);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        bearer.ClearSummoningSickness();
+        owner.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, owner);
+        bearer.ActiveEffects = effects;
+        return bearer;
+    }
+
+    [Fact]
+    public void Grant_NonMana_Firebreathing_RehomesSelfPumpToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{R}: This creature gets +1/+0 until end of turn."
+        var hellhound = new Creature("Fiery Stub", "1RR", 2, 2);
+        hellhound.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(hellhound);
+        hellhound.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Fiery Stub", "{R}: This creature gets +1/+0 until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), hellhound);
+
+        // The bearer gained a non-mana pump ability sourced on itself.
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's firebreathing");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        pump.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("R"));
+
+        // Activating it pumps the BEARER (CR 613.1f Layer 7c), not the dork.
+        // (Base 2/2 + the +1/+1 counter = 3/3 before the pump.)
+        var powerBefore = bearer.GetPower();
+        var toughnessBefore = bearer.GetToughness();
+        foreach (var effect in pump.Effects) effect.Execute();
+        bearer.GetPower().Should().Be(powerBefore + 1,
+            "the re-homed firebreathing pumps the BEARER's power");
+        bearer.GetToughness().Should().Be(toughnessBefore,
+            "+1/+0 leaves the BEARER's toughness unchanged");
+    }
+
+    [Fact]
+    public void Grant_NonMana_Pinger_RehomesTapAndDamageToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{T}: This creature deals 1 damage to any target."
+        var pinger = new Creature("Pinger Stub", "2R", 1, 1);
+        pinger.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(pinger);
+        pinger.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Pinger Stub", "{T}: This creature deals 1 damage to any target.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), pinger);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's pinger");
+        var ping = granted[0];
+        ping.Source.Should().BeSameAs(bearer, "re-homed to the BEARER");
+        ping.TargetRequests.Should().ContainSingle(t => t.Description.Contains("any target"));
+
+        // The cost is a {T} that taps the BEARER.
+        var tapCost = ping.Costs.OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.Tap);
+        bearer.IsTapped.Should().BeFalse();
+        tapCost.Pay(alice);
+        bearer.IsTapped.Should().BeTrue("the re-homed {T} cost taps the BEARER, not the exiled card");
+        pinger.IsTapped.Should().BeFalse("the exiled imprinted card is never tapped");
+
+        // Resolving deals 1 to the chosen target.
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+        var lifeBefore = bob.LifeTotal;
+        foreach (var effect in ping.Effects) effect.Execute();
+        bob.LifeTotal.Should().Be(lifeBefore - 1,
+            "the re-homed pinger deals its damage to the chosen target");
+    }
+
+    [Fact]
+    public void Grant_NonMana_SacrificePinger_RehomesSacOfBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted: "Sacrifice this creature: It deals 1 damage to any target."
+        var mogg = new Creature("Mogg Stub", "R", 1, 1);
+        mogg.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(mogg);
+        mogg.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Mogg Stub", "Sacrifice this creature: It deals 1 damage to any target.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), mogg);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle();
+        var ping = granted[0];
+        ping.Source.Should().BeSameAs(bearer);
+        ping.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice,
+                "the re-homed sacrifice cost sacrifices the BEARER");
+
+        // Paying the cost sacrifices the BEARER (moves it to its graveyard).
+        var sacCost = ping.Costs.OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.Sacrifice);
+        sacCost.Pay(alice);
+        bearer.Zone.Should().Be(ZoneType.Graveyard, "the BEARER is sacrificed, not the exiled card");
+        mogg.Zone.Should().Be(ZoneType.Exile, "the exiled imprinted card stays exiled");
+    }
+
+    [Fact]
+    public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A creature whose only ability is a bespoke, NON-reconstructable one:
+        // a tutor with an unmodellable cost shape and an effect the binder
+        // doesn't know. Plus an "Activate only" rider on a pump (must be skipped
+        // too — sound, not broken).
+        var bespoke = new Creature("Bespoke Stub", "2GG", 3, 3);
+        bespoke.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bespoke);
+        bespoke.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Bespoke Stub",
+                "{2}, {T}: Search your library for a creature card, reveal it, "
+                + "put it into your hand, then shuffle.\n"
+                + "{G}: This creature gets +2/+2 until end of turn. Activate only as a sorcery.\n"
+                + "{E}{E}: This creature deals 2 damage to any target.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), bespoke);
+
+        GrantedActivated(bearer).Should().BeEmpty(
+            "no broken ability is emitted for bespoke / ridered / unmodellable-cost shapes; "
+            + "the binder skips what it cannot soundly rebuild");
+    }
 }
