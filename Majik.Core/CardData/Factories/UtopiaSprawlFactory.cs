@@ -43,11 +43,31 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Choose-a-color (CR 614 replacement-style "as ~ enters")
 ///
-/// "As this Aura enters, choose a color." (CR 614.12) is resolved up front:
-/// the chosen <see cref="ManaColor"/> is supplied to <see cref="Create(Player, ManaColor, Majik.Core.Abilities.TriggerManager?)"/>.
-/// A live agent prompt for the choice is deferred engine-wide (same posture
-/// as Spreading Seas' cast-time target prompt); callers/tests pass the
-/// already-chosen color.
+/// "As this Aura enters, choose a color." (CR 614.12) selects the color the
+/// trigger adds. The chosen <see cref="ManaColor"/> is supplied to
+/// <see cref="Create(Player, ManaColor, Majik.Core.Abilities.TriggerManager?)"/>;
+/// the production / single-arg path defaults to
+/// <see cref="LotusCobraFactory.DefaultColor"/> (Green — Utopia Sprawl's own
+/// color identity, and the only color a Forest-bound mana doubler ever needs)
+/// because a live <c>ChooseManaColorAsync</c> agent prompt is deferred
+/// engine-wide (same posture as Coldsteel Heart / Temple of the Dragon Queen /
+/// Fertile Ground's "any color").
+///
+/// ## Routed production wiring (the gap this factory closes)
+///
+/// Utopia Sprawl is routed through this factory in production
+/// (<see cref="FactoryRouting"/>). The routed instance-swap build deliberately
+/// does NOT run <see cref="OracleTriggeredAbilityBinder"/> — the factory owns
+/// its triggered ability — and it dispatches only the single-arg
+/// <see cref="Create(Player)"/> overload. So that overload both attaches the
+/// triggered mana ability AND registers it with the live per-game
+/// <see cref="Majik.Core.Abilities.TriggerManager"/> resolved from
+/// <see cref="Majik.Core.Abilities.TriggerManagerRegistry"/> (the ambient
+/// per-game manager installed at game start in
+/// <c>GameDriver.RunGameAsync</c>). The trigger only matches while the Aura is
+/// on the battlefield (<see cref="TriggeredAbility"/>'s <c>ActiveZones</c>
+/// gate, CR 603.1), so registering at deck-build time is harmless until the
+/// Aura resolves and attaches.
 ///
 /// ## Enchant Forest
 ///
@@ -75,11 +95,20 @@ public static class UtopiaSprawlFactory
         CardDefinitionLoader.FromEmbeddedResource("utopia-sprawl");
 
     /// <summary>
-    /// Construct Utopia Sprawl with correct card identity only (no live
-    /// mana-trigger wiring). Suitable for factory-shape / dispatcher tests.
+    /// Single-arg dispatch — the overload the routed production build
+    /// (<see cref="FactoryRouting"/>) invokes. Attaches the triggered mana
+    /// ability with the default color (<see cref="LotusCobraFactory.DefaultColor"/>)
+    /// and registers it with the live per-game
+    /// <see cref="TriggerManager"/> resolved from
+    /// <see cref="TriggerManagerRegistry"/>, so the bonus actually fires in a
+    /// real match (the routed build runs no triggered-ability binder — the
+    /// factory owns the trigger). Outside any game scope (pure shape /
+    /// dispatcher tests) the registry yields <c>null</c> and the trigger is
+    /// merely attached, not registered — identical to the prior shape-only
+    /// posture.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        (Enchantment)CardDefinitionFactory.Build(Definition, owner);
+        Create(owner, LotusCobraFactory.DefaultColor, TriggerManagerRegistry.Get());
 
     /// <summary>
     /// Construct a fully-wired Utopia Sprawl. The triggered mana ability is
@@ -96,7 +125,8 @@ public static class UtopiaSprawlFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = Create(owner);
+        // Identity only (no recursion into the trigger-wiring overload).
+        var card = (Enchantment)CardDefinitionFactory.Build(Definition, owner);
 
         // "Whenever enchanted Forest is tapped for mana, its controller adds
         // an additional one mana of the chosen color." (CR 605.1b / 603.2.)
