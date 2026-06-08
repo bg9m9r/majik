@@ -91,4 +91,19 @@ public sealed class LevelBandEffect : ContinuousEffect
             chars.Toughness = band.Toughness;
         }
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="LevelBandEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// The level-counter count is read live from the cloned source's counters
+    /// (counters are value-cloned by <see cref="Majik.Core.Simulation.GameStateCloner"/>),
+    /// so the band resolves correctly without any extra wiring.
+    /// preserves: _bands; source → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new LevelBandEffect(clonedCreature, _bands)
+            : null;
 }

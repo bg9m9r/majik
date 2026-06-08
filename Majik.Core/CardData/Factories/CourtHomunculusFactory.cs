@@ -196,6 +196,19 @@ public static class CourtHomunculusFactory
             chars.Power += Bonus;
             chars.Toughness += Bonus;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="ConditionalSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The "controls another artifact" predicate reads clonedSource.Controller live.
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new ConditionalSelfPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

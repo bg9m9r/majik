@@ -200,6 +200,25 @@ public static class DragonsRageChannelerFactory
                 chars.Keywords.Add("Flying");
             }
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="DeliriumPumpEffect"/> bound to
+        /// <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The controller is captured as a field; the cloned controller is obtained from
+        /// clonedSource.Controller (remapped by RelinkReferences). Both the PT_Modify and
+        /// Abilities layer instances are reconstructed independently by the cloner (one
+        /// CloneForSim call per registered effect instance).
+        /// preserves: _layer; source → clonedSource (as Creature); controller → clonedSource.Controller.
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        {
+            if (clonedSource is not Majik.Core.Cards.Creature clonedCreature) return null;
+            var clonedController = clonedCreature.Controller;
+            if (clonedController == null) return null;
+            return new DeliriumPumpEffect(clonedCreature, clonedController, _layer);
+        }
     }
 
     /// <summary>

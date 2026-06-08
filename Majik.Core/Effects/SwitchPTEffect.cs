@@ -17,6 +17,8 @@ public sealed class SwitchPTEffect : ContinuousEffect
     }
 
     public override Layer Layer => Layer.PT_Switch;
+    // CR 613.1g — target as source so GameStateCloner can locate this effect.
+    public override Permanent? Source => _target;
     public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
     public override bool IsActive() =>
         _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
@@ -25,4 +27,16 @@ public sealed class SwitchPTEffect : ContinuousEffect
     {
         (chars.Power, chars.Toughness) = (chars.Toughness, chars.Power);
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="SwitchPTEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: nothing beyond the target reference; target → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new SwitchPTEffect(clonedCreature)
+            : null;
 }

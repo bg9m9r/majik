@@ -235,5 +235,19 @@ public static class KorSpiritdancerFactory
             chars.Power += bonus;
             chars.Toughness += bonus;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="AuraCountPumpEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The Aura count reads clonedSource's live attachment list (correctly remapped
+        /// by RelinkReferences in Pass 2c of the cloner).
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new AuraCountPumpEffect(clonedCreature)
+                : null;
     }
 }

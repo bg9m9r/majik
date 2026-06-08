@@ -34,6 +34,8 @@ public sealed class BecomesPTUntilEndOfTurnEffect : ContinuousEffect
 
     public override Layer Layer => Layer.PT_SetBase;
     public override bool ExpiresAtEndOfTurn => true;
+    // CR 613.1g — target as source so GameStateCloner can locate this effect.
+    public override Permanent? Source => _target;
     public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
     public override bool IsActive() =>
         _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
@@ -43,4 +45,16 @@ public sealed class BecomesPTUntilEndOfTurnEffect : ContinuousEffect
         chars.Power = NewPower;
         chars.Toughness = NewToughness;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="BecomesPTUntilEndOfTurnEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: NewPower, NewToughness; target → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new BecomesPTUntilEndOfTurnEffect(clonedCreature, NewPower, NewToughness)
+            : null;
 }

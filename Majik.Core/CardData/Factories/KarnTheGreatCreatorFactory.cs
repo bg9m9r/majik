@@ -281,4 +281,14 @@ internal sealed class KarnAnimatedShimPTEffect : ContinuousEffect
     // ContinuousEffectsService.Compute upgrades the animated artifact to a
     // creature row (CR 613.1c) on Karn's Layer-4 Creature grant, so this
     // set-base (MV-based P/T) lands and surfaces through combat math.
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="KarnAnimatedShimPTEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: NewPower, NewToughness, ExpiresAtEndOfTurn; target → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new KarnAnimatedShimPTEffect(clonedSource, NewPower, NewToughness);
 }

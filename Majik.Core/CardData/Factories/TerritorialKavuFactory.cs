@@ -253,6 +253,24 @@ public static class TerritorialKavuFactory
             chars.Power += n;
             chars.Toughness += n;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="DomainPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The domain count reads clonedSource.Controller live. The layerService is
+        /// always passed as null (Apply already passes null for the service to avoid
+        /// recursion), so null is correct for the clone as well.
+        /// preserves: nothing scalar; source → clonedSource (as Creature); controller → clonedSource.Controller.
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        {
+            if (clonedSource is not Majik.Core.Cards.Creature clonedCreature) return null;
+            var clonedController = clonedCreature.Controller;
+            if (clonedController == null) return null;
+            return new DomainPumpStaticEffect(clonedCreature, clonedController, layerService: null);
+        }
     }
 
     // -----------------------------------------------------------------------

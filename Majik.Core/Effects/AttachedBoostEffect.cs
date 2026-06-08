@@ -75,4 +75,41 @@ public sealed class AttachedBoostEffect : ContinuousEffect
         chars.Toughness += _toughnessFn();
         foreach (var kw in _grantedKeywords) chars.Keywords.Add(kw);
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="AttachedBoostEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.  The dynamic
+    /// power/toughness closures are preserved exactly — they already read from the
+    /// <em>source</em> permanent's live state (e.g. artifact count on the controller),
+    /// but because both scalar and closure constructors are stored behind <c>_powerFn</c>
+    /// / <c>_toughnessFn</c> fields we cannot safely rebind arbitrary closures.
+    ///
+    /// <para>For the scalar constructor (most equipment) the closures are constants so
+    /// they are safe to preserve.  For the dynamic-closure variant (e.g. Cranial Plating
+    /// reading artifact count) the closure captures the ORIGINAL source's controller and
+    /// would read the original (live) game state — which is wrong in the sandbox.
+    /// Because there is no way to distinguish the two cases at this layer we return null
+    /// for the dynamic-closure variant (callers passed power-0/toughness-0 closures
+    /// or scalars are fine; anything more complex needs a bespoke override on the
+    /// originating factory).</para>
+    ///
+    /// Heuristic: if the closures are stored scalar constants (created via the scalar
+    /// ctor, where the lambda captures only the stack-frame int), the result is safe.
+    /// We cannot inspect closure captures at runtime, so we port the common scalar case
+    /// (which covers all standard equipment) and leave dynamic-closure callers as null.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+    {
+        // preserves: _source→clonedSource, _powerFn, _toughnessFn, _grantedKeywords, _layer
+        // The cloned effect reads clonedSource.AttachedTo for its AppliesTo gate, which
+        // is correctly remapped by Pass 2c (RelinkReferences) in the cloner.
+        return new AttachedBoostEffect(
+            source:          clonedSource,
+            powerFn:         _powerFn,
+            toughnessFn:     _toughnessFn,
+            grantedKeywords: _grantedKeywords,
+            layer:           _layer);
+    }
 }

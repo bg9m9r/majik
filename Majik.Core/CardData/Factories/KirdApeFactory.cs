@@ -186,6 +186,20 @@ public static class KirdApeFactory
             chars.Power += ForestBonusPower;
             chars.Toughness += ForestBonusToughness;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="ForestSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The controller is read live from clonedSource.Controller (correctly remapped
+        /// by the cloner's Pass 2c RelinkReferences), so Forest-check routes correctly.
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new ForestSelfPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

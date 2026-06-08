@@ -222,4 +222,9 @@ public sealed class TreetopVillageBecomesPTEffect : ContinuousEffect
     // creature row. ContinuousEffectsService.Compute upgrades an animated
     // Land to a creature row (CR 613.1c) on a Layer-4 Creature grant, so this
     // set-base lands and the animated body surfaces through combat math.
+
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new TreetopVillageBecomesPTEffect(clonedSource, NewPower, NewToughness);
 }

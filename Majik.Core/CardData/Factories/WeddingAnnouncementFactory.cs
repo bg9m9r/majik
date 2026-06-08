@@ -325,5 +325,17 @@ public static class WeddingAnnouncementFactory
             chars.Power += _power;
             chars.Toughness += _toughness;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="BackFaceAnthemEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The MdfcState and controller are read live from clonedSource (correctly
+        /// remapped by Pass 2c of the cloner).
+        /// preserves: _power, _toughness; source → clonedSource.
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => new BackFaceAnthemEffect(clonedSource, _power, _toughness);
     }
 }

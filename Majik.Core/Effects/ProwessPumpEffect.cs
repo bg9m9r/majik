@@ -19,10 +19,26 @@ public sealed class ProwessPumpEffect : ContinuousEffect
 
     public override Layer Layer => Layer.PT_Modify;
     public override bool ExpiresAtEndOfTurn => true;
+    // CR 613.1g — target as source so GameStateCloner can locate this effect.
+    public override Permanent? Source => _target;
     public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
     public override void Apply(CreatureCharacteristics chars)
     {
         chars.Power += 1;
         chars.Toughness += 1;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="ProwessPumpEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// The effect expires at end of turn; it is only registered mid-turn when prowess
+    /// triggered, so cloning it is correct for in-turn snapshots.
+    /// preserves: nothing beyond target; target → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new ProwessPumpEffect(clonedCreature)
+            : null;
 }

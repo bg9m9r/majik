@@ -153,4 +153,18 @@ public sealed class KilnFiendPumpEffect : ContinuousEffect
         chars.Power += KilnFiendFactory.PumpAmount;
         // +3/+0 — toughness unchanged.
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="KilnFiendPumpEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// The effect expires at end of turn; it is only registered mid-turn when the
+    /// cast trigger resolves, so cloning it is correct for in-turn snapshots.
+    /// preserves: nothing scalar (amount comes from static PumpAmount); target → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new KilnFiendPumpEffect(clonedCreature)
+            : null;
 }
