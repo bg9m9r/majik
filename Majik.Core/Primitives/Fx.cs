@@ -331,6 +331,11 @@ public static class Fx
     /// gap as Faithless Looting / Liliana of the Veil). Empty-hand halts
     /// the loop cleanly. Returns the cards actually discarded in discard
     /// order.
+    ///
+    /// <para>Each card discarded routes through <see cref="DiscardCard"/>,
+    /// which performs the hand→graveyard move AND publishes a
+    /// <see cref="DiscardedEvent"/> (<c>wasCost: false</c> — this is an
+    /// effect discard) so "Whenever you discard a card …" triggers fire.</para>
     /// </summary>
     public static IReadOnlyList<ICard> Discard(Player player, int count)
     {
@@ -342,12 +347,47 @@ public static class Fx
         {
             var pick = player.Zones.Hand.GetCards().FirstOrDefault();
             if (pick is null) break;
-            player.Zones.Hand.RemoveCard(pick);
-            player.Zones.Graveyard.AddCard(pick);
-            pick.SetZone(ZoneType.Graveyard);
+            DiscardCard(player, pick, wasCost: false);
             discarded.Add(pick);
         }
         return discarded;
+    }
+
+    /// <summary>
+    /// CR 701.8 — central discard chokepoint. Moves <paramref name="card"/>
+    /// from <paramref name="player"/>'s hand to their graveyard as a discard,
+    /// then publishes a <see cref="DiscardedEvent"/> on the player's
+    /// registered bus (looked up via <see cref="EventBusRegistry.Get(Player?)"/>,
+    /// best-effort — no publish if none is registered) so "Whenever you
+    /// discard a card …" / "When you discard ~ …" triggers (Flameblade Adept,
+    /// Horror of the Broken Lands, Curator of Mysteries; madness later)
+    /// observe the post-move state.
+    ///
+    /// <para>EVERY real discard route funnels through here: effect discards
+    /// (<see cref="Discard(Player, int)"/>), the discard-cost surface in
+    /// <c>Majik.Core/Costs/</c>, and the cleanup-step max-hand-size trim
+    /// (<c>CleanupStep.DiscardToHandSize</c>).</para>
+    /// </summary>
+    /// <param name="player">The discarding player (CR 701.8a).</param>
+    /// <param name="card">The card to discard. Must currently be in
+    /// <paramref name="player"/>'s hand.</param>
+    /// <param name="wasCost"><see langword="true"/> when the discard is paid
+    /// as a cost (discard cost / additional cost / "discard this card"),
+    /// <see langword="false"/> for an effect discard or the cleanup trim.</param>
+    /// <param name="eventBus">Optional explicit bus. When supplied the
+    /// <see cref="DiscardedEvent"/> is published there directly; otherwise the
+    /// player's registered bus (via <see cref="EventBusRegistry"/>) is used.</param>
+    public static void DiscardCard(Player player, ICard card, bool wasCost, IEventBus? eventBus = null)
+    {
+        if (player is null) throw new ArgumentNullException(nameof(player));
+        if (card is null) throw new ArgumentNullException(nameof(card));
+
+        player.Zones.Hand.RemoveCard(card);
+        player.Zones.Graveyard.AddCard(card);
+        card.SetZone(ZoneType.Graveyard);
+
+        var bus = eventBus ?? EventBusRegistry.Get(player);
+        bus?.Publish(new DiscardedEvent(player, card, wasCost));
     }
 
     // ------------------------------------------------------------------

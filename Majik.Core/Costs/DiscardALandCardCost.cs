@@ -91,8 +91,9 @@ public sealed class DiscardALandCardCost : ICost
             throw new InvalidPlayerActionException(
                 $"Cannot pay {Description}: nominated card is not in {player.Name}'s hand.");
 
-        player.Zones.Hand.RemoveCard(pick);
-        player.Zones.Graveyard.AddCard(pick);
-        // Zone.AddCard sets card.Zone — no manual SetZone needed.
+        // CR 701.8 — route through the central discard chokepoint so a
+        // DiscardedEvent fires (wasCost: true) and "Whenever you discard a
+        // card …" triggers see it.
+        Majik.Core.Primitives.Fx.DiscardCard(player, pick, wasCost: true);
     }
 }

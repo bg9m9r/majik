@@ -49,16 +49,15 @@ namespace Majik.Core.CardData.Factories;
 ///   613.1f, Layer 7c — flows through the layers pipeline; self-expires at
 ///   cleanup, CR 514.2).
 ///
-/// ## Discard surface deferral
-///
-/// The "or discard a card" half of the printed trigger is NOT wired in v1 —
-/// identical posture to <see cref="HorrorOfTheBrokenLandsFactory"/> and
-/// <see cref="CuratorOfMysteriesFactory"/>. The engine has no dedicated
-/// <c>DiscardedEvent</c> surface today, so the trigger only fires on cycle
-/// events (<see cref="CardCycledEvent"/>). Cycling is the load-bearing half
-/// (Flameblade Adept was printed for the Amonkhet cycling shell); the
-/// discard half is a small future wire-up once a <c>DiscardedEvent</c>
-/// surface ships.
+/// - <b>"Whenever you ... discard a card, +1/+0 EOT" trigger</b> (CR 603.1):
+///   the discard leg, wired as a second <see cref="TriggeredAbility"/> over
+///   <see cref="EventTriggerCondition{DiscardedEvent}"/> filtered to
+///   <c>e.Player == card.Controller</c> ("you discard", CR 109.5) — the
+///   <c>DiscardedEvent</c> surface (CR 701.8) published by the central
+///   discard chokepoint <see cref="Majik.Core.Primitives.Fx.DiscardCard"/>.
+///   Same +1/+0 EOT pump + <c>activeZones = Battlefield</c> as the cycle leg.
+///   Printed text is "a card" (NOT "another card") — no self-gate; Flameblade
+///   Adept on the battlefield is never the discarded card anyway.
 ///
 /// ## Wiring overloads
 ///
@@ -159,6 +158,33 @@ public static class FlamebladeAdeptFactory
 
         card.AddAbility(cycleTrigger);
         triggers?.RegisterTriggeredAbility(cycleTrigger);
+
+        // ----------------------------------------------------------------
+        // "Whenever you ... discard a card, this creature gets +1/+0 until
+        // end of turn." (CR 603.1) — the discard leg of the printed
+        // "cycle or discard" trigger, now wired over the DiscardedEvent
+        // surface (CR 701.8). Gated to e.Player == controller ("you
+        // discard", CR 109.5). Printed text is "a card" (NOT "another
+        // card"), so no self-gate — and Flameblade Adept on the battlefield
+        // is never the discarded card anyway. Same pump effect + activeZones
+        // shape as the cycle leg.
+        // ----------------------------------------------------------------
+        var discardPump = new Effect(
+            $"{CardName}: +{PumpPower}/+{PumpToughness} until end of turn (cycle or discard a card)",
+            () => layers.Register(new PumpUntilEndOfTurnEffect(card, PumpPower, PumpToughness)));
+
+        var discardCondition = new EventTriggerCondition<DiscardedEvent>(
+            (e, _) => ReferenceEquals(e.Player, card.Controller ?? owner));
+
+        var discardTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: discardCondition,
+            effects: new IEffect[] { discardPump },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(discardTrigger);
+        triggers?.RegisterTriggeredAbility(discardTrigger);
 
         return card;
     }

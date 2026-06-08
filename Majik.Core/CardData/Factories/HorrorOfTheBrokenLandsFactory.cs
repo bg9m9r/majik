@@ -55,14 +55,15 @@ namespace Majik.Core.CardData.Factories;
 ///   on the cost stack, and on resolve draws a card then publishes
 ///   <see cref="CardCycledEvent"/> for CR 702.32d subscribers.
 ///
-/// ## Discard surface deferral
-///
-/// The "or discard a card" half of the printed trigger is NOT wired in v1 —
-/// identical posture to <see cref="CuratorOfMysteriesFactory"/>. The engine
-/// has no dedicated <c>DiscardedEvent</c> today, so the trigger only fires on
-/// cycle events. Cycling itself is the load-bearing half (the card was
-/// printed for the Amonkhet/Hour cycling shell); the discard half is a small
-/// future wire-up once a <c>DiscardedEvent</c> surface ships.
+/// - <b>"Whenever you ... discard another card, +2/+1 EOT" trigger</b>
+///   (CR 603.1): the discard leg, wired as a second
+///   <see cref="TriggeredAbility"/> over
+///   <see cref="EventTriggerCondition{DiscardedEvent}"/> gated to
+///   <c>e.Player == card.Controller</c> ("you discard", CR 109.5) AND
+///   <c>!ReferenceEquals(e.Card, card)</c> (the "another card" gate) — the
+///   <c>DiscardedEvent</c> surface (CR 701.8) published by the central
+///   discard chokepoint <see cref="Majik.Core.Primitives.Fx.DiscardCard"/>.
+///   Same +2/+1 EOT pump + <c>activeZones = Battlefield</c> as the cycle leg.
 ///
 /// ## Wiring overloads
 ///
@@ -180,6 +181,35 @@ public static class HorrorOfTheBrokenLandsFactory
 
         card.AddAbility(cycleTrigger);
         triggers?.RegisterTriggeredAbility(cycleTrigger);
+
+        // ----------------------------------------------------------------
+        // "Whenever you ... discard another card, this creature gets +2/+1
+        // until end of turn." (CR 603.1) — the discard leg of the printed
+        // "cycle or discard another card" trigger, now wired over the
+        // DiscardedEvent surface (CR 701.8). Gated identically to the cycle
+        // leg:
+        //   1. e.Player == controller — "you discard" (CR 109.5).
+        //   2. !ReferenceEquals(e.Card, card) — the "another card" gate.
+        // Same pump effect + activeZones shape as the cycle leg.
+        // ----------------------------------------------------------------
+        var discardPump = new Effect(
+            $"{CardName}: +{PumpPower}/+{PumpToughness} until end of turn (cycle or discard another card)",
+            () => layers.Register(new PumpUntilEndOfTurnEffect(card, PumpPower, PumpToughness)));
+
+        var discardCondition = new EventTriggerCondition<DiscardedEvent>(
+            (e, _) =>
+                ReferenceEquals(e.Player, card.Controller ?? owner)
+                && !ReferenceEquals(e.Card, card));
+
+        var discardTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: discardCondition,
+            effects: new IEffect[] { discardPump },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(discardTrigger);
+        triggers?.RegisterTriggeredAbility(discardTrigger);
 
         // ----------------------------------------------------------------
         // Cycling {B} — CR 702.32. Routed through the shared CyclingFactory
