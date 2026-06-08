@@ -67,6 +67,20 @@ public abstract class ContinuousEffect
     public virtual bool DependsOn(ContinuousEffect other) => false;
 
     /// <summary>
+    /// Sim-only: reconstruct this effect bound to <paramref name="clonedSource"/> for a
+    /// search-sandbox clone, so it re-applies on the cloned battlefield. Returns null when
+    /// this effect type isn't (yet) sim-cloneable — the cloner then skips it (eval loses
+    /// that effect, acceptable until the bespoke long-tail is ported). P/T effects override.
+    ///
+    /// <para>Implementations must copy ALL configuration fields from <c>this</c> and point
+    /// only the source reference at <paramref name="clonedSource"/>, so the reconstructed
+    /// effect is behaviourally identical to the original within the clone universe.</para>
+    /// </summary>
+    internal virtual ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers) => null;
+
+    /// <summary>
     /// Lifecycle hook fired by <see cref="ContinuousEffectsService"/> when this
     /// effect is dropped from the registry — during end-of-turn cleanup
     /// (<see cref="ContinuousEffectsService.ExpireEndOfTurn"/>, CR 514.2),
