@@ -40,16 +40,16 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="IPlayerAgent"/> is registered, default-to-bottom fallback
 ///   otherwise (same shape as <see cref="PreordainFactory"/>'s scry leg).
 ///
-/// ## Discard surface deferral
-///
-/// The "or discard a card" half of the printed trigger is NOT wired in
-/// v1. The engine has no dedicated <c>DiscardedEvent</c> (only
-/// <c>NecropotenceFactory</c> needs the surface today and uses a
-/// hand→graveyard <see cref="CardMovedEvent"/> replacement instead). The
-/// trigger only fires on cycle events. Cycling alone already covers the
-/// Living End / Astral Slide / Lightning Rift cycle-shell payoff
-/// pattern this card was printed for; the discard half is a small future
-/// wire-up once <c>DiscardedEvent</c> ships.
+/// - <b>"Whenever you ... discard another card, scry 1" trigger</b>
+///   (CR 603.1): the discard leg, wired as a second
+///   <see cref="TriggeredAbility"/> over
+///   <see cref="EventTriggerCondition{DiscardedEvent}"/> gated to
+///   <c>e.Player == card.Controller</c> ("you discard", CR 109.5) AND
+///   <c>!ReferenceEquals(e.Card, card)</c> (the "another card" gate) — the
+///   <c>DiscardedEvent</c> surface (CR 701.8) published by the central
+///   discard chokepoint <see cref="Majik.Core.Primitives.Fx.DiscardCard"/>.
+///   Same scry-1 resolve body + <c>activeZones = Battlefield</c> as the
+///   cycle leg.
 ///
 /// ## Wiring overloads
 ///
@@ -128,7 +128,11 @@ public static class CuratorOfMysteriesFactory
         // today (see class doc). The cycle leg alone covers the Living
         // End / cycle-shell payoff role this card was printed for.
         // ----------------------------------------------------------------
-        var cycleEffect = new Effect(
+        // Shared "scry 1" resolve body — fired by both the cycle leg and the
+        // discard leg (a fresh Effect instance per leg so they are distinct
+        // abilities). Agent-driven partition when an IPlayerAgent is
+        // registered; default-to-bottom fallback otherwise.
+        Effect NewScryEffect() => new(
             $"{CardName}: scry {ScryAmount}",
             async ctx =>
             {
@@ -163,11 +167,35 @@ public static class CuratorOfMysteriesFactory
             source: card,
             controller: owner,
             condition: cycleCondition,
-            effects: new IEffect[] { cycleEffect },
+            effects: new IEffect[] { NewScryEffect() },
             activeZones: new[] { ZoneType.Battlefield });
 
         card.AddAbility(cycleTrigger);
         triggers?.RegisterTriggeredAbility(cycleTrigger);
+
+        // ----------------------------------------------------------------
+        // "Whenever you ... discard another card, scry 1." (CR 603.1) — the
+        // discard leg of the printed "cycle or discard another card" trigger,
+        // now wired over the DiscardedEvent surface (CR 701.8). Gated
+        // identically to the cycle leg:
+        //   1. e.Player == controller — "you discard" (CR 109.5).
+        //   2. !ReferenceEquals(e.Card, card) — the "another card" gate.
+        // Same scry-1 resolve body + activeZones shape as the cycle leg.
+        // ----------------------------------------------------------------
+        var discardCondition = new EventTriggerCondition<DiscardedEvent>(
+            (e, _) =>
+                ReferenceEquals(e.Player, card.Controller ?? owner)
+                && !ReferenceEquals(e.Card, card));
+
+        var discardTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: discardCondition,
+            effects: new IEffect[] { NewScryEffect() },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(discardTrigger);
+        triggers?.RegisterTriggeredAbility(discardTrigger);
 
         // ----------------------------------------------------------------
         // Cycling {U} — CR 702.32.
