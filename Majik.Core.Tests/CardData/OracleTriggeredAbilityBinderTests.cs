@@ -563,4 +563,224 @@ public class OracleTriggeredAbilityBinderTests
         _alice.Zones.Graveyard.GetCards().Should().Contain(top,
             because: "no agent was registered; surveil falls back to all-to-graveyard");
     }
+
+    // -----------------------------------------------------------------------
+    // Sanctum of Ugin — "Whenever you cast a colorless spell with mana value
+    // 7 or greater, you may sacrifice this land. If you do, search your library
+    // for a colorless creature card, reveal it, put it into your hand, then
+    // shuffle." (CR 603.1.)
+    //
+    // Sanctum of Ugin is a LAND, so production NEVER routes it through its
+    // named factory — it is built through GameFacade.BindCardAbilities (the
+    // binder chain). These tests build the trigger via OracleTriggeredAbilityBinder
+    // (the real prod path) to prove the cast-trigger binds in real games.
+    // -----------------------------------------------------------------------
+
+    private static CardEntity SanctumEntity() => new()
+    {
+        Name = "Sanctum of Ugin",
+        TypeLine = "Land",
+        OracleText = "{T}: Add {C}.\nWhenever you cast a colorless spell with " +
+                     "mana value 7 or greater, you may sacrifice this land. If " +
+                     "you do, search your library for a colorless creature card, " +
+                     "reveal it, put it into your hand, then shuffle.",
+    };
+
+    private static Majik.Core.Spells.Spell ColorlessSpell(Player controller, string manaCost)
+    {
+        var card = new Creature($"Eldrazi_{manaCost}", manaCost, 5, 5) { Owner = controller };
+        return new Majik.Core.Spells.Spell(card, controller);
+    }
+
+    private static Majik.Core.Spells.Spell ColoredSpell(Player controller, string manaCost)
+    {
+        var card = new Creature($"Colored_{manaCost}", manaCost, 5, 5) { Owner = controller };
+        return new Majik.Core.Spells.Spell(card, controller);
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColorlessMV7_BindsTriggerGatedToBattlefield()
+    {
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+
+        var trigger = OracleTriggeredAbilityBinder
+            .Bind(land, SanctumEntity(), _alice)
+            .OfType<TriggeredAbility>()
+            .Single();
+
+        trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColorlessMV7_Fires()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColorlessSpell(_alice, "7")));
+
+        triggers.PendingCount.Should().Be(1,
+            "colorless spell with MV 7 triggers Sanctum's bound ability");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColoredSpell_DoesNotFire()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColoredSpell(_alice, "6W")));
+
+        triggers.PendingCount.Should().Be(0, "colored spell does not trigger");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColorlessMV6_DoesNotFire()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColorlessSpell(_alice, "6")));
+
+        triggers.PendingCount.Should().Be(0, "colorless spell with MV < 7 does not trigger");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_OpponentCasts_DoesNotFire()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColorlessSpell(_bob, "7")));
+
+        triggers.PendingCount.Should().Be(0,
+            "'whenever YOU cast' restricts the trigger to Sanctum's controller");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_Resolve_YesSac_TutorsColorlessCreatureToHand()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueYesNo(true);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+                land.AddAbility(ab);
+            _alice.Zones.Battlefield.AddCard(land);
+            land.SetZone(ZoneType.Battlefield);
+            triggers.BindCard(land);
+
+            var titan = new Creature("Eldrazi Titan", "10", 10, 10) { Owner = _alice };
+            _alice.Zones.Library.AddCard(titan);
+            titan.SetZone(ZoneType.Library);
+
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+                ColorlessSpell(_alice, "7")));
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            land.Zone.Should().Be(ZoneType.Graveyard, "land was sacrificed on yes");
+            _alice.Zones.Hand.GetCards().Should().Contain(titan,
+                "tutor moved the colorless creature to hand");
+            _alice.Zones.Library.GetCards().Should().NotContain(titan);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_Resolve_NoSac_LandStaysNoTutor()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueYesNo(false);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+                land.AddAbility(ab);
+            _alice.Zones.Battlefield.AddCard(land);
+            land.SetZone(ZoneType.Battlefield);
+            triggers.BindCard(land);
+
+            var titan = new Creature("Eldrazi Titan", "10", 10, 10) { Owner = _alice };
+            _alice.Zones.Library.AddCard(titan);
+            titan.SetZone(ZoneType.Library);
+
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+                ColorlessSpell(_alice, "7")));
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            land.Zone.Should().Be(ZoneType.Battlefield, "declining leaves the land");
+            _alice.Zones.Hand.GetCards().Should().BeEmpty("declining skips the tutor");
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
 }

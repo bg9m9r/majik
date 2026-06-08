@@ -61,13 +61,6 @@ public static class KnownPartialImplementations
             ["Sunbaked Canyon"] = new CardGap(CardGapSeverity.Stub,
                 "Horizon land: pain-mana + '{1},{T},Sacrifice: draw' not bound by the binder chain (no factory) — vanilla land in play."),
 
-            // Lands with a working mana ability but a missing triggered ability.
-            // Lands are never routed through named factories, so their bespoke
-            // factory triggers (if any) don't run in play; the binder chain
-            // doesn't bind these triggers either.
-            ["Sanctum of Ugin"] = new CardGap(CardGapSeverity.Partial,
-                "Colorless mana ability works; the 'Whenever you cast a colorless spell with mana value 7+' sacrifice-to-tutor triggered ability is not bound (lands aren't routed)."),
-
             // Non-land factory-backed cards (routed in production) whose factory
             // builds part of the card but not the implied triggered ability.
             ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,

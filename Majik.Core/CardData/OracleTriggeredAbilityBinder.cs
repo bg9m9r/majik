@@ -104,6 +104,18 @@ public static class OracleTriggeredAbilityBinder
         @"whenever\s+(?:a|each)\s+player\s+casts\s+a\s+spell\s+with\s+mana\s+value\s+(?<cmc>\d+|one|two|three|four|five|six|seven)\s+or\s+less\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
 
+    // Sanctum of Ugin (BFZ): "Whenever you cast a colorless spell with mana
+    // value N or greater, you may sacrifice this land. If you do, search your
+    // library for a colorless creature card, reveal it, put it into your hand,
+    // then shuffle." (CR 603.1.) Sanctum is a LAND — production builds it
+    // through the binder chain (never its named factory), so this controller-
+    // scoped SpellCastEvent trigger MUST be synthesized here to work in real
+    // games. The whole two-sentence body is matched at once; only the MV
+    // threshold is parameterized (`mv`).
+    private static readonly Regex YouCastColorlessHighMvSacTutor = new(
+        @"whenever\s+you\s+cast\s+a\s+colorless\s+spell\s+with\s+mana\s+value\s+(?<mv>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+or\s+greater\s*,\s*you\s+may\s+sacrifice\s+(?:~|this\s+land|this\s+permanent)\.?\s*if\s+you\s+do\s*,\s*search\s+your\s+library\s+for\s+a\s+colorless\s+creature\s+card\s*,\s*reveal\s+it\s*,\s*put\s+it\s+into\s+your\s+hand\s*,\s*then\s+shuffle",
+        RegexOptions.IgnoreCase);
+
     // Goblin Guide attack pattern: "Whenever ~ attacks, defending player
     // reveals the top card of their library. If it's a land card, that
     // player puts it into their hand." Two sentences — the AttackLine
@@ -315,6 +327,103 @@ public static class OracleTriggeredAbilityBinder
                         }
                     }),
                 });
+        }
+
+        // Sanctum of Ugin (BFZ): "Whenever you cast a colorless spell with mana
+        // value N or greater, you may sacrifice this land. If you do, search
+        // your library for a colorless creature card, reveal it, put it into
+        // your hand, then shuffle." (CR 603.1.)
+        //
+        // This is a LAND — production builds it through the binder chain (never
+        // the named factory), so the trigger is synthesized here. Built inline
+        // (not via BuildEffects) because the sac-then-tutor body is bespoke:
+        //   - Trigger condition: SpellCastEvent whose Spell.Controller is this
+        //     card's controller ("you cast"), the spell is colorless
+        //     (CardColors.GetColors == empty, CR 105), and its mana value ≥ N
+        //     (printed cost TotalValue; X = 0 per CR 202.3e).
+        //   - Effect: "you may sacrifice" → consult the agent (default YES, the
+        //     branch is strictly card-advantageous). On YES sacrifice this card
+        //     to its owner's graveyard (CR 701.16), search the controller's
+        //     library for a colorless creature (agent picks; else first), move
+        //     it to hand, and shuffle (CR 701.20a). On NO, nothing happens.
+        // activeZones defaults to Battlefield (CR 113.6) — matches the named
+        // factory's SanctumOfUginFactory shape.
+        foreach (Match m in YouCastColorlessHighMvSacTutor.Matches(text))
+        {
+            var mvThreshold = WordToInt(m.Groups["mv"].Value);
+            if (mvThreshold <= 0) continue;
+            if (source is not Permanent self) continue;
+
+            var castCondition = new EventTriggerCondition<SpellCastEvent>((e, _) =>
+            {
+                var liveController = self.Controller ?? ctrl;
+                if (!ReferenceEquals(e.Spell.Controller, liveController))
+                    return false;
+                var spellCard = e.Spell.Card;
+                if (CardColors.GetColors(spellCard).Count != 0)
+                    return false;
+                var costStr = spellCard.ManaCost;
+                if (string.IsNullOrEmpty(costStr)) return false;
+                return Majik.Core.ValueObjects.ManaCost.Parse(costStr).TotalValue >= mvThreshold;
+            });
+
+            var sacTutorEffect = new Effect(
+                "you may sacrifice this land to tutor a colorless creature to hand",
+                async fxCtx =>
+                {
+                    var controller = self.Controller ?? ctrl;
+                    var agent = fxCtx.Agent
+                        ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+
+                    var sacrifice = agent == null
+                        ? true
+                        : (await agent.ChooseYesNoAsync(
+                            "Sacrifice this land to search for a colorless creature?",
+                            Majik.Core.Cards.BotIntent.Tutor).ConfigureAwait(false));
+                    if (!sacrifice) return;
+
+                    // Sacrifice (CR 701.16) — only if still on the battlefield.
+                    if (self.Zone != ZoneType.Battlefield) return;
+                    var ownerOfSelf = self.Owner;
+                    if (ownerOfSelf == null) return;
+                    var holder = self.Controller ?? ownerOfSelf;
+                    holder.Zones.Battlefield.RemoveCard(self);
+                    ownerOfSelf.Zones.Graveyard.AddCard(self);
+                    self.SetZone(ZoneType.Graveyard);
+
+                    // Search the controller's library for a colorless creature
+                    // (CR 302 / CR 105). Agent picks; deterministic fallback is
+                    // the first eligible card.
+                    var candidates = controller.Zones.Library.GetCards()
+                        .Where(c => c.HasType(CardType.Creature)
+                                    && CardColors.GetColors(c).Count == 0)
+                        .ToList();
+
+                    if (candidates.Count > 0)
+                    {
+                        ICard? pick = agent != null
+                            ? (await agent.ChooseLibraryPickAsync(
+                                ctx: fxCtx.Game,
+                                candidates: candidates,
+                                kindLabel: "colorless creature card").ConfigureAwait(false))
+                            : candidates[0];
+                        if (pick != null)
+                        {
+                            controller.Zones.Library.RemoveCard(pick);
+                            controller.Zones.Hand.AddCard(pick);
+                            pick.SetZone(ZoneType.Hand);
+                        }
+                    }
+
+                    // CR 701.20a — shuffle after the search resolves.
+                    Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "sanctum-of-ugin");
+                });
+
+            yield return new TriggeredAbility(
+                source, ctrl,
+                castCondition,
+                effects: new IEffect[] { sacTutorEffect },
+                activeZones: new[] { ZoneType.Battlefield });
         }
 
         // "At the beginning of your upkeep, …"
