@@ -203,6 +203,13 @@ internal sealed class SearchStrategy : IBotStrategy
         if (!_prioritySearchEnabled)
             return _heuristic.PickPriorityAction(ctx, self);
 
+        // Defensive guard: if the player has already lost, do not launch search.
+        // The engine's PriorityLoop now skips lost players before reaching this
+        // method (CR 800.4a fix), but this guard provides an additional safety
+        // layer in case the strategy is called from another code path or tests.
+        if (self.HasLost)
+            return PriorityAction.Pass;
+
         // Step 1 — enumerate legal actions.
         var legal = LegalActionEnumerator.ForPriority(ctx, self);
 

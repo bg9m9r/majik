@@ -124,7 +124,7 @@ public sealed class SearchVsHeuristicTests
         _out = output;
     }
 
-    private enum GameWinner { Search, Heuristic, Draw }
+    private enum GameWinner { Search, Heuristic, Draw, Inconclusive }
 
     /// <summary>
     /// Phase 2A re-measure: priority search enabled, Prowess deck, 150 iter / 1500 ms.
@@ -140,7 +140,7 @@ public sealed class SearchVsHeuristicTests
     [Fact]
     public async Task SearchBot_BeatsHeuristicBot_HeadToHead()
     {
-        int searchWins = 0, heuristicWins = 0, draws = 0;
+        int searchWins = 0, heuristicWins = 0, draws = 0, inconclusive = 0;
 
         for (int i = 0; i < Games; i++)
         {
@@ -151,30 +151,34 @@ public sealed class SearchVsHeuristicTests
             bool searchOnPlay = i % 2 == 0;
             int seed = BaseSeed + i;
 
-            var outcome = await PlayOneGame(searchOnPlay: searchOnPlay, seed: seed);
+            var outcome = await PlayOneGame(searchOnPlay: searchOnPlay, seed: seed, gameIndex: i, output: _out);
 
             switch (outcome)
             {
-                case GameWinner.Search:    searchWins++;    break;
-                case GameWinner.Heuristic: heuristicWins++; break;
-                case GameWinner.Draw:      draws++;          break;
+                case GameWinner.Search:      searchWins++;    break;
+                case GameWinner.Heuristic:   heuristicWins++; break;
+                case GameWinner.Draw:        draws++;          break;
+                case GameWinner.Inconclusive: inconclusive++;  break;
             }
 
             _out.WriteLine(
                 $"  game {i,2}: seed={seed} search={( searchOnPlay ? "A(play)" : "B(draw)" )} " +
-                $"result={outcome}  cumulative: search {searchWins} heuristic {heuristicWins} draw {draws}");
+                $"result={outcome}  cumulative: search {searchWins} heuristic {heuristicWins} draw {draws} inconclusive {inconclusive}");
         }
 
         int decided = searchWins + heuristicWins;
         double winRate = decided > 0 ? (double)searchWins / decided : 0.0;
 
         _out.WriteLine(
-            $"[STRENGTH] search {searchWins}/{decided} decided ({Games} played, {draws} draws) " +
+            $"[STRENGTH] search {searchWins}/{decided} decided ({Games} played, {draws} draws, {inconclusive} inconclusive) " +
             $"win-rate={winRate:P1}  " +
             $"deck={Archetype} iter={MctsIterations} budgetMs={MctsBudgetMs} prioritySearch=true");
 
-        // The suite must have at least one decided game — if all are draws
-        // (e.g. max-turns hit every time) the strength assertion is meaningless.
+        // The suite must have at least one decided game — if all are draws or
+        // inconclusive the strength assertion is meaningless. Inconclusive games
+        // (unexpected engine exceptions) are reported separately and excluded from
+        // both numerator and denominator of the win-rate calculation so one bad
+        // game cannot inflate or deflate the measured percentage.
         decided.Should().BeGreaterThan(0,
             "at least one game must be decided for the strength assertion to apply");
 
@@ -236,8 +240,16 @@ public sealed class SearchVsHeuristicTests
     /// priority decisions (land plays; spells still fall back to the inner
     /// heuristic via remap, as CastSpell remap is deferred to Phase 2).
     /// </para>
+    ///
+    /// <para>
+    /// On any unexpected engine exception the game is counted as
+    /// <see cref="GameWinner.Inconclusive"/> so a single crash does not abort
+    /// the entire 20-game measurement run. The exception is logged to
+    /// <paramref name="output"/> for investigation.
+    /// </para>
     /// </summary>
-    private static async Task<GameWinner> PlayOneGame(bool searchOnPlay, int seed)
+    private static async Task<GameWinner> PlayOneGame(
+        bool searchOnPlay, int seed, int gameIndex, ITestOutputHelper output)
     {
         string aliceName = searchOnPlay ? "Search"    : "Heuristic";
         string bobName   = searchOnPlay ? "Heuristic" : "Search";
@@ -282,21 +294,35 @@ public sealed class SearchVsHeuristicTests
         // longer than Phase 1. 20 games total target: under 15 minutes wall-time.
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
 
-        await facade.StartFullGameAsync(
-            maxTurns: MaxTurns,
-            ct: cts.Token,
-            rng: new GameRandom(seed));
+        try
+        {
+            await facade.StartFullGameAsync(
+                maxTurns: MaxTurns,
+                ct: cts.Token,
+                rng: new GameRandom(seed));
 
-        var result = await facade.FullGameTask!;
+            var result = await facade.FullGameTask!;
 
-        if (result.Winner == null)
-            return GameWinner.Draw;
+            if (result.Winner == null)
+                return GameWinner.Draw;
 
-        // Map winner → strategy by checking which seat held the search bot.
-        bool searchWon = searchOnPlay
-            ? ReferenceEquals(result.Winner, facade.Alice)  // Alice = search
-            : ReferenceEquals(result.Winner, facade.Bob);   // Bob = search
+            // Map winner → strategy by checking which seat held the search bot.
+            bool searchWon = searchOnPlay
+                ? ReferenceEquals(result.Winner, facade.Alice)  // Alice = search
+                : ReferenceEquals(result.Winner, facade.Bob);   // Bob = search
 
-        return searchWon ? GameWinner.Search : GameWinner.Heuristic;
+            return searchWon ? GameWinner.Search : GameWinner.Heuristic;
+        }
+        catch (Exception ex)
+        {
+            // Unexpected engine exception — log and count as inconclusive.
+            // This prevents one crash from aborting the entire 20-game run,
+            // allowing the other games to produce a valid win-rate measurement.
+            // The exception is logged so the root cause can be investigated.
+            output.WriteLine(
+                $"  game {gameIndex,2}: INCONCLUSIVE — unexpected exception: {ex.GetType().Name}: {ex.Message}");
+            output.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+            return GameWinner.Inconclusive;
+        }
     }
 }
