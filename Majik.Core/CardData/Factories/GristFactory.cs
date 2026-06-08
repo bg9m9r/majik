@@ -3,6 +3,7 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Tokens;
@@ -68,17 +69,21 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Fx.LoseLife(Player, int)"/>. Zero creature cards ⇒ no life lost
 ///   (CR 119.3 — losing 0 life is still an event but changes nothing).
 ///
-/// ## Loyalty abilities — V1 simplifications
+/// ## Loyalty abilities — −2 (sacrifice + prompted destroy)
 /// - <b>−2: You may sacrifice a creature. When you do, destroy target creature
 ///   or planeswalker (CR 606 + CR 701.17 sacrifice + CR 603.3 reflexive trigger
-///   + CR 701.7 destroy)</b>: implemented deterministically through resolvers —
-///   the creature to sacrifice comes from <paramref name="sacrificeResolver"/>
-///   and the permanent to destroy from <paramref name="destroyTargetResolver"/>.
-///   The "When you do" reflexive trigger (CR 603.3) is flattened: if a sacrifice
-///   is chosen, it is performed and the destroy follows in the same resolution.
-///   No sacrifice chosen ⇒ the whole clause is skipped ("You MAY sacrifice").
-///   v1 has no agent target / sacrifice prompt for loyalty abilities (same gap
-///   Koth / Liliana / Chandra share); a null resolver no-ops that half.
+///   + CR 701.7 destroy)</b>: activated through the priority loop as a sorcery-
+///   speed loyalty ability — the loyalty cost is paid as it is put on the stack
+///   and the effect resolves off the stack (CR 606.3). The DESTROY half is a
+///   real agent-chosen target: the ability declares a <see cref="TargetRequest"/>
+///   (gathering every battlefield creature / planeswalker), the dispatch path
+///   prompts the activating player, and the effect destroys the CHOSEN permanent
+///   read off the <see cref="Abilities.ResolutionContext"/> (falling back to
+///   <paramref name="destroyTargetResolver"/> only on the legacy direct-activation
+///   path). The creature to sacrifice comes from <paramref name="sacrificeResolver"/>
+///   ("You MAY sacrifice" — a choice, not a target); no sacrifice chosen ⇒ the
+///   whole clause is skipped, and the "When you do" reflexive trigger (CR 603.3)
+///   is flattened: the destroy follows the sacrifice in the same resolution.
 /// </summary>
 [CardName("Grist, the Hunger Tide")]
 public static class GristFactory
@@ -202,27 +207,62 @@ public static class GristFactory
         // -- −2: You may sacrifice a creature. When you do, destroy target
         //    creature or planeswalker. ------------------------------------------
         // CR 606 (loyalty) + CR 701.17 (sacrifice) + CR 603.3 (reflexive "when
-        // you do" trigger, flattened here) + CR 701.7 (destroy). v1
-        // deterministic via resolvers; "you MAY sacrifice" → no sacrifice chosen
+        // you do" trigger, flattened here) + CR 701.7 (destroy). The DESTROY
+        // half is a real target chosen by the activating player's agent: a
+        // TargetRequest is declared so the dispatch path prompts for it and the
+        // effect reads the chosen permanent off the ResolutionContext (CR 602.2b
+        // / 608.2g) — not a deterministic resolver. The sacrifice ("you MAY")
+        // remains a choice supplied by sacrificeResolver; no sacrifice chosen
         // skips the whole clause (the destroy is gated on the sacrifice).
-        grist.AddAbility(new LoyaltyAbility(grist, Minus2Loyalty, () =>
-        {
-            var toSacrifice = sacrificeResolver?.Invoke()?.FirstOrDefault();
-            if (toSacrifice == null) return;
-            if (toSacrifice.Zone != ZoneType.Battlefield) return;
+        //
+        // Candidates are gathered live at activation (every battlefield creature
+        // or planeswalker) so the target reflects the board state when the
+        // ability is put on the stack.
+        var destroyRequest = new TargetRequest(
+            Description: "Destroy target creature or planeswalker",
+            MinTargets: 0, // "When you do" — the destroy only happens if a sacrifice was made.
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Removal,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+                .Cast<object>()
+                .ToList());
 
-            // CR 701.17 — sacrifice the chosen creature.
-            Fx.Sacrifice(toSacrifice);
+        grist.AddAbility(new LoyaltyAbility(
+            grist,
+            Minus2Loyalty,
+            new[]
+            {
+                Fx.Inline("You may sacrifice a creature; if you do, destroy target creature or planeswalker", rc =>
+                {
+                    var toSacrifice = sacrificeResolver?.Invoke()?.FirstOrDefault();
+                    if (toSacrifice == null) return default;
+                    if (toSacrifice.Zone != ZoneType.Battlefield) return default;
 
-            // CR 603.3 — "When you do, destroy target creature or planeswalker."
-            // The reflexive trigger only fires because a sacrifice happened.
-            var toDestroy = destroyTargetResolver?.Invoke()?.FirstOrDefault();
-            if (toDestroy == null) return;
-            if (toDestroy.Zone != ZoneType.Battlefield) return;
-            // CR 701.7 — "destroy" routes through the indestructible /
-            // regeneration gate via the Destroy zone-move reason.
-            Fx.MoveToGraveyard(toDestroy, ZoneMoveReason.Destroy);
-        }));
+                    // CR 701.17 — sacrifice the chosen creature.
+                    Fx.Sacrifice(toSacrifice);
+
+                    // CR 603.3 — "When you do, destroy target creature or
+                    // planeswalker." Prefer the agent-chosen target off the
+                    // ResolutionContext (slot 0); fall back to the resolver on
+                    // the legacy direct-activation path (no chosen targets).
+                    // Fizzles if neither yields a target or it left the
+                    // battlefield (CR 608.2b).
+                    var toDestroy = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Permanent
+                        : null)
+                        ?? destroyTargetResolver?.Invoke()?.FirstOrDefault();
+                    if (toDestroy == null) return default;
+                    if (toDestroy.Zone != ZoneType.Battlefield) return default;
+                    // CR 701.7 — "destroy" routes through the indestructible /
+                    // regeneration gate via the Destroy zone-move reason.
+                    Fx.MoveToGraveyard(toDestroy, ZoneMoveReason.Destroy);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { destroyRequest }));
 
         // -- −5: Each opponent loses life equal to the number of creature cards
         //    in your graveyard. -------------------------------------------------

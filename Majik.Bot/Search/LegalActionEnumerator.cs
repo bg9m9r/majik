@@ -84,6 +84,24 @@ internal static class LegalActionEnumerator
             }
         }
 
+        // CR 606.3 — loyalty abilities of planeswalkers the player controls.
+        // Sorcery-speed only (active player + main phase + empty stack — the
+        // same sorceryWindow predicate the land/sorcery-cast paths use), plus
+        // the once-per-turn + sufficient-loyalty gate (CR 606.3/606.5).
+        // LoyaltyAbility is its own ability shape (not IActivatedAbility); the
+        // dispatcher builds the stack object from it on activation.
+        if (sorceryWindow)
+        {
+            foreach (var card in self.Zones.Battlefield.GetCards())
+            {
+                foreach (var loyalty in card.Abilities.OfType<LoyaltyAbility>())
+                {
+                    if (loyalty.CanActivate())
+                        result.Add(new PriorityAction.ActivateLoyaltyAbility(loyalty, Array.Empty<object>()));
+                }
+            }
+        }
+
         return result;
     }
 

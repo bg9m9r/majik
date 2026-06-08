@@ -46,6 +46,15 @@ public abstract record PriorityAction
     public sealed record ActivateAbility(IActivatedAbility Ability, IReadOnlyList<object> Targets, bool HoldPriority = false) : PriorityAction;
 
     /// <summary>
+    /// Activate a planeswalker loyalty ability (CR 606). Loyalty abilities
+    /// are their own ability shape (<see cref="LoyaltyAbility"/>), not
+    /// <see cref="IActivatedAbility"/>: the loyalty cost is paid as the
+    /// ability is put on the stack, and the dispatcher builds the stack
+    /// object from the template. Sorcery-speed + once-per-turn (CR 606.3).
+    /// </summary>
+    public sealed record ActivateLoyaltyAbility(LoyaltyAbility Ability, IReadOnlyList<object> Targets, bool HoldPriority = false) : PriorityAction;
+
+    /// <summary>
     /// Activate a mana ability (CR 605). Mana abilities don't use the stack
     /// (CR 605.3a) and the activating player retains priority — the
     /// priority loop treats this as an implicit hold-priority so the same

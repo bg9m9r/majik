@@ -58,6 +58,81 @@ public static class ActivatedAbilityPolicy
         return costDelta + effectDelta;
     }
 
+    /// <summary>
+    /// CR 606 — projected BoardEval delta for activating a planeswalker
+    /// loyalty ability. Loyalty abilities are their own shape
+    /// (<see cref="LoyaltyAbility"/>), pre-pay their cost as loyalty change,
+    /// and resolve their effects off the stack. The heuristic: a loyalty
+    /// ability is broadly favourable (it protects the walker by adding
+    /// loyalty, or spends loyalty for an effect), so we give a baseline
+    /// keep-the-walker-active bump plus the same effect-intent sniff used for
+    /// activated abilities. Plus / ultimate abilities additionally credit the
+    /// loyalty they bank (a more loaded walker is worth more); minus abilities
+    /// that remove a threat lean on the effect sniff (destroy / damage), and
+    /// the loyalty spent is a mild cost. Always at least slightly positive so
+    /// the bot uses its planeswalkers rather than letting them idle.
+    /// </summary>
+    public static double ProjectLoyaltyDelta(
+        LoyaltyAbility ability,
+        GameContext ctx,
+        Player self,
+        ArchetypeWeights weights)
+    {
+        // Effect-intent sniff over the loyalty ability's own effect
+        // descriptions + the source name (same vocabulary as EffectDelta).
+        var description = string.Join(" | ",
+            ability.Effects.Select(e => (e.Description ?? string.Empty).ToLowerInvariant()));
+        var sourceName = (ability.Source.Name ?? string.Empty).ToLowerInvariant();
+        var combined = description + " | " + sourceName;
+
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
+        var oppHasBigThreat = opp != null
+            && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any(c => c.Power >= 3);
+
+        double delta;
+
+        if (ability.LoyaltyChange >= 0)
+        {
+            // Plus / zero ability: banks loyalty (protects the walker) and
+            // generally develops our board. Credit the loyalty gained as a
+            // small key-card-stability bump, plus any effect payoff.
+            delta = weights.KeyCardInPlay * 0.25 * Math.Max(1, ability.LoyaltyChange + 1);
+        }
+        else
+        {
+            // Minus ability: spends loyalty for a (usually stronger) effect.
+            // Mild cost for the loyalty burned; the effect sniff supplies the
+            // upside (removal against a threat scores high).
+            delta = -weights.KeyCardInPlay * 0.1 * -ability.LoyaltyChange;
+        }
+
+        // Effect payoff — removal is the high-value case the spec calls out.
+        if (Mentions(combined, "destroy", "exile target", "return target", "sacrifice"))
+        {
+            delta += oppHasBigThreat
+                ? weights.OpponentThreats * -2 + weights.Tempo
+                : weights.OpponentThreats * -1 + weights.Tempo * 0.5;
+        }
+        else if (Mentions(combined, "deals", "damage", "loses") && Mentions(combined, "life"))
+        {
+            delta += weights.LifeDelta * 1.0 + weights.Tempo * 0.25;
+        }
+        else if (Mentions(combined, "draw"))
+        {
+            delta += weights.HandSize * ExtractInt(combined, fallback: 1);
+        }
+        else if (Mentions(combined, "create", "token"))
+        {
+            delta += weights.BoardPower + weights.BoardToughness;
+        }
+        else
+        {
+            delta += weights.Tempo * 0.3;
+        }
+
+        return delta;
+    }
+
     // ----- Cost side -----
 
     /// <summary>Negative delta from paying the activation's costs.

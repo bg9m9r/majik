@@ -74,10 +74,14 @@ public static class KnownPartialImplementations
             // {T}, Sacrifice this land: Draw a card" — both route through
             // HorizonLandBinder. Fiery Islet + Sunbaked Canyon removed.
 
-            // Non-land factory-backed cards (routed in production) whose factory
-            // builds part of the card but not the implied triggered ability.
-            ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,
-                "Loyalty abilities + zone-conditional CDA bound; only the −2 target-prompt gap remains. The CDA ('As long as Grist isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types', CR 604.3) is fully modelled via Card.SetOffBattlefieldCharacteristics — off the battlefield Grist is a 1/1 Insect creature (tutors/reanimation/delirium see it); on the battlefield it is only a Planeswalker. The +1 (Insect token + mill loop + loyalty counters) and −5 (each opponent loses life per creature card in graveyard) are fully implemented; the −2 sacrifice/destroy runs deterministically through resolvers (no agent target prompt — same loyalty-ability gap as Koth/Liliana). That −2 prompt is the only residual."),
+            // Grist, the Hunger Tide is now FULLY implemented and was removed
+            // from this registry: loyalty abilities are playable end-to-end
+            // through the priority loop (sorcery-speed activation, stack
+            // resolution), and the −2's destroy is a real agent-prompted target
+            // (the last documented residual). The +1 (Insect token + mill loop +
+            // loyalty counters), −2 (sacrifice + prompted destroy), −5 (each
+            // opponent loses life per creature card in graveyard), and the
+            // zone-conditional 1/1-Insect CDA (CR 604.3) are all complete.
         };
 
     /// <summary>True when <paramref name="name"/> has a recorded gap.</summary>

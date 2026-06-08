@@ -54,6 +54,15 @@ public class PriorityPolicy
     private readonly HashSet<Guid> _castProposedThisTurn = new();
     private Guid? _lastCastProposed;
 
+    /// <summary>CR 606.3 — loyalty abilities are once-per-turn-per-walker.
+    /// The engine's LoyaltyAbilityActivatedThisTurn flag stops the enumerator
+    /// re-offering after a successful activation, but a proposal the dispatcher
+    /// rejected (raced out of the sorcery window) could otherwise re-spin. Memo
+    /// the planeswalker InstanceIds we've proposed a loyalty activation for this
+    /// turn. Reset on turn boundary alongside the other memos.</summary>
+    private readonly HashSet<Guid> _loyaltyProposedThisTurn = new();
+    private Guid? _lastLoyaltyProposed;
+
     public PriorityPolicy(ArchetypeWeights weights)
         : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null) { }
 
@@ -81,6 +90,8 @@ public class PriorityPolicy
             _lastWasLandProposal = false;
             _castProposedThisTurn.Clear();
             _lastCastProposed = null;
+            _loyaltyProposedThisTurn.Clear();
+            _lastLoyaltyProposed = null;
             _abilityMemoTurn = ctx.TurnNumber;
         }
         // If our previous proposal hasn't left the activation stream (e.g.
@@ -113,6 +124,14 @@ public class PriorityPolicy
             _castProposedThisTurn.Add(prevCast);
             _lastCastProposed = null;
         }
+        // Same conservative posture for loyalty abilities: if we proposed a
+        // loyalty activation last time and we're being asked again, mark that
+        // walker as already-proposed so EnumerateCandidates suppresses it.
+        if (_lastLoyaltyProposed is Guid prevLoyalty)
+        {
+            _loyaltyProposedThisTurn.Add(prevLoyalty);
+            _lastLoyaltyProposed = null;
+        }
 
         var current = BoardEval.Score(ctx, self, _weights);
 
@@ -141,6 +160,11 @@ public class PriorityPolicy
         else if (best is PriorityAction.PlayLand)
         {
             _lastWasLandProposal = true;
+        }
+        else if (best is PriorityAction.ActivateLoyaltyAbility la
+            && la.Ability.Source is ICard pwCard)
+        {
+            _lastLoyaltyProposed = pwCard.InstanceId;
         }
         else if (best is PriorityAction.CastSpell cs)
         {
@@ -206,6 +230,8 @@ public class PriorityPolicy
         PriorityAction.PlayLand pl => $"PlayLand:{pl.Land.Name}",
         PriorityAction.CastSpell cs => $"CastSpell:{cs.Card.Name}",
         PriorityAction.ActivateAbility aa => $"Activate:{(aa.Ability.Source is ICard c ? c.Name : "?")}",
+        PriorityAction.ActivateLoyaltyAbility la =>
+            $"Loyalty:{(la.Ability.Source is ICard lc ? lc.Name : "?")}{la.Ability.Description}",
         _ => action.GetType().Name,
     };
 
@@ -254,6 +280,12 @@ public class PriorityPolicy
                 && _castProposedThisTurn.Contains(castAction.Card.InstanceId)
                 && self.Zones.Hand.GetCards().Any(c => c.InstanceId == castAction.Card.InstanceId))
                 continue;
+            // CR 606.3 — suppress re-proposing a loyalty ability for a walker
+            // we already proposed one for this turn.
+            if (action is PriorityAction.ActivateLoyaltyAbility loyaltyAction
+                && loyaltyAction.Ability.Source is ICard loyaltyCard
+                && _loyaltyProposedThisTurn.Contains(loyaltyCard.InstanceId))
+                continue;
 
             var projected = ProjectAction(action, ctx, self, current);
             yield return (action, projected);
@@ -283,6 +315,11 @@ public class PriorityPolicy
                 // reach here.
                 current + ActivatedAbilityPolicy.ProjectActivateDelta(
                     aa.Ability, ctx, self, _weights),
+
+            PriorityAction.ActivateLoyaltyAbility la =>
+                // CR 606 — planeswalker loyalty abilities.
+                current + ActivatedAbilityPolicy.ProjectLoyaltyDelta(
+                    la.Ability, ctx, self, _weights),
 
             _ => current // conservative: treat unknown action types as neutral
         };
