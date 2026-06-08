@@ -85,6 +85,30 @@ public class ActivatedAbility : IActivatedAbility
     /// </summary>
     public IReadOnlyList<IReadOnlyList<object>> ChosenTargets => _chosenTargets;
 
+    /// <summary>
+    /// STAGE 2/3 (re-sourceable abilities) — provenance flag asserting that
+    /// EVERY effect of this ability reads its source / subject off the live
+    /// <see cref="ResolutionContext"/> (its own <see cref="ResolutionContext.Source"/>,
+    /// <see cref="Controller"/>, or <see cref="ChosenTargets"/>) rather than
+    /// capturing a specific authoring permanent in a closure. When true, the
+    /// whole ability is SOUND to re-home via <see cref="RebindTo"/>: costs
+    /// already re-home (Stage 1) and the effects re-source themselves at
+    /// resolution. When false (the default), a re-sourced copy may still
+    /// reference the ORIGINAL source through a captured closure, so a consumer
+    /// like Agatha's Soul Cauldron must NOT blindly RebindTo it.
+    ///
+    /// <para>
+    /// Set true only by build paths that have audited every effect they emit
+    /// — currently the data-driven CardDef path
+    /// (<see cref="Majik.Core.CardData.Definitions.CardDefActivatedAbility"/>),
+    /// whose self-source verbs (pump / connive / explore) were migrated to read
+    /// <see cref="ResolutionContext.Source"/>, with all other verbs already
+    /// scoped to the controller / chosen targets. Preserved across
+    /// <see cref="RebindTo"/>.
+    /// </para>
+    /// </summary>
+    public bool RebindSafe { get; init; }
+
     public ActivatedAbility(
         object source,
         Player controller,
@@ -93,7 +117,8 @@ public class ActivatedAbility : IActivatedAbility
         IEnumerable<IEffect>? effects = null,
         IEnumerable<TargetRequest>? targetRequests = null,
         bool sorcerySpeed = false,
-        Func<bool>? canActivateCheck = null)
+        Func<bool>? canActivateCheck = null,
+        bool rebindSafe = false)
     {
         if (source == null)
         {
@@ -113,6 +138,7 @@ public class ActivatedAbility : IActivatedAbility
         Id = Majik.Core.Game.DeterministicIdScope.NewId();
         Timestamp = DateTime.UtcNow;
         IsSorcerySpeed = sorcerySpeed;
+        RebindSafe = rebindSafe;
         _canActivateCheck = canActivateCheck;
         _resolutionState = ResolutionState.NotResolving();
 
@@ -145,18 +171,24 @@ public class ActivatedAbility : IActivatedAbility
     /// own (the stack object is sourced from the copy via
     /// <see cref="Services.AbilityActivator"/>).
     ///
-    /// STAGE 1 (re-sourceable abilities): COSTS now re-home. Each
-    /// <see cref="AdditionalCost"/> whose captured permanent is reference-equal
-    /// to this ability's own <see cref="Source"/> is rebound to
-    /// <paramref name="newSource"/> via <see cref="AdditionalCost.RebindSource"/>,
-    /// so a re-sourced ability taps / sacrifices the NEW source rather than the
-    /// original permanent. Mana costs and non-matching costs pass through
-    /// unchanged. EFFECTS are NOT migrated this stage — effect closures that
-    /// captured the ORIGINAL source permanent directly still reference the
-    /// original; a later stage migrates effect authoring to read
-    /// <see cref="ResolutionContext.Source"/>. This generic rebind is correct
-    /// for the common case where the ability references only its own
-    /// <see cref="Source"/> / <see cref="Controller"/>.
+    /// STAGE 1 — COSTS re-home. Each <see cref="AdditionalCost"/> whose captured
+    /// permanent is reference-equal to this ability's own <see cref="Source"/>
+    /// is rebound to <paramref name="newSource"/> via
+    /// <see cref="AdditionalCost.RebindSource"/>, so a re-sourced ability taps /
+    /// sacrifices the NEW source rather than the original permanent. Mana costs
+    /// and non-matching costs pass through unchanged.
+    ///
+    /// STAGE 2/3 — EFFECTS are REUSED (the same <see cref="IEffect"/> objects)
+    /// and re-home iff they read their source off the live
+    /// <see cref="ResolutionContext"/> (<see cref="ResolutionContext.Source"/> =
+    /// the new source at resolution, since the rebound ability's own
+    /// <see cref="Source"/> is <paramref name="newSource"/>). The
+    /// <see cref="RebindSafe"/> flag (preserved here) records whether EVERY
+    /// effect does so; a caller that requires soundness (Agatha's grant) only
+    /// re-homes abilities for which it is true. Effects that still capture the
+    /// ORIGINAL source in a closure (un-migrated bespoke factory abilities,
+    /// <see cref="RebindSafe"/> = false) are NOT made sound by this method — the
+    /// caller must gate on the flag.
     /// </summary>
     public ActivatedAbility RebindTo(object newSource, Player newController) =>
         new(
@@ -173,7 +205,8 @@ public class ActivatedAbility : IActivatedAbility
             effects: _effects.Count > 0 ? _effects : null,
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
             sorcerySpeed: IsSorcerySpeed,
-            canActivateCheck: _canActivateCheck);
+            canActivateCheck: _canActivateCheck,
+            rebindSafe: RebindSafe);
 
     /// <summary>
     /// Store the targets chosen by the activating player's agent. Called by

@@ -1406,13 +1406,18 @@ public static class CardDefRuntime
 
     private static IEffect BuildConniveSelfEffect(ConniveSelfEffectDef def, ICard card)
     {
+        // STAGE 3 (re-sourceable abilities) — "this creature connives" resolves
+        // its subject off ResolutionContext.Source (CR 113.7) so the SAME effect
+        // connives the BEARER when re-homed by Agatha's grant. Falls back to the
+        // captured card on the normal / legacy-null-context paths.
         var amount = def.Amount;
         return new Effect(
             $"{card.Name}: connive x{amount}",
-            () =>
+            ctx =>
             {
-                if (card is not Creature creature) return;
-                Fx.Connive(creature, amount);
+                var creature = (ctx.Source as Creature) ?? (card as Creature);
+                if (creature != null) Fx.Connive(creature, amount);
+                return ValueTask.CompletedTask;
             });
     }
 
@@ -1841,16 +1846,21 @@ public static class CardDefRuntime
         // ability was put on the stack carries, CR 701.40a). This is the
         // declarative form of the shared ExploreEtb body (PR #2237) — the SAME
         // ExploreAction primitive Seekers' Squire / Merfolk Branchwalker run.
+        // STAGE 3 (re-sourceable abilities) — the exploring permanent is read
+        // off ResolutionContext.Source (CR 113.7), so a re-homed activated
+        // explore (Agatha's grant) explores the BEARER. Falls back to the
+        // captured card on the normal / legacy-null-context paths.
         var count = Math.Max(1, def.Count);
         return new Effect(
             count == 1 ? $"{card.Name}: explores" : $"{card.Name}: explores {count}x",
             async ctx =>
             {
-                var explorerController = (card as Permanent)?.Controller ?? controller;
+                var explorer = (ctx.Source as ICard) ?? card;
+                var explorerController = (explorer as Permanent)?.Controller ?? controller;
                 for (var i = 0; i < count; i++)
                 {
                     await Majik.Core.Keywords.ExploreAction.ExploreAsync(
-                        creature: card,
+                        creature: explorer,
                         controller: explorerController,
                         agent: ctx.Agent ?? AgentRegistry.Get(explorerController),
                         game: ctx.Game,
@@ -1947,19 +1957,28 @@ public static class CardDefRuntime
         // at the cleanup step and stacks additively per activation (CR 611.2c).
         // Source not a battlefield creature / ActiveEffects null (pure-shape
         // test path) → silent no-op, mirroring BuildPumpTargetEffect.
+        //
+        // STAGE 3 (re-sourceable abilities) — "this creature" resolves off the
+        // live ResolutionContext.Source (CR 113.7) rather than the captured
+        // authoring card, so the SAME effect object pumps the BEARER when this
+        // ability is re-homed by Agatha's Soul Cauldron's RebindTo grant. On the
+        // normal battlefield path Source IS the card, so behaviour is unchanged;
+        // the legacy null-context path (Effect.Execute) falls back to the card.
         var p = def.Power;
         var t = def.Toughness;
         return new Effect(
             $"{card.Name}: gets {(p < 0 ? "" : "+")}{p}/{(t < 0 ? "" : "+")}{t} until EOT",
-            () =>
+            ctx =>
             {
-                if (card is Creature creature
-                    && creature.Zone == ZoneType.Battlefield
-                    && creature.ActiveEffects != null)
+                var subject = (ctx.Source as Creature) ?? (card as Creature);
+                if (subject != null
+                    && subject.Zone == ZoneType.Battlefield
+                    && subject.ActiveEffects != null)
                 {
-                    creature.ActiveEffects.Register(
-                        new PumpUntilEndOfTurnEffect(creature, p, t));
+                    subject.ActiveEffects.Register(
+                        new PumpUntilEndOfTurnEffect(subject, p, t));
                 }
+                return ValueTask.CompletedTask;
             });
     }
 

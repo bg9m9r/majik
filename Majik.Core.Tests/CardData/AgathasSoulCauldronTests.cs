@@ -984,4 +984,107 @@ public class AgathasSoulCauldronTests
         bearer.Abilities.OfType<IManaAbility>().Where(ProducesGreen).Should().BeEmpty(
             "a new Cauldron does NOT grant abilities from a previous Cauldron's exiles");
     }
+
+    // -----------------------------------------------------------------------
+    // STAGE 2/3 — PRIMARY grant mechanism: RebindTo the imprinted creature's
+    // REAL activated abilities. Where the existing OracleStub tests imprint a
+    // synthetic creature with no engine-built abilities (so the oracle-rebuild
+    // FALLBACK runs), these tests imprint a creature built through the real
+    // data-driven CardDef path, so it carries actual RebindSafe ActivatedAbility
+    // objects. The grant re-homes THOSE via RebindTo — covering whatever the
+    // card actually has, not just oracle-parseable shapes — and never re-parses.
+    // -----------------------------------------------------------------------
+
+    /// <summary>Build a real Creature carrying a data-driven self-pump activated
+    /// ability ("{R}: This creature gets +2/+0 until end of turn"). The ability
+    /// is RebindSafe because pump_self reads ResolutionContext.Source.</summary>
+    private static Creature DataDrivenFirebreather(Player owner)
+    {
+        var abilityDef = new Majik.Core.CardData.Definitions.ActivatedAbilityDefinition
+        {
+            Costs = { new Majik.Core.CardData.Definitions.ManaCostDef { Amount = "{R}" } },
+            Effects = { new Majik.Core.CardData.Definitions.PumpSelfEffectDef { Power = 2, Toughness = 0 } },
+        };
+        var def = Majik.Core.CardData.Definitions.CardDef
+            .Creature("Real Firebreather", "1R", 2, 2)
+            .WithAbility(abilityDef.ToCardDefAbility())
+            .Build();
+        return (Creature)Majik.Core.CardData.Definitions.CardDefRuntime.Build(def, owner);
+    }
+
+    [Fact]
+    public async Task Grant_RebindsRealActivatedAbility_OfDataDrivenImprint_ToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL data-driven creature (carries an actual RebindSafe ability).
+        var firebreather = DataDrivenFirebreather(alice);
+        alice.Zones.Graveyard.AddCard(firebreather);
+        firebreather.SetZone(ZoneType.Graveyard);
+        // It has a real activated ability sourced on ITSELF before the grant.
+        firebreather.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility).RebindSafe.Should().BeTrue();
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // No oracle lookup needed — the grant uses the REAL ability, not text.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), firebreather);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's REAL activated ability via RebindTo");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer, "re-homed to the BEARER (CR 707.2)");
+        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source-safe provenance");
+
+        // Activating it pumps the BEARER (+2/+0), not the exiled card. Resolve
+        // through the ability path so ResolutionContext.Source = the rebound
+        // ability's own source (the bearer) — the re-source seam that makes the
+        // migrated pump_self effect act on the bearer.
+        var powerBefore = bearer.GetPower();
+        await pump.ResolveAsync(agent: null, game: null);
+        bearer.GetPower().Should().Be(powerBefore + 2,
+            "the re-homed real ability pumps the BEARER (ResolutionContext.Source = bearer)");
+        firebreather.GetPower().Should().Be(2,
+            "the exiled imprinted card is untouched");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsRealAbility_ResolvesThroughAbilityPath_AffectingBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var firebreather = DataDrivenFirebreather(alice);
+        alice.Zones.Graveyard.AddCard(firebreather);
+        firebreather.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), firebreather);
+
+        var pump = GrantedActivated(bearer).Single();
+        var powerBefore = bearer.GetPower();
+
+        // Resolve through the real ability path: ResolutionContext.Source is the
+        // rebound ability's own Source = the bearer, so the migrated pump_self
+        // effect pumps the bearer.
+        await pump.ResolveAsync(agent: null, game: null);
+
+        bearer.GetPower().Should().Be(powerBefore + 2,
+            "resolving the re-homed ability through ResolveAsync pumps the BEARER");
+    }
 }

@@ -34,21 +34,23 @@ public static class KnownPartialImplementations
         {
             ["Agatha's Soul Cauldron"] = new CardGap(
                 CardGapSeverity.Partial,
-                "Ability-grant static mostly implemented: an imprinted creature's MANA abilities "
-                + "('{T}: Add …') AND the common soundly-reconstructable NON-mana activated "
-                + "abilities are re-homed to each +1/+1-countered creature you control, sourced on "
-                + "the bearer (the cost taps/sacrifices the bearer; 'this creature' = bearer). "
-                + "Non-mana shapes covered (OracleActivatedAbilityBinder): firebreathing / self-pump "
-                + "('{cost}: This creature gets +X/+Y until end of turn'), pingers ('{cost}: This "
-                + "creature deals N damage to any target / target creature / target player'), and "
-                + "sacrifice-self pingers ('Sacrifice this creature: It deals N damage to …'), with a "
-                + "', '-separated mana+{T} cost grammar. Residual (skipped, NOT emitted broken): "
-                + "bespoke abilities outside that set — tutors, token makers, modal/'choose one', "
-                + "anthem grants, '{T}: Draw', loyalty-style; abilities with unmodellable cost tokens "
-                + "({X}, energy {E}, snow {S}, Phyrexian, 'Pay N life', 'Discard a card'); 'Activate "
-                + "only …' riders; restricted damage targets. Fully closing the residual waits on a "
-                + "re-bindable ability model. Targeting + Legendary supertype + mana-colour-substitution "
-                + "done (#2497)."),
+                "Ability-grant static broadly implemented: an imprinted creature's MANA abilities "
+                + "('{T}: Add …') AND its non-mana activated abilities are re-homed to each "
+                + "+1/+1-countered creature you control, sourced on the bearer (the cost "
+                + "taps/sacrifices the bearer; 'this creature' = bearer). PRIMARY mechanism is now "
+                + "ActivatedAbility.RebindTo of the creature's REAL abilities (CR 707.2) — it covers "
+                + "WHATEVER abilities the card actually has, not just oracle-parseable shapes, gated "
+                + "on ActivatedAbility.RebindSafe (true for ALL data-driven CardDef abilities, whose "
+                + "self-source verbs pump/connive/explore read ResolutionContext.Source, with the "
+                + "rest scoped to controller/chosen targets). FALLBACK oracle-rebuild "
+                + "(OracleActivatedAbilityBinder) runs only when RebindTo yields nothing, "
+                + "reconstructing firebreathing / pinger / sacrifice-self-pinger from oracle text. "
+                + "Residual (NOT emitted broken): bespoke [CardName]-factory activated abilities "
+                + "whose effect closures still capture the original card (not yet RebindSafe) AND "
+                + "whose oracle text is outside the fallback's firebreathing/pinger/sac set. As such "
+                + "factories migrate their effects to ResolutionContext.Source + mark RebindSafe, the "
+                + "RebindTo path picks them up automatically. Targeting + Legendary supertype + "
+                + "mana-colour-substitution done (#2497)."),
 
             // --- Re-derived from the faithful BotDeckImplementationAuditTests
             // run (cards built via the real GameFacade.Create + PopulateSideboard
