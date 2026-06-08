@@ -530,13 +530,16 @@ public sealed class SearchAgent : IPlayerAgent
                        ?? ctx.AllPlayers[0];
 
         var totalEligible = usable.Count;
-        var moves = new List<SimMove>(1 << Math.Min(totalEligible, 10));
-
-        // Empty attack (always the first move so IsEmptyAttack is easy to find).
-        moves.Add(SimMove.FromCombatPlan(CombatPlan.None, eligibleCount: totalEligible));
+        var n = usable.Count;
 
         // Enumerate all non-empty attacker subsets (mirrors CombatSearch.SearchSubsets).
-        var n = usable.Count;
+        // ORDERING: sort subsets by descending popcount (all-out attack first, then
+        // n-1 attackers, etc.) so MCTS explores the most aggressive / highest-damage
+        // plans before smaller subsets. With a limited iteration budget (e.g. 150 iter
+        // over 257 subsets) the tail of the queue is never reached; putting the most
+        // tactically important subsets at the front ensures they are evaluated first.
+        // Empty attack is appended LAST so that aggressive moves dominate early visits.
+        var nonEmptyMoves = new List<SimMove>(1 << Math.Min(n, 10));
         for (long mask = 1; mask < (1L << n); mask++)
         {
             var subset = new List<AttackerDeclaration>(n);
@@ -546,8 +549,29 @@ public sealed class SearchAgent : IPlayerAgent
                     subset.Add(new AttackerDeclaration(usable[i], defender));
             }
             var plan = new CombatPlan(subset);
-            moves.Add(SimMove.FromCombatPlan(plan, eligibleCount: totalEligible));
+            nonEmptyMoves.Add(SimMove.FromCombatPlan(plan, eligibleCount: totalEligible));
         }
+
+        // Sort descending by attacker count: all-out attack first, singletons last.
+        // Within same count, order by descending total power so highest-damage
+        // subsets lead (kills opponent fastest → highest reward under lethal-proximity eval).
+        nonEmptyMoves.Sort((a, b) =>
+        {
+            var ca = a.CombatPlan?.Attackers.Count ?? 0;
+            var cb = b.CombatPlan?.Attackers.Count ?? 0;
+            if (ca != cb) return cb.CompareTo(ca); // descending attacker count
+            var pa = a.CombatPlan?.Attackers.Sum(d => d.Attacker.Power) ?? 0;
+            var pb = b.CombatPlan?.Attackers.Sum(d => d.Attacker.Power) ?? 0;
+            return pb.CompareTo(pa); // descending total power
+        });
+
+        // Build final list: non-empty moves first (high-card first), empty attack last.
+        var moves = new List<SimMove>(nonEmptyMoves.Count + 1);
+        moves.AddRange(nonEmptyMoves);
+        // Empty attack appended last — IsEmptyAttack is checked explicitly in
+        // SearchStrategy.PickAttackers and PickRolloutMove, so position doesn't affect
+        // correctness; it just means "no attack" is tried after aggressive plans.
+        moves.Add(SimMove.FromCombatPlan(CombatPlan.None, eligibleCount: totalEligible));
 
         return moves;
     }

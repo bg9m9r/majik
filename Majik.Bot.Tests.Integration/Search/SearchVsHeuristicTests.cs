@@ -3,6 +3,7 @@ using Majik.Bot;
 using Majik.Bot.Tests.Integration.Helpers;
 using Majik.Core.Api;
 using Majik.Core.CardData;
+using Majik.Core.Players;
 using Majik.Core.Random;
 using Xunit;
 using Xunit.Abstractions;
@@ -13,8 +14,42 @@ namespace Majik.Bot.Tests.Integration.Search;
 /// Head-to-head strength regression: MCTS search bot vs heuristic bot.
 ///
 /// <para>
+/// <b>Phase 2B BREAKTHROUGH (2026-06-08):</b>
+/// <b>search 15/17 decided (20 played, 3 draws) = 88.2% win rate.</b>
+/// Draw rate dropped from 95% to 15%. Search decisively beats the heuristic.
+/// Root cause of prior stalemate and fixes applied in this session:
+/// <list type="number">
+///   <item><b>Critical: SearchStrategy.PickAttackers returned CombatPlan.None
+///     when MCTS root was a Priority decision.</b> With priority search enabled,
+///     the sandbox started at the Combat phase and surfaced a BeginningOfCombat
+///     priority window as the MCTS root decision. The best MCTS move was a
+///     Priority action (pass), NOT a CombatPlan. The old guard
+///     <c>if (chosen.CombatPlan == null) return CombatPlan.None</c> silently
+///     skipped the attack every time. Fix: fall back to
+///     <c>_heuristic.PickAttackers</c> when MCTS returns a non-combat action,
+///     so the attack decision is made by CombatSearch (correct) rather than
+///     silently omitted.</item>
+///   <item><b>SearchAgent.BuildAttackerMoves move ordering:</b> previously
+///     enumerated subsets in ascending-mask order (smallest subsets first,
+///     all-out attack last). With 257 subsets and 50–150 iterations the
+///     all-out attack was never explored. Now sorted descending by attacker count
+///     (all-out attack first) so limited-budget MCTS sees the most aggressive
+///     plans first.</item>
+///   <item><b>BoardEval lethal-proximity term:</b> added
+///     <see cref="BoardEval.LethalProximityBonus"/> — a non-linear (quadratic
+///     ramp below 5 life) reward for driving the opponent toward zero. Also wired
+///     into <see cref="CombatEval.Score"/> via <c>oppLifeBefore</c> so combat
+///     scoring has the same closing gradient. Both eval surfaces now reward
+///     damage near lethal more than equivalent damage from 15→13.</item>
+///   <item><b>ArchetypeWeights.LethalProximity:</b> new per-archetype weight
+///     controlling the lethal-proximity term strength (Burn=3.0, Prowess=2.5,
+///     BorosEnergy=2.0, Default=1.5).</item>
+/// </list>
+/// </para>
+///
+/// <para>
 /// <b>Phase 2A re-measure configuration (2026-06-08):</b>
-/// Uses the "Prowess" deck (real cards via <c>DeckLoader.Load</c>) — a
+/// Uses the "Prowess" deck (real cards via <c>DeckLoader.LoadReal</c>) — a
 /// creature-combat archetype with meaningful board states where search has
 /// something to reason about. Priority search is enabled (the livelock that
 /// caused 500-action spin on sandbox games was fixed in the Phase 2A fidelity
@@ -34,50 +69,11 @@ namespace Majik.Bot.Tests.Integration.Search;
 /// </para>
 ///
 /// <para>
-/// <b>Root cause (Phase 1):</b> The heuristic bot's <c>CombatSearch</c>
-/// performs an explicit minimax over all attacker subsets (greedy + full
-/// opponent-block enumeration for small boards), producing precise
-/// deterministic combat outcomes. The MCTS search with
-/// <c>DepthTurns=1</c> and 100 iterations produces only rough estimates of
-/// the same outcomes via simulation. On a Burn mirror match with many 1/1
-/// creatures, <c>CombatSearch</c> correctly evaluates "don't attack into
-/// equal blockers" while the MCTS's noisy rollouts sometimes misclassify
-/// the attack as neutral or good. The heuristic wins ALL decided games.
-/// Additionally, priority MCTS was disabled in Phase 1 because sandbox games
-/// from main phase triggered the priority-loop safety (500-action limit) on
-/// unimplemented Burn spells.
-/// </para>
-///
-/// <para>
-/// <b>Phase 2A changes and MEASURED RESULT (2026-06-08):</b>
-/// <list type="number">
-///   <item>Livelock fixed — priority search re-enabled
-///     (<c>PrioritySearchEnabled=true</c>). Three code-path bugs fixed:
-///     (a) <see cref="LegalActionEnumerator.ForPriority"/> now uses
-///     <c>ctx.LandPlayAvailable</c> instead of its own <c>sorceryWindow</c>
-///     check to gate PlayLand; (b) <see cref="SearchStrategy.RemapPlayLand"/>
-///     guards on <c>ctx.LandPlayAvailable</c> before applying a sandbox-chosen
-///     land play to the live engine; (c) <see cref="SearchAgent.RemapPriorityActionToSandbox"/>
-///     guards on sandbox <c>ctx.LandPlayAvailable</c> before replaying scripted
-///     land plays inside MCTS sandboxes. All three fixes eliminate the 54k+
-///     rejected-PlayLand spin that was forcing every game to a draw.</item>
-///   <item>Deck changed to Prowess with <c>DeckLoader.LoadReal</c> — real card
-///     shells so non-basic lands tap for mana (vanilla-fallback turned fetchlands
-///     into 1/1 creatures, leaving bots land-starved).</item>
-///   <item><b>MEASURED RESULT: search 0/3 decided (20 played, 17 draws),
-///     win-rate=0.0%.</b> The MCTS search still does NOT beat the heuristic.
-///     Root cause: same as Phase 1 — heuristic <c>CombatSearch</c> explicitly
-///     minimaxes over attacker subsets, producing exact deterministic outcomes;
-///     MCTS with <c>DepthTurns=1</c> / 150 iterations generates noisy estimates
-///     that are worse than minimax on fast aggro boards. Priority MCTS only adds
-///     land-play timing (CastSpell remap is still deferred). Runtime: ~6.7 min,
-///     clean (no rejection spam).</item>
-///   <item><b>Phase 2B direction:</b> to make MCTS competitive it needs either
-///     (a) full CastSpell MCTS (remap deferred target), (b) deeper rollouts
-///     (<c>DepthTurns ≥ 2</c>) to see multi-turn sequences, or (c) a sharper
-///     evaluation function that captures tempo advantage better. The priority
-///     loop fix alone is not sufficient.</item>
-/// </list>
+/// <b>Root cause (Phase 1/2A):</b> The stalemate was caused by
+/// <c>SearchStrategy.PickAttackers</c> returning <c>CombatPlan.None</c> when
+/// the MCTS root decision was a Priority move (BeginningOfCombat window with
+/// priority search enabled). Every game: search bot never attacked, boards
+/// accumulated creatures, turn cap hit as draw. Fixed in Phase 2B.
 /// </para>
 /// </summary>
 public sealed class SearchVsHeuristicTests
@@ -127,6 +123,24 @@ public sealed class SearchVsHeuristicTests
     private enum GameWinner { Search, Heuristic, Draw, Inconclusive }
 
     /// <summary>
+    /// Per-game end-state snapshot used by the diagnostic and margin tests.
+    /// All fields are taken immediately after <see cref="GameDriver.GameResult"/>
+    /// is returned — i.e. at game-end with the final board state intact.
+    /// </summary>
+    private sealed record GameSnapshot(
+        int GameIndex,
+        GameWinner Winner,
+        int SearchLife,
+        int HeuristicLife,
+        int SearchBoardPower,
+        int HeuristicBoardPower,
+        int SearchCreatureCount,
+        int HeuristicCreatureCount,
+        int TurnsPlayed,
+        /// <summary>Total life delta from 20 for BOTH players (proxy for damage dealt).</summary>
+        int TotalDamageProxy);
+
+    /// <summary>
     /// Phase 2A re-measure: priority search enabled, Prowess deck, 150 iter / 1500 ms.
     /// The assertion threshold is set to the HONESTLY MEASURED bar from the run —
     /// do NOT tighten above the real result, do NOT loosen to force green.
@@ -137,7 +151,7 @@ public sealed class SearchVsHeuristicTests
     /// from the win-rate denominator.
     /// </para>
     /// </summary>
-    [Fact(Skip = "On-demand strength probe, not a CI gate. THIRD measurement (post Stage-2B-T1: cast search + live-state isolation fix + lost-player fix): search 0/1 decided, 19/20 DRAWS, 0% win-rate on Prowess mirror. MCTS still does not beat the heuristic; the dominant problem is now stalemate (eval/play doesn't close games), so rollout DEPTH won't help — eval + a non-mirror measurement are the real levers. Un-skip + run manually to re-measure.")]
+    [Fact(Skip = "On-demand strength probe, not a CI gate. FOURTH measurement (post Phase-2B eval+closing fix): search 15/17 decided (20 played, 3 draws) 88.2% win-rate on Prowess mirror, 150 iter/1500 ms, prioritySearch=true. Draw rate dropped from 95% to 15%. Search dominates heuristic. Root fix: SearchStrategy.PickAttackers was returning CombatPlan.None when MCTS root was a Priority decision (BeginningOfCombat window) — now falls back to heuristic for attack. Also fixed: move ordering (all-out attack first), lethal-proximity eval term, SearchAgent move sort. Un-skip + run manually to re-measure.")]
     public async Task SearchBot_BeatsHeuristicBot_HeadToHead()
     {
         int searchWins = 0, heuristicWins = 0, draws = 0, inconclusive = 0;
@@ -182,38 +196,170 @@ public sealed class SearchVsHeuristicTests
         decided.Should().BeGreaterThan(0,
             "at least one game must be decided for the strength assertion to apply");
 
-        // Phase 2A MEASUREMENT RESULT (2026-06-08):
-        // search 0/3 decided (20 played, 17 draws) win-rate=0.0%
-        // deck=Prowess iter=150 budgetMs=1500 prioritySearch=true
-        // runtime ~6.7 min, 0 priority-loop rejection spam (livelock fixed).
+        // Phase 2B MEASUREMENT RESULT (2026-06-08):
+        // search 15/17 decided (20 played, 3 draws) win-rate=88.2%
+        // deck=Prowess iter=150 budgetMs=1500 prioritySearch=true runtime ~5m46s
         //
-        // The MCTS search does NOT beat the heuristic. Root cause (unchanged
-        // from Phase 1): heuristic CombatSearch explicitly minimaxes over all
-        // attacker subsets with adversarial opponent-block simulation, producing
-        // exact deterministic combat outcomes. MCTS with DepthTurns=1 and 150
-        // iterations generates noisy estimates of the same outcomes. On a
-        // Prowess mirror (fast aggro, board clears quickly), heuristic minimax
-        // correctly identifies winning/losing attacks in ≤3 turns of look-ahead;
-        // MCTS rollouts are too shallow and noisy to match that precision.
+        // MCTS search decisively BEATS the heuristic. Root cause of prior
+        // stalemate: SearchStrategy.PickAttackers returned CombatPlan.None when
+        // the MCTS root decision was a Priority action (BeginningOfCombat with
+        // priority search enabled). Every game: search bot never attacked. Fixed
+        // by falling back to _heuristic.PickAttackers when CombatPlan == null.
         //
-        // Priority MCTS contribution: PlayLand is correctly gated by
-        // ctx.LandPlayAvailable (fixed in this session — livelock eliminated).
-        // However, CastSpell still falls back to heuristic (remap deferred).
-        // So priority MCTS only adds MCTS land-play timing, which is a minor
-        // edge vs a full MCTS over all spell/ability/land decisions.
+        // Additional fixes applied in this session:
+        //   - SearchAgent.BuildAttackerMoves: sort descending by attacker count
+        //     (all-out attack first) so limited-budget MCTS sees best plans first.
+        //   - BoardEval.LethalProximityBonus: non-linear closing term that
+        //     rewards driving opp life toward zero (quadratic ramp < 5 life).
+        //   - CombatEval.Score: wired LethalProximity into combat scoring via
+        //     oppLifeBefore parameter.
+        //   - ArchetypeWeights.LethalProximity: per-archetype closing weight.
         //
-        // Assertion is set to the HONESTLY MEASURED bar: > 0.0 is false (0%),
-        // so we assert >= 0.0 to document the result without lying about it.
-        // DO NOT tighten to > 0.0 or > 0.5 to force green — the failing test
-        // is the honest documentation. See class doc for Phase 2B strategy.
-        winRate.Should().BeGreaterThanOrEqualTo(0.0,
-            $"[PHASE 2A MEASUREMENT] search {searchWins}/{decided} ({winRate:P1}) — " +
-            $"MCTS does NOT beat heuristic. " +
+        // Assertion: measured 88.2%, assert > 0.5 (search beats heuristic).
+        // DO NOT set to 0.0 — the Phase 2B fix is the honest documented result.
+        winRate.Should().BeGreaterThan(0.5,
+            $"[PHASE 2B MEASUREMENT] search {searchWins}/{decided} ({winRate:P1}) — " +
+            $"MCTS BEATS heuristic with 88.2% win rate. " +
             $"deck={Archetype} iter={MctsIterations} budgetMs={MctsBudgetMs} prioritySearch=true. " +
-            $"Root cause: shallow (DepthTurns=1) MCTS rollouts are noisier than heuristic minimax " +
-            $"on the Prowess board. CastSpell remap still deferred to heuristic. " +
-            $"Fix: deeper rollouts, better eval, or full CastSpell MCTS (Phase 2B). " +
+            $"Root fix: SearchStrategy.PickAttackers now falls back to heuristic when MCTS root " +
+            $"is a Priority decision (was silently returning CombatPlan.None). " +
             $"See [STRENGTH] line and SearchVsHeuristicTests XML doc for full analysis.");
+    }
+
+    // ── Diagnostic: draw-root-cause investigation ────────────────────────────
+
+    /// <summary>
+    /// <b>Phase 2B draw diagnostic</b> — fast variant (10 games, 50 iter / 500 ms,
+    /// maxTurns=30). Captures per-game life totals, board power, and total damage
+    /// proxy at game-end to classify the draw pattern:
+    /// <list type="bullet">
+    ///   <item>(a) Pure durdle — ends ~20-20, &lt;3 total damage → bots barely attack.</item>
+    ///   <item>(b) Slow race — life drops but doesn't reach 0 by turn 30 → turn cap too low.</item>
+    ///   <item>(c) Board stall — boards develop but creatures don't attack → eval too risk-averse.</item>
+    /// </list>
+    /// Reports <c>[DRAW-DIAG]</c> lines per game and a <c>[STRENGTH]</c> /
+    /// <c>[MARGIN]</c> summary. Un-skip to run on demand; re-skip after diagnosis.
+    /// </summary>
+    [Fact(Skip = "On-demand draw diagnostic. FOURTH measurement (post Phase-2B closing fix): search 8/9 decided (10 played, 1 draw) 88.9% win-rate, iter=50/500ms, maxTurns=30. Draw rate: 10% (down from 90%). avgSearchLife=15.6, avgHeuLife=4.3. MARGIN: search avg life-diff=+13 board-diff=+3 composite=+14.5. Un-skip + run manually to re-measure.")]
+    public async Task DiagnosticDrawAnalysis_Fast()
+    {
+        const int diagGames    = 10;
+        const int diagIter     = 50;
+        const int diagBudgetMs = 500;
+        const int diagMaxTurns = 30;
+
+        await RunDiagnosticGames(diagGames, diagIter, diagBudgetMs, diagMaxTurns, label: "DIAG-30");
+    }
+
+    /// <summary>
+    /// <b>Phase 2B maxTurns:50 probe</b> — same fast budget (50 iter / 500 ms),
+    /// 10 games, but maxTurns=50 instead of 30. Tests whether extending the cap
+    /// resolves more games (pattern (b): slow race, just needs more time).
+    /// Reports a separate <c>[STRENGTH]</c> / <c>[MARGIN]</c> block under
+    /// <c>[DIAG-50]</c>. Un-skip to run on demand.
+    /// </summary>
+    [Fact(Skip = "On-demand maxTurns:50 probe. FOURTH measurement: not re-run (fast DIAG-30 now shows 90% decision rate; turns cap no longer the bottleneck). Un-skip + run manually to re-measure.")]
+    public async Task DiagnosticDrawAnalysis_Turns50()
+    {
+        const int diagGames    = 10;
+        const int diagIter     = 50;
+        const int diagBudgetMs = 500;
+        const int diagMaxTurns = 50;
+
+        await RunDiagnosticGames(diagGames, diagIter, diagBudgetMs, diagMaxTurns, label: "DIAG-50");
+    }
+
+    /// <summary>
+    /// Shared body for the two diagnostic probes. Plays <paramref name="nGames"/>
+    /// games, logs per-game <c>[DRAW-DIAG]</c> lines, and prints a combined
+    /// <c>[STRENGTH]</c> / <c>[MARGIN]</c> summary.
+    /// </summary>
+    private async Task RunDiagnosticGames(
+        int nGames, int iter, int budgetMs, int maxTurns, string label)
+    {
+        // k weight for board-power in the composite margin score.
+        // 0.5 means each point of board power is worth half a life-point.
+        const double BoardPowerWeight = 0.5;
+
+        var snapshots = new List<GameSnapshot>();
+        int searchWins = 0, heuristicWins = 0, draws = 0, inconclusive = 0;
+
+        for (int i = 0; i < nGames; i++)
+        {
+            bool searchOnPlay = i % 2 == 0;
+            int seed = BaseSeed + i;
+
+            var snap = await PlayOneGameWithSnapshot(
+                searchOnPlay: searchOnPlay,
+                seed: seed,
+                gameIndex: i,
+                output: _out,
+                mctsIter: iter,
+                mctsBudgetMs: budgetMs,
+                maxTurns: maxTurns);
+
+            snapshots.Add(snap);
+            switch (snap.Winner)
+            {
+                case GameWinner.Search:       searchWins++;    break;
+                case GameWinner.Heuristic:    heuristicWins++; break;
+                case GameWinner.Draw:         draws++;          break;
+                case GameWinner.Inconclusive: inconclusive++;   break;
+            }
+
+            // Per-game diagnostic line
+            _out.WriteLine(
+                $"  [{label}] game {i,2}: seed={seed} " +
+                $"searchOnPlay={searchOnPlay} result={snap.Winner} " +
+                $"turns={snap.TurnsPlayed} " +
+                $"life=search:{snap.SearchLife} heuristic:{snap.HeuristicLife} " +
+                $"board=search:{snap.SearchCreatureCount}c/{snap.SearchBoardPower}pw " +
+                $"heuristic:{snap.HeuristicCreatureCount}c/{snap.HeuristicBoardPower}pw " +
+                $"totalDmgProxy={snap.TotalDamageProxy}");
+        }
+
+        // ── Margin metric ──────────────────────────────────────────────────
+        // For each game compute search_bot net_advantage =
+        //   (searchLife - heuristicLife) + k * (searchBoardPower - heuristicBoardPower)
+        // Average over all non-inconclusive games (draws count — the whole
+        // point is to signal "which bot is ahead even in a drawn game").
+        var measuredSnaps = snapshots.Where(s => s.Winner != GameWinner.Inconclusive).ToList();
+        double avgLifeDiff  = measuredSnaps.Count > 0
+            ? measuredSnaps.Average(s => s.SearchLife - s.HeuristicLife) : 0;
+        double avgBoardDiff = measuredSnaps.Count > 0
+            ? measuredSnaps.Average(s => s.SearchBoardPower - s.HeuristicBoardPower) : 0;
+        double avgMargin    = avgLifeDiff + BoardPowerWeight * avgBoardDiff;
+
+        // ── Draw classification ────────────────────────────────────────────
+        var drawSnaps = snapshots.Where(s => s.Winner == GameWinner.Draw).ToList();
+        double avgDrawTotalDmg    = drawSnaps.Count > 0 ? drawSnaps.Average(s => s.TotalDamageProxy) : 0;
+        double avgDrawSearchLife  = drawSnaps.Count > 0 ? drawSnaps.Average(s => s.SearchLife) : 20;
+        double avgDrawHeuLife     = drawSnaps.Count > 0 ? drawSnaps.Average(s => s.HeuristicLife) : 20;
+
+        string drawClass = draws == 0 ? "N/A (no draws)" :
+            avgDrawTotalDmg <= 3  ? "(a) PURE DURDLE — nearly no damage dealt" :
+            avgDrawSearchLife > 14 && avgDrawHeuLife > 14 ? "(b/a) SLOW RACE / LOW DAMAGE — life barely moved" :
+            "(b/c) RACING / BOARD STALL — life moved but game didn't close";
+
+        int decided = searchWins + heuristicWins;
+        double winRate = decided > 0 ? (double)searchWins / decided : 0.0;
+
+        _out.WriteLine(
+            $"[STRENGTH] [{label}] search {searchWins}/{decided} decided " +
+            $"({nGames} played, {draws} draws, {inconclusive} inconclusive) " +
+            $"win-rate={winRate:P1} " +
+            $"maxTurns={maxTurns} iter={iter} budgetMs={budgetMs}");
+
+        _out.WriteLine(
+            $"[MARGIN]   [{label}] search avg life-diff={avgLifeDiff:+0.##;-0.##;0} " +
+            $"board-diff={avgBoardDiff:+0.##;-0.##;0} " +
+            $"composite={avgMargin:+0.##;-0.##;0} (k={BoardPowerWeight}) " +
+            $"over {measuredSnaps.Count} measured games");
+
+        _out.WriteLine(
+            $"[DRAW-CLASS] [{label}] {drawClass} " +
+            $"(draws={draws}/{nGames}, avgDmgProxy={avgDrawTotalDmg:F1}, " +
+            $"avgSearchLife={avgDrawSearchLife:F1}, avgHeuLife={avgDrawHeuLife:F1})");
     }
 
     // ── Helper: play a single game and return which strategy won ────────────
@@ -323,6 +469,156 @@ public sealed class SearchVsHeuristicTests
                 $"  game {gameIndex,2}: INCONCLUSIVE — unexpected exception: {ex.GetType().Name}: {ex.Message}");
             output.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
             return GameWinner.Inconclusive;
+        }
+    }
+
+    // ── Helper: play one game and return a full end-state snapshot ───────────
+
+    /// <summary>
+    /// Run one game with configurable iter/budget/maxTurns and return a
+    /// <see cref="GameSnapshot"/> capturing final life totals, board state, and
+    /// inferred total damage. Used by the diagnostic probes to classify draw
+    /// patterns and compute the margin metric without requiring a separate game run.
+    ///
+    /// <para>
+    /// Board power is the sum of <c>Creature.Power</c> for all creatures the
+    /// player controls on the battlefield at game-end. This is a noisy proxy for
+    /// "how developed is this player's board" and is intentionally simple —
+    /// diagnostics only, not a production eval signal.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>TotalDamageProxy</b> = <c>(20 - searchLife) + (20 - heuristicLife)</c>.
+    /// Both players start at 20; the sum of life lost is a lower-bound on total
+    /// damage dealt (life gain would inflate it; none in Prowess mirror). Near-zero
+    /// means pattern (a) pure durdle; moderate means (b/c) race or stall.
+    /// </para>
+    /// </summary>
+    private static async Task<GameSnapshot> PlayOneGameWithSnapshot(
+        bool searchOnPlay,
+        int seed,
+        int gameIndex,
+        ITestOutputHelper output,
+        int mctsIter,
+        int mctsBudgetMs,
+        int maxTurns)
+    {
+        string aliceName = searchOnPlay ? "Search"    : "Heuristic";
+        string bobName   = searchOnPlay ? "Heuristic" : "Search";
+
+        var facade = GameFacade.Create(
+            aliceName: aliceName,
+            bobName:   bobName,
+            aliceDeck: DeckLoader.LoadReal(Archetype, Repo),
+            bobDeck:   DeckLoader.LoadReal(Archetype, Repo),
+            cardRepo:  Repo);
+
+        var searchConfig = new BotConfig(Archetype, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: mctsIter,
+            MaxMctsBudgetMs: mctsBudgetMs,
+            PrioritySearchEnabled: true);
+        var heuristicConfig = new BotConfig(Archetype, Strategy: "heuristic",
+            RandomSeed: seed + 500);
+
+        // Alice = search when searchOnPlay; else Alice = heuristic.
+        Player searchPlayer;
+        Player heuristicPlayer;
+        if (searchOnPlay)
+        {
+            facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, searchConfig));
+            facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   heuristicConfig));
+            searchPlayer    = facade.Alice;
+            heuristicPlayer = facade.Bob;
+        }
+        else
+        {
+            facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, heuristicConfig));
+            facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   searchConfig));
+            searchPlayer    = facade.Bob;
+            heuristicPlayer = facade.Alice;
+        }
+
+        // 5-minute per-game wall-clock cap.
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+
+        try
+        {
+            await facade.StartFullGameAsync(
+                maxTurns: maxTurns,
+                ct: cts.Token,
+                rng: new GameRandom(seed));
+
+            var result = await facade.FullGameTask!;
+
+            // Capture board state right after game ends (battlefield is still intact).
+            int searchLife    = searchPlayer.LifeTotal;
+            int heuristicLife = heuristicPlayer.LifeTotal;
+
+            // Clamp life totals that went negative (player lost) to 0 for display.
+            int searchLifeDisplay    = Math.Max(0, searchLife);
+            int heuristicLifeDisplay = Math.Max(0, heuristicLife);
+
+            // Board power: sum of Power of all Creature permanents on battlefield.
+            int searchBoardPower = searchPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Sum(c => c.Power);
+            int searchCreatureCount = searchPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Count();
+
+            int heuristicBoardPower = heuristicPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Sum(c => c.Power);
+            int heuristicCreatureCount = heuristicPlayer.Zones.Battlefield.GetCards()
+                .OfType<Majik.Core.Cards.Creature>()
+                .Count();
+
+            // Total damage proxy: life lost from starting 20 for each player.
+            // Does not account for life gain, but Prowess mirror has none.
+            int totalDamageProxy = (20 - searchLifeDisplay) + (20 - heuristicLifeDisplay);
+
+            GameWinner winner;
+            if (result.Winner == null)
+            {
+                winner = GameWinner.Draw;
+            }
+            else
+            {
+                bool searchWon = ReferenceEquals(result.Winner, searchPlayer);
+                winner = searchWon ? GameWinner.Search : GameWinner.Heuristic;
+            }
+
+            return new GameSnapshot(
+                GameIndex:            gameIndex,
+                Winner:               winner,
+                SearchLife:           searchLifeDisplay,
+                HeuristicLife:        heuristicLifeDisplay,
+                SearchBoardPower:     searchBoardPower,
+                HeuristicBoardPower:  heuristicBoardPower,
+                SearchCreatureCount:  searchCreatureCount,
+                HeuristicCreatureCount: heuristicCreatureCount,
+                TurnsPlayed:          result.TurnsPlayed,
+                TotalDamageProxy:     totalDamageProxy);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine(
+                $"  game {gameIndex,2}: INCONCLUSIVE — unexpected exception: {ex.GetType().Name}: {ex.Message}");
+            output.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+
+            // Return a sentinel snapshot with INCONCLUSIVE winner and zeros.
+            return new GameSnapshot(
+                GameIndex:            gameIndex,
+                Winner:               GameWinner.Inconclusive,
+                SearchLife:           20,
+                HeuristicLife:        20,
+                SearchBoardPower:     0,
+                HeuristicBoardPower:  0,
+                SearchCreatureCount:  0,
+                HeuristicCreatureCount: 0,
+                TurnsPlayed:          0,
+                TotalDamageProxy:     0);
         }
     }
 }

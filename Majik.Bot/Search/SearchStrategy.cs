@@ -94,8 +94,17 @@ internal sealed class SearchStrategy : IBotStrategy
             return _heuristic.PickAttackers(ctx, self, eligible);
         }
 
-        // Empty-attack: pass combat.
-        if (chosen.CombatPlan == null || chosen.IsEmptyAttack)
+        // MCTS may return a Priority action (not a CombatPlan) when priority search
+        // is enabled and the root decision surfaced as a priority window
+        // (e.g. BeginningOfCombat) rather than DeclareAttackers. In that case
+        // the search correctly chose the best priority action, but we still need
+        // to decide on attackers — fall back to the heuristic for that decision
+        // rather than returning CombatPlan.None (which silently skips the attack).
+        if (chosen.CombatPlan == null)
+            return _heuristic.PickAttackers(ctx, self, eligible);
+
+        // Explicit empty-attack: search deliberately chose to not attack.
+        if (chosen.IsEmptyAttack)
             return CombatPlan.None;
 
         // ── InstanceId remap ─────────────────────────────────────────────────
