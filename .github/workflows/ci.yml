@@ -17,7 +17,6 @@ jobs:
     # by the last digit via endsWith (even last digit -> self-hosted).
     runs-on: ${{ (endsWith(github.run_number, '0') || endsWith(github.run_number, '2') || endsWith(github.run_number, '4') || endsWith(github.run_number, '6') || endsWith(github.run_number, '8')) && 'self-hosted' || 'ubuntu-latest' }}
     timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
-    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v6
