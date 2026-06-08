@@ -23,10 +23,11 @@ public sealed class BecomesPTEffect : ContinuousEffect
     }
 
     public override Layer Layer => Layer.PT_SetBase;
-    // CR 613.1g — the target is the source for suppression purposes (the effect
-    // is self-generated from the perspective of the layer service; returning the
-    // target lets GameStateCloner locate this effect via the cloned permanent).
-    public override Permanent? Source => _target;
+    // Sim-only: the cloner routes this effect to the cloned _target permanent.
+    // Source is intentionally NOT overridden — it remains null (floating effect)
+    // so CR 613.6 ability-suppression logic cannot erroneously drop this effect
+    // when the target is stripped by a LoseAllAbilitiesEffect (Dress Down / Oko).
+    internal override Permanent? SimAnchorPermanent => _target;
     public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
     public override bool IsActive() =>
         _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;

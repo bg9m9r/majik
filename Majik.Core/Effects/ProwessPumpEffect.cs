@@ -19,8 +19,9 @@ public sealed class ProwessPumpEffect : ContinuousEffect
 
     public override Layer Layer => Layer.PT_Modify;
     public override bool ExpiresAtEndOfTurn => true;
-    // CR 613.1g — target as source so GameStateCloner can locate this effect.
-    public override Permanent? Source => _target;
+    // Sim-only: the cloner routes this effect to the cloned _target permanent.
+    // Source is intentionally NOT overridden — see BecomesPTEffect for rationale.
+    internal override Permanent? SimAnchorPermanent => _target;
     public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
     public override void Apply(CreatureCharacteristics chars)
     {

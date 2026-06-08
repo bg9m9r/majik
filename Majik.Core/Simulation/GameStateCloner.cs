@@ -148,9 +148,16 @@ public static class GameStateCloner
 
             foreach (var liveEffect in liveCes.RegisteredEffects)
             {
-                // Gate 1: effect must have a source permanent that was cloned
+                // Gate 1: effect must have a sim-anchor permanent that was cloned
                 // (i.e. existed on the original battlefield).
-                if (liveEffect.Source is not Permanent liveSrc) continue;
+                // SimAnchorPermanent is the cloner's routing key — it is the
+                // permanent the cloned effect should be bound to. For source-carries-
+                // effect cases (lords/anthems) this equals Source. For target-capturing
+                // effects (BecomesPTEffect, PumpUntilEndOfTurnEffect, etc.) Source is null
+                // or a non-battlefield permanent, so those classes override SimAnchorPermanent
+                // to return _target instead — without touching Source (which carries live
+                // CR 613.6 ability-suppression semantics). See ContinuousEffect.SimAnchorPermanent.
+                if (liveEffect.SimAnchorPermanent is not Permanent liveSrc) continue;
                 if (!cardMap.TryGetValue(liveSrc.InstanceId, out var clonedCard)) continue;
                 if (clonedCard is not Permanent clonedSrc) continue;
 

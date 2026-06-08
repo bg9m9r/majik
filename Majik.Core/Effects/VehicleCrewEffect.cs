@@ -29,8 +29,9 @@ public sealed class VehicleCrewEffect : ContinuousEffect
 
     public override Layer Layer => Layer.PT_SetBase;
     public override bool ExpiresAtEndOfTurn => true;
-    // CR 613.1g — vehicle as source so GameStateCloner can locate this effect.
-    public override Permanent? Source => _vehicle;
+    // Sim-only: the cloner routes this effect to the cloned vehicle permanent.
+    // Source is intentionally NOT overridden — see BecomesPTEffect for rationale.
+    internal override Permanent? SimAnchorPermanent => _vehicle;
     public override bool AppliesTo(Creature creature) => ReferenceEquals(creature, _vehicle);
 
     public override void Apply(CreatureCharacteristics chars)

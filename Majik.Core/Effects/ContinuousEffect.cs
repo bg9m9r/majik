@@ -67,6 +67,25 @@ public abstract class ContinuousEffect
     public virtual bool DependsOn(ContinuousEffect other) => false;
 
     /// <summary>
+    /// Sim-only: the permanent the <see cref="Majik.Core.Simulation.GameStateCloner"/> uses
+    /// to locate and re-register this effect on the cloned battlefield. Defaults to
+    /// <see cref="Source"/> (correct for effects whose source IS the affected permanent,
+    /// e.g. lord/anthem effects). Target-capturing effects — where <see cref="Source"/>
+    /// is null or a DIFFERENT permanent from the one the effect applies to (e.g.
+    /// <see cref="BecomesPTEffect"/> created by Dress Down or Oko, whose source is the
+    /// Dress Down/Oko enchantment/planeswalker but whose <c>_target</c> is the affected
+    /// creature) — override this to return their <c>_target</c> field instead.
+    ///
+    /// <para>This intentionally does NOT override <see cref="Source"/>. <c>Source</c>
+    /// carries live semantics (CR 613.6 ability-suppression, CES cache-invalidation
+    /// wiring via <c>ActiveEffects</c>); pointing it at <c>_target</c> caused the
+    /// Phase 2A B2 regression (DressDownTests / OkoTests failed because
+    /// <c>ComputeStrippedSet</c> included the target in the stripped set, then the
+    /// suppression filter dropped the BecomesPTEffect). The anchor is sim-only.</para>
+    /// </summary>
+    internal virtual Permanent? SimAnchorPermanent => Source;
+
+    /// <summary>
     /// Sim-only: reconstruct this effect bound to <paramref name="clonedSource"/> for a
     /// search-sandbox clone, so it re-applies on the cloned battlefield. Returns null when
     /// this effect type isn't (yet) sim-cloneable — the cloner then skips it (eval loses
