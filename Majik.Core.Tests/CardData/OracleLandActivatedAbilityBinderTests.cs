@@ -6,6 +6,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Moq;
 using Xunit;
@@ -423,8 +424,75 @@ public class OracleLandActivatedAbilityBinderTests
     }
 
     // -------------------------------------------------------------------
+    // Horizon Canopy cycle — "{1}, {T}, Sacrifice this land: Draw a card."
+    // The sac-to-draw activated ability (Fiery Islet, Sunbaked Canyon, etc.).
+    // -------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Fiery Islet")]
+    [InlineData("Sunbaked Canyon")]
+    public void Bind_HorizonLandSacDraw_AttachesActivatedAbility(string name)
+    {
+        var land = new Land(name) { Owner = _alice, Controller = _alice };
+        var entity = HorizonLandEntity(name);
+
+        var bound = OracleLandActivatedAbilityBinder.Bind(land, entity, _alice);
+
+        bound.Should().BeTrue();
+        land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Bind_HorizonLandSacDraw_AbilityHasManaTapAndSacrificeCosts()
+    {
+        var land = new Land("Fiery Islet") { Owner = _alice, Controller = _alice };
+
+        OracleLandActivatedAbilityBinder.Bind(land, HorizonLandEntity("Fiery Islet"), _alice);
+
+        var ab = land.Abilities.OfType<ActivatedAbility>().Single();
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+            because: "the sac-draw ability taps the land");
+        ab.Costs.OfType<AdditionalCost>().Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice,
+            because: "the sac-draw ability sacrifices the land");
+        ab.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Cost.ToString() == ManaCost.Parse("1").ToString(),
+            because: "the sac-draw ability has a {1} generic mana cost");
+        ab.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Bind_HorizonLandSacDraw_EffectDrawsTopCard()
+    {
+        var land = new Land("Fiery Islet") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(land);
+
+        var top = new Land("Mountain", subtypes: new[] { CardSubtype.Mountain })
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        _alice.Zones.Library.AddCard(top);
+
+        OracleLandActivatedAbilityBinder.Bind(land, HorizonLandEntity("Fiery Islet"), _alice);
+        land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+        _alice.Zones.Hand.GetCards().Should().Contain(top,
+            because: "the sac-draw effect draws the top card of the library");
+        _alice.Zones.Library.GetCards().Should().NotContain(top);
+    }
+
+    // -------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------
+
+    private static CardEntity HorizonLandEntity(string name) => new()
+    {
+        Name = name,
+        TypeLine = "Land",
+        // Real seed wording (verified via EmbeddedCardRepository): the pain-mana
+        // line is bound by OracleManaBinder; this binder only handles the
+        // sac-to-draw activated ability.
+        OracleText = "{T}, Pay 1 life: Add {U} or {R}.\n" +
+                     "{1}, {T}, Sacrifice this land: Draw a card.",
+    };
 
     private static CardEntity MistyRainforestEntity() => new()
     {

@@ -46,6 +46,16 @@ public static class OracleManaBinder
         @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+color",
         RegexOptions.IgnoreCase);
 
+    // {T}, Pay 1 life: Add {U} or {R}.  — Modern Horizons "Horizon Canopy"
+    // painless-dual cycle (Fiery Islet, Sunbaked Canyon, Silent Clearing,
+    // Nurturing Peatland, Waterlogged Grove, Horizon Canopy). The cost prefix
+    // is "{T}, Pay 1 life:" rather than a bare "{T}:", so the standard
+    // tap-for-mana regexes never match it. Each colour is bound as a separate
+    // pay-life ManaAbility (life-floor gate, CR 119.4) via HorizonLandBinder.
+    private static readonly Regex PayLifeDualManaRegex = new(
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*:\s*Add\s+(\{[WUBRGC]\})\s*or\s+(\{[WUBRGC]\})",
+        RegexOptions.IgnoreCase);
+
     /// <summary>
     /// Attaches the correct <see cref="ManaAbility"/> to a basic land that
     /// already has its controller set. Idempotent — if the card is not a
@@ -87,6 +97,24 @@ public static class OracleManaBinder
     {
         var text = entity.OracleText;
         if (string.IsNullOrWhiteSpace(text)) return;
+
+        // Horizon Canopy painless-dual cycle: "{T}, Pay 1 life: Add {A} or {B}."
+        // Checked before the bare-{T} regexes because the pay-life prefix is a
+        // distinct (richer) activation cost. Each colour binds as its own
+        // pay-life ManaAbility (CR 119.4 life-floor gate). Only Land cards carry
+        // this shape, so it's a no-op on non-lands.
+        if (card is Land horizonLand)
+        {
+            var payLife = PayLifeDualManaRegex.Match(text);
+            if (payLife.Success)
+            {
+                var colorA = payLife.Groups[1].Value.Replace("{", "").Replace("}", "");
+                var colorB = payLife.Groups[2].Value.Replace("{", "").Replace("}", "");
+                HorizonLandBinder.AttachPayLifeMana(horizonLand, controller, colorA);
+                HorizonLandBinder.AttachPayLifeMana(horizonLand, controller, colorB);
+                return;
+            }
+        }
 
         // Any-colour mana sources (Mox Opal, City of Brass, command tower).
         if (TapForAnyColorRegex.IsMatch(text))
