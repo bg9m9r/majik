@@ -794,6 +794,42 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.49 — the <see cref="InstanceId"/> of the permanent this card was
+    /// exiled "with" (imprinted on), or <c>null</c> when the card is not linked
+    /// to any permanent's imprint. Set when an imprint effect (e.g. Agatha's
+    /// Soul Cauldron's <c>{T}</c> exile ability) moves this card to exile "with"
+    /// that permanent; cleared when that permanent leaves the battlefield (the
+    /// card stays in exile but becomes plain exile — it does NOT return).
+    ///
+    /// <para>This is a CLIENT-facing back-link: the snapshotter surfaces the
+    /// linked cards under the permanent (<c>CardSnapshotDto.ImprintedCards</c>)
+    /// so a client can render where the granted abilities come from. It is the
+    /// card-side mirror of <see cref="Permanent.ImprintedCards"/>; the two are
+    /// maintained together by the imprint effect and its leave-the-battlefield
+    /// teardown.</para>
+    ///
+    /// <para>Defaults to <c>null</c>.</para>
+    /// </summary>
+    public Guid? ExiledWith { get; private set; }
+
+    /// <summary>Link this card to the permanent (by its
+    /// <see cref="InstanceId"/>) it was exiled "with" (CR 702.49). Called by an
+    /// imprint effect alongside <see cref="Permanent.AddImprinted"/>.</summary>
+    public void SetExiledWith(Guid? permanentId)
+    {
+        ExiledWith = permanentId;
+    }
+
+    /// <summary>Clear the imprint back-link (CR 702.49) — the card stays in
+    /// whatever zone it is in (typically exile) but is no longer linked to any
+    /// permanent. Called when the imprinting permanent leaves the battlefield.
+    /// Idempotent.</summary>
+    public void ClearExiledWith()
+    {
+        ExiledWith = null;
+    }
+
+    /// <summary>
     /// CR 702.138b — "escaped" runtime sentinel propagated from the
     /// resolving <see cref="Majik.Core.Spells.Spell.WasCastForEscape"/>
     /// onto the card itself, so battlefield-resident triggers
@@ -1483,6 +1519,7 @@ public class Card : ICard
         WasOffspringPaid = src.WasOffspringPaid;
         WasCastForSurge = src.WasCastForSurge;
         HasGiftPromised = src.HasGiftPromised;
+        ExiledWith = src.ExiledWith;                    // imprint back-link (CR 702.49)
 
         // runtime grants (immutable value-object refs or scalars)
         RuntimeFlashbackCost = src.RuntimeFlashbackCost;

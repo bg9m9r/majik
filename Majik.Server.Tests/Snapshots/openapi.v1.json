@@ -441,6 +441,15 @@
               "object"
             ]
           },
+          "imprintedCards": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "instanceId": {
             "format": "uuid",
             "type": "string"

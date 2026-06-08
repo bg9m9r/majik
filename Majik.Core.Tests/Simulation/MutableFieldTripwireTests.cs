@@ -46,6 +46,7 @@ public sealed class MutableFieldTripwireTests
             // ── auto-property backing fields (normalized to PropName) ────────
             "AdventureSpec",                        // COPIED (definition ref — AdventureSpec = src.AdventureSpec)
             "ColorIndicator",                       // COPIED (immutable list ref)
+            "ExiledWith",                           // COPIED (ExiledWith = src.ExiledWith — imprint back-link Guid?)
             "HasGiftPromised",                      // COPIED (cast sentinel)
             "InstanceId",                           // COPIED (InstanceId = src.InstanceId — stable identity)
             "Intensity",                            // COPIED (Intensity = src.Intensity)
