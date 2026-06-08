@@ -13,13 +13,16 @@ jobs:
     # by run-number parity, so combined concurrency sustains a wider card-shipping POOL.
     # NB: GitHub Actions expressions have NO modulo operator, so parity is by last digit.
     runs-on: ${{ (endsWith(github.run_number, '0') || endsWith(github.run_number, '2') || endsWith(github.run_number, '4') || endsWith(github.run_number, '6') || endsWith(github.run_number, '8')) && 'self-hosted' || 'ubuntu-latest' }}
-    # 20min, not 12: the gate is fast locally (~1.6min on many cores) but on the actual
-    # runners it legitimately needs more — the GitHub-hosted fallback is 2-core (the
-    # ~24k-test suite + the FORCED-SEQUENTIAL Server.Tests WebApplicationFactory hosts
-    # take ~13-15min there), and the self-hosted 4-core pool spikes past 12min under
-    # card-loop contention. 12min was too tight on both and failed real runs as
-    # timeouts (not real failures), ejecting unrelated PRs. 20min covers both paths.
-    timeout-minutes: 20
+    # 30min, not 12: the gate is fast locally (~1.6min on many cores) but the actual
+    # runners are far slower and VARIABLE — the GitHub-hosted 2-core fallback runs the
+    # ~24k-test suite + the FORCED-SEQUENTIAL Server.Tests WebApplicationFactory hosts,
+    # which on a slow instance has been observed >20min; the self-hosted 4-core pool
+    # also spikes past 12min under card-loop contention. 12/20min failed real runs as
+    # timeouts (not real failures), ejecting unrelated PRs. 30min absorbs the worst
+    # observed case. FOLLOW-UP: the real fix is speeding up Server.Tests (share one
+    # WebApplicationFactory host across the suite instead of per-test) so the cap can
+    # come back down — tracked separately.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v6
