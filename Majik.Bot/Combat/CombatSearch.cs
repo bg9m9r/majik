@@ -43,6 +43,8 @@ internal static class CombatSearch
 
         var opp = ctx.AllPlayers.First(p => !ReferenceEquals(p, self));
         var oppBlockers = opp.Zones.Battlefield.GetCards().OfType<Creature>().ToList();
+        // Capture opp's current life for the lethal-proximity ramp in CombatEval.
+        int oppLifeBefore = opp.LifeTotal;
 
         // Track all scored subsets so we can surface alternatives. List is
         // bounded by 2^TopKAttackers = 256 in the worst case — cheap.
@@ -51,7 +53,7 @@ internal static class CombatSearch
         // Pass 1: greedy block projection over all attacker subsets.
         var (best, bestScore) = SearchSubsets(
             usable, oppBlockers, opp, weights, sw, budgetMs,
-            (subset, blockers) => ScoreSubsetGreedy(subset, blockers, weights),
+            (subset, blockers) => ScoreSubsetGreedy(subset, blockers, weights, oppLifeBefore),
             scored, deep: false);
 
         bool usedDeep = false;
@@ -66,7 +68,7 @@ internal static class CombatSearch
             scored.Clear();
             var (deepBest, deepScore) = SearchSubsets(
                 usable, oppBlockers, opp, weights, sw, budgetMs,
-                (subset, blockers) => ScoreSubsetMinimax(subset, blockers, weights),
+                (subset, blockers) => ScoreSubsetMinimax(subset, blockers, weights, oppLifeBefore),
                 scored, deep: true);
             best = deepBest;
             bestScore = deepScore;
@@ -170,11 +172,12 @@ internal static class CombatSearch
     private static double ScoreSubsetGreedy(
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> oppBlockers,
-        ArchetypeWeights weights)
+        ArchetypeWeights weights,
+        int oppLifeBefore)
     {
         var (botLifeLost, oppLifeLost, botPowerKilled, oppPowerKilled)
             = ProjectCombatGreedy(attackers, oppBlockers);
-        return CombatEval.Score(botLifeLost, oppLifeLost, botPowerKilled, oppPowerKilled, weights);
+        return CombatEval.Score(botLifeLost, oppLifeLost, botPowerKilled, oppPowerKilled, weights, oppLifeBefore);
     }
 
     /// <summary>
@@ -185,10 +188,11 @@ internal static class CombatSearch
     private static double ScoreSubsetMinimax(
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> oppBlockers,
-        ArchetypeWeights weights)
+        ArchetypeWeights weights,
+        int oppLifeBefore)
     {
         if (attackers.Count == 0)
-            return CombatEval.Score(0, 0, 0, 0, weights);
+            return CombatEval.Score(0, 0, 0, 0, weights, oppLifeBefore);
 
         var assignment = new int[oppBlockers.Count]; // -1 = no block
         for (int i = 0; i < assignment.Length; i++) assignment[i] = -1;
@@ -211,7 +215,7 @@ internal static class CombatSearch
         if (totalCombos < 0)
         {
             // Fall back to greedy if combos blow up (shouldn't happen with caps).
-            return ScoreSubsetGreedy(attackers, oppBlockers, weights);
+            return ScoreSubsetGreedy(attackers, oppBlockers, weights, oppLifeBefore);
         }
 
         for (long combo = 0; combo < totalCombos; combo++)
@@ -225,7 +229,7 @@ internal static class CombatSearch
 
             var (botLifeLost, oppLifeLost, botKilled, oppKilled) =
                 ProjectCombatWithAssignment(attackers, oppBlockers, assignment);
-            var score = CombatEval.Score(botLifeLost, oppLifeLost, botKilled, oppKilled, weights);
+            var score = CombatEval.Score(botLifeLost, oppLifeLost, botKilled, oppKilled, weights, oppLifeBefore);
 
             if (!anyEvaluated || score < worstForBot)
             {

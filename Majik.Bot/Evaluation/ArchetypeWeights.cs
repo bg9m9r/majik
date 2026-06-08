@@ -15,7 +15,16 @@ public sealed record ArchetypeWeights(
     double ManaSources,
     double HandSize,
     double Tempo,
-    double KeyCardInPlay)
+    double KeyCardInPlay,
+    /// <summary>
+    /// Weight for the lethal-proximity closing term in
+    /// <see cref="BoardEval"/>. Controls how strongly the eval rewards
+    /// driving the opponent's life toward zero. The term is non-linear:
+    /// marginal damage value rises steeply as opp life drops below 5 (see
+    /// <see cref="BoardEval.LethalProximityBonus"/>). Aggressive archetypes
+    /// (Burn) weight this higher than controlling ones (BorosEnergy).
+    /// </summary>
+    double LethalProximity = 1.0)
 {
     public static readonly ArchetypeWeights Burn = new(
         LifeDelta:        3.0,
@@ -25,7 +34,8 @@ public sealed record ArchetypeWeights(
         ManaSources:      0.8,  // a land on board > a land in hand for an aggressive deck
         HandSize:         0.3,
         Tempo:            1.0,
-        KeyCardInPlay:    2.0);
+        KeyCardInPlay:    2.0,
+        LethalProximity:  3.0); // burn races hard — every point closer to 0 is precious
 
     public static readonly ArchetypeWeights Prowess = new(
         LifeDelta:        1.0,
@@ -35,7 +45,8 @@ public sealed record ArchetypeWeights(
         ManaSources:      1.0,
         HandSize:         0.8,
         Tempo:            1.5,
-        KeyCardInPlay:    2.5);
+        KeyCardInPlay:    2.5,
+        LethalProximity:  2.5); // prowess converts board advantage to kills
 
     public static readonly ArchetypeWeights BorosEnergy = new(
         LifeDelta:        1.5,
@@ -45,7 +56,8 @@ public sealed record ArchetypeWeights(
         ManaSources:      1.5,
         HandSize:         2.0,
         Tempo:            1.5,
-        KeyCardInPlay:    2.0);
+        KeyCardInPlay:    2.0,
+        LethalProximity:  2.0); // midrange — still wants to close games
 
     /// <summary>
     /// Neutral midrange baseline for any archetype that does not (yet) have a
@@ -68,7 +80,8 @@ public sealed record ArchetypeWeights(
         ManaSources:      1.2,  // mana sources on board outvalue cards in hand
         HandSize:         0.8,
         Tempo:            1.0,
-        KeyCardInPlay:    2.0);
+        KeyCardInPlay:    2.0,
+        LethalProximity:  1.5); // sensible default: reward closing games
 
     /// <summary>Resolve the eval weights for an archetype, falling back to
     /// <see cref="Default"/> for any archetype without a bespoke table. Never
