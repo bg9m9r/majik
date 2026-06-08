@@ -145,19 +145,31 @@ public class ActivatedAbility : IActivatedAbility
     /// own (the stack object is sourced from the copy via
     /// <see cref="Services.AbilityActivator"/>).
     ///
-    /// NOTE (v1 boundary): cost / effect closures that captured the ORIGINAL
-    /// source permanent directly (rather than reading it from the ability) still
-    /// reference the original — those abilities must be rebuilt by a bespoke
-    /// per-card rebind. This generic rebind is correct for the common case where
-    /// the ability references only its own <see cref="Source"/> /
-    /// <see cref="Controller"/>.
+    /// STAGE 1 (re-sourceable abilities): COSTS now re-home. Each
+    /// <see cref="AdditionalCost"/> whose captured permanent is reference-equal
+    /// to this ability's own <see cref="Source"/> is rebound to
+    /// <paramref name="newSource"/> via <see cref="AdditionalCost.RebindSource"/>,
+    /// so a re-sourced ability taps / sacrifices the NEW source rather than the
+    /// original permanent. Mana costs and non-matching costs pass through
+    /// unchanged. EFFECTS are NOT migrated this stage — effect closures that
+    /// captured the ORIGINAL source permanent directly still reference the
+    /// original; a later stage migrates effect authoring to read
+    /// <see cref="ResolutionContext.Source"/>. This generic rebind is correct
+    /// for the common case where the ability references only its own
+    /// <see cref="Source"/> / <see cref="Controller"/>.
     /// </summary>
     public ActivatedAbility RebindTo(object newSource, Player newController) =>
         new(
             source: newSource ?? throw new ArgumentNullException(nameof(newSource)),
             controller: newController ?? throw new ArgumentNullException(nameof(newController)),
             targets: _targets.Count > 0 ? _targets : null,
-            costs: _costs.Count > 0 ? _costs : null,
+            // STAGE 1 — re-home source-capturing costs ({T} / sacrifice) onto
+            // the new source so the rebound ability pays its cost with the new
+            // permanent; other ICost types pass through untouched.
+            costs: _costs.Count > 0
+                ? _costs.Select(c =>
+                    c is AdditionalCost ac ? ac.RebindSource(Source, newSource) : c)
+                : null,
             effects: _effects.Count > 0 ? _effects : null,
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
             sorcerySpeed: IsSorcerySpeed,
@@ -195,7 +207,11 @@ public class ActivatedAbility : IActivatedAbility
 
         _resolutionState = ResolutionState.Resolving();
 
-        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct);
+        // STAGE 1 — expose the ability's own source (when it is a battlefield
+        // permanent) so effects can read "their source" generically off the
+        // context (CR 113.7) rather than capturing a specific permanent.
+        var rc = ResolutionContext.For(
+            Controller, agent, game, _chosenTargets, ct, source: Source as Cards.Permanent);
 
         // Resolution logic (Rule 608) — await each effect in order.
         foreach (var effect in _effects)

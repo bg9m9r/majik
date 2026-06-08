@@ -226,7 +226,11 @@ public class TriggeredAbility : ITriggeredAbility
 
         _resolutionState = ResolutionState.Resolving();
 
-        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct)
+        // STAGE 1 — expose the trigger's own source (when it is a battlefield
+        // permanent) so effects can read "their source" generically off the
+        // context (CR 113.7) rather than capturing a specific permanent.
+        var rc = ResolutionContext.For(
+                Controller, agent, game, _chosenTargets, ct, source: Source as Permanent)
             with
             { TriggeringPlayer = TriggeringPlayer };
 
