@@ -25,7 +25,11 @@ internal sealed class HeuristicStrategy : IBotStrategy
         _sink = config.DecisionSink ?? NullBotDecisionSink.Instance;
         _vanillaTracker = config.VanillaShellTracker;
         _priority = new PriorityPolicy(_weights, _sink, _vanillaTracker);
-        _combat = new CombatPolicy(_weights, sink: _sink);
+        // SimCombatBudgetMs caps the CombatPolicy stopwatch budget for sandbox
+        // opponent agents inside MCTS. The production default (~800 ms) is used
+        // when the field is null (live agent or test without an explicit cap).
+        var combatBudgetMs = config.SimCombatBudgetMs ?? 800;
+        _combat = new CombatPolicy(_weights, budgetMs: combatBudgetMs, sink: _sink);
     }
 
     public PriorityAction PickPriorityAction(GameContext ctx, Player self) => _priority.Pick(ctx, self);

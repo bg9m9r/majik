@@ -6,7 +6,6 @@ using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
-using Majik.Core.Players.Agents;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
@@ -23,12 +22,14 @@ namespace Majik.Bot.Tests.Search;
 /// <para>
 /// Architecture note — why PickAttackers uses MCTS and PickBlockers does not:
 /// <see cref="SearchStrategy.PickAttackers"/> runs a real MCTS search over a
-/// sandbox engine. The sandbox opponent is a <see cref="DeterministicBotAgent"/>
-/// that never declares attackers or blockers, so block-outcome modelling is not
-/// available to the MCTS attacker search.
+/// sandbox engine. The sandbox opponent (Task D3) is now a
+/// <see cref="BotPlayerAgent"/> backed by <see cref="Heuristic.HeuristicStrategy"/>
+/// with a capped combat budget, so the sandbox IS adversarial: the opponent
+/// declares blockers, allowing MCTS to observe trade outcomes and penalise
+/// bad attacks (see P2).
 /// <see cref="SearchStrategy.PickBlockers"/> bypasses MCTS entirely and uses
 /// <see cref="BlockCombatEval"/>, a direct lethal-aware combat projector over the
-/// enriched candidate set, which IS fully able to reason about trade outcomes.
+/// enriched candidate set.
 /// </para>
 /// </summary>
 public class CombatPuzzleTests
@@ -102,7 +103,7 @@ public class CombatPuzzleTests
     // ── Puzzle 2: Don't attack into a bad trade ───────────────────────────────
 
     /// <summary>
-    /// Puzzle 2 — Don't attack into a bad trade.
+    /// Puzzle 2 — Don't attack into a bad trade (verified via MCTS, Task D3).
     ///
     /// <para>
     /// Bot has a lone 2/2; opponent has an untapped 3/3 on the battlefield and
@@ -112,20 +113,16 @@ public class CombatPuzzleTests
     /// </para>
     ///
     /// <para>
-    /// Implementation note — MCTS scope limitation:
-    /// <see cref="SearchStrategy.PickAttackers"/> runs MCTS where the sandbox
-    /// opponent is a <see cref="DeterministicBotAgent"/> that NEVER declares
-    /// blockers. On a vanilla board the MCTS simulator therefore cannot observe
-    /// the 3/3 blocking the 2/2 and cannot score the board-loss directly.
-    /// The puzzle is instead verified via <see cref="CombatPolicy.PickAttackers"/>
-    /// (the minimax-backed heuristic search that models the opponent's optimal
-    /// blocking response), which correctly declines the attack.
-    /// This is the appropriate tool for this decision class — the MCTS attacker
-    /// search is designed for racing / lethal scenarios, not for modelling opponent
-    /// blocking responses on defensive boards.
+    /// Task D3 fix — adversarial sandbox opponent: the MCTS simulator now places
+    /// a <see cref="BotPlayerAgent"/> backed by <see cref="Heuristic.HeuristicStrategy"/>
+    /// on the opponent seat. When the bot declares the 2/2 as an attacker, the
+    /// sandbox opponent declares the 3/3 as a blocker (hard-block: toughness 3 &gt;
+    /// power 2). The MCTS sees the board after combat: bot lost its 2/2, opponent
+    /// kept its 3/3, opponent life unchanged. BoardEval heavily penalises the
+    /// board-power loss, so the hold-back line scores higher and MCTS chooses it.
     /// </para>
     ///
-    /// Correct answer: do NOT attack (empty plan).
+    /// Correct answer: do NOT attack (empty plan) — verified via MCTS search path.
     /// </summary>
     [Fact]
     public void P2_DontAttackIntoBadTrade_HoldsBack()
@@ -134,35 +131,25 @@ public class CombatPuzzleTests
         var opp = new Player("Opp", 20);
 
         var bot22 = AddReadyCreature(bot, "Bot22", 2, 2);
-        // Opponent's 3/3 is untapped and will block / outclass the bot's 2/2.
+        // Opponent's 3/3 is untapped and will block and survive, killing the bot's 2/2.
         AddReadyCreature(opp, "Opp33", 3, 3);
 
         PadLibraries(bot, opp);
 
-        // Use the minimax CombatPolicy — it correctly models opponent's optimal
-        // blocking response (the MCTS sandbox cannot, as noted above).
-        // "Burn" weights are aggressive, so the fact it still holds back makes the
-        // assertion conservative: even a racing archetype declines this trade.
-        var policy = new CombatPolicy(ArchetypeWeights.Burn);
+        // Use MCTS (adversarial sandbox opponent) — Task D3 makes this work.
+        // "Burn" weights are aggressive, so the fact it still holds back proves
+        // the search correctly observes the trade via the blocking sandbox opponent.
+        var ctx = SearchTestCtx.AtCombat(bot, opp);
+        var strat = MctsStrategy();
 
-        // Build a minimal GameContext in the attacker's DeclareAttackers window.
-        var bus = new EventBus();
-        var stack = new Majik.Core.Stack.Stack(bus);
-        var ctx = new GameContext(
-            self: bot,
-            allPlayers: new[] { bot, opp },
-            activePlayer: bot,
-            turnNumber: 3,
-            currentPhase: StepStateType.DeclareAttackers,
-            stack: stack);
+        var plan = strat.PickAttackers(ctx, bot, new[] { bot22 });
 
-        var plan = policy.PickAttackers(ctx, bot, new[] { bot22 });
-
-        // Minimax sees that the 3/3 blocks and kills the 2/2 — net board loss
-        // for the bot with no life-total gain against a 20-life opponent.
-        plan.Attackers.Should().NotContain(
-            a => a.Attacker.InstanceId == bot22.InstanceId,
-            because: "attacking the lone 2/2 into an untapped 3/3 at 20 life is a losing trade — bot should hold back");
+        // MCTS sees that the sandbox opponent's 3/3 blocks and kills the 2/2 —
+        // net board loss for the bot with no life-total gain against a 20-life
+        // opponent. The hold-back line (empty attack) scores higher.
+        plan.Attackers.Should().BeEmpty(
+            because: "attacking the lone 2/2 into an untapped 3/3 at 20 life is a losing trade — " +
+                     "the adversarial sandbox opponent blocks, so MCTS correctly holds back");
     }
 
     // ── Puzzle 3: Profitable block ────────────────────────────────────────────

@@ -135,11 +135,22 @@ internal sealed class SearchStrategy : IBotStrategy
     /// enriched candidate set produced by <see cref="SearchAgent.BuildBlockerMoves"/>
     /// (accessible via <see cref="BlockCombatEval"/>), rather than full MCTS.
     ///
-    /// Rationale: MCTS block search would require the sandbox's opponent agent
-    /// (DeterministicBotAgent) to actually declare attackers so the engine reaches
-    /// a DeclareBlockers node — but DeterministicBotAgent always passes, so the
-    /// sandbox never surfaces that decision. A direct combat-projection evaluator
-    /// over the enumerated candidates is correct, fast, and deterministic.
+    /// Rationale — why PickBlockers does NOT use MCTS (and should not in Phase 2
+    /// without combat-state resume support):
+    ///
+    /// The bot's block decision is made against the SPECIFIC live attack that was
+    /// just declared by the real opponent. If we launched an MCTS sandbox to search
+    /// the block decision, the sandbox would resume from a pre-combat game state and
+    /// the sandbox's opponent agent (even the adversarial HeuristicStrategy added in
+    /// Task D3) would re-derive its OWN attack from that state — which may differ
+    /// from the real attack. The MCTS would then search blocks against the WRONG
+    /// attack, producing a meaningless or misleading block plan.
+    ///
+    /// The correct fix (Phase 2) is "combat-state resume": clone the game state
+    /// AFTER attackers are declared (mid-combat) so the sandbox sees the real attack.
+    /// Until that infrastructure exists, <see cref="BlockCombatEval"/> — a direct
+    /// one-ply lethal-aware combat projector over the actual attackers — is the
+    /// correct and safe tool for this decision class.
     ///
     /// The evaluator is lethal-aware: a plan that lets all-attacker power through
     /// when it would kill the defender is scored as <c>double.MinValue</c> so

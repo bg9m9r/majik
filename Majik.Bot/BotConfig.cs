@@ -34,6 +34,14 @@ namespace Majik.Bot;
 /// <see cref="Majik.Core.Events.UnimplementedCardEncounteredEvent"/> fires
 /// on the tracker's event bus. Defaults to no-op (the bot still
 /// deprioritises vanilla shells in EV scoring, just silently).</para>
+///
+/// <para><c>SimCombatBudgetMs</c> limits the opponent's <see cref="Combat.CombatPolicy"/>
+/// budget when this config is used for a sandbox opponent inside MCTS.
+/// The default (null) uses the production default (~800 ms). Set to a small
+/// value (e.g. 20) for sandbox-opponent agents so that an adversarial
+/// HeuristicStrategy blocking call at every MCTS node does not dominate
+/// search time. This field is only consulted by <see cref="Search.EngineSimulator"/>;
+/// it has no effect on the live (top-level) BotPlayerAgent.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -41,4 +49,5 @@ public sealed record BotConfig(
     int RandomSeed = 0,
     string Strategy = "heuristic",
     IBotDecisionSink? DecisionSink = null,
-    VanillaShellTracker? VanillaShellTracker = null);
+    VanillaShellTracker? VanillaShellTracker = null,
+    int? SimCombatBudgetMs = null);

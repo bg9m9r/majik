@@ -35,6 +35,17 @@ namespace Majik.Bot.Search;
 /// have their exceptions observed via a fire-and-forget continuation so the CLR
 /// never surfaces an <see cref="UnobservedTaskException"/>.
 /// </para>
+///
+/// <para>
+/// <b>Adversarial opponent (Task D3):</b> The non-searched (opponent) seat is driven
+/// by <see cref="BotPlayerAgent"/> using <see cref="Heuristic.HeuristicStrategy"/>,
+/// which blocks and attacks sensibly. This makes the search genuinely adversarial:
+/// when the searched bot declares attackers the sandbox opponent will declare blockers
+/// so MCTS can see trades and correctly penalise bad attacks.
+/// The opponent's <see cref="Combat.CombatPolicy"/> combat-search budget is capped at
+/// <see cref="OpponentSimCombatBudgetMs"/> (20 ms) so that the blocking decision at
+/// each MCTS node expansion does not dominate search time.
+/// </para>
 /// </summary>
 public sealed class EngineSimulator : ISearchSimulator
 {
@@ -45,11 +56,24 @@ public sealed class EngineSimulator : ISearchSimulator
     /// <summary>Fixed seed so every Advance/Rollout on the same root is deterministic.</summary>
     private const int FixedSeed = 42;
 
-    private readonly ArchetypeWeights _weights;
+    /// <summary>
+    /// Combat-search budget (ms) for the sandbox opponent agent (Task D3 perf guard).
+    /// The opponent's HeuristicStrategy CombatPolicy stopwatch is capped here so that
+    /// blocking at every MCTS node does not blow up search time. 20 ms is enough for
+    /// the greedy pass on small boards (which is all that matters for correctness) and
+    /// keeps a 200-iteration search well under the 1.5 s MCTS budget.
+    /// </summary>
+    private const int OpponentSimCombatBudgetMs = 20;
 
-    public EngineSimulator(ArchetypeWeights weights)
+    private readonly ArchetypeWeights _weights;
+    private readonly string _archetypeName;
+
+    public EngineSimulator(ArchetypeWeights weights, string archetypeName = "Burn")
     {
         _weights = weights ?? throw new ArgumentNullException(nameof(weights));
+        // archetypeName is used to build the sandbox opponent's BotConfig.
+        // The opponent archetype mainly tunes eval weights; any valid archetype works.
+        _archetypeName = archetypeName;
     }
 
     // ── ISearchSimulator ─────────────────────────────────────────────────────
@@ -193,10 +217,18 @@ public sealed class EngineSimulator : ISearchSimulator
 
     /// <summary>
     /// Agent factory called by <see cref="SandboxGame.From"/> for each cloned player.
+    ///
+    /// <para>
     /// The searched seat gets a <see cref="SearchAgent"/> (with the path script and
-    /// optional rollout strategy); all other seats get a <see cref="DeterministicBotAgent"/>.
+    /// optional rollout strategy). The opponent seat gets a <see cref="BotPlayerAgent"/>
+    /// backed by <see cref="Heuristic.HeuristicStrategy"/> — it blocks and attacks
+    /// sensibly, making the search adversarial. The opponent's
+    /// <see cref="Combat.CombatPolicy"/> budget is capped at
+    /// <see cref="OpponentSimCombatBudgetMs"/> so that its blocking call at each MCTS
+    /// node does not dominate search time (Task D3 perf guard).
+    /// </para>
     /// </summary>
-    private static IPlayerAgent BuildAgent(
+    private IPlayerAgent BuildAgent(
         Player clonedPlayer,
         SimState root,
         IReadOnlyList<SimMove> path,
@@ -213,7 +245,16 @@ public sealed class EngineSimulator : ISearchSimulator
             return agent;
         }
 
-        return new DeterministicBotAgent();
+        // Adversarial opponent: HeuristicStrategy with a capped combat budget.
+        // This makes the sandbox genuinely adversarial — the opponent blocks when
+        // profitable, so MCTS can observe bad-trade outcomes and penalise them.
+        // SimCombatBudgetMs caps the CombatPolicy stopwatch to keep each node
+        // expansion fast (see OpponentSimCombatBudgetMs).
+        var opponentConfig = new BotConfig(
+            ArchetypeName: _archetypeName,
+            Strategy: "heuristic",
+            SimCombatBudgetMs: OpponentSimCombatBudgetMs);
+        return new BotPlayerAgent(clonedPlayer, opponentConfig);
     }
 
     /// <summary>
