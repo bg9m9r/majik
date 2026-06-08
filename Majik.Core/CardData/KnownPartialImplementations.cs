@@ -34,14 +34,21 @@ public static class KnownPartialImplementations
         {
             ["Agatha's Soul Cauldron"] = new CardGap(
                 CardGapSeverity.Partial,
-                "Ability-grant static partially implemented: the MANA-ability slice is granted "
-                + "(an imprinted creature's '{T}: Add …' is re-homed to each +1/+1-countered "
-                + "creature you control, sourced on the bearer — taps the bearer, not the exiled "
-                + "card). Still deferred: NON-mana activated abilities of imprinted creatures "
-                + "('{2}: this gets +1/+1', '{T}: deal 1 damage', etc.) — no general re-source-able "
-                + "oracle→activated-ability binder exists, so an arbitrary creature's non-mana "
-                + "ability can't be soundly rebuilt against a new source. Targeting + Legendary "
-                + "supertype + mana-colour-substitution done (#2497)."),
+                "Ability-grant static mostly implemented: an imprinted creature's MANA abilities "
+                + "('{T}: Add …') AND the common soundly-reconstructable NON-mana activated "
+                + "abilities are re-homed to each +1/+1-countered creature you control, sourced on "
+                + "the bearer (the cost taps/sacrifices the bearer; 'this creature' = bearer). "
+                + "Non-mana shapes covered (OracleActivatedAbilityBinder): firebreathing / self-pump "
+                + "('{cost}: This creature gets +X/+Y until end of turn'), pingers ('{cost}: This "
+                + "creature deals N damage to any target / target creature / target player'), and "
+                + "sacrifice-self pingers ('Sacrifice this creature: It deals N damage to …'), with a "
+                + "', '-separated mana+{T} cost grammar. Residual (skipped, NOT emitted broken): "
+                + "bespoke abilities outside that set — tutors, token makers, modal/'choose one', "
+                + "anthem grants, '{T}: Draw', loyalty-style; abilities with unmodellable cost tokens "
+                + "({X}, energy {E}, snow {S}, Phyrexian, 'Pay N life', 'Discard a card'); 'Activate "
+                + "only …' riders; restricted damage targets. Fully closing the residual waits on a "
+                + "re-bindable ability model. Targeting + Legendary supertype + mana-colour-substitution "
+                + "done (#2497)."),
 
             // --- Re-derived from the faithful BotDeckImplementationAuditTests
             // run (cards built via the real GameFacade.Create + PopulateSideboard
