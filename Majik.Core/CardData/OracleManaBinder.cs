@@ -78,6 +78,63 @@ public static class OracleManaBinder
         TryBindFromOracle(card, entity, controller);
     }
 
+    /// <summary>
+    /// Parse the "{T}: Add …" mana-ability clauses out of <paramref name="oracleText"/>
+    /// and return one <see cref="ManaCost"/> per <see cref="ManaAbility"/> that
+    /// <see cref="Bind"/> would attach — WITHOUT mutating any card. The same
+    /// regexes drive both methods, so a card's printed mana abilities and this
+    /// list stay in lock-step.
+    ///
+    /// <para>This is the card-identity-agnostic core that makes a "{T}: Add {C}"
+    /// mana ability RE-HOMABLE to an arbitrary source: a caller can take the
+    /// returned costs and build fresh <see cref="ManaAbility"/> instances homed
+    /// to any permanent (CR 605.1a). The canonical consumer is Agatha's Soul
+    /// Cauldron's ability-grant static — it grants each imprinted creature card's
+    /// mana abilities to the bearer by re-running this parse against the imprinted
+    /// card's oracle text and constructing mana abilities sourced on the bearer.
+    /// Only the {T}-cost mana clauses are returned; non-mana activated abilities
+    /// (e.g. "{2}: this gets +1/+1") are not produced by this binder at all.</para>
+    /// </summary>
+    /// <returns>One <see cref="ManaCost"/> per mana ability the oracle text
+    /// implies (an any-colour clause expands to five single-colour costs; a modal
+    /// "Add {R} or {W}" to one per option). Empty when the text has no
+    /// {T}-cost mana clause.</returns>
+    public static IReadOnlyList<ManaCost> ParseTapManaCosts(string? oracleText)
+    {
+        var result = new List<ManaCost>();
+        if (string.IsNullOrWhiteSpace(oracleText)) return result;
+
+        // Any-colour mana sources (Mox Opal, City of Brass, command tower).
+        if (TapForAnyColorRegex.IsMatch(oracleText))
+        {
+            foreach (var color in new[] { "W", "U", "B", "R", "G" })
+                result.Add(ManaCost.Parse(color));
+            return result;
+        }
+
+        // Dual / triple colour modal — one ManaCost per option.
+        foreach (Match m in TapForModalManaRegex.Matches(oracleText))
+        {
+            for (var i = 1; i <= 3; i++)
+            {
+                if (!m.Groups[i].Success) continue;
+                var raw = m.Groups[i].Value.Replace("{", "").Replace("}", "");
+                result.Add(ManaCost.Parse(raw));
+            }
+            return result; // matched a modal — don't double-add via the non-modal regex
+        }
+
+        foreach (Match m in TapForManaRegex.Matches(oracleText))
+        {
+            var symbols = m.Groups[1].Value;
+            var stripped = symbols.Replace("{", "").Replace("}", "").Replace(" ", "");
+            if (string.IsNullOrEmpty(stripped)) continue;
+            result.Add(ManaCost.Parse(stripped));
+        }
+
+        return result;
+    }
+
     private static bool TryBindBasicLand(ICard card, Player controller)
     {
         if (!card.HasSupertype(CardSupertype.Basic)) return false;
@@ -100,9 +157,11 @@ public static class OracleManaBinder
 
         // Horizon Canopy painless-dual cycle: "{T}, Pay 1 life: Add {A} or {B}."
         // Checked before the bare-{T} regexes because the pay-life prefix is a
-        // distinct (richer) activation cost. Each colour binds as its own
-        // pay-life ManaAbility (CR 119.4 life-floor gate). Only Land cards carry
-        // this shape, so it's a no-op on non-lands.
+        // distinct (richer) activation cost — NOT a bare {T} mana ability, so it
+        // is intentionally out of scope for ParseTapManaCosts (which only knows
+        // the source-agnostic {T}-cost mana clauses). Each colour binds as its
+        // own pay-life ManaAbility (CR 119.4 life-floor gate). Only Land cards
+        // carry this shape, so it's a no-op on non-lands.
         if (card is Land horizonLand)
         {
             var payLife = PayLifeDualManaRegex.Match(text);
@@ -116,37 +175,13 @@ public static class OracleManaBinder
             }
         }
 
-        // Any-colour mana sources (Mox Opal, City of Brass, command tower).
-        if (TapForAnyColorRegex.IsMatch(text))
+        // Single source of truth for the bare-{T} mana clauses: ParseTapManaCosts
+        // applies the same regexes and produces one ManaCost per ManaAbility.
+        // Bind each homed to this card. (Bot's source-picker scans abilities and
+        // picks the first that produces the needed colour.)
+        foreach (var cost in ParseTapManaCosts(text))
         {
-            foreach (var color in new[] { "W", "U", "B", "R", "G" })
-            {
-                card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(color)));
-            }
-            return;
-        }
-
-        // Dual / triple colour modal — bind each option as a separate
-        // ManaAbility. Bot's source-picker scans abilities and picks the
-        // first that produces the needed colour.
-        foreach (Match m in TapForModalManaRegex.Matches(text))
-        {
-            for (var i = 1; i <= 3; i++)
-            {
-                if (!m.Groups[i].Success) continue;
-                var raw = m.Groups[i].Value.Replace("{", "").Replace("}", "");
-                card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(raw)));
-            }
-            return; // matched a modal — don't double-add via the non-modal regex
-        }
-
-        foreach (Match m in TapForManaRegex.Matches(text))
-        {
-            var symbols = m.Groups[1].Value;
-            var stripped = symbols.Replace("{", "").Replace("}", "").Replace(" ", "");
-            if (string.IsNullOrEmpty(stripped)) continue;
-
-            card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(stripped)));
+            card.AddAbility(new ManaAbility(card, controller, cost));
         }
     }
 }

@@ -92,6 +92,15 @@ public sealed class GrantAbilityToGroupLifecycle
         Sync();
     }
 
+    /// <summary>
+    /// Force a full re-grant of the registered group static (revoke every
+    /// bearer, then re-run the ability factory for all current members). Use
+    /// when the abilities the factory would PRODUCE have changed independently
+    /// of membership — e.g. Agatha's Soul Cauldron imprinting a new creature
+    /// card. No-op when the grant is not currently registered.
+    /// </summary>
+    public void Refresh() => _registered?.Refresh();
+
     /// <summary>Unsubscribe and unregister (revoking every bearer). Idempotent.</summary>
     public void Detach()
     {
