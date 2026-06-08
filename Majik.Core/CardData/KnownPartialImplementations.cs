@@ -53,13 +53,11 @@ public static class KnownPartialImplementations
             // is bound via the BasicLandFetch branch. All three were removed from
             // this registry.
 
-            // Horizon Canopy cycle (pain-mana + sac-to-draw). The binder chain
-            // binds neither the pain mana ability nor the sac-to-draw activated
-            // ability, so they currently produce a do-nothing land.
-            ["Fiery Islet"] = new CardGap(CardGapSeverity.Stub,
-                "Horizon land: pain-mana + '{1},{T},Sacrifice: draw' not bound by the binder chain (no factory) — vanilla land in play."),
-            ["Sunbaked Canyon"] = new CardGap(CardGapSeverity.Stub,
-                "Horizon land: pain-mana + '{1},{T},Sacrifice: draw' not bound by the binder chain (no factory) — vanilla land in play."),
+            // Horizon Canopy cycle (pain-mana + sac-to-draw) is now bound on the
+            // prod binder path: OracleManaBinder recognises "{T}, Pay 1 life: Add
+            // {A} or {B}" and OracleLandActivatedAbilityBinder recognises "{1},
+            // {T}, Sacrifice this land: Draw a card" — both route through
+            // HorizonLandBinder. Fiery Islet + Sunbaked Canyon removed.
 
             // Non-land factory-backed cards (routed in production) whose factory
             // builds part of the card but not the implied triggered ability.

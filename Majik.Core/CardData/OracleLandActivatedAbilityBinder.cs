@@ -54,6 +54,17 @@ public static class OracleLandActivatedAbilityBinder
         @"basic\s+land\s+card",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Matches the Modern Horizons "Horizon Canopy" cycle's sac-to-draw line:
+    //   "{1}, {T}, Sacrifice this land: Draw a card."
+    // (Fiery Islet, Sunbaked Canyon, Horizon Canopy, Silent Clearing,
+    // Nurturing Peatland, Waterlogged Grove). The pain-mana line on these
+    // lands is bound separately by OracleManaBinder. The ability binds via
+    // HorizonLandBinder.AttachSacDraw — costs {1} + {T} + Sacrifice, effect
+    // draws the top card of the controller's library.
+    private static readonly Regex HorizonSacDraw = new(
+        @"\{1\}\s*,\s*\{T\}\s*,\s*Sacrifice\s+[^:]+:\s*Draw\s+a\s+card",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // Map from oracle name → CardSubtype enum value.
     private static readonly Dictionary<string, CardSubtype> SubtypeByName =
         new(StringComparer.OrdinalIgnoreCase)
@@ -83,6 +94,15 @@ public static class OracleLandActivatedAbilityBinder
 
         var text = entity.OracleText;
         if (string.IsNullOrWhiteSpace(text)) return false;
+
+        // Horizon Canopy cycle sac-to-draw: "{1}, {T}, Sacrifice this land:
+        // Draw a card." Distinct wording from any fetch-land form, so order
+        // among these branches is for clarity, not correctness.
+        if (HorizonSacDraw.IsMatch(text))
+        {
+            HorizonLandBinder.AttachSacDraw(land, controller);
+            return true;
+        }
 
         // Prismatic Vista form first: "a basic land card" (single any-basic
         // target). The two-basic FetchLand regex never matches this wording, so
