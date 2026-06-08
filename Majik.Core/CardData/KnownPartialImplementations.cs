@@ -70,8 +70,6 @@ public static class KnownPartialImplementations
 
             // Non-land factory-backed cards (routed in production) whose factory
             // builds part of the card but not the implied triggered ability.
-            ["Leyline Binding"] = new CardGap(CardGapSeverity.Partial,
-                "Domain cost reduction (Flash + cheaper-per-basic-type) works via the factory; the 'When this enchantment enters, exile target nonland permanent...' O-Ring ETB triggered ability is not bound."),
             ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,
                 "Aura attaches (Enchant Forest); the 'Whenever enchanted Forest is tapped for mana, add an additional mana of the chosen color' triggered ability isn't wired on the routed build because the 'As this Aura enters, choose a color' prompt is deferred engine-wide."),
             ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,

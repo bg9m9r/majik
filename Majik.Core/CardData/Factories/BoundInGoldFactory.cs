@@ -30,7 +30,7 @@ namespace Majik.Core.CardData.Factories;
 ///   matches the broad "Enchant permanent" line, including lands).
 ///   1..1 cardinality.
 /// - <b>Static lockout effect (CR 602.5 / 509.1c / 508.1c)</b> — mirrors
-///   <see cref="LeylineBindingLifecycle"/> exactly. While the aura is on
+///   <c>LeylineBindingLifecycle</c> exactly. While the aura is on
 ///   the battlefield AND attached to a Creature, three restrictions are
 ///   registered on the bearer's <see cref="ContinuousEffectsService"/>:
 ///     * <see cref="CombatRestriction.CannotAttack"/> — "can't attack"
@@ -50,7 +50,7 @@ namespace Majik.Core.CardData.Factories;
 ///   crew-restriction primitive (only <see cref="CombatRestriction"/>
 ///   has CannotAttack / CannotBlock / CannotBeBlocked). Tracked as a
 ///   small follow-up paired with the Vehicle crew-cost surface.
-/// - <b>Non-creature bearer scope</b>: the <see cref="LeylineBindingLifecycle"/>-
+/// - <b>Non-creature bearer scope</b>: the <c>LeylineBindingLifecycle</c>-
 ///   shaped wiring only registers the three restrictions when the
 ///   bearer is a <see cref="Creature"/> (the per-permanent
 ///   <see cref="ContinuousEffectsService"/> only exists on Creature in
@@ -150,7 +150,7 @@ public static class BoundInGoldFactory
 /// and its activated abilities can't be activated unless they're mana
 /// abilities" static effect.
 ///
-/// Mirrors <see cref="LeylineBindingLifecycle"/> structurally — three
+/// Mirrors <c>LeylineBindingLifecycle</c> structurally — three
 /// restrictions registered as a unit (CombatRestriction.CannotAttack +
 /// CombatRestriction.CannotBlock + ActivationRestrictionEffect with
 /// ExcludesManaAbilities = true). The "can't crew Vehicles" piece is
