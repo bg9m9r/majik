@@ -482,11 +482,19 @@ public sealed class SearchAgent : IPlayerAgent
             PriorityAction.PassAction => PriorityAction.Pass,
 
             PriorityAction.PlayLand pl =>
-                // Find the cloned land in the current sandbox hand by InstanceId.
-                _seat.Zones.Hand.GetCards()
-                    .FirstOrDefault(c => c.InstanceId == pl.Land.InstanceId) is { } clonedLand
-                    ? new PriorityAction.PlayLand(clonedLand, HoldPriority: pl.HoldPriority)
-                    : PriorityAction.Pass, // not found → pass (safe fallback)
+                // Guard: sandbox context must allow a land play. A scripted PlayLand
+                // was valid in the live priority window where it was chosen, but the
+                // sandbox may be at a different turn/phase (e.g. replaying through
+                // the opponent's priority windows) where land play is illegal.
+                // Returning Pass here prevents the sandbox PriorityLoop from rejecting
+                // the action and emitting spurious log noise; forward progress is
+                // preserved (pass → next priority holder).
+                ctx.LandPlayAvailable
+                    ? _seat.Zones.Hand.GetCards()
+                        .FirstOrDefault(c => c.InstanceId == pl.Land.InstanceId) is { } clonedLand
+                        ? new PriorityAction.PlayLand(clonedLand, HoldPriority: pl.HoldPriority)
+                        : PriorityAction.Pass // not found in sandbox hand → pass
+                    : PriorityAction.Pass, // land play not legal in this sandbox window → pass
 
             PriorityAction.CastSpell cs =>
                 // Find the cloned card in the current sandbox hand by InstanceId.

@@ -49,11 +49,16 @@ public class LegalActionEnumeratorTests
     public void ForPriority_NotSorceryWindow_ReturnsPassOnly_WhenNoInstants()
     {
         var s = new BotTestScenario();
-        // Build an opponent's-turn context.
+        // Build an opponent's-turn context. landPlayAvailable=false because it
+        // is not self's turn — mirrors what PriorityLoop.MakeContext computes
+        // (LandDropTracker.CanPlayLand returns false when actor != activePlayer).
+        // LegalActionEnumerator.ForPriority now uses ctx.LandPlayAvailable
+        // (single source of truth) instead of its own sorceryWindow check, so
+        // callers that build test contexts must set this field correctly.
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
             turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
-            stack: s.Stack);
+            stack: s.Stack, landPlayAvailable: false);
 
         s.AddCardToHand(s.Self, new Land("Forest"));
         s.AddLandToBattlefield(s.Self, "ForestBF");
@@ -77,10 +82,11 @@ public class LegalActionEnumeratorTests
     public void ForPriority_NotSorceryWindow_IncludesInstantCast_WhenAffordable()
     {
         var s = new BotTestScenario();
+        // landPlayAvailable=false: opponent's turn, land play is not available.
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
             turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
-            stack: s.Stack);
+            stack: s.Stack, landPlayAvailable: false);
 
         s.AddLandToBattlefield(s.Self, "Mountain1");
         var bolt = new Instant("Lightning Bolt", manaCost: "{R}");

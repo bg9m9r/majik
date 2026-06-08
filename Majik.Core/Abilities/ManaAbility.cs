@@ -265,4 +265,43 @@ public class ManaAbility : IManaAbility
 
         return mana;
     }
+
+    /// <summary>
+    /// Simulation-clone helper: returns a new <see cref="ManaAbility"/> bound
+    /// to <paramref name="newSource"/> and <paramref name="newController"/>
+    /// that is otherwise equivalent to this one. Used by
+    /// <see cref="Majik.Core.Cards.Permanent.RelinkReferences"/> to replace
+    /// shared-ref mana abilities on sandbox clones so that tapping a cloned
+    /// land doesn't tap the LIVE permanent (which would corrupt live game
+    /// state across MCTS iterations).
+    ///
+    /// <para>
+    /// Only the "simple fixed-mana" shape is supported for cloning:
+    ///   • no custom <c>canActivateCheck</c> (defaults to <c>!Source.IsTapped</c>)
+    ///   • no additional cost payer (e.g. "Pay 1 life", Painland damage)
+    ///   • taps the source as its cost (<c>_tapsAsCost == true</c>)
+    ///   • no spend restriction
+    /// This covers every basic land ability wired by
+    /// <c>NamedCardFactory.AttachBasicLandMana</c> and the vast majority of
+    /// produced-mana abilities on simple non-land permanents.
+    /// </para>
+    ///
+    /// <para>Returns <c>null</c> for abilities that don't fit the simple shape
+    /// (dynamic generators, additional-cost payers, spend-restricted mana):
+    /// the caller keeps the original ability in that case. Those abilities
+    /// will still reference the live source — a known limitation that will be
+    /// addressed when those card types are added to the sim scope.</para>
+    /// </summary>
+    internal ManaAbility? CloneForSim(object newSource, Player newController)
+    {
+        // Only clone the simple fixed-mana shape — all four guards must pass.
+        if (_canActivateCheck != null)   return null;   // custom gate → can't rebind
+        if (_additionalCostPayer != null) return null;  // side-effect cost → can't rebind
+        if (!_tapsAsCost)                return null;   // no-tap ability → rebind logic differs
+        if (SpendRestriction != null)    return null;   // spend restriction → keep original for now
+
+        var cloned = new ManaAbility(newSource, newController, ManaGenerated);
+        cloned.ProvenanceReaction = ProvenanceReaction;
+        return cloned;
+    }
 }
