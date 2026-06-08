@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.Events;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.Zones;
@@ -738,6 +739,250 @@ public class OracleTriggeredAbilityBinderTests
             _alice.Zones.Hand.GetCards().Should().Contain(titan,
                 "tutor moved the colorless creature to hand");
             _alice.Zones.Library.GetCards().Should().NotContain(titan);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Karoo / "bounce land" cycle (Ravnica city-of-guilds duals) — 10 lands:
+    // Azorius Chancery, Boros Garrison, Dimir Aqueduct, Golgari Rot Farm,
+    // Gruul Turf, Izzet Boilerworks, Orzhov Basilica, Rakdos Carnarium,
+    // Selesnya Sanctuary, Simic Growth Chamber.
+    //
+    // Oracle (Scryfall-confirmed):
+    //   "This land enters tapped.
+    //    When this land enters, return a land you control to its owner's hand.
+    //    {T}: Add {W}{U}." (colors vary per card)
+    //
+    // These are LANDS — production NEVER routes them through a named factory;
+    // the only prod binding path is OracleTriggeredAbilityBinder (the binder
+    // chain). The ETB bounce trigger must be synthesized here. The agent
+    // chooses which land they control to return (CR 603.3 / CR 701.20).
+    // -----------------------------------------------------------------------
+
+    private static CardEntity BounceLandEntity(string name = "Azorius Chancery") => new()
+    {
+        Name = name,
+        TypeLine = "Land",
+        OracleText = "This land enters tapped.\n" +
+                     "When this land enters, return a land you control to its owner's hand.\n" +
+                     "{T}: Add {W}{U}.",
+    };
+
+    [Fact]
+    public void Bind_BounceLand_Etb_BindsSingleTrigger()
+    {
+        var land = new Majik.Core.Cards.Land("Azorius Chancery")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+
+        var bound = OracleTriggeredAbilityBinder.Bind(land, BounceLandEntity(), _alice).ToList();
+
+        bound.Should().ContainSingle("the ETB return-a-land trigger must bind exactly once");
+    }
+
+    [Fact]
+    public void Bind_BounceLand_Etb_ReturnsChosenLandToHand()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Two lands already on Alice's battlefield — she should pick one to bounce.
+        var forest = new Majik.Core.Cards.Land("Forest") { Owner = _alice, Controller = _alice };
+        var island = new Majik.Core.Cards.Land("Island") { Owner = _alice, Controller = _alice };
+        forest.SetZone(ZoneType.Battlefield);
+        island.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+        _alice.Zones.Battlefield.AddCard(island);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(island); // controller chooses to return Island
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var chancery = new Majik.Core.Cards.Land("Azorius Chancery")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            chancery.SetZone(ZoneType.Hand);
+            _alice.Zones.Hand.AddCard(chancery);
+
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(chancery, BounceLandEntity(), _alice))
+                chancery.AddAbility(ab);
+            triggers.BindCard(chancery);
+
+            zones.MoveCardTo(chancery, ZoneType.Battlefield, controller: _alice);
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            _alice.Zones.Hand.GetCards().Should().Contain(island,
+                "the chosen land returns to its owner's hand (CR 701.20)");
+            _alice.Zones.Battlefield.GetCards().Should().NotContain(island);
+            _alice.Zones.Battlefield.GetCards().Should().Contain(forest,
+                "only the chosen land is returned");
+            island.Zone.Should().Be(ZoneType.Hand);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Bind_BounceLand_Etb_DefaultReturnsALand_WhenNoAgent()
+    {
+        // No agent registered — deterministic fallback bounces the first land
+        // the controller controls (the binder must still return SOMETHING,
+        // mirroring the surveil/scry pre-agent defaults). The bounce land
+        // itself is a legal choice but the fallback prefers a different land
+        // when one exists.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var forest = new Majik.Core.Cards.Land("Forest") { Owner = _alice, Controller = _alice };
+        forest.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+
+        var chancery = new Majik.Core.Cards.Land("Azorius Chancery")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        chancery.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(chancery);
+
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(chancery, BounceLandEntity(), _alice))
+            chancery.AddAbility(ab);
+        triggers.BindCard(chancery);
+
+        zones.MoveCardTo(chancery, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        var act = () => stack.Pop()!.Resolve();
+        act.Should().NotThrow();
+
+        // Exactly one land was returned to hand (a Karoo always bounces a land).
+        _alice.Zones.Hand.GetCards().OfType<Majik.Core.Cards.Land>().Should().HaveCount(1,
+            "the ETB trigger returns one land you control to its owner's hand");
+    }
+
+    // -----------------------------------------------------------------------
+    // Scry-Temple cycle (Theros block "scry lands") — Temple of Abandon,
+    // Deceit, Enlightenment, Epiphany, Malady, Malice, Mystery, Plenty,
+    // Silence, Triumph.
+    //
+    // Oracle (Scryfall-confirmed):
+    //   "This land enters tapped.
+    //    When this land enters, scry 1. (...)
+    //    {T}: Add {W} or {U}." (colors vary per card)
+    //
+    // LANDS — bound through the binder chain (OracleTriggeredAbilityBinder),
+    // not the named factory, in real play. ETB scry 1 (CR 701.20).
+    // (Temple of the Dragon Queen is NOT in this cycle — its oracle is a
+    // reveal-a-Dragon conditional-tapped + choose-a-color land with no scry.)
+    // -----------------------------------------------------------------------
+
+    private static CardEntity TempleEntity(string name = "Temple of Enlightenment") => new()
+    {
+        Name = name,
+        TypeLine = "Land",
+        OracleText = "This land enters tapped.\n" +
+                     "When this land enters, scry 1. (Look at the top card of your " +
+                     "library. You may put that card on the bottom.)\n" +
+                     "{T}: Add {W} or {U}.",
+    };
+
+    [Fact]
+    public void Bind_ScryTemple_Etb_BindsSingleTrigger()
+    {
+        var land = new Majik.Core.Cards.Land("Temple of Enlightenment")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+
+        var bound = OracleTriggeredAbilityBinder.Bind(land, TempleEntity(), _alice).ToList();
+
+        bound.Should().ContainSingle("the ETB scry-1 trigger must bind exactly once");
+    }
+
+    [Fact]
+    public void Bind_ScryTemple_Etb_Scries1_DefaultSendsTopToBottom()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Two distinguishable cards on top so scry-1's reorder is observable.
+        var top = new Creature("Top Card", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var second = new Creature("Second Card", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(top);    // index 0 = top
+        _alice.Zones.Library.AddCard(second);
+        top.SetZone(ZoneType.Library);
+        second.SetZone(ZoneType.Library);
+
+        var temple = new Majik.Core.Cards.Land("Temple of Enlightenment")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        temple.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(temple);
+
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(temple, TempleEntity(), _alice))
+            temple.AddAbility(ab);
+        triggers.BindCard(temple);
+
+        zones.MoveCardTo(temple, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        // Pre-agent default: peeked top card → bottom of library.
+        _alice.Zones.Library.GetCards().Last().Should().Be(top,
+            "no agent registered; scry-1 default sends the peeked card to the bottom");
+        _alice.Zones.Library.GetCards().First().Should().Be(second,
+            "the previously-second card becomes the new top");
+    }
+
+    [Fact]
+    public void Bind_ScryTemple_Etb_Scries1_AgentKeepsOnTop()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var top = new Creature("Top Card", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(top);
+        top.SetZone(ZoneType.Library);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        // Keep the single peeked card on top (no cards to bottom).
+        agent.QueueScryDecision(new ScryAction.ScryDecision(
+            ToBottom: Array.Empty<ICard>(),
+            TopOrder: new ICard[] { top }));
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var temple = new Majik.Core.Cards.Land("Temple of Mystery")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            temple.SetZone(ZoneType.Hand);
+            _alice.Zones.Hand.AddCard(temple);
+
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(
+                temple, TempleEntity("Temple of Mystery"), _alice))
+                temple.AddAbility(ab);
+            triggers.BindCard(temple);
+
+            zones.MoveCardTo(temple, ZoneType.Battlefield, controller: _alice);
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            _alice.Zones.Library.GetCards().First().Should().Be(top,
+                "agent chose to keep the card on top");
         }
         finally
         {

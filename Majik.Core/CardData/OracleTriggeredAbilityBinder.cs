@@ -53,6 +53,22 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex SurveilN = new(
         @"surveil\s+(?<n>\d+|a|one|two|three|four|five|six|seven|eight|nine|ten)\b",
         RegexOptions.IgnoreCase);
+    // "scry N" — CR 701.20. ETB rider on the Theros-block "Temple" scry-land
+    // cycle ("When this land enters, scry 1.") and various spells. We bind the
+    // inner scry effect; the EtbLine binder above wires the ETB trigger. The
+    // `\b` after the number keeps it from greedily swallowing the reminder
+    // text that follows in parentheses (a separate sentence after the period).
+    private static readonly Regex ScryN = new(
+        @"scry\s+(?<n>\d+|a|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        RegexOptions.IgnoreCase);
+    // "return a land you control to its owner's hand" — CR 701.20. ETB rider on
+    // the Ravnica Karoo / "bounce land" cycle ("When this land enters, return a
+    // land you control to its owner's hand."). The controller chooses which
+    // land they control to bounce. Lands aren't routed through named factories,
+    // so this is the only prod binding path.
+    private static readonly Regex ReturnALandYouControlToHand = new(
+        @"return\s+a\s+land\s+you\s+control\s+to\s+its\s+owner'?s\s+hand",
+        RegexOptions.IgnoreCase);
     private static readonly Regex DealDamageOpponent = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+(that\s+player|any\s+opponent)",
         RegexOptions.IgnoreCase);
@@ -663,6 +679,71 @@ public static class OracleTriggeredAbilityBinder
                     Majik.Core.Keywords.SurveilAction.Apply(controller, n, decision);
                 });
             }
+        }
+
+        // "Scry N" — CR 701.20. Look at the top N of the controller's library
+        // and partition them top/bottom. ETB rider on the Theros-block "Temple"
+        // scry-land cycle (Temple of Enlightenment, Temple of Mystery, …) and
+        // various spells. Mirrors the named-card scry-self path (RestlessSpire /
+        // PreordainFactory) so the binder-driven production load of these LANDS
+        // gets the same agent-driven prompt + apply behaviour without a per-card
+        // factory. Pre-agent default sends every peeked card to the bottom.
+        m = ScryN.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            if (n > 0)
+            {
+                yield return new Effect($"scry {n}", async ctx =>
+                {
+                    var peeked = Majik.Core.Keywords.ScryAction.Peek(controller, n);
+                    if (peeked.Count == 0) return;
+
+                    var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                    Majik.Core.Keywords.ScryAction.ScryDecision decision;
+                    if (agent != null)
+                    {
+                        decision = (await agent.ChooseScryDecisionAsync(ctx.Game, peeked).ConfigureAwait(false));
+                    }
+                    else
+                    {
+                        decision = new Majik.Core.Keywords.ScryAction.ScryDecision(
+                            ToBottom: peeked.ToList(),
+                            TopOrder: Array.Empty<ICard>());
+                    }
+                    Majik.Core.Keywords.ScryAction.Apply(controller, peeked.Count, decision);
+                });
+            }
+        }
+
+        // "Return a land you control to its owner's hand" — CR 701.20. ETB rider
+        // on the Ravnica Karoo / "bounce land" cycle (Azorius Chancery, Boros
+        // Garrison, …). The controller chooses one land they control to bounce;
+        // it returns to its owner's hand. These are LANDS — the only prod
+        // binding path is this binder, never a named factory. The agent picks
+        // via ChooseFromBattlefieldAsync (deterministic first-land fallback when
+        // no agent is registered). Routed through Fx.BounceToHand (raw-zone
+        // fallback; the trigger resolves outside a ZoneService context here, so
+        // LTB events for the bounced land are deferred — same posture as the
+        // other binder-bound land moves).
+        if (ReturnALandYouControlToHand.IsMatch(effectText))
+        {
+            yield return new Effect("return a land you control to its owner's hand", async ctx =>
+            {
+                var lands = controller.Zones.Battlefield.GetCards()
+                    .Where(c => c.HasType(CardType.Land))
+                    .ToList();
+                if (lands.Count == 0) return;
+
+                var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                ICard? pick = agent != null
+                    ? (await agent.ChooseFromBattlefieldAsync(
+                        controller, lands, Majik.Core.Cards.BotIntent.Bounce).ConfigureAwait(false))
+                    : lands[0];
+                pick ??= lands[0];
+
+                Majik.Core.Primitives.Fx.BounceToHand(pick);
+            });
         }
     }
 
