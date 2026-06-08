@@ -9,14 +9,14 @@ on:
 
 jobs:
   build-test:
-    # Dual-pool: alternate each run between the self-hosted pool and GitHub-hosted
-    # by run-number parity, so combined concurrency (self-hosted runners + hosted)
-    # sustains a wider card-shipping POOL. Degrades gracefully — if one pool is
-    # throttled/down the other still takes its share.
-    # NB: GitHub Actions expressions have NO modulo operator, so parity is tested
-    # by the last digit via endsWith (even last digit -> self-hosted).
-    runs-on: ${{ (endsWith(github.run_number, '0') || endsWith(github.run_number, '2') || endsWith(github.run_number, '4') || endsWith(github.run_number, '6') || endsWith(github.run_number, '8')) && 'self-hosted' || 'ubuntu-latest' }}
-    timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
+    # Pinned to GitHub-hosted. The gated suite is fast (~1.6min build+test locally),
+    # but this job is TIME-CAPPED, and the self-hosted pool (small ephemeral 4-core
+    # Docker runners) is contended by the card-shipping loop + concurrent PRs — under
+    # contention a ~1.6min suite stretches past the 12min cap and the gate fails as a
+    # timeout (not a real failure), ejecting unrelated PRs. A reliable gate must not
+    # share the contended pool; keep self-hosted for the card-shipping POOL elsewhere.
+    runs-on: ubuntu-latest
+    timeout-minutes: 12  # healthy run is ~3-5min; fail fast so a flaky hang frees the runner instead of hogging it
 
     steps:
       - uses: actions/checkout@v6
