@@ -32,6 +32,7 @@ public sealed class PriorityLoop
     private readonly LandDropTracker _landDropTracker;
     private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
+    private readonly Func<Player, PriorityAction.ActivateLoyaltyAbility, GameContext, Task>? _loyaltyDispatcher;
     private readonly Action<Player, PriorityAction.ActivateManaAbility>? _manaAbilityDispatcher;
     // Slice 5a — server-side auto-pass plumbing. All three are optional;
     // when null the loop falls back to its pre-Slice-5a behaviour
@@ -72,6 +73,7 @@ public sealed class PriorityLoop
         LandDropTracker landDropTracker,
         Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? castDispatcher = null,
         Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null,
+        Func<Player, PriorityAction.ActivateLoyaltyAbility, GameContext, Task>? loyaltyDispatcher = null,
         Action<Player, PriorityAction.ActivateManaAbility>? manaAbilityDispatcher = null,
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
@@ -80,6 +82,7 @@ public sealed class PriorityLoop
     {
         _castDispatcher = castDispatcher;
         _activateDispatcher = activateDispatcher;
+        _loyaltyDispatcher = loyaltyDispatcher;
         _manaAbilityDispatcher = manaAbilityDispatcher;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _priority = priority ?? throw new ArgumentNullException(nameof(priority));
@@ -294,6 +297,12 @@ public sealed class PriorityLoop
                         "PriorityLoop received ActivateAbility but no activateDispatcher was supplied.");
                 await _activateDispatcher(actor, activate, ctx).ConfigureAwait(false);
                 break;
+            case PriorityAction.ActivateLoyaltyAbility loyalty:
+                if (_loyaltyDispatcher == null)
+                    throw new InvalidOperationException(
+                        "PriorityLoop received ActivateLoyaltyAbility but no loyaltyDispatcher was supplied.");
+                await _loyaltyDispatcher(actor, loyalty, ctx).ConfigureAwait(false);
+                break;
             case PriorityAction.ActivateManaAbility mana:
                 if (_manaAbilityDispatcher == null)
                     throw new InvalidOperationException(
@@ -460,6 +469,7 @@ public sealed class PriorityLoop
     {
         PriorityAction.CastSpell cs => cs.HoldPriority,
         PriorityAction.ActivateAbility a => a.HoldPriority,
+        PriorityAction.ActivateLoyaltyAbility la => la.HoldPriority,
         PriorityAction.PlayLand pl => pl.HoldPriority,
         // CR 605.3a — activating a mana ability does not cause the player
         // to pass priority. Implicit hold so the same player gets the next
