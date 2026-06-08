@@ -1,10 +1,14 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -144,5 +148,119 @@ public class MirariWakeTests
 
         bear.GetPower().Should().Be(4, "two Mirari's Wakes stack: 2 base + 1 + 1 = 4.");
         bear.GetToughness().Should().Be(4);
+    }
+
+    // -----------------------------------------------------------------------
+    // "Whenever you tap a land for mana, add one mana of any type that land
+    //  produced." (CR 605.1b — a triggered mana ability.)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void MirarisWake_HasTapLandForManaTrigger()
+    {
+        var svc = new ContinuousEffectsService();
+        var wake = MirariWakeFactory.Create(_alice, svc);
+
+        // The mana-doubling trigger has no targets.
+        var tapTrigger = wake.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.TargetRequests.Count == 0);
+        tapTrigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+    }
+
+    /// <summary>
+    /// You tap a Forest for {G}: the land adds its own {G}, and Mirari's Wake's
+    /// trigger adds an additional {G} (one mana of the type the land produced).
+    /// </summary>
+    [Fact]
+    public void TappingYourLandForMana_AddsAdditionalManaOfThatType()
+    {
+        var (bus, stack, triggers, activator) = BuildEngine();
+
+        var wake = MirariWakeFactory.Create(_alice, triggers);
+        wake.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(wake);
+
+        var forest = (Land)NamedCardFactory.Create("Forest", _alice);
+        forest.SetController(_alice);
+        forest.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+
+        var manaAbility = forest.Abilities.OfType<IManaAbility>().Single();
+
+        activator.ActivateManaAbility(manaAbility, _alice);
+
+        // The Forest's own {G} is in the pool immediately; the trigger is
+        // pending (CR 605.3 — the land's mana ability doesn't use the stack).
+        _alice.ManaPool.Green.Should().Be(1, "the Forest's own {G}");
+        triggers.PendingCount.Should().Be(1);
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.ManaPool.Green.Should().Be(2,
+            "Mirari's Wake adds an additional {G} of the type the land produced (CR 605.1b)");
+    }
+
+    /// <summary>
+    /// "Whenever you tap a LAND for mana" — tapping a non-land mana source
+    /// (a mana rock) does not trigger, even though it's yours.
+    /// </summary>
+    [Fact]
+    public void TappingYourNonLandForMana_DoesNotTrigger()
+    {
+        var (bus, stack, triggers, activator) = BuildEngine();
+
+        var wake = MirariWakeFactory.Create(_alice, triggers);
+        wake.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(wake);
+
+        // A mana rock: an Artifact with "{T}: Add {C}". Not a land.
+        var rock = new Artifact("Mind Stone", "2");
+        rock.SetController(_alice);
+        rock.SetZone(ZoneType.Battlefield);
+        rock.AddAbility(new ManaAbility(rock, _alice, ManaCost.Parse("C")));
+        _alice.Zones.Battlefield.AddCard(rock);
+
+        var manaAbility = rock.Abilities.OfType<IManaAbility>().Single();
+
+        activator.ActivateManaAbility(manaAbility, _alice);
+
+        triggers.PendingCount.Should().Be(0, "a mana rock isn't a land");
+    }
+
+    /// <summary>
+    /// The clause is "Whenever YOU tap a land for mana" — only the Wake's
+    /// controller tapping a land counts. An opponent tapping their own land
+    /// does not trigger.
+    /// </summary>
+    [Fact]
+    public void OpponentTappingTheirLand_DoesNotTrigger()
+    {
+        var (bus, stack, triggers, activator) = BuildEngine();
+
+        var wake = MirariWakeFactory.Create(_alice, triggers);
+        wake.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(wake);
+
+        var bobForest = (Land)NamedCardFactory.Create("Forest", _bob);
+        bobForest.SetController(_bob);
+        bobForest.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bobForest);
+
+        var manaAbility = bobForest.Abilities.OfType<IManaAbility>().Single();
+
+        activator.ActivateManaAbility(manaAbility, _bob);
+
+        triggers.PendingCount.Should().Be(0, "only YOU tapping a land triggers it");
+        _alice.ManaPool.Green.Should().Be(0);
+    }
+
+    private static (EventBus bus, Majik.Core.Stack.Stack stack, TriggerManager triggers, ManaAbilityActivator activator) BuildEngine()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var activator = new ManaAbilityActivator(bus);
+        return (bus, stack, triggers, activator);
     }
 }
