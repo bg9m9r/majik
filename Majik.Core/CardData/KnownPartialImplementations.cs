@@ -81,8 +81,6 @@ public static class KnownPartialImplementations
             // builds part of the card but not the implied triggered ability.
             ["Leyline Binding"] = new CardGap(CardGapSeverity.Partial,
                 "Domain cost reduction (Flash + cheaper-per-basic-type) works via the factory; the 'When this enchantment enters, exile target nonland permanent...' O-Ring ETB triggered ability is not bound."),
-            ["Necrodominance"] = new CardGap(CardGapSeverity.Partial,
-                "Skip-draw, max-hand-size-5 and graveyard-replacement statics work; the 'At the beginning of your end step, you may pay any amount of life: draw that many cards' triggered ability is not bound."),
             ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,
                 "Aura attaches (Enchant Forest); the 'Whenever enchanted Forest is tapped for mana, add an additional mana of the chosen color' triggered ability isn't wired on the routed build because the 'As this Aura enters, choose a color' prompt is deferred engine-wide."),
             ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,
