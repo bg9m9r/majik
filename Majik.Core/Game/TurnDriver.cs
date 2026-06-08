@@ -254,6 +254,31 @@ public sealed class TurnDriver
         }
     }
 
+    // -----------------------------------------------------------------
+    // Resume-point enum — coarse phases a sim can resume at.
+    // Used by RunTurnFromPhaseAsync to decide which helpers to call.
+    // -----------------------------------------------------------------
+
+    private enum ResumePoint { PreCombatMain, Combat, PostCombatMain, Ending }
+
+    /// <summary>
+    /// Maps a <see cref="PhaseStateType"/> to the coarse <see cref="ResumePoint"/>
+    /// at which <see cref="RunTurnFromPhaseAsync"/> should re-enter.
+    /// Beginning-phase inputs (<see cref="PhaseStateType.TurnBeginning"/>) map to
+    /// <see cref="ResumePoint.PreCombatMain"/> because the beginning phase is
+    /// always skipped on resume (untap/upkeep/draw and turn-tracker resets are
+    /// the caller's responsibility in a cloned mid-game position).
+    /// </summary>
+    private static ResumePoint NormalizeResumePhase(PhaseStateType phase) => phase switch
+    {
+        PhaseStateType.TurnBeginning  => ResumePoint.PreCombatMain,
+        PhaseStateType.PreCombatMain  => ResumePoint.PreCombatMain,
+        PhaseStateType.Combat         => ResumePoint.Combat,
+        PhaseStateType.PostCombatMain => ResumePoint.PostCombatMain,
+        PhaseStateType.TurnEnding     => ResumePoint.Ending,
+        _                             => ResumePoint.PreCombatMain,
+    };
+
     public async Task RunTurnAsync(Player activePlayer, int turnNumber, CancellationToken ct = default)
     {
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
@@ -304,6 +329,45 @@ public sealed class TurnDriver
         // even though the previous turn ended in TurnEnding.
         _currentTurnState = null;
 
+        var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
+
+        await RunBeginningPhaseAsync(activePlayer, turnNumber, ct);
+        await RunPreCombatMainAsync(activePlayer, ct);
+        await RunCombatPhaseAsync(activePlayer, defender, ct);
+        await RunPostCombatMainAsync(activePlayer, ct);
+        await RunEndingPhaseAsync(activePlayer, ct);
+    }
+
+    /// <summary>
+    /// Sim-only: resume this turn at <paramref name="resumePhase"/>, skipping the
+    /// beginning-phase init and any earlier phases, then run to end of turn exactly
+    /// as RunTurnAsync would. Used by the bot search simulator to re-enter a cloned
+    /// mid-game position. NOTE: does not run untap/upkeep/draw or reset turn trackers.
+    /// </summary>
+    internal async Task RunTurnFromPhaseAsync(Player activePlayer, int turnNumber, PhaseStateType resumePhase, CancellationToken ct = default)
+    {
+        _currentTurnNumber = turnNumber;
+        _activePlayerForStepEvents = activePlayer;
+        var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
+
+        var resume = NormalizeResumePhase(resumePhase);
+        if (resume <= ResumePoint.PreCombatMain) await RunPreCombatMainAsync(activePlayer, ct);
+        if (resume <= ResumePoint.Combat)        await RunCombatPhaseAsync(activePlayer, defender, ct);
+        if (resume <= ResumePoint.PostCombatMain) await RunPostCombatMainAsync(activePlayer, ct);
+        await RunEndingPhaseAsync(activePlayer, ct);
+    }
+
+    // -----------------------------------------------------------------
+    // Phase-block helpers — ONE source of truth per phase block.
+    // Called by both RunTurnAsync and RunTurnFromPhaseAsync.
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Beginning phase (CR 501-504): Untap → Upkeep → Draw.
+    /// Preserves: day/night transition, untap step restrictions, draw skip.
+    /// </summary>
+    private async Task RunBeginningPhaseAsync(Player activePlayer, int turnNumber, CancellationToken ct)
+    {
         // Beginning phase (CR 501-504: Untap, Upkeep, Draw).
         SetTurnState(PhaseStateType.TurnBeginning);
         SetPhase(StepStateType.Untap);
@@ -333,20 +397,34 @@ public sealed class TurnDriver
             DrawCard(activePlayer);
         }
         await PriorityRound(activePlayer, ct);
+    }
 
+    /// <summary>
+    /// Pre-combat main phase (CR 505).
+    /// Preserves: Saga lore-counter tick, SetTurnState, SetPhase, PriorityRound.
+    /// </summary>
+    private async Task RunPreCombatMainAsync(Player activePlayer, CancellationToken ct)
+    {
         // Main 1 (CR 505 — precombat main phase).
         SetTurnState(PhaseStateType.PreCombatMain);
         SetPhase(StepStateType.PreCombatMain);
         // CR 714.2 — Saga lore-counter tick fires at the precombat main.
         AdvanceSagas(activePlayer);
         await PriorityRound(activePlayer, ct);
+    }
 
+    /// <summary>
+    /// Full combat phase (CR 506-511): BeginningOfCombat priority → DeclareAttackers →
+    /// additional-combats drain loop → EndOfCombat.
+    /// Preserves: additional combat queue drain, per-combat EndOfCombat step.
+    /// </summary>
+    private async Task RunCombatPhaseAsync(Player activePlayer, Player defender, CancellationToken ct)
+    {
         // Combat (CR 506-511).
         SetTurnState(PhaseStateType.Combat);
         SetPhase(StepStateType.BeginningOfCombat);
         await PriorityRound(activePlayer, ct);
 
-        var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
         SetPhase(StepStateType.DeclareAttackers);
         await RunCombat(activePlayer, defender, ct);
 
@@ -387,12 +465,25 @@ public sealed class TurnDriver
         // combat" durations (e.g. Firebending mana) can expire before the
         // postcombat main begins.
         SetPhase(StepStateType.EndOfCombat);
+    }
 
+    /// <summary>
+    /// Post-combat main phase (CR 505).
+    /// </summary>
+    private async Task RunPostCombatMainAsync(Player activePlayer, CancellationToken ct)
+    {
         // Main 2 (CR 505 — postcombat main phase).
         SetTurnState(PhaseStateType.PostCombatMain);
         SetPhase(StepStateType.PostCombatMain);
         await PriorityRound(activePlayer, ct);
+    }
 
+    /// <summary>
+    /// Ending phase (CR 512-514): End step → Cleanup.
+    /// Also records _previousTurnActivePlayer and clears active control grant.
+    /// </summary>
+    private async Task RunEndingPhaseAsync(Player activePlayer, CancellationToken ct)
+    {
         // End phase (CR 512-514: End step, Cleanup).
         SetTurnState(PhaseStateType.TurnEnding);
         SetPhase(StepStateType.End);

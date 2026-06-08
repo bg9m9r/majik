@@ -22,8 +22,8 @@ public sealed record ArchetypeWeights(
         BoardPower:       1.5,
         BoardToughness:   0.2,
         OpponentThreats: -1.0,
-        ManaSources:      0.5,
-        HandSize:         0.5,
+        ManaSources:      0.8,  // a land on board > a land in hand for an aggressive deck
+        HandSize:         0.3,
         Tempo:            1.0,
         KeyCardInPlay:    2.0);
 
@@ -65,8 +65,8 @@ public sealed record ArchetypeWeights(
         BoardPower:       1.5,
         BoardToughness:   0.75,
         OpponentThreats: -1.5,
-        ManaSources:      1.0,
-        HandSize:         1.0,
+        ManaSources:      1.2,  // mana sources on board outvalue cards in hand
+        HandSize:         0.8,
         Tempo:            1.0,
         KeyCardInPlay:    2.0);
 
