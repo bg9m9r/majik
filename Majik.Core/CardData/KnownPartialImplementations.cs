@@ -45,20 +45,13 @@ public static class KnownPartialImplementations
             // binder runs on the faithful path — so only the ones the binder's
             // regex still misses remain Stubs.
 
-            // Fetchlands whose first fetched basic begins with a VOWEL ("an
-            // Island ...") — OracleLandActivatedAbilityBinder's FetchLand regex
-            // requires literal " a <Basic> " (consonant article), so it fails to
-            // match "an Island", leaving these as do-nothing lands. The 8
-            // consonant-article fetchlands (Arid Mesa, Bloodstained Mire,
-            // Flooded Strand, Marsh Flats, Misty Rainforest, Verdant Catacombs,
-            // Windswept Heath, Wooded Foothills) ARE bound and are no longer
-            // gaps — they were removed from this registry.
-            ["Polluted Delta"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: OracleLandActivatedAbilityBinder's regex requires a consonant-article 'a <Basic>' and so misses 'an Island or Swamp' — fetch ability not bound, vanilla land in play."),
-            ["Scalding Tarn"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: OracleLandActivatedAbilityBinder's regex requires a consonant-article 'a <Basic>' and so misses 'an Island or Mountain' — fetch ability not bound, vanilla land in play."),
-            ["Prismatic Vista"] = new CardGap(CardGapSeverity.Stub,
-                "Basic-fetch land: oracle says 'a basic land card', not two named basics, so OracleLandActivatedAbilityBinder (which keys off named basics) doesn't bind it; lands aren't routed through PrismaticVistaFactory either — vanilla land in play."),
+            // NOTE: all 10 fetchlands are NOW bound by OracleLandActivatedAbilityBinder
+            // on the faithful path. The "an <vowel-basic>" fetchlands (Polluted
+            // Delta, Scalding Tarn) used to be missed because the FetchLand regex
+            // required a consonant article "a <Basic>"; the regex now accepts
+            // "an?" so both are bound. Prismatic Vista's "a basic land card" form
+            // is bound via the BasicLandFetch branch. All three were removed from
+            // this registry.
 
             // Horizon Canopy cycle (pain-mana + sac-to-draw). The binder chain
             // binds neither the pain mana ability nor the sac-to-draw activated

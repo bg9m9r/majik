@@ -32,11 +32,26 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleLandActivatedAbilityBinder
 {
-    // Matches: "{T}, Pay 1 life, Sacrifice <anything>: Search your library for a
+    // Matches: "{T}, Pay 1 life, Sacrifice <anything>: Search your library for a[n]
     //           <Plains|Island|Swamp|Mountain|Forest> or <Plains|Island|Swamp|Mountain|Forest> card"
+    //
+    // The article is "a" for consonant-leading basics (a Forest, a Swamp) and
+    // "an" for vowel-leading basics (an Island) — Polluted Delta / Scalding Tarn
+    // read "an Island or ...". `an?` accepts both; missing it left those two
+    // fetchlands as do-nothing lands in real games.
     private static readonly Regex FetchLand = new(
-        @"\{T\}\s*,\s*Pay\s+1\s+life\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+a\s+" +
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+an?\s+" +
         @"(?<a>Plains|Island|Swamp|Mountain|Forest)\s+or\s+(?<b>Plains|Island|Swamp|Mountain|Forest)\s+card",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Matches Prismatic Vista's single-target form:
+    //   "{T}, Pay 1 life, Sacrifice <anything>: Search your library for a basic
+    //    land card, put it onto the battlefield, then shuffle."
+    // Fetches ANY basic land (CR 205.4a — Basic supertype + Land card type)
+    // rather than two specific basic-land subtypes.
+    private static readonly Regex BasicLandFetch = new(
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+a\s+" +
+        @"basic\s+land\s+card",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Map from oracle name → CardSubtype enum value.
@@ -68,6 +83,15 @@ public static class OracleLandActivatedAbilityBinder
 
         var text = entity.OracleText;
         if (string.IsNullOrWhiteSpace(text)) return false;
+
+        // Prismatic Vista form first: "a basic land card" (single any-basic
+        // target). The two-basic FetchLand regex never matches this wording, so
+        // ordering is for clarity, not correctness.
+        if (BasicLandFetch.IsMatch(text))
+        {
+            BindBasicLandFetch(land, controller);
+            return true;
+        }
 
         var m = FetchLand.Match(text);
         if (!m.Success) return false;
@@ -103,6 +127,68 @@ public static class OracleLandActivatedAbilityBinder
 
         fetchLand.AddAbility(ability);
         return true;
+    }
+
+    /// <summary>
+    /// Attaches the Prismatic Vista–style fetch ability: same Tap + Pay 1 life +
+    /// Sacrifice cost as the colour-pair cycle, but the effect searches for ANY
+    /// basic land (CR 205.4a) rather than two named basic-land subtypes.
+    /// </summary>
+    private static void BindBasicLandFetch(Land land, Player controller)
+    {
+        var fetchLand = land;
+        var ctrl = controller;
+
+        var ability = new ActivatedAbility(
+            source: fetchLand,
+            controller: ctrl,
+            costs: new ICost[]
+            {
+                AdditionalCost.Tap(fetchLand),
+                AdditionalCost.PayLife(1),
+                AdditionalCost.Sacrifice(fetchLand),
+            },
+            effects: new IEffect[]
+            {
+                new Effect(
+                    "search library for a basic land and put onto battlefield",
+                    ctx => BasicLandFetchEffectAsync(ctrl, ctx)),
+            });
+
+        fetchLand.AddAbility(ability);
+    }
+
+    private static async ValueTask BasicLandFetchEffectAsync(Player controller, ResolutionContext ctx)
+    {
+        // CR 205.4a — basic lands are those with the Basic supertype. Mirrors
+        // PrismaticVistaFactory.TutorBasicLandToBattlefieldAsync so the live
+        // binder path matches the (test-only) factory path exactly.
+        var candidates = controller.Zones.Library
+            .GetCards()
+            .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
+            .ToList();
+
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, controller, candidates, "basic land card").ConfigureAwait(false);
+
+        if (pick != null)
+        {
+            var zones = ZoneServiceRegistry.Get(controller);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+            }
+            else
+            {
+                controller.Zones.Library.RemoveCard(pick);
+                controller.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(controller);
+            }
+        }
+
+        // CR 701.20a — shuffle whether or not a card was found.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "fetch-land");
     }
 
     private static async ValueTask FetchEffectAsync(Player controller, CardSubtype subtypeA, CardSubtype subtypeB, ResolutionContext ctx)
