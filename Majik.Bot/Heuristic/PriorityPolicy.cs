@@ -424,10 +424,11 @@ public class PriorityPolicy
     protected static int ApproxCmc(ICard card)
         => ManaCost.Parse(card.ManaCost ?? string.Empty).TotalValue;
 
-    /// <summary>Count of untapped lands (rough mana-available proxy).
-    /// Matches BoardEval's land-count semantics and keeps the policy
-    /// independent of the full mana-payment search.</summary>
+    /// <summary>Total mana available now: floating pool + untapped mana-source
+    /// permanents (lands, dorks, rocks, Treasures). Delegates to the shared
+    /// <see cref="LegalActionEnumerator.UntappedManaSources"/> so both the
+    /// heuristic policy and the MCTS enumerator use the same count.</summary>
     private static int UntappedManaSources(Player self)
-        => self.Zones.Battlefield.GetCards().OfType<Land>().Count(l => !l.IsTapped);
+        => LegalActionEnumerator.UntappedManaSources(self);
 
 }
