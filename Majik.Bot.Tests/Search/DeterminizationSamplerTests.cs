@@ -116,6 +116,23 @@ public class DeterminizationSamplerTests
     }
 
     [Fact]
+    public void Resample_SameSeed_YieldsIdenticalSelfLibraryOrder()
+    {
+        var (selfA, oppA) = BuildFixture();
+        var (selfB, oppB) = BuildFixture();
+
+        DeterminizationSampler.Resample(Players(selfA, oppA), selfA.Id, OppDecklist, worldSeed: 4242);
+        DeterminizationSampler.Resample(Players(selfB, oppB), selfB.Id, OppDecklist, worldSeed: 4242);
+
+        // The searched seat's library order is hidden -> reshuffled with the same
+        // seeded rng. Two independent fixtures under the same worldSeed must produce
+        // the identical reshuffled order, not just the same multiset.
+        var libA = selfA.Zones.GetZone(ZoneType.Library).GetCards().Select(c => c.Name).ToList();
+        var libB = selfB.Zones.GetZone(ZoneType.Library).GetCards().Select(c => c.Name).ToList();
+        libA.Should().Equal(libB);
+    }
+
+    [Fact]
     public void Resample_DifferentSeeds_ProduceDifferentArrangements()
     {
         var (selfA, oppA) = BuildFixture();

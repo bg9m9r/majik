@@ -43,6 +43,8 @@ internal static class DeterminizationSampler
     // Lazily-constructed shared repo + factory for the default (no-injection) path.
     // EmbeddedCardRepository loads its 22k-row seed lazily on first GetByName, so
     // constructing this is cheap; one shared instance avoids re-reading the gz per call.
+    // Safe to share under concurrent Resample (parallel MCTS rollouts): Create is
+    // read-only over the immutable repo and builds a fresh Card instance per call.
     private static readonly Lazy<ScryfallCardFactory> DefaultFactory =
         new(() => new ScryfallCardFactory(new EmbeddedCardRepository()));
 
@@ -113,9 +115,12 @@ internal static class DeterminizationSampler
                 counts[visible] = c - 1;
         }
 
-        // Expand to a flat name list, then shuffle with the seeded rng.
+        // Expand to a flat name list, then shuffle with the seeded rng. Order the
+        // names deterministically (ordinal) BEFORE expanding so the seeded shuffle is
+        // the SOLE source of order — never Dictionary bucket-enumeration order. Same
+        // (state, worldSeed) -> same result, with no latent BCL-order dependency.
         var pool = new List<string>();
-        foreach (var (name, count) in counts)
+        foreach (var (name, count) in counts.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             for (var i = 0; i < count; i++)
                 pool.Add(name);
         rng.Shuffle(pool);
