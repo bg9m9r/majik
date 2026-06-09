@@ -46,7 +46,6 @@ public sealed class DeckStrategyCoverageTests
         "Yawg",
         "Affinity",
         "RubyStorm",
-        "Belcher",
         "GoryoVengeance",
         "LivingEnd",
         "EldraziTron",
