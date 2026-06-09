@@ -10,7 +10,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Yawgmoth, Thran Physician (Dominaria, {2}{B}).
 ///
-/// Legendary Creature — Phyrexian Human Cleric 2/4.
+/// Legendary Creature — Human Cleric 2/4.
 /// Oracle text (Scryfall, verified against the embedded seed):
 ///   "Protection from Humans
 ///    Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one
@@ -37,7 +37,7 @@ namespace Majik.Core.CardData.Factories;
 /// plus "draw a card", which is what the engine now wires.
 ///
 /// ## Implemented (v1)
-/// - Legendary 2/4 Creature with Phyrexian, Human, Cleric subtypes.
+/// - Legendary 2/4 Creature with Human, Cleric subtypes.
 /// - Activated ability cost: Pay 1 life + Sacrifice another creature
 ///   (<see cref="AdditionalCost.PayLife"/> + <see cref="SacrificeAnotherCreatureCost"/>).
 /// - Activated ability effect: controller draws a card (CR 120.1).
@@ -87,7 +87,7 @@ public static class YawgmothFactory
             power: 2,
             toughness: 4,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Human, CardSubtype.Cleric });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);

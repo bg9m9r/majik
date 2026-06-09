@@ -10,16 +10,16 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Sojourner's Companion (Modern Horizons 2, {6}).
+/// Named-card factory for Sojourner's Companion (Modern Horizons 2, {7}).
 ///
-/// Artifact Creature — Thopter Knight 4/4. Oracle text:
+/// Artifact Creature — Salamander 4/4. Oracle text:
 ///   "Affinity for artifacts (This spell costs {1} less to cast for each
 ///    artifact you control.)
 ///    {2}, {T}, Sacrifice Sojourner's Companion: Search your library for a
 ///    basic land card, put it onto the battlefield tapped, then shuffle."
 ///
 /// ## Implemented (v1)
-/// - 4/4 Artifact Creature — Thopter Knight with printed mana cost {6}.
+/// - 4/4 Artifact Creature — Salamander with printed mana cost {7}.
 ///   <see cref="Card.AddCardType"/> additively flags the Artifact type so
 ///   <c>HasType(Artifact)</c> + <c>HasType(Creature)</c> both pass — same
 ///   shape as <see cref="FrogmiteFactory"/> / <see cref="MyrEnforcerFactory"/>.
@@ -106,7 +106,7 @@ public static class SojournersCompanionFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Thopter, CardSubtype.Knight });
+            subtypes: new[] { CardSubtype.Salamander });
 
         // CR 301.1 / 302.1 — Artifact Creature: additively flag the
         // Artifact type so HasType lookups + colour identity see both

@@ -11,19 +11,22 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for All Is Dust (Rise of the Eldrazi, {7}).
 ///
-/// Tribal Sorcery — Eldrazi. Oracle text:
+/// Sorcery — Eldrazi (printed "Kindred Sorcery — Eldrazi"; see note below).
+/// Oracle text:
 ///   "Each player sacrifices all colored permanents they control."
 ///
 /// ## Implemented (v1)
-/// - Tribal Sorcery — Eldrazi at {7}, colourless (no coloured pips in
+/// - Sorcery — Eldrazi at {7}, colourless (no coloured pips in
 ///   the printed cost so <see cref="CardColors.GetColors"/> returns the
 ///   empty set — All Is Dust does not sacrifice itself off the stack
 ///   because the stack is not a "permanent" zone, CR 110.1 / CR 405).
-/// - The card carries both <see cref="CardType.Sorcery"/> and
-///   <see cref="CardType.Tribal"/> (CR 308 — the legacy Tribal card
-///   type is set independently of Sorcery; the Eldrazi subtype piggy-
-///   backs on the Tribal type rather than the Sorcery type per
-///   CR 308.2).
+/// - The card carries <see cref="CardType.Sorcery"/> with the Eldrazi
+///   creature subtype on the spell. The printed type line is "Kindred
+///   Sorcery — Eldrazi", but the Kindred (formerly "Tribal") card type
+///   was removed by the 2024 type-line errata and the seed type line no
+///   longer carries it; the engine therefore does NOT stamp
+///   <see cref="CardType.Tribal"/> (Tribal product decision — see the
+///   semantic-parity-tail PR).
 /// - <b>Resolve effect</b> via <see cref="BuildResolveEffect"/>:
 ///   each supplied player sacrifices every coloured permanent they
 ///   control. A permanent counts as "coloured" when
@@ -109,15 +112,16 @@ public static class AllIsDustFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
+        // CR 205.3 — the Kindred (formerly "Tribal") card type was removed
+        // from the game by the 2024 type-line errata. All Is Dust's modern
+        // printing is just "Sorcery"; the Eldrazi creature subtype rides on
+        // the spell (set on the Sorcery ctor below). The engine no longer
+        // stamps CardType.Tribal — see the Tribal product decision in the
+        // semantic-parity-tail PR.
         var card = new Sorcery(
             name: CardName,
             manaCost: PrintedManaCost,
             subtypes: new[] { CardSubtype.Eldrazi });
-
-        // CR 308 — the legacy Tribal card type. Layered on top of
-        // Sorcery so the Eldrazi subtype is grammatically grounded
-        // (CR 308.2). Idempotent — AddCardType skips duplicates.
-        card.AddCardType(CardType.Tribal);
 
         card.SetOwner(owner);
         card.SetController(owner);

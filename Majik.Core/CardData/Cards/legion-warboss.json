@@ -4,6 +4,6 @@
   "subtypes": ["Goblin", "Soldier"],
   "manaCost": "{2}{R}",
   "power": 2,
-  "toughness": 1,
+  "toughness": 2,
   "abilities": []
 }

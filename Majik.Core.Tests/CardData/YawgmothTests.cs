@@ -13,8 +13,8 @@ namespace Majik.Core.Tests.CardData;
 /// <summary>
 /// Unit tests for <see cref="YawgmothFactory"/>.
 ///
-/// Card: Yawgmoth, Thran Physician — Legendary Creature — Phyrexian Human
-/// Cleric, {2}{B} (2/4). Current Scryfall oracle (verified against the seed):
+/// Card: Yawgmoth, Thran Physician — Legendary Creature — Human Cleric,
+/// {2}{B}{B} (2/4). Current Scryfall oracle (verified against the seed):
 ///   "Protection from Humans
 ///    Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one
 ///    target creature and draw a card.
@@ -44,11 +44,13 @@ public class YawgmothTests
     }
 
     [Fact]
-    public void Yawgmoth_HasPhyrexianHumanClericSubtypes()
+    public void Yawgmoth_HasHumanClericSubtypes()
     {
         var yawg = YawgmothFactory.Create(_alice);
 
-        yawg.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
+        // CR 205.3 — printed "Human Cleric" only; the card is NOT Phyrexian
+        // (the seed type line carries no Phyrexian subtype).
+        yawg.HasSubtype(CardSubtype.Phyrexian).Should().BeFalse();
         yawg.HasSubtype(CardSubtype.Human).Should().BeTrue();
         yawg.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
     }

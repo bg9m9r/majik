@@ -15,14 +15,15 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Unit tests for <see cref="TarfireFactory"/> (Lorwyn / Modern Masters,
 /// {R}).
 ///
-/// Tarfire is a Kindred Instant — Goblin (CR 312 — Kindred is the modern
-/// name for the legacy Tribal card type, modelled by
-/// <see cref="CardType.Tribal"/>). Its oracle text is the vanilla Shock
-/// shape:
+/// Tarfire's printed type line is "Kindred Instant — Goblin" (CR 312), but
+/// the Kindred (formerly "Tribal") card type was removed by the 2024
+/// type-line errata; the engine models it as a plain Instant with the Goblin
+/// subtype. Its oracle text is the vanilla Shock shape:
 ///   "Tarfire deals 2 damage to any target."
 ///
 /// Covers:
-/// - Identity ({R} Instant + Tribal type + Goblin subtype, owner/controller).
+/// - Identity ({R} Instant + Goblin subtype; NOT the removed Kindred/Tribal
+///   type, owner/controller).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - Spell definition shape: 1..1 "any target".
 /// - Resolve body deals 2 damage to a player target.
@@ -42,8 +43,9 @@ public class TarfireFactoryTests
 
         tarfire.Name.Should().Be("Tarfire");
         tarfire.HasType(CardType.Instant).Should().BeTrue();
-        // CR 312 — Kindred (printed) == the engine's legacy Tribal type.
-        tarfire.HasType(CardType.Tribal).Should().BeTrue();
+        // CR 205.3 — Kindred/Tribal was removed; the seed type line is
+        // "Instant — Goblin" and the engine no longer stamps Tribal.
+        tarfire.HasType(CardType.Tribal).Should().BeFalse();
         tarfire.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         tarfire.ManaCost.ToString().Should().Be("{R}");
         tarfire.Owner.Should().BeSameAs(_alice);

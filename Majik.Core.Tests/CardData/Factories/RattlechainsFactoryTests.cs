@@ -15,10 +15,10 @@ using Xunit;
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// Tests for Rattlechains (Shadows over Innistrad, {1}{W}).
+/// Tests for Rattlechains (Shadows over Innistrad, {1}{U}).
 ///
 /// Covers:
-///   - Card shape: name, type, Spirit subtype, P/T 2/2, mana cost.
+///   - Card shape: name, type, Spirit subtype, P/T 2/1, mana cost.
 ///   - Flash + Flying keyword markers.
 ///   - ETB trigger structure (1..1 target Spirit, BotIntent.Protection).
 ///   - Resolve: grants Hexproof until EOT to the chosen target Spirit.
@@ -53,11 +53,11 @@ public class RattlechainsFactoryTests : IDisposable
         var c = RattlechainsFactory.Create(_alice);
 
         c.Name.Should().Be("Rattlechains");
-        c.ManaCost.Should().Be("{1}{W}");
+        c.ManaCost.Should().Be("{1}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
         c.BasePower.Should().Be(2);
-        c.BaseToughness.Should().Be(2);
+        c.BaseToughness.Should().Be(1);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
