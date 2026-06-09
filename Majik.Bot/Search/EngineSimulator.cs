@@ -1,5 +1,6 @@
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
+using Majik.Bot.Strategies;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Effects;
@@ -70,13 +71,16 @@ public sealed class EngineSimulator : ISearchSimulator
 
     private readonly ArchetypeWeights _weights;
     private readonly string _archetypeName;
+    private readonly IDeckStrategy? _deck;
 
-    public EngineSimulator(ArchetypeWeights weights, string archetypeName = "Burn")
+    public EngineSimulator(ArchetypeWeights weights, string archetypeName = "Burn", IDeckStrategy? deck = null)
     {
         _weights = weights ?? throw new ArgumentNullException(nameof(weights));
         // archetypeName is used to build the sandbox opponent's BotConfig.
         // The opponent archetype mainly tunes eval weights; any valid archetype works.
         _archetypeName = archetypeName;
+        // deck: per-deck strategic term; null → unchanged behavior (Task 5 wires the real value).
+        _deck = deck;
     }
 
     // ── ISearchSimulator ─────────────────────────────────────────────────────
@@ -628,7 +632,7 @@ public sealed class EngineSimulator : ISearchSimulator
         // BoardEval can compute the leaf score.
         var allPlayers = clonedState.Players;
         var ctx = BuildLeafContext(clonedSeat, allPlayers);
-        return BoardEval.Score(ctx, clonedSeat, _weights);
+        return BoardEval.Score(ctx, clonedSeat, _weights, _deck);
     }
 
     /// <summary>
