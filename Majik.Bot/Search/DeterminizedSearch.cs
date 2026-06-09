@@ -110,10 +110,13 @@ internal static class DeterminizedSearch
             return firstWorldBest!;
 
         // ── Summed robust child ────────────────────────────────────────────────
-        // Most summed visits; tie-break by summed mean value (guard div-by-zero).
+        // Most summed visits; tie-break by summed mean value (guard div-by-zero);
+        // final tie-break on the move Key so a full tie resolves deterministically
+        // independent of Dictionary enumeration order (same care as the sampler).
         var winner = tally.Values
             .OrderByDescending(t => t.Visits)
             .ThenByDescending(t => t.Visits > 0 ? t.TotalValue / t.Visits : double.NegativeInfinity)
+            .ThenBy(t => t.Move.Key, StringComparer.Ordinal)
             .First();
 
         return winner.Move;
