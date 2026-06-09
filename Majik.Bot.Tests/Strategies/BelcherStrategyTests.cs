@@ -103,11 +103,13 @@ public sealed class BelcherStrategyTests
     }
 
     /// <summary>
-    /// Charbelcher is in hand but not yet on the battlefield → null.
-    /// The search (guided by StrategicScore) should find the cast.
+    /// Cast arm fires when Charbelcher is in hand AND pool ≥ 7 ({4} cast + {3} activation).
+    /// The directive takes ownership of the cast to guarantee {3} remains for the activation.
+    /// This is the Phase 2 fix: prevents the heuristic from spending exactly {4} on the cast
+    /// and stranding Charbelcher on the board with no activation mana.
     /// </summary>
     [Fact]
-    public void TryGetNextWinningAction_Null_WhenCharbelcherInHandOnly()
+    public void TryGetNextWinningAction_ReturnsCast_WhenCharbelcherInHandAndPool7()
     {
         var s = new BotTestScenario();
 
@@ -116,9 +118,29 @@ public sealed class BelcherStrategyTests
 
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
+        action.Should().BeOfType<PriorityAction.CastSpell>(
+            "pool >= 7 with Charbelcher in hand — directive casts Charbelcher to preserve {3} for activation");
+        var cast = (PriorityAction.CastSpell)action!;
+        cast.Card.Name.Should().Be("Goblin Charbelcher");
+    }
+
+    /// <summary>
+    /// Cast arm suppressed when pool = 4 (bare cast cost, not enough for the full line).
+    /// Prevents the pre-fix failure: casting at pool=4 leaves {0} for activation.
+    /// </summary>
+    [Fact]
+    public void TryGetNextWinningAction_Null_WhenCharbelcherInHandAndPool4()
+    {
+        var s = new BotTestScenario();
+
+        s.AddCardToHand(s.Self, new Artifact("Goblin Charbelcher", "{4}"));
+        s.Self.AddManaToPool(ManaCost.Parse("{R}{R}{R}{R}"));
+
+        var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
+
         action.Should().BeNull(
-            "Charbelcher in hand but not on the battlefield — casting it is not the atomic kill; " +
-            "StrategicScore steers the search toward the cast");
+            "pool = 4 is only enough for the cast — directive defers until pool ≥ 7 " +
+            "to guarantee {3} remains for the activation");
     }
 
     /// <summary>
