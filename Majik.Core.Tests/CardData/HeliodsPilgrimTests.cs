@@ -37,7 +37,7 @@ public class HeliodsPilgrimTests
         var c = HeliodsPilgrimFactory.Create(_alice);
 
         c.Name.Should().Be("Heliod's Pilgrim");
-        c.ManaCost.Should().Be("{1}{W}");
+        c.ManaCost.Should().Be("{2}{W}");
         c.Power.Should().Be(1);
         c.Toughness.Should().Be(2);
         c.HasType(CardType.Creature).Should().BeTrue();

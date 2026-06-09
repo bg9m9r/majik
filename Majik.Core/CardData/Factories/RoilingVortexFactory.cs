@@ -97,7 +97,7 @@ namespace Majik.Core.CardData.Factories;
 public static class RoilingVortexFactory
 {
     public const string CardName = "Roiling Vortex";
-    public const string PrintedManaCost = "{R}";
+    public const string PrintedManaCost = "{1}{R}";
 
     /// <summary>
     /// Construct Roiling Vortex with no live runtime services. All three

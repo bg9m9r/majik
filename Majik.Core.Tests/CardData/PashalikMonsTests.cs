@@ -61,7 +61,7 @@ public class PashalikMonsTests
         var c = PashalikMonsFactory.Create(_alice);
 
         c.Name.Should().Be("Pashalik Mons");
-        c.ManaCost.Should().Be("{3}{R}{R}");
+        c.ManaCost.Should().Be("{2}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue("Pashalik Mons is legendary");
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();

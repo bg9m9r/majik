@@ -76,7 +76,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MatterReshaperFactory
 {
     public const string CardName = "Matter Reshaper";
-    public const string PrintedManaCost = "{3}{C}";
+    public const string PrintedManaCost = "{2}{C}";
     public const int Power = 3;
     public const int Toughness = 2;
 

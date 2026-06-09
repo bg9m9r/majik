@@ -60,7 +60,7 @@ public class MortivoreTests
         morti.Name.Should().Be("Mortivore");
         morti.HasType(CardType.Creature).Should().BeTrue();
         morti.HasSubtype(CardSubtype.Lhurgoyf).Should().BeTrue();
-        morti.ManaCost.Should().Be("{3}{B}{B}");
+        morti.ManaCost.Should().Be("{2}{B}{B}");
         morti.BasePower.Should().Be(0);
         morti.BaseToughness.Should().Be(0);
         morti.Owner.Should().BeSameAs(_alice);

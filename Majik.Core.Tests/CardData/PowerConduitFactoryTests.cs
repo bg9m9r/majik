@@ -61,7 +61,7 @@ public class PowerConduitFactoryTests
         var c = PowerConduitFactory.Create(_alice);
 
         c.Name.Should().Be("Power Conduit");
-        c.ManaCost.Should().Be("{1}");
+        c.ManaCost.Should().Be("{2}");
         c.HasType(CardType.Artifact).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

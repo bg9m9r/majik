@@ -78,7 +78,7 @@ namespace Majik.Core.CardData.Factories;
 public static class NahirisWrathFactory
 {
     public const string CardName = "Nahiri's Wrath";
-    public const string PrintedManaCost = "{4}{R}{R}";
+    public const string PrintedManaCost = "{2}{R}";
 
     /// <summary>
     /// Construct a Nahiri's Wrath sorcery owned and controlled by

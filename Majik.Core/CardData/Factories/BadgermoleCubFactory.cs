@@ -56,7 +56,7 @@ public static class BadgermoleCubFactory
     public const string CardName = "Badgermole Cub";
 
     public static CardDef Define() => CardDef
-        .Creature(CardName, "{G}", power: 2, toughness: 2);
+        .Creature(CardName, "{1}{G}", power: 2, toughness: 2);
 
     /// <summary>
     /// Build Badgermole Cub with its Earthbend-1 ETB trigger attached. Used by

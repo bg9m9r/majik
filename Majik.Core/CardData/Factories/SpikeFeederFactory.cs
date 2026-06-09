@@ -62,7 +62,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SpikeFeederFactory
 {
     public const string CardName = "Spike Feeder";
-    public const string PrintedManaCost = "{1}{G}";
+    public const string PrintedManaCost = "{1}{G}{G}";
     public const int Power = 0;
     public const int Toughness = 0;
     public const int EntersWithCounters = 2;

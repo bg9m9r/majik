@@ -7,7 +7,7 @@ using Majik.Core.Players;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Vault Skirge (New Phyrexia, {2}{B/P}).
+/// Named-card factory for Vault Skirge (New Phyrexia, {1}{B/P}).
 ///
 /// Artifact Creature — Imp 1/1. Oracle text:
 ///   "({B/P} can be paid with either {B} or 2 life.)
@@ -18,7 +18,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implementation (v1)
 ///
-/// - 1/1 Artifact Creature — Imp at printed cost {2}{B/P}. The Artifact
+/// - 1/1 Artifact Creature — Imp at printed cost {1}{B/P}. The Artifact
 ///   type is layered on via <see cref="Card.AddCardType"/> so HasType
 ///   lookups + colour identity see both types (same shape as
 ///   <see cref="FrogmiteFactory"/> / <see cref="ArcboundRavagerFactory"/>).
@@ -36,7 +36,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Combat.CombatAbilities"/> read them directly.
 /// - <b>Phyrexian alt-cost (CR 107.4f / CR 118.8)</b>: exposed via
 ///   <see cref="PhyrexianAlternativeCost"/> — strips the single {B/P}
-///   pip from the printed cost, leaving {2} mana to pay and charging
+///   pip from the printed cost, leaving {1} mana to pay and charging
 ///   2 life. Callers (SpellCastFlow / tests) supply this as
 ///   <c>alternativeCost</c> on cast. Same shape as
 ///   <see cref="SurgicalExtractionFactory.PhyrexianAlternativeCost"/> /
@@ -48,7 +48,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Per-pip selectivity (pay the single phyrexian pip as mana while
 ///   still using the phyrexian alt-cost path) — n/a here, Vault Skirge
 ///   has exactly one phyrexian pip so the two paths
-///   ({2}{B} all mana vs. {2} + 2 life) are the only legal payments.
+///   ({1}{B} all mana vs. {1} + 2 life) are the only legal payments.
 /// - Bot-side probe / heuristics for picking between the {B} and the
 ///   2-life payment — the engine relies on the caller to pass the
 ///   alternative cost explicitly.
@@ -61,11 +61,11 @@ public static class VaultSkirgeFactory
     /// <summary>
     /// Printed mana cost. The {B/P} symbol is parsed into a phyrexian pip
     /// on the ManaCost value object; for runtime payment in the v1 engine
-    /// we treat the cost as {2}{B} (mana-pay) and the 2-life option via
+    /// we treat the cost as {1}{B} (mana-pay) and the 2-life option via
     /// <see cref="PhyrexianAlternativeCost"/>. Mirrors the Surgical
     /// Extraction / Spellskite convention.
     /// </summary>
-    public const string PrintedManaCost = "{2}{B}";
+    public const string PrintedManaCost = "{1}{B/P}";
     public const int Power = 1;
     public const int Toughness = 1;
 
@@ -109,13 +109,13 @@ public static class VaultSkirgeFactory
     }
 
     /// <summary>
-    /// Build the phyrexian alternative cost (pay {2} mana + 2 life
-    /// instead of {2}{B}) for a just-created Vault Skirge instance.
+    /// Build the phyrexian alternative cost (pay {1} mana + 2 life
+    /// instead of {1}{B}) for a just-created Vault Skirge instance.
     /// Caller passes this to <c>SpellCastFlow.CastAsync(...,
-    /// alternativeCost: ...)</c>. The remaining mana cost is {2}; the
+    /// alternativeCost: ...)</c>. The remaining mana cost is {1}; the
     /// life cost is 2 (one phyrexian pip × 2 life).
     /// </summary>
     public static PhyrexianManaAlternativeCost PhyrexianAlternativeCost()
         => PhyrexianManaAlternativeCost.ForPrintedCost(
-            Majik.Core.ValueObjects.ManaCost.Parse("{2}{B/P}"));
+            Majik.Core.ValueObjects.ManaCost.Parse(PrintedManaCost));
 }

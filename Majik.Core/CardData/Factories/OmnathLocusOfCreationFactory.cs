@@ -62,7 +62,7 @@ namespace Majik.Core.CardData.Factories;
 public static class OmnathLocusOfCreationFactory
 {
     public const string CardName = "Omnath, Locus of Creation";
-    public const string PrintedManaCost = "{1}{R}{G}{W}{U}";
+    public const string PrintedManaCost = "{R}{G}{W}{U}";
 
     /// <summary>Mana produced on the 2nd landfall resolution.</summary>
     public const string SecondLandfallManaProduced = "RGWU";

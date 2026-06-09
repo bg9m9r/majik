@@ -53,7 +53,7 @@ namespace Majik.Core.CardData.Factories;
 public static class CliffhavenVampireFactory
 {
     public const string CardName = "Cliffhaven Vampire";
-    public const string PrintedManaCost = "{1}{W}{B}";
+    public const string PrintedManaCost = "{2}{W}{B}";
     public const int Power = 2;
     public const int Toughness = 4;
     public const int LifeLossPerOpponent = 1;

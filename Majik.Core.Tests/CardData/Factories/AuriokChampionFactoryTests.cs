@@ -50,8 +50,8 @@ public class AuriokChampionFactoryTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
         c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-        c.ManaCost.Should().Be("{W}");
-        c.ManaCostValue.TotalValue.Should().Be(1);
+        c.ManaCost.Should().Be("{W}{W}");
+        c.ManaCostValue.TotalValue.Should().Be(2);
         c.BasePower.Should().Be(1);
         c.BaseToughness.Should().Be(1);
         CardColors.GetColors(c).Should().Contain(ManaColor.White);

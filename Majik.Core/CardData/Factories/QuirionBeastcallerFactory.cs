@@ -64,7 +64,7 @@ namespace Majik.Core.CardData.Factories;
 public static class QuirionBeastcallerFactory
 {
     public const string CardName = "Quirion Beastcaller";
-    public const string PrintedManaCost = "{G}";
+    public const string PrintedManaCost = "{1}{G}";
     public const int Power = 2;
     public const int Toughness = 2;
 

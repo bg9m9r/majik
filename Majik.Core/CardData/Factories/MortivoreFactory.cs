@@ -63,7 +63,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MortivoreFactory
 {
     public const string CardName = "Mortivore";
-    public const string Cost = "{3}{B}{B}";
+    public const string Cost = "{2}{B}{B}";
 
     /// <summary>
     /// Creates a Mortivore with correct card identity + the {B}:

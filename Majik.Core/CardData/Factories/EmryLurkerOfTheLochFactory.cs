@@ -10,7 +10,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Emry, Lurker of the Loch (Throne of Eldraine,
-/// {4}{U} reduced by Affinity for artifacts).
+/// {2}{U} reduced by Affinity for artifacts).
 ///
 /// Legendary Creature — Merfolk Wizard 1/2. Oracle text:
 ///   "Affinity for artifacts (This spell costs {1} less to cast for each
@@ -22,7 +22,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 1/2 Legendary Merfolk Wizard with printed mana cost {4}{U}.
+/// - 1/2 Legendary Merfolk Wizard with printed mana cost {2}{U}.
 /// - <b>Affinity for artifacts (CR 702.40)</b>: wired via
 ///   <see cref="CostReductionAbility.AffinityFor"/>(<see cref="CardType.Artifact"/>).
 ///   The cost-reducer scans the caster's battlefield at cast time
@@ -78,7 +78,7 @@ namespace Majik.Core.CardData.Factories;
 public static class EmryLurkerOfTheLochFactory
 {
     public const string CardName = "Emry, Lurker of the Loch";
-    public const string PrintedManaCost = "{4}{U}";
+    public const string PrintedManaCost = "{2}{U}";
     public const int Power = 1;
     public const int Toughness = 2;
 

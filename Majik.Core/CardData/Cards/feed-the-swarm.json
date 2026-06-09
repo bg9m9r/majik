@@ -1,5 +1,5 @@
 {
   "name": "Feed the Swarm",
   "types": ["Sorcery"],
-  "manaCost": "{B}"
+  "manaCost": "{1}{B}"
 }

@@ -82,7 +82,7 @@ namespace Majik.Core.CardData.Factories;
 public static class WorshipFactory
 {
     public const string CardName = "Worship";
-    public const string PrintedManaCost = "{2}{W}";
+    public const string PrintedManaCost = "{3}{W}";
 
     /// <summary>
     /// Construct a Worship card with no live wiring. Shape-only —

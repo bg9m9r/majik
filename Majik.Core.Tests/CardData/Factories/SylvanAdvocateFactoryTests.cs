@@ -95,7 +95,7 @@ public class SylvanAdvocateFactoryTests
         var card = SylvanAdvocateFactory.Create(_alice);
 
         card.Name.Should().Be("Sylvan Advocate");
-        card.ManaCost.Should().Be("{2}{G}");
+        card.ManaCost.Should().Be("{1}{G}");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Elf).Should().BeTrue();
         card.HasSubtype(CardSubtype.Druid).Should().BeTrue();

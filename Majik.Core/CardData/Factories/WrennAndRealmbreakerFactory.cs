@@ -97,7 +97,7 @@ public static class WrennAndRealmbreakerFactory
 
         var wrenn = new Planeswalker(
             name: "Wrenn and Realmbreaker",
-            manaCost: "{3}{G}",
+            manaCost: "{1}{G}{G}",
             startingLoyalty: 4,
             supertypes: new[] { CardSupertype.Legendary },
             subtypes: new[] { CardSubtype.Wrenn });

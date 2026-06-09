@@ -55,7 +55,7 @@ namespace Majik.Core.CardData.Factories;
 public static class HibernationFactory
 {
     public const string CardName = "Hibernation";
-    public const string PrintedManaCost = "{1}{U}";
+    public const string PrintedManaCost = "{2}{U}";
 
     /// <summary>
     /// Build Hibernation as an Instant card with owner/controller wired.

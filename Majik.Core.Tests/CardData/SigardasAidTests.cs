@@ -54,7 +54,7 @@ public class SigardasAidTests : IDisposable
         var aid = SigardasAidFactory.Create(_alice);
 
         aid.Name.Should().Be("Sigarda's Aid");
-        aid.ManaCost.Should().Be("{1}{W}");
+        aid.ManaCost.Should().Be("{W}");
         aid.HasType(CardType.Enchantment).Should().BeTrue();
         aid.Owner.Should().BeSameAs(_alice);
         aid.Controller.Should().BeSameAs(_alice);
@@ -68,7 +68,7 @@ public class SigardasAidTests : IDisposable
 
         card.Should().BeOfType<Enchantment>();
         card.Name.Should().Be("Sigarda's Aid");
-        card.ManaCost.Should().Be("{1}{W}");
+        card.ManaCost.Should().Be("{W}");
         card.HasType(CardType.Enchantment).Should().BeTrue();
         card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }

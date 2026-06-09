@@ -80,7 +80,7 @@ namespace Majik.Core.CardData.Factories;
 public static class DriftOfPhantasmsFactory
 {
     public const string CardName = "Drift of Phantasms";
-    public const string PrintedManaCost = "{3}{U}";
+    public const string PrintedManaCost = "{2}{U}";
     public const int Power = 0;
     public const int Toughness = 5;
     public const string TransmuteCost = "{1}{U}{U}";

@@ -70,7 +70,7 @@ public class FoundationBreakerTests
         var fb = FoundationBreakerFactory.Create(_alice);
 
         fb.Name.Should().Be("Foundation Breaker");
-        fb.ManaCost.Should().Be("{2}{G}");
+        fb.ManaCost.Should().Be("{3}{G}");
         fb.BasePower.Should().Be(3);
         fb.BaseToughness.Should().Be(2);
         fb.HasType(CardType.Creature).Should().BeTrue();

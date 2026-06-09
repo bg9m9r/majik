@@ -56,7 +56,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SigardaHostOfHeronsFactory
 {
     public const string CardName = "Sigarda, Host of Herons";
-    public const string PrintedManaCost = "{2}{G}{W}";
+    public const string PrintedManaCost = "{2}{G}{W}{W}";
     public const int Power = 5;
     public const int Toughness = 5;
 

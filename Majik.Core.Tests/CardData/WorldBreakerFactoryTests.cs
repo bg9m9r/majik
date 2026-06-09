@@ -37,7 +37,7 @@ public class WorldBreakerFactoryTests
         var wb = WorldBreakerFactory.Create(_alice);
 
         wb.Name.Should().Be("World Breaker");
-        wb.ManaCost.Should().Be("{5}{G}");
+        wb.ManaCost.Should().Be("{6}{G}");
         wb.Power.Should().Be(5);
         wb.Toughness.Should().Be(5);
         wb.HasType(CardType.Creature).Should().BeTrue();

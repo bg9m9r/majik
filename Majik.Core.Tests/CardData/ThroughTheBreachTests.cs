@@ -54,7 +54,7 @@ public class ThroughTheBreachTests
         var card = ThroughTheBreachFactory.Create(_alice);
 
         card.Name.Should().Be("Through the Breach");
-        card.ManaCost.Should().Be("{2}{R}{R}");
+        card.ManaCost.Should().Be("{4}{R}");
         card.HasType(CardType.Instant).Should().BeTrue();
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
@@ -68,7 +68,7 @@ public class ThroughTheBreachTests
         card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Through the Breach");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{R}{R}");
+        card.ManaCost.Should().Be("{4}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
 

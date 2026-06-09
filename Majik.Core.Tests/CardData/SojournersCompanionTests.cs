@@ -83,7 +83,7 @@ public class SojournersCompanionTests
         var c = SojournersCompanionFactory.Create(_alice);
 
         c.Name.Should().Be("Sojourner's Companion");
-        c.ManaCost.Should().Be("{6}");
+        c.ManaCost.Should().Be("{7}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasType(CardType.Artifact).Should().BeTrue("Sojourner's Companion is an Artifact Creature (CR 301.1 / 302.1)");
         c.HasSubtype(CardSubtype.Thopter).Should().BeTrue();
@@ -118,19 +118,19 @@ public class SojournersCompanionTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void Affinity_NoArtifacts_FullSix()
+    public void Affinity_NoArtifacts_FullSeven()
     {
         var companion = SojournersCompanionFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(companion);
         companion.SetZone(ZoneType.Hand);
 
         var effective = CostReduction.GetEffectiveCost(companion, _alice);
-        effective.Generic.Should().Be(6);
-        effective.TotalValue.Should().Be(6);
+        effective.Generic.Should().Be(7);
+        effective.TotalValue.Should().Be(7);
     }
 
     [Fact]
-    public void Affinity_ThreeArtifacts_GenericThree()
+    public void Affinity_ThreeArtifacts_GenericFour()
     {
         var companion = SojournersCompanionFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(companion);
@@ -142,24 +142,24 @@ public class SojournersCompanionTests
         }
 
         var effective = CostReduction.GetEffectiveCost(companion, _alice);
-        effective.Generic.Should().Be(3, "{6} reduced by 3 → {3}");
+        effective.Generic.Should().Be(4, "{7} reduced by 3 → {4}");
     }
 
     [Fact]
-    public void Affinity_SixArtifacts_FreeCast()
+    public void Affinity_SevenArtifacts_FreeCast()
     {
-        // Headline dream: six artifacts → cast Sojourner's Companion free.
+        // Headline dream: seven artifacts → cast Sojourner's Companion free.
         var companion = SojournersCompanionFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(companion);
         companion.SetZone(ZoneType.Hand);
 
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 7; i++)
         {
             PutOnBattlefield(_alice, new Artifact($"Artifact {i}", "{0}"));
         }
 
         var effective = CostReduction.GetEffectiveCost(companion, _alice);
-        effective.Generic.Should().Be(0, "{6} reduced by 6 → {0} (free)");
+        effective.Generic.Should().Be(0, "{7} reduced by 7 → {0} (free)");
         effective.TotalValue.Should().Be(0);
     }
 

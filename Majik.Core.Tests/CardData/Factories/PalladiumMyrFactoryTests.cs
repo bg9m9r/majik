@@ -41,7 +41,7 @@ public class PalladiumMyrFactoryTests
         var c = (Creature)NamedCardFactory.Create("Palladium Myr", _alice);
 
         c.Name.Should().Be("Palladium Myr");
-        c.ManaCost.Should().Be("{4}");
+        c.ManaCost.Should().Be("{3}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasType(CardType.Artifact).Should().BeTrue(
             "Artifact Creature — CR 301.1 / 302.1");

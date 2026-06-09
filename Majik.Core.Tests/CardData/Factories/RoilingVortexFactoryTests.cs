@@ -57,8 +57,8 @@ public class RoilingVortexFactoryTests
         vortex.Should().BeOfType<Enchantment>();
         vortex.Name.Should().Be("Roiling Vortex");
         vortex.HasType(CardType.Enchantment).Should().BeTrue();
-        vortex.ManaCost.Should().Be("{R}");
-        vortex.ManaCostValue.TotalValue.Should().Be(1);
+        vortex.ManaCost.Should().Be("{1}{R}");
+        vortex.ManaCostValue.TotalValue.Should().Be(2);
         vortex.Owner.Should().BeSameAs(_alice);
         vortex.Controller.Should().BeSameAs(_alice);
     }

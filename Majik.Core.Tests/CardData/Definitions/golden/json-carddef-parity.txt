@@ -1865,7 +1865,7 @@
 ==== auriok-champion ====
 {
   "name": "Auriok Champion",
-  "manaCost": "{W}",
+  "manaCost": "{W}{W}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -6275,7 +6275,7 @@
 ==== cloud-key ====
 {
   "name": "Cloud Key",
-  "manaCost": "{2}",
+  "manaCost": "{3}",
   "primaryType": "Artifact",
   "cardTypes": [
     "Artifact"
@@ -6808,7 +6808,7 @@
 ==== conclave-tribunal ====
 {
   "name": "Conclave Tribunal",
-  "manaCost": "{4}{W}",
+  "manaCost": "{3}{W}",
   "primaryType": "Enchantment",
   "cardTypes": [
     "Enchantment"
@@ -11646,7 +11646,7 @@
 ==== feed-the-swarm ====
 {
   "name": "Feed the Swarm",
-  "manaCost": "{B}",
+  "manaCost": "{1}{B}",
   "primaryType": "Sorcery",
   "cardTypes": [
     "Sorcery"
@@ -11891,7 +11891,7 @@
 ==== fiery-cannonade ====
 {
   "name": "Fiery Cannonade",
-  "manaCost": "{1}{R}",
+  "manaCost": "{2}{R}",
   "primaryType": "Instant",
   "cardTypes": [
     "Instant"
@@ -14710,7 +14710,7 @@
 ==== glissa-sunslayer ====
 {
   "name": "Glissa Sunslayer",
-  "manaCost": "{B}{G}",
+  "manaCost": "{1}{B}{G}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -21163,7 +21163,7 @@
 ==== legion-warboss ====
 {
   "name": "Legion Warboss",
-  "manaCost": "{1}{R}",
+  "manaCost": "{2}{R}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -26118,7 +26118,7 @@
 ==== palladium-myr ====
 {
   "name": "Palladium Myr",
-  "manaCost": "{4}",
+  "manaCost": "{3}",
   "primaryType": "Creature",
   "cardTypes": [
     "Artifact",
@@ -33120,7 +33120,7 @@
 ==== shriekmaw ====
 {
   "name": "Shriekmaw",
-  "manaCost": "{5}{B}",
+  "manaCost": "{4}{B}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -37199,7 +37199,7 @@
 ==== sylvan-advocate ====
 {
   "name": "Sylvan Advocate",
-  "manaCost": "{2}{G}",
+  "manaCost": "{1}{G}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"

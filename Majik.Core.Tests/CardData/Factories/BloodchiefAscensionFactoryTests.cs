@@ -44,7 +44,7 @@ public class BloodchiefAscensionFactoryTests
 
         card.Name.Should().Be("Bloodchief Ascension");
         card.HasType(CardType.Enchantment).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{B}");
+        card.ManaCost.Should().Be("{B}");
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }

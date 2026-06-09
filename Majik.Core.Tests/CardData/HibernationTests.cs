@@ -36,7 +36,7 @@ public class HibernationTests
         var c = HibernationFactory.Create(_alice);
 
         c.Name.Should().Be("Hibernation");
-        c.ManaCost.Should().Be("{1}{U}");
+        c.ManaCost.Should().Be("{2}{U}");
         c.HasType(CardType.Instant).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class HibernationTests
         card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Hibernation");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{U}");
+        card.ManaCost.Should().Be("{2}{U}");
     }
 
     // -------- Resolve body ------------------------------------------------

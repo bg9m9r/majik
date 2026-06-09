@@ -94,7 +94,7 @@ namespace Majik.Core.CardData.Factories;
 public static class StormchasersTalentFactory
 {
     public const string CardName = "Stormchaser's Talent";
-    public const string PrintedManaCost = "{U}{R}";
+    public const string PrintedManaCost = "{U}";
     public const string Level2Cost = "{1}{U}{R}";
     public const string Level3Cost = "{3}{U}{R}";
 

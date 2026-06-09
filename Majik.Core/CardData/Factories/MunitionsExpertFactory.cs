@@ -68,7 +68,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MunitionsExpertFactory
 {
     public const string CardName = "Munitions Expert";
-    public const string PrintedManaCost = "{R}";
+    public const string PrintedManaCost = "{B}{R}";
     public const int Power = 1;
     public const int Toughness = 1;
 

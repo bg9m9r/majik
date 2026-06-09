@@ -85,7 +85,7 @@ namespace Majik.Core.CardData.Factories;
 public static class DemilichFactory
 {
     public const string CardName = "Demilich";
-    public const string PrintedManaCost = "{3}{U}{U}{U}";
+    public const string PrintedManaCost = "{U}{U}{U}{U}";
     public const int Power = 4;
     public const int Toughness = 3;
     public const int OnCastExileCount = 2;

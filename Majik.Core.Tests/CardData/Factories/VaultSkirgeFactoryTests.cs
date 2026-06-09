@@ -24,14 +24,14 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    Flying, lifelink."
 ///
 /// Covers:
-///   - Identity (dual Artifact + Creature, Imp subtype, {2}{B} runtime
+///   - Identity (dual Artifact + Creature, Imp subtype, {1}{B/P} printed
 ///     printed cost, 1/1, owner/controller).
 ///   - NamedCardFactory dispatch.
 ///   - Affinity for artifacts wires CostReductionAbility + KeywordAbility
 ///     marker; Frogmite-shape reduction at 0 / 2 / 3+ artifacts (floor
 ///     at zero).
 ///   - Flying + Lifelink + Phyrexian keyword markers attached.
-///   - PhyrexianAlternativeCost: AlternativeManaCost = {2}, LifeCost = 2;
+///   - PhyrexianAlternativeCost: AlternativeManaCost = {1}, LifeCost = 2;
 ///     OnResolved drains 2 life from the caster.
 /// </summary>
 [Trait("Color", "B")]
@@ -57,7 +57,7 @@ public class VaultSkirgeFactoryTests
         var c = VaultSkirgeFactory.Create(_alice);
 
         c.Name.Should().Be("Vault Skirge");
-        c.ManaCost.Should().Be("{2}{B}");
+        c.ManaCost.Should().Be("{1}{B/P}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasType(CardType.Artifact).Should().BeTrue(
             "Artifact Creature — CR 301.1 / 302.1");
@@ -107,26 +107,30 @@ public class VaultSkirgeFactoryTests
 
         var effective = CostReduction.GetEffectiveCost(skirge, _alice);
 
-        effective.Generic.Should().Be(2, "no artifacts → full {2} generic");
-        effective.Black.Should().Be(1, "the {B} pip is not affected by Affinity");
+        effective.Generic.Should().Be(1, "no artifacts → full {1} generic");
+        effective.PhyrexianPips.Should().ContainSingle()
+            .Which.Should().Be(ManaColor.Black,
+                "the {B/P} phyrexian pip is not affected by Affinity");
     }
 
     [Fact]
-    public void Affinity_TwoArtifactsControlled_GenericReducedByTwo()
+    public void Affinity_OneArtifactControlled_GenericReducedToZero()
     {
         var skirge = VaultSkirgeFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(skirge);
         skirge.SetZone(ZoneType.Hand);
 
-        for (var i = 0; i < 2; i++)
+        for (var i = 0; i < 1; i++)
         {
             PutOnBattlefield(_alice, new Artifact($"Artifact {i}", "{0}"));
         }
 
         var effective = CostReduction.GetEffectiveCost(skirge, _alice);
 
-        effective.Generic.Should().Be(0, "{2} reduced by 2 → {0} generic");
-        effective.Black.Should().Be(1, "Affinity does not reduce coloured pips");
+        effective.Generic.Should().Be(0, "{1} reduced by 1 → {0} generic");
+        effective.PhyrexianPips.Should().ContainSingle()
+            .Which.Should().Be(ManaColor.Black,
+                "Affinity does not reduce the {B/P} phyrexian pip");
     }
 
     [Fact]
@@ -144,7 +148,8 @@ public class VaultSkirgeFactoryTests
         var effective = CostReduction.GetEffectiveCost(skirge, _alice);
 
         effective.Generic.Should().Be(0, "reduction floors at 0 (CR 117.7c)");
-        effective.Black.Should().Be(1, "{B} pip unaffected");
+        effective.PhyrexianPips.Should().ContainSingle()
+            .Which.Should().Be(ManaColor.Black, "{B/P} phyrexian pip unaffected");
     }
 
     // -------------------------------------------------------------------------
@@ -152,12 +157,12 @@ public class VaultSkirgeFactoryTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void PhyrexianAlternativeCost_ReturnsTwoGenericPlusTwoLife()
+    public void PhyrexianAlternativeCost_ReturnsOneGenericPlusTwoLife()
     {
         var alt = VaultSkirgeFactory.PhyrexianAlternativeCost();
 
-        alt.AlternativeManaCost.Generic.Should().Be(2,
-            "the {B/P} pip is stripped; the {2} generic remains as mana cost");
+        alt.AlternativeManaCost.Generic.Should().Be(1,
+            "the {B/P} pip is stripped; the {1} generic remains as mana cost");
         alt.AlternativeManaCost.Black.Should().Be(0,
             "the {B/P} pip becomes the life payment — no Black remains");
         alt.LifeCost.Should().Be(2,

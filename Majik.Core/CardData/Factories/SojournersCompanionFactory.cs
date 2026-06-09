@@ -79,7 +79,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SojournersCompanionFactory
 {
     public const string CardName = "Sojourner's Companion";
-    public const string PrintedManaCost = "{6}";
+    public const string PrintedManaCost = "{7}";
     public const string TutorActivationCost = "{2}";
     public const int Power = 4;
     public const int Toughness = 4;

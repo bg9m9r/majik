@@ -36,7 +36,7 @@ public class PhoenixOfAshTests
         var phoenix = PhoenixOfAshFactory.Create(_alice);
 
         phoenix.Name.Should().Be("Phoenix of Ash");
-        phoenix.ManaCost.Should().Be("{2}{R}{R}");
+        phoenix.ManaCost.Should().Be("{1}{R}{R}");
         phoenix.HasType(CardType.Creature).Should().BeTrue();
         phoenix.HasSubtype(CardSubtype.Phoenix).Should().BeTrue();
         phoenix.BasePower.Should().Be(3);

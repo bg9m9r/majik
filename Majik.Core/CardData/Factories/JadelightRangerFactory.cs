@@ -38,7 +38,7 @@ namespace Majik.Core.CardData.Factories;
 public static class JadelightRangerFactory
 {
     public const string CardName = "Jadelight Ranger";
-    public const string PrintedManaCost = "{1}{G}";
+    public const string PrintedManaCost = "{1}{G}{G}";
     public const int Power = 2;
     public const int Toughness = 1;
 

@@ -74,7 +74,7 @@ public class LegionWarbossFactoryTests
         var c = LegionWarbossFactory.Create(_alice);
 
         c.Name.Should().Be("Legion Warboss");
-        c.ManaCost.Should().Be("{1}{R}");
+        c.ManaCost.Should().Be("{2}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();

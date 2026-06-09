@@ -51,7 +51,7 @@ namespace Majik.Core.CardData.Factories;
 public static class FoundationBreakerFactory
 {
     public const string CardName = "Foundation Breaker";
-    public const string PrintedManaCost = "{2}{G}";
+    public const string PrintedManaCost = "{3}{G}";
     public const int Power = 3;
     public const int Toughness = 2;
 

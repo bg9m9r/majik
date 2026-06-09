@@ -44,7 +44,7 @@ namespace Majik.Core.CardData.Factories;
 public static class BoilFactory
 {
     public const string CardName = "Boil";
-    public const string PrintedManaCost = "{2}{R}";
+    public const string PrintedManaCost = "{3}{R}";
 
     /// <summary>
     /// Build Boil with correct identity owned and controlled by
