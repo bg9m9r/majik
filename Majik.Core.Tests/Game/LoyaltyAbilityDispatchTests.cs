@@ -208,8 +208,7 @@ public class LoyaltyAbilityDispatchTests
             _alice,
             zones: _zones,
             sacrificeResolver: () => new[] { sac },
-            destroyTargetResolver: null,
-            opponentsResolver: null);
+            destroyTargetResolver: null);
         grist.ChangeOwner(_alice);
         grist.ChangeController(_alice);
         _alice.Zones.Battlefield.AddCard(grist);

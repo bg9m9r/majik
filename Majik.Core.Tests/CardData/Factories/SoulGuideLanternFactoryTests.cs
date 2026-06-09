@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -176,8 +177,7 @@ public class SoulGuideLanternFactoryTests
         _alice.Zones.Graveyard.AddCard(aliceCard);
         aliceCard.SetZone(ZoneType.Graveyard);
 
-        var lantern = SoulGuideLanternFactory.Create(
-            _alice, triggers: null, opponentsResolver: () => new[] { _bob });
+        var lantern = SoulGuideLanternFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(lantern);
         lantern.SetZone(ZoneType.Battlefield);
 
@@ -185,7 +185,9 @@ public class SoulGuideLanternFactoryTests
         var sweep = lantern.Abilities.OfType<ActivatedAbility>()
             .Single(a => !a.Costs.OfType<ManaCostCost>().Any());
 
-        sweep.Resolve();
+        // The sweep reads opponents off the LIVE resolution context — resolve
+        // it through a GameContext exactly as the live engine does.
+        ResolveWithGame(sweep, _alice, _alice, _bob);
 
         // Bob's graveyard fully exiled.
         _bob.Zones.Graveyard.GetCards().Should().BeEmpty();
@@ -201,6 +203,58 @@ public class SoulGuideLanternFactoryTests
         _alice.Zones.Battlefield.GetCards().Should().NotContain(lantern);
         _alice.Zones.Graveyard.GetCards().Should().Contain(lantern);
         lantern.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    /// <summary>
+    /// PROD-PATH guard (the resolver-null bug class). The production
+    /// <c>GameFacade</c> routed build dispatches
+    /// <see cref="NamedCardFactory.Create(string, Player)"/> (single-arg shape
+    /// build); the sweep ability resolves through
+    /// <see cref="ActivatedAbility.ResolveAsync"/> with the live
+    /// <see cref="GameContext"/>. The sweep must read opponents off that context
+    /// (not a captured null resolver) so it actually exiles their graveyards.
+    /// </summary>
+    [Fact]
+    public void SweepAbility_ExilesOpponentGraveyard_OnProdBuild()
+    {
+        var bobCard = new Card("Bob's Spell", "{2}");
+        bobCard.SetOwner(_bob);
+        _bob.Zones.Graveyard.AddCard(bobCard);
+        bobCard.SetZone(ZoneType.Graveyard);
+
+        var built = NamedCardFactory.Create("Soul-Guide Lantern", _alice);
+        built.Should().BeOfType<Artifact>();
+        var lantern = (Artifact)built;
+        _alice.Zones.Battlefield.AddCard(lantern);
+        lantern.SetZone(ZoneType.Battlefield);
+
+        var sweep = lantern.Abilities.OfType<ActivatedAbility>()
+            .Single(a => !a.Costs.OfType<ManaCostCost>().Any());
+
+        ResolveWithGame(sweep, _alice, _alice, _bob);
+
+        _bob.Zones.Exile.GetCards().Should().Contain(bobCard,
+            "the prod-built sweep reads opponents from the live context (not inert)");
+        _bob.Zones.Graveyard.GetCards().Should().NotContain(bobCard);
+    }
+
+    /// <summary>
+    /// Resolve an activated ability through the async path with a live
+    /// <see cref="GameContext"/> built from <paramref name="players"/>, so a
+    /// context-reading effect sees opponents exactly as it does in a live match.
+    /// </summary>
+    private static void ResolveWithGame(
+        ActivatedAbility ability, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new EventBus()));
+
+        ability.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 
     [Fact]
