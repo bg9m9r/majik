@@ -91,6 +91,68 @@ public static class OracleManaBinder
         + @"\s+mining\s+counters?\s+on\s+it",
         RegexOptions.IgnoreCase);
 
+    // "{T}: Add one mana of any type that a land you control could produce."
+    //   — Reflecting Pool (Tempest). The set of producible mana types is NOT
+    // fixed — it is recomputed at every legality check from the lands the
+    // controller currently controls. Modelled as six fixed-type ManaAbility
+    // instances (WUBRG + {C}), each gated so it is legal ONLY while some OTHER
+    // land the controller controls could produce that type (CR 605.1a). Lands
+    // are never routed through their [CardName] factory, so this binder is the
+    // ONLY prod binding path — it ports the (test-only) ReflectingPoolFactory
+    // logic verbatim. A "type" is one of W/U/B/R/G plus colorless (CR 107.4c).
+    private static readonly Regex ReflectingPoolManaRegex = new(
+        @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+type\s+that\s+a\s+land\s+you\s+control\s+could\s+produce",
+        RegexOptions.IgnoreCase);
+
+    // "{T}, Pay 2 life: Add {C}." — Boseiju, Who Shelters All (Champions of
+    // Kamigawa). A {C}-producing mana ability with an additional "lose 2 life"
+    // activation cost (CR 605.1a / 119.4). The "spent on an instant/sorcery →
+    // can't be countered" rider is DEFERRED (needs per-slot mana provenance +
+    // a cast-time uncounterable flag — same deferral as Cavern of Souls). The
+    // pay-life cost prefix is "{T}, Pay 2 life:" (NOT a bare {T}), so the bare
+    // tap-for-mana regexes never match it. Ports BoseijuWhoSheltersAllFactory.
+    private static readonly Regex PayTwoLifeColorlessManaRegex = new(
+        @"\{T\}\s*,\s*Pay\s+2\s+life\s*:\s*Add\s+\{C\}",
+        RegexOptions.IgnoreCase);
+
+    // "{T}: Add one mana of the chosen color." — Sunken Citadel /
+    // Temple of the Dragon Queen "as it enters, choose a color" cycle. There
+    // is no agent colour-choice surface in the binder layer yet (deferred
+    // engine-wide — same posture as Sejiri Steppe / Crumbling Vestige), so the
+    // faithful-but-pragmatic modelling is five fixed-type ManaAbility instances
+    // (one per WUBRG), exactly like the any-colour lands (Glimmervoid / Mox
+    // Opal) — the bot taps for whichever colour it needs. This is strictly
+    // MORE permissive than the printed single-chosen-colour card; the precise
+    // choose-a-color restriction unlocks when the agent colour-choice surface
+    // lands. Ports the colour-bearing half of SunkenCitadelFactory /
+    // TempleOfTheDragonQueenFactory.
+    private static readonly Regex ChosenColorOneManaRegex = new(
+        @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+the\s+chosen\s+color",
+        RegexOptions.IgnoreCase);
+
+    // "{T}: Add two mana of the chosen color. Spend this mana only to activate
+    // abilities of land sources." — Sunken Citadel's restricted double-mana
+    // ability (CR 605.1a / 106.4). Five fixed-type double-pip ManaAbility
+    // instances (one per WUBRG), each stamped with a land-ability-only
+    // SpendRestriction. Payment-gate enforcement of the restriction is DEFERRED
+    // (ManaPool stores bucketed colour counts, no per-slot tags yet — same
+    // deferral as Eldrazi Temple); the rider is observational metadata today.
+    private static readonly Regex ChosenColorTwoManaLandAbilityRegex = new(
+        @"\{T\}\s*:\s*Add\s+two\s+mana\s+of\s+the\s+chosen\s+color\.\s*Spend\s+this\s+mana\s+only\s+to\s+activate\s+abilities\s+of\s+land\s+sources",
+        RegexOptions.IgnoreCase);
+
+    // CR 106.4 — Sunken Citadel's "Spend this mana only to activate abilities
+    // of land sources." The SpendRestriction predicate is spell-side only
+    // (Func<ISpell,bool>); this mana can never pay a spell pip, so it denies
+    // every spell. Shared instance keeps the rider structurally stable
+    // (SpendRestriction equality is by-reference).
+    private static readonly Majik.Core.Mana.SpendRestriction SunkenCitadelLandAbilitiesOnly =
+        new("land source ability", _ => false);
+
+    // The five colours plus colorless — the complete set of mana "types" a
+    // Reflecting Pool can ever reflect (CR 107.4c / 106.1b).
+    private static readonly string[] ReflectingPoolManaTypes = { "W", "U", "B", "R", "G", "C" };
+
     /// <summary>
     /// Attaches the correct <see cref="ManaAbility"/> to a basic land that
     /// already has its controller set. Idempotent — if the card is not a
@@ -199,6 +261,48 @@ public static class OracleManaBinder
         // carry this shape, so it's a no-op on non-lands.
         if (card is Land payLifeLand)
         {
+            // Reflecting Pool — six dynamic-output mana abilities (WUBRG + {C}),
+            // each gated on some OTHER land the controller controls being able
+            // to produce that type (recomputed every legality check). Ports the
+            // test-only ReflectingPoolFactory into the prod binder path.
+            if (ReflectingPoolManaRegex.IsMatch(text))
+            {
+                BindReflectingPool(payLifeLand, controller);
+                return;
+            }
+
+            // Boseiju, Who Shelters All — "{T}, Pay 2 life: Add {C}." A {C}
+            // mana ability with a lose-2-life additional cost (CR 605.1a /
+            // 119.4). The uncounterable rider is deferred (provenance infra).
+            if (PayTwoLifeColorlessManaRegex.IsMatch(text))
+            {
+                payLifeLand.AddAbility(new ManaAbility(
+                    source: payLifeLand,
+                    controller: controller,
+                    manaGenerated: ManaCost.Parse("C"),
+                    canActivateCheck: () =>
+                    {
+                        if (payLifeLand.IsTapped) return false;
+                        var c = payLifeLand.Controller ?? controller;
+                        return c.LifeTotal > 2;
+                    },
+                    additionalCostPayer: p => p.LoseLife(2)));
+                return;
+            }
+
+            // Sunken Citadel / Temple of the Dragon Queen — "{T}: Add one mana
+            // of the chosen color" (+ Sunken Citadel's restricted double-mana
+            // ability). No agent colour-choice surface in the binder yet, so
+            // five WUBRG instances are bound (bot taps for the colour it needs)
+            // — the precise single-chosen-colour gate is deferred. The
+            // double-mana clause additionally stamps a land-ability-only
+            // SpendRestriction (payment-gate enforcement deferred).
+            if (ChosenColorOneManaRegex.IsMatch(text))
+            {
+                BindChosenColorLand(payLifeLand, text, controller);
+                return;
+            }
+
             var payLife = PayLifeDualManaRegex.Match(text);
             if (payLife.Success)
             {
@@ -337,6 +441,100 @@ public static class OracleManaBinder
         holder.Zones.Battlefield.RemoveCard(land);
         graveyardOwner.Zones.Graveyard.AddCard(land);
         land.SetZone(Majik.Core.Zones.ZoneType.Graveyard);
+    }
+
+    /// <summary>
+    /// Wire Reflecting Pool's six dynamic-output mana abilities (CR 605.1a).
+    /// One per W/U/B/R/G/{C}, each legal ONLY while some OTHER land the
+    /// controller currently controls could produce that type — recomputed at
+    /// every legality check, so it tracks control changes / lands entering and
+    /// leaving. Ports <c>ReflectingPoolFactory.Create</c> into the prod binder
+    /// path (lands are never routed through their [CardName] factory).
+    /// </summary>
+    private static void BindReflectingPool(Land land, Player controller)
+    {
+        foreach (var type in ReflectingPoolManaTypes)
+        {
+            var thisType = type; // capture per iteration
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerated: ManaCost.Parse(thisType),
+                canActivateCheck: () => !land.IsTapped
+                                        && land.Zone == Majik.Core.Zones.ZoneType.Battlefield
+                                        && ControllerCanProduce(land, thisType)));
+        }
+    }
+
+    /// <summary>
+    /// True when some land the <paramref name="pool"/>'s current controller
+    /// controls — other than <paramref name="pool"/> itself (and any other
+    /// Reflecting Pool, to break the circular self-reference) — has a mana
+    /// ability that produces <paramref name="typeSymbol"/> (one of W/U/B/R/G/C).
+    /// This is the "any type that a land you control could produce" gate
+    /// (CR 605.1a). Mirrors <c>ReflectingPoolFactory.ControllerCanProduce</c>.
+    /// </summary>
+    private static bool ControllerCanProduce(Land pool, string typeSymbol)
+    {
+        var target = ManaCost.Parse(typeSymbol).ToString();
+        var c = pool.Controller;
+        if (c == null) return false;
+
+        foreach (var card in c.Zones.Battlefield.GetCards())
+        {
+            if (ReferenceEquals(card, pool)
+                || card is not Land otherLand
+                || !otherLand.HasType(CardType.Land)
+                || otherLand.Name == ReflectingPoolName)
+            {
+                continue;
+            }
+
+            var produces = otherLand.Abilities
+                .OfType<ManaAbility>()
+                .Any(ma => ma.ManaGenerated.ToString() == target);
+            if (produces) return true;
+        }
+        return false;
+    }
+
+    private const string ReflectingPoolName = "Reflecting Pool";
+
+    /// <summary>
+    /// Wire the "{T}: Add one mana of the chosen color" cycle (Sunken Citadel /
+    /// Temple of the Dragon Queen). Five fixed-type single-pip ManaAbility
+    /// instances (one per WUBRG) — the bot taps for whichever colour it needs,
+    /// since the binder layer has no agent colour-choice surface yet (the
+    /// precise single-chosen-colour gate is deferred). When the oracle also
+    /// carries Sunken Citadel's "{T}: Add two mana of the chosen color. Spend
+    /// this mana only to activate abilities of land sources." clause, five
+    /// double-pip ManaAbility instances are added too, each stamped with a
+    /// land-ability-only <see cref="Majik.Core.Mana.SpendRestriction"/>
+    /// (payment-gate enforcement deferred — same posture as Eldrazi Temple).
+    /// </summary>
+    private static void BindChosenColorLand(Land land, string text, Player controller)
+    {
+        foreach (var color in new[] { "W", "U", "B", "R", "G" })
+        {
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerated: ManaCost.Parse(color),
+                canActivateCheck: () => !land.IsTapped));
+        }
+
+        if (ChosenColorTwoManaLandAbilityRegex.IsMatch(text))
+        {
+            foreach (var color in new[] { "W", "U", "B", "R", "G" })
+            {
+                land.AddAbility(new ManaAbility(
+                    source: land,
+                    controller: controller,
+                    manaGenerated: ManaCost.Parse(color + color),
+                    canActivateCheck: () => !land.IsTapped,
+                    spendRestriction: SunkenCitadelLandAbilitiesOnly));
+            }
+        }
     }
 
     private static int WordToInt(string s) =>

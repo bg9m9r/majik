@@ -1,3 +1,4 @@
+using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.Api;
 using Majik.Core.CardData;
@@ -52,6 +53,38 @@ public class PoolWideImplementationAuditTests
         {
             // WARD templated wording (CR 702.21) — see BotDeckImplementationAuditTests.
             "Reality Smasher",
+        };
+
+    /// <summary>
+    /// Stub-heuristic false positives: <see cref="ICard.IsVanillaShell"/> is
+    /// true (the binder chain attached no <c>card.Abilities</c>) but the card's
+    /// printed behaviour DOES run — it lives in an OFF-CARD effect the
+    /// classifier cannot see (a continuous/replacement effect registered on a
+    /// live per-game service, not a <c>card.Ability</c>). Verified working via
+    /// the GameFacade prod path in
+    /// <c>Majik.Core.Api.Tests.OffCardEffectLandBinderTests</c>. Each entry
+    /// names WHY. Only provably-working cards belong here — do NOT use this to
+    /// silence a genuine gap (those go in <see cref="KnownPartialImplementations"/>).
+    /// </summary>
+    private static readonly HashSet<string> StubHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // CR 305.7 — additive land-retype static ("Each land is a [basic]
+            // in addition to its other land types"). Bound by
+            // AdditiveLandSubtypeBinder as a GrantLandSubtypeStaticEffect on the
+            // game's ContinuousEffectsService — an off-card continuous effect,
+            // not a card.Ability — so the land has zero card.Abilities yet the
+            // static is live.
+            "Urborg, Tomb of Yawgmoth",
+            "Yavimaya, Cradle of Growth",
+
+            // CR 706.2 — "enter tapped as a copy of any land on the
+            // battlefield." Bound by EntersAsCopyBinder as an
+            // EntersAsCopyReplacement on the game's ReplacementBus (an off-card
+            // replacement effect, not a card.Ability). Vesuva's printed
+            // characteristics all come from the copied land, so it carries no
+            // card.Abilities of its own until it copies one on ETB.
+            "Vesuva",
         };
 
     private enum Status { Ok, Stub, Partial, MissingTrigger, Skipped }
@@ -129,7 +162,7 @@ public class PoolWideImplementationAuditTests
         // GameFacade.BuildDeckCard stamps IsVanillaShell only on the non-routed
         // binder-chain path; routed (factory-backed) cards are implemented by
         // definition. Same semantics as the bot-deck gate.
-        if (card.IsVanillaShell)
+        if (card.IsVanillaShell && !StubHeuristicAllowlist.Contains(name))
             return Status.Stub;
 
         var entity = Repo.GetByName(name);
@@ -191,6 +224,49 @@ public class PoolWideImplementationAuditTests
         _out.WriteLine($"----- BACKLOG: MissingTrigger ({byStatus[Status.MissingTrigger].Count}) -----");
         foreach (var n in byStatus[Status.MissingTrigger])
             _out.WriteLine($"  [MissingTrigger] {n} — oracle implies a trigger but none is bound");
+    }
+
+    /// <summary>
+    /// Regression gate for the land-binding + off-card-effect-allowlist work:
+    /// the named cards must NOT appear in the Stub / MissingTrigger backlog.
+    /// <list type="bullet">
+    ///   <item>The bound lands (Reflecting Pool / Boseiju / Sunken Citadel /
+    ///   Temple of the Dragon Queen / Glimmervoid / Abraded Bluffs / Witch's
+    ///   Cottage) now carry real card.Abilities through the prod binder chain.</item>
+    ///   <item>The off-card-effect lands (Urborg / Yavimaya / Vesuva) are
+    ///   cleared by the StubHeuristicAllowlist — their behaviour is provably
+    ///   live but lives off-card.</item>
+    ///   <item>Overgrowth / Fertile Ground now wire their tap-for-mana trigger
+    ///   into card.Abilities on the prod dispatch path (a real bug fix, not an
+    ///   allowlist).</item>
+    /// </list>
+    /// Unlike <see cref="PrintPoolWideHealth"/> this one FAILS on regression.
+    /// </summary>
+    [Fact]
+    public void BoundAndAllowlistedCards_AreNotInBacklog()
+    {
+        string[] mustBeOk =
+        {
+            // Stub → now bound (mana abilities).
+            "Reflecting Pool", "Boseiju, Who Shelters All", "Sunken Citadel",
+            "Temple of the Dragon Queen",
+            // MissingTrigger → now bound (triggered abilities).
+            "Glimmervoid", "Abraded Bluffs", "Witch's Cottage",
+            // Stub → cleared by the off-card-effect allowlist.
+            "Urborg, Tomb of Yawgmoth", "Yavimaya, Cradle of Growth", "Vesuva",
+            // MissingTrigger → real prod fix (trigger now in card.Abilities).
+            "Overgrowth", "Fertile Ground",
+        };
+
+        var stillFlagged = mustBeOk
+            .Select(n => (Name: n, Status: Classify(n)))
+            .Where(x => x.Status is Status.Stub or Status.MissingTrigger)
+            .Select(x => $"{x.Name}: {x.Status}")
+            .ToList();
+
+        stillFlagged.Should().BeEmpty(
+            "these cards were fixed (bound) or allowlisted (provable off-card "
+            + "effect) and must no longer appear in the audit backlog");
     }
 
     // ---------------------------------------------------------------------

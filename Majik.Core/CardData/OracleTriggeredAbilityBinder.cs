@@ -236,6 +236,47 @@ public static class OracleTriggeredAbilityBinder
         + @"target\s+opponent\s+creates\s+a\s+1/1\s+colorless\s+spirit\s+creature\s+token",
         RegexOptions.IgnoreCase);
 
+    // Glimmervoid (Mirrodin): "At the beginning of the end step, if you control
+    // no artifacts, sacrifice this land." (CR 603.4 — intervening-if end-step
+    // trigger.) This is a LAND — only this binder binds it in prod. The
+    // EndStepLine regex above requires "your"/"each player's"/nothing after
+    // "of"; Glimmervoid reads "of the end step", so it is matched separately
+    // here as a whole-text pattern. The intervening-if ("you control no
+    // artifacts") is checked at trigger time AND at resolution (CR 603.4); the
+    // effect sacrifices Glimmervoid (Battlefield → owner's graveyard, CR
+    // 701.16). Ports GlimmervoidFactory's end-step sac trigger.
+    private static readonly Regex EndStepIfNoArtifactsSacSelf = new(
+        @"at\s+the\s+beginning\s+of\s+(?:the\s+|your\s+|each\s+player'?s\s+)?end\s+step\s*,\s*"
+        + @"if\s+you\s+control\s+no\s+artifacts\s*,\s*sacrifice\s+(?:~|this\s+land|this\s+permanent)",
+        RegexOptions.IgnoreCase);
+
+    // Abraded Bluffs (Outlaws of Thunder Junction): "When this land enters, it
+    // deals N damage to target opponent." ETB damage to an opponent (CR
+    // 119.1d). This is a LAND — only this binder binds it in prod. The existing
+    // DealDamageOpponent regex handles "that player|any opponent" but not
+    // "target opponent"; this whole-text pattern captures the Abraded Bluffs
+    // wording. First-opponent resolution (binder posture — same as Piranha
+    // Marsh / Sunscorched Desert). Ports AbradedBluffsFactory's ETB damage.
+    private static readonly Regex EtbDealsDamageToTargetOpponent = new(
+        @"When\s+(?:~|this\s+land|this\s+permanent)\s+enters\s*,\s*it\s+deals\s+"
+        + @"(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+target\s+opponent",
+        RegexOptions.IgnoreCase);
+
+    // Witch's Cottage (Throne of Eldraine): "When this land enters untapped,
+    // you may put target creature card from your graveyard on top of your
+    // library." (CR 603.6e.) An ENTERS-UNTAPPED trigger — distinct from the
+    // generic EtbLine (which fires on any enter). This is a LAND — only this
+    // binder binds it in prod. The condition fires on CardMovedEvent →
+    // Battlefield for this card, gated on the land being UNtapped at
+    // event-publish time (ZoneService applies the enters-tapped intent BEFORE
+    // publishing, so !IsTapped faithfully distinguishes the untapped entry).
+    // The recur effect reuses the existing PutCreatureFromGraveyardOnTop branch
+    // in BuildEffects. Ports WitchsCottageFactory's enters-untapped recur.
+    private static readonly Regex EntersUntappedRecurCreature = new(
+        @"When\s+(?:~|this\s+land|this\s+permanent)\s+enters\s+untapped\s*,\s*"
+        + @"(?<effect>you\s+may\s+put\s+target\s+creature\s+card\s+from\s+your\s+graveyard\s+on\s+top\s+of\s+your\s+library)",
+        RegexOptions.IgnoreCase);
+
     private static readonly Regex GoblinGuideFullPattern = new(
         @"whenever\s+(?:~|this\s+creature)\s+attacks\s*,\s*defending\s+player\s+reveals\s+the\s+top\s+card\s+of\s+(?:their|that\s+player'?s)\s+library\.?\s*if\s+it'?s\s+a\s+land(?:\s+card)?\s*,\s*(?:that\s+player|they)\s+puts?\s+it\s+into\s+(?:their|that\s+player'?s)\s+hand",
         RegexOptions.IgnoreCase);
@@ -558,6 +599,96 @@ public static class OracleTriggeredAbilityBinder
                 source, ctrl,
                 Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.StepStateType.End),
                 effects: effects);
+        }
+
+        // Glimmervoid: "At the beginning of the end step, if you control no
+        // artifacts, sacrifice this land." (CR 603.4 — intervening if.) Fires
+        // on the controller's own end step. The intervening-if predicate
+        // ("you control no artifacts") is read at trigger time AND re-checked
+        // at resolution; the effect sacrifices the source to its owner's
+        // graveyard (CR 701.16). Glimmervoid itself is a Land, not an Artifact,
+        // so it doesn't count toward "no artifacts".
+        foreach (Match _gv in EndStepIfNoArtifactsSacSelf.Matches(text))
+        {
+            if (source is not Permanent gvSelf) break;
+
+            bool ControllerHasNoArtifacts()
+            {
+                var c = gvSelf.Controller ?? ctrl;
+                foreach (var permanent in c.Zones.Battlefield.GetCards())
+                    if (permanent.HasType(CardType.Artifact)) return false;
+                return true;
+            }
+
+            var sacEffect = new Effect(
+                "~: sacrifice if you control no artifacts at end step",
+                () =>
+                {
+                    // CR 603.4 — re-check the intervening-if at resolution.
+                    if (!ControllerHasNoArtifacts()) return;
+                    if (gvSelf.Zone != ZoneType.Battlefield) return;
+                    var holder = gvSelf.Controller ?? ctrl;
+                    var graveyardOwner = gvSelf.Owner ?? ctrl;
+                    holder.Zones.Battlefield.RemoveCard(gvSelf);
+                    graveyardOwner.Zones.Graveyard.AddCard(gvSelf);
+                    gvSelf.SetZone(ZoneType.Graveyard);
+                });
+
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.StepStateType.End),
+                effects: new IEffect[] { sacEffect },
+                interveningIf: ControllerHasNoArtifacts,
+                activeZones: new[] { ZoneType.Battlefield });
+            break; // one trigger per card
+        }
+
+        // Abraded Bluffs: "When this land enters, it deals N damage to target
+        // opponent." (CR 119.1d.) First-opponent resolution (binder posture —
+        // same as Piranha Marsh / Sunscorched Desert). The damage goes to the
+        // first opponent via Fx.DealDamageAny; no opponent → clean no-op.
+        foreach (Match m in EtbDealsDamageToTargetOpponent.Matches(text))
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            if (n <= 0) continue;
+            var players = allPlayers;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnEnterBattlefieldSelf(source),
+                effects: new IEffect[]
+                {
+                    new Effect($"~: deal {n} damage to target opponent", () =>
+                    {
+                        var youController = (source as Permanent)?.Controller ?? ctrl;
+                        var opponent =
+                            players?.FirstOrDefault(p => !ReferenceEquals(p, youController));
+                        if (opponent == null) return;
+                        Majik.Core.Primitives.Fx.DealDamageAny(opponent, n);
+                    }),
+                },
+                activeZones: new[] { ZoneType.Battlefield });
+            break; // one ETB-damage trigger per card
+        }
+
+        // Witch's Cottage: "When this land enters untapped, you may put target
+        // creature card from your graveyard on top of your library." (CR
+        // 603.6e.) An ENTERS-UNTAPPED trigger (CardMovedEvent → Battlefield for
+        // this card, gated on !IsTapped at publish time — ZoneService applies
+        // the enters-tapped intent before publishing). The recur reuses the
+        // existing PutCreatureFromGraveyardOnTop branch in BuildEffects.
+        foreach (Match m in EntersUntappedRecurCreature.Matches(text))
+        {
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
+            if (effects.Count == 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+                    ReferenceEquals(e.Card, source)
+                    && e.ToZone == ZoneType.Battlefield
+                    && source is Permanent p && !p.IsTapped),
+                effects: effects,
+                activeZones: new[] { ZoneType.Battlefield });
+            break; // one trigger per card
         }
 
         // Landfall — "Whenever a land enters [the battlefield under your
