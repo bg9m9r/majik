@@ -18,10 +18,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Unit tests for <see cref="StormbreathDragonFactory"/> (Theros, {3}{R}{R}).
 ///
 /// Creature — Dragon 4/4. Oracle text:
-///   "Flying. Haste. Protection from white.
-///    Monstrosity 3.
-///    When Stormbreath Dragon becomes monstrous, if you have seven or
-///    more cards in hand, it deals 3 damage to each opponent."
+///   "Flying, haste, protection from white
+///    {5}{R}{R}: Monstrosity 3.
+///    When this creature becomes monstrous, it deals damage to each
+///    opponent equal to the number of cards in that player's hand."
 ///
 /// Covers:
 ///   - Identity / shape / NamedCardFactory dispatch.
@@ -29,8 +29,9 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Protection from white via Rules.Protection.HasProtectionFromColor.
 ///   - Monstrosity activation places three +1/+1 counters + flips the
 ///     monstrous flag; second activation no-ops.
-///   - Becomes-monstrous trigger fires 3-damage-each-opponent IFF hand
-///     size ≥ 7.
+///   - Becomes-monstrous trigger deals each opponent damage equal to
+///     THAT opponent's own hand size (per-opponent variable; no
+///     hand-size threshold).
 /// </summary>
 [Trait("Color", "R")]
 public class StormbreathDragonFactoryTests
@@ -137,39 +138,64 @@ public class StormbreathDragonFactoryTests
     // Becomes-monstrous trigger
     // -------------------------------------------------------------------------
 
-    [Fact]
-    public void BecomesMonstrous_HandSizeSeven_DealsThreeToEachOpponent()
+    private static void FillHand(Player p, int count)
     {
-        var dragon = StormbreathDragonFactory.Create(_alice, opponentsResolver: () => new[] { _bob });
-
-        // Fill Alice's hand to 7 cards (vanilla shells).
-        for (var i = 0; i < 7; i++)
+        for (var i = 0; i < count; i++)
         {
             var c = new Card($"Filler{i}", "");
-            c.SetOwner(_alice);
-            _alice.Zones.Hand.AddCard(c);
+            c.SetOwner(p);
+            p.Zones.Hand.AddCard(c);
         }
+    }
 
+    [Fact]
+    public void BecomesMonstrous_DealsEachOpponentDamageEqualToTheirOwnHandSize()
+    {
+        var carol = new Player("Carol", 20);
+        var dragon = StormbreathDragonFactory.Create(
+            _alice, opponentsResolver: () => new[] { _bob, carol });
+
+        // Bob holds 4 cards, Carol holds 2 — each opponent takes damage
+        // equal to THAT player's hand size (per-opponent variable).
+        FillHand(_bob, 4);
+        FillHand(carol, 2);
+
+        var bobLifeBefore = _bob.LifeTotal;
+        var carolLifeBefore = carol.LifeTotal;
+
+        var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
+        foreach (var e in monstrosity.Effects) e.Execute();
+
+        _bob.LifeTotal.Should().Be(bobLifeBefore - 4, "Bob held 4 cards");
+        carol.LifeTotal.Should().Be(carolLifeBefore - 2, "Carol held 2 cards");
+    }
+
+    [Fact]
+    public void BecomesMonstrous_OpponentWithEmptyHand_TakesNoDamage()
+    {
+        var dragon = StormbreathDragonFactory.Create(
+            _alice, opponentsResolver: () => new[] { _bob });
+
+        // Bob's hand is empty — zero cards means zero damage (CR 701.31
+        // damage = the number of cards in that player's hand). No
+        // hand-size threshold gate exists in the current oracle.
         var bobLifeBefore = _bob.LifeTotal;
 
         var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
         foreach (var e in monstrosity.Effects) e.Execute();
 
-        _bob.LifeTotal.Should().Be(bobLifeBefore - StormbreathDragonFactory.BecomesMonstrousDamage);
+        _bob.LifeTotal.Should().Be(bobLifeBefore, "Bob had no cards in hand");
     }
 
     [Fact]
-    public void BecomesMonstrous_HandSizeUnderSeven_DoesNotDeal()
+    public void BecomesMonstrous_ControllerHandSize_DoesNotMatter()
     {
-        var dragon = StormbreathDragonFactory.Create(_alice, opponentsResolver: () => new[] { _bob });
+        // The damage keys off each OPPONENT's hand, never the controller's.
+        // Stuff Alice's (controller) hand; Bob's empty — Bob still takes 0.
+        var dragon = StormbreathDragonFactory.Create(
+            _alice, opponentsResolver: () => new[] { _bob });
 
-        // Only 6 cards in hand — intervening-if fails (CR 603.6c).
-        for (var i = 0; i < 6; i++)
-        {
-            var c = new Card($"Filler{i}", "");
-            c.SetOwner(_alice);
-            _alice.Zones.Hand.AddCard(c);
-        }
+        FillHand(_alice, 7);
 
         var bobLifeBefore = _bob.LifeTotal;
 
@@ -177,22 +203,39 @@ public class StormbreathDragonFactoryTests
         foreach (var e in monstrosity.Effects) e.Execute();
 
         _bob.LifeTotal.Should().Be(bobLifeBefore,
-            "intervening-if fails at 6 cards — no damage even though monstrous flips");
+            "controller hand size is irrelevant under the current oracle");
+    }
+
+    [Fact]
+    public void BecomesMonstrous_OnlyFiresOnce_SecondActivationNoOp()
+    {
+        // CR 701.31 — monstrosity does nothing if the creature is already
+        // monstrous, so the becomes-monstrous trigger does not re-fire.
+        var dragon = StormbreathDragonFactory.Create(
+            _alice, opponentsResolver: () => new[] { _bob });
+
+        FillHand(_bob, 3);
+
+        var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
+        foreach (var e in monstrosity.Effects) e.Execute(); // becomes monstrous → 3 damage
+
+        var bobLifeAfterFirst = _bob.LifeTotal;
+        bobLifeAfterFirst.Should().Be(20 - 3);
+
+        foreach (var e in monstrosity.Effects) e.Execute(); // already monstrous → no-op
+
+        _bob.LifeTotal.Should().Be(bobLifeAfterFirst,
+            "already monstrous — monstrosity (and its trigger) does nothing");
     }
 
     [Fact]
     public void BecomesMonstrous_NoOpponentsResolver_NoOp()
     {
         // Single-arg overload — no opponents resolver, no damage even
-        // when the hand threshold is met (defensive — shape-only tests).
+        // when opponents hold cards (defensive — shape-only tests).
         var dragon = StormbreathDragonFactory.Create(_alice);
 
-        for (var i = 0; i < 7; i++)
-        {
-            var c = new Card($"Filler{i}", "");
-            c.SetOwner(_alice);
-            _alice.Zones.Hand.AddCard(c);
-        }
+        FillHand(_bob, 5);
 
         var bobLifeBefore = _bob.LifeTotal;
 
