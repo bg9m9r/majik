@@ -58,7 +58,9 @@ internal sealed class SearchStrategy : IBotStrategy
     {
         ArgumentNullException.ThrowIfNull(config);
         _heuristic = new HeuristicStrategy(config);
-        _weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
+        // WeightsOverride: use explicit vector when provided; fall back to the
+        // archetype lookup so default behavior is completely unchanged.
+        _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
         var sim = new EngineSimulator(_weights);
         _mcts = new Mcts(sim, ConfigFrom(config));

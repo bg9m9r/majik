@@ -21,7 +21,9 @@ internal sealed class HeuristicStrategy : IBotStrategy
 
     public HeuristicStrategy(BotConfig config)
     {
-        _weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
+        // WeightsOverride: use explicit vector when provided; fall back to the
+        // archetype lookup so default behavior is completely unchanged.
+        _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _sink = config.DecisionSink ?? NullBotDecisionSink.Instance;
         _vanillaTracker = config.VanillaShellTracker;
         _priority = new PriorityPolicy(_weights, _sink, _vanillaTracker);
