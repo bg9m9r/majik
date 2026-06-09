@@ -101,25 +101,22 @@ public static class KozileksReturnFactory
     public const string DevoidKeyword = "Devoid";
 
     /// <summary>Build Kozilek's Return shape-only (no trigger registration).</summary>
-    public static Instant Create(Player owner) => Create(owner, triggers: null, playerResolver: null);
+    public static Instant Create(Player owner) => Create(owner, triggers: null);
 
     /// <summary>
     /// Build Kozilek's Return from the embedded JSON, stamp Devoid, and
-    /// attach the graveyard-recursion triggered ability.
+    /// attach the graveyard-recursion triggered ability. The "5 damage to each
+    /// creature" recursion sweep reads every player from the LIVE resolution
+    /// context (<c>ctx.Game.AllPlayers</c>) at resolution — no captured player
+    /// resolver, so it is correct on the production routed build (mirrors
+    /// #2551); with no live game context it falls back to the controller alone.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">When supplied, the recursion trigger registers
     /// so <see cref="SpellCastEvent"/> drives it automatically (CR 603.2).</param>
-    /// <param name="playerResolver">Supplies the full player list the
-    /// recursion sweep should reach (every player whose battlefield is
-    /// scanned). The engine has no global player registry, so the caller
-    /// injects this the same way <see cref="FalkenrathNobleFactory"/>
-    /// injects its opponent resolver. When null the sweep falls back to the
-    /// controller alone (single-seat shape posture).</param>
     public static Instant Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? playerResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -143,13 +140,20 @@ public static class KozileksReturnFactory
 
         var recursionEffect = new Effect(
             $"{CardName}: may exile from graveyard to deal {RecursionDamage} to each creature",
-            () =>
+            ctx =>
             {
-                var players = playerResolver?.Invoke() ?? new[] { owner };
+                // "5 damage to each creature" — across every player's
+                // battlefield, read from the LIVE game at resolution
+                // (ctx.Game.AllPlayers). No captured resolver, so the sweep is
+                // correct on the routed prod build; shape-only resolves fall
+                // back to the controller.
+                var players = ctx.Game?.AllPlayers ?? new[] { owner };
                 foreach (var ef in BuildGraveyardRecursionEffect(card, owner, players))
                 {
                     ef.Execute();
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var recursionTrigger = new TriggeredAbility(

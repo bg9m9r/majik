@@ -106,20 +106,20 @@ public static class EtaliPrimalStormFactory
     public static Creature Create(Player owner) =>
         Create(owner,
             triggers: null,
-            allPlayersResolver: null,
             chooseSpells: null,
             onAttackResolved: null);
 
     /// <summary>
-    /// Construct Etali, Primal Storm with optional runtime wiring.
+    /// Construct Etali, Primal Storm with optional runtime wiring. The attack
+    /// trigger exiles the top card of EACH player's library — players read from
+    /// the LIVE resolution context (<c>ctx.Game.AllPlayers</c>) at resolution,
+    /// so it is correct on the production routed build (mirrors #2551). With no
+    /// live game context only the controller's library is exiled from.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">When supplied, the attack trigger is
     /// registered so a <see cref="CreatureAttacksEvent"/> for this card
     /// lands on the stack automatically.</param>
-    /// <param name="allPlayersResolver">Closure returning every player
-    /// at trigger-resolution time. When null, only the controller's
-    /// library is exiled from (degraded behaviour).</param>
     /// <param name="chooseSpells">Picker invoked with the eligible
     /// nonland pile. Returns the subset to cast for free. Default =
     /// every eligible card (auto-accept "any number"). Tests / bots
@@ -132,7 +132,6 @@ public static class EtaliPrimalStormFactory
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>>? chooseSpells = null,
         Action<Result>? onAttackResolved = null)
     {
@@ -158,10 +157,11 @@ public static class EtaliPrimalStormFactory
         // ----------------------------------------------------------------
         var attackEffect = new Effect(
             $"{CardName}: exile top of each library, may cast nonland cards for free",
-            () =>
+            ctx =>
             {
-                var result = ResolveAttack(owner, allPlayersResolver, chooseSpells);
+                var result = ResolveAttack(owner, ctx.Game?.AllPlayers, chooseSpells);
                 onAttackResolved?.Invoke(result);
+                return ValueTask.CompletedTask;
             });
 
         var attackTrigger = new TriggeredAbility(
@@ -188,13 +188,13 @@ public static class EtaliPrimalStormFactory
     /// </summary>
     public static Result ResolveAttack(
         Player controller,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        IReadOnlyList<Player>? allPlayers,
         Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>>? chooseSpells = null)
     {
         ArgumentNullException.ThrowIfNull(controller);
         chooseSpells ??= static pile => pile;
 
-        var players = allPlayersResolver?.Invoke()
+        var players = allPlayers
             ?? (IReadOnlyList<Player>)new[] { controller };
 
         var exiled = new List<ICard>(players.Count);

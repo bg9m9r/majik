@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -183,15 +184,16 @@ public class RelicOfProgenitusTests
         _alice.Zones.Library.AddCard(topCard);
         topCard.SetZone(ZoneType.Library);
 
-        var players = new List<Player> { _alice, _bob };
-        var relic = RelicOfProgenitusFactory.Create(_alice, () => players);
+        var relic = RelicOfProgenitusFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(relic);
         relic.SetZone(ZoneType.Battlefield);
 
         var sweepAbility = relic.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.TargetRequests.Count == 0);
 
-        sweepAbility.Resolve();
+        // Resolve through a live GameContext so the sweep reads
+        // ctx.Game.AllPlayers (the production path) — all graveyards.
+        ContextResolve.Resolve(sweepAbility, _alice, _alice, _bob);
 
         // All graveyard cards are now in Exile.
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty(

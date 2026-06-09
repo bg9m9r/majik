@@ -70,7 +70,7 @@ public static class GoblinWelderFactory
     /// call <see cref="WeldResolve"/> directly.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, zoneService: null, eventBus: null, playerProvider: null);
+        Create(owner, zoneService: null, eventBus: null);
 
     /// <summary>
     /// Construct Goblin Welder with optional runtime services. When
@@ -78,15 +78,17 @@ public static class GoblinWelderFactory
     /// (battlefield → graveyard) and the reanimation (graveyard →
     /// battlefield) are routed through <see cref="ZoneService.MoveCard"/>
     /// so dies / ETB triggers fire on the affected cards (CR 603.6a).
-    /// <paramref name="playerProvider"/> returns the candidate players
-    /// to scan for a legal (battlefield artifact, graveyard artifact)
-    /// pair at resolution time.
+    /// The activated ability scans the candidate players for a legal
+    /// (battlefield artifact, graveyard artifact) pair, reading the players
+    /// from the LIVE resolution context (<c>ctx.Game.AllPlayers</c>) at
+    /// resolution — no captured player provider, so it is correct on the
+    /// production routed build (mirrors #2551). With no live game context the
+    /// effect body no-ops (shape-only paths).
     /// </summary>
     public static Creature Create(
         Player owner,
         ZoneService? zoneService,
-        IEventBus? eventBus,
-        Func<IEnumerable<Player>>? playerProvider)
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -113,11 +115,15 @@ public static class GoblinWelderFactory
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             "Goblin Welder: sacrifice target artifact, reanimate artifact card from same player's graveyard",
-            () =>
+            ctx =>
             {
-                var players = playerProvider?.Invoke();
-                if (players == null) return;
+                // Candidate players read from the LIVE game at resolution
+                // (ctx.Game.AllPlayers). No captured provider, so correct on
+                // the routed prod build; no game → no-op.
+                var players = ctx.Game?.AllPlayers;
+                if (players == null) return ValueTask.CompletedTask;
                 WeldResolve(players, zoneService);
+                return ValueTask.CompletedTask;
             });
 
         var activatedAbility = new ActivatedAbility(

@@ -66,22 +66,14 @@ public static class RatchetBombFactory
     private const string ManaCost = "{2}";
 
     /// <summary>
-    /// Construct Ratchet Bomb with no live runtime wiring; the sweep scans
-    /// only the controller's battlefield. Suitable for shape / dispatcher
-    /// tests.
+    /// Construct Ratchet Bomb. The sweep scans every player's battlefield for
+    /// nonland permanents with mv = charge counters, read from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551). With no live game context the sweep falls back to
+    /// the controller's battlefield (shape-only paths).
     /// </summary>
-    public static Artifact Create(Player owner) =>
-        Create(owner, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Ratchet Bomb. When <paramref name="allPlayersResolver"/> is
-    /// supplied, the sweep scans every player's battlefield for nonland
-    /// permanents with mv = charge counters; otherwise only the controller's
-    /// battlefield is scanned.
-    /// </summary>
-    public static Artifact Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Artifact Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -127,7 +119,7 @@ public static class RatchetBombFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: destroy each nonland permanent with mv = charge counters",
-            () =>
+            ctx =>
             {
                 // Snapshot before the sacrifice — once Ratchet Bomb is in
                 // the graveyard its Counters bag is gone (CR 121.2).
@@ -143,7 +135,9 @@ public static class RatchetBombFactory
                     bomb.SetZone(ZoneType.Graveyard);
                 }
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each nonland permanent" — across every player's battlefield,
+                // read from the LIVE game at resolution (ctx.Game.AllPlayers).
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -169,6 +163,8 @@ public static class RatchetBombFactory
                         v.SetZone(ZoneType.Graveyard);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         bomb.AddAbility(new ActivatedAbility(

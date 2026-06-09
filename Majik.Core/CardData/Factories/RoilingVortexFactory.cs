@@ -107,10 +107,15 @@ public static class RoilingVortexFactory
     /// Suitable for dispatcher / shape tests.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, triggers: null, replacements: null, allPlayersResolver: null);
+        Create(owner, triggers: null, replacements: null);
 
     /// <summary>
-    /// Construct Roiling Vortex with optional runtime services.
+    /// Construct Roiling Vortex with optional runtime services. The upkeep
+    /// "deals 1 damage to each player" effect reads every player from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551); with no live game context the ping drains the
+    /// controller only.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager — when supplied both the
@@ -121,16 +126,10 @@ public static class RoilingVortexFactory
     /// <see cref="LifeGainIntent"/> replacement that rewrites every gain
     /// to zero (CR 614 / 615). Without a bus the static silently
     /// no-ops, matching the Valakut single-arg posture.</param>
-    /// <param name="allPlayersResolver">Optional resolver supplying the
-    /// full table for the upkeep "deals 1 to each player" effect.
-    /// Without one the ping drains the controller only (defensive
-    /// fallback — same convention as Pernicious Deed / Meathook
-    /// Massacre).</param>
     public static Enchantment Create(
         Player owner,
         TriggerManager? triggers,
-        ReplacementBus? replacements,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -146,11 +145,14 @@ public static class RoilingVortexFactory
         // ----------------------------------------------------------------
         var upkeepEffect = new Effect(
             $"{CardName}: at upkeep, deal 1 damage to each player",
-            () =>
+            ctx =>
             {
-                if (card.Zone != ZoneType.Battlefield) return;
+                if (card.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each player" — read every player from the LIVE game at
+                // resolution (ctx.Game.AllPlayers). No captured resolver, so
+                // correct on the routed prod build; no game → controller only.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -158,6 +160,8 @@ public static class RoilingVortexFactory
                     if (p.HasLost) continue;
                     p.LoseLife(1);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var upkeepTrigger = new TriggeredAbility(

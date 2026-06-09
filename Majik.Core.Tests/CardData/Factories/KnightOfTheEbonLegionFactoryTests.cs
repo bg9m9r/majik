@@ -10,6 +10,7 @@ using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -39,9 +40,6 @@ public class KnightOfTheEbonLegionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
-
-    private Func<IReadOnlyList<Player>> AllPlayers()
-        => () => new[] { _alice, _bob };
 
     // ------------------------------------------------------------------
     // Card identity + dispatch
@@ -83,7 +81,7 @@ public class KnightOfTheEbonLegionFactoryTests
         var effects = new ContinuousEffectsService();
         var knight = KnightOfTheEbonLegionFactory.Create(
             _alice, eventBus: null, triggers: null, effects: effects,
-            replacements: null, playerResolver: null);
+            replacements: null);
 
         _alice.Zones.Battlefield.AddCard(knight);
         knight.SetZone(ZoneType.Battlefield);
@@ -122,8 +120,7 @@ public class KnightOfTheEbonLegionFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var knight = KnightOfTheEbonLegionFactory.Create(
-            _alice, bus, triggers, effects: null, replacements: null,
-            playerResolver: AllPlayers());
+            _alice, bus, triggers, effects: null, replacements: null);
         _alice.Zones.Battlefield.AddCard(knight);
         knight.SetZone(ZoneType.Battlefield);
 
@@ -138,7 +135,9 @@ public class KnightOfTheEbonLegionFactoryTests
             "the end-step counter trigger fires when a player lost 4+ life this turn");
 
         triggers.PutPendingTriggersOnStack(_alice);
-        while (stack.Count > 0) stack.Pop()!.Resolve();
+        // Resolve through a live GameContext so the intervening-if reads each
+        // player's LifeLostThisTurn off ctx.Game.AllPlayers (the prod path).
+        while (stack.Count > 0) ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         knight.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
             "a +1/+1 counter is put on the Knight (CR 121.1)");
@@ -152,8 +151,7 @@ public class KnightOfTheEbonLegionFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var knight = KnightOfTheEbonLegionFactory.Create(
-            _alice, bus, triggers, effects: null, replacements: null,
-            playerResolver: AllPlayers());
+            _alice, bus, triggers, effects: null, replacements: null);
         _alice.Zones.Battlefield.AddCard(knight);
         knight.SetZone(ZoneType.Battlefield);
 
@@ -162,7 +160,7 @@ public class KnightOfTheEbonLegionFactoryTests
 
         bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
-        while (stack.Count > 0) stack.Pop()!.Resolve();
+        while (stack.Count > 0) ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         knight.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
             "fewer than 4 life lost → no counter (CR 603.4)");
@@ -176,8 +174,7 @@ public class KnightOfTheEbonLegionFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var knight = KnightOfTheEbonLegionFactory.Create(
-            _alice, bus, triggers, effects: null, replacements: null,
-            playerResolver: AllPlayers());
+            _alice, bus, triggers, effects: null, replacements: null);
         _alice.Zones.Battlefield.AddCard(knight);
         knight.SetZone(ZoneType.Battlefield);
 

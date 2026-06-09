@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -86,8 +87,7 @@ public class PerniciousDeedTests
     {
         var deed = PerniciousDeedFactory.Create(
             _alice,
-            xValueProvider: () => 2,
-            allPlayersResolver: () => new[] { _alice, _bob });
+            xValueProvider: () => 2);
         _alice.Zones.Battlefield.AddCard(deed);
         deed.SetZone(ZoneType.Battlefield);
 
@@ -123,8 +123,10 @@ public class PerniciousDeedTests
         _bob.Zones.Battlefield.AddCard(bobBig);
         bobBig.SetZone(ZoneType.Battlefield);
 
+        // Resolve through a live GameContext so the sweep reads
+        // ctx.Game.AllPlayers (the production path) — both battlefields.
         var ability = deed.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         aliceBear.Zone.Should().Be(ZoneType.Graveyard,
             "Alice's mv-2 creature is destroyed (mv ≤ 2)");
@@ -160,8 +162,7 @@ public class PerniciousDeedTests
     {
         var deed = PerniciousDeedFactory.Create(
             _alice,
-            xValueProvider: () => 0,
-            allPlayersResolver: null);
+            xValueProvider: () => 0);
         _alice.Zones.Battlefield.AddCard(deed);
         deed.SetZone(ZoneType.Battlefield);
 
@@ -178,7 +179,7 @@ public class PerniciousDeedTests
         bird.SetZone(ZoneType.Battlefield);
 
         var ability = deed.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice);
 
         bauble.Zone.Should().Be(ZoneType.Graveyard,
             "mv-0 artifact destroyed at X = 0");
@@ -201,7 +202,7 @@ public class PerniciousDeedTests
         deed.SetZone(ZoneType.Battlefield);
 
         var ability = deed.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice);
 
         deed.Zone.Should().Be(ZoneType.Graveyard,
             "the sacrifice cost moves Pernicious Deed to its owner's graveyard (CR 701.16)");

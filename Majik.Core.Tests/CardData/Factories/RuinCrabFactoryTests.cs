@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -109,8 +110,7 @@ public class RuinCrabFactoryTests
             c.SetZone(ZoneType.Library);
         }
 
-        var crab = RuinCrabFactory.Create(_alice, triggers,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var crab = RuinCrabFactory.Create(_alice, triggers);
         _alice.Zones.Battlefield.AddCard(crab);
         crab.SetZone(ZoneType.Battlefield);
         triggers.BindCard(crab);
@@ -127,7 +127,9 @@ public class RuinCrabFactoryTests
             "landfall trigger must queue when a land enters under the controller's control");
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        // Resolve through a live GameContext so the mill reads its opponents
+        // off ctx.Game.AllPlayers (the production path).
+        ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         // Bob (the opponent) is milled three.
         _bob.Zones.Graveyard.Count.Should().Be(RuinCrabFactory.MillCount);
@@ -143,8 +145,7 @@ public class RuinCrabFactoryTests
     {
         var (zones, _, triggers) = BuildEngine();
 
-        var crab = RuinCrabFactory.Create(_alice, triggers,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var crab = RuinCrabFactory.Create(_alice, triggers);
         _alice.Zones.Battlefield.AddCard(crab);
         crab.SetZone(ZoneType.Battlefield);
         triggers.BindCard(crab);

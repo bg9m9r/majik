@@ -49,7 +49,7 @@ namespace Majik.Core.CardData.Factories;
 /// ## Deferred (v1 gaps)
 /// - <b>Sunburst colour-provenance</b>: the engine does not track
 ///   which colours of mana paid a spell's cost. Use the
-///   <see cref="Create(Player, Func{int}?, Func{IReadOnlyList{Player}}?)"/>
+///   <see cref="Create(Player, Func{int}?)"/>
 ///   overload to supply an X-value provider; the printed cast-time X
 ///   is the natural upper bound when no colour ledger exists.
 /// - <b>"Each nonland permanent" target/regenerate prompts</b>: v1
@@ -72,21 +72,22 @@ public static class EngineeredExplosivesFactory
     /// Suitable for shape / dispatcher tests.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, xValueProvider: null, allPlayersResolver: null);
+        Create(owner, xValueProvider: null);
 
     /// <summary>
     /// Construct Engineered Explosives. When <paramref name="xValueProvider"/>
     /// is supplied, the Sunburst ETB effect adds that many charge counters
     /// when executed (callers wire this to the cast-time X value or a
-    /// colour-provenance ledger). When <paramref name="allPlayersResolver"/>
-    /// is supplied, the activated ability scans every player's battlefield
-    /// for nonland permanents with mv = charge count; otherwise only the
-    /// controller's battlefield is scanned.
+    /// colour-provenance ledger). The activated ability scans every player's
+    /// battlefield for nonland permanents with mv = charge count, read from the
+    /// live resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on both the shape build and
+    /// the routed prod build (mirrors #2551). With no live game context the
+    /// sweep falls back to the controller's battlefield (shape-only paths).
     /// </summary>
     public static Artifact Create(
         Player owner,
-        Func<int>? xValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        Func<int>? xValueProvider)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -133,15 +134,16 @@ public static class EngineeredExplosivesFactory
         //   no-op stub at the engine level (see Mishra's Bauble); the
         //   effect closure performs the zone move so visible state matches
         //   CR 701.16.
-        // - Effect: iterate every battlefield (resolver-supplied; falls
-        //   back to controller-only when no resolver), destroy nonland
+        // - Effect: iterate every battlefield (read from the live resolution
+        //   context — ctx.Game.AllPlayers — at resolution; falls back to
+        //   controller-only when no live game), destroy nonland
         //   permanents whose mana value equals the charge count. Tokens
         //   and copies are caught by the same predicate (token mv is its
         //   printed mana cost's converted value — CR 110.5a).
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             "Engineered Explosives: destroy each nonland permanent with mv = charge counters",
-            () =>
+            ctx =>
             {
                 var target = card.Counters.Count(CounterType.Charge);
 
@@ -154,7 +156,11 @@ public static class EngineeredExplosivesFactory
                     card.SetZone(ZoneType.Graveyard);
                 }
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each nonland permanent" — across every player's battlefield,
+                // read from the LIVE game at resolution (ctx.Game.AllPlayers).
+                // No captured resolver, so the sweep is correct on the routed
+                // prod build. Shape-only resolves fall back to the controller.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -177,6 +183,8 @@ public static class EngineeredExplosivesFactory
                         v.SetZone(ZoneType.Graveyard);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var ability = new ActivatedAbility(

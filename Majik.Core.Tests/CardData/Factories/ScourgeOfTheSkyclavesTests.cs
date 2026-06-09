@@ -11,6 +11,7 @@ using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Spells;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -189,7 +190,9 @@ public class ScourgeOfTheSkyclavesTests
         triggers.PendingCount.Should().BeGreaterThanOrEqualTo(1,
             "kicked → intervening-if true → cast trigger queues");
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        // Resolve through a live GameContext so the each-player half-life loss
+        // reads ctx.Game.AllPlayers (the production path).
+        ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _alice.LifeTotal.Should().Be(10, "20 - ceil(20/2) = 10");
         _bob.LifeTotal.Should().Be(7, "15 - ceil(15/2) = 15 - 8 = 7");

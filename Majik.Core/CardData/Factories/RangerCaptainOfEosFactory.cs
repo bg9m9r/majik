@@ -98,15 +98,16 @@ public static class RangerCaptainOfEosFactory
     /// dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
     /// Construct Ranger-Captain of Eos with optional runtime services.
-    /// When <paramref name="opponentResolver"/> is supplied, the
-    /// sacrifice activated ability registers a turn-scoped
-    /// noncreature-spell restriction against each opponent on resolve.
-    /// When <paramref name="eventBus"/> is supplied, a one-shot
-    /// <see cref="TurnEndedEvent"/> handler clears the restriction at
+    /// The sacrifice activated ability registers a turn-scoped
+    /// noncreature-spell restriction against each opponent read from the LIVE
+    /// resolution context (<c>ContextOpponents.Of</c>) at resolution — no
+    /// captured opponent resolver, so it is correct on the production routed
+    /// build (mirrors #2551). When <paramref name="eventBus"/> is supplied, a
+    /// one-shot <see cref="TurnEndedEvent"/> handler clears the restriction at
     /// end of turn (CR 514.2). When <paramref name="triggers"/> is
     /// supplied, the ETB tutor trigger is registered so a
     /// <see cref="CardMovedEvent"/> to the battlefield places it on the
@@ -114,7 +115,6 @@ public static class RangerCaptainOfEosFactory
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -191,7 +191,7 @@ public static class RangerCaptainOfEosFactory
         // ----------------------------------------------------------------
         var sacEffect = new Effect(
             $"{CardName}: sacrifice self, then opponents can't cast noncreature spells this turn",
-            () =>
+            ctx =>
             {
                 // ---- Sacrifice self (CR 701.16) ----
                 if (card.Zone == ZoneType.Battlefield)
@@ -203,14 +203,16 @@ public static class RangerCaptainOfEosFactory
                 }
 
                 // ---- Register the turn-scoped noncreature restriction ----
-                if (opponentResolver == null) return;
-                var opponents = opponentResolver();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                // "Your opponents" — read from the LIVE resolution context
+                // (ContextOpponents.Of, CR 102.1). No captured resolver, so
+                // correct on the routed prod build.
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opp == null) continue;
                     CastingRestrictions.AddNoncreatureSpellRestrictionForTurn(opp);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var sacAbility = new ActivatedAbility(

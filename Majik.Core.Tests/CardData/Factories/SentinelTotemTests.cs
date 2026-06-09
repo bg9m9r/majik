@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -163,13 +164,14 @@ public class SentinelTotemTests
         _bob.Zones.Graveyard.AddCard(bobCard2);
         bobCard2.SetZone(ZoneType.Graveyard);
 
-        var players = new List<Player> { _alice, _bob };
-        var totem = SentinelTotemFactory.Create(_alice, () => players);
+        var totem = SentinelTotemFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(totem);
         totem.SetZone(ZoneType.Battlefield);
 
         var sweep = totem.Abilities.OfType<ActivatedAbility>().Single();
-        sweep.Resolve();
+        // Resolve through a live GameContext so the sweep reads
+        // ctx.Game.AllPlayers (the production path) — all graveyards.
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         // All graveyard cards are now in Exile.
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
