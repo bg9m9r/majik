@@ -70,6 +70,16 @@ namespace Majik.Bot;
 /// games are slow (e.g., because the sandbox heuristic hits the priority-loop
 /// safety on unimplemented cards). The combat search (DeclareAttackers /
 /// DeclareBlockers) is unaffected by this flag.</para>
+///
+/// <para><c>OpponentArchetype</c> optional. When set to a known archetype name
+/// (a key in <see cref="Decks.BotDeckCatalog"/>), <see cref="Search.SearchStrategy"/>
+/// runs <em>determinized</em> MCTS: the search samples the opponent's hidden zones
+/// from that archetype's decklist across K worlds and votes by summed robust child
+/// (see <see cref="Search.DeterminizedSearch"/>). When null (the default), the bot
+/// uses today's perfect-info single-tree search — the opponent's hidden zones are
+/// left exactly as captured. Null is the production-safe default: an unknown
+/// opponent must NOT route through determinization, which would invent a wrong
+/// hidden world.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -82,4 +92,5 @@ public sealed record BotConfig(
     int? MaxMctsIterations = null,
     int? MaxMctsBudgetMs = null,
     bool PrioritySearchEnabled = true,
-    ArchetypeWeights? WeightsOverride = null);
+    ArchetypeWeights? WeightsOverride = null,
+    string? OpponentArchetype = null);

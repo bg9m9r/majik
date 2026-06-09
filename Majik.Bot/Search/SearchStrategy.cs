@@ -1,4 +1,5 @@
 using Majik.Bot.Combat;
+using Majik.Bot.Decks;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
 using Majik.Core.Abilities;
@@ -34,8 +35,49 @@ internal sealed class SearchStrategy : IBotStrategy
 {
     private readonly HeuristicStrategy _heuristic;
     private readonly Mcts _mcts;
+
+    /// <summary>
+    /// The Mcts used for the K-world determinized loop, bounded PER WORLD to
+    /// <see cref="PerWorldBudgetMs"/> (and a proportionally-scaled iteration cap)
+    /// so K worlds × per-world ≈ the configured total budget. Non-null only when
+    /// <see cref="_opponentDecklist"/> is set; the perfect-info path always uses the
+    /// original <see cref="_mcts"/> and is unaffected by this instance.
+    /// </summary>
+    private readonly Mcts? _determinizedMcts;
+
     private readonly ArchetypeWeights _weights;
     private readonly bool _prioritySearchEnabled;
+
+    /// <summary>
+    /// The opponent's decklist when their archetype is known
+    /// (<see cref="BotConfig.OpponentArchetype"/>), else null. Non-null selects
+    /// the determinized K-world search path in <see cref="SearchRoot"/>; null keeps
+    /// today's perfect-info single-tree search.
+    /// </summary>
+    private readonly IReadOnlyList<string>? _opponentDecklist;
+
+    /// <summary>Total search budget (ms) handed to the K-world driver.</summary>
+    private readonly int _totalBudgetMs;
+
+    /// <summary>Reproducible base world seed for determinized sampling.</summary>
+    private readonly int _baseSeed;
+
+    /// <summary>
+    /// Per-world budget (ms) for the determinized driver. The total budget is
+    /// split across K worlds (K = round(total / perWorld), clamped 1..kMax inside
+    /// <see cref="DeterminizedSearch"/>), so a larger total yields more worlds, not
+    /// longer per-world searches. 400 ms matches <see cref="DeterminizedSearch.Run"/>'s
+    /// default and gives a sensible 1..few worlds at the production 1500 ms total.
+    ///
+    /// <para>
+    /// Each per-world <see cref="Mcts.SearchWithStats"/> call is ALSO bounded to this
+    /// value (see <see cref="_determinizedMcts"/> / <see cref="DeterminizedConfigFrom"/>),
+    /// so the K worlds genuinely SPLIT the total budget — total wall-clock ≈
+    /// K × PerWorldBudgetMs ≈ the configured total (modulo the K clamp). It does NOT
+    /// run K full-budget searches.
+    /// </para>
+    /// </summary>
+    private const int PerWorldBudgetMs = 400;
 
     /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
@@ -54,6 +96,37 @@ internal sealed class SearchStrategy : IBotStrategy
         DepthTurns: 1,
         ExplorationC: 1.41);
 
+    /// <summary>
+    /// Derive the PER-WORLD MctsConfig for the determinized K-world loop from the
+    /// perfect-info <paramref name="full"/> config. Both bounds present in
+    /// <see cref="MctsConfig"/> are split so K worlds genuinely divide the total
+    /// budget instead of each running the full search:
+    /// <list type="bullet">
+    ///   <item><c>MaxMillis</c> → <paramref name="perWorldBudgetMs"/> (the wall-clock
+    ///     bound; K worlds × perWorld ≈ full.MaxMillis since K ≈ full.MaxMillis/perWorld).</item>
+    ///   <item><c>MaxIterations</c> → scaled by the <c>perWorld / total</c> fraction
+    ///     (min 1) so an iteration-bounded config also splits across worlds rather
+    ///     than running the full iteration count K times.</item>
+    /// </list>
+    /// <c>DepthTurns</c> / <c>ExplorationC</c> are preserved unchanged.
+    /// </summary>
+    internal static MctsConfig DeterminizedConfigFrom(MctsConfig full, int perWorldBudgetMs)
+    {
+        // Iteration split: same perWorld/total fraction as the time split, floored at 1
+        // so a tiny budget still searches at least one iteration per world.
+        var total = full.MaxMillis;
+        var scaledIterations = total <= 0
+            ? full.MaxIterations
+            : Math.Max(1, (int)Math.Round((double)full.MaxIterations * perWorldBudgetMs / total));
+
+        // preserves: DepthTurns, ExplorationC; splits: MaxMillis, MaxIterations
+        return full with
+        {
+            MaxMillis = perWorldBudgetMs,
+            MaxIterations = scaledIterations,
+        };
+    }
+
     public SearchStrategy(BotConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -62,8 +135,57 @@ internal sealed class SearchStrategy : IBotStrategy
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
+        var mctsConfig = ConfigFrom(config);
         var sim = new EngineSimulator(_weights);
-        _mcts = new Mcts(sim, ConfigFrom(config));
+        _mcts = new Mcts(sim, mctsConfig);
+
+        // OpponentArchetype: resolve the decklist ONCE up front. A known archetype
+        // selects determinized search; null = perfect-info (the production-safe
+        // default). An unknown name throws here (BotDeckCatalog.Get) so a typo
+        // fails fast at construction rather than silently degrading to perfect-info.
+        _opponentDecklist = config.OpponentArchetype is { } a
+            ? BotDeckCatalog.Get(a)
+            : null;
+
+        // Determinized total budget reuses the same wall-clock budget the MCTS
+        // config already computes (MaxMctsBudgetMs ?? 1500). The K-world driver
+        // splits this total across worlds via PerWorldBudgetMs, and the per-world
+        // Mcts it runs (_determinizedMcts) is bounded to PerWorldBudgetMs PER WORLD
+        // (not the full total), so K worlds × per-world ≈ the total budget — NOT
+        // K full searches. Built only in determinized mode; the perfect-info path
+        // keeps using _mcts untouched.
+        _totalBudgetMs = mctsConfig.MaxMillis;
+        _determinizedMcts = _opponentDecklist is null
+            ? null
+            : new Mcts(sim, DeterminizedConfigFrom(mctsConfig, PerWorldBudgetMs));
+
+        // Fixed, config-derived base seed → determinized runs are reproducible.
+        _baseSeed = config.RandomSeed;
+    }
+
+    /// <summary>
+    /// Runs the root search: determinized K-world search when the opponent's
+    /// archetype is known, else today's perfect-info single-tree
+    /// <see cref="Mcts.Search"/>. Returns a <see cref="SimMove"/> of the SAME shape
+    /// either way — a representative move carrying sandbox object refs — so the
+    /// callers' existing InstanceId / Player.Id remap handles both paths unchanged.
+    /// </summary>
+    private SimMove SearchRoot(SimState root)
+    {
+        if (_opponentDecklist is { } deck)
+        {
+            var determinized = root.WithDeterminization(deck, worldSeed: _baseSeed);
+            // _determinizedMcts is bounded to PerWorldBudgetMs PER WORLD, so the
+            // K-world loop SPLITS the total budget (K × per-world ≈ total) instead
+            // of running K full-budget searches.
+            return DeterminizedSearch.Run(
+                _determinizedMcts!,   // non-null whenever _opponentDecklist is set
+                determinized,
+                totalBudgetMs: _totalBudgetMs,
+                perWorldBudgetMs: PerWorldBudgetMs);
+        }
+
+        return _mcts.Search(root);   // perfect-info, unchanged
     }
 
     // ── Combat decisions — run the search ─────────────────────────────────────
@@ -88,7 +210,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = _mcts.Search(root);
+            chosen = SearchRoot(root);
         }
         catch
         {
@@ -251,7 +373,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = _mcts.Search(root);
+            chosen = SearchRoot(root);
         }
         catch
         {
