@@ -232,9 +232,11 @@ internal sealed class SearchStrategy : IBotStrategy
             var alloc = WorldAllocator.Allocate(belief, k, topM: 4)
                 .Select(x => ((IReadOnlyList<string>)BotDeckCatalog.Get(x.Archetype), x.Worlds))
                 .ToList();
-            // Safety: an empty belief (e.g. zero public cards → no allocation) must NOT
-            // route through RunBelief (which requires a non-empty allocation). Fall back
-            // to perfect-info search rather than inventing a world.
+            // Defensive: Infer always returns a normalized belief (the metagame prior when
+            // no public cards are seen) and KFor is always >= 1, so a non-empty allocation
+            // is the norm — this guard only fires if the archetype catalog is empty or k<=0.
+            // Fall back to perfect-info search rather than routing an empty allocation
+            // through RunBelief (which requires a non-empty one).
             if (alloc.Count == 0) return _mcts.Search(root);
             return DeterminizedSearch.RunBelief(
                 _determinizedMcts!,   // non-null whenever _inferOpponent is true
