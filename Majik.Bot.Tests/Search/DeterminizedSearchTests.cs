@@ -25,6 +25,7 @@ public class DeterminizedSearchTests
     [InlineData(100, 400, 8, 1)]    // clamp low: round(0.25) = 0 → clamp to 1
     [InlineData(99999, 400, 8, 8)]  // clamp high: 250 → clamp to 8
     [InlineData(400, 400, 8, 1)]    // 400/400 = 1
+    [InlineData(1000, 400, 8, 2)]   // 1000/400 = 2.5 → banker's rounding round(2.5) = 2
     public void KFor_ComputesAdaptiveClampedK(int totalMs, int perWorldMs, int kMax, int expected)
     {
         DeterminizedSearch.KFor(totalMs, perWorldMs, kMax).Should().Be(expected);
@@ -157,6 +158,32 @@ public class DeterminizedSearchTests
             3,
             PhaseStateType.PreCombatMain,
             searchedSeat: alice);
+
+        var act = () => DeterminizedSearch.Run(BuildMcts(), root, totalBudgetMs: 1600);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Run_OnWorldSeededButUndeterminizedRoot_Throws()
+    {
+        // Covers the second arm of the guard's `||`: WorldSeed set but
+        // OpponentDecklist null. WithWorldSeed on a perfect-info root sets the seed
+        // while leaving the decklist null (it merely preserves the existing null),
+        // so the root is "seeded but not determinized" — Run must still reject it.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var root = SimState.Capture(
+            new[] { alice, bob },
+            alice,
+            3,
+            PhaseStateType.PreCombatMain,
+            searchedSeat: alice)
+            .WithWorldSeed(5);
+
+        root.WorldSeed.Should().Be(5, "WithWorldSeed sets the seed");
+        root.OpponentDecklist.Should().BeNull(
+            "WithWorldSeed preserves the (null) decklist on a perfect-info root");
 
         var act = () => DeterminizedSearch.Run(BuildMcts(), root, totalBudgetMs: 1600);
 
