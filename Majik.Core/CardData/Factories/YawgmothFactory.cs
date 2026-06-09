@@ -11,66 +11,79 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Yawgmoth, Thran Physician (Dominaria, {2}{B}).
 ///
 /// Legendary Creature — Phyrexian Human Cleric 2/4.
-/// Oracle text:
+/// Oracle text (Scryfall, verified against the embedded seed):
 ///   "Protection from Humans
-///    Pay 1 life, Sacrifice another creature: Each other player loses 1 life
-///    and discards a card. Put a -1/-1 counter on up to one target creature.
-///    You draw a card."
+///    Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one
+///    target creature and draw a card.
+///    {B}{B}, Discard a card: Proliferate."
+///
+/// ## Oracle-drift note (the fix)
+/// An EARLIER printing of Yawgmoth read "Pay 1 life, Sacrifice another creature:
+/// Each other player loses 1 life and discards a card. Put a -1/-1 counter on up
+/// to one target creature. You draw a card." This factory used to implement that
+/// stale wording — an "each other player loses 1 life / discards a card" rider
+/// driven by a <c>Func&lt;IReadOnlyList&lt;Player&gt;&gt; opponentsResolver</c>
+/// captured at factory-build time. That rider had TWO problems:
+///   1. It is no longer printed — the current Scryfall oracle (above) has no
+///      each-opponent life-loss / discard clause at all.
+///   2. Even as written it was INERT on the production routed build: the
+///      <c>GameFacade.BuildDeckCard → NamedCardFactory.Create(name, owner, effects)</c>
+///      path dispatched the single-arg shape build, leaving the resolver null,
+///      so the rider did nothing in real games (only the factory-direct tests
+///      that injected a resolver saw it run).
+/// Both are resolved by deleting the stale rider and modelling the current
+/// oracle: the activated ability's printed effect is the -1/-1 counter on up to
+/// one target creature (DEFERRED — needs the ITarget / TargetResolver system)
+/// plus "draw a card", which is what the engine now wires.
 ///
 /// ## Implemented (v1)
-/// - Legendary 2/4 Creature with Phyrexian, Human, Cleric subtypes
-/// - Activated ability costs: Pay 1 life + Sacrifice another creature
-///   (<see cref="AdditionalCost.PayLife"/> + <see cref="SacrificeAnotherCreatureCost"/>)
-/// - Effect 1: Each other player loses 1 life
-/// - Effect 2: Each other player discards a card (first card in hand,
-///   deterministic — no agent prompt yet)
-/// - Effect 4: Controller draws a card
+/// - Legendary 2/4 Creature with Phyrexian, Human, Cleric subtypes.
+/// - Activated ability cost: Pay 1 life + Sacrifice another creature
+///   (<see cref="AdditionalCost.PayLife"/> + <see cref="SacrificeAnotherCreatureCost"/>).
+/// - Activated ability effect: controller draws a card (CR 120.1).
+///
+/// ## Wiring overloads
+/// - <see cref="Create(Player)"/> — canonical build.
+/// - <see cref="Create(Player, Effects.ContinuousEffectsService?)"/> — the
+///   effects-aware overload the source generator recognises and the production
+///   <c>GameFacade</c> routed build dispatches to (via
+///   <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+///   Yawgmoth registers no continuous effect, so it forwards straight to the
+///   canonical overload — its sole purpose is to make the generator emit the
+///   effects-aware dispatch arm so the routed prod build dispatches through the
+///   named factory (mirrors the Stormbreath Dragon / Priest of Forgotten Gods
+///   fix). Without it the routed build still fell through to single-arg dispatch
+///   (the draw was controller-captured so it was not inert), but routing through
+///   the named factory explicitly keeps the prod path on the same overload the
+///   audit / other cards use.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Protection from Humans</b>: no protection-from-subtype infrastructure
-///   exists yet. Marked functional in the seed list but the keyword does not
-///   affect gameplay.
+/// - <b>Protection from Humans (CR 702.16)</b>: no protection-from-subtype
+///   infrastructure exists yet. The keyword does not affect gameplay.
+/// - <b>"-1/-1 counter on up to one target creature"</b>: skipped — requires
+///   the ITarget / TargetResolver targeting system (the optional-target prompt
+///   + counter placement). The draw still happens.
+/// - <b>"{B}{B}, Discard a card: Proliferate."</b>: the second activated
+///   ability is not modelled — no Proliferate primitive exists in the engine
+///   today (CR 701.27). Deferred alongside the other counter-manipulation gaps.
 /// - <b>Sacrifice target prompt</b>: <see cref="SacrificeAnotherCreatureCost.Target"/>
-///   must be set by the agent; v1 falls back to the first eligible creature
-///   on the battlefield (deterministic).
-/// - <b>Effect 3 (-1/-1 counter on target)</b>: skipped entirely — requires
-///   the ITarget / TargetResolver targeting system.
-/// - <b>Each-other-player resolution</b>: Effects that iterate opponents
-///   use a <see cref="Func{T}"/> resolver injected at factory time. When
-///   called from <see cref="Majik.Core.CardData.NamedCardFactory"/> (test /
-///   console path) the resolver is a no-op; production wiring must supply
-///   the full player list via the <paramref name="opponentsResolver"/>
-///   overload.
-/// - <b>Discard — first non-land preference</b>: v1 picks the first card in
-///   hand regardless of card type; full oracle-compliant discard is deferred.
+///   must be set by the agent; v1 falls back to the first eligible creature on
+///   the battlefield (deterministic).
 /// </summary>
 [CardName("Yawgmoth, Thran Physician")]
 public static class YawgmothFactory
 {
-    /// <summary>
-    /// Construct Yawgmoth with no opponent resolver (test / vanilla path).
-    /// Opponent-targeting effects (lose life, discard) are no-ops in this mode.
-    /// </summary>
-    public static Creature Create(Player owner) =>
-        Create(owner, opponentsResolver: null);
+    public const string CardName = "Yawgmoth, Thran Physician";
+    public const string PrintedManaCost = "{2}{B}";
 
-    /// <summary>
-    /// Construct Yawgmoth with a runtime opponent resolver so that the
-    /// activated ability can iterate all other players.
-    /// </summary>
-    /// <param name="owner">Owner and initial controller of the card.</param>
-    /// <param name="opponentsResolver">
-    /// Called at ability resolution time to obtain the list of all players
-    /// (including the controller). Pass the game's player collection here.
-    /// May be null (falls back to empty — effects are silently skipped).
-    /// </param>
-    public static Creature Create(Player owner, Func<IReadOnlyList<Player>>? opponentsResolver)
+    /// <summary>Canonical build — see class xmldoc.</summary>
+    public static Creature Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
         var card = new Creature(
-            name: "Yawgmoth, Thran Physician",
-            manaCost: "{2}{B}",
+            name: CardName,
+            manaCost: PrintedManaCost,
             power: 2,
             toughness: 4,
             supertypes: new[] { CardSupertype.Legendary },
@@ -80,16 +93,10 @@ public static class YawgmothFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Activated ability:
+        // Activated ability (current oracle):
         //   Cost: Pay 1 life, Sacrifice another creature
-        //   Effects:
-        //     1. Each other player loses 1 life
-        //     2. Each other player discards a card (first in hand — v1)
-        //     3. Put a -1/-1 counter on up to one target creature (DEFERRED)
-        //     4. Draw a card
-        //
-        // Opponent iteration deferred when opponentsResolver is null — see
-        // class xmldoc.
+        //   Effect: Put a -1/-1 counter on up to one target creature
+        //           (DEFERRED — needs targeting), then draw a card.
         // ----------------------------------------------------------------
 
         var sacrificeCost = new SacrificeAnotherCreatureCost(card);
@@ -104,54 +111,19 @@ public static class YawgmothFactory
             },
             effects: new IEffect[]
             {
-                // Effect 1: each other player loses 1 life (CR 119.3).
-                new Effect(
-                    "Yawgmoth: each other player loses 1 life",
-                    () =>
-                    {
-                        var allPlayers = opponentsResolver?.Invoke();
-                        if (allPlayers == null) return;
-                        foreach (var p in allPlayers)
-                        {
-                            if (!ReferenceEquals(p, owner))
-                                p.LoseLife(1);
-                        }
-                    }),
-
-                // Effect 2: each other player discards a card.
-                // v1: pick the first card in the opponent's hand
-                // deterministically (no agent choice, no "first non-land"
-                // preference). Full targeting deferred.
-                new Effect(
-                    "Yawgmoth: each other player discards a card",
-                    () =>
-                    {
-                        var allPlayers = opponentsResolver?.Invoke();
-                        if (allPlayers == null) return;
-                        foreach (var p in allPlayers)
-                        {
-                            if (ReferenceEquals(p, owner)) continue;
-                            var pick = p.Zones.Hand.GetCards().FirstOrDefault();
-                            if (pick == null) continue;
-                            p.Zones.Hand.RemoveCard(pick);
-                            p.Zones.Graveyard.AddCard(pick);
-                            pick.SetZone(ZoneType.Graveyard);
-                        }
-                    }),
-
-                // Effect 3: put a -1/-1 counter on up to one target creature.
+                // Effect 1: put a -1/-1 counter on up to one target creature.
                 // DEFERRED — requires ITarget / TargetResolver infrastructure.
                 // See class xmldoc.
 
-                // Effect 4: controller draws a card (CR 120.1).
+                // Effect 2: controller draws a card (CR 120.1).
                 new Effect(
-                    "Yawgmoth: you draw a card",
+                    $"{CardName}: you draw a card",
                     () =>
                     {
                         var top = owner.Zones.Library.GetCards().FirstOrDefault();
                         if (top == null)
                         {
-                            // CR 120.3: drawing from empty library is noted;
+                            // CR 120.3: drawing from an empty library is noted;
                             // SBA will handle loss at next opportunity.
                             owner.MarkTriedToDrawFromEmptyLibrary();
                             return;
@@ -165,4 +137,18 @@ public static class YawgmothFactory
         card.AddAbility(ability);
         return card;
     }
+
+    /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+    /// Yawgmoth registers no continuous effect, so this forwards straight to the
+    /// canonical <see cref="Create(Player)"/> — its sole purpose is to make the
+    /// generator emit the effects-aware dispatch arm so the routed prod build
+    /// dispatches through this named factory (same fix as Stormbreath Dragon /
+    /// Priest of Forgotten Gods). The <paramref name="effects"/> service is
+    /// intentionally unused.
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner);
 }
