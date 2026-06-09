@@ -50,7 +50,6 @@ public sealed class DeckStrategyCoverageTests
         "GoryoVengeance",
         "LivingEnd",
         "EldraziTron",
-        "GrixisReanimator",
         "DimirMidrange",
         "EldraziRamp",
         "Neobrand",
