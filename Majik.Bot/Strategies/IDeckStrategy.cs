@@ -21,4 +21,14 @@ public interface IDeckStrategy
 
     /// Advisory: the primer's keep/ship rule (else null → generic MulliganPolicy).
     MulliganDecision? AdviseMulligan(IReadOnlyList<ICard> hand, int mulligansTaken);
+
+    /// <summary>
+    /// Card names that this strategy explicitly references — key pieces the
+    /// strategy logic depends on (combo components, finishers, tutor targets).
+    /// Populated by strategy authors to document key cards AND to enable the
+    /// deck-strategy coverage tripwire to validate that every referenced name
+    /// exists in the archetype's <see cref="Majik.Bot.Decks.BotDeckCatalog"/>
+    /// card list. Default: empty (strategy references no specific card names).
+    /// </summary>
+    IReadOnlyList<string> ReferencedCardNames => Array.Empty<string>();
 }
