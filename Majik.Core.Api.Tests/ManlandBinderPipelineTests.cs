@@ -4,8 +4,13 @@ using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Counters;
 using Majik.Core.Effects;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
+using Majik.Core.Targeting;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -219,11 +224,11 @@ public class ManlandBinderPipelineTests
     }
 
     [Fact]
-    public void Prod_RestlessReef_TargetedTrigger_IsDeferred_ButAnimates()
+    public void Prod_RestlessReef_TargetedMillTrigger_BindsAndAnimates()
     {
-        // Restless Reef's "mill TARGET player" trigger needs an agent target
-        // prompt — deferred. The animate ability (4/4 Shark, deathtouch) still
-        // binds in prod; only the targeted attack trigger is a no-op.
+        // Restless Reef's "mill TARGET player" trigger now binds in prod as a
+        // real TargetRequest-carrying TriggeredAbility. The animate ability
+        // (4/4 Shark, deathtouch) still binds too.
         var repo = new FakeCardRepo();
         repo.Add("Restless Reef", "Land", oracleText: RestlessReefOracle, colors: "U,B");
         var land = new Land("Restless Reef", supertypes: null, subtypes: null);
@@ -235,9 +240,11 @@ public class ManlandBinderPipelineTests
 
         live.Abilities.OfType<ActivatedAbility>()
             .Count(a => a.Costs.OfType<ManaCostCost>().Any())
-            .Should().Be(1, "the animate ability binds even though the trigger is deferred");
-        live.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
-            "the TARGETED mill trigger is deferred (needs an agent target prompt)");
+            .Should().Be(1, "the animate ability binds");
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the TARGETED mill trigger is now bound").Subject;
+        trigger.TargetRequests.Should().ContainSingle()
+            .Which.Description.Should().Be("target player");
 
         var animate = live.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<ManaCostCost>().Any());
@@ -248,5 +255,127 @@ public class ManlandBinderPipelineTests
         cc.Toughness.Should().Be(4);
         cc.Keywords.Should().Contain("Deathtouch");
         cc.Subtypes.Should().Contain(CardSubtype.Shark);
+    }
+
+    // -----------------------------------------------------------------------
+    // AGENT-CHOSEN targets — the trigger affects the agent's pick, not "first"
+    // -----------------------------------------------------------------------
+
+    private const string RestlessBivouacOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {R} or {W}.\n" +
+        "{1}{R}{W}: This land becomes a 2/2 red and white Ox creature until " +
+        "end of turn. It's still a land.\n" +
+        "Whenever this land attacks, put a +1/+1 counter on target creature you control.";
+
+    private static GameContext Ctx(GameFacade facade) =>
+        new(facade.Alice, new[] { facade.Alice, facade.Bob }, facade.Alice, 1,
+            StepStateType.PreCombatMain, facade.LiveStack);
+
+    /// <summary>
+    /// Run the trigger's TargetRequests through the real collection pipeline
+    /// with the given agent, stamp ChosenTargets, then execute the effect — the
+    /// exact path TriggerManager.PutPendingTriggersOnStackAsync drives.
+    /// </summary>
+    private static void CollectAndExecute(
+        TriggeredAbility trigger, GameContext ctx, IPlayerAgent? agent)
+    {
+        var collected = TargetCollection.CollectAsync(
+            trigger.TargetRequests, trigger.Source as ICard, ctx, agent).GetAwaiter().GetResult();
+        trigger.SetChosenTargets(collected);
+        foreach (var e in trigger.Effects)
+            e.ExecuteAsync(ResolutionContext.For(ctx.Self, agent, ctx, null))
+                .GetAwaiter().GetResult();
+    }
+
+    [Fact]
+    public void Prod_RestlessBivouac_AttackTrigger_CountersTheAgentChosenCreature()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Bivouac", "Land", oracleText: RestlessBivouacOracle, colors: "R,W");
+        var land = new Land("Restless Bivouac", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Two of the controller's creatures: the agent must pick the SECOND
+        // (proving the agent's choice is honoured, not first-eligible).
+        var first = new Creature("Bear A", "{G}", 2, 2, null, new[] { CardSubtype.Bear });
+        var second = new Creature("Bear B", "{G}", 2, 2, null, new[] { CardSubtype.Bear });
+        foreach (var c in new[] { first, second })
+        {
+            c.SetOwner(alice); c.SetController(alice);
+            alice.Zones.Battlefield.AddCard(c); c.SetZone(ZoneType.Battlefield);
+        }
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Single();
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { second });
+
+        CollectAndExecute(trigger, Ctx(facade), agent);
+
+        second.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the +1/+1 counter goes on the AGENT-CHOSEN creature");
+        first.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the non-chosen creature is untouched (not first-eligible)");
+    }
+
+    [Fact]
+    public void Prod_RestlessReef_AttackTrigger_MillsTheAgentChosenPlayer()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Reef", "Land", oracleText: RestlessReefOracle, colors: "U,B");
+        var land = new Land("Restless Reef", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        var bob = facade.Bob;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Give Bob a known library so the mill is observable.
+        for (var i = 0; i < 6; i++)
+        {
+            var c = new Land("Island", new[] { CardSupertype.Basic }, new[] { CardSubtype.Island });
+            c.SetOwner(bob);
+            bob.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library);
+        }
+        var bobLibBefore = bob.Zones.Library.GetCards().Count();
+        var bobGyBefore = bob.Zones.Graveyard.GetCards().Count();
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Single();
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { bob }); // mill the OPPONENT, agent's pick
+
+        CollectAndExecute(trigger, Ctx(facade), agent);
+
+        bob.Zones.Graveyard.GetCards().Count().Should().Be(bobGyBefore + 4,
+            "the AGENT-CHOSEN player mills exactly four cards");
+        bob.Zones.Library.GetCards().Count().Should().Be(bobLibBefore - 4);
+    }
+
+    [Fact]
+    public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
+    {
+        // No agent registered → CollectAsync resolves the request to an empty
+        // pick → the mill no-ops (CR 608.2b). Faithful to the manland posture.
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Reef", "Land", oracleText: RestlessReefOracle, colors: "U,B");
+        var land = new Land("Restless Reef", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        var bob = facade.Bob;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        var bobGyBefore = bob.Zones.Graveyard.GetCards().Count();
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Single();
+        CollectAndExecute(trigger, Ctx(facade), agent: null);
+
+        bob.Zones.Graveyard.GetCards().Count().Should().Be(bobGyBefore,
+            "with no agent the targeted mill is a clean no-op");
     }
 }

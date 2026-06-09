@@ -953,7 +953,8 @@ public sealed class GameFacade : IDisposable
                 // abilities route through the stack (responder priority window)
                 // and the Fable rummage prompts the controller's agent.
                 SagaBinder.Bind(card, entity, effects, zones, triggers, eventBus);
-                foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, controller))
+                foreach (var trig in OracleTriggeredAbilityBinder.Bind(
+                    card, entity, controller, allPlayers: null, eventBus: eventBus))
                 {
                     card.AddAbility(trig);
                 }

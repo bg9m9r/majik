@@ -6,6 +6,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData;
@@ -257,9 +258,13 @@ public static class OracleTriggeredAbilityBinder
     // "target opponent"; this whole-text pattern captures the Abraded Bluffs
     // wording. First-opponent resolution (binder posture — same as Piranha
     // Marsh / Sunscorched Desert). Ports AbradedBluffsFactory's ETB damage.
-    private static readonly Regex EtbDealsDamageToTargetOpponent = new(
-        @"When\s+(?:~|this\s+land|this\s+permanent)\s+enters\s*,\s*it\s+deals\s+"
-        + @"(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+target\s+opponent",
+    // Abraded Bluffs (Outlaws of Thunder Junction): "When this land enters, it
+    // deals N damage to target opponent." (CR 119.1d.) Matched against the
+    // EtbLine effect group (no "When … enters," prefix) inside
+    // TryBuildTargetedEtbTrigger, which binds it as a real 1..1 "target
+    // opponent" TargetRequest (agent-chosen, first-opponent fallback).
+    private static readonly Regex EtbDealsDamageToTargetOpponentFragment = new(
+        @"it\s+deals\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+target\s+opponent",
         RegexOptions.IgnoreCase);
 
     // Witch's Cottage (Throne of Eldraine): "When this land enters untapped,
@@ -275,6 +280,37 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex EntersUntappedRecurCreature = new(
         @"When\s+(?:~|this\s+land|this\s+permanent)\s+enters\s+untapped\s*,\s*"
         + @"(?<effect>you\s+may\s+put\s+target\s+creature\s+card\s+from\s+your\s+graveyard\s+on\s+top\s+of\s+your\s+library)",
+        RegexOptions.IgnoreCase);
+
+    // Valakut, the Molten Pinnacle (Zendikar): "Whenever a Mountain you control
+    // enters, if you control at least five other Mountains, you may have this
+    // land deal 3 damage to any target." (CR 603.4 intervening-if.) Valakut is
+    // a LAND — only this binder binds it in prod. The trigger fires on a
+    // Mountain entering under the controller (CardMovedEvent → Battlefield),
+    // gated on ≥5 OTHER Mountains (the just-entered one excluded by reference),
+    // is optional ("you may", auto-accepted in v1 when a target is chosen),
+    // declares a 1..1 "any target" TargetRequest, and deals 3 via
+    // Fx.DealDamageAny reading ChosenTargets. The N damage / threshold are
+    // parameterized; the printed Valakut values are 3 / five.
+    private static readonly Regex ValakutMountainDealDamageAnyTarget = new(
+        @"whenever a mountain you control enters\s*,\s*"
+        + @"if you control at least (?<thr>\d+|one|two|three|four|five|six|seven|eight|nine|ten) other mountains\s*,\s*"
+        + @"you may have (?:~|this land|this permanent) deal "
+        + @"(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten) damage to any target",
+        RegexOptions.IgnoreCase);
+
+    // Frostwalk Bastion (Kaldheim, snow manland): "Whenever this land deals
+    // combat damage to a creature, tap that creature and it doesn't untap
+    // during its controller's next untap step." (CR 603.1.) Frostwalk is a LAND
+    // — only this binder binds it in prod. Non-targeted: the rider acts on the
+    // creature it damaged, captured off CombatDamageDealtEvent. The
+    // manland-combat-math gap means an animated Land doesn't surface as a
+    // combat-damage source in production combat yet (documented in
+    // FrostwalkBastionFactory), so binding it gives the card a real
+    // ITriggeredAbility on the prod path and reuses ApplyCombatRider verbatim.
+    private static readonly Regex CombatDamageToCreatureTapNoUntap = new(
+        @"whenever (?:~|this land|this permanent) deals combat damage to a creature\s*,\s*"
+        + @"tap that creature and it doesn'?t untap during its controller'?s next untap step",
         RegexOptions.IgnoreCase);
 
     private static readonly Regex GoblinGuideFullPattern = new(
@@ -293,7 +329,8 @@ public static class OracleTriggeredAbilityBinder
 
     public static IEnumerable<TriggeredAbility> Bind(
         ICard source, CardEntity entity, Player? controller = null,
-        IReadOnlyList<Player>? allPlayers = null)
+        IReadOnlyList<Player>? allPlayers = null,
+        Majik.Core.Events.IEventBus? eventBus = null)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -320,7 +357,22 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in EtbLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source, allPlayers).ToList();
+            var etbEffectText = m.Groups["effect"].Value;
+
+            // Utility-land ETB targets (Piranha Marsh / Teetering Peaks / Sejiri
+            // Steppe / Soaring Seacliff / Mortuary Mire / Abraded Bluffs) bind as
+            // a real TargetRequest-carrying trigger so the agent CHOOSES the
+            // target via the standard CR 603.3 collection pipeline. A no-agent
+            // fallback (first-eligible) keeps the existing non-interactive tests
+            // green. Matched first; falls through to BuildEffects otherwise.
+            var targeted = TryBuildTargetedEtbTrigger(etbEffectText, source, ctrl, allPlayers);
+            if (targeted != null)
+            {
+                yield return targeted;
+                continue;
+            }
+
+            var effects = BuildEffects(etbEffectText, ctrl, source, allPlayers).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -435,6 +487,117 @@ public static class OracleTriggeredAbilityBinder
             // Only one Goblin Guide trigger per card; break after the first
             // match to avoid double-binding if the regex matches twice.
             break;
+        }
+
+        // Valakut, the Molten Pinnacle: "Whenever a Mountain you control enters,
+        // if you control at least N other Mountains, you may have this land deal
+        // M damage to any target." (CR 603.4.) LAND — binder is the only prod
+        // path. Fires on a Mountain entering under the controller, gated on ≥N
+        // OTHER Mountains (the just-entered one excluded by reference). The
+        // intervening-if is checked at trigger time AND re-checked at resolution
+        // (CR 603.4). A 1..1 "any target" TargetRequest carries a
+        // CandidateGatherer over every creature / player / planeswalker; "you
+        // may" auto-accepts in v1 when a target was chosen (same posture as the
+        // named ValakutTheMoltenPinnacleFactory); the M damage is dealt via
+        // Fx.DealDamageAny on resolution.
+        foreach (Match m in ValakutMountainDealDamageAnyTarget.Matches(text))
+        {
+            var threshold = WordToInt(m.Groups["thr"].Value);
+            var dmg = WordToInt(m.Groups["n"].Value);
+            if (threshold <= 0 || dmg <= 0) continue;
+
+            bool ControllerHasEnoughOtherMountains(ICard justEntered)
+            {
+                var you = (source as Permanent)?.Controller ?? ctrl;
+                return you.Zones.Battlefield.GetCards()
+                    .Count(c => !ReferenceEquals(c, justEntered)
+                                && !ReferenceEquals(c, source)
+                                && c.HasSubtype(CardSubtype.Mountain)) >= threshold;
+            }
+
+            TriggeredAbility? valakutTrigger = null;
+            var dmgEffect = new Effect(
+                $"~: deal {dmg} damage to any target (Valakut)",
+                () =>
+                {
+                    // CR 603.4 — re-check the intervening-if at resolution. We
+                    // can't see the original triggering Mountain here, so the
+                    // resolution check counts OTHER Mountains excluding the
+                    // source (a slightly looser tally than the strict CR
+                    // double-check; the trigger-time gate already enforced ≥N
+                    // including the entering Mountain).
+                    var you = (source as Permanent)?.Controller ?? ctrl;
+                    var otherMountains = you.Zones.Battlefield.GetCards()
+                        .Count(c => !ReferenceEquals(c, source) && c.HasSubtype(CardSubtype.Mountain));
+                    if (otherMountains < threshold) return;
+
+                    if (valakutTrigger == null) return;
+                    if (valakutTrigger.ChosenTargets.Count == 0) return;
+                    if (valakutTrigger.ChosenTargets[0].Count == 0) return; // "you may" → no target chosen → no-op
+                    var target = valakutTrigger.ChosenTargets[0][0];
+                    Majik.Core.Primitives.Fx.DealDamageAny(target, dmg);
+                });
+
+            valakutTrigger = new TriggeredAbility(
+                source, ctrl,
+                new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+                {
+                    if (e.ToZone != ZoneType.Battlefield) return false;
+                    if (!e.Card.HasSubtype(CardSubtype.Mountain)) return false;
+                    var you = (source as Permanent)?.Controller ?? ctrl;
+                    if (!ReferenceEquals(e.Card.Controller, you)) return false;
+                    return ControllerHasEnoughOtherMountains(e.Card);
+                }),
+                effects: new IEffect[] { dmgEffect },
+                activeZones: new[] { ZoneType.Battlefield },
+                targetRequests: new[]
+                {
+                    new Majik.Core.Players.Agents.TargetRequest(
+                        Description: "any target",
+                        MinTargets: 0, // "you may" — optional; no legal/chosen target → no-op
+                        MaxTargets: 1,
+                        LegalCandidates: Array.Empty<object>(),
+                        Intent: Majik.Core.Cards.BotIntent.Removal,
+                        CandidateGatherer: GatherAnyTarget),
+                });
+
+            yield return valakutTrigger;
+            break; // one Valakut trigger per card
+        }
+
+        // Frostwalk Bastion: "Whenever this land deals combat damage to a
+        // creature, tap that creature and it doesn't untap during its
+        // controller's next untap step." (CR 603.1.) LAND — binder is the only
+        // prod path. Non-targeted: the rider acts on the creature it damaged,
+        // captured off CombatDamageDealtEvent (SourceCard == this land,
+        // TargetCard is a Creature). Reuses FrostwalkBastionFactory.
+        // ApplyCombatRider (tap + skip-next-untap with one-shot cleanup) when an
+        // event bus is available for the cleanup subscription.
+        foreach (Match _fb in CombatDamageToCreatureTapNoUntap.Matches(text))
+        {
+            Creature? capturedVictim = null;
+            var riderEffect = new Effect(
+                "~: tap the damaged creature; it skips its next untap step",
+                () =>
+                {
+                    var victim = capturedVictim;
+                    if (victim == null || eventBus == null) return;
+                    Majik.Core.CardData.Factories.FrostwalkBastionFactory
+                        .ApplyCombatRider(victim, eventBus);
+                });
+
+            yield return new TriggeredAbility(
+                source, ctrl,
+                new EventTriggerCondition<Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent>((e, _) =>
+                {
+                    if (!ReferenceEquals(e.SourceCard, source)) return false;
+                    if (e.TargetCard is not Creature victim) return false;
+                    capturedVictim = victim;
+                    return true;
+                }),
+                effects: new IEffect[] { riderEffect },
+                activeZones: new[] { ZoneType.Battlefield });
+            break; // one combat-damage rider per card
         }
 
         // "Whenever a player casts a spell with mana value N or less, ~ deals
@@ -643,32 +806,11 @@ public static class OracleTriggeredAbilityBinder
             break; // one trigger per card
         }
 
-        // Abraded Bluffs: "When this land enters, it deals N damage to target
-        // opponent." (CR 119.1d.) First-opponent resolution (binder posture —
-        // same as Piranha Marsh / Sunscorched Desert). The damage goes to the
-        // first opponent via Fx.DealDamageAny; no opponent → clean no-op.
-        foreach (Match m in EtbDealsDamageToTargetOpponent.Matches(text))
-        {
-            var n = WordToInt(m.Groups["n"].Value);
-            if (n <= 0) continue;
-            var players = allPlayers;
-            yield return new TriggeredAbility(
-                source, ctrl,
-                Triggers.OnEnterBattlefieldSelf(source),
-                effects: new IEffect[]
-                {
-                    new Effect($"~: deal {n} damage to target opponent", () =>
-                    {
-                        var youController = (source as Permanent)?.Controller ?? ctrl;
-                        var opponent =
-                            players?.FirstOrDefault(p => !ReferenceEquals(p, youController));
-                        if (opponent == null) return;
-                        Majik.Core.Primitives.Fx.DealDamageAny(opponent, n);
-                    }),
-                },
-                activeZones: new[] { ZoneType.Battlefield });
-            break; // one ETB-damage trigger per card
-        }
+        // Abraded Bluffs' "When this land enters, it deals N damage to target
+        // opponent." is bound by the EtbLine loop above via
+        // TryBuildTargetedEtbTrigger (a real 1..1 "target opponent"
+        // TargetRequest, agent-chosen with a first-opponent fallback), so the
+        // former dedicated first-opponent loop here is gone.
 
         // Witch's Cottage: "When this land enters untapped, you may put target
         // creature card from your graveyard on top of your library." (CR
@@ -1266,6 +1408,244 @@ public static class OracleTriggeredAbilityBinder
                     Majik.Core.CardData.Factories.LotusCobraFactory.BuildOneManaOfColor(
                         Majik.Core.ValueObjects.ManaColor.Green)));
         }
+    }
+
+    /// <summary>
+    /// Build a real <see cref="TargetRequest"/>-carrying ETB
+    /// <see cref="TriggeredAbility"/> for the six utility lands whose ETB
+    /// targets (Piranha Marsh / Teetering Peaks / Sejiri Steppe / Soaring
+    /// Seacliff / Mortuary Mire / Abraded Bluffs). The agent CHOOSES the target
+    /// through the standard CR 603.3 collection pipeline (the live
+    /// <see cref="TriggerManager"/> calls <c>TargetCollection.CollectAsync</c>
+    /// and stamps <see cref="TriggeredAbility.ChosenTargets"/>). Every effect
+    /// reads <c>ChosenTargets</c> first and, when empty (no agent registered —
+    /// the non-interactive test posture), falls back to the FIRST eligible
+    /// candidate from the same gatherer so existing tests stay green. Returns
+    /// null when <paramref name="effectText"/> is not one of the six.
+    /// </summary>
+    private static TriggeredAbility? TryBuildTargetedEtbTrigger(
+        string effectText, ICard source, Player ctrl,
+        IReadOnlyList<Player>? allPlayers)
+    {
+        Player You() => (source as Permanent)?.Controller ?? ctrl;
+
+        // The no-agent fallback enumerates players from the live GameContext
+        // when available (prod) else the bind-time allPlayers list (the sync
+        // test pipeline, which doesn't collect targets). Either yields the
+        // first-eligible deterministic pick that keeps non-interactive tests
+        // green; a real agent's choice flows through ChosenTargets instead.
+        IReadOnlyList<Player> Players(Majik.Core.Game.GameContext? ctx) =>
+            ctx?.AllPlayers ?? allPlayers ?? Array.Empty<Player>();
+
+        // ---- Piranha Marsh — "target player loses N life." (CR 119.3) ----
+        var lifeM = TargetPlayerLosesLife.Match(effectText);
+        if (lifeM.Success)
+        {
+            var n = WordToInt(lifeM.Groups["n"].Value);
+            TriggeredAbility? trig = null;
+            var eff = new Effect($"~: target player loses {n} life", ctx =>
+            {
+                var target = ChosenPlayer(trig)
+                    ?? FirstOpponent(Players(ctx.Game), You());
+                target?.LoseLife(n);
+                return ValueTask.CompletedTask;
+            });
+            return trig = MakeEtbTrigger(source, ctrl, eff, new TargetRequest(
+                "target player", 1, 1, Array.Empty<object>(),
+                Majik.Core.Cards.BotIntent.Removal,
+                CandidateGatherer: c => c.AllPlayers.Cast<object>().ToList()));
+        }
+
+        // ---- Teetering Peaks — "target creature gets +P/+0 until EOT." ----
+        var pumpM = TargetCreatureGetsPump.Match(effectText);
+        if (pumpM.Success)
+        {
+            var p = WordToInt(pumpM.Groups["p"].Value);
+            var t = WordToInt(pumpM.Groups["t"].Value);
+            TriggeredAbility? trig = null;
+            var eff = new Effect($"~: target creature gets +{p}/+{t} EOT", ctx =>
+            {
+                var creature = ChosenCreature(trig)
+                    ?? FirstCreature(Players(ctx.Game), controllerOnly: false, You());
+                if (creature == null || creature.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                creature.ActiveEffects?.Register(
+                    new Majik.Core.Effects.PumpUntilEndOfTurnEffect(creature, p, t));
+                return ValueTask.CompletedTask;
+            });
+            return trig = MakeEtbTrigger(source, ctrl, eff, new TargetRequest(
+                "target creature", 1, 1, Array.Empty<object>(),
+                Majik.Core.Cards.BotIntent.Buff,
+                CandidateGatherer: c => GatherCreatures(c, controllerOnly: false, You())));
+        }
+
+        // ---- Sejiri Steppe — "target creature you control gains protection
+        // from the color of your choice until end of turn." (CR 702.16) ----
+        if (TargetCreatureYouControlGainsProtection.IsMatch(effectText))
+        {
+            TriggeredAbility? trig = null;
+            var eff = new Effect("~: target creature you control gains protection EOT", ctx =>
+            {
+                var creature = ChosenCreature(trig)
+                    ?? FirstCreature(Players(ctx.Game), controllerOnly: true, You());
+                if (creature == null || creature.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                if (creature.ActiveEffects == null) return ValueTask.CompletedTask;
+                // CR 700.2a — "of your choice"; no agent colour surface yet,
+                // default white (an arbitrary but legal WUBRG colour).
+                var grant = new Majik.Core.Effects.GrantAbilityEffect(
+                    source: creature, target: creature,
+                    ability: new Majik.Core.Abilities.ProtectionAbility("white"),
+                    expiresAtEndOfTurn: true);
+                creature.ActiveEffects.Register(grant);
+                grant.Sync();
+                return ValueTask.CompletedTask;
+            });
+            return trig = MakeEtbTrigger(source, ctrl, eff, new TargetRequest(
+                "target creature you control", 1, 1, Array.Empty<object>(),
+                Majik.Core.Cards.BotIntent.Protection,
+                CandidateGatherer: c => GatherCreatures(c, controllerOnly: true, You())));
+        }
+
+        // ---- Soaring Seacliff — "target creature gains flying until EOT." --
+        if (TargetCreatureGainsFlying.IsMatch(effectText))
+        {
+            TriggeredAbility? trig = null;
+            var eff = new Effect("~: target creature gains flying EOT", ctx =>
+            {
+                var creature = ChosenCreature(trig)
+                    ?? FirstCreature(Players(ctx.Game), controllerOnly: false, You());
+                if (creature == null || creature.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                creature.ActiveEffects?.Register(
+                    new Majik.Core.Effects.GrantKeywordUntilEndOfTurnEffect(creature, "Flying"));
+                return ValueTask.CompletedTask;
+            });
+            return trig = MakeEtbTrigger(source, ctrl, eff, new TargetRequest(
+                "target creature", 1, 1, Array.Empty<object>(),
+                Majik.Core.Cards.BotIntent.Buff,
+                CandidateGatherer: c => GatherCreatures(c, controllerOnly: false, You())));
+        }
+
+        // ---- Mortuary Mire — "you may put target creature card from your
+        // graveyard on top of your library." (CR 701.20) ----
+        if (PutCreatureFromGraveyardOnTop.IsMatch(effectText))
+        {
+            TriggeredAbility? trig = null;
+            var eff = new Effect(
+                "~: put target creature card from your graveyard on top of your library",
+                ctx =>
+                {
+                    var you = You();
+                    var pick = ChosenCard(trig)
+                        ?? you.Zones.Graveyard.GetCards()
+                            .FirstOrDefault(c => c.HasType(CardType.Creature));
+                    if (pick == null) return ValueTask.CompletedTask;
+                    if (pick.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask;
+                    you.Zones.Graveyard.RemoveCard(pick);
+                    you.Zones.Library.InsertCardAt(0, pick);
+                    pick.SetZone(ZoneType.Library);
+                    return ValueTask.CompletedTask;
+                });
+            return trig = MakeEtbTrigger(source, ctrl, eff, new TargetRequest(
+                "target creature card in your graveyard", 0, 1, Array.Empty<object>(),
+                Majik.Core.Cards.BotIntent.Reanimate,
+                CandidateGatherer: c => You().Zones.Graveyard.GetCards()
+                    .Where(x => x.HasType(CardType.Creature)).Cast<object>().ToList()));
+        }
+
+        // ---- Abraded Bluffs — "it deals N damage to target opponent." -----
+        var dmgM = EtbDealsDamageToTargetOpponentFragment.Match(effectText);
+        if (dmgM.Success)
+        {
+            var n = WordToInt(dmgM.Groups["n"].Value);
+            if (n <= 0) return null;
+            TriggeredAbility? trig = null;
+            var eff = new Effect($"~: deal {n} damage to target opponent", ctx =>
+            {
+                var target = ChosenPlayer(trig)
+                    ?? FirstOpponent(Players(ctx.Game), You());
+                if (target != null) Majik.Core.Primitives.Fx.DealDamageAny(target, n);
+                return ValueTask.CompletedTask;
+            });
+            return trig = MakeEtbTrigger(source, ctrl, eff, new TargetRequest(
+                "target opponent", 1, 1, Array.Empty<object>(),
+                Majik.Core.Cards.BotIntent.Removal,
+                CandidateGatherer: c => c.AllPlayers
+                    .Where(p => !ReferenceEquals(p, You())).Cast<object>().ToList()));
+        }
+
+        return null;
+    }
+
+    private static TriggeredAbility MakeEtbTrigger(
+        ICard source, Player ctrl, IEffect effect, TargetRequest request) =>
+        new(source, ctrl,
+            Triggers.OnEnterBattlefieldSelf(source),
+            effects: new[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[] { request });
+
+    private static object? FirstChosenObject(TriggeredAbility? trig)
+    {
+        if (trig == null) return null;
+        var chosen = trig.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return null;
+        return chosen[0][0];
+    }
+
+    private static Player? ChosenPlayer(TriggeredAbility? trig) =>
+        FirstChosenObject(trig) as Player;
+    private static Creature? ChosenCreature(TriggeredAbility? trig) =>
+        FirstChosenObject(trig) as Creature;
+    private static ICard? ChosenCard(TriggeredAbility? trig) =>
+        FirstChosenObject(trig) as ICard;
+
+    private static Player? FirstOpponent(IReadOnlyList<Player> players, Player you) =>
+        players.FirstOrDefault(p => !ReferenceEquals(p, you));
+
+    private static IReadOnlyList<object> GatherCreatures(
+        Majik.Core.Game.GameContext ctx, bool controllerOnly, Player you)
+    {
+        IEnumerable<Player> players = controllerOnly ? new[] { you } : ctx.AllPlayers;
+        return players
+            .SelectMany(p => p.Zones.Battlefield.GetCards())
+            .OfType<Creature>()
+            .Where(c => c.Zone == ZoneType.Battlefield)
+            .Cast<object>()
+            .ToList();
+    }
+
+    private static Creature? FirstCreature(
+        IReadOnlyList<Player> players, bool controllerOnly, Player you)
+    {
+        if (controllerOnly || players.Count == 0)
+        {
+            return you.Zones.Battlefield.GetCards().OfType<Creature>()
+                .FirstOrDefault(c => c.Zone == ZoneType.Battlefield);
+        }
+        return players
+            .SelectMany(p => p.Zones.Battlefield.GetCards())
+            .OfType<Creature>()
+            .FirstOrDefault(c => c.Zone == ZoneType.Battlefield);
+    }
+
+    /// <summary>
+    /// CR 115.4 — candidate pool for an "any target" effect (Valakut): every
+    /// creature and planeswalker on every battlefield, plus every player.
+    /// Resolved at fire-time from the live <see cref="GameContext"/>.
+    /// </summary>
+    private static IReadOnlyList<object> GatherAnyTarget(
+        Majik.Core.Game.GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+        {
+            result.Add(p); // a player is a legal "any target"
+            foreach (var c in p.Zones.Battlefield.GetCards())
+            {
+                if (c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+                    result.Add(c);
+            }
+        }
+        return result;
     }
 
     /// <summary>
