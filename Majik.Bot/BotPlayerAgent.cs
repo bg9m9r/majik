@@ -32,6 +32,21 @@ public sealed class BotPlayerAgent : IPlayerAgent
     }
 
     /// <summary>
+    /// Internal test-seam constructor. Accepts a prebuilt <see cref="IBotStrategy"/>
+    /// so probes can inject a custom <see cref="Search.SearchStrategy"/> (built with
+    /// an explicit deck-strategy override) without going through the config path.
+    /// This is the correct injection point for controlled experiments that must
+    /// isolate a single variable (deck strategy ON vs OFF) while keeping all other
+    /// strategy configuration identical.
+    /// </summary>
+    internal BotPlayerAgent(Player self, IBotStrategy strategy, Action<bool>? onThinking = null)
+    {
+        _self = self ?? throw new ArgumentNullException(nameof(self));
+        _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+        _onThinking = onThinking;
+    }
+
+    /// <summary>
     /// Wraps a synchronous policy call with the optional thinking callback.
     /// Fires <c>onThinking(true)</c> before, <c>onThinking(false)</c> after.
     /// Observer exceptions are swallowed so a faulty subscriber cannot abort
