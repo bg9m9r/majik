@@ -1,4 +1,5 @@
 using Majik.Bot.Diagnostics;
+using Majik.Bot.Evaluation;
 using Majik.Core.Diagnostics;
 
 namespace Majik.Bot;
@@ -20,6 +21,13 @@ namespace Majik.Bot;
 /// <para><c>Strategy</c> selects the <see cref="IBotStrategy"/> implementation:
 /// <c>"heuristic"</c> uses the pure-heuristic strategy; <c>"mcts"</c> uses
 /// MCTS-backed combat search with heuristic fallback for all other prompts.</para>
+///
+/// <para><c>WeightsOverride</c> optional. When non-null, the bot uses this
+/// explicit <see cref="ArchetypeWeights"/> vector directly instead of calling
+/// <c>ArchetypeWeights.ForArchetype(ArchetypeName)</c>. Null preserves the
+/// default archetype-lookup behaviour so existing production code is unaffected.
+/// Primarily used by the self-play weight tuner to inject candidate weight
+/// vectors into individual bots without changing the archetype mapping.</para>
 ///
 /// <para><c>DecisionSink</c> optional. When non-null, EV-scored policies
 /// (PriorityPolicy, ActivatedAbilityPolicy via priority pump, CombatSearch)
@@ -73,4 +81,5 @@ public sealed record BotConfig(
     int? SimCombatBudgetMs = null,
     int? MaxMctsIterations = null,
     int? MaxMctsBudgetMs = null,
-    bool PrioritySearchEnabled = true);
+    bool PrioritySearchEnabled = true,
+    ArchetypeWeights? WeightsOverride = null);
