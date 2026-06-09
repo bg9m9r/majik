@@ -209,6 +209,33 @@ public static class OracleTriggeredAbilityBinder
     // The predicate captures the defending player from
     // CreatureAttacksEvent so the effect resolves against the correct
     // library at resolution time (CR 508.1f, CR 506.2).
+    // City of Brass pain rider: "Whenever this land becomes tapped, it deals N
+    // damage to you." (CR 603.2 — becomes-tapped trigger.) This is a LAND, so
+    // its only prod binding path is this binder (never the named factory). The
+    // trigger fires on PermanentTappedEvent for THIS card regardless of who
+    // tapped it (its own mana ability, an opponent's "tap target land", the
+    // attack tap, …) — the engine models "deals N damage to you" as the
+    // controller losing N life (same posture as the merged PainLand / City of
+    // Brass factory; CR 120.3). The `~` self-reference normalisation upstream
+    // converts the card name; "this land" is matched literally here.
+    private static readonly Regex BecomesTappedDealsDamageToYou = new(
+        @"whenever\s+(?:~|this\s+land|this\s+permanent)\s+becomes\s+tapped\s*,\s*"
+        + @"it\s+deals\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+you",
+        RegexOptions.IgnoreCase);
+
+    // Forbidden Orchard reflexive Spirit: "Whenever you tap this land for mana,
+    // target opponent creates a 1/1 colorless Spirit creature token." (CR 605 —
+    // mana abilities surface ManaAbilityActivatedEvent, the only observable
+    // tap-for-mana hook; same posture as Manabarbs.) This is a LAND — only this
+    // binder binds it in prod. The trigger is scoped to THIS land's mana
+    // (e.Source == source), and the targeted OPPONENT creates the token (CR 111
+    // / 111.2). Single-sentence whole-match: the colour/P/T is fixed by the
+    // printed text (1/1 colourless Spirit) so no capture groups are needed.
+    private static readonly Regex TapThisLandForManaOpponentSpirit = new(
+        @"whenever\s+you\s+tap\s+(?:~|this\s+land)\s+for\s+mana\s*,\s*"
+        + @"target\s+opponent\s+creates\s+a\s+1/1\s+colorless\s+spirit\s+creature\s+token",
+        RegexOptions.IgnoreCase);
+
     private static readonly Regex GoblinGuideFullPattern = new(
         @"whenever\s+(?:~|this\s+creature)\s+attacks\s*,\s*defending\s+player\s+reveals\s+the\s+top\s+card\s+of\s+(?:their|that\s+player'?s)\s+library\.?\s*if\s+it'?s\s+a\s+land(?:\s+card)?\s*,\s*(?:that\s+player|they)\s+puts?\s+it\s+into\s+(?:their|that\s+player'?s)\s+hand",
         RegexOptions.IgnoreCase);
@@ -556,6 +583,79 @@ public static class OracleTriggeredAbilityBinder
                 source, ctrl,
                 Triggers.OnAnotherCreatureYouControlEnters(ctrl, source),
                 effects: effects);
+        }
+
+        // City of Brass: "Whenever this land becomes tapped, it deals N damage
+        // to you." (CR 603.2.) Fires on PermanentTappedEvent for THIS source,
+        // regardless of the tapper (CR 603.2 keys on the permanent becoming
+        // tapped). "Deals N damage to you" → the controller loses N life
+        // (CR 120.3; same posture as the painland / City of Brass factory).
+        // Scoped to the LIVE controller so a control change (CR 720) reads
+        // "you" correctly at resolution.
+        foreach (Match m in BecomesTappedDealsDamageToYou.Matches(text))
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            if (n <= 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnThisBecomesTapped(source),
+                effects: new IEffect[]
+                {
+                    new Effect($"~ deals {n} damage to its controller", () =>
+                    {
+                        var youController = (source as Permanent)?.Controller ?? ctrl;
+                        youController.LoseLife(n);
+                    }),
+                },
+                activeZones: new[] { ZoneType.Battlefield });
+        }
+
+        // Forbidden Orchard: "Whenever you tap this land for mana, target
+        // opponent creates a 1/1 colorless Spirit creature token." (CR 605 —
+        // mana abilities surface ManaAbilityActivatedEvent.) Scoped to THIS
+        // land's mana (e.Source == source). The targeted OPPONENT creates the
+        // token; in a 2-player game the opponent is unambiguous and resolved
+        // from the live game's player list at resolution time (same posture as
+        // Endurance / Bojuka Bog's binder-bound target resolution). No agent
+        // multiplayer prompt yet — first opponent is chosen deterministically.
+        foreach (Match _orchard in TapThisLandForManaOpponentSpirit.Matches(text))
+        {
+            yield return new TriggeredAbility(
+                source, ctrl,
+                new EventTriggerCondition<Majik.Core.Events.ManaAbilityActivatedEvent>(
+                    (e, _) => ReferenceEquals(e.Source, source)),
+                effects: new IEffect[]
+                {
+                    new Effect(
+                        "target opponent creates a 1/1 colorless Spirit creature token",
+                        ctx =>
+                        {
+                            var youController = (source as Permanent)?.Controller ?? ctrl;
+                            // CR 109.5 — an opponent is any other player. Resolve
+                            // from the live game (prod) or the binder's allPlayers
+                            // (test); no opponent available → clean no-op.
+                            var opponent =
+                                ctx.Game?.AllPlayers
+                                    .FirstOrDefault(p => !ReferenceEquals(p, youController))
+                                ?? allPlayers?
+                                    .FirstOrDefault(p => !ReferenceEquals(p, youController));
+                            if (opponent == null) return ValueTask.CompletedTask;
+
+                            // CR 111 / 111.4 — the OPPONENT owns + controls the
+                            // 1/1 colourless Spirit (empty colour list = colourless).
+                            var spec = new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                                Name: "Spirit",
+                                Power: 1,
+                                Toughness: 1,
+                                Subtypes: new[] { CardSubtype.Spirit },
+                                Keywords: Array.Empty<string>(),
+                                Colors: Array.Empty<Majik.Core.ValueObjects.ManaColor>());
+                            Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(spec, opponent);
+                            return ValueTask.CompletedTask;
+                        }),
+                },
+                activeZones: new[] { ZoneType.Battlefield });
+            break; // one trigger per card
         }
     }
 

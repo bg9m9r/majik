@@ -1,10 +1,12 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -1310,5 +1312,159 @@ public class OracleTriggeredAbilityBinderTests
 
         _alice.ManaPool.Total.Should().BeGreaterThan(0,
             "the ETB trigger adds one mana of any color (default green) to the pool");
+    }
+}
+
+/// <summary>
+/// Tap-driven / mana-driven land triggers synthesized by
+/// <see cref="OracleTriggeredAbilityBinder"/> for the mana-pain land family
+/// (City of Brass becomes-tapped pain, Forbidden Orchard reflexive Spirit).
+/// These need the ambient <see cref="Majik.Core.Events.EventBusRegistry"/>
+/// (so <c>Permanent.Tap()</c> publishes <see cref="PermanentTappedEvent"/>)
+/// and a clean default bus per test, hence a dedicated IDisposable fixture.
+/// </summary>
+public class OracleTriggeredAbilityBinderLandTapTests : IDisposable
+{
+    private readonly EventBus _bus = new();
+    private readonly Majik.Core.Stack.Stack _stack;
+    private readonly TriggerManager _triggers;
+    private readonly ZoneService _zones;
+    private readonly Player _alice = new("Alice", 20);
+    private readonly Player _bob = new("Bob", 20);
+
+    public OracleTriggeredAbilityBinderLandTapTests()
+    {
+        _stack = new Majik.Core.Stack.Stack(_bus);
+        _triggers = new TriggerManager(_stack, _bus);
+        _zones = new ZoneService(_bus);
+        Majik.Core.Events.EventBusRegistry.Clear();
+        Majik.Core.Events.EventBusRegistry.SetDefault(_bus);
+    }
+
+    public void Dispose()
+    {
+        Majik.Core.Events.EventBusRegistry.Clear();
+        Majik.Core.Events.EventBusRegistry.SetDefault(null);
+    }
+
+    private Majik.Core.Cards.Land BindLand(string name, string oracle)
+    {
+        var land = new Majik.Core.Cards.Land(name) { Owner = _alice, Controller = _alice };
+        land.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(land);
+        var entity = new CardEntity { Name = name, TypeLine = "Land", OracleText = oracle };
+        // Bind mana abilities too so a real tap-for-mana ManaAbilityActivatedEvent
+        // can be raised against the land's own mana ability (Forbidden Orchard).
+        OracleManaBinder.Bind(land, entity, _alice);
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, entity, _alice,
+            new[] { _alice, _bob }))
+        {
+            land.AddAbility(ab);
+        }
+        _triggers.BindCard(land);
+        return land;
+    }
+
+    // --- City of Brass: "Whenever this land becomes tapped, it deals 1 damage
+    //     to you." (CR 603.2 becomes-tapped trigger via PermanentTappedEvent.) -
+
+    [Fact]
+    public void CityOfBrass_BecomesTapped_DealsOneDamageToController()
+    {
+        var land = BindLand("City of Brass",
+            "Whenever this land becomes tapped, it deals 1 damage to you.\n"
+            + "{T}: Add one mana of any color.");
+
+        land.Tap();
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Pop()!.Resolve();
+
+        _alice.LifeTotal.Should().Be(19,
+            because: "becoming tapped deals 1 damage to the controller");
+    }
+
+    [Fact]
+    public void CityOfBrass_BecomesTapped_FiresRegardlessOfTapper()
+    {
+        var land = BindLand("City of Brass",
+            "Whenever this land becomes tapped, it deals 1 damage to you.");
+
+        // Tapped by an opponent's effect ("tap target land") — CR 603.2 keys on
+        // the permanent becoming tapped, not who tapped it. Should still fire.
+        land.Tap(causedBy: _bob);
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Pop()!.Resolve();
+
+        _alice.LifeTotal.Should().Be(19);
+    }
+
+    [Fact]
+    public void CityOfBrass_Untapping_DoesNotDeal()
+    {
+        var land = BindLand("City of Brass",
+            "Whenever this land becomes tapped, it deals 1 damage to you.");
+
+        land.Tap();
+        land.Untap();
+        // Drain the tap trigger from the first tap.
+        _triggers.PutPendingTriggersOnStack(_alice);
+        while (_stack.Count > 0) _stack.Pop()!.Resolve();
+        var lifeAfterFirstTap = _alice.LifeTotal;
+
+        // Untap does NOT publish a tap event, so no further trigger pends.
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Count.Should().Be(0, because: "untapping is not a becomes-tapped event");
+        _alice.LifeTotal.Should().Be(lifeAfterFirstTap);
+    }
+
+    // --- Forbidden Orchard: "Whenever you tap this land for mana, target
+    //     opponent creates a 1/1 colorless Spirit creature token." -----------
+
+    [Fact]
+    public void ForbiddenOrchard_TapForMana_OpponentGetsSpirit()
+    {
+        var land = BindLand("Forbidden Orchard",
+            "{T}: Add one mana of any color.\n"
+            + "Whenever you tap this land for mana, target opponent creates a 1/1 "
+            + "colorless Spirit creature token.");
+
+        // Simulate the tap-for-mana signal (CR 605 — mana abilities publish
+        // ManaAbilityActivatedEvent, the only observable tap-for-mana hook).
+        var manaAbility = land.Abilities.OfType<IManaAbility>().First();
+        _bus.Publish(new ManaAbilityActivatedEvent(manaAbility, _alice, ManaCost.Parse("U")));
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Pop()!.Resolve();
+
+        var spirits = _bob.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.Name == "Spirit")
+            .ToList();
+        spirits.Should().HaveCount(1, because: "the opponent creates one Spirit token");
+        var spirit = spirits[0];
+        spirit.Power.Should().Be(1);
+        spirit.Toughness.Should().Be(1);
+        spirit.IsToken.Should().BeTrue();
+        spirit.Controller.Should().Be(_bob, because: "the targeted opponent controls it");
+        Majik.Core.Cards.CardColors.GetColors(spirit).Should().BeEmpty(
+            because: "the Spirit is colorless");
+    }
+
+    [Fact]
+    public void ForbiddenOrchard_TapForMana_DoesNotFireForOtherLandsMana()
+    {
+        var land = BindLand("Forbidden Orchard",
+            "{T}: Add one mana of any color.\n"
+            + "Whenever you tap this land for mana, target opponent creates a 1/1 "
+            + "colorless Spirit creature token.");
+
+        // A DIFFERENT land's mana ability fires — must not trigger Orchard's
+        // Spirit (the condition gates on "this land" specifically).
+        var other = new Majik.Core.Cards.Land("Island") { Owner = _alice, Controller = _alice };
+        var otherMana = new Majik.Core.Abilities.ManaAbility(other, _alice, ManaCost.Parse("U"));
+        _bus.Publish(new ManaAbilityActivatedEvent(otherMana, _alice, ManaCost.Parse("U")));
+        _triggers.PutPendingTriggersOnStack(_alice);
+
+        _stack.Count.Should().Be(0, because: "the trigger is scoped to Forbidden Orchard's own mana");
+        _bob.Zones.Battlefield.GetCards().Should().BeEmpty();
     }
 }
