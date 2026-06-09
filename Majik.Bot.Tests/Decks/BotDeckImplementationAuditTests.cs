@@ -65,6 +65,31 @@ public class BotDeckImplementationAuditTests
             "Reality Smasher",
         };
 
+    /// <summary>Stub-heuristic false positives: <see cref="ICard.IsVanillaShell"/>
+    /// is true (the binder chain attached no <c>card.Abilities</c>) but the
+    /// card's printed behaviour DOES run — it lives in an OFF-CARD effect the
+    /// classifier cannot see (a continuous/replacement effect on a live per-game
+    /// service, not a <c>card.Ability</c>). Verified working via the GameFacade
+    /// prod path in <c>Majik.Core.Api.Tests.OffCardEffectLandBinderTests</c>.
+    /// Each entry names WHY. Real gaps go in
+    /// <see cref="KnownPartialImplementations"/>, NOT here. (None of these are
+    /// in the bot decks today, so the gate is unaffected — the allowlist is
+    /// kept in lock-step with the pool-wide audit's copy so the shared
+    /// detection logic stays consistent.)</summary>
+    private static readonly HashSet<string> StubHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // CR 305.7 — additive land-retype static, bound by
+            // AdditiveLandSubtypeBinder as an off-card continuous effect on the
+            // game's ContinuousEffectsService (not a card.Ability).
+            "Urborg, Tomb of Yawgmoth",
+            "Yavimaya, Cradle of Growth",
+            // CR 706.2 — "enter tapped as a copy of any land", bound by
+            // EntersAsCopyBinder as an off-card replacement effect on the
+            // game's ReplacementBus (not a card.Ability).
+            "Vesuva",
+        };
+
     /// <summary>Detection result for one distinct card name.</summary>
     private enum RawSignal { None, Stub, MissingTrigger }
 
@@ -150,7 +175,15 @@ public class BotDeckImplementationAuditTests
         // their behaviour lives in off-card continuous / replacement / CDA
         // effects the classifier can't see — so they are never stamped and no
         // allowlist is needed here.
-        if (card.IsVanillaShell)
+        //
+        // LANDS are the exception: they are never routed through a [CardName]
+        // factory (the instance-swap is gated on !HasType(Land)), so a land
+        // whose ONLY behaviour is an off-card continuous/replacement effect
+        // (Urborg additive static, Vesuva enters-as-copy replacement) reaches
+        // the binder-chain path with zero card.Abilities and IS stamped a
+        // vanilla shell — a false positive. The StubHeuristicAllowlist clears
+        // these provably-working off-card-effect lands.
+        if (card.IsVanillaShell && !StubHeuristicAllowlist.Contains(name))
             return RawSignal.Stub;
 
         var entity = Repo.GetByName(name);
