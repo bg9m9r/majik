@@ -3,6 +3,7 @@ using Majik.Bot.Decks;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
 using Majik.Bot.OpponentModel;
+using Majik.Bot.Strategies;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -49,6 +50,7 @@ internal sealed class SearchStrategy : IBotStrategy
 
     private readonly ArchetypeWeights _weights;
     private readonly bool _prioritySearchEnabled;
+    private readonly IDeckStrategy? _deckStrategy;
 
     /// <summary>
     /// Root-level block search (default ON): <see cref="PickBlockers"/> runs
@@ -232,8 +234,11 @@ internal sealed class SearchStrategy : IBotStrategy
     /// </summary>
     private readonly SearchGate? _gate;
 
+    /// <summary>Production constructor. Resolves the deck strategy from the
+    /// registry (null when no strategy is registered for the archetype, which
+    /// preserves byte-identical behaviour for all existing bots).</summary>
     public SearchStrategy(BotConfig config)
-        : this(config, ResolveGate(config))
+        : this(config, ResolveGate(config), deckOverride: null)
     {
     }
 
@@ -243,17 +248,38 @@ internal sealed class SearchStrategy : IBotStrategy
     /// through the public constructor → <see cref="ResolveGate"/>.
     /// </summary>
     internal SearchStrategy(BotConfig config, SearchGate? gate)
+        : this(config, gate, deckOverride: null)
+    {
+    }
+
+    /// <summary>Internal test-seam constructor. Accepts an explicit
+    /// <paramref name="deckOverride"/> so unit tests can inject stubs without
+    /// a registered <see cref="IDeckStrategy"/> in the assembly.</summary>
+    internal SearchStrategy(BotConfig config, IDeckStrategy? deckOverride)
+        : this(config, ResolveGate(config), deckOverride)
+    {
+    }
+
+    /// <summary>Core constructor — both test seams (isolated gate, deck-strategy
+    /// override) funnel here. Production resolves the gate via
+    /// <see cref="ResolveGate"/> and the deck strategy via
+    /// <see cref="DeckStrategyRegistry"/>.</summary>
+    internal SearchStrategy(BotConfig config, SearchGate? gate, IDeckStrategy? deckOverride)
     {
         ArgumentNullException.ThrowIfNull(config);
         _gate = gate;
-        _heuristic = new HeuristicStrategy(config);
+        // Resolve the per-deck strategic advisor.  deckOverride is the test-seam
+        // path; in production we ask the registry (null → unchanged behavior).
+        var deckStrategy = deckOverride ?? DeckStrategyRegistry.For(config.ArchetypeName);
+        _deckStrategy = deckStrategy;
+        _heuristic = new HeuristicStrategy(config, deckStrategy);
         // WeightsOverride: use explicit vector when provided; fall back to the
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
         _rootBlockSearch = config.RootBlockSearch ?? true;
         var mctsConfig = ConfigFrom(config);
-        var sim = new EngineSimulator(_weights, deck: null); // Task 5 wires the real deck strategy
+        var sim = new EngineSimulator(_weights, deck: deckStrategy);
         _mcts = new Mcts(sim, mctsConfig);
 
         // OpponentArchetype: resolve the decklist ONCE up front. A known archetype
@@ -624,6 +650,12 @@ internal sealed class SearchStrategy : IBotStrategy
     /// </summary>
     public PriorityAction PickPriorityAction(GameContext ctx, Player self)
     {
+        // Directive override: if the deck strategy has identified an assembled
+        // win-line and knows the next action, execute it immediately — before
+        // any heuristic or MCTS search.  Re-evaluated each priority window.
+        var win = _deckStrategy?.TryGetNextWinningAction(ctx, self);
+        if (win is not null) return win;
+
         // Short-circuit: if priority MCTS is disabled, delegate to the inner heuristic.
         // Used in tests where sandbox games hit the priority-loop-safety limit,
         // making each MCTS call prohibitively slow (e.g., unimplemented Burn cards).
