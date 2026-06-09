@@ -78,16 +78,11 @@ public class PriorityPolicy
         : this(weights, sink, vanillaTracker, deck: null) { }
 
     /// <summary>
-    /// Full-param constructor. <paramref name="deck"/> is the optional per-deck
-    /// strategic advisor threaded into <see cref="BoardEval.Score"/>; null → unchanged
-    /// behavior (Task 5 wires the real value).
+    /// Full-param constructor (sink + vanillaTracker + deck). Used by
+    /// <see cref="HeuristicStrategy"/> to thread the resolved deck strategy.
+    /// <paramref name="deck"/> null → unchanged behavior.
     /// </summary>
     public PriorityPolicy(
-        ArchetypeWeights weights,
-        IDeckStrategy? deck)
-        : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null, deck: deck) { }
-
-    private PriorityPolicy(
         ArchetypeWeights weights,
         IBotDecisionSink sink,
         Majik.Core.Diagnostics.VanillaShellTracker? vanillaTracker,
@@ -98,6 +93,15 @@ public class PriorityPolicy
         _vanillaTracker = vanillaTracker;
         _deck = deck;
     }
+
+    /// <summary>
+    /// Two-param constructor for callers that only need weights + deck.
+    /// Null deck → unchanged behavior.
+    /// </summary>
+    public PriorityPolicy(
+        ArchetypeWeights weights,
+        IDeckStrategy? deck)
+        : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null, deck: deck) { }
 
     public virtual PriorityAction Pick(GameContext ctx, Player self)
     {

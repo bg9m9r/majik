@@ -1,6 +1,7 @@
 using Majik.Bot.Combat;
 using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
+using Majik.Bot.Strategies;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -16,17 +17,30 @@ internal sealed class HeuristicStrategy : IBotStrategy
     private readonly PriorityPolicy _priority;
     private readonly CombatPolicy _combat;
     private readonly IBotDecisionSink _sink;
+    private readonly IDeckStrategy? _deckStrategy;
 
     private readonly Majik.Core.Diagnostics.VanillaShellTracker? _vanillaTracker;
 
+    /// <summary>Production constructor. Resolves the deck strategy from the
+    /// registry (null when no strategy is registered for the archetype, which
+    /// preserves byte-identical behaviour for all existing bots).</summary>
     public HeuristicStrategy(BotConfig config)
+        : this(config, deckOverride: null) { }
+
+    /// <summary>Internal test-seam constructor. Accepts an explicit
+    /// <paramref name="deckOverride"/> so unit tests can inject stubs without
+    /// a registered <see cref="IDeckStrategy"/> in the assembly.</summary>
+    internal HeuristicStrategy(BotConfig config, IDeckStrategy? deckOverride)
     {
         // WeightsOverride: use explicit vector when provided; fall back to the
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _sink = config.DecisionSink ?? NullBotDecisionSink.Instance;
         _vanillaTracker = config.VanillaShellTracker;
-        _priority = new PriorityPolicy(_weights, _sink, _vanillaTracker);
+        // Resolve the per-deck strategic advisor.  deckOverride is the test-seam
+        // path; in production we ask the registry (null → unchanged behavior).
+        _deckStrategy = deckOverride ?? DeckStrategyRegistry.For(config.ArchetypeName);
+        _priority = new PriorityPolicy(_weights, _sink, _vanillaTracker, _deckStrategy);
         // SimCombatBudgetMs caps the CombatPolicy stopwatch budget for sandbox
         // opponent agents inside MCTS. The production default (~800 ms) is used
         // when the field is null (live agent or test without an explicit cap).
@@ -34,10 +48,20 @@ internal sealed class HeuristicStrategy : IBotStrategy
         _combat = new CombatPolicy(_weights, budgetMs: combatBudgetMs, sink: _sink);
     }
 
-    public PriorityAction PickPriorityAction(GameContext ctx, Player self) => _priority.Pick(ctx, self);
+    public PriorityAction PickPriorityAction(GameContext ctx, Player self)
+    {
+        // Directive override: if the deck strategy has identified an assembled
+        // win-line and knows the next action, execute it immediately before any
+        // heuristic/search scoring.  Re-evaluated each priority window so it
+        // stays current with the board state.
+        var win = _deckStrategy?.TryGetNextWinningAction(ctx, self);
+        if (win is not null) return win;
+
+        return _priority.Pick(ctx, self);
+    }
 
     public MulliganDecision PickMulligan(IReadOnlyList<ICard> hand, int mulligansTaken)
-        => MulliganPolicy.Decide(hand, mulligansTaken);
+        => _deckStrategy?.AdviseMulligan(hand, mulligansTaken) ?? MulliganPolicy.Decide(hand, mulligansTaken);
 
     public IReadOnlyList<ICard> PickCardsToBottom(IReadOnlyList<ICard> hand, int countToBottom)
         => hand.OrderByDescending(c => c is Land ? 0 : 1).Take(countToBottom).ToList();
