@@ -975,6 +975,14 @@ public sealed class GameFacade : IDisposable
                 EntersWithCountersBinder.Bind(card, entity, replacements);
                 EntersAsCopyBinder.Bind(card, entity, replacements, effects);
                 OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
+                // Manland (creature-land) animate + Restless attack triggers.
+                // Lands are NEVER routed through their [CardName] factory (the
+                // factory instance-swap is gated on !shell.HasType(Land)), so
+                // the per-card manland factories are dead in production — this
+                // binder is the ONLY path that gives a real-match manland its
+                // animate ability + attack trigger. Reuses the shared
+                // AnimateLandEffect / keyword primitives the factories use.
+                ManlandBinder.Bind(card, entity, controller, effects, triggers);
                 OracleLoyaltyAbilityBinder.Bind(card, entity, controller);
                 // CR 305.7 — additive land-retype static ("Each land is a
                 // [basic] in addition to its other land types"): Urborg, Tomb
