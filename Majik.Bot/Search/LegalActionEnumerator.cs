@@ -78,13 +78,22 @@ internal static class LegalActionEnumerator
 
         // CR 602 — activated abilities of permanents the player controls.
         // Mana abilities are excluded (fired as part of mana payment, not here).
-        foreach (var card in self.Zones.Battlefield.GetCards())
+        // Affordability is symmetric with casting (CR 116.2a / 602.2):
+        //   - Mana costs are checked against UntappedManaSources (floating + untapped
+        //     tappable sources), so the bot enumerates activations the engine can pay
+        //     by auto-tapping — not only when the mana is already floating.
+        //   - Non-mana costs (tap, sacrifice, pay-life, etc.) continue to use
+        //     cost.CanPay(self) which checks the actual game-state condition.
         {
-            foreach (var ability in card.Abilities.OfType<IActivatedAbility>())
+            var manaAvailable = UntappedManaSources(self);
+            foreach (var card in self.Zones.Battlefield.GetCards())
             {
-                if (ability is IManaAbility) continue;
-                if (ability.Costs.All(cost => cost.CanPay(self)))
-                    result.Add(new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
+                foreach (var ability in card.Abilities.OfType<IActivatedAbility>())
+                {
+                    if (ability is IManaAbility) continue;
+                    if (CanAffordAbility(ability, self, manaAvailable))
+                        result.Add(new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
+                }
             }
         }
 
@@ -110,6 +119,53 @@ internal static class LegalActionEnumerator
     }
 
     // ── Helpers (same semantics as PriorityPolicy's private equivalents) ────────
+
+    /// <summary>
+    /// Affordability check for an activated ability — symmetric with spell
+    /// casting (CR 602.2 / 116.2a).
+    ///
+    /// <para>
+    /// The mana portion of the cost is checked against
+    /// <paramref name="manaAvailable"/> (= <see cref="UntappedManaSources"/>),
+    /// which includes both floating mana and untapped tappable sources.  This
+    /// matches the approximation used for spell casting and mirrors how
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> auto-taps sources to
+    /// pay mana costs at resolution.
+    /// </para>
+    ///
+    /// <para>
+    /// Non-mana costs (e.g. <c>{T}</c>, sacrifice, pay-life) keep their
+    /// existing <see cref="ICost.CanPay"/> check, which evaluates the actual
+    /// game-state condition (untapped + not summoning-sick for tap costs,
+    /// controller match for sacrifice, sufficient life for pay-life).
+    /// </para>
+    ///
+    /// <para>
+    /// Like <see cref="ApproxCmc"/>, this is colour-blind — it does not
+    /// verify that the available mana can satisfy the colour requirement.
+    /// The anti-spin memos and the engine's action-validator handle the rare
+    /// case where a colour mismatch prevents the cost from actually being paid
+    /// at resolution.
+    /// </para>
+    /// </summary>
+    private static bool CanAffordAbility(IActivatedAbility ability, Player self, int manaAvailable)
+    {
+        foreach (var cost in ability.Costs)
+        {
+            if (cost is Majik.Core.Costs.ManaCostCost manaCostCost)
+            {
+                // Mana portion: affordable by tapping — same model as casting.
+                if (manaCostCost.Cost.TotalValue > manaAvailable)
+                    return false;
+            }
+            else if (!cost.CanPay(self))
+            {
+                // Non-mana cost: tap, sacrifice, pay-life, etc.
+                return false;
+            }
+        }
+        return true;
+    }
 
     /// <summary>
     /// Converted mana cost via the engine's parser. Matches the convention
