@@ -13,13 +13,11 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Stormbreath Dragon (Theros, {3}{R}{R}).
 ///
 /// Creature — Dragon 4/4. Oracle text:
-///   "Flying.
-///    Haste.
-///    Protection from white.
-///    Monstrosity 3 ({5}{R}{R}: If this creature isn't monstrous, put
+///   "Flying, haste, protection from white
+///    {5}{R}{R}: Monstrosity 3. (If this creature isn't monstrous, put
 ///    three +1/+1 counters on it and it becomes monstrous.)
-///    When Stormbreath Dragon becomes monstrous, if you have seven or
-///    more cards in hand, it deals 3 damage to each opponent."
+///    When this creature becomes monstrous, it deals damage to each
+///    opponent equal to the number of cards in that player's hand."
 ///
 /// ## Implemented (v1)
 ///
@@ -44,12 +42,15 @@ namespace Majik.Core.CardData.Factories;
 ///   this creature isn't monstrous"). A future Monstrosity primitive
 ///   PR can lift the marker onto <see cref="Creature"/> and reuse the
 ///   gate.
-/// - <b>"Becomes monstrous" intervening-if trigger (CR 603.4 / CR 603.1)
-///   </b> — when the monstrosity activation resolves, the closure invokes
-///   the becomes-monstrous trigger inline: if Stormbreath Dragon's
-///   controller has seven or more cards in hand, the dragon deals 3
-///   damage to each opponent. The hand-size check is performed at
-///   resolution time of the monstrosity activation (one stage simpler
+/// - <b>"Becomes monstrous" trigger (CR 603.1)</b> — when the monstrosity
+///   activation resolves, the closure invokes the becomes-monstrous
+///   trigger inline: the dragon deals damage to EACH opponent equal to
+///   the number of cards in THAT opponent's own hand (a per-opponent
+///   variable — opponents with empty hands take zero; the controller's
+///   hand size is irrelevant). There is no hand-size threshold gate (the
+///   pre-errata "if you have seven or more cards in hand, 3 damage"
+///   wording is no longer printed). The per-opponent hand count is read
+///   at resolution time of the monstrosity activation (one stage simpler
 ///   than firing as a separate triggered ability on the stack — v1
 ///   convenience, see "Deferred" below).
 ///
@@ -73,15 +74,25 @@ namespace Majik.Core.CardData.Factories;
 ///   primitive's event. Same posture as the Plot deferral noted on
 ///   <see cref="SlickshotShowOffFactory"/>.
 /// - <b>Becomes-monstrous trigger as a real <see cref="TriggeredAbility"/>
-///   on the stack</b>: today the intervening-if check + damage runs
-///   inline at the end of the monstrosity activation resolve. A future
-///   PR can split this into a proper triggered ability that queues on
-///   the stack after the monstrosity activation finishes resolving,
-///   honouring CR 603.6c intervening-if semantics fully (the hand check
-///   would happen twice — once when the trigger goes on the stack,
-///   again when it resolves; the v1 single-point check is
-///   indistinguishable for any card that doesn't change controller's
-///   hand size between those two snapshots, which is the typical case).
+///   on the stack</b>: today the damage runs inline at the end of the
+///   monstrosity activation resolve. A future PR can split this into a
+///   proper triggered ability that queues on the stack after the
+///   monstrosity activation finishes resolving (CR 603.3 — put on the
+///   stack the next time a player would receive priority), so the
+///   per-opponent hand count is locked in when the ability resolves
+///   rather than at the moment monstrosity resolves. The two snapshots
+///   are indistinguishable for any card that doesn't change an
+///   opponent's hand size in between, which is the typical case.
+/// - <b>Opponents resolution in the production routed build</b>: the
+///   becomes-monstrous damage needs the live opponent list, supplied via
+///   the <see cref="Create(Player, Func{IReadOnlyList{Player}}?)"/>
+///   overload's <c>opponentsResolver</c>. The GameFacade routed build
+///   currently dispatches the single-arg <see cref="Create(Player)"/>
+///   overload (resolver = null), so the damage is inert in a live match
+///   — the SAME latent gap as Yawgmoth / Priest of Forgotten Gods, which
+///   also iterate opponents via an injected resolver the routed build
+///   doesn't wire. Lifting a shared game-context resolver into the routed
+///   build is its own cross-cutting PR.
 /// </summary>
 [CardName("Stormbreath Dragon")]
 public static class StormbreathDragonFactory
@@ -92,8 +103,6 @@ public static class StormbreathDragonFactory
     public const int Toughness = 4;
     public const string MonstrosityCost = "{5}{R}{R}";
     public const int MonstrosityCounters = 3;
-    public const int BecomesMonstrousHandSize = 7;
-    public const int BecomesMonstrousDamage = 3;
 
     /// <summary>
     /// Construct Stormbreath Dragon with no opponents resolver. The
@@ -136,7 +145,7 @@ public static class StormbreathDragonFactory
         // monstrous, …").
         StormbreathDragonAbility? monstrosity = null;
         var monstrosityEffect = new Effect(
-            $"{CardName}: become monstrous — +3/+3 counters, then check hand size for 3 to each opponent",
+            $"{CardName}: become monstrous — +3/+3 counters, then deal each opponent damage equal to that opponent's hand size",
             () =>
             {
                 if (monstrosity == null) return;
@@ -146,14 +155,15 @@ public static class StormbreathDragonFactory
                 card.Counters.Add(CounterType.PlusOnePlusOne, MonstrosityCounters);
                 monstrosity.IsMonstrous = true;
 
-                // CR 603.1 / 603.6c — becomes-monstrous trigger with
-                // intervening-if "if you have seven or more cards in
-                // hand". Resolved inline; the hand snapshot is taken
-                // from the live controller hand zone at activation
-                // resolution time (see class xmldoc "Deferred" for
-                // the split-trigger gap).
+                // CR 603.1 — "When this creature becomes monstrous, it
+                // deals damage to each opponent equal to the number of
+                // cards in that player's hand." Resolved inline; the
+                // per-opponent hand count is read from each opponent's
+                // live hand zone at activation resolution time (see class
+                // xmldoc "Deferred" for the split-trigger gap). No
+                // hand-size threshold — an opponent with an empty hand
+                // simply takes zero.
                 var controller = card.Controller ?? owner;
-                if (controller.Zones.Hand.GetCards().Count() < BecomesMonstrousHandSize) return;
 
                 var opponents = opponentsResolver?.Invoke();
                 if (opponents == null) return;
@@ -162,7 +172,9 @@ public static class StormbreathDragonFactory
                 {
                     if (ReferenceEquals(opp, controller)) continue; // defensive
                     if (opp.HasLost) continue;
-                    opp.LoseLife(BecomesMonstrousDamage);
+                    var damage = opp.Zones.Hand.GetCards().Count();
+                    if (damage <= 0) continue;
+                    opp.LoseLife(damage);
                 }
             });
 
