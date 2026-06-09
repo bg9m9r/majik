@@ -114,34 +114,55 @@ internal sealed class BelcherStrategy : IDeckStrategy
         return score;
     }
 
+    // ── Mana thresholds ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Minimum mana in the floating pool required to cast Goblin Charbelcher
+    /// ({4}) AND immediately activate it ({3},{T}) in the same priority window
+    /// after resolution.  The full line costs 4 + 3 = 7 total mana, all of
+    /// which must be available as floating mana (the Belcher deck runs 0 lands,
+    /// so there is no tap-to-pay source available after rituals burn their
+    /// mana).
+    ///
+    /// <para>
+    /// Rationale: if the directive allowed casting Charbelcher whenever the
+    /// pool >= 4 (the bare cast cost), the pool would be 0 after the cast and
+    /// the activation would be impossible the same turn.  The heuristic fallback
+    /// also scores the cast positively at pool = 4, so without this threshold
+    /// the bot always casts Charbelcher sub-optimally and then stalls (board
+    /// shows Charbelcher but 0 mana → 0/12 belch activations observed in the
+    /// 12-game pilot run).
+    /// </para>
+    /// </summary>
+    private const int MinManaForFullLine = 7; // {4} cast + {3} activation
+
     // ── TryGetNextWinningAction ─────────────────────────────────────────────
 
     /// <summary>
-    /// DIRECTIVE atomic-kill override.
+    /// DIRECTIVE atomic-kill override — two arms:
     ///
-    /// <para>
-    /// Returns the Goblin Charbelcher activation whenever:
     /// <list type="number">
-    ///   <item>Charbelcher is on the battlefield.</item>
-    ///   <item>The activation costs ({3}, {T}) are payable — i.e. the
-    ///     Charbelcher is untapped AND the player's mana pool contains at
-    ///     least {3} (typically from a ritual chain resolved this turn).</item>
-    ///   <item>There is a valid opponent to target.</item>
+    ///   <item>
+    ///     <b>Activate arm</b> — Charbelcher is already on the battlefield,
+    ///     untapped, and the floating pool contains ≥ {3}.  Returns the
+    ///     activation immediately; the belch deals ~50 damage in a single
+    ///     resolution and ends the game on the spot.
+    ///   </item>
+    ///   <item>
+    ///     <b>Cast arm</b> — Charbelcher is in hand and the floating pool
+    ///     contains ≥ {7} ({4} for the cast + {3} for the immediate
+    ///     activation).  Directs a sorcery-speed CastSpell so that after
+    ///     resolution the pool still has ≥ {3} floating and the activate arm
+    ///     fires on the next priority call.
+    ///     The cast arm short-circuits the heuristic's sub-optimal path of
+    ///     casting at pool = 4 (which drains the pool and strands Charbelcher
+    ///     on the board with no activation mana).
+    ///   </item>
     /// </list>
-    /// </para>
     ///
     /// <para>
-    /// The Belcher deck runs near-zero lands, so the belch deals ~50 damage in
-    /// a single activation — an immediate game-ending event that the MCTS
-    /// search cannot discover via board-eval.  Firing the activation when the
-    /// above conditions hold is always correct.
-    /// </para>
-    ///
-    /// <para>
-    /// If Charbelcher is in hand but not yet on the board this method returns
-    /// null and defers to the search (the cast is not itself an atomic kill;
-    /// the search should find the cast naturally once mana is available, guided
-    /// by <see cref="StrategicScore"/>).
+    /// If neither arm fires (Charbelcher not assembled, or pool insufficient),
+    /// returns null and defers to the search / heuristic.
     /// </para>
     /// </summary>
     public PriorityAction? TryGetNextWinningAction(GameContext ctx, Player self)
@@ -150,12 +171,37 @@ internal sealed class BelcherStrategy : IDeckStrategy
         var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
         if (opponent is null) return null;
 
-        // Charbelcher must be on the battlefield with its activation costs
-        // payable ({3} in pool + Charbelcher untapped).
+        // ── Arm 1: activate — Charbelcher on board with {3} floating ─────────
         // BuildActivate null-guards: returns null if the permanent is absent
         // OR if any of its costs (ManaCostCost("{3}") + AdditionalCost.Tap)
         // cannot be paid — exactly the correct gate.
-        return DeckStrategyHelpers.BuildActivate(ctx, self, GoblinCharbelcher, target: opponent);
+        var activate = DeckStrategyHelpers.BuildActivate(ctx, self, GoblinCharbelcher, target: opponent);
+        if (activate is not null) return activate;
+
+        // ── Arm 2: cast — Charbelcher in hand, pool ≥ 7 (full line affordable)
+        // Only fire when the floating pool already covers the cast ({4}) AND
+        // the subsequent activation ({3}).  ManaCostCost.CanPay checks the
+        // floating pool only (not tappable sources), which is correct here:
+        // the Belcher deck has no tappable mana sources after rituals resolve
+        // (Talisman / Treasure are either already tapped or absent), so the
+        // full 7 must be floating.
+        //
+        // Sorcery-window guard mirrors DeckStrategyHelpers.BuildCast: require
+        // active player + main phase + empty stack (CR 116.2a).  The card is
+        // a sorcery-speed permanent ({4} artifact), so instant-speed bypass
+        // is not available.
+        if (DeckStrategyHelpers.HasInHand(self, GoblinCharbelcher)
+            && self.ManaPool.Total >= MinManaForFullLine)
+        {
+            // BuildCast applies the affordability gate (ApproxCmc({4}) = 4 ≤
+            // UntappedManaSources) and the sorcery-window gate. If either fails
+            // (e.g. wrong phase, stack non-empty, or timing mismatch) it returns
+            // null and we fall through to the heuristic.
+            var cast = DeckStrategyHelpers.BuildCast(ctx, self, GoblinCharbelcher);
+            if (cast is not null) return cast;
+        }
+
+        return null;
     }
 
     // ── AdviseMulligan ──────────────────────────────────────────────────────
