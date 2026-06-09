@@ -290,7 +290,7 @@ public class GristTests
     {
         var zones = new ZoneService();
         var grist = GristFactory.Create(_alice, zones,
-            sacrificeResolver: null, destroyTargetResolver: null, opponentsResolver: null);
+            sacrificeResolver: null, destroyTargetResolver: null);
         _alice.Zones.Battlefield.AddCard(grist);
         grist.SetZone(ZoneType.Battlefield);
 
@@ -327,7 +327,7 @@ public class GristTests
     {
         var zones = new ZoneService();
         var grist = GristFactory.Create(_alice, zones,
-            sacrificeResolver: null, destroyTargetResolver: null, opponentsResolver: null);
+            sacrificeResolver: null, destroyTargetResolver: null);
         _alice.Zones.Battlefield.AddCard(grist);
         grist.SetZone(ZoneType.Battlefield);
 
@@ -366,7 +366,7 @@ public class GristTests
     {
         var zones = new ZoneService();
         var grist = GristFactory.Create(_alice, zones,
-            sacrificeResolver: null, destroyTargetResolver: null, opponentsResolver: null);
+            sacrificeResolver: null, destroyTargetResolver: null);
         _alice.Zones.Battlefield.AddCard(grist);
         grist.SetZone(ZoneType.Battlefield);
         // Empty library — mill returns nothing, not an Insect.
@@ -405,8 +405,7 @@ public class GristTests
         var grist2 = GristFactory.Create(_alice,
             zones: null,
             sacrificeResolver: () => new[] { sac },
-            destroyTargetResolver: () => new Permanent[] { victim },
-            opponentsResolver: null);
+            destroyTargetResolver: () => new Permanent[] { victim });
         _alice.Zones.Battlefield.AddCard(grist2);
         grist2.SetZone(ZoneType.Battlefield);
 
@@ -430,8 +429,7 @@ public class GristTests
         var grist = GristFactory.Create(_alice,
             zones: null,
             sacrificeResolver: null,
-            destroyTargetResolver: () => new Permanent[] { victim },
-            opponentsResolver: null);
+            destroyTargetResolver: () => new Permanent[] { victim });
         _alice.Zones.Battlefield.AddCard(grist);
         grist.SetZone(ZoneType.Battlefield);
 
@@ -468,18 +466,105 @@ public class GristTests
         var grist = GristFactory.Create(_alice,
             zones: null,
             sacrificeResolver: null,
-            destroyTargetResolver: null,
-            opponentsResolver: () => new[] { bob, carol });
+            destroyTargetResolver: null);
         _alice.Zones.Battlefield.AddCard(grist);
         grist.SetZone(ZoneType.Battlefield);
 
         var minus5 = grist.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -5);
         // Need at least 5 loyalty to use the ultimate.
         grist.AddLoyalty(2); // 3 -> 5
-        minus5.Activate();
+        minus5.PayLoyaltyCost();
+        // The −5 reads opponents off the LIVE resolution context — resolve its
+        // effects through a GameContext exactly as the dispatch path does.
+        ResolveLoyaltyWithGame(minus5, _alice, _alice, bob, carol);
 
         grist.Loyalty.Should().Be(0, "5 - 5 = 0");
         bob.LifeTotal.Should().Be(17, "20 - 3 creature cards");
         carol.LifeTotal.Should().Be(17, "20 - 3 creature cards");
+    }
+
+    [Fact]
+    public void Grist_Minus5_ReadsOpponentsFromContext_NotControllerOrLostPlayers()
+    {
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        carol.MarkLost(); // a player who has left the game is not hit (CR 800.4a).
+
+        var creature = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        creature.SetOwner(_alice);
+        _alice.Zones.Graveyard.AddCard(creature); creature.SetZone(ZoneType.Graveyard);
+
+        var grist = GristFactory.Create(_alice,
+            zones: null,
+            sacrificeResolver: null,
+            destroyTargetResolver: null);
+        _alice.Zones.Battlefield.AddCard(grist);
+        grist.SetZone(ZoneType.Battlefield);
+
+        var minus5 = grist.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -5);
+        grist.AddLoyalty(2);
+        minus5.PayLoyaltyCost();
+        ResolveLoyaltyWithGame(minus5, _alice, _alice, bob, carol);
+
+        _alice.LifeTotal.Should().Be(20, "the controller is never their own opponent");
+        bob.LifeTotal.Should().Be(19, "20 - 1 creature card");
+        carol.LifeTotal.Should().Be(20, "a player who has lost the game is not affected");
+    }
+
+    /// <summary>
+    /// PROD-PATH guard (the resolver-null bug class). The routed prod build
+    /// resolves the loyalty ability through the stack
+    /// (<c>TurnDriver.DispatchLoyalty → ActivatedAbility.ResolveAsync</c>),
+    /// which threads the live <see cref="GameContext"/> into <c>rc.Game</c>.
+    /// Grist built via <see cref="NamedCardFactory"/> (no captured resolver)
+    /// must make each opponent lose life when resolved that way.
+    /// </summary>
+    [Fact]
+    public void Grist_Minus5_EachOpponentLosesLife_OnProdBuild()
+    {
+        var bob = new Player("Bob", 20);
+
+        var built = NamedCardFactory.Create("Grist, the Hunger Tide", _alice);
+        built.Should().BeOfType<Planeswalker>();
+        var grist = (Planeswalker)built;
+        _alice.Zones.Battlefield.AddCard(grist);
+        grist.SetZone(ZoneType.Battlefield);
+
+        var creature = new Creature("Tarmogoyf", "{1}{G}", 2, 2);
+        creature.SetOwner(_alice);
+        _alice.Zones.Graveyard.AddCard(creature); creature.SetZone(ZoneType.Graveyard);
+
+        var minus5 = grist.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -5);
+        grist.AddLoyalty(2);
+        minus5.PayLoyaltyCost();
+        ResolveLoyaltyWithGame(minus5, _alice, _alice, bob);
+
+        bob.LifeTotal.Should().Be(19,
+            "the prod-built −5 reads opponents from the live context (not inert)");
+    }
+
+    /// <summary>
+    /// Resolve a loyalty ability's effects through the async resolution path
+    /// with a live <see cref="GameContext"/> built from <paramref name="players"/>,
+    /// mirroring how <c>TurnDriver.DispatchLoyalty</c> builds the
+    /// <see cref="Abilities.ActivatedAbility"/> stack object and resolves it.
+    /// </summary>
+    private static void ResolveLoyaltyWithGame(
+        LoyaltyAbility loyalty, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        var stackObject = new Majik.Core.Abilities.ActivatedAbility(
+            source: loyalty.Source,
+            controller: controller,
+            costs: null,
+            effects: loyalty.Effects);
+        stackObject.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

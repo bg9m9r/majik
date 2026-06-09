@@ -38,13 +38,17 @@ namespace Majik.Core.CardData.Factories;
 ///   reads (same marker as <see cref="PhyrexianCrusaderFactory"/> /
 ///   <see cref="BorosReckonerFactory"/>).
 /// - <b>ETB triggered ability with an intervening-if (CR 603.4 / CR 603.6a)</b>
-///   over <see cref="Triggers.OnEnterBattlefieldSelf"/>. The
-///   <see cref="TriggeredAbility.InterveningIf"/> is checked twice (CR 603.4):
-///   once as the ability would go on the stack and again as it resolves
-///   (this factory's effect re-checks the predicate on resolution too). The
+///   over <see cref="Triggers.OnEnterBattlefieldSelf"/>. The "an opponent
+///   controls more lands than you" comparison reads the LIVE game off the
+///   resolution context (<c>ctx.Game.AllPlayers</c>, filtered to
+///   non-controller / not-lost) at resolution — NOT a captured resolver. The
 ///   predicate reads true iff at least one opponent controls strictly more
 ///   lands than the controller (CR 603.4 — "more lands than you" is a strict
-///   comparison; a tie does not satisfy it).
+///   comparison; a tie does not satisfy it). The authoritative check is at
+///   resolution; the parameterless stack-placement intervening-if is left null
+///   (it has no GameContext to read the live board), so a do-nothing instance
+///   of the "may" ability may briefly sit on the stack when no opponent
+///   out-lands you — its resolution is a clean no-op.
 /// - <b>"May search ... for a Plains card, put it onto the battlefield, then
 ///   shuffle" (CR 701.19a / CR 701.20a)</b>. "A Plains card" reads the Plains
 ///   land subtype (CR 305.6) so it matches basic Plains and any non-basic
@@ -63,13 +67,14 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Wiring overloads
 /// - <see cref="Create(Player)"/> — shape + First strike + ETB trigger
-///   attached for inspection; the intervening-if reduces to false (no
-///   opponents resolver, so no opponent can out-land you). This is the
-///   overload <see cref="NamedCardFactory"/> dispatches to.
-/// - <see cref="Create(Player, TriggerManager?, Func{IReadOnlyList{Player}}?)"/>
-///   — registers the ETB trigger with the supplied
-///   <see cref="TriggerManager"/> and walks the supplied
-///   <paramref name="opponentsResolver"/> for the land-count comparison.
+///   attached. The land-count comparison reads the live resolution context, so
+///   it is correct on the production routed build (no captured resolver). This
+///   is the overload <see cref="NamedCardFactory"/> / the routed prod build
+///   dispatches to; the live engine registers the trigger via
+///   <c>TriggerManager.BindCard</c> when the Knight enters.
+/// - <see cref="Create(Player, TriggerManager?)"/> — additionally registers the
+///   ETB trigger with the supplied <see cref="TriggerManager"/> for tests that
+///   drive the bus-fired trigger path directly.
 /// </summary>
 [CardName("Knight of the White Orchid")]
 public static class KnightOfTheWhiteOrchidFactory
@@ -80,11 +85,13 @@ public static class KnightOfTheWhiteOrchidFactory
     /// <summary>
     /// Shape-only overload — First strike + ETB trigger attached without
     /// registering with a <see cref="TriggerManager"/>. The intervening-if
-    /// reduces to false (no opponents resolver). This is the overload
-    /// <see cref="NamedCardFactory"/> dispatches to.
+    /// land-count comparison reads the live resolution context, so it is
+    /// correct on the production routed build (see the class xmldoc). This is
+    /// the overload <see cref="NamedCardFactory"/> / the routed prod build
+    /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, opponentsResolver: null);
+        => Create(owner, triggers: null);
 
     /// <summary>
     /// Construct Knight of the White Orchid with its ETB trigger attached and
@@ -95,14 +102,9 @@ public static class KnightOfTheWhiteOrchidFactory
     /// <param name="triggers">When supplied, the ETB trigger registers so a
     /// qualifying <see cref="Majik.Core.Events.CardMovedEvent"/> queues the
     /// ability on the stack automatically (CR 603.2).</param>
-    /// <param name="opponentsResolver">When supplied, the intervening-if
-    /// (CR 603.4) walks this resolver's players and reads true iff one of
-    /// them controls strictly more lands than the controller. Null →
-    /// false (no opponent to out-land you — shape path).</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentsResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -122,21 +124,42 @@ public static class KnightOfTheWhiteOrchidFactory
         //    than you, you may search your library for a Plains card, put it
         //    onto the battlefield, then shuffle."
         //
-        // CR 603.4 — the intervening-if is checked both when the ability would
-        // be put on the stack (TriggeredAbility.CanBePutOnStack) AND again as
-        // it resolves; this factory re-checks the predicate inside the effect
-        // for the resolution check too. "More lands than you" is strict — a
-        // tie does NOT satisfy it.
+        // The "an opponent controls more lands than you" comparison reads the
+        // LIVE game at RESOLUTION (ctx.Game.AllPlayers, filtered to
+        // non-controller / not-lost) — NOT a captured opponentsResolver. The
+        // production routed build (GameFacade.BuildDeckCard →
+        // NamedCardFactory.Create(name, owner, effects) → single-arg shape
+        // build) left that resolver null, so the predicate ALWAYS read false in
+        // real games and the Knight NEVER fetched a Plains (only the resolver-
+        // injecting factory-direct tests saw the tutor). Reading the live
+        // context fixes the routed build (mirrors Stormbreath #2540 / Yawgmoth +
+        // Priest #2543). "More lands than you" is strict — a tie does NOT
+        // satisfy it.
+        //
+        // CR 603.4 — the intervening-if is normally checked both as the ability
+        // would go on the stack (CanBePutOnStack) AND again as it resolves. The
+        // stack-placement check is parameterless and has no GameContext to read
+        // the live board from, so it is left permissive (interveningIf: null —
+        // the trigger goes on the stack) and the AUTHORITATIVE check happens at
+        // resolution, where ctx.Game is live. The only observable effect of the
+        // deferred stack-placement check is that a do-nothing instance of the
+        // "may" ability can sit on the stack when no opponent out-lands you;
+        // its resolution is a clean no-op (no Plains is fetched), so the tutor
+        // outcome is correct. This is the same resolution-time-gating posture
+        // every other opponent-board-conditional ETB in the engine uses
+        // (e.g. the OracleTriggeredAbilityBinder opponent riders).
         // --------------------------------------------------------------------
-        bool AnOpponentControlsMoreLands()
+        bool AnOpponentControlsMoreLands(ResolutionContext ctx)
         {
-            var opponents = opponentsResolver?.Invoke();
-            if (opponents == null) return false;
+            var players = ctx.Game?.AllPlayers;
+            if (players == null) return false;
             var controller = card.Controller ?? owner;
             var myLands = CountLands(controller);
-            foreach (var opp in opponents)
+            foreach (var opp in players)
             {
-                if (opp == null || ReferenceEquals(opp, controller)) continue;
+                // CR 102.1 — the controller is never their own opponent.
+                if (ReferenceEquals(opp, controller)) continue;
+                if (opp.HasLost) continue;
                 if (CountLands(opp) > myLands) return true;
             }
             return false;
@@ -146,8 +169,9 @@ public static class KnightOfTheWhiteOrchidFactory
             $"{CardName}: if an opponent controls more lands, may tutor a Plains to battlefield, then shuffle",
             async ctx =>
             {
-                // CR 603.4 — resolution-time re-check of the intervening-if.
-                if (!AnOpponentControlsMoreLands()) return;
+                // CR 603.4 — authoritative resolution-time check of the
+                // intervening-if, reading the live game off the context.
+                if (!AnOpponentControlsMoreLands(ctx)) return;
                 var controller = card.Controller ?? owner;
                 await TutorPlainsToBattlefieldAsync(controller, ctx).ConfigureAwait(false);
             });
@@ -157,7 +181,9 @@ public static class KnightOfTheWhiteOrchidFactory
             controller: owner,
             condition: Triggers.OnEnterBattlefieldSelf(card),
             effects: new IEffect[] { etbEffect },
-            interveningIf: AnOpponentControlsMoreLands,
+            // interveningIf left null — see the block comment above (CanBePutOnStack
+            // has no GameContext; the authoritative check is at resolution).
+            interveningIf: null,
             activeZones: new[] { ZoneType.Battlefield });
 
         card.AddAbility(etb);

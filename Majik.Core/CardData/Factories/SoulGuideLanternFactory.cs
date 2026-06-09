@@ -34,10 +34,11 @@ namespace Majik.Core.CardData.Factories;
 ///   + <see cref="AdditionalCost.Sacrifice"/>. The self-sac zone move is
 ///   performed by the effect closure because the generic Sacrifice cost
 ///   path is a no-op stub today (same posture as Tormod's Crypt / Relic of
-///   Progenitus). Resolution iterates the supplied
-///   <paramref name="opponentsResolver"/> (or, when omitted, an empty list
-///   — shape-only path used by structural tests) and moves every card in
-///   each opponent's graveyard to that opponent's exile zone.
+///   Progenitus). Resolution reads the opponents from the LIVE game
+///   (<c>rc.Game.AllPlayers</c>, filtered to non-controller) at resolution —
+///   NOT a captured resolver — and moves every card in each opponent's
+///   graveyard to that opponent's exile zone. Without a live game context
+///   (shape-only path) the sweep is a safe no-op.
 /// - <b>{1}, {T}, Sacrifice: Draw a card.</b> Wired as a second
 ///   <see cref="ActivatedAbility"/> with <see cref="ManaCostCost"/>{1} +
 ///   <see cref="AdditionalCost.Tap"/> + <see cref="AdditionalCost.Sacrifice"/>.
@@ -64,26 +65,33 @@ public static class SoulGuideLanternFactory
     public const string PrintedManaCost = "{1}";
 
     /// <summary>
-    /// Construct Soul-Guide Lantern with no live opponents resolver. The
-    /// {T}, Sacrifice graveyard-sweep ability still resolves cleanly but
-    /// sweeps zero graveyards (suitable for card-shape / dispatcher
-    /// tests).
+    /// Construct Soul-Guide Lantern. The {T}, Sacrifice graveyard-sweep ability
+    /// reads its opponents from the LIVE resolution context at resolution time
+    /// (a safe no-op when resolved without a live game). This is the overload
+    /// <see cref="NamedCardFactory"/> / the routed prod build dispatches to.
     /// </summary>
-    public static Artifact Create(Player owner) => Create(owner, triggers: null, opponentsResolver: null);
+    public static Artifact Create(Player owner) => Create(owner, triggers: null);
 
     /// <summary>
     /// Construct Soul-Guide Lantern with optional <see cref="TriggerManager"/>
-    /// registration for the ETB trigger and an optional opponents-resolver
-    /// for the sweep ability. When <paramref name="triggers"/> is supplied
-    /// the ETB trigger is registered for bus-driven firing. When
-    /// <paramref name="opponentsResolver"/> is supplied the sweep ability
-    /// iterates each opponent's graveyard at resolution; without it the
-    /// sweep is a no-op (shape-only path).
+    /// registration for the ETB trigger. When <paramref name="triggers"/> is
+    /// supplied the ETB trigger is registered for bus-driven firing.
+    ///
+    /// The {T}, Sacrifice graveyard-sweep ability reads its opponents from the
+    /// LIVE game at RESOLUTION (<c>rc.Game.AllPlayers</c>, filtered to
+    /// non-controller) — NOT a captured resolver. Previously the sweep captured
+    /// a <c>Func&lt;IReadOnlyList&lt;Player&gt;&gt; opponentsResolver</c> at
+    /// build time; the production routed build
+    /// (<c>GameFacade.BuildDeckCard → NamedCardFactory.Create(name, owner,
+    /// effects)</c>) dispatches the single-arg shape build, which left that
+    /// resolver null, so the sweep exiled ZERO graveyards in real games (only
+    /// the resolver-injecting factory-direct tests saw it run). Reading the live
+    /// context fixes the routed build (mirrors Stormbreath #2540 / Yawgmoth +
+    /// Priest #2543).
     /// </summary>
     public static Artifact Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentsResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -129,10 +137,18 @@ public static class SoulGuideLanternFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: exile each opponent's graveyard",
-            () =>
+            rc =>
             {
                 SacrificeSelf(lantern, owner);
-                ExileEachOpponentGraveyard(owner, opponentsResolver);
+                // Read opponents from the LIVE game at resolution
+                // (rc.Game.AllPlayers, filtered to non-controller) — NOT a
+                // captured resolver — so the sweep is correct on the routed
+                // prod build (the resolver-null bug this fix addresses). With no
+                // game context (shape-only Resolve) there are no opponents, so
+                // the sweep is a safe no-op.
+                var controller = lantern.Controller ?? owner;
+                ExileEachOpponentGraveyard(controller, rc.Game?.AllPlayers);
+                return default;
             });
 
         var sweepAbility = new ActivatedAbility(
@@ -207,13 +223,14 @@ public static class SoulGuideLanternFactory
     }
 
     private static void ExileEachOpponentGraveyard(
-        Player owner,
-        Func<IReadOnlyList<Player>>? opponentsResolver)
+        Player controller,
+        IReadOnlyList<Player>? allPlayers)
     {
-        var opponents = opponentsResolver?.Invoke() ?? (IReadOnlyList<Player>)Array.Empty<Player>();
-        foreach (var opp in opponents)
+        if (allPlayers == null) return;
+        foreach (var opp in allPlayers)
         {
-            if (ReferenceEquals(opp, owner)) continue;
+            // CR 102.1 — the controller is never their own opponent.
+            if (ReferenceEquals(opp, controller)) continue;
             var graveyardCards = opp.Zones.Graveyard.GetCards().ToList();
             foreach (var card in graveyardCards)
             {
