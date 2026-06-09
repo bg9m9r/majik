@@ -102,67 +102,27 @@ internal sealed class GrixisReanimatorStrategy : IDeckStrategy
     // ── TryGetNextWinningAction ─────────────────────────────────────────────
 
     /// <summary>
-    /// Returns the next action of an assembled win-line when one is
-    /// immediately executable, else null.
+    /// Advisory-only — always returns <see langword="null"/>.
     ///
-    /// <para><b>Win-line 1 — Reanimate Emperor to set up the Archon chain:</b>
-    /// Archon is in the graveyard AND a Persist or Unearth is in hand AND
-    /// Emperor of Bones is in the graveyard (the engine piece needed after
-    /// cast) AND mana+timing allows → cast Persist (or Unearth) targeting
-    /// Emperor of Bones. Emperor then uses its begin-of-combat ability to
-    /// exile Archon, adapts to gain a +1/+1 counter, and returns Archon
-    /// under our control.</para>
+    /// <para>Reanimation is a 2-turn ENGINE (discard Archon → reanimate Emperor
+    /// → adapt → Archon returns), NOT an atomic kill. Directive override of the
+    /// MCTS search on a multi-turn engine over-commits the bot to the combo
+    /// line regardless of board state, which loses: a controlled measurement
+    /// showed 20 % win-rate with directive enabled (combo fired 12/16 games)
+    /// vs the no-strategy baseline.</para>
     ///
-    /// <para><b>Target handling:</b> the Emperor of Bones card object from
-    /// the graveyard is passed as the explicit <c>target</c> to
-    /// <see cref="DeckStrategyHelpers.BuildCast"/>. This folds it into the
-    /// <see cref="PriorityAction.CastSpell.Targets"/> list exactly as
-    /// <see cref="PersistCardFactory.BuildSpellDefinition"/> expects a
-    /// single graveyard-creature target (CMC ≤ 3 — Emperor is CMC 2). If
-    /// the engine's target-resolution pipeline discards the pre-set target
-    /// and re-prompts the bot agent, the <see cref="Bot.Search.TargetPolicy"/>
-    /// will pick the best legal candidate from the graveyard anyway — so this
-    /// is correct regardless of which path fires.</para>
-    ///
-    /// <para><b>Win-line 2 — Enable graveyard fill:</b> if Archon is NOT yet
-    /// in the graveyard but Faithless Looting is in hand and castable (the
-    /// cheapest enabler at {R}), direct the bot to cast it so the plan
-    /// progresses. Sorcery-speed gate is enforced by BuildCast.</para>
-    ///
-    /// Returns null when neither line is executable this priority window.
+    /// <para><see cref="StrategicScore"/> steers the search toward assembling
+    /// and executing the engine; the search evaluates whether each line pays off
+    /// and decides timing autonomously. Directive override is reserved for
+    /// ATOMIC, (near-)immediate kills — see
+    /// <see cref="IDeckStrategy.TryGetNextWinningAction"/>.</para>
     /// </summary>
     public PriorityAction? TryGetNextWinningAction(GameContext ctx, Player self)
     {
-        // Win-line 1: reanimate Emperor (sets up Archon chain).
-        if (DeckStrategyHelpers.HasInGraveyard(self, ArchonOfCruelty)
-            && DeckStrategyHelpers.HasInGraveyard(self, EmperorOfBones))
-        {
-            // Prefer Persist (CMC 3 for {2}{B}) over Unearth (CMC 1 for {B})
-            // when both are available — Persist grants haste so Emperor can
-            // attack immediately to begin exiling.
-            var emperorInYard = DeckStrategyHelpers.Graveyard(self)
-                .FirstOrDefault(c => c.Name == EmperorOfBones);
-
-            if (emperorInYard != null)
-            {
-                var withPersist = DeckStrategyHelpers.BuildCast(
-                    ctx, self, PersistSpell, target: emperorInYard);
-                if (withPersist != null) return withPersist;
-
-                var withUnearth = DeckStrategyHelpers.BuildCast(
-                    ctx, self, UnearthSpell, target: emperorInYard);
-                if (withUnearth != null) return withUnearth;
-            }
-        }
-
-        // Win-line 2: Archon not in yard yet — cast Faithless Looting to
-        // discard Archon and set up the engine.
-        if (!DeckStrategyHelpers.HasInGraveyard(self, ArchonOfCruelty))
-        {
-            var loot = DeckStrategyHelpers.BuildCast(ctx, self, FaithlessLooting);
-            if (loot != null) return loot;
-        }
-
+        // Reanimation is a multi-turn engine, not an atomic kill.
+        // StrategicScore steers the MCTS search toward assembling + executing
+        // the plan; the search sees whether the line pays off and decides
+        // timing. Directive override hurts here (measured: over-commits, loses).
         return null;
     }
 
