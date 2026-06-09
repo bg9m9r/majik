@@ -154,6 +154,11 @@ public sealed class EngineSimulator : ISearchSimulator
             new GameRandom(FixedSeed),
             p => BuildAgent(p, root, pathFromRoot, rolloutStrategy: null, ref searchAgent));
 
+        // Determinization: when the root carries a world seed, re-draw the hidden
+        // zones of this clone before it is searched. Null seed => perfect-info,
+        // byte-identical to before (no resample happens).
+        MaybeResample(sandbox, root);
+
         var agent = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
 
@@ -232,6 +237,9 @@ public sealed class EngineSimulator : ISearchSimulator
             root.LivePlayers,
             new GameRandom(FixedSeed),
             p => BuildAgent(p, root, pathFromRoot, rolloutStrategy, ref searchAgent));
+
+        // Determinization (see AdvanceCoreUnsafe). Null seed => no resample.
+        MaybeResample(sandbox, root);
 
         _ = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
@@ -368,5 +376,50 @@ public sealed class EngineSimulator : ISearchSimulator
         task.ContinueWith(
             static t => _ = t.Exception,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+    }
+
+    /// <summary>
+    /// Determinization hook shared by <see cref="AdvanceCoreUnsafe"/> and
+    /// <see cref="RolloutCoreUnsafe"/>. When the root carries BOTH a
+    /// <see cref="SimState.WorldSeed"/> and a <see cref="SimState.OpponentDecklist"/>,
+    /// the freshly-cloned players inside <paramref name="sandbox"/> have their hidden
+    /// zones (opponent hand + both libraries) re-drawn deterministically per the world
+    /// seed BEFORE the sandbox is searched / rolled out. When the world seed is null
+    /// this is a no-op — the perfect-info path is left byte-identical to before.
+    /// </summary>
+    private static void MaybeResample(SandboxGame sandbox, SimState root)
+    {
+        if (root.WorldSeed is int seed && root.OpponentDecklist is { } deck)
+        {
+            DeterminizationSampler.Resample(
+                sandbox.State.Players, root.SearchedSeatId, deck, seed);
+        }
+    }
+
+    /// <summary>
+    /// Test-only observation hook (no game is driven): performs ONE clone via the
+    /// same <see cref="SandboxGame.From"/> path used by the search, applies the
+    /// resample-when-WorldSeed-set logic, then returns the cloned opponent's hand
+    /// card names. With a null world seed the opponent's ACTUAL hand is returned
+    /// (proving the perfect-info path is untouched). Lets the determinization wiring
+    /// be verified without running a whole game.
+    /// </summary>
+    internal IReadOnlyList<string> DebugSampledOpponentHand(SimState root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        // The sandbox is never run here, so the agent choice is irrelevant; a
+        // bare SearchAgent (empty script) satisfies SandboxGame.From's factory.
+        var sandbox = SandboxGame.From(
+            root.LivePlayers,
+            new GameRandom(FixedSeed),
+            p => new SearchAgent(p));
+
+        MaybeResample(sandbox, root);
+
+        var opp = sandbox.State.Players.FirstOrDefault(p => p.Id != root.SearchedSeatId)
+            ?? throw new InvalidOperationException("No opponent seat in cloned players.");
+
+        return opp.Zones.Hand.GetCards().Select(c => c.Name).ToList();
     }
 }
