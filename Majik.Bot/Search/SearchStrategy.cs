@@ -253,7 +253,7 @@ internal sealed class SearchStrategy : IBotStrategy
         _prioritySearchEnabled = config.PrioritySearchEnabled;
         _rootBlockSearch = config.RootBlockSearch ?? true;
         var mctsConfig = ConfigFrom(config);
-        var sim = new EngineSimulator(_weights);
+        var sim = new EngineSimulator(_weights, deck: null); // Task 5 wires the real deck strategy
         _mcts = new Mcts(sim, mctsConfig);
 
         // OpponentArchetype: resolve the decklist ONCE up front. A known archetype
