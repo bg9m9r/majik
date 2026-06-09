@@ -29,6 +29,31 @@ public class ArchetypeWeightsTests
     }
 
     [Fact]
+    public void AzoriusControl_PrioritizesCardAdvantageOverLife()
+    {
+        var w = ArchetypeWeights.ForArchetype("AzoriusControl");
+        w.CardAdvantage.Should().BeGreaterThan(w.LifeDelta,
+            because: "control wins on resources, not life races — card advantage must outweigh life delta");
+    }
+
+    [Fact]
+    public void AzoriusControl_HasHighPlaneswalkerEngine()
+    {
+        var w = ArchetypeWeights.ForArchetype("AzoriusControl");
+        w.PlaneswalkerEngine.Should().BeGreaterThan(1.0,
+            because: "Teferi loyalty = inevitability; control must value walkers");
+    }
+
+    [Fact]
+    public void AzoriusControl_CardAdvantage_HigherThan_Aggro()
+    {
+        var control = ArchetypeWeights.ForArchetype("AzoriusControl");
+        var burn    = ArchetypeWeights.ForArchetype("Burn");
+        control.CardAdvantage.Should().BeGreaterThan(burn.CardAdvantage,
+            because: "control cares about card parity much more than burn does");
+    }
+
+    [Fact]
     public void Untuned_FallsBackToNeutralDefault()
     {
         // An archetype without a bespoke table must NOT throw — it is still a

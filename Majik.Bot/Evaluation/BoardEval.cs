@@ -37,17 +37,27 @@ public static class BoardEval
         var tempo = ctx.ActivePlayer == opp ? CountUntappedLands(self) : 0;
         var keyCard = HasKeyCardInPlay(self) ? 1 : 0;
         var lethalProx = LethalProximityBonus(opp.LifeTotal);
+        // Card-advantage differential: being up cards on the opponent is the
+        // core attrition signal for control/midrange. Positive = ahead on cards.
+        var cardAdvDiff = self.Zones.Hand.Count - opp.Zones.Hand.Count;
+        // Planeswalker-engine bonus: each planeswalker the bot controls
+        // contributes its current loyalty as a proxy for accumulated/future
+        // value. A Teferi at 7 loyalty has already generated card advantage and
+        // threatens to keep doing so each turn (see ArchetypeWeights.PlaneswalkerEngine).
+        var planeswalkerEngine = SumPlaneswalkerLoyalty(self);
 
         return
-              weights.LifeDelta        * lifeDelta
-            + weights.BoardPower       * boardPower
-            + weights.BoardToughness   * boardToughness
-            + weights.OpponentThreats  * oppThreats
-            + weights.ManaSources      * manaSources
-            + weights.HandSize         * handSize
-            + weights.Tempo            * tempo
-            + weights.KeyCardInPlay    * keyCard
-            + weights.LethalProximity  * lethalProx;
+              weights.LifeDelta           * lifeDelta
+            + weights.BoardPower          * boardPower
+            + weights.BoardToughness      * boardToughness
+            + weights.OpponentThreats     * oppThreats
+            + weights.ManaSources         * manaSources
+            + weights.HandSize            * handSize
+            + weights.Tempo               * tempo
+            + weights.KeyCardInPlay       * keyCard
+            + weights.LethalProximity     * lethalProx
+            + weights.CardAdvantage       * cardAdvDiff
+            + weights.PlaneswalkerEngine  * planeswalkerEngine;
     }
 
     /// <summary>
@@ -115,4 +125,22 @@ public static class BoardEval
     {
         return p.Zones.Battlefield.GetCards().OfType<Creature>().Any(c => c.Power >= 4);
     }
+
+    /// <summary>
+    /// Sum of current loyalty across all planeswalkers the player controls.
+    /// Loyalty is a proxy for accumulated value: each activation has already
+    /// produced an effect and raised/lowered loyalty, so high loyalty means
+    /// the walker has been ticking up (card draws, bounces) while staying
+    /// alive. Used by the <see cref="ArchetypeWeights.PlaneswalkerEngine"/> term.
+    ///
+    /// <para>Uses <see cref="Permanent.IsEffectivePlaneswalker"/> so DFC
+    /// backs (creature front / planeswalker back) are counted even though their
+    /// C# type is <see cref="Permanent"/> rather than
+    /// <see cref="Planeswalker"/>.</para>
+    /// </summary>
+    private static int SumPlaneswalkerLoyalty(Player p)
+        => p.Zones.Battlefield.GetCards()
+               .OfType<Permanent>()
+               .Where(perm => perm.IsEffectivePlaneswalker())
+               .Sum(perm => perm.GetEffectiveLoyalty() ?? 0);
 }
