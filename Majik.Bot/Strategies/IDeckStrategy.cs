@@ -9,7 +9,7 @@ namespace Majik.Bot.Strategies;
 /// Per-deck strategic knowledge distilled from the deck's primer. Resolved by
 /// archetype name. Fair decks need no implementation (null → unchanged behavior).
 /// </summary>
-internal interface IDeckStrategy
+public interface IDeckStrategy
 {
     /// Advisory eval bonus folded into BoardEval — values progress toward the
     /// deck's plan (combo pieces assembled, payoff protected, ramp toward finisher).

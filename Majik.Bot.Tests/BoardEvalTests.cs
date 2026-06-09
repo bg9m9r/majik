@@ -1,6 +1,10 @@
 using FluentAssertions;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Tests.Helpers;
+using Majik.Core.Cards;
+using Majik.Core.Game;
+using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Xunit;
 
 namespace Majik.Bot.Tests;
@@ -283,6 +287,35 @@ public class BoardEvalTests
             .Should().BeGreaterThan(
                 BoardEval.Score(lowLoyalty.Context, lowLoyalty.Self, w),
                 because: "8 loyalty represents more accumulated value than 3 loyalty");
+    }
+
+    // ── Strategic bonus term tests ──────────────────────────────────────────
+
+    /// <summary>
+    /// When a deck strategy returns a positive strategic score, the eval with
+    /// that strategy must exceed the baseline (no strategy) by exactly
+    /// <c>weights.Strategic * strategyScore</c>.
+    /// </summary>
+    [Fact]
+    public void Score_IncludesStrategicBonus_WhenDeckStrategyProvided()
+    {
+        var s = new BotTestScenario();   // self/opp, neutral board
+        var weights = ArchetypeWeights.Default with { Strategic = 1.0 };
+        var withStrat = new StubStrategy(7.0);
+
+        var baseline = BoardEval.Score(s.Context, s.Self, weights, deck: null);
+        var boosted  = BoardEval.Score(s.Context, s.Self, weights, deck: withStrat);
+
+        (boosted - baseline).Should().BeApproximately(7.0, 1e-9);
+    }
+
+    private sealed class StubStrategy : Majik.Bot.Strategies.IDeckStrategy
+    {
+        private readonly double _v;
+        public StubStrategy(double v) => _v = v;
+        public double StrategicScore(GameContext ctx, Player self) => _v;
+        public PriorityAction? TryGetNextWinningAction(GameContext ctx, Player self) => null;
+        public MulliganDecision? AdviseMulligan(IReadOnlyList<ICard> hand, int n) => null;
     }
 
     // ── Non-regression: existing dominant terms are not overridden ──────────
