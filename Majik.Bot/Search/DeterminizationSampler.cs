@@ -60,6 +60,13 @@ internal static class DeterminizationSampler
     /// VISIBLE cards (battlefield + graveyard + exile) by name.</param>
     /// <param name="worldSeed">The deterministic world seed. Identical
     /// (players-state, worldSeed) -&gt; identical result.</param>
+    /// <param name="observedPublic">Optional observation-augmentation hint: names the
+    /// opponent has ALREADY revealed publicly this game (e.g. cast / put on the stack /
+    /// shown). Each such name has its assumed decklist count raised toward a playset
+    /// BEFORE the visible-subtraction runs, biasing the sampled HIDDEN pool toward MORE
+    /// copies of the revealed card (a committed card → the opponent likely holds more).
+    /// A revealed name NOT in the decklist is seeded so the bot still anticipates it.
+    /// Null / empty leaves the sampler byte-identical to the pre-augmentation path.</param>
     /// <param name="factory">Optional card-build factory. Defaults to a shared
     /// <see cref="ScryfallCardFactory"/> over the embedded repo. Inject a factory
     /// wired with live services if you need fully-live sampled cards.</param>
@@ -68,6 +75,7 @@ internal static class DeterminizationSampler
         Guid searchedSeatId,
         IReadOnlyList<string> opponentDecklist,
         int worldSeed,
+        IReadOnlyList<string>? observedPublic = null,
         ScryfallCardFactory? factory = null)
     {
         ArgumentNullException.ThrowIfNull(players);
@@ -86,7 +94,7 @@ internal static class DeterminizationSampler
         // reshuffle, so the whole operation is a pure function of worldSeed.
         var rng = new GameRandom(worldSeed);
 
-        ResampleOpponentHidden(opp, opponentDecklist, build, rng);
+        ResampleOpponentHidden(opp, opponentDecklist, observedPublic, build, rng);
         ReshuffleSelfLibrary(self, rng);
     }
 
@@ -98,6 +106,7 @@ internal static class DeterminizationSampler
     private static void ResampleOpponentHidden(
         Player opp,
         IReadOnlyList<string> opponentDecklist,
+        IReadOnlyList<string>? observedPublic,
         ScryfallCardFactory factory,
         GameRandom rng)
     {
@@ -108,6 +117,24 @@ internal static class DeterminizationSampler
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var name in opponentDecklist)
             counts[name] = counts.GetValueOrDefault(name) + 1;
+
+        // Observation-augmentation: raise the assumed count of each publicly-revealed
+        // name toward a playset BEFORE the visible-subtraction. A card the opponent has
+        // committed to is one they likely hold more of; boosting the deck count (then
+        // letting the subtraction below remove the visible copies) nets out to MORE of
+        // that card in the sampled HIDDEN pool. Runs before the ordinal-sort + seeded
+        // shuffle, so determinism per worldSeed is preserved.
+        const int Boost = 1; // playset cap of 4.
+        if (observedPublic is { Count: > 0 })
+        {
+            var obs = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var n in observedPublic)
+                obs[n] = obs.GetValueOrDefault(n) + 1;
+            foreach (var (name, oc) in obs)
+                counts[name] = Math.Min(
+                    4,
+                    Math.Max(counts.GetValueOrDefault(name), oc + Boost));
+        }
 
         foreach (var visible in VisibleCardNames(opp))
         {
