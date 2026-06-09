@@ -44,7 +44,7 @@ public class KnightErrantOfEosFactoryTests
         c.Name.Should().Be("Knight-Errant of Eos");
         c.ManaCost.Should().Be("{3}{G}{W}");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
         c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
         c.Power.Should().Be(4);
         c.Toughness.Should().Be(4);

@@ -15,7 +15,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Psychic Frog (Modern Horizons 3, {U}{B}).
 ///
-/// Creature — Frog Mutant 1/3. Oracle text:
+/// Creature — Frog 1/2. Oracle text:
 ///   "Flying.
 ///    Whenever Psychic Frog deals combat damage to a player, draw that
 ///    many cards, then discard that many cards.
@@ -23,8 +23,8 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - <b>1/3 Creature — Frog Mutant at {U}{B}</b>. Two new
-///   <see cref="CardSubtype"/> entries (Frog, Mutant) registered alongside
+/// - <b>1/2 Creature — Frog at {U}{B}</b>. The Frog
+///   <see cref="CardSubtype"/> entry registered alongside
 ///   the existing creature-subtype roster (CR 205.3m).
 /// - <b>Flying</b> — wired as a <see cref="KeywordAbility"/> marker so
 ///   combat code (block-restriction at CR 509.1b) reads it the same way it
@@ -103,8 +103,8 @@ public static class PsychicFrogFactory
             name: CardName,
             manaCost: Cost,
             power: 1,
-            toughness: 3,
-            subtypes: new[] { CardSubtype.Frog, CardSubtype.Mutant });
+            toughness: 2,
+            subtypes: new[] { CardSubtype.Frog });
 
         card.SetOwner(owner);
         card.SetController(owner);

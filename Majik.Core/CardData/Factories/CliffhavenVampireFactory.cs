@@ -12,12 +12,12 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Cliffhaven Vampire (Battle for Zendikar,
 /// {1}{W}{B}).
 ///
-/// Creature — Vampire Cleric 2/3. Oracle text:
+/// Creature — Vampire Warrior Ally 2/4. Oracle text:
 ///   "Flying
 ///    Whenever you gain life, each opponent loses 1 life."
 ///
 /// ## Implemented (v1)
-/// - 2/3 Creature — Vampire Cleric, mana cost {1}{W}{B}, owner / controller
+/// - 2/4 Creature — Vampire Warrior Ally, mana cost {1}{W}{B}, owner / controller
 ///   wired.
 /// - <b>Flying (CR 702.9)</b>: <see cref="KeywordAbility"/> marker so
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasFlying"/> reads it for
@@ -55,7 +55,7 @@ public static class CliffhavenVampireFactory
     public const string CardName = "Cliffhaven Vampire";
     public const string PrintedManaCost = "{1}{W}{B}";
     public const int Power = 2;
-    public const int Toughness = 3;
+    public const int Toughness = 4;
     public const int LifeLossPerOpponent = 1;
 
     /// <summary>
@@ -88,7 +88,7 @@ public static class CliffhavenVampireFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Cleric });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Warrior, CardSubtype.Ally });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -12,13 +12,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Voldaren Epicure (Innistrad: Crimson Vow, {R}).
 ///
-/// Creature — Vampire Citizen 1/1. Oracle text:
+/// Creature — Vampire 1/1. Oracle text:
 ///   "When Voldaren Epicure enters, it deals 1 damage to each opponent
 ///    and you create a Blood token."
 ///
 /// ## Implemented (v1)
 ///
-/// - 1/1 Vampire Citizen with mana cost {R}, owner / controller stamped.
+/// - 1/1 Vampire with mana cost {R}, owner / controller stamped.
 /// - <b>ETB triggered ability (CR 603.6a)</b>: <see cref="TriggeredAbility"/>
 ///   wired via <see cref="Triggers.OnEnterBattlefieldSelf"/>. On resolution
 ///   the effect:
@@ -104,7 +104,7 @@ public static class VoldarenEpicureFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Citizen });
+            subtypes: new[] { CardSubtype.Vampire });
 
         card.SetOwner(owner);
         card.SetController(owner);

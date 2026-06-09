@@ -65,7 +65,7 @@ public class GuideOfSoulsTests
     {
         var g = GuideOfSoulsFactory.Create(_alice);
 
-        g.HasSubtype(CardSubtype.Spirit).Should().BeTrue("printed type is Spirit Cleric");
+        g.HasSubtype(CardSubtype.Human).Should().BeTrue("printed type is Human Cleric");
         g.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
     }
 

@@ -49,10 +49,10 @@ public class EtchedOracleTests
         eo.ManaCost.Should().Be("{4}");
         eo.HasType(CardType.Artifact).Should().BeTrue();
         eo.HasType(CardType.Creature).Should().BeTrue();
-        eo.Subtypes.Should().Contain(CardSubtype.Human);
+        eo.Subtypes.Should().NotContain(CardSubtype.Human);
         eo.Subtypes.Should().Contain(CardSubtype.Wizard);
-        eo.BasePower.Should().Be(1);
-        eo.BaseToughness.Should().Be(1);
+        eo.BasePower.Should().Be(0);
+        eo.BaseToughness.Should().Be(0);
         eo.Owner.Should().BeSameAs(_alice);
         eo.Controller.Should().BeSameAs(_alice);
     }

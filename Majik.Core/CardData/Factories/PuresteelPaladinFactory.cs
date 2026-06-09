@@ -11,14 +11,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Puresteel Paladin (New Phyrexia, {1}{W}).
 ///
-/// Creature — Human Soldier 2/2. Oracle text:
+/// Creature — Human Knight 2/2. Oracle text:
 ///   "Whenever an Equipment enters under your control, you may draw a card.
 ///    As long as you control three or more artifacts, Equipment you control
 ///    have equip {0}."
 ///
 /// ## Implemented (v1)
 ///
-/// - 2/2 Human Soldier with mana cost {1}{W}.
+/// - 2/2 Human Knight with mana cost {1}{W}.
 /// - <b>ETB-draw trigger (CR 603.1)</b>: a <see cref="TriggeredAbility"/> over
 ///   <see cref="CardMovedEvent"/> matches when any <see cref="CardType.Artifact"/>
 ///   carrying the <see cref="CardSubtype.Equipment"/> subtype enters the
@@ -165,7 +165,7 @@ public static class PuresteelPaladinFactory
             manaCost: Cost,
             power: 2,
             toughness: 2,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Soldier });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Knight });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -45,9 +45,9 @@ public class MagmaticChannelerTests
         card.ManaCost.Should().Be("{1}{R}");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         card.BasePower.Should().Be(1);
-        card.BaseToughness.Should().Be(2);
+        card.BaseToughness.Should().Be(3);
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
@@ -60,9 +60,9 @@ public class MagmaticChannelerTests
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Magmatic Channeler");
         card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(2);
+        ((Creature)card).BaseToughness.Should().Be(3);
 
         card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }

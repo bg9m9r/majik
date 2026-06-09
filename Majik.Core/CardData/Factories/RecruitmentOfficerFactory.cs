@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Recruitment Officer (Modern Horizons 3, {W}).
 ///
-/// Creature — Human Soldier 1/1. Oracle text:
+/// Creature — Human Soldier 2/1. Oracle text:
 ///   "Recruitment Officer can block as if it had reach.
 ///    {2}{W}: Look at the top six cards of your library. You may reveal
 ///    a creature card with mana value 2 or less from among them and put
@@ -33,7 +33,7 @@ namespace Majik.Core.CardData.Factories;
 /// mana value ≤ 2 instead of colourless.
 ///
 /// ## Implemented (v1)
-/// - 1/1 Creature — Human Soldier, mana cost {W}. Both
+/// - 2/1 Creature — Human Soldier, mana cost {W}. Both
 ///   <see cref="CardSubtype.Human"/> and <see cref="CardSubtype.Soldier"/>
 ///   assigned (CR 205.3 — printed subtypes).
 /// - <b>"Can block as if it had reach" rider</b> wired as a
@@ -121,7 +121,7 @@ public static class RecruitmentOfficerFactory
         var card = new Creature(
             name: CardName,
             manaCost: PrintedManaCost,
-            power: 1,
+            power: 2,
             toughness: 1,
             subtypes: new[] { CardSubtype.Human, CardSubtype.Soldier });
 

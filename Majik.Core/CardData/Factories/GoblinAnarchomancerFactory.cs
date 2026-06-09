@@ -10,12 +10,12 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Goblin Anarchomancer (Modern Horizons 2,
 /// {R}{G}).
 ///
-/// Creature — Goblin Shaman 1/3. Oracle text:
+/// Creature — Goblin Shaman 2/2. Oracle text:
 ///   "Red instant and sorcery spells you cast cost {1} less to cast.
 ///    Green instant and sorcery spells you cast cost {1} less to cast."
 ///
 /// ## Implemented (v1)
-/// - Creature — Goblin Shaman, {R}{G}, 1/3, owner/controller wired.
+/// - Creature — Goblin Shaman, {R}{G}, 2/2, owner/controller wired.
 /// - <b>Spell-cost reduction rider (CR 117.7 / CR 601.2f)</b> wired via
 ///   <see cref="SpellCostReductionAbility"/>. The predicate matches a
 ///   spell that is BOTH (instant or sorcery) AND (red or green) — the
@@ -56,8 +56,8 @@ public static class GoblinAnarchomancerFactory
 {
     public const string CardName = "Goblin Anarchomancer";
     public const string PrintedManaCost = "{R}{G}";
-    public const int Power = 1;
-    public const int Toughness = 3;
+    public const int Power = 2;
+    public const int Toughness = 2;
 
     /// <summary>
     /// Construct Goblin Anarchomancer with the red-or-green

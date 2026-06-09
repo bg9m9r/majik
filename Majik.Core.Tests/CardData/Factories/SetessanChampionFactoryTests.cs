@@ -52,8 +52,8 @@ public class SetessanChampionFactoryTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
         c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-        c.BasePower.Should().Be(2);
-        c.BaseToughness.Should().Be(2);
+        c.BasePower.Should().Be(1);
+        c.BaseToughness.Should().Be(3);
         c.ManaCost.Should().Be("{1}{G}{G}");
 
         var parsed = ManaCost.Parse(c.ManaCost);

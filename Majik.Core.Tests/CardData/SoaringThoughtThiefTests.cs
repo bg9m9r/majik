@@ -80,10 +80,10 @@ public class SoaringThoughtThiefTests
         c.Name.Should().Be("Soaring Thought-Thief");
         c.ManaCost.Should().Be("{1}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
         c.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
         c.BasePower.Should().Be(1);
-        c.BaseToughness.Should().Be(2);
+        c.BaseToughness.Should().Be(3);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
@@ -95,7 +95,7 @@ public class SoaringThoughtThiefTests
 
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Soaring Thought-Thief");
-        card.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
         card.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
     }
 

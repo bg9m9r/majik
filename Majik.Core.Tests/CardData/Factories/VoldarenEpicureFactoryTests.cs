@@ -45,7 +45,7 @@ public class VoldarenEpicureFactoryTests
         c.ManaCost.Should().Be("{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Citizen).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Citizen).Should().BeFalse();
         c.BasePower.Should().Be(1);
         c.BaseToughness.Should().Be(1);
         c.Owner.Should().BeSameAs(_alice);

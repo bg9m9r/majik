@@ -112,7 +112,7 @@ public static class SheoldredWhisperingOneFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Praetor });
+            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Praetor });
 
         card.SetOwner(owner);
         card.SetController(owner);

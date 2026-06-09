@@ -9,14 +9,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Signal Pest (Mirrodin Besieged, {R}).
 ///
-/// Artifact Creature — Pest 1/1. Oracle text:
+/// Artifact Creature — Pest 0/1. Oracle text:
 ///   "Battle cry (Whenever this creature attacks, each other attacking
 ///    creature gets +1/+1 until end of turn.)
 ///    Signal Pest can't be blocked except by creatures with flying or reach."
 ///
 /// ## Implementation
 ///
-/// - 1/1 Pest with the Artifact card type, mana cost {R}.
+/// - 0/1 Pest with the Artifact card type, mana cost {R}.
 /// - <b>Can't be blocked except by flying or reach (CR 509.1b)</b>: registered
 ///   as a <see cref="CantBeBlockedExceptByEffect"/> on the supplied
 ///   <see cref="ContinuousEffectsService"/>. The predicate accepts a blocker
@@ -43,7 +43,7 @@ public static class SignalPestFactory
 {
     public const string CardName = "Signal Pest";
     public const string PrintedManaCost = "{R}";
-    public const int Power = 1;
+    public const int Power = 0;
     public const int Toughness = 1;
 
     /// <summary>

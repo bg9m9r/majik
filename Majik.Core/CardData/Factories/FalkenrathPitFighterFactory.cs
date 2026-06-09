@@ -12,7 +12,7 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Falkenrath Pit Fighter (Innistrad: Crimson Vow,
 /// {R}).
 ///
-/// Creature — Vampire Berserker 1/1. Oracle text:
+/// Creature — Vampire Warrior 2/1. Oracle text:
 ///   "Trample
 ///    Haste
 ///    {R}, Sacrifice another creature or Blood token: Draw a card. Activate
@@ -20,7 +20,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 1/1 Vampire Berserker with mana cost {R}, owner / controller stamped.
+/// - 2/1 Vampire Warrior with mana cost {R}, owner / controller stamped.
 /// - <see cref="KeywordAbility"/> markers for Trample (CR 702.19) and Haste
 ///   (CR 702.10), read by <see cref="Majik.Core.Combat.CombatAbilities"/>.
 /// - <b>Activated ability (CR 602.1)</b>: <see cref="ActivatedAbility"/>
@@ -65,7 +65,7 @@ public static class FalkenrathPitFighterFactory
 {
     public const string CardName = "Falkenrath Pit Fighter";
     public const string PrintedManaCost = "{R}";
-    public const int Power = 1;
+    public const int Power = 2;
     public const int Toughness = 1;
 
     /// <summary>
@@ -85,7 +85,7 @@ public static class FalkenrathPitFighterFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Berserker });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Warrior });
 
         card.SetOwner(owner);
         card.SetController(owner);

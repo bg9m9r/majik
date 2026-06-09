@@ -47,7 +47,7 @@ public class VitoThornOfTheDuskRoseTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
         c.BasePower.Should().Be(1);
         c.BaseToughness.Should().Be(3);
         c.Owner.Should().BeSameAs(_alice);
@@ -63,7 +63,7 @@ public class VitoThornOfTheDuskRoseTests
         c.Name.Should().Be("Vito, Thorn of the Dusk Rose");
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
     }
 
     // -----------------------------------------------------------------------

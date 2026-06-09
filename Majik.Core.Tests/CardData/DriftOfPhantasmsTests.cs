@@ -50,8 +50,8 @@ public class DriftOfPhantasmsTests
         drift.Name.Should().Be("Drift of Phantasms");
         drift.ManaCost.Should().Be("{3}{U}");
         drift.HasType(CardType.Creature).Should().BeTrue();
-        drift.HasSubtype(CardSubtype.Illusion).Should().BeTrue();
-        drift.BasePower.Should().Be(1);
+        drift.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
+        drift.BasePower.Should().Be(0);
         drift.BaseToughness.Should().Be(5);
         drift.ManaCostValue.TotalValue.Should().Be(4);
         drift.Owner.Should().BeSameAs(_alice);

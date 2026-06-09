@@ -43,7 +43,7 @@ public class GoblinChieftainTests
         c.ManaCost.Should().Be("{1}{R}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeFalse();
         c.BasePower.Should().Be(2);
         c.BaseToughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
@@ -58,7 +58,7 @@ public class GoblinChieftainTests
         c.Should().BeOfType<Creature>();
         c.Name.Should().Be("Goblin Chieftain");
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeFalse();
     }
 
     [Fact]

@@ -54,8 +54,8 @@ public class VoiceOfVictoryFactoryTests : IDisposable
         card.Should().BeOfType<Creature>();
         card.HasType(CardType.Creature).Should().BeTrue();
         card.Name.Should().Be("Voice of Victory");
-        card.BasePower.Should().Be(2);
-        card.BaseToughness.Should().Be(2);
+        card.BasePower.Should().Be(1);
+        card.BaseToughness.Should().Be(3);
         card.ManaCostValue.TotalValue.Should().Be(2, "{1}{W} is mana value 2");
         card.HasSubtype(CardSubtype.Human).Should().BeTrue();
         card.HasSubtype(CardSubtype.Bard).Should().BeTrue();

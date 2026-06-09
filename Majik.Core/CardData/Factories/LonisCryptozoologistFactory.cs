@@ -13,7 +13,7 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Lonis, Cryptozoologist (Streets of New Capenna
 /// Commander, {G}{U}).
 ///
-/// Legendary Creature — Snake Elf Scout 2/2. Oracle text:
+/// Legendary Creature — Snake Elf Scout 1/2. Oracle text:
 ///   "Whenever another nontoken creature you control enters, investigate.
 ///    {T}, Sacrifice X Clues: Target opponent reveals the top X cards of
 ///    their library. You may put a nonland permanent card with mana value
@@ -22,8 +22,8 @@ namespace Majik.Core.CardData.Factories;
 ///    random order."
 ///
 /// ## Implemented (v1)
-/// - 2/2 Legendary Creature — Snake Elf Scout, mana cost {G}{U}. Power +
-///   toughness match the printed back-face (Lonis is printed as 2/2 in
+/// - 1/2 Legendary Creature — Snake Elf Scout, mana cost {G}{U}. Power +
+///   toughness match the printed back-face (Lonis is printed as 1/2 in
 ///   the Commander Legends: Battle for Baldur's Gate sibling reprint as
 ///   well — values are stable).
 /// - <b>Nontoken-creature-ETB investigate trigger (CR 603.1 / CR 701.30)</b>:
@@ -56,7 +56,7 @@ public static class LonisCryptozoologistFactory
 {
     public const string CardName = "Lonis, Cryptozoologist";
     public const string PrintedManaCost = "{G}{U}";
-    public const int Power = 2;
+    public const int Power = 1;
     public const int Toughness = 2;
 
     /// <summary>

@@ -69,7 +69,7 @@ public class KalitasTraitorOfGhetTests
         k.HasType(CardType.Creature).Should().BeTrue();
         k.Supertypes.Should().Contain(CardSupertype.Legendary);
         k.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        k.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        k.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
         k.BasePower.Should().Be(3);
         k.BaseToughness.Should().Be(4);
         k.Owner.Should().BeSameAs(_alice);

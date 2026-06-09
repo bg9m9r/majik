@@ -14,14 +14,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Etched Oracle (Fifth Dawn, {4}).
 ///
-/// Artifact Creature — Human Wizard 1/1. Oracle text:
+/// Artifact Creature — Wizard 0/0. Oracle text:
 ///   "Sunburst (This enters with a +1/+1 counter on it for each color of
 ///    mana spent to cast it.)"
 ///   "{2}, Remove three +1/+1 counters from Etched Oracle: Each player
 ///    draws three cards."
 ///
 /// ## Implemented (v1)
-/// - Artifact Creature {4} 1/1 with owner/controller wired + Human Wizard
+/// - Artifact Creature {4} 0/0 with owner/controller wired + Wizard
 ///   subtypes.
 /// - <b>Sunburst (CR 702.44)</b> wired via the shared
 ///   <see cref="SunburstFactory.Build"/> primitive. As an artifact
@@ -58,8 +58,8 @@ public static class EtchedOracleFactory
 {
     public const string CardName = "Etched Oracle";
     public const string PrintedManaCost = "{4}";
-    public const int Power = 1;
-    public const int Toughness = 1;
+    public const int Power = 0;
+    public const int Toughness = 0;
     public const int CountersToRemove = 3;
     public const int CardsDrawn = 3;
 
@@ -93,7 +93,7 @@ public static class EtchedOracleFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Wizard });
+            subtypes: new[] { CardSubtype.Wizard });
 
         // CR 301.1 / 302.1 — Artifact Creature.
         card.AddCardType(CardType.Artifact);

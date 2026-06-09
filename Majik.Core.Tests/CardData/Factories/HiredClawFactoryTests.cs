@@ -87,7 +87,7 @@ public class HiredClawFactoryTests
         card.HasSubtype(CardSubtype.Lizard).Should().BeTrue();
         card.HasSubtype(CardSubtype.Mercenary).Should().BeTrue();
         card.BasePower.Should().Be(1);
-        card.BaseToughness.Should().Be(1);
+        card.BaseToughness.Should().Be(2);
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }

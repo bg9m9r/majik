@@ -12,12 +12,12 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Vito, Thorn of the Dusk Rose (Core Set 2021,
 /// {1}{B}{B}).
 ///
-/// Legendary Creature — Vampire Knight 1/3. Oracle text:
+/// Legendary Creature — Vampire Cleric 1/3. Oracle text:
 ///   "Lifelink
 ///    Whenever you gain life, each opponent loses that much life."
 ///
 /// ## Implemented (v1)
-/// - 1/3 Legendary Creature — Vampire Knight, mana cost {1}{B}{B}, owner /
+/// - 1/3 Legendary Creature — Vampire Cleric, mana cost {1}{B}{B}, owner /
 ///   controller wired.
 /// - <b>Lifelink (CR 702.15)</b>: <see cref="KeywordAbility"/> marker so
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasLifelink"/> reads it
@@ -103,7 +103,7 @@ public static class VitoThornOfTheDuskRoseFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Knight });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);

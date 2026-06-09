@@ -13,7 +13,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Vengevine (Rise of the Eldrazi, {2}{G}{G}).
 ///
-/// Creature — Plant Elemental 4/3. Oracle text:
+/// Creature — Elemental 4/3. Oracle text:
 ///   "Haste.
 ///    Whenever you cast a creature spell, if it's the second creature spell
 ///    you cast this turn, you may return Vengevine from your graveyard to
@@ -21,7 +21,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 4/3 Plant Elemental with mana cost {2}{G}{G}, owner / controller stamped.
+/// - 4/3 Elemental with mana cost {2}{G}{G}, owner / controller stamped.
 /// - <see cref="KeywordAbility"/> marker for Haste (CR 702.10).
 /// - <b>Graveyard-resident creature-cast trigger (CR 603.6d)</b>: a
 ///   <see cref="TriggeredAbility"/> over <see cref="SpellCastEvent"/> filtered
@@ -109,7 +109,7 @@ public static class VengevineFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Plant, CardSubtype.Elemental });
+            subtypes: new[] { CardSubtype.Elemental });
 
         card.SetOwner(owner);
         card.SetController(owner);

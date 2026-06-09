@@ -47,9 +47,10 @@ public class CliffhavenVampireTests
         c.ManaCost.Should().Be("{1}{W}{B}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Ally).Should().BeTrue();
         c.BasePower.Should().Be(2);
-        c.BaseToughness.Should().Be(3);
+        c.BaseToughness.Should().Be(4);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
@@ -62,7 +63,7 @@ public class CliffhavenVampireTests
         c.Should().BeOfType<Creature>();
         c.Name.Should().Be("Cliffhaven Vampire");
         c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
     }
 
     // -----------------------------------------------------------------------

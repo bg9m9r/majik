@@ -10,7 +10,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Ramunap Excavator (Hour of Devastation).
 ///
-/// Creature — Naga Cleric, {1}{G}{G}, 2/3. Oracle text:
+/// Creature — Snake Cleric, {1}{G}{G}, 2/3. Oracle text:
 ///   "You may play lands from your graveyard."
 ///
 /// ## Implementation
@@ -20,7 +20,7 @@ namespace Majik.Core.CardData.Factories;
 /// half of the land-play action without waiving the usual per-turn
 /// land-drop cap from CR 305.2). The implementation mirrors
 /// <see cref="CrucibleOfWorldsFactory"/> exactly, swapping only the card
-/// shape (Creature — Naga Cleric vs Artifact) and printed mana cost.
+/// shape (Creature — Snake Cleric vs Artifact) and printed mana cost.
 /// The runtime permission stamps the same per-card
 /// <see cref="Card.MayPlayFromGraveyard"/> flag — multiple Crucible /
 /// Ramunap Excavator / Conduit of Worlds permission sources are
@@ -30,7 +30,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// This implementation wires:
 ///
-/// - <b>Creature shape</b> (2/3 Naga Cleric {1}{G}{G}, owner / controller).
+/// - <b>Creature shape</b> (2/3 Snake Cleric {1}{G}{G}, owner / controller).
 /// - <b>Static ability marker</b> (<see cref="StaticAbility"/> with the
 ///   printed description) so shape tests and UI surface "You may play
 ///   lands from your graveyard." Gated on Ramunap Excavator being on the
@@ -56,8 +56,9 @@ namespace Majik.Core.CardData.Factories;
 ///   cleared when Ramunap Excavator leaves the battlefield. The flag is
 ///   benign off-battlefield once the agent layer ALSO checks for a live
 ///   permission source; re-stamping on a fresh Excavator is idempotent.
-/// - <b>Printed land subtype "Naga"</b>: not previously needed; added
-///   to <see cref="CardSubtype.Naga"/> alongside this factory.
+/// - <b>Printed creature subtype "Snake"</b>: the current Scryfall type
+///   line is "Snake Cleric" (the historical "Naga" type was folded into
+///   Snake), so this factory builds <see cref="CardSubtype.Snake"/>.
 /// </summary>
 [CardName("Ramunap Excavator")]
 public static class RamunapExcavatorFactory
@@ -94,7 +95,7 @@ public static class RamunapExcavatorFactory
             manaCost: PrintedManaCost,
             power: 2,
             toughness: 3,
-            subtypes: new[] { CardSubtype.Naga, CardSubtype.Cleric });
+            subtypes: new[] { CardSubtype.Snake, CardSubtype.Cleric });
         card.SetOwner(owner);
         card.SetController(owner);
 

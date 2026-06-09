@@ -8,14 +8,14 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Goblin Chieftain (Magic 2010 / many reprints,
-/// Creature — Goblin Warrior {1}{R}{R}).
+/// Creature — Goblin {1}{R}{R}).
 ///
 /// Oracle text:
 ///   "Haste.
 ///    Other Goblin creatures you control have haste and get +1/+1."
 ///
 /// ## Implemented (v1)
-/// - 2/2 Creature — Goblin Warrior, mana cost {1}{R}{R}, owner/controller wired.
+/// - 2/2 Creature — Goblin, mana cost {1}{R}{R}, owner/controller wired.
 /// - <b>Haste</b> on Goblin Chieftain itself (CR 702.10) — wired as a
 ///   <see cref="KeywordAbility"/> marker.
 /// - <b>Static "Other Goblin creatures you control have haste and get
@@ -85,7 +85,7 @@ public static class GoblinChieftainFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Goblin, CardSubtype.Warrior });
+            subtypes: new[] { CardSubtype.Goblin });
 
         card.SetOwner(owner);
         card.SetController(owner);

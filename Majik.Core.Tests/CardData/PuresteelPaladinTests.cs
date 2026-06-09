@@ -61,7 +61,7 @@ public class PuresteelPaladinTests : IDisposable
         c.Power.Should().Be(2);
         c.Toughness.Should().Be(2);
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
@@ -74,7 +74,7 @@ public class PuresteelPaladinTests : IDisposable
         c.Should().BeOfType<Creature>();
         c.Name.Should().Be("Puresteel Paladin");
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
     }
 
     // -----------------------------------------------------------------------
