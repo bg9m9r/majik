@@ -56,7 +56,18 @@ public sealed record ArchetypeWeights(
     /// primary inevitability engine. Aggro archetypes weight it LOW because
     /// they rarely cast planeswalkers and the term would just add noise.</para>
     /// </summary>
-    double PlaneswalkerEngine = 0.0)
+    double PlaneswalkerEngine = 0.0,
+    /// <summary>
+    /// Weight for the deck-strategy advisory term in <see cref="BoardEval"/>.
+    /// Folds in <see cref="Majik.Bot.Strategies.IDeckStrategy.StrategicScore"/>
+    /// when a strategy is wired up. Without a strategy (<c>deck == null</c>) this
+    /// term is zero and the eval is identical to before.
+    ///
+    /// <para>Default 1.0 — strategy scores are already calibrated by the
+    /// implementing strategy; this weight lets a tuned profile dial the advisory
+    /// bonus up or down relative to the existing eval terms.</para>
+    /// </summary>
+    double Strategic = 1.0)
 {
     public static readonly ArchetypeWeights Burn = new(
         LifeDelta:           3.0,

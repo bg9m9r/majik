@@ -1,3 +1,4 @@
+using Majik.Bot.Strategies;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -24,7 +25,7 @@ public static class BoardEval
     /// </summary>
     private const int LowLifeThreshold = 5;
 
-    public static double Score(GameContext ctx, Player self, ArchetypeWeights weights)
+    public static double Score(GameContext ctx, Player self, ArchetypeWeights weights, IDeckStrategy? deck = null)
     {
         var opp = FindOpponent(ctx, self);
 
@@ -57,7 +58,8 @@ public static class BoardEval
             + weights.KeyCardInPlay       * keyCard
             + weights.LethalProximity     * lethalProx
             + weights.CardAdvantage       * cardAdvDiff
-            + weights.PlaneswalkerEngine  * planeswalkerEngine;
+            + weights.PlaneswalkerEngine  * planeswalkerEngine
+            + weights.Strategic           * (deck?.StrategicScore(ctx, self) ?? 0.0);
     }
 
     /// <summary>
