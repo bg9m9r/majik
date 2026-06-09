@@ -43,24 +43,16 @@ namespace Majik.Core.CardData.Factories;
 public static class ScavengingOozeFactory
 {
     /// <summary>
-    /// Construct Scavenging Ooze with no cross-player graveyard resolver.
-    /// The activated ability falls back to the controller's own graveyard
-    /// only — suitable for shape / dispatcher tests.
+    /// Construct Scavenging Ooze. The activated ability scans every player's
+    /// graveyard for the first creature card to exile (CR 109.1 — graveyard
+    /// cards are public across all players), reading the players from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551). With no live game context only the controller's
+    /// graveyard is reachable (shape-only paths). This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
-    public static Creature Create(Player owner) =>
-        Create(owner, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Scavenging Ooze. When
-    /// <paramref name="allPlayersResolver"/> is non-null, the activated
-    /// ability scans every player's graveyard for the first creature card
-    /// to exile (CR 109.1 — graveyard cards are public information across
-    /// all players). When null, only the controller's graveyard is
-    /// reachable.
-    /// </summary>
-    public static Creature Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Creature Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -85,13 +77,14 @@ public static class ScavengingOozeFactory
         // ----------------------------------------------------------------
         var exileEffect = new Effect(
             "Scavenging Ooze: exile creature from graveyard, then +1/+1 + 1 life",
-            () =>
+            ctx =>
             {
-                // Build the list of graveyards to scan. Controller first,
-                // then any additional players the resolver surfaces (with
-                // owner deduplicated).
+                // Build the list of graveyards to scan. Controller first, then
+                // any additional players read off the LIVE game at resolution
+                // (ctx.Game.AllPlayers, with owner deduplicated). No captured
+                // resolver, so correct on the routed prod build.
                 var graveyardOwners = new List<Player> { owner };
-                var extra = allPlayersResolver?.Invoke();
+                var extra = ctx.Game?.AllPlayers;
                 if (extra != null)
                 {
                     foreach (var p in extra)
@@ -117,7 +110,7 @@ public static class ScavengingOozeFactory
                 // "If you do" — no creature card found, no exile, so the
                 // counter + life riders are skipped (CR 605.x conditional
                 // payoff).
-                if (target == null || targetOwner == null) return;
+                if (target == null || targetOwner == null) return ValueTask.CompletedTask;
 
                 targetOwner.Zones.Graveyard.RemoveCard(target);
                 targetOwner.Zones.Exile.AddCard(target);
@@ -128,6 +121,8 @@ public static class ScavengingOozeFactory
 
                 // Controller gains 1 life (CR 119.3).
                 owner.GainLife(1);
+
+                return ValueTask.CompletedTask;
             });
 
         var activated = new ActivatedAbility(

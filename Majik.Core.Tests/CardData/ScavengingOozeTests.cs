@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -212,14 +213,14 @@ public class ScavengingOozeTests
         bob.Zones.Graveyard.AddCard(bobBear);
         bobBear.SetZone(ZoneType.Graveyard);
 
-        var ooze = ScavengingOozeFactory.Create(
-            alice,
-            allPlayersResolver: () => new[] { alice, bob });
+        var ooze = ScavengingOozeFactory.Create(alice);
         alice.Zones.Battlefield.AddCard(ooze);
         ooze.SetZone(ZoneType.Battlefield);
 
+        // Resolve through a live GameContext so the graveyard scan reads
+        // ctx.Game.AllPlayers (the production path) — every player's graveyard.
         var ability = ooze.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
+        ContextResolve.Resolve(ability, alice, alice, bob);
 
         bob.Zones.Graveyard.GetCards().Should().NotContain(bobBear,
             "Bob's bear was removed from his graveyard");

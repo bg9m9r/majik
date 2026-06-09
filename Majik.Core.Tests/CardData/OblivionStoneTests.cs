@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -98,9 +99,7 @@ public class OblivionStoneTests
     [Fact]
     public void Mark_AddsFateCounterToEachNonlandPermanent_AcrossBoth()
     {
-        var stone = OblivionStoneFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var stone = OblivionStoneFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(stone);
         stone.SetZone(ZoneType.Battlefield);
 
@@ -121,7 +120,9 @@ public class OblivionStoneTests
         var mark = stone.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<AdditionalCost>()
                 .All(c => c.CostType != AdditionalCostType.Sacrifice));
-        foreach (var e in mark.Effects) e.Execute();
+        // Resolve through a live GameContext so the scan reads
+        // ctx.Game.AllPlayers (the production path) — both battlefields.
+        ContextResolve.Resolve(mark, _alice, _alice, _bob);
 
         bear.Counters.Count(CounterType.Fate).Should().Be(1);
         aura.Counters.Count(CounterType.Fate).Should().Be(1);
@@ -163,9 +164,7 @@ public class OblivionStoneTests
     [Fact]
     public void Sweep_DestroysNonlandPermanentsWithoutFateCounter_AcrossBoth()
     {
-        var stone = OblivionStoneFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var stone = OblivionStoneFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(stone);
         stone.SetZone(ZoneType.Battlefield);
 
@@ -201,7 +200,9 @@ public class OblivionStoneTests
         var sweep = stone.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<AdditionalCost>()
                 .Any(c => c.CostType == AdditionalCostType.Sacrifice));
-        foreach (var e in sweep.Effects) e.Execute();
+        // Resolve through a live GameContext so the sweep reads
+        // ctx.Game.AllPlayers (the production path) — both battlefields.
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         // Unmarked nonland permanents destroyed.
         giant.Zone.Should().Be(ZoneType.Graveyard);

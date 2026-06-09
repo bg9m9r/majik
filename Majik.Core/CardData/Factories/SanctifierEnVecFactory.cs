@@ -82,15 +82,17 @@ public static class SanctifierEnVecFactory
     /// This is the overload <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, allPlayersResolver: null, replacements: null, zoneService: null, triggers: null);
+        Create(owner, replacements: null, zoneService: null, triggers: null);
 
     /// <summary>
-    /// Construct Sanctifier en-Vec.
+    /// Construct Sanctifier en-Vec. The ETB "exile black-or-red from all
+    /// graveyards" half reads every player from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution — no captured player
+    /// resolver, so it is correct on the production routed build (mirrors
+    /// #2551). With no live game context the ETB exile half no-ops (shape-only
+    /// paths).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Returns the full player list at ETB
-    /// resolution. v1 walks every player's graveyard. Null → the ETB exile
-    /// half no-ops.</param>
     /// <param name="replacements">Bus on which the static black-or-red
     /// graveyard→exile replacement is registered. Null → static half is
     /// skipped.</param>
@@ -101,7 +103,6 @@ public static class SanctifierEnVecFactory
     /// registered so it lands on the stack on battlefield arrival.</param>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         ReplacementBus? replacements,
         ZoneService? zoneService,
         TriggerManager? triggers)
@@ -141,7 +142,11 @@ public static class SanctifierEnVecFactory
 
         var etbEffect = new Effect(
             $"{CardName} — exile all black or red cards from all graveyards (CR 701.21)",
-            () => ResolveEtbExile(allPlayersResolver, zoneService));
+            ctx =>
+            {
+                ResolveEtbExile(ctx.Game?.AllPlayers, zoneService);
+                return ValueTask.CompletedTask;
+            });
 
         var etb = new TriggeredAbility(
             source: card,
@@ -175,10 +180,9 @@ public static class SanctifierEnVecFactory
     /// (or all-other-colour) graveyard is a clean no-op.
     /// </summary>
     public static void ResolveEtbExile(
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        IReadOnlyList<Player>? players,
         ZoneService? zoneService)
     {
-        var players = allPlayersResolver?.Invoke();
         if (players == null) return;
 
         foreach (var player in players)

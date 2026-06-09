@@ -71,20 +71,21 @@ public static class EtchedOracleFactory
     /// Suitable for shape / dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, replacements: null, allPlayersResolver: null);
+        Create(owner, replacements: null);
 
     /// <summary>
     /// Construct Etched Oracle. When <paramref name="replacements"/> is
     /// supplied, Sunburst's counter placement routes through
     /// <see cref="CountersService.Add"/> so Hardened Scales / Doubling
-    /// Season bumps apply. When <paramref name="allPlayersResolver"/> is
-    /// supplied, the activated ability draws three cards for every
-    /// player in the list; otherwise only the controller draws.
+    /// Season bumps apply. The activated ability draws three cards for every
+    /// player read from the LIVE resolution context (<c>ctx.Game.AllPlayers</c>)
+    /// at resolution — no captured player resolver, so it is correct on the
+    /// production routed build (mirrors #2551); with no live game context only
+    /// the controller draws.
     /// </summary>
     public static Creature Create(
         Player owner,
-        ReplacementBus? replacements,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -122,7 +123,7 @@ public static class EtchedOracleFactory
         // ----------------------------------------------------------------
         var drawEffect = new Effect(
             $"{CardName}: each player draws {CardsDrawn} cards",
-            () =>
+            ctx =>
             {
                 // Counter-removal payment is a no-op stub at the engine
                 // level — perform it inline so visible state matches.
@@ -132,17 +133,21 @@ public static class EtchedOracleFactory
                     // the test surface checks the counter total before
                     // activating, but future runtime gates should reject
                     // earlier via CostValidator.
-                    return;
+                    return ValueTask.CompletedTask;
                 }
                 card.Counters.Remove(CounterType.PlusOnePlusOne, CountersToRemove);
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each player draws" — read every player from the LIVE game at
+                // resolution (ctx.Game.AllPlayers). No captured resolver.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
                 {
                     Fx.DrawCards(p, CardsDrawn);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var ability = new ActivatedAbility(

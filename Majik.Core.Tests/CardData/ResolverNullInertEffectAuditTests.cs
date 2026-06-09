@@ -204,85 +204,32 @@ public sealed class ResolverNullInertEffectAuditTests
             ["HiredClawFactory.cs"] =
                 "attack-trigger Effect deals damage to 'target opponent'; prod supplies the target via ChosenTargets, resolver is a v1 fallback — needs the targeting system, not a context-read. v1-deferrals #3b.",
 
-            // === Tier 2: resolver-null inert backlog — #2551 sweep follow-up ===
-            // The #2551 sweep fixed the each-opponent/each-player LIFE-DRAIN family
-            // (Gray Merchant, aristocrats, Sheoldred, …) to read ContextOpponents.
-            // This gate surfaces the REST of the same routed-factory bug class that
-            // #2551 did not touch — board-wipes that enumerate all players to reach
-            // the battlefield, graveyard-hate that enumerates graveyards, all-player
-            // discard/sacrifice, and planeswalker target-resolver ultimates. Each is
-            // routed through NamedCardFactory.Create on prod (non-land), so its
-            // resolver is NULL there and the effect body is inert in real games —
-            // EXACTLY the #2551 class.
+            // === Tier 2: genuine targeting-infra deferral — #2551b sweep tail ===
+            // The #2551b sweep (this PR) cleared the REST of the routed-factory
+            // resolver-null class that #2551 did not touch — board-wipes that
+            // enumerate all players to reach the battlefield (Pernicious Deed,
+            // Engineered Explosives, Oblivion Stone, Ratchet Bomb, Steel Hellkite,
+            // Kozilek's Return), graveyard-hate that enumerates graveyards (Relic of
+            // Progenitus, Rest in Peace, Sanctifier en-Vec, Sentinel Totem,
+            // Scavenging Ooze, Ruin Crab), opponents-mill (Soaring Thought-Thief,
+            // Thieves' Guild Enforcer), each-player edicts / discard / search with
+            // per-player choice (Smallpox, Plaguecrafter, Exhume, Veteran Explorer),
+            // and the all-players enumeration cards (Adeline, Etched Oracle, Faerie
+            // Mastermind, Knight of the Ebon Legion, Ranger-Captain of Eos,
+            // Reanimate, Roiling Vortex, Scourge of the Skyclaves, Goblin Welder,
+            // Etali Primal Storm) — all now read ContextOpponents.Of / ctx.Game.
+            // AllPlayers at resolution (per-player "of their choice" picks read that
+            // player's AgentRegistry agent).
             //
-            // They are NOT fixed in this PR (the gate's job is to fence the class +
-            // surface the backlog): several need an IPlayerAgent choice channel
-            // (sacrifice/discard "of their choice") or the targeting system (the
-            // planeswalker target resolvers), i.e. more than a context-read; the
-            // pure-enumeration ones are a ContextOpponents/rc.Game.AllPlayers swap.
-            // Tracked under v1-deferrals #3b ("resolver-null inert backlog"). Each
-            // entry is the card's clause + the fix it needs. Pay down BEFORE related
-            // new work; remove the entry once the factory reads context (the
-            // Allowlist_EntriesStillTripTheGate guard enforces that staleness).
-
-            ["AdelineResplendentCatharFactory.cs"] =
-                "ETB token-count reads opponents via resolver; pure context-read swap (ContextOpponents.Of). BACKLOG #2551b.",
-            ["EngineeredExplosivesFactory.cs"] =
-                "destroy-each-permanent-with-N-charge-counters sweep enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["EtaliPrimalStormFactory.cs"] =
-                "attack trigger 'each player exiles top + may cast' enumerates all players via resolver; needs all-players read + cast-choice channel. BACKLOG #2551b.",
-            ["EtchedOracleFactory.cs"] =
-                "remove-counters draw enumerates players via resolver; context-read swap. BACKLOG #2551b.",
-            ["ExhumeFactory.cs"] =
-                "'each player returns a creature card from their graveyard' enumerates all players via resolver; needs all-players read + per-player choice. BACKLOG #2551b.",
-            ["FaerieMastermindFactory.cs"] =
-                "'whenever an opponent draws their second card' all-players reset enumerates via resolver; context-read swap. BACKLOG #2551b.",
-            ["GoblinWelderFactory.cs"] =
-                "swap-artifacts ability enumerates all players' battlefields/graveyards via playerProvider; rc.Game.AllPlayers swap + targeting. BACKLOG #2551b.",
-            ["KnightOfTheEbonLegionFactory.cs"] =
-                "end-step 'if a player lost 4+ life' enumerates players via resolver; context-read swap. BACKLOG #2551b.",
-            ["KozileksReturnFactory.cs"] =
-                "all-creatures damage sweep enumerates players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["OblivionStoneFactory.cs"] =
-                "destroy-all-nontoken-permanents enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["PerniciousDeedFactory.cs"] =
-                "destroy-each-artifact/creature/enchantment-with-cmc<=X enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["PlaguecrafterFactory.cs"] =
-                "ETB 'each player sacrifices … / discards' enumerates all players via resolver; needs all-players read + IPlayerAgent choice channel. BACKLOG #2551b.",
-            ["RangerCaptainOfEosFactory.cs"] =
-                "sac ability 'opponents can't cast noncreature spells' enumerates opponents via resolver; ContextOpponents.Of swap. BACKLOG #2551b.",
-            ["RatchetBombFactory.cs"] =
-                "destroy-each-permanent-with-N-counters sweep enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["ReanimateFactory.cs"] =
-                "optional all-graveyards scan enumerates players via resolver; rc.Game.AllPlayers swap (opt-in). BACKLOG #2551b.",
-            ["RelicOfProgenitusFactory.cs"] =
-                "exile-all-graveyards enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["RestInPeaceFactory.cs"] =
-                "ETB exile-all-graveyards enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["RoilingVortexFactory.cs"] =
-                "upkeep + lifegain-punish enumerates players via resolver; context-read swap. BACKLOG #2551b.",
-            ["RuinCrabFactory.cs"] =
-                "landfall mill enumerates players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["SanctifierEnVecFactory.cs"] =
-                "ETB exile-all-graveyards + static enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["ScavengingOozeFactory.cs"] =
-                "exile-target-graveyard-card enumerates players via resolver; rc.Game.AllPlayers + targeting. BACKLOG #2551b.",
-            ["ScourgeOfTheSkyclavesFactory.cs"] =
-                "cast cost / CDA reads players via resolver; context-read swap. BACKLOG #2551b.",
-            ["SentinelTotemFactory.cs"] =
-                "sac+exile-all-graveyards enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
-            ["SmallpoxFactory.cs"] =
-                "'each player loses 1 life, discards, sacrifices a creature and a land' enumerates all players via resolver; needs all-players read + IPlayerAgent choice channel. BACKLOG #2551b.",
-            ["SoaringThoughtThiefFactory.cs"] =
-                "surveil-on-attack + opponents-mill enumerates via resolver; ContextOpponents/all-players swap. BACKLOG #2551b.",
-            ["SteelHellkiteFactory.cs"] =
-                "{X} destroy-each-nonland-permanent-with-cmc-X sweep enumerates all players via resolver; rc.Game.AllPlayers swap. BACKLOG #2551b.",
+            // What REMAINS is the one card that needs MORE than a context-read +
+            // AgentRegistry: Teferi's ultimate exiles "target permanent an opponent
+            // controls" (CR 110.4a) — a true chosen TARGET, which on the routed
+            // build arrives via the trigger's ChosenTargets (the ITarget /
+            // TargetResolver pipeline the binder triggers use), not a bare
+            // ContextOpponents read. Reaching opponent permanents at resolve time
+            // without a chosen target needs the targeting system. v1-deferrals #3b.
             ["TeferiHeroOfDominariaFactory.cs"] =
-                "ultimate exile-opponent-permanents enumerates via opponentPermanentResolver; needs targeting/all-opponents read. BACKLOG #2551b.",
-            ["ThievesGuildEnforcerFactory.cs"] =
-                "opponents-mill / surveil enumerates via resolver; ContextOpponents/all-players swap. BACKLOG #2551b.",
-            ["VeteranExplorerFactory.cs"] =
-                "dies-trigger 'each player may search for two basics' enumerates all players via resolver; needs all-players read + per-player search choice. BACKLOG #2551b.",
+                "−3 ultimate exiles 'target permanent an opponent controls' (CR 110.4a) via opponentPermanentResolver; prod must supply the target via the ITarget/TargetResolver pipeline (ChosenTargets), not a context-read — same posture as Hired Claw. v1-deferrals #3b.",
         };
 
     /// <summary>

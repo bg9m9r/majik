@@ -59,26 +59,28 @@ public static class RuinCrabFactory
     public const int MillCount = 3;
 
     /// <summary>
-    /// Construct Ruin Crab with no live <see cref="TriggerManager"/> wiring
-    /// and no player-list resolver. The landfall trigger is attached for
-    /// shape inspection but not registered with a bus; with no resolver the
-    /// resolve body mills nobody. Suitable for shape / dispatcher tests.
+    /// Construct Ruin Crab with no live <see cref="TriggerManager"/> wiring.
+    /// The landfall trigger is attached for shape inspection but not registered
+    /// with a bus. The mill body reads each opponent from the LIVE resolution
+    /// context (<c>ContextOpponents.Of</c>) at resolution. Suitable for shape /
+    /// dispatcher tests.
     /// </summary>
-    public static Creature Create(Player owner) => Create(owner, triggers: null, allPlayersResolver: null);
+    public static Creature Create(Player owner) => Create(owner, triggers: null);
 
     /// <summary>
     /// Construct Ruin Crab. When <paramref name="triggers"/> is supplied the
     /// landfall trigger is registered so a
     /// <see cref="Majik.Core.Events.CardMovedEvent"/> for a land entering
-    /// under the controller's control automatically queues the ability. When
-    /// <paramref name="allPlayersResolver"/> is supplied, resolving the
-    /// ability mills <see cref="MillCount"/> from each opponent's library
-    /// (every player in the list except the controller, CR 102.1).
+    /// under the controller's control automatically queues the ability.
+    /// Resolving the ability mills <see cref="MillCount"/> from each opponent's
+    /// library — opponents read from the LIVE resolution context
+    /// (<c>ContextOpponents.Of(ctx, controller)</c>, every live non-controller
+    /// player) at resolution. No captured player resolver, so it is correct on
+    /// the production routed build (mirrors #2551).
     /// </summary>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? allPlayersResolver = null)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -103,22 +105,22 @@ public static class RuinCrabFactory
         // ----------------------------------------------------------------
         var millEffect = new Effect(
             $"{CardName}: each opponent mills {MillCount} cards (landfall)",
-            () =>
+            ctx =>
             {
-                if (allPlayersResolver == null) return;
-                var players = allPlayersResolver();
-                if (players == null) return;
-
                 var controller = card.Controller ?? owner;
-                foreach (var p in players)
-                {
-                    // "Each OPPONENT" — never the controller (CR 102.1).
-                    if (ReferenceEquals(p, controller)) continue;
 
+                // "Each OPPONENT" — read from the LIVE resolution context
+                // (ContextOpponents.Of filters to live non-controller players,
+                // CR 102.1). No captured resolver, so correct on the routed
+                // prod build.
+                foreach (var p in ContextOpponents.Of(ctx, controller))
+                {
                     // CR 701.13b — mill 3 per opponent. Empty / short
                     // libraries handled inside MillAction.Apply (CR 701.13a).
                     MillAction.Apply(p, MillCount);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var trigger = new TriggeredAbility(

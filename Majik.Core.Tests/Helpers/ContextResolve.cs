@@ -78,4 +78,24 @@ public static class ContextResolve
             e.ExecuteAsync(rc).AsTask().GetAwaiter().GetResult();
         }
     }
+
+    /// <summary>
+    /// Run a raw list of <see cref="IEffect"/> (e.g. a spell-definition's
+    /// EffectFactory output, or a factory's BuildResolveEffect) through a live
+    /// <see cref="ResolutionContext"/> built from <paramref name="players"/>
+    /// (the first is treated as the controller). The resolver-null bug-class
+    /// fix routes the each-player read off the resolution context, so these
+    /// effects must be executed with a live game to behave as they do in prod.
+    /// </summary>
+    public static void ResolveEffects(
+        System.Collections.Generic.IEnumerable<IEffect> effects,
+        Player controller, params Player[] players)
+    {
+        var rc = ResolutionContext.For(
+            controller, agent: null, game: Game(controller, players), chosenTargets: null);
+        foreach (var e in effects)
+        {
+            e.ExecuteAsync(rc).AsTask().GetAwaiter().GetResult();
+        }
+    }
 }

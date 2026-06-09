@@ -11,6 +11,7 @@ using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.StateMachine;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -81,11 +82,7 @@ public class RoilingVortexFactoryTests
     [Fact]
     public void UpkeepTrigger_AllPlayersResolverSupplied_DrainsEveryPlayerOne()
     {
-        var vortex = RoilingVortexFactory.Create(
-            _alice,
-            triggers: null,
-            replacements: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var vortex = RoilingVortexFactory.Create(_alice, triggers: null, replacements: null);
 
         vortex.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(vortex);
@@ -93,10 +90,11 @@ public class RoilingVortexFactoryTests
         var aliceLifeBefore = _alice.LifeTotal;
         var bobLifeBefore = _bob.LifeTotal;
 
-        // Resolve the upkeep trigger directly — execute its effect chain.
+        // Resolve the upkeep trigger through a live GameContext so it reads
+        // ctx.Game.AllPlayers (the production path) — every player.
         var upkeep = vortex.Abilities.OfType<TriggeredAbility>()
             .First(t => t.Condition is EventTriggerCondition<StepStartedEvent>);
-        foreach (var e in upkeep.Effects) e.Execute();
+        ContextResolve.Resolve(upkeep, _alice, _alice, _bob);
 
         _alice.LifeTotal.Should().Be(aliceLifeBefore - 1,
             "Roiling Vortex is symmetric — controller takes 1 too");
@@ -134,7 +132,7 @@ public class RoilingVortexFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var vortex = RoilingVortexFactory.Create(_alice, triggers, replacements: null, allPlayersResolver: null);
+        var vortex = RoilingVortexFactory.Create(_alice, triggers, replacements: null);
         _alice.Zones.Battlefield.AddCard(vortex);
         vortex.SetZone(ZoneType.Battlefield);
 
@@ -159,7 +157,7 @@ public class RoilingVortexFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var vortex = RoilingVortexFactory.Create(_alice, triggers, replacements: null, allPlayersResolver: null);
+        var vortex = RoilingVortexFactory.Create(_alice, triggers, replacements: null);
         _alice.Zones.Battlefield.AddCard(vortex);
         vortex.SetZone(ZoneType.Battlefield);
 
@@ -191,7 +189,7 @@ public class RoilingVortexFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var vortex = RoilingVortexFactory.Create(_alice, triggers, replacements: null, allPlayersResolver: null);
+        var vortex = RoilingVortexFactory.Create(_alice, triggers, replacements: null);
         _alice.Zones.Battlefield.AddCard(vortex);
         vortex.SetZone(ZoneType.Battlefield);
 
@@ -296,7 +294,7 @@ public class RoilingVortexFactoryTests
         _bob.AttachReplacementBus(bus);
 
         // Build Roiling Vortex with the replacement registered.
-        RoilingVortexFactory.Create(_alice, triggers: null, replacements: bus, allPlayersResolver: null);
+        RoilingVortexFactory.Create(_alice, triggers: null, replacements: bus);
 
         var aliceLifeBefore = _alice.LifeTotal;
         var bobLifeBefore = _bob.LifeTotal;

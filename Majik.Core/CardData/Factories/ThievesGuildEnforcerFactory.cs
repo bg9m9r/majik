@@ -116,10 +116,13 @@ public static class ThievesGuildEnforcerFactory
     /// attack mill trigger against. May be null — the trigger shape is
     /// still attached to the card.</param>
     /// <param name="allPlayersResolver">Closure returning the full
-    /// player list. Used by both the trigger body (mill every opponent)
-    /// AND the conditional self-buff predicate (scan opponents'
-    /// graveyards). May be null — mill body is a no-op and buff stays
-    /// inactive.</param>
+    /// player list. The mill trigger body no longer uses this — it reads each
+    /// opponent from the live resolution context (<c>ContextOpponents.Of</c>)
+    /// so the mill is correct on prod. This resolver now feeds ONLY the
+    /// conditional self-buff predicate (scan opponents' graveyards), which runs
+    /// in the continuous-effects layer (no resolution context available there).
+    /// Without it the buff predicate stays inactive — a continuous-effect infra
+    /// gap, not the each-opponent effect-body bug.</param>
     public static Creature Create(
         Player owner,
         ContinuousEffectsService? continuousEffects,
@@ -162,22 +165,23 @@ public static class ThievesGuildEnforcerFactory
 
         // CR 603.1 / 603.6c — combined "ETB or attacks" trigger. One
         // ability, one trigger condition that matches either event.
+        // "Each opponent mills two" reads the opponents from the LIVE
+        // resolution context (ContextOpponents.Of) at resolution — no captured
+        // resolver, so the mill is correct on the production routed build
+        // (mirrors #2551).
         var millEffect = new Effect(
             $"{CardName}: each opponent mills 2",
-            () =>
+            ctx =>
             {
-                if (allPlayersResolver == null) return;
-                var players = allPlayersResolver();
-                if (players == null) return;
-
                 var controller = card.Controller ?? owner;
-                foreach (var p in players)
+                foreach (var p in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(p, controller)) continue;
                     // CR 701.13b — mill 2 per opponent. Empty-library
                     // handled inside MillAction.Apply.
                     MillAction.Apply(p, MillCount);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var trigger = new TriggeredAbility(

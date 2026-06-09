@@ -118,22 +118,23 @@ public static class SteelHellkiteFactory
     public static Creature Create(Player owner) =>
         Create(owner,
             xValueProvider: null,
-            allPlayersResolver: null,
             eventBus: null);
 
     /// <summary>
     /// Construct Steel Hellkite. When <paramref name="xValueProvider"/>
-    /// is supplied, the {X} activation samples it at resolution. When
-    /// <paramref name="allPlayersResolver"/> is supplied, the sweep
-    /// scans every player's battlefield; otherwise only the controller's.
-    /// When <paramref name="eventBus"/> is supplied, the combat-damage-
-    /// victim tracker subscribes to <see cref="CombatDamageDealtEvent"/>
-    /// (accumulate) and <see cref="TurnStartedEvent"/> (clear).
+    /// is supplied, the {X} activation samples it at resolution. The sweep
+    /// scans every player's battlefield read from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution — no captured player
+    /// resolver, so it is correct on the production routed build (mirrors
+    /// #2551); with no live game context it falls back to the controller's
+    /// battlefield. When <paramref name="eventBus"/> is supplied, the
+    /// combat-damage-victim tracker subscribes to
+    /// <see cref="CombatDamageDealtEvent"/> (accumulate) and
+    /// <see cref="TurnStartedEvent"/> (clear).
     /// </summary>
     public static Creature Create(
         Player owner,
         Func<int>? xValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -197,7 +198,11 @@ public static class SteelHellkiteFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: destroy each nontoken permanent with mv = X whose controller took combat damage from this card this turn",
-            () => ResolveDestroySweep(owner, xValueProvider, allPlayersResolver, combatVictims));
+            ctx =>
+            {
+                ResolveDestroySweep(owner, xValueProvider, ctx.Game?.AllPlayers, combatVictims);
+                return ValueTask.CompletedTask;
+            });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
@@ -240,13 +245,13 @@ public static class SteelHellkiteFactory
     private static void ResolveDestroySweep(
         Player owner,
         Func<int>? xValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        IReadOnlyList<Player>? allPlayers,
         HashSet<Player> combatVictims)
     {
         var x = xValueProvider?.Invoke() ?? 0;
         if (combatVictims.Count == 0) return;
 
-        var players = allPlayersResolver?.Invoke() ?? (IReadOnlyList<Player>)new[] { owner };
+        var players = allPlayers ?? (IReadOnlyList<Player>)new[] { owner };
 
         foreach (var p in players)
         {

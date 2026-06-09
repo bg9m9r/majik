@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -130,7 +131,6 @@ public class RangerCaptainOfEosTests : IDisposable
     {
         var rc = RangerCaptainOfEosFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: null,
             triggers: null);
 
@@ -138,7 +138,7 @@ public class RangerCaptainOfEosTests : IDisposable
         rc.SetZone(ZoneType.Battlefield);
 
         var ability = rc.Abilities.OfType<ActivatedAbility>().First();
-        foreach (var effect in ability.Effects) effect.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         CastingRestrictions.CannotCastNoncreatureSpell(_bob).Should().BeTrue();
         // Controller (Alice) is not opponent-side — not restricted.
@@ -179,7 +179,6 @@ public class RangerCaptainOfEosTests : IDisposable
         var bus = new EventBus();
         var rc = RangerCaptainOfEosFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: bus,
             triggers: null);
 
@@ -187,7 +186,7 @@ public class RangerCaptainOfEosTests : IDisposable
         rc.SetZone(ZoneType.Battlefield);
 
         var ability = rc.Abilities.OfType<ActivatedAbility>().First();
-        foreach (var effect in ability.Effects) effect.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
         CastingRestrictions.CannotCastNoncreatureSpell(_bob).Should().BeTrue();
 
         // Publish a TurnEndedEvent — handler clears the restriction.

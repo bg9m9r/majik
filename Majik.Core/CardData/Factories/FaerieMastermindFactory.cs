@@ -89,19 +89,14 @@ public static class FaerieMastermindFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null, allPlayersResolver: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Faerie Mastermind wired for the opponent-second-draw trigger
-    /// (event bus + trigger manager) but without an all-players resolver — the
-    /// {3}{U} activated ability then draws for nobody. Convenience overload for
-    /// trigger tests.
-    /// </summary>
-    public static Creature Create(Player owner, IEventBus? eventBus, TriggerManager? triggers) =>
-        Create(owner, eventBus, triggers, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Faerie Mastermind with optional runtime services.
+    /// Construct Faerie Mastermind with optional runtime services. The {3}{U}
+    /// "each player draws a card" ability reads every player from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551); with no live game context it draws for nobody.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">Event bus. When supplied, a
@@ -110,14 +105,10 @@ public static class FaerieMastermindFactory
     /// <param name="triggers">TriggerManager the opponent-second-draw trigger
     /// registers with so a <see cref="CardDrawnEvent"/> lands it on the stack.
     /// May be null.</param>
-    /// <param name="allPlayersResolver">Returns every player in the game at
-    /// {3}{U} resolution; each draws one card. May be null — the activated
-    /// ability then draws for nobody (shape path).</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -133,7 +124,7 @@ public static class FaerieMastermindFactory
         card.AddAbility(new KeywordAbility("Flying", card, owner));
 
         AddOpponentSecondDrawTrigger(card, owner, eventBus, triggers);
-        AddEachPlayerDrawsAbility(card, owner, allPlayersResolver);
+        AddEachPlayerDrawsAbility(card, owner);
 
         return card;
     }
@@ -196,20 +187,24 @@ public static class FaerieMastermindFactory
     // -----------------------------------------------------------------------
     private static void AddEachPlayerDrawsAbility(
         Creature card,
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        Player owner)
     {
         var drawAllEffect = new Effect(
             $"{CardName}: each player draws a card ({ActivatedCost} activated)",
-            () =>
+            ctx =>
             {
-                var players = allPlayersResolver?.Invoke();
-                if (players == null) return; // shape path — no resolver wired.
+                // "Each player draws" — read every player from the LIVE game at
+                // resolution (ctx.Game.AllPlayers). No captured resolver, so
+                // correct on the routed prod build; no game → draws for nobody.
+                var players = ctx.Game?.AllPlayers;
+                if (players == null) return ValueTask.CompletedTask;
                 foreach (var player in players)
                 {
                     if (player == null) continue;
                     DrawCard(player);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var ability = new ActivatedAbility(

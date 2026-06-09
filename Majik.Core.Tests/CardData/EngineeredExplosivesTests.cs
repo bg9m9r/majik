@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -70,7 +71,7 @@ public class EngineeredExplosivesTests
     public void EngineeredExplosives_EtbTrigger_WithXProvider_AddsXChargeCounters()
     {
         var ee = EngineeredExplosivesFactory.Create(
-            _alice, xValueProvider: () => 2, allPlayersResolver: null);
+            _alice, xValueProvider: () => 2);
         _alice.Zones.Battlefield.AddCard(ee);
         ee.SetZone(ZoneType.Battlefield);
 
@@ -110,10 +111,7 @@ public class EngineeredExplosivesTests
     [Fact]
     public void EngineeredExplosives_Activate_DestroysNonlandPermanentsOnBothSidesWithMatchingMv()
     {
-        var ee = EngineeredExplosivesFactory.Create(
-            _alice,
-            xValueProvider: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var ee = EngineeredExplosivesFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(ee);
         ee.SetZone(ZoneType.Battlefield);
         ee.Counters.Add(CounterType.Charge, 2);
@@ -130,8 +128,10 @@ public class EngineeredExplosivesTests
         _bob.Zones.Battlefield.AddCard(bobArtifact);
         bobArtifact.SetZone(ZoneType.Battlefield);
 
+        // Resolve through a live GameContext so the sweep reads
+        // ctx.Game.AllPlayers (the production path) — both battlefields.
         var ability = ee.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         aliceBear.Zone.Should().Be(ZoneType.Graveyard,
             "Alice's mv-2 creature is destroyed");

@@ -60,21 +60,14 @@ public static class SentinelTotemFactory
 
     /// <summary>
     /// Construct Sentinel Totem. The activated sweep's "exile all graveyards"
-    /// is scoped to the controller only (no allPlayersResolver). Identity and
-    /// the ETB scry-1 trigger come from the embedded JSON definition.
+    /// reads every player from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution — no captured player
+    /// resolver, so it is correct on the production routed build (mirrors
+    /// #2551). With no live game context the sweep falls back to the
+    /// controller's graveyard (shape-only paths). Identity and the ETB scry-1
+    /// trigger come from the embedded JSON definition.
     /// </summary>
-    public static Artifact Create(Player owner) =>
-        Create(owner, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Sentinel Totem with optional cross-player graveyard access.
-    /// When <paramref name="allPlayersResolver"/> is supplied, the activated
-    /// ability's "exile all graveyards" sweeps every player's graveyard in
-    /// resolver order. Without it, only the controller's graveyard is swept.
-    /// </summary>
-    public static Artifact Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Artifact Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -91,7 +84,7 @@ public static class SentinelTotemFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             "Sentinel Totem: exile all graveyards",
-            () =>
+            ctx =>
             {
                 // Self-exile: move the Totem from Battlefield → Exile.
                 // Idempotent if already exiled by the time this closure runs.
@@ -102,8 +95,11 @@ public static class SentinelTotemFactory
                     totem.SetZone(ZoneType.Exile);
                 }
 
-                // Exile all cards from all reachable graveyards.
-                var players = allPlayersResolver?.Invoke()
+                // Exile all cards from ALL graveyards — read every player from
+                // the LIVE game at resolution (ctx.Game.AllPlayers). No
+                // captured resolver, so the sweep is correct on the routed prod
+                // build. Shape-only resolves fall back to the controller.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -116,6 +112,8 @@ public static class SentinelTotemFactory
                         card.SetZone(ZoneType.Exile);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var sweepAbility = new ActivatedAbility(

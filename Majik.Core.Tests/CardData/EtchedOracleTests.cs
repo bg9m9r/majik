@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -141,10 +142,7 @@ public class EtchedOracleTests
     [Fact]
     public void EtchedOracle_Activated_WithAllPlayersResolver_DrawsForEveryPlayer()
     {
-        var eo = EtchedOracleFactory.Create(
-            _alice,
-            replacements: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var eo = EtchedOracleFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(eo);
         eo.SetZone(ZoneType.Battlefield);
         eo.Counters.Add(CounterType.PlusOnePlusOne, 3);
@@ -155,8 +153,10 @@ public class EtchedOracleTests
         var aliceBefore = _alice.Zones.Hand.GetCards().Count();
         var bobBefore = _bob.Zones.Hand.GetCards().Count();
 
+        // Resolve through a live GameContext so the draw reads
+        // ctx.Game.AllPlayers (the production path) — every player.
         var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         (_alice.Zones.Hand.GetCards().Count() - aliceBefore).Should().Be(3,
             "Alice draws three");
