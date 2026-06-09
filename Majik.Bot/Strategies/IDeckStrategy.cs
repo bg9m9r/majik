@@ -15,8 +15,21 @@ public interface IDeckStrategy
     /// deck's plan (combo pieces assembled, payoff protected, ramp toward finisher).
     double StrategicScore(GameContext ctx, Player self);
 
-    /// Directive: the NEXT action of an ASSEMBLED win-line (else null). Checked
-    /// first in PickPriorityAction; re-evaluated each priority window.
+    /// <summary>
+    /// Directive override — return the next action ONLY when an ATOMIC,
+    /// (near-)immediate KILL is assembled (e.g. cast the lethal spell, the
+    /// storm payoff, the one-shot combo that wins THIS turn).
+    ///
+    /// <para>For multi-turn ENGINES / value combos (reanimator,
+    /// ramp-to-payoff), return <see langword="null"/> and rely on
+    /// <see cref="StrategicScore"/> to steer the search instead — directive
+    /// override of the search hurts on non-atomic lines (measured: it
+    /// over-commits and loses, e.g. GrixisReanimator 20 % win-rate when
+    /// directive-forced vs 12/16 combo fires).</para>
+    ///
+    /// <para>Checked first in PickPriorityAction; re-evaluated each priority
+    /// window.</para>
+    /// </summary>
     PriorityAction? TryGetNextWinningAction(GameContext ctx, Player self);
 
     /// Advisory: the primer's keep/ship rule (else null → generic MulliganPolicy).
