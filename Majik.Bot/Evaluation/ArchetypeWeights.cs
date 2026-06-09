@@ -67,7 +67,18 @@ public sealed record ArchetypeWeights(
     /// <para>0 = kill-switch: fully disables the term. All presets start at
     /// 1.0; per-archetype tuning comes later.</para>
     /// </summary>
-    double HiddenReach = 1.0)
+    double HiddenReach = 1.0,
+    /// <summary>
+    /// Weight for the deck-strategy advisory term in <see cref="BoardEval"/>.
+    /// Folds in <see cref="Majik.Bot.Strategies.IDeckStrategy.StrategicScore"/>
+    /// when a strategy is wired up. Without a strategy (<c>deck == null</c>) this
+    /// term is zero and the eval is identical to before.
+    ///
+    /// <para>Default 1.0 — strategy scores are already calibrated by the
+    /// implementing strategy; this weight lets a tuned profile dial the advisory
+    /// bonus up or down relative to the existing eval terms.</para>
+    /// </summary>
+    double Strategic = 1.0)
 {
     public static readonly ArchetypeWeights Burn = new(
         LifeDelta:           3.0,
