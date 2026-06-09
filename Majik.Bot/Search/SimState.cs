@@ -95,6 +95,14 @@ public sealed class SimState
     /// the existing <see cref="OpponentDecklist"/> (used by the K-world search loop
     /// to spin the same root across many determinized worlds). Every other field is
     /// preserved unchanged.
+    ///
+    /// <para>
+    /// Presupposes a decklist is already attached (intended use: re-seeding an
+    /// already-determinized root — i.e. one produced by <see cref="WithDeterminization"/>).
+    /// Calling this on a perfect-info root yields a seed-without-decklist state,
+    /// which resamples nothing (see <see cref="EngineSimulator"/>'s
+    /// resample-when-both-set guard); use <see cref="WithDeterminization"/> to opt in.
+    /// </para>
     /// </summary>
     public SimState WithWorldSeed(int worldSeed)
     {

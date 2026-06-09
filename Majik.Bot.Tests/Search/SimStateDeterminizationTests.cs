@@ -59,7 +59,7 @@ public class SimStateDeterminizationTests
     [Fact]
     public void WithWorldSeed_PreservesDecklist_AndSetsSeed()
     {
-        var root = BuildRoot(out _, out _);
+        var root = BuildRoot(out var active, out var searched);
         var deck = new[] { "Lightning Bolt", "Mountain" };
         var det = root.WithDeterminization(deck, 5);
 
@@ -67,5 +67,13 @@ public class SimStateDeterminizationTests
 
         reseeded.WorldSeed.Should().Be(9);
         reseeded.OpponentDecklist.Should().BeSameAs(deck);
+
+        // The second hop must NOT drop any other field either (same drop-a-field
+        // risk as the first hop — guards the K-world reseed path).
+        reseeded.ActivePlayer.Should().BeSameAs(active);
+        reseeded.TurnNumber.Should().Be(root.TurnNumber);
+        reseeded.Phase.Should().Be(root.Phase);
+        reseeded.LivePlayers.Should().BeSameAs(root.LivePlayers);
+        reseeded.SearchedSeat.Should().BeSameAs(searched);
     }
 }
