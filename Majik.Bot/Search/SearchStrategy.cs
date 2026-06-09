@@ -62,7 +62,7 @@ internal sealed class SearchStrategy : IBotStrategy
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
-        var sim = new EngineSimulator(_weights);
+        var sim = new EngineSimulator(_weights, deck: null); // Task 5 wires the real deck strategy
         _mcts = new Mcts(sim, ConfigFrom(config));
     }
 
