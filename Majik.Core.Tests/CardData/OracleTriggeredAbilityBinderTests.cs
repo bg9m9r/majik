@@ -1028,4 +1028,287 @@ public class OracleTriggeredAbilityBinderTests
             Majik.Core.Players.Agents.AgentRegistry.Clear();
         }
     }
+
+    // =======================================================================
+    // Utility-land ETB triggers — LANDS bound through the binder chain
+    // (OracleTriggeredAbilityBinder), never their named factory, in real play.
+    // Oracle text verified against EmbeddedCardRepository.GetByName(...).
+    // Each test drives the real stack/trigger flow.
+    // =======================================================================
+
+    private static CardEntity LandEntity(string name, string oracle, string typeLine = "Land") =>
+        new() { Name = name, TypeLine = typeLine, OracleText = oracle };
+
+    private void DriveEtb(
+        Majik.Core.Cards.Land land, CardEntity entity,
+        Majik.Core.Stack.Stack stack, TriggerManager triggers, ZoneService zones)
+    {
+        land.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(land);
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(
+                     land, entity, _alice, new[] { _alice, _bob }))
+            land.AddAbility(ab);
+        triggers.BindCard(land);
+
+        zones.MoveCardTo(land, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+    }
+
+    [Fact]
+    public void KhalniGarden_Etb_CreatesPlantToken()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var land = new Majik.Core.Cards.Land("Khalni Garden") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Khalni Garden",
+            "This land enters tapped.\n" +
+            "When this land enters, create a 0/1 green Plant creature token.\n" +
+            "{T}: Add {G}."), stack, triggers, zones);
+
+        var token = _alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .FirstOrDefault(c => c.Name == "Plant");
+        token.Should().NotBeNull("the ETB trigger mints a 0/1 green Plant token");
+        token!.Power.Should().Be(0);
+        token.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void PiranhaMarsh_Etb_TargetPlayerLosesLife()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var land = new Majik.Core.Cards.Land("Piranha Marsh") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Piranha Marsh",
+            "This land enters tapped.\n" +
+            "When this land enters, target player loses 1 life.\n" +
+            "{T}: Add {B}."), stack, triggers, zones);
+
+        _bob.LifeTotal.Should().Be(19, "the first opponent loses 1 life (CR 119.3)");
+        _alice.LifeTotal.Should().Be(20, "the controller is not the chosen target");
+    }
+
+    [Fact]
+    public void TeeteringPeaks_Etb_PumpsChosenCreature()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        bear.ActiveEffects = effects;
+        bear.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(bear);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Teetering Peaks") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Teetering Peaks",
+                "This land enters tapped.\n" +
+                "When this land enters, target creature gets +2/+0 until end of turn.\n" +
+                "{T}: Add {R}."), stack, triggers, zones);
+
+            bear.Power.Should().Be(4, "+2/+0 until end of turn (CR 613.1g)");
+            bear.Toughness.Should().Be(2);
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void SejiriSteppe_Etb_GrantsProtectionToControllerCreature()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        bear.ActiveEffects = effects;
+        bear.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(bear);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Sejiri Steppe") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Sejiri Steppe",
+                "This land enters tapped.\n" +
+                "When this land enters, target creature you control gains protection from the color of your choice until end of turn.\n" +
+                "{T}: Add {W}."), stack, triggers, zones);
+
+            bear.Abilities.OfType<ProtectionAbility>().Should().ContainSingle(
+                "the chosen creature gains protection from a colour (default white)");
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void SoaringSeacliff_Etb_GrantsFlying()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        bear.ActiveEffects = effects;
+        bear.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(bear);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Soaring Seacliff") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Soaring Seacliff",
+                "This land enters tapped.\n" +
+                "When this land enters, target creature gains flying until end of turn.\n" +
+                "{T}: Add {U}."), stack, triggers, zones);
+
+            bear.HasEffectiveKeyword("Flying")
+                .Should().BeTrue("the chosen creature gains flying until end of turn (CR 702.9)");
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void HalimarDepths_Etb_LooksAtTopThreeAndReorders()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var a = new Creature("A", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var b = new Creature("B", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var c = new Creature("C", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        foreach (var card in new[] { a, b, c }) { _alice.Zones.Library.AddCard(card); card.SetZone(ZoneType.Library); }
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        // Reorder the top three to C, B, A.
+        agent.QueueScryDecision(new ScryAction.ScryDecision(
+            ToBottom: Array.Empty<ICard>(),
+            TopOrder: new ICard[] { c, b, a }));
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Halimar Depths") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Halimar Depths",
+                "This land enters tapped.\n" +
+                "When this land enters, look at the top three cards of your library, then put them back in any order.\n" +
+                "{T}: Add {U}."), stack, triggers, zones);
+
+            _alice.Zones.Library.GetCards().Take(3).Should().Equal(new ICard[] { c, b, a },
+                "the agent's reorder is applied; no card is bottomed (reorder-only)");
+            _alice.Zones.Library.GetCards().Should().HaveCount(3, "no card left the library");
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void MortuaryMire_Etb_PutsCreatureCardFromGraveyardOnTop()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var grizzly = new Creature("Grizzly", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Graveyard.AddCard(grizzly);
+        grizzly.SetZone(ZoneType.Graveyard);
+        // A bystander library card so "on top" is observable.
+        var filler = new Creature("Filler", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(filler);
+        filler.SetZone(ZoneType.Library);
+
+        var land = new Majik.Core.Cards.Land("Mortuary Mire") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Mortuary Mire",
+            "This land enters tapped.\n" +
+            "When this land enters, you may put target creature card from your graveyard on top of your library.\n" +
+            "{T}: Add {B}."), stack, triggers, zones);
+
+        _alice.Zones.Library.GetCards().First().Should().Be(grizzly,
+            "the graveyard creature is put on top of the library (CR 701.20)");
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(grizzly);
+    }
+
+    [Fact]
+    public void SunscorchedDesert_Etb_DealsDamageToTargetPlayer()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Sunscorched Desert does NOT enter tapped — no "This land enters tapped." line.
+        var land = new Majik.Core.Cards.Land("Sunscorched Desert") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Sunscorched Desert",
+            "When this land enters, it deals 1 damage to target player or planeswalker.\n" +
+            "{T}: Add {C}.", "Land — Desert"), stack, triggers, zones);
+
+        _bob.LifeTotal.Should().Be(19, "the first opponent takes 1 damage (CR 119.1d)");
+    }
+
+    [Fact]
+    public void RuptureSpire_Etb_SacrificesWhenUnpaid()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // No mana in pool → cannot pay {1} → land is sacrificed.
+        var land = new Majik.Core.Cards.Land("Rupture Spire") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Rupture Spire",
+            "This land enters tapped.\n" +
+            "When this land enters, sacrifice it unless you pay {1}.\n" +
+            "{T}: Add one mana of any color."), stack, triggers, zones);
+
+        land.Zone.Should().Be(ZoneType.Graveyard, "unpaid {1} sacrifices the land (CR 701.17)");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(land);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(land);
+    }
+
+    [Fact]
+    public void RuptureSpire_Etb_StaysWhenPaid()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // {1} available in pool → pays → land stays.
+        _alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("G"));
+
+        var land = new Majik.Core.Cards.Land("Transguild Promenade") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Transguild Promenade",
+            "This land enters tapped.\n" +
+            "When this land enters, sacrifice it unless you pay {1}.\n" +
+            "{T}: Add one mana of any color."), stack, triggers, zones);
+
+        land.Zone.Should().Be(ZoneType.Battlefield, "paying {1} keeps the land");
+    }
+
+    [Fact]
+    public void CrumblingVestige_Etb_AddsOneManaOfAnyColor()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var land = new Majik.Core.Cards.Land("Crumbling Vestige") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Crumbling Vestige",
+            "This land enters tapped.\n" +
+            "When this land enters, add one mana of any color.\n" +
+            "{T}: Add {C}."), stack, triggers, zones);
+
+        _alice.ManaPool.Total.Should().BeGreaterThan(0,
+            "the ETB trigger adds one mana of any color (default green) to the pool");
+    }
 }
