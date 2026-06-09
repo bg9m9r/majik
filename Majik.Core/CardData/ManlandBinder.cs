@@ -55,13 +55,26 @@ namespace Majik.Core.CardData;
 ///   <item>A "Put counters … Then you may have it become …" preamble
 ///     (Crawling Barrens) — the animate is conditional on a prior counter
 ///     step.</item>
-///   <item>Attack triggers that need a target prompt or the defending player
-///     (Restless Bivouac / Cottage / Reef / Ridgeline / Vinestalk / Bones /
-///     Fortress drain) — only the non-targeted, self-contained Restless
-///     triggers (rummage, scry, anthem-pump) bind here; the rest are no-ops
-///     until a target-prompt / defender-capture-aware binding lands.</item>
+///   <item>Restless Bones' "exile up to two target cards from graveyards, then
+///     create that many tapped 2/2 Skeletons" attack trigger — the
+///     count-linked token rider has no generic primitive yet; deferred.</item>
 /// </list>
 /// </para>
+///
+/// <para><b>Targeted Restless attack triggers (now bound, CR 603.3).</b> The
+/// six targeted/defender-capturing Restless attack triggers — Bivouac (+1/+1
+/// counter on target creature you control), Cottage (Food + exile up to one
+/// target graveyard card), Reef (target player mills four), Ridgeline (another
+/// target attacking creature gets +2/+0 + untap), Vinestalk (up to one other
+/// target creature becomes base 3/3), and Fortress (defending player loses 2 /
+/// you gain 2) — bind here as real <see cref="TriggeredAbility"/>s. The five
+/// targeting ones declare a <see cref="Players.Agents.TargetRequest"/> with a
+/// <c>CandidateGatherer</c> scoped per the oracle; the live
+/// <see cref="TriggerManager"/> collects the agent's chosen target via
+/// <see cref="Targeting.TargetCollection.CollectAsync"/> and the effect reads
+/// <see cref="TriggeredAbility.ChosenTargets"/> on resolution (CR 608.2b
+/// resolve-time legality recheck). Fortress is non-targeted; it captures the
+/// defending player off the live <see cref="Events.CreatureAttacksEvent"/>.</para>
 /// </summary>
 public static class ManlandBinder
 {
@@ -132,6 +145,36 @@ public static class ManlandBinder
         @"scry (?<n>\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex Anthem = new(
         @"other creatures you control get \+(?<p>\d+)/\+(?<t>\d+) until end of turn",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // --- Targeted / defender-capturing Restless attack triggers (CR 603.3) ---
+    // Restless Bivouac — "put a +1/+1 counter on target creature you control."
+    private static readonly Regex CounterOnTargetYouControl = new(
+        @"put a \+1/\+1 counter on target creature you control",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Restless Cottage — "create a Food token[,]? then exile up to one target
+    // card from a graveyard." (Scryfall uses "and"/"then"; accept both.)
+    private static readonly Regex FoodThenExileGraveyardCard = new(
+        @"create a Food token[,]?\s+(?:and|then)\s+exile up to one target card from a graveyard",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Restless Reef — "target player mills four cards." (number is fixed text.)
+    private static readonly Regex TargetPlayerMills = new(
+        @"target player mills (?<n>\d+|a|one|two|three|four|five|six|seven|eight|nine|ten) cards?",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Restless Ridgeline — "another target attacking creature gets +N/+0 until
+    // end of turn. Untap that creature."
+    private static readonly Regex AnotherTargetPumpUntap = new(
+        @"another target attacking creature gets \+(?<p>\d+)/\+(?<t>\d+) until end of turn\.?\s*untap that creature",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Restless Vinestalk — "up to one other target creature has base power and
+    // toughness N/N until end of turn."
+    private static readonly Regex UpToOneOtherTargetBasePT = new(
+        @"up to one other target creature has base power and toughness (?<p>\d+)/(?<t>\d+) until end of turn",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Restless Fortress — "defending player loses N life and you gain N life."
+    // Non-targeted (defender captured off CreatureAttacksEvent).
+    private static readonly Regex DefenderLosesYouGain = new(
+        @"defending player loses (?<n>\d+) life and you gain (?<g>\d+) life",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -391,23 +434,373 @@ public static class ManlandBinder
                 });
         }
 
-        if (effect is null)
+        if (effect is not null)
         {
-            // Deferred Restless trigger (targeted / mill / Food+exile / +1/+1
-            // counter on target / pump another target). Bind nothing — the
-            // animate ability still works; the trigger is a no-op until a
-            // target-prompt-aware binding lands. Recorded in v1-deferrals.
+            // Non-targeted self-contained Restless trigger (rummage / scry /
+            // anthem). Simple no-target shape.
+            var simpleTrigger = new TriggeredAbility(
+                source: land,
+                controller: controller,
+                condition: Triggers.OnAttackSelf(land),
+                effects: new IEffect[] { effect },
+                activeZones: new[] { ZoneType.Battlefield });
+
+            land.AddAbility(simpleTrigger);
+            triggers?.RegisterTriggeredAbility(simpleTrigger);
             return;
         }
+
+        // ------------------------------------------------------------------
+        // Targeted / defender-capturing Restless attack triggers (CR 603.3).
+        // Each declares a TargetRequest with a CandidateGatherer (or, for
+        // Fortress, captures the defender off CreatureAttacksEvent). The live
+        // TriggerManager collects the agent's chosen target and the effect
+        // reads ChosenTargets on resolution (CR 608.2b legality recheck).
+        // ------------------------------------------------------------------
+        if (BindCounterOnTargetTrigger(land, effectText, controller, triggers)) return;
+        if (BindFoodExileTrigger(land, effectText, controller, triggers)) return;
+        if (BindTargetPlayerMillTrigger(land, effectText, controller, triggers)) return;
+        if (BindAnotherTargetPumpUntapTrigger(land, effectText, controller, effects, triggers)) return;
+        if (BindUpToOneOtherTargetBasePTTrigger(land, effectText, controller, effects, triggers)) return;
+        if (BindDefenderDrainTrigger(land, effectText, controller, triggers)) return;
+
+        // Anything else (Restless Bones' count-linked exile→Skeleton rider)
+        // stays deferred — the animate ability still works; the trigger is a
+        // no-op until a richer primitive lands. Recorded in v1-deferrals.
+    }
+
+    /// <summary>
+    /// Restless Bivouac — "put a +1/+1 counter on target creature you control."
+    /// 1..1 TargetRequest gated to the controller's creatures; resolution adds
+    /// one +1/+1 counter after a CR 608.2b legality recheck.
+    /// </summary>
+    private static bool BindCounterOnTargetTrigger(
+        Land land, string effectText, Player controller, TriggerManager? triggers)
+    {
+        if (!CounterOnTargetYouControl.IsMatch(effectText)) return false;
+
+        TriggeredAbility? trigger = null;
+        var effect = new Effect(
+            $"{land.Name}: put a +1/+1 counter on target creature you control (attack trigger)",
+            () =>
+            {
+                var chosen = FirstChosen(trigger);
+                if (chosen is not Permanent target) return;
+                if (target.Zone != ZoneType.Battlefield) return;
+                if (!target.HasType(CardType.Creature)) return;
+                // CR 608.2b — "you control" recheck against the trigger's
+                // controller (land.Controller may be unset pre-game).
+                var you = land.Controller ?? controller;
+                if (!ReferenceEquals(target.Controller, you)) return;
+                target.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
+            });
+
+        trigger = new TriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: Triggers.OnAttackSelf(land),
+            effects: new IEffect[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new Majik.Core.Players.Agents.TargetRequest(
+                    Description: "target creature you control",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff,
+                    CandidateGatherer: _ => GatherControllerCreatures(land)),
+            });
+
+        land.AddAbility(trigger);
+        triggers?.RegisterTriggeredAbility(trigger);
+        return true;
+    }
+
+    /// <summary>
+    /// Restless Cottage — "create a Food token, then exile up to one target
+    /// card from a graveyard." The Food is unconditional; the exile is the
+    /// 0..1 target. Resolution always mints the Food and exiles the chosen
+    /// graveyard card if one is still in a graveyard (CR 608.2b).
+    /// </summary>
+    private static bool BindFoodExileTrigger(
+        Land land, string effectText, Player controller, TriggerManager? triggers)
+    {
+        if (!FoodThenExileGraveyardCard.IsMatch(effectText)) return false;
+
+        TriggeredAbility? trigger = null;
+        var effect = new Effect(
+            $"{land.Name}: create a Food token, then exile up to one target card from a graveyard (attack trigger)",
+            () =>
+            {
+                var ctrl = land.Controller ?? controller;
+                Majik.Core.Tokens.TokenFactory.CreateFood(ctrl);
+
+                var chosen = FirstChosen(trigger);
+                if (chosen is not ICard card) return;
+                if (card.Zone != ZoneType.Graveyard) return;
+                Majik.Core.Primitives.Fx.MoveToExile(card);
+            });
+
+        trigger = new TriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: Triggers.OnAttackSelf(land),
+            effects: new IEffect[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new Majik.Core.Players.Agents.TargetRequest(
+                    Description: "target card in a graveyard",
+                    MinTargets: 0,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    CandidateGatherer: ctx => GatherGraveyardCards(ctx)),
+            });
+
+        land.AddAbility(trigger);
+        triggers?.RegisterTriggeredAbility(trigger);
+        return true;
+    }
+
+    /// <summary>
+    /// Restless Reef — "target player mills four cards." 1..1 player target;
+    /// resolution mills via <see cref="Majik.Core.Keywords.MillAction.Apply"/>.
+    /// </summary>
+    private static bool BindTargetPlayerMillTrigger(
+        Land land, string effectText, Player controller, TriggerManager? triggers)
+    {
+        var m = TargetPlayerMills.Match(effectText);
+        if (!m.Success) return false;
+        var n = WordToInt(m.Groups["n"].Value);
+        if (n <= 0) return false;
+
+        TriggeredAbility? trigger = null;
+        var effect = new Effect(
+            $"{land.Name}: target player mills {n} cards (attack trigger)",
+            () =>
+            {
+                var chosen = FirstChosen(trigger);
+                if (chosen is not Player target) return;
+                Majik.Core.Keywords.MillAction.Apply(target, n);
+            });
+
+        trigger = new TriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: Triggers.OnAttackSelf(land),
+            effects: new IEffect[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new Majik.Core.Players.Agents.TargetRequest(
+                    Description: "target player",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Mill,
+                    CandidateGatherer: ctx => ctx.AllPlayers.Cast<object>().ToList()),
+            });
+
+        land.AddAbility(trigger);
+        triggers?.RegisterTriggeredAbility(trigger);
+        return true;
+    }
+
+    /// <summary>
+    /// Restless Ridgeline — "another target attacking creature gets +N/+0 until
+    /// end of turn. Untap that creature." 1..1 target over OTHER creatures;
+    /// resolution registers a +N/+0 pump (CR 613.7c, EOT expiry) and untaps the
+    /// creature (CR 701.21, gated on IsTapped).
+    /// </summary>
+    private static bool BindAnotherTargetPumpUntapTrigger(
+        Land land, string effectText, Player controller,
+        ContinuousEffectsService effects, TriggerManager? triggers)
+    {
+        var m = AnotherTargetPumpUntap.Match(effectText);
+        if (!m.Success) return false;
+        var p = int.Parse(m.Groups["p"].Value);
+        var t = int.Parse(m.Groups["t"].Value);
+
+        TriggeredAbility? trigger = null;
+        var effect = new Effect(
+            $"{land.Name}: another target attacking creature gets +{p}/+{t} until EOT; untap it (attack trigger)",
+            () =>
+            {
+                var chosen = FirstChosen(trigger);
+                if (chosen is not Creature target) return;
+                if (target.Zone != ZoneType.Battlefield) return;
+                if (ReferenceEquals(target, land)) return; // "another"
+                effects.Register(new PumpUntilEndOfTurnEffect(target, p, t));
+                if (target.IsTapped) target.Untap();
+            });
+
+        trigger = new TriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: Triggers.OnAttackSelf(land),
+            effects: new IEffect[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new Majik.Core.Players.Agents.TargetRequest(
+                    Description: "another target attacking creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff,
+                    CandidateGatherer: ctx => GatherOtherCreatures(land, ctx)),
+            });
+
+        land.AddAbility(trigger);
+        triggers?.RegisterTriggeredAbility(trigger);
+        return true;
+    }
+
+    /// <summary>
+    /// Restless Vinestalk — "up to one other target creature has base power and
+    /// toughness N/N until end of turn." 0..1 target over OTHER creatures;
+    /// resolution registers a set-base P/T effect (CR 613.7b, EOT expiry).
+    /// </summary>
+    private static bool BindUpToOneOtherTargetBasePTTrigger(
+        Land land, string effectText, Player controller,
+        ContinuousEffectsService effects, TriggerManager? triggers)
+    {
+        var m = UpToOneOtherTargetBasePT.Match(effectText);
+        if (!m.Success) return false;
+        var p = int.Parse(m.Groups["p"].Value);
+        var t = int.Parse(m.Groups["t"].Value);
+
+        TriggeredAbility? trigger = null;
+        var effect = new Effect(
+            $"{land.Name}: up to one other target creature has base P/T {p}/{t} until EOT (attack trigger)",
+            () =>
+            {
+                var chosen = FirstChosen(trigger);
+                if (chosen is not Creature target) return;
+                if (target.Zone != ZoneType.Battlefield) return;
+                if (ReferenceEquals(target, land)) return; // "other"
+                effects.Register(new BecomesPTUntilEndOfTurnEffect(target, p, t));
+            });
+
+        trigger = new TriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: Triggers.OnAttackSelf(land),
+            effects: new IEffect[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new Majik.Core.Players.Agents.TargetRequest(
+                    Description: "up to one other target creature",
+                    MinTargets: 0,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff,
+                    CandidateGatherer: ctx => GatherOtherCreatures(land, ctx)),
+            });
+
+        land.AddAbility(trigger);
+        triggers?.RegisterTriggeredAbility(trigger);
+        return true;
+    }
+
+    /// <summary>
+    /// Restless Fortress — "defending player loses N life and you gain N life."
+    /// Non-targeted: the defending player is captured off the live
+    /// <see cref="Events.CreatureAttacksEvent"/> (CR 506.2); the controller's
+    /// gain applies regardless (CR 119.3).
+    /// </summary>
+    private static bool BindDefenderDrainTrigger(
+        Land land, string effectText, Player controller, TriggerManager? triggers)
+    {
+        var m = DefenderLosesYouGain.Match(effectText);
+        if (!m.Success) return false;
+        var lose = int.Parse(m.Groups["n"].Value);
+        var gain = int.Parse(m.Groups["g"].Value);
+
+        Player? capturedDefender = null;
+        var effect = new Effect(
+            $"{land.Name}: defending player loses {lose} life; you gain {gain} life (attack trigger)",
+            () =>
+            {
+                capturedDefender?.LoseLife(lose);
+                var ctrl = land.Controller ?? controller;
+                ctrl.GainLife(gain);
+            });
 
         var trigger = new TriggeredAbility(
             source: land,
             controller: controller,
-            condition: Triggers.OnAttackSelf(land),
+            condition: new Majik.Core.Abilities.EventTriggerCondition<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(
+                (e, _) =>
+                {
+                    capturedDefender = e.DefendingPlayerOrPlaneswalker as Player;
+                    return ReferenceEquals(e.Attacker, land);
+                }),
             effects: new IEffect[] { effect },
             activeZones: new[] { ZoneType.Battlefield });
 
         land.AddAbility(trigger);
         triggers?.RegisterTriggeredAbility(trigger);
+        return true;
     }
+
+    /// <summary>First chosen target across the trigger's first request, or null.</summary>
+    private static object? FirstChosen(TriggeredAbility? trigger)
+    {
+        if (trigger is null) return null;
+        var chosen = trigger.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return null;
+        return chosen[0][0];
+    }
+
+    /// <summary>CR 601.2c — the controller's battlefield creatures.</summary>
+    private static IReadOnlyList<object> GatherControllerCreatures(Land land)
+    {
+        var ctrl = land.Controller ?? land.Owner;
+        if (ctrl == null) return Array.Empty<object>();
+        return ctrl.Zones.Battlefield.GetCards().OfType<Creature>().Cast<object>().ToList();
+    }
+
+    /// <summary>CR 601.2c — every creature on the battlefield except the source
+    /// land itself ("another" / "other"). Scans every player's battlefield.</summary>
+    private static IReadOnlyList<object> GatherOtherCreatures(
+        Land land, Majik.Core.Game.GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+        {
+            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
+            {
+                if (ReferenceEquals(c, land)) continue;
+                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>CR 601.2c — every card in any player's graveyard.</summary>
+    private static IReadOnlyList<object> GatherGraveyardCards(Majik.Core.Game.GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+        {
+            foreach (var c in p.Zones.Graveyard.GetCards())
+            {
+                result.Add(c);
+            }
+        }
+        return result;
+    }
+
+    private static int WordToInt(string s) =>
+        s.ToLowerInvariant() switch
+        {
+            "a" or "an" or "one" => 1,
+            "two" => 2, "three" => 3, "four" => 4, "five" => 5,
+            "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
+            _ => int.TryParse(s, out var n) ? n : 0,
+        };
 }

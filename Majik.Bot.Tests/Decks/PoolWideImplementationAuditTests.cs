@@ -256,6 +256,15 @@ public class PoolWideImplementationAuditTests
             "Urborg, Tomb of Yawgmoth", "Yavimaya, Cradle of Growth", "Vesuva",
             // MissingTrigger → real prod fix (trigger now in card.Abilities).
             "Overgrowth", "Fertile Ground",
+            // MissingTrigger → targeted Restless attack triggers bound with
+            // real TargetRequests (agent-chosen targets via the prod binder
+            // chain); Fortress is the non-targeted defender drain.
+            "Restless Bivouac", "Restless Cottage", "Restless Fortress",
+            "Restless Reef", "Restless Ridgeline", "Restless Vinestalk",
+            // MissingTrigger → Valakut "Mountain enters → deal 3 to any target"
+            // and Frostwalk Bastion's combat-damage tap/skip-untap rider, both
+            // bound in OracleTriggeredAbilityBinder (lands' only prod path).
+            "Valakut, the Molten Pinnacle", "Frostwalk Bastion",
         };
 
         var stillFlagged = mustBeOk

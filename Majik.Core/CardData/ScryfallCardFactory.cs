@@ -108,7 +108,8 @@ public sealed class ScryfallCardFactory
         // grant cleanup schedules. Without a TriggerManager the binder falls
         // back to synchronous chapter resolution.
         SagaBinder.Bind(card, entity, _effects, _zones, _triggers, _eventBus);
-        foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
+        foreach (var trig in OracleTriggeredAbilityBinder.Bind(
+            card, entity, owner, allPlayers: null, eventBus: _eventBus))
         {
             card.AddAbility(trig);
         }

@@ -97,7 +97,12 @@ public class BoundLandTriggerBinderTests
         land.SetZone(ZoneType.Battlefield);
 
         var trig = BindTriggers(land).Should().ContainSingle().Subject;
+        // Retrofitted to a real "target opponent" TargetRequest (agent-chosen).
+        trig.TargetRequests.Should().ContainSingle()
+            .Which.Description.Should().Be("target opponent");
 
+        // No agent / no chosen target → first-opponent fallback (the
+        // non-interactive posture): Bob takes the damage.
         foreach (var e in trig.Effects) e.Execute();
         _bob.LifeTotal.Should().Be(19, "the opponent takes 1 damage on ETB (CR 119.1d)");
         _alice.LifeTotal.Should().Be(20, "the controller is unaffected");
@@ -165,15 +170,88 @@ public class BoundLandTriggerBinderTests
     }
 
     // -----------------------------------------------------------------------
-    // Valakut — DEFERRED (targeted "any target" + "you may"): no trigger bound.
+    // Valakut — "Whenever a Mountain you control enters, if you control ≥5
+    // other Mountains, you may have this land deal 3 damage to any target."
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Valakut_TargetedLandfallTrigger_IsDeferred_NoTriggerBound()
+    public void Valakut_BindsMountainEntersDealDamageTrigger_WithAnyTargetRequest()
     {
         var land = MakeLandShell("Valakut, the Molten Pinnacle");
-        BindTriggers(land).Should().BeEmpty(
-            "Valakut's 'deal 3 damage to any target' landfall needs an agent "
-            + "target + 'you may' prompt — deferred (same posture as Restless Reef)");
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var trig = BindTriggers(land).Should().ContainSingle().Subject;
+        trig.TargetRequests.Should().ContainSingle()
+            .Which.Description.Should().Be("any target");
+    }
+
+    [Fact]
+    public void Valakut_DealsDamageToTheChosenTarget_WhenControllerHasFiveOtherMountains()
+    {
+        var land = MakeLandShell("Valakut, the Molten Pinnacle");
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Five OTHER Mountains under the controller satisfy the intervening-if.
+        for (var i = 0; i < 5; i++)
+        {
+            var mtn = new Land("Mountain", new[] { CardSupertype.Basic }, new[] { CardSubtype.Mountain })
+            { Owner = _alice, Controller = _alice };
+            _alice.Zones.Battlefield.AddCard(mtn);
+            mtn.SetZone(ZoneType.Battlefield);
+        }
+
+        var trig = BindTriggers(land).Single();
+
+        // The chosen "any target" is Bob — resolution deals 3 to him (CR 119).
+        trig.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { _bob } });
+        foreach (var e in trig.Effects) e.Execute();
+
+        _bob.LifeTotal.Should().Be(17, "Valakut deals 3 to the AGENT-CHOSEN target");
+        _alice.LifeTotal.Should().Be(20, "the controller is unaffected");
+    }
+
+    [Fact]
+    public void Valakut_NoChosenTarget_IsCleanNoOp()
+    {
+        // "you may" + no target chosen → the optional ability does nothing.
+        var land = MakeLandShell("Valakut, the Molten Pinnacle");
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        for (var i = 0; i < 5; i++)
+        {
+            var mtn = new Land("Mountain", new[] { CardSupertype.Basic }, new[] { CardSubtype.Mountain })
+            { Owner = _alice, Controller = _alice };
+            _alice.Zones.Battlefield.AddCard(mtn);
+            mtn.SetZone(ZoneType.Battlefield);
+        }
+
+        var trig = BindTriggers(land).Single();
+        foreach (var e in trig.Effects) e.Execute();
+
+        _bob.LifeTotal.Should().Be(20, "no chosen target → no damage");
+    }
+
+    // -----------------------------------------------------------------------
+    // Frostwalk Bastion — "Whenever this land deals combat damage to a
+    // creature, tap that creature and it doesn't untap during its controller's
+    // next untap step." Bound (non-targeted) via the binder's prod path.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void FrostwalkBastion_BindsCombatDamageToCreatureRiderTrigger()
+    {
+        var land = MakeLandShell("Frostwalk Bastion");
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // The binder must surface a real ITriggeredAbility for the combat-damage
+        // rider (the audit's MissingTrigger criterion). It's non-targeted.
+        var triggers = OracleTriggeredAbilityBinder.Bind(
+            land, _repo.GetByName("Frostwalk Bastion")!, _alice, _players,
+            eventBus: new Majik.Core.Events.EventBus()).ToList();
+        triggers.Should().ContainSingle();
+        triggers[0].TargetRequests.Should().BeEmpty("the rider acts on the damaged creature, not a chosen target");
     }
 }
