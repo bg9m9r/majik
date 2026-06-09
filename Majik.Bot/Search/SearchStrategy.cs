@@ -2,6 +2,7 @@ using Majik.Bot.Combat;
 using Majik.Bot.Decks;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
+using Majik.Bot.OpponentModel;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -39,9 +40,10 @@ internal sealed class SearchStrategy : IBotStrategy
     /// <summary>
     /// The Mcts used for the K-world determinized loop, bounded PER WORLD to
     /// <see cref="PerWorldBudgetMs"/> (and a proportionally-scaled iteration cap)
-    /// so K worlds × per-world ≈ the configured total budget. Non-null only when
-    /// <see cref="_opponentDecklist"/> is set; the perfect-info path always uses the
-    /// original <see cref="_mcts"/> and is unaffected by this instance.
+    /// so K worlds × per-world ≈ the configured total budget. Non-null when EITHER
+    /// determinized path is active — a known <see cref="_opponentDecklist"/> OR
+    /// <see cref="_inferOpponent"/>; the perfect-info path always uses the original
+    /// <see cref="_mcts"/> and is unaffected by this instance.
     /// </summary>
     private readonly Mcts? _determinizedMcts;
 
@@ -55,6 +57,22 @@ internal sealed class SearchStrategy : IBotStrategy
     /// today's perfect-info single-tree search.
     /// </summary>
     private readonly IReadOnlyList<string>? _opponentDecklist;
+
+    /// <summary>
+    /// True when the bot must INFER the opponent's archetype from their public cards
+    /// (<see cref="BotConfig.InferOpponentArchetype"/> set AND no explicit
+    /// <see cref="BotConfig.OpponentArchetype"/>). Selects the belief-driven
+    /// determinized path in <see cref="SearchRoot"/>; false keeps either the
+    /// known-archetype determinized path (when <see cref="_opponentDecklist"/> is set)
+    /// or today's perfect-info search.
+    /// </summary>
+    private readonly bool _inferOpponent;
+
+    /// <summary>
+    /// The archetype inferencer (idf precomputed once). Non-null only when
+    /// <see cref="_inferOpponent"/> is true.
+    /// </summary>
+    private readonly ArchetypeInferencer? _inferencer;
 
     /// <summary>Total search budget (ms) handed to the K-world driver.</summary>
     private readonly int _totalBudgetMs;
@@ -78,6 +96,14 @@ internal sealed class SearchStrategy : IBotStrategy
     /// </para>
     /// </summary>
     private const int PerWorldBudgetMs = 400;
+
+    /// <summary>
+    /// Upper clamp on the determinized world count K, matching
+    /// <see cref="DeterminizedSearch.Run"/> / <see cref="DeterminizedSearch.RunBelief"/>'s
+    /// default kMax. Threaded through both determinized paths so the K-world budget split
+    /// is identical whether the archetype is known or inferred.
+    /// </summary>
+    private const int KMax = 8;
 
     /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
@@ -147,15 +173,22 @@ internal sealed class SearchStrategy : IBotStrategy
             ? BotDeckCatalog.Get(a)
             : null;
 
+        // InferOpponentArchetype: only the "honest-vs-human" inference path when no
+        // explicit archetype is given (an explicit OpponentArchetype takes precedence
+        // — we never override a known opponent with a guess). Build the inferencer
+        // ONCE up front (idf precomputed) so per-decision inference is cheap.
+        _inferOpponent = config.InferOpponentArchetype && config.OpponentArchetype is null;
+        _inferencer = _inferOpponent ? new ArchetypeInferencer() : null;
+
         // Determinized total budget reuses the same wall-clock budget the MCTS
         // config already computes (MaxMctsBudgetMs ?? 1500). The K-world driver
         // splits this total across worlds via PerWorldBudgetMs, and the per-world
         // Mcts it runs (_determinizedMcts) is bounded to PerWorldBudgetMs PER WORLD
         // (not the full total), so K worlds × per-world ≈ the total budget — NOT
-        // K full searches. Built only in determinized mode; the perfect-info path
-        // keeps using _mcts untouched.
+        // K full searches. Built whenever a determinized path is active (known
+        // archetype OR inference); the perfect-info path keeps using _mcts untouched.
         _totalBudgetMs = mctsConfig.MaxMillis;
-        _determinizedMcts = _opponentDecklist is null
+        _determinizedMcts = (_opponentDecklist is null && !_inferOpponent)
             ? null
             : new Mcts(sim, DeterminizedConfigFrom(mctsConfig, PerWorldBudgetMs));
 
@@ -170,8 +203,10 @@ internal sealed class SearchStrategy : IBotStrategy
     /// either way — a representative move carrying sandbox object refs — so the
     /// callers' existing InstanceId / Player.Id remap handles both paths unchanged.
     /// </summary>
-    private SimMove SearchRoot(SimState root)
+    private SimMove SearchRoot(SimState root, GameContext ctx, Player self)
     {
+        // (1) Known archetype — UNCHANGED. Determinize against the known decklist and
+        // run the K-world summed-robust-child driver.
         if (_opponentDecklist is { } deck)
         {
             var determinized = root.WithDeterminization(deck, worldSeed: _baseSeed);
@@ -185,7 +220,51 @@ internal sealed class SearchStrategy : IBotStrategy
                 perWorldBudgetMs: PerWorldBudgetMs);
         }
 
+        // (2) Inference — "honest-vs-human". Read the opponent's public cards, infer
+        // a belief over archetypes, allocate worlds across the top-M, and run the
+        // belief-driven determinized driver. baseRoot here is the PLAIN capture root
+        // (NOT pre-determinized) — RunBelief attaches each world's decklist + seed.
+        if (_inferOpponent)
+        {
+            var publicCards = OpponentPublicCardNames(ctx, self);
+            var belief = _inferencer!.Infer(publicCards);
+            int k = DeterminizedSearch.KFor(_totalBudgetMs, PerWorldBudgetMs, KMax);
+            var alloc = WorldAllocator.Allocate(belief, k, topM: 4)
+                .Select(x => ((IReadOnlyList<string>)BotDeckCatalog.Get(x.Archetype), x.Worlds))
+                .ToList();
+            // Safety: an empty belief (e.g. zero public cards → no allocation) must NOT
+            // route through RunBelief (which requires a non-empty allocation). Fall back
+            // to perfect-info search rather than inventing a world.
+            if (alloc.Count == 0) return _mcts.Search(root);
+            return DeterminizedSearch.RunBelief(
+                _determinizedMcts!,   // non-null whenever _inferOpponent is true
+                root,
+                alloc,
+                publicCards,
+                totalBudgetMs: _totalBudgetMs,
+                perWorldBudgetMs: PerWorldBudgetMs,
+                kMax: KMax);
+        }
+
         return _mcts.Search(root);   // perfect-info, unchanged
+    }
+
+    /// <summary>
+    /// The opponent's PUBLIC card names — battlefield + graveyard + exile of the
+    /// non-self player (the zones a human opponent has visibly revealed). Hidden zones
+    /// (hand / library) are deliberately NOT read: inference works only from what the
+    /// opponent has shown. Returns empty when there is no distinct opponent.
+    /// </summary>
+    private static IReadOnlyList<string> OpponentPublicCardNames(GameContext ctx, Player self)
+    {
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
+        if (opp is null) return Array.Empty<string>();
+
+        return opp.Zones.Battlefield.GetCards()
+            .Concat(opp.Zones.Graveyard.GetCards())
+            .Concat(opp.Zones.Exile.GetCards())
+            .Select(c => c.Name)
+            .ToList();
     }
 
     // ── Combat decisions — run the search ─────────────────────────────────────
@@ -210,7 +289,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = SearchRoot(root);
+            chosen = SearchRoot(root, ctx, self);
         }
         catch
         {
@@ -373,7 +452,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = SearchRoot(root);
+            chosen = SearchRoot(root, ctx, self);
         }
         catch
         {
