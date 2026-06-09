@@ -72,6 +72,75 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex DealDamageOpponent = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+(that\s+player|any\s+opponent)",
         RegexOptions.IgnoreCase);
+    // ------------------------------------------------------------------
+    // Utility-land ETB effect riders (CR 603.6e). These are ETB triggers on
+    // LANDS, which production NEVER routes through their [CardName] factory
+    // (FactoryRouting excludes lands) — the binder chain is the only prod
+    // binding path, so the effects MUST be synthesized here or the lands ETB
+    // with no trigger at all. Each oracle was verified against
+    // EmbeddedCardRepository.GetByName(...).OracleText. Targeting follows the
+    // established binder posture: "target creature" effects consult the agent
+    // via ChooseFromBattlefieldAsync with a deterministic first-eligible
+    // fallback (mirrors the Karoo bounce-land path); "target player" effects
+    // hit the first opponent with a controller fallback (mirrors Endurance /
+    // Bojuka Bog). Real TargetRequest-driven targeting for binder-bound
+    // triggers is deferred engine-wide (the named factories carry the rich
+    // TargetRequest shape for the test path).
+    // ------------------------------------------------------------------
+
+    // Khalni Garden (Worldwake): "create a 0/1 green Plant creature token."
+    private static readonly Regex CreatePlantToken = new(
+        @"create\s+a\s+0/1\s+green\s+plant\s+creature\s+token",
+        RegexOptions.IgnoreCase);
+    // Piranha Marsh (Conflux): "target player loses 1 life." Life loss
+    // (CR 119.3), NOT damage — no damage event / replacement applies.
+    private static readonly Regex TargetPlayerLosesLife = new(
+        @"target\s+player\s+loses\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+life",
+        RegexOptions.IgnoreCase);
+    // Teetering Peaks (Zendikar): "target creature gets +N/+0 until end of
+    // turn." Pump (CR 613.1g layer 7c, CR 514.2 EOT expiry).
+    private static readonly Regex TargetCreatureGetsPump = new(
+        @"target\s+creature\s+gets\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+    // Sejiri Steppe (Zendikar): "target creature you control gains protection
+    // from the color of your choice until end of turn." (CR 702.16.)
+    private static readonly Regex TargetCreatureYouControlGainsProtection = new(
+        @"target\s+creature\s+you\s+control\s+gains\s+protection\s+from\s+the\s+color\s+of\s+your\s+choice\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+    // Soaring Seacliff (Zendikar): "target creature gains flying until end of
+    // turn." (CR 702.9.)
+    private static readonly Regex TargetCreatureGainsFlying = new(
+        @"target\s+creature\s+gains\s+flying\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+    // Halimar Depths (Worldwake): "look at the top three cards of your
+    // library, then put them back in any order." A reorder-only look — never
+    // bottoms a card, so this is NOT scry. Routed through ScryAction.Peek /
+    // Apply with ToBottom = [] (same primitive the scry path uses).
+    private static readonly Regex LookAtTopThreeReorder = new(
+        @"look\s+at\s+the\s+top\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards\s+of\s+your\s+library\s*,\s*then\s+put\s+them\s+back\s+in\s+any\s+order",
+        RegexOptions.IgnoreCase);
+    // Mortuary Mire (Battle for Zendikar): "you may put target creature card
+    // from your graveyard on top of your library." (CR 701.20.) Graveyard
+    // recursion to top of library.
+    private static readonly Regex PutCreatureFromGraveyardOnTop = new(
+        @"(?:you\s+may\s+)?put\s+target\s+creature\s+card\s+from\s+your\s+graveyard\s+on\s+top\s+of\s+your\s+library",
+        RegexOptions.IgnoreCase);
+    // Sunscorched Desert (Hour of Devastation): "it deals 1 damage to target
+    // player or planeswalker." (Does NOT enter tapped.) Damage (CR 119.1d).
+    private static readonly Regex DealsDamageToTargetPlayerOrPw = new(
+        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+target\s+player\s+or\s+planeswalker",
+        RegexOptions.IgnoreCase);
+    // Rupture Spire / Transguild Promenade: "sacrifice it unless you pay {1}."
+    // (CR 603.1 pay-or-sacrifice.) The cost pip is parameterized.
+    private static readonly Regex SacrificeItUnlessYouPay = new(
+        @"sacrifice\s+it\s+unless\s+you\s+pay\s+\{(?<cost>[^}]+)\}",
+        RegexOptions.IgnoreCase);
+    // Crumbling Vestige (Oath of the Gatewatch): "add one mana of any color."
+    // One-shot ETB mana (CR 106) — NOT a mana ability (it's a triggered
+    // ability that uses the stack).
+    private static readonly Regex AddOneManaOfAnyColor = new(
+        @"add\s+one\s+mana\s+of\s+any\s+color",
+        RegexOptions.IgnoreCase);
     private static readonly Regex CreateTreasure = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+treasure\s+tokens?",
         RegexOptions.IgnoreCase);
@@ -745,6 +814,263 @@ public static class OracleTriggeredAbilityBinder
                 Majik.Core.Primitives.Fx.BounceToHand(pick);
             });
         }
+
+        // ------------------------------------------------------------------
+        // Utility-land ETB effects (CR 603.6e). See the regex-field comment
+        // block above for the LANDS-only binding rationale.
+        // ------------------------------------------------------------------
+
+        // Khalni Garden — "create a 0/1 green Plant creature token." Mints one
+        // 0/1 green Plant under the controller (CR 111 / 111.4). Reuses the
+        // named factory's public token spec so the token shape stays single-
+        // sourced.
+        if (CreatePlantToken.IsMatch(effectText))
+        {
+            yield return new Effect("create a 0/1 green Plant creature token", () =>
+                Majik.Core.CardData.Factories.KhalniGardenFactory.CreatePlantToken(controller));
+        }
+
+        // Piranha Marsh — "target player loses N life." Life loss (CR 119.3),
+        // not damage. First-opponent target with controller fallback (mirrors
+        // Endurance / Bojuka Bog binder posture).
+        m = TargetPlayerLosesLife.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            var players = allPlayers;
+            yield return new Effect($"target player loses {n} life", () =>
+            {
+                var target = players?.FirstOrDefault(p => !ReferenceEquals(p, controller))
+                             ?? controller;
+                target.LoseLife(n);
+            });
+        }
+
+        // Teetering Peaks — "target creature gets +P/+0 until end of turn."
+        // CR 613.1g layer 7c; CR 514.2 EOT expiry. Agent picks the creature
+        // (any creature on the battlefield) with a first-eligible fallback.
+        m = TargetCreatureGetsPump.Match(effectText);
+        if (m.Success)
+        {
+            var p = WordToInt(m.Groups["p"].Value);
+            var t = WordToInt(m.Groups["t"].Value);
+            var players = allPlayers;
+            yield return new Effect($"target creature gets +{p}/+{t} EOT", async ctx =>
+            {
+                var creature = await ChooseTargetCreatureAsync(
+                    ctx, controller, players, controllerOnly: false,
+                    Majik.Core.Cards.BotIntent.Buff).ConfigureAwait(false);
+                if (creature == null || creature.Zone != ZoneType.Battlefield) return;
+                if (creature.ActiveEffects == null) return;
+                creature.ActiveEffects.Register(
+                    new Majik.Core.Effects.PumpUntilEndOfTurnEffect(creature, p, t));
+            });
+        }
+
+        // Sejiri Steppe — "target creature you control gains protection from
+        // the color of your choice until end of turn." CR 702.16; CR 514.2.
+        // The colour choice has no agent surface yet (same deferral as the
+        // named SejiriSteppeFactory / Crumbling Vestige) — defaults to white.
+        if (TargetCreatureYouControlGainsProtection.IsMatch(effectText))
+        {
+            yield return new Effect(
+                "target creature you control gains protection from chosen colour EOT",
+                async ctx =>
+                {
+                    var creature = await ChooseTargetCreatureAsync(
+                        ctx, controller, allPlayers, controllerOnly: true,
+                        Majik.Core.Cards.BotIntent.Protection).ConfigureAwait(false);
+                    if (creature == null || creature.Zone != ZoneType.Battlefield) return;
+                    if (creature.ActiveEffects == null) return;
+                    // CR 700.2a — "of your choice"; no agent colour surface yet,
+                    // default white (an arbitrary but legal WUBRG colour).
+                    var grant = new Majik.Core.Effects.GrantAbilityEffect(
+                        source: creature,
+                        target: creature,
+                        ability: new Majik.Core.Abilities.ProtectionAbility("white"),
+                        expiresAtEndOfTurn: true);
+                    creature.ActiveEffects.Register(grant);
+                    grant.Sync();
+                });
+        }
+
+        // Soaring Seacliff — "target creature gains flying until end of turn."
+        // CR 702.9; CR 514.2 EOT expiry via GrantKeywordUntilEndOfTurnEffect.
+        if (TargetCreatureGainsFlying.IsMatch(effectText))
+        {
+            yield return new Effect("target creature gains flying EOT", async ctx =>
+            {
+                var creature = await ChooseTargetCreatureAsync(
+                    ctx, controller, allPlayers, controllerOnly: false,
+                    Majik.Core.Cards.BotIntent.Buff).ConfigureAwait(false);
+                if (creature == null || creature.Zone != ZoneType.Battlefield) return;
+                if (creature.ActiveEffects == null) return;
+                creature.ActiveEffects.Register(
+                    new Majik.Core.Effects.GrantKeywordUntilEndOfTurnEffect(creature, "Flying"));
+            });
+        }
+
+        // Halimar Depths — "look at the top three cards of your library, then
+        // put them back in any order." Reorder-only look (never bottoms — NOT
+        // scry). Routes through ScryAction.Peek/Apply with ToBottom = [].
+        m = LookAtTopThreeReorder.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            if (n > 0)
+            {
+                yield return new Effect($"look at top {n} of your library, reorder", async ctx =>
+                {
+                    var peeked = Majik.Core.Keywords.ScryAction.Peek(controller, n);
+                    if (peeked.Count == 0) return;
+
+                    var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                    Majik.Core.Keywords.ScryAction.ScryDecision decision;
+                    if (agent != null)
+                    {
+                        var agentDecision = (await agent.ChooseScryDecisionAsync(ctx.Game, peeked).ConfigureAwait(false));
+                        // Reorder-only: collapse any ToBottom back into TopOrder so
+                        // a scry-shaped agent can't bottom a card it isn't allowed
+                        // to (Halimar Depths never bottoms — CR 701.20 doesn't apply).
+                        var collapsed = agentDecision.TopOrder
+                            .Concat(agentDecision.ToBottom)
+                            .ToList();
+                        decision = new Majik.Core.Keywords.ScryAction.ScryDecision(
+                            ToBottom: Array.Empty<ICard>(),
+                            TopOrder: collapsed);
+                    }
+                    else
+                    {
+                        // Pre-agent default: keep current order on top.
+                        decision = new Majik.Core.Keywords.ScryAction.ScryDecision(
+                            ToBottom: Array.Empty<ICard>(),
+                            TopOrder: peeked.ToList());
+                    }
+                    Majik.Core.Keywords.ScryAction.Apply(controller, peeked.Count, decision);
+                });
+            }
+        }
+
+        // Mortuary Mire — "you may put target creature card from your graveyard
+        // on top of your library." Graveyard recursion to top (CR 701.20).
+        // Agent picks from the controller's graveyard creatures; first-eligible
+        // fallback. "You may" → done when a candidate exists (strictly card-
+        // advantageous, same posture as Sanctum's may-sac default).
+        if (PutCreatureFromGraveyardOnTop.IsMatch(effectText))
+        {
+            yield return new Effect(
+                "put target creature card from your graveyard on top of your library",
+                async ctx =>
+                {
+                    var candidates = controller.Zones.Graveyard.GetCards()
+                        .Where(c => c.HasType(CardType.Creature))
+                        .ToList();
+                    if (candidates.Count == 0) return;
+
+                    var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                    ICard? pick = agent != null
+                        ? (await agent.ChooseFromPileAsync(
+                            controller, candidates, "creature card in your graveyard",
+                            Majik.Core.Cards.BotIntent.Reanimate).ConfigureAwait(false))
+                        : candidates[0];
+                    pick ??= candidates[0];
+
+                    controller.Zones.Graveyard.RemoveCard(pick);
+                    controller.Zones.Library.InsertCardAt(0, pick);
+                    pick.SetZone(ZoneType.Library);
+                });
+        }
+
+        // Sunscorched Desert — "it deals N damage to target player or
+        // planeswalker." Damage (CR 119.1d). First-opponent target with
+        // controller fallback (binder posture). Uses Fx.DealDamageAny so a
+        // Player target loses life via the damage path.
+        m = DealsDamageToTargetPlayerOrPw.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            var players = allPlayers;
+            yield return new Effect($"deal {n} damage to target player or planeswalker", () =>
+            {
+                var target = players?.FirstOrDefault(p => !ReferenceEquals(p, controller))
+                             ?? controller;
+                Majik.Core.Primitives.Fx.DealDamageAny(target, n);
+            });
+        }
+
+        // Rupture Spire / Transguild Promenade — "sacrifice it unless you pay
+        // {cost}." CR 603.1 pay-or-sacrifice. v1 auto-pays if the controller's
+        // pool can cover the cost; otherwise the source land is sacrificed
+        // (Battlefield → Graveyard, CR 701.17). No "do you want to pay?" agent
+        // surface yet — same deferral as the named RuptureSpireFactory / Stasis
+        // / Mana Vault / the pact cycle.
+        m = SacrificeItUnlessYouPay.Match(effectText);
+        if (m.Success && source is Permanent sacSelf)
+        {
+            var costStr = m.Groups["cost"].Value;
+            yield return new Effect($"sacrifice it unless you pay {{{costStr}}}", () =>
+            {
+                var cost = Majik.Core.ValueObjects.ManaCost.Parse(costStr);
+                if (controller.PayMana(cost)) return; // paid — land stays
+                // Failed to pay → sacrifice the source land (CR 701.17).
+                if (sacSelf.Zone != ZoneType.Battlefield) return;
+                var owner = sacSelf.Owner;
+                if (owner == null) return;
+                var holder = sacSelf.Controller ?? owner;
+                holder.Zones.Battlefield.RemoveCard(sacSelf);
+                owner.Zones.Graveyard.AddCard(sacSelf);
+                sacSelf.SetZone(ZoneType.Graveyard);
+            });
+        }
+
+        // Crumbling Vestige — "add one mana of any color." One-shot ETB mana
+        // (CR 106). No agent colour surface yet (same deferral as the named
+        // CrumblingVestigeFactory / Lotus Cobra) — defaults to green (an
+        // arbitrary but legal WUBRG colour). NOT a mana ability — it's the
+        // resolution of a triggered ability that uses the stack.
+        if (AddOneManaOfAnyColor.IsMatch(effectText))
+        {
+            yield return new Effect("add one mana of any color", () =>
+                controller.AddManaToPool(
+                    Majik.Core.CardData.Factories.LotusCobraFactory.BuildOneManaOfColor(
+                        Majik.Core.ValueObjects.ManaColor.Green)));
+        }
+    }
+
+    /// <summary>
+    /// Shared "target creature" picker for binder-bound ETB triggers. Consults
+    /// the registered agent via <c>ChooseFromBattlefieldAsync</c> over the
+    /// candidate creatures (controller's creatures when
+    /// <paramref name="controllerOnly"/>, else every creature on the
+    /// battlefield), with a deterministic first-eligible fallback — mirrors the
+    /// Karoo bounce-land binder posture. Returns null when no creature is
+    /// available (CR 608.2c — a no-target ability simply doesn't do anything).
+    /// </summary>
+    private static async System.Threading.Tasks.ValueTask<Creature?> ChooseTargetCreatureAsync(
+        Majik.Core.Abilities.ResolutionContext ctx,
+        Player controller,
+        IReadOnlyList<Player>? allPlayers,
+        bool controllerOnly,
+        Majik.Core.Cards.BotIntent intent)
+    {
+        IEnumerable<Creature> pool;
+        if (controllerOnly || allPlayers == null)
+        {
+            pool = controller.Zones.Battlefield.GetCards().OfType<Creature>();
+        }
+        else
+        {
+            pool = allPlayers.SelectMany(p => p.Zones.Battlefield.GetCards()).OfType<Creature>();
+        }
+        var candidates = pool.Where(c => c.Zone == ZoneType.Battlefield).ToList();
+        if (candidates.Count == 0) return null;
+
+        var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+        if (agent == null) return candidates[0];
+
+        var pick = await agent.ChooseFromBattlefieldAsync(
+            controller, candidates.Cast<ICard>().ToList(), intent).ConfigureAwait(false);
+        return pick as Creature ?? candidates[0];
     }
 
     private static void DrawN(Player player, int n)
