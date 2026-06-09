@@ -18,49 +18,49 @@ public sealed class GrixisReanimatorStrategyTests
 {
     private static GrixisReanimatorStrategy Strategy() => new();
 
-    // ── TryGetNextWinningAction ─────────────────────────────────────────────
+    // ── TryGetNextWinningAction — advisory-only (always null) ───────────────
+    //
+    // Reanimation is a multi-turn ENGINE, not an atomic kill. Directive
+    // override over-commits the bot and loses (measured: 20 % win-rate,
+    // combo fired 12/16 games). The method always returns null; StrategicScore
+    // steers the MCTS search toward assembling and executing the plan instead.
+    //
+    // Each test below verifies advisory-only behaviour in a board state that
+    // the OLD directive code would have returned a CastSpell action for.
 
     [Fact]
-    public void TryGetNextWinningAction_ReturnsReanimate_WhenEmperorAndArchonInYard_PersistInHand_WithMana()
+    public void TryGetNextWinningAction_AlwaysNull_AdvisoryOnly_EngineCombo_FullLineAssembled_Persist()
     {
-        // Arrange: Archon of Cruelty + Emperor of Bones in graveyard,
-        // Persist in hand, 3 lands (CMC of Persist = {2}{B} = 3).
+        // Emperor + Archon in yard, Persist in hand, 3 lands — previously
+        // would have returned CastSpell(Persist); now must return null because
+        // reanimation is a multi-turn engine, not an atomic kill.
         var s = new BotTestScenario();
 
-        // Graveyard: Emperor of Bones (CMC 2 — valid Persist target).
         var emperor = new Creature("Emperor of Bones", manaCost: "{1}{B}", power: 2, toughness: 2);
         emperor.ChangeOwner(s.Self);
         s.Self.Zones.Graveyard.AddCard(emperor);
 
-        // Graveyard: Archon of Cruelty (the payoff — reason we care).
         var archon = new Creature("Archon of Cruelty", manaCost: "{6}{B}{B}", power: 6, toughness: 6);
         archon.ChangeOwner(s.Self);
         s.Self.Zones.Graveyard.AddCard(archon);
 
-        // Hand: Persist — the reanimate spell.
         s.AddCardToHand(s.Self, new Sorcery("Persist", manaCost: "{2}{B}"));
-
-        // Lands: 3 untapped sources (Persist needs CMC 3).
         s.AddLandToBattlefield(s.Self, "Swamp1");
         s.AddLandToBattlefield(s.Self, "Swamp2");
         s.AddLandToBattlefield(s.Self, "Swamp3");
 
-        // Act
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
-        // Assert: we get a CastSpell for Persist, with Emperor as the target.
-        action.Should().BeOfType<PriorityAction.CastSpell>("the line is assembled — should cast Persist");
-        var cast = (PriorityAction.CastSpell)action!;
-        cast.Card.Name.Should().Be("Persist");
-        cast.Targets.Should().ContainSingle(t => ReferenceEquals(t, emperor),
-            "Emperor of Bones in the graveyard should be passed as the explicit target");
+        action.Should().BeNull(
+            "GrixisReanimator is advisory-only: reanimation is a multi-turn engine, " +
+            "not an atomic kill — directive override over-commits and loses");
     }
 
     [Fact]
-    public void TryGetNextWinningAction_ReturnsReanimate_WithUnearth_WhenPersistAbsent()
+    public void TryGetNextWinningAction_AlwaysNull_AdvisoryOnly_EngineCombo_Unearth()
     {
-        // Arrange: Archon + Emperor in yard, only Unearth in hand, 1 land
-        // (Unearth costs {B} = CMC 1).
+        // Emperor + Archon in yard, Unearth in hand, 1 land — previously
+        // would have returned CastSpell(Unearth); now always null.
         var s = new BotTestScenario();
 
         var emperor = new Creature("Emperor of Bones", manaCost: "{1}{B}", power: 2, toughness: 2);
@@ -72,20 +72,18 @@ public sealed class GrixisReanimatorStrategyTests
         s.Self.Zones.Graveyard.AddCard(archon);
 
         s.AddCardToHand(s.Self, new Sorcery("Unearth", manaCost: "{B}"));
-
         s.AddLandToBattlefield(s.Self, "Swamp");
 
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
-        action.Should().BeOfType<PriorityAction.CastSpell>();
-        ((PriorityAction.CastSpell)action!).Card.Name.Should().Be("Unearth");
+        action.Should().BeNull("advisory-only: always returns null regardless of board state");
     }
 
     [Fact]
-    public void TryGetNextWinningAction_ReturnsNull_WhenArchonInYard_ButEmperorNotInYard()
+    public void TryGetNextWinningAction_AlwaysNull_AdvisoryOnly_PartialLine_NoEmperor()
     {
-        // Win-line 1 requires both Archon AND Emperor in the graveyard;
-        // without Emperor there's no valid CMC-≤3 target for Persist.
+        // Archon in yard, Persist in hand, no Emperor — previously null for a
+        // different reason; now always null for the advisory-only reason.
         var s = new BotTestScenario();
 
         var archon = new Creature("Archon of Cruelty", manaCost: "{6}{B}{B}", power: 6, toughness: 6);
@@ -97,17 +95,15 @@ public sealed class GrixisReanimatorStrategyTests
         s.AddLandToBattlefield(s.Self, "Swamp2");
         s.AddLandToBattlefield(s.Self, "Swamp3");
 
-        // Win-line 1 aborts — no Emperor. Win-line 2 checks if Archon is in
-        // yard (it is), so it also skips FaithlessLooting. Net result: null.
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
-        action.Should().BeNull("Emperor is not in the graveyard — reanimate line is incomplete");
+        action.Should().BeNull("advisory-only: always returns null");
     }
 
     [Fact]
-    public void TryGetNextWinningAction_ReturnsNull_WhenReanimateSpellNotInHand()
+    public void TryGetNextWinningAction_AlwaysNull_AdvisoryOnly_NoReanimateSpell()
     {
-        // Pieces in yard but no reanimate spell — line not executable.
+        // All graveyard pieces but no spell in hand — always null.
         var s = new BotTestScenario();
 
         var emperor = new Creature("Emperor of Bones", manaCost: "{1}{B}", power: 2, toughness: 2);
@@ -121,17 +117,16 @@ public sealed class GrixisReanimatorStrategyTests
         s.AddLandToBattlefield(s.Self, "Swamp1");
         s.AddLandToBattlefield(s.Self, "Swamp2");
         s.AddLandToBattlefield(s.Self, "Swamp3");
-        // No Persist or Unearth in hand.
 
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
-        action.Should().BeNull("no reanimation spell in hand");
+        action.Should().BeNull("advisory-only: always returns null");
     }
 
     [Fact]
-    public void TryGetNextWinningAction_ReturnsNull_WhenInsufficientMana()
+    public void TryGetNextWinningAction_AlwaysNull_AdvisoryOnly_InsufficientMana()
     {
-        // All pieces present but not enough mana to cast Persist ({2}{B} = CMC 3).
+        // Full line assembled but only 2 lands (can't cast Persist) — always null.
         var s = new BotTestScenario();
 
         var emperor = new Creature("Emperor of Bones", manaCost: "{1}{B}", power: 2, toughness: 2);
@@ -143,31 +138,30 @@ public sealed class GrixisReanimatorStrategyTests
         s.Self.Zones.Graveyard.AddCard(archon);
 
         s.AddCardToHand(s.Self, new Sorcery("Persist", manaCost: "{2}{B}"));
-        // Only 2 lands — CMC 3 is unaffordable.
         s.AddLandToBattlefield(s.Self, "Swamp1");
         s.AddLandToBattlefield(s.Self, "Swamp2");
 
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
-        action.Should().BeNull("insufficient mana to cast Persist");
+        action.Should().BeNull("advisory-only: always returns null");
     }
 
     [Fact]
-    public void TryGetNextWinningAction_ReturnsFaithlessLooting_WhenArchonNotYetInYard()
+    public void TryGetNextWinningAction_AlwaysNull_AdvisoryOnly_SetupPhase_FaithlessLootingInHand()
     {
-        // Archon not yet in graveyard → win-line 2: cast Faithless Looting
-        // to bin Archon (and set up the full chain next turn).
+        // Archon not in yard yet, Faithless Looting in hand — previously
+        // would have returned CastSpell(Faithless Looting); now always null.
+        // StrategicScore will steer the search toward casting the enabler.
         var s = new BotTestScenario();
 
-        // Faithless Looting at {R} = CMC 1.
         s.AddCardToHand(s.Self, new Sorcery("Faithless Looting", manaCost: "{R}"));
         s.AddLandToBattlefield(s.Self, "Mountain");
 
         var action = Strategy().TryGetNextWinningAction(s.Context, s.Self);
 
-        action.Should().BeOfType<PriorityAction.CastSpell>();
-        ((PriorityAction.CastSpell)action!).Card.Name.Should().Be("Faithless Looting",
-            "Looting is the cheapest enabler to start filling the graveyard");
+        action.Should().BeNull(
+            "advisory-only: StrategicScore steers toward enablers; " +
+            "directive override is for atomic kills only");
     }
 
     // ── StrategicScore ──────────────────────────────────────────────────────
