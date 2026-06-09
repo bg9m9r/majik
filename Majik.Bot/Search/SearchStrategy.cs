@@ -1,4 +1,5 @@
 using Majik.Bot.Combat;
+using Majik.Bot.Decks;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
 using Majik.Core.Abilities;
@@ -38,6 +39,29 @@ internal sealed class SearchStrategy : IBotStrategy
     private readonly bool _prioritySearchEnabled;
 
     /// <summary>
+    /// The opponent's decklist when their archetype is known
+    /// (<see cref="BotConfig.OpponentArchetype"/>), else null. Non-null selects
+    /// the determinized K-world search path in <see cref="SearchRoot"/>; null keeps
+    /// today's perfect-info single-tree search.
+    /// </summary>
+    private readonly IReadOnlyList<string>? _opponentDecklist;
+
+    /// <summary>Total search budget (ms) handed to the K-world driver.</summary>
+    private readonly int _totalBudgetMs;
+
+    /// <summary>Reproducible base world seed for determinized sampling.</summary>
+    private readonly int _baseSeed;
+
+    /// <summary>
+    /// Per-world budget (ms) for the determinized driver. The total budget is
+    /// split across K worlds (K = round(total / perWorld), clamped 1..kMax inside
+    /// <see cref="DeterminizedSearch"/>), so a larger total yields more worlds, not
+    /// longer per-world searches. 400 ms matches <see cref="DeterminizedSearch.Run"/>'s
+    /// default and gives a sensible 1..few worlds at the production 1500 ms total.
+    /// </summary>
+    private const int PerWorldBudgetMs = 400;
+
+    /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
     ///
     /// <para>
@@ -62,8 +86,48 @@ internal sealed class SearchStrategy : IBotStrategy
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
+        var mctsConfig = ConfigFrom(config);
         var sim = new EngineSimulator(_weights);
-        _mcts = new Mcts(sim, ConfigFrom(config));
+        _mcts = new Mcts(sim, mctsConfig);
+
+        // OpponentArchetype: resolve the decklist ONCE up front. A known archetype
+        // selects determinized search; null = perfect-info (the production-safe
+        // default). An unknown name throws here (BotDeckCatalog.Get) so a typo
+        // fails fast at construction rather than silently degrading to perfect-info.
+        _opponentDecklist = config.OpponentArchetype is { } a
+            ? BotDeckCatalog.Get(a)
+            : null;
+
+        // Determinized total budget reuses the same wall-clock budget the MCTS
+        // config already computes (MaxMctsBudgetMs ?? 1500). The K-world driver
+        // splits this total across worlds via PerWorldBudgetMs; the per-world Mcts
+        // run is still bounded by mctsConfig.MaxMillis, so total time stays bounded.
+        _totalBudgetMs = mctsConfig.MaxMillis;
+
+        // Fixed, config-derived base seed → determinized runs are reproducible.
+        _baseSeed = config.RandomSeed;
+    }
+
+    /// <summary>
+    /// Runs the root search: determinized K-world search when the opponent's
+    /// archetype is known, else today's perfect-info single-tree
+    /// <see cref="Mcts.Search"/>. Returns a <see cref="SimMove"/> of the SAME shape
+    /// either way — a representative move carrying sandbox object refs — so the
+    /// callers' existing InstanceId / Player.Id remap handles both paths unchanged.
+    /// </summary>
+    private SimMove SearchRoot(SimState root)
+    {
+        if (_opponentDecklist is { } deck)
+        {
+            var determinized = root.WithDeterminization(deck, worldSeed: _baseSeed);
+            return DeterminizedSearch.Run(
+                _mcts,
+                determinized,
+                totalBudgetMs: _totalBudgetMs,
+                perWorldBudgetMs: PerWorldBudgetMs);
+        }
+
+        return _mcts.Search(root);   // perfect-info, unchanged
     }
 
     // ── Combat decisions — run the search ─────────────────────────────────────
@@ -88,7 +152,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = _mcts.Search(root);
+            chosen = SearchRoot(root);
         }
         catch
         {
@@ -251,7 +315,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = _mcts.Search(root);
+            chosen = SearchRoot(root);
         }
         catch
         {
