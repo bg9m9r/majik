@@ -48,7 +48,7 @@ public class SunderingTitanTests
         titan.ManaCost.Should().Be("{8}");
         titan.HasType(CardType.Creature).Should().BeTrue();
         titan.HasType(CardType.Artifact).Should().BeTrue("Artifact Creature (CR 301.1 / 302.1)");
-        titan.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
+        titan.HasSubtype(CardSubtype.Phyrexian).Should().BeFalse();
         titan.HasSubtype(CardSubtype.Golem).Should().BeTrue();
         titan.BasePower.Should().Be(7);
         titan.BaseToughness.Should().Be(10);

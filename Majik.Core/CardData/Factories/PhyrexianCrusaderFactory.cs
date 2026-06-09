@@ -66,6 +66,7 @@ public static class PhyrexianCrusaderFactory
             subtypes: new[]
             {
                 CardSubtype.Phyrexian,
+                CardSubtype.Zombie,
                 CardSubtype.Knight,
             });
 

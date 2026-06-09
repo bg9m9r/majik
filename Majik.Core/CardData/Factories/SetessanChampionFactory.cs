@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Setessan Champion (Theros Beyond Death — {1}{G}{G}).
 ///
-/// Creature — Human Warrior 2/2. Oracle text:
+/// Creature — Human Warrior 1/3. Oracle text:
 ///   "Constellation — Whenever Setessan Champion or another enchantment
 ///    enters under your control, you may pay 1 life. If you do, draw a card."
 ///
@@ -60,8 +60,8 @@ public static class SetessanChampionFactory
 {
     public const string CardName = "Setessan Champion";
     public const string PrintedManaCost = "{1}{G}{G}";
-    public const int Power = 2;
-    public const int Toughness = 2;
+    public const int Power = 1;
+    public const int Toughness = 3;
     public const int LifeCost = 1;
 
     /// <summary>

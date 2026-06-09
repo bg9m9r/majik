@@ -13,7 +13,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Soaring Thought-Thief (Zendikar Rising,
-/// {1}{U}). Creature — Faerie Rogue 1/2.
+/// {1}{U}). Creature — Human Rogue 1/3.
 ///
 /// Oracle text:
 ///   "Flying
@@ -22,7 +22,7 @@ namespace Majik.Core.CardData.Factories;
 ///    Other Rogues you control have flying."
 ///
 /// ## Implemented (v1)
-/// - 1/2 Creature — Faerie Rogue, mana cost {1}{U}, owner/controller wired.
+/// - 1/3 Creature — Human Rogue, mana cost {1}{U}, owner/controller wired.
 /// - <b>Flying</b> keyword marker (CR 702.9) via <see cref="KeywordAbility"/>.
 /// - <b>Attack-with-Rogues trigger (CR 603.1 / CR 508.1f)</b> wired via
 ///   <see cref="EventTriggerCondition{TEvent}"/> against
@@ -69,7 +69,7 @@ public static class SoaringThoughtThiefFactory
     public const string CardName = "Soaring Thought-Thief";
     public const string PrintedManaCost = "{1}{U}";
     public const int Power = 1;
-    public const int Toughness = 2;
+    public const int Toughness = 3;
 
     /// <summary>Number of cards milled by the attack trigger.</summary>
     public const int MillCount = 2;
@@ -115,7 +115,7 @@ public static class SoaringThoughtThiefFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Faerie, CardSubtype.Rogue });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Rogue });
 
         card.SetOwner(owner);
         card.SetController(owner);

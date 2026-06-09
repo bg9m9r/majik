@@ -101,7 +101,7 @@ public static class ZulaportCutthroatFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Rogue });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Rogue, CardSubtype.Ally });
 
         card.SetOwner(owner);
         card.SetController(owner);

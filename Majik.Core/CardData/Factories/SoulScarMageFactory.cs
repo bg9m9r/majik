@@ -12,7 +12,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Soul-Scar Mage (Amonkhet, {R}).
 ///
-/// Creature — Human Monk 1/2. Oracle text:
+/// Creature — Human Wizard 1/2. Oracle text:
 ///   "Prowess (Whenever you cast a noncreature spell, this creature gets
 ///    +1/+1 until end of turn.)
 ///    If a source you control would deal noncombat damage to a creature
@@ -21,7 +21,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implementation
 ///
-/// - 1/2 Human Monk, mana cost {R}.
+/// - 1/2 Human Wizard, mana cost {R}.
 /// - <b>Prowess (CR 702.108)</b>: wired via <see cref="ProwessFactory.Build"/>
 ///   when a <see cref="ContinuousEffectsService"/> is supplied. Mirrors
 ///   <see cref="MonasteryMentorFactory"/>'s shape — the keyword marker is
@@ -135,7 +135,7 @@ public static class SoulScarMageFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Monk });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Wizard });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -96,7 +96,7 @@ public static class FalkenrathNobleFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Vampire });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Noble });
 
         card.SetOwner(owner);
         card.SetController(owner);

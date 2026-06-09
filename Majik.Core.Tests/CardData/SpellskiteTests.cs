@@ -47,6 +47,7 @@ public class SpellskiteTests
         skite.ManaCost.Should().Be("{2}");
         skite.HasType(CardType.Creature).Should().BeTrue();
         skite.HasType(CardType.Artifact).Should().BeTrue();
+        skite.Subtypes.Should().Contain(CardSubtype.Phyrexian);
         skite.Subtypes.Should().Contain(CardSubtype.Horror);
         skite.BasePower.Should().Be(0);
         skite.BaseToughness.Should().Be(4);

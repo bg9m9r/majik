@@ -67,7 +67,7 @@ public class AtarkaWorldRenderFactoryTests
         c.ManaCost.Should().Be("{5}{R}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elder).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Elder).Should().BeFalse();
         c.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
         c.BasePower.Should().Be(6);
         c.BaseToughness.Should().Be(4);

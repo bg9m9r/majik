@@ -14,7 +14,7 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Knight-Errant of Eos (Modern Horizons 3,
 /// {3}{G}{W}).
 ///
-/// Creature — Elf Knight 4/4. Oracle text:
+/// Creature — Human Knight 4/4. Oracle text:
 ///   "Convoke
 ///    When Knight-Errant of Eos enters, look at the top six cards of your
 ///    library. You may reveal up to two creature cards with mana value 2
@@ -32,7 +32,7 @@ namespace Majik.Core.CardData.Factories;
 /// instead of "one per card type".
 ///
 /// ## Implemented (v1)
-/// - 4/4 Creature — Elf Knight at {3}{G}{W}, owner / controller wired.
+/// - 4/4 Creature — Human Knight at {3}{G}{W}, owner / controller wired.
 /// - <b>Convoke</b> (CR 702.51) keyword marker via
 ///   <see cref="KeywordAbility"/>. Surfaced via
 ///   <see cref="BuildAlternativeCost"/> for cost-flow integration —
@@ -110,7 +110,7 @@ public static class KnightErrantOfEosFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Elf, CardSubtype.Knight });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Knight });
 
         card.SetOwner(owner);
         card.SetController(owner);

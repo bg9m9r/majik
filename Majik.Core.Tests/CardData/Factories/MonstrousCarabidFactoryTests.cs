@@ -42,7 +42,7 @@ public class MonstrousCarabidFactoryTests
         card.Name.Should().Be("Monstrous Carabid");
         card.ManaCost.ToString().Should().Be("{4}{B}");
         card.BasePower.Should().Be(4);
-        card.BaseToughness.Should().Be(1);
+        card.BaseToughness.Should().Be(4);
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Insect).Should().BeTrue();
         card.Owner.Should().BeSameAs(_alice);

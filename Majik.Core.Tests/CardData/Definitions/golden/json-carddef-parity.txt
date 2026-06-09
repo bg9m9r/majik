@@ -17002,7 +17002,7 @@
     "Mercenary"
   ],
   "power": 1,
-  "toughness": 1,
+  "toughness": 2,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -19509,7 +19509,7 @@
     "Warrior"
   ],
   "power": 3,
-  "toughness": 1,
+  "toughness": 3,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -30653,7 +30653,7 @@
     "Peasant"
   ],
   "power": 2,
-  "toughness": 1,
+  "toughness": 2,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -43735,7 +43735,7 @@
     "Snake"
   ],
   "power": 2,
-  "toughness": 2,
+  "toughness": 3,
   "loyalty": null,
   "abilities": {
     "keyword": {

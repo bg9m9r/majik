@@ -9,7 +9,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Anointed Peacekeeper (Dominaria United,
-/// {1}{W}{W} — Creature — Human Cleric 2/3).
+/// {1}{W}{W} — Creature — Human Cleric 3/3).
 ///
 /// Oracle text:
 ///   "Vigilance.
@@ -21,7 +21,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 /// - Creature shape: Legendary-class identity is NOT printed (Anointed
-///   Peacekeeper is not Legendary) — Human Cleric 2/3 with {1}{W}{W}.
+///   Peacekeeper is not Legendary) — Human Cleric 3/3 with {1}{W}{W}.
 /// - <b>Vigilance</b> (CR 702.20) — wired as a <see cref="KeywordAbility"/>
 ///   marker; combat code reads
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasVigilance"/>.
@@ -85,7 +85,7 @@ public static class AnointedPeacekeeperFactory
 {
     public const string CardName = "Anointed Peacekeeper";
     public const string PrintedManaCost = "{1}{W}{W}";
-    public const int Power = 2;
+    public const int Power = 3;
     public const int Toughness = 3;
 
     /// <summary>

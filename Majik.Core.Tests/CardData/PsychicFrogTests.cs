@@ -46,10 +46,10 @@ public class PsychicFrogTests
         frog.HasType(CardType.Creature).Should().BeTrue();
         frog.HasSubtype(CardSubtype.Frog).Should().BeTrue(
             "Psychic Frog is a Frog");
-        frog.HasSubtype(CardSubtype.Mutant).Should().BeTrue(
+        frog.HasSubtype(CardSubtype.Mutant).Should().BeFalse(
             "Psychic Frog is a Mutant");
         frog.BasePower.Should().Be(1);
-        frog.BaseToughness.Should().Be(3);
+        frog.BaseToughness.Should().Be(2);
         frog.Owner.Should().BeSameAs(_alice);
         frog.Controller.Should().BeSameAs(_alice);
 
@@ -67,9 +67,9 @@ public class PsychicFrogTests
         card.Should().BeOfType<Creature>("Psychic Frog is a Creature");
         card.Name.Should().Be("Psychic Frog");
         card.HasSubtype(CardSubtype.Frog).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mutant).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Mutant).Should().BeFalse();
         ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(3);
+        ((Creature)card).BaseToughness.Should().Be(2);
         card.Abilities.OfType<KeywordAbility>()
             .Should().ContainSingle(k => k.Keyword == "Flying");
         card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,

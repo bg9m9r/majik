@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Slickshot Show-Off (Outlaws of Thunder Junction,
 /// {1}{R}).
 ///
-/// Creature — Human Mercenary Jock 1/1. Oracle text:
+/// Creature — Bird Wizard 1/2. Oracle text:
 ///   "Flying.
 ///    Haste.
 ///    Whenever you cast a noncreature spell, this creature gets +3/+0 until
@@ -21,7 +21,7 @@ namespace Majik.Core.CardData.Factories;
 ///    mana cost.)"
 ///
 /// ## Implemented (v1)
-/// - 1/1 Creature — Human Mercenary Jock, mana cost {1}{R}, owner/controller
+/// - 1/2 Creature — Bird Wizard, mana cost {1}{R}, owner/controller
 ///   wired.
 /// - Flying (CR 702.9) + Haste (CR 702.10) keyword markers via
 ///   <see cref="KeywordAbility"/> — same wiring shape as Arclight Phoenix /
@@ -78,7 +78,7 @@ namespace Majik.Core.CardData.Factories;
 ///   exile-on-a-later-turn shape). Ship the printed shape + the most
 ///   common triggered/static body, defer the Plot mechanic until its
 ///   primitive lands. Bot evaluation will treat Slickshot as a vanilla
-///   1/1 Flying+Haste body with prowess-style pump rider until Plot
+///   1/2 Flying+Haste body with prowess-style pump rider until Plot
 ///   ships.
 /// </summary>
 [CardName("Slickshot Show-Off")]
@@ -87,7 +87,7 @@ public static class SlickshotShowOffFactory
     public const string CardName = "Slickshot Show-Off";
     public const string PrintedManaCost = "{1}{R}";
     public const int Power = 1;
-    public const int Toughness = 1;
+    public const int Toughness = 2;
     public const int PumpPower = 3;
     public const int PumpToughness = 0;
 
@@ -129,7 +129,7 @@ public static class SlickshotShowOffFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Mercenary, CardSubtype.Jock });
+            subtypes: new[] { CardSubtype.Bird, CardSubtype.Wizard });
 
         card.SetOwner(owner);
         card.SetController(owner);

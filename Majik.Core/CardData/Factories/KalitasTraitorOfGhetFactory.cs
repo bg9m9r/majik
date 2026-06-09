@@ -14,14 +14,14 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Kalitas, Traitor of Ghet (Oath of the Gatewatch,
 /// {2}{B}{B}).
 ///
-/// Legendary Creature — Vampire Knight 3/4. Oracle text:
+/// Legendary Creature — Vampire Warrior 3/4. Oracle text:
 ///   "Lifelink.
 ///    If a nontoken creature an opponent controls would die, exile it
 ///    instead and you create a 2/2 black Zombie creature token."
 ///
 /// ## Implemented (v1)
 ///
-/// - 3/4 Legendary Creature — Vampire Knight, mana cost {2}{B}{B}.
+/// - 3/4 Legendary Creature — Vampire Warrior, mana cost {2}{B}{B}.
 /// - <b>Lifelink (CR 702.15)</b>: <see cref="KeywordAbility"/> marker;
 ///   combat helpers in <see cref="Majik.Core.Combat.CombatAbilities"/>
 ///   read the marker directly (same shape as
@@ -119,7 +119,7 @@ public static class KalitasTraitorOfGhetFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Knight });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Warrior });
 
         card.SetOwner(owner);
         card.SetController(owner);

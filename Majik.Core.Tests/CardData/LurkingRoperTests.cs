@@ -37,8 +37,8 @@ public class LurkingRoperTests
         c.ManaCost.Should().Be("{3}{B}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.BasePower.Should().Be(4);
-        c.BaseToughness.Should().Be(3);
-        c.Subtypes.Should().Contain(CardSubtype.Snake);
+        c.BaseToughness.Should().Be(5);
+        c.Subtypes.Should().NotContain(CardSubtype.Snake);
         c.Subtypes.Should().Contain(CardSubtype.Horror);
     }
 

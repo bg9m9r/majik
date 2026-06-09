@@ -557,6 +557,12 @@ public class CardDefTests
             "Badgermole Cub", _alice);
 
         card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Bear).Should().BeTrue();
+        var cub = (Creature)card;
+        cub.Name.Should().Be("Badgermole Cub");
+        cub.BasePower.Should().Be(2);
+        cub.BaseToughness.Should().Be(2);
+        // Printed type line is "Badger Mole", which has no CardSubtype enum
+        // value — so the built creature carries no subtypes (matches seed).
+        cub.Subtypes.Should().BeEmpty();
     }
 }

@@ -4,5 +4,5 @@
   "subtypes": ["Snake"],
   "manaCost": "{B}{G}",
   "power": 2,
-  "toughness": 2
+  "toughness": 3
 }

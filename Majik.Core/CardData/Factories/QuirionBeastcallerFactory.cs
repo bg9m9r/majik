@@ -12,7 +12,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Quirion Beastcaller (Dominaria United, {G}).
 ///
-/// Creature — Elf Druid 1/1. Oracle text (Scryfall, verified):
+/// Creature — Dryad Warrior 2/2. Oracle text (Scryfall, verified):
 ///   "Quirion Beastcaller enters with a +1/+1 counter on it for each other
 ///    creature spell you've cast this turn.
 ///    When Quirion Beastcaller dies, distribute a number of +1/+1 counters
@@ -20,7 +20,7 @@ namespace Majik.Core.CardData.Factories;
 ///    any number of target creatures."
 ///
 /// ## Implemented (v1)
-/// - 1/1 Creature — Elf Druid at {G}.
+/// - 2/2 Creature — Dryad Warrior at {G}.
 /// - <b>Dies trigger (CR 603.6c / CR 700.4)</b>: a
 ///   <see cref="TriggeredAbility"/> over <see cref="Events.CardMovedEvent"/>
 ///   filtered to <c>FromZone == Battlefield AND ToZone == Graveyard</c>
@@ -65,8 +65,8 @@ public static class QuirionBeastcallerFactory
 {
     public const string CardName = "Quirion Beastcaller";
     public const string PrintedManaCost = "{G}";
-    public const int Power = 1;
-    public const int Toughness = 1;
+    public const int Power = 2;
+    public const int Toughness = 2;
 
     /// <summary>
     /// Construct Quirion Beastcaller with no live <see cref="TriggerManager"/>
@@ -92,7 +92,7 @@ public static class QuirionBeastcallerFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Elf, CardSubtype.Druid });
+            subtypes: new[] { CardSubtype.Dryad, CardSubtype.Warrior });
 
         card.SetOwner(owner);
         card.SetController(owner);

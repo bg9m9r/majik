@@ -108,7 +108,7 @@ public static class KrosanTuskerFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Beast });
+            subtypes: new[] { CardSubtype.Boar, CardSubtype.Beast });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -78,7 +78,7 @@ public static class VaultSkirgeFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Imp });
+            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Imp });
 
         // CR 301.1 / 302.1 — Artifact Creature: additively flag the
         // Artifact type so HasType lookups + colour identity see both

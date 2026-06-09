@@ -50,7 +50,7 @@ public class PrizedAmalgamTests
         card.ManaCost.Should().Be("{3}{U/B}");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Horror).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Horror).Should().BeFalse();
         card.BasePower.Should().Be(3);
         card.BaseToughness.Should().Be(3);
         card.Owner.Should().BeSameAs(_alice);
@@ -66,7 +66,7 @@ public class PrizedAmalgamTests
         card.Name.Should().Be("Prized Amalgam");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Horror).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Horror).Should().BeFalse();
     }
 
     [Fact]

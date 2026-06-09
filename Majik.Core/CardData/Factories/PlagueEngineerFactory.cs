@@ -8,7 +8,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Plague Engineer (Core Set 2020 / reprints,
-/// Creature — Human Rogue {2}{B} 2/2).
+/// Creature — Phyrexian Carrier {2}{B} 2/2).
 ///
 /// Oracle text:
 ///   "Deathtouch.
@@ -16,7 +16,8 @@ namespace Majik.Core.CardData.Factories;
 ///    Creatures of the chosen type your opponents control get -1/-1."
 ///
 /// ## Implemented (v1)
-/// - 2/2 Human Rogue with mana cost {2}{B} and correct identity / owner /
+/// - 2/2 Phyrexian (printed "Phyrexian Carrier"; Carrier has no CardSubtype
+///   enum value) with mana cost {2}{B} and correct identity / owner /
 ///   controller.
 /// - <b>Deathtouch</b> wired as a <see cref="KeywordAbility"/> marker
 ///   (CR 702.2). <see cref="Majik.Core.Combat.CombatAbilities.HasDeathtouch"/>
@@ -116,7 +117,7 @@ public static class PlagueEngineerFactory
             manaCost: Cost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Rogue });
+            subtypes: new[] { CardSubtype.Phyrexian });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -44,9 +44,9 @@ public class PriestOfFellRitesTests
         c.Name.Should().Be("Priest of Fell Rites");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.Power.Should().Be(2);
-        c.Toughness.Should().Be(1);
+        c.Toughness.Should().Be(2);
         c.HasSubtype(CardSubtype.Human).Should().BeTrue("Priest of Fell Rites is a Human");
-        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue("Priest of Fell Rites is a Cleric");
+        c.HasSubtype(CardSubtype.Warlock).Should().BeTrue("Priest of Fell Rites is a Warlock");
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
         c.ManaCost.Should().Be("{W}{B}");
@@ -60,7 +60,7 @@ public class PriestOfFellRitesTests
         c.Should().BeOfType<Creature>("Priest of Fell Rites is a Creature");
         c.Name.Should().Be("Priest of Fell Rites");
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warlock).Should().BeTrue();
     }
 
     // -----------------------------------------------------------------------

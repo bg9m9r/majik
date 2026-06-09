@@ -52,7 +52,7 @@ public class EarthshakerKhenraTests
     {
         var k = EarthshakerKhenraFactory.Create(_alice);
 
-        k.HasSubtype(CardSubtype.Minotaur).Should().BeTrue("printed oracle is Minotaur Warrior");
+        k.HasSubtype(CardSubtype.Jackal).Should().BeTrue("printed type is Jackal Warrior");
         k.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
     }
 

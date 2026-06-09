@@ -10,13 +10,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Lurking Roper (Bloomburrow, {3}{B}).
 ///
-/// Creature — Snake Horror 4/3. Oracle text:
+/// Creature — Horror 4/5. Oracle text:
 ///   "Forage (You may exile three cards from your graveyard or sacrifice
 ///    a creature. If you do, …)
 ///    When this creature enters, each opponent mills three cards."
 ///
 /// ## Implemented (v1)
-/// - 4/3 Creature — Snake Horror, mana cost {3}{B}.
+/// - 4/5 Creature — Horror, mana cost {3}{B}.
 /// - <b>ETB triggered ability (CR 603.6a)</b>: when Lurking Roper
 ///   enters the battlefield, each opponent supplied by the caller
 ///   mills three cards (CR 701.13 — Mill is the formal name for
@@ -45,7 +45,7 @@ public static class LurkingRoperFactory
     public const string CardName = "Lurking Roper";
     public const string PrintedManaCost = "{3}{B}";
     public const int Power = 4;
-    public const int Toughness = 3;
+    public const int Toughness = 5;
     public const int MillAmount = 3;
 
     /// <summary>
@@ -78,7 +78,7 @@ public static class LurkingRoperFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Snake, CardSubtype.Horror });
+            subtypes: new[] { CardSubtype.Horror });
 
         card.SetOwner(owner);
         card.SetController(owner);

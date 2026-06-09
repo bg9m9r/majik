@@ -14,7 +14,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Whirler Virtuoso (Kaladesh, {2}{U}{R}).
 ///
-/// Creature — Human Artificer 2/3. Oracle text:
+/// Creature — Vedalken Artificer 2/3. Oracle text:
 ///   "When Whirler Virtuoso enters, you get {E}{E}{E} (three energy
 ///    counters). Pay {E}{E}: Create a 1/1 colorless Thopter artifact
 ///    creature token with flying."
@@ -26,7 +26,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 2/3 <see cref="Creature"/> — Human Artificer, mana cost {2}{U}{R}.
+/// - 2/3 <see cref="Creature"/> — Vedalken Artificer, mana cost {2}{U}{R}.
 ///   Owner / controller wired.
 /// - <b>ETB triggered ability</b> (CR 603.6a + CR 106.13): "When Whirler
 ///   Virtuoso enters, you get {E}{E}{E}." Wired via
@@ -83,7 +83,7 @@ public static class WhirlerVirtuosoFactory
     public const string ThopterTokenName = "Thopter";
 
     /// <summary>
-    /// Construct Whirler Virtuoso — a 2/3 Human Artificer with an ETB
+    /// Construct Whirler Virtuoso — a 2/3 Vedalken Artificer with an ETB
     /// energy trigger and a <c>Pay {E}{E}: Create a 1/1 flying Thopter
     /// token</c> activated ability. Single-arg dispatcher path; the ETB
     /// trigger is attached structurally for shape inspection (no
@@ -98,7 +98,7 @@ public static class WhirlerVirtuosoFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Artificer });
+            subtypes: new[] { CardSubtype.Vedalken, CardSubtype.Artificer });
 
         // Whirler Virtuoso is a plain "Creature — Human Artificer" (NOT an
         // Artifact Creature) — only the Thopter tokens it mints are artifacts.
