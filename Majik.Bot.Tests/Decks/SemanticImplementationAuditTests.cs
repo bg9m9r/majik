@@ -96,7 +96,40 @@ public class SemanticImplementationAuditTests
     private static readonly HashSet<string> ParityAllowlist =
         new(StringComparer.Ordinal)
         {
-            // Filled from the first report run — only justified differences.
+            // --- Vehicles: intentionally built Artifact + Creature (v1 modeling) ---
+            // CR 301.5 / 702.122 — a Vehicle is an Artifact that becomes a
+            // Creature only while crewed. v1 models it as an Artifact Creature
+            // up front and gates the "is a creature" interactions through the
+            // crew effect rather than dynamically adding the Creature type, so
+            // the built card carries Creature in addition to the seed's printed
+            // Artifact. This is a deliberate modeling choice, not a dropped
+            // type — the crew gameplay (attack/block only when crewed) is
+            // exercised by the dedicated Vehicle/crew tests.
+            "Cultivator's Caravan",
+            "Esika's Chariot",
+            "Heart of Kiran",
+            "Reckoner Bankbuster", // BOTH a Vehicle (built Artifact+Creature)
+                                   // AND was flagged for the dropped-Artifact
+                                   // bug; with types now preserved it is just
+                                   // the Vehicle case.
+            "Smuggler's Copter",
+            "Subterranean Schooner",
+
+            // --- Changelings: intentional all-creature-types expansion ---
+            // CR 702.73a — Changeling is every creature type in every zone.
+            // The engine models this as the full printed creature-subtype set
+            // rather than the seed's single "Shapeshifter" subtype, so the
+            // built card's Subtypes legitimately differ from the seed.
+            "Mutable Explorer",
+            "Unsettled Mariner",
+
+            // NOTE — the "Tribal"-stamp bucket (All Is Dust, Bitterblossom,
+            // Kozilek's Command, Nameless Inversion, Tarfire) is left OUT of
+            // this allowlist on purpose. CardType.Tribal was removed from the
+            // game (the 2024 type-line errata folded it into the card's other
+            // types), and whether the engine should stop stamping it is a
+            // separate product decision, tracked in the PR. It stays a
+            // report-only mismatch until that decision is made.
         };
 
     internal sealed record ParityMismatch(string Name, string Field, string Expected, string Actual);
@@ -390,54 +423,11 @@ public class SemanticImplementationAuditTests
         => int.TryParse(s, out v);
 
     // ------------------------------------------------------------------
-    // Materialization — identical to PoolWideImplementationAuditTests so the
-    // prod build path is exercised the same way.
+    // Materialization — delegates to the shared DeckCardShellBuilder so the
+    // prod build path (RealDeckLoader → GameFacade) is exercised the same way,
+    // including CR 205.1b multi-type preservation (artifact lands actually
+    // carry Artifact) and the CR 202.2c color indicator.
     // ------------------------------------------------------------------
     private static ICard MaterializeReal(CardEntity entity)
-    {
-        var parsed = TypeLineParser.Parse(entity.TypeLine);
-        var manaCost = entity.ManaCost ?? "";
-
-        ICard card = PickPrimaryType(parsed.Types) switch
-        {
-            CardType.Creature => new Creature(
-                entity.Name, manaCost,
-                ParseStat(entity.Power), ParseStat(entity.Toughness),
-                parsed.Supertypes, parsed.Subtypes),
-            CardType.Land => new Land(entity.Name, parsed.Supertypes, parsed.Subtypes),
-            CardType.Instant => new Instant(entity.Name, manaCost),
-            CardType.Sorcery => new Sorcery(entity.Name, manaCost),
-            CardType.Enchantment => new Enchantment(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Artifact => new Artifact(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Planeswalker => new Planeswalker(
-                entity.Name, manaCost,
-                startingLoyalty: entity.Loyalty ?? 0,
-                parsed.Supertypes, parsed.Subtypes),
-            _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
-        };
-
-        if (card is Card concrete)
-        {
-            var colors = CardColors.ParseScryfallColors(entity.Colors);
-            if (colors.Count > 0) concrete.SetColorIndicator(colors);
-        }
-
-        return card;
-    }
-
-    private static CardType? PickPrimaryType(IReadOnlyList<CardType> types)
-    {
-        foreach (var p in new[]
-        {
-            CardType.Creature, CardType.Land, CardType.Instant, CardType.Sorcery,
-            CardType.Enchantment, CardType.Artifact, CardType.Planeswalker,
-        })
-        {
-            if (types.Contains(p)) return p;
-        }
-        return null;
-    }
-
-    private static int ParseStat(string? s)
-        => int.TryParse(s, out var v) ? v : 0;
+        => DeckCardShellBuilder.Build(entity);
 }

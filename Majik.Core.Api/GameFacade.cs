@@ -857,6 +857,30 @@ public sealed class GameFacade : IDisposable
         ReplacementBus replacements,
         ContinuousEffectsService effects)
     {
+        // CR 205.1b — preserve EVERY printed card type. A [CardName] factory
+        // builds a single concrete subclass (Creature / Land / …) that only
+        // registers its OWN primary type, so a dual-type card built through
+        // the factory route loses its secondary type unless the factory
+        // remembered to AddCardType it (most do not — Esper Sentinel's
+        // Artifact was silently dropped). Additively flag any parsed type the
+        // built card is missing, so every artifact-creature / artifact-land /
+        // enchantment-land is correctly typed in prod regardless of whether
+        // its factory bothered. AddCardType is idempotent — a type the factory
+        // already added is a no-op. Composite (DFC / split / adventure) rows
+        // build as their FRONT face, so parse only the front half; adding the
+        // back face's types here would mistype the front (e.g. a spell-front
+        // // land-back MDFC must not become a Land).
+        if (card is Card typedCard)
+        {
+            var typeLine = entity.TypeLine ?? "";
+            var splitIdx = typeLine.IndexOf(" // ", StringComparison.Ordinal);
+            var frontTypeLine = splitIdx >= 0 ? typeLine[..splitIdx] : typeLine;
+            foreach (var t in Majik.Core.CardData.TypeLineParser.Parse(frontTypeLine).Types)
+            {
+                typedCard.AddCardType(t);
+            }
+        }
+
         // Snapshot the keyword + mana abilities the factory already attached
         // so the binders' additions can be deduped.
         var existingKeywords = card.Abilities.OfType<KeywordAbility>()
