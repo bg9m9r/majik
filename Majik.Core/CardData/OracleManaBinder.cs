@@ -56,6 +56,41 @@ public static class OracleManaBinder
         @"\{T\}\s*,\s*Pay\s+1\s+life\s*:\s*Add\s+(\{[WUBRGC]\})\s*or\s+(\{[WUBRGC]\})",
         RegexOptions.IgnoreCase);
 
+    // {T}, Pay 1 life: Add one mana of any color.  — Mana Confluence
+    // (Journey into Nyx). The any-colour sibling of the Horizon Canopy
+    // pay-life dual above: the cost prefix is "{T}, Pay 1 life:" (NOT a bare
+    // {T}), so neither TapForAnyColorRegex nor the dual pay-life regex match
+    // it. Binds five pay-life ManaAbility options (one per WUBRG). The
+    // life-floor gate is the precise CR 119.4 reading — payable at exactly
+    // 1 life (drops to 0), NOT the stricter "> 1" HorizonLandBinder gate.
+    private static readonly Regex PayLifeAnyColorRegex = new(
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*:\s*Add\s+one\s+mana\s+of\s+any\s+color",
+        RegexOptions.IgnoreCase);
+
+    // {T}, Remove a mining counter from this land: Add one mana of any color.
+    // If there are no mining counters on this land, sacrifice it.
+    //   — Gemstone Mine (Weatherlight + reprints). The cost prefix is
+    // "{T}, Remove a mining counter from this land:" (NOT a bare {T}), so the
+    // bare TapForAnyColorRegex never matches this line — there is no risk of a
+    // free any-colour ability slipping in. Binds five counter-cost ManaAbility
+    // options (one per WUBRG); each removes a mining counter as part of the
+    // activation cost (CR 119.4 — the cost must be payable) and, when the last
+    // counter is gone, sacrifices the land (CR 701.16). The "enters with three
+    // mining counters" rider is wired as an ETB trigger (see BindGemstoneMine)
+    // because EntersWithCountersReplacement only models +1/+1 counters today.
+    private static readonly Regex GemstoneMineCounterManaRegex = new(
+        @"\{T\}\s*,\s*Remove\s+a\s+mining\s+counter\s+from\s+this\s+land\s*:\s*"
+        + @"Add\s+one\s+mana\s+of\s+any\s+color",
+        RegexOptions.IgnoreCase);
+
+    // "This land enters with three mining counters on it." — Gemstone Mine's
+    // ETB rider. Parameterised on the count word so a future variant reads
+    // cleanly; today only "three" ships.
+    private static readonly Regex EntersWithMiningCountersRegex = new(
+        @"enters\s+with\s+(?<n>a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)"
+        + @"\s+mining\s+counters?\s+on\s+it",
+        RegexOptions.IgnoreCase);
+
     /// <summary>
     /// Attaches the correct <see cref="ManaAbility"/> to a basic land that
     /// already has its controller set. Idempotent — if the card is not a
@@ -162,15 +197,50 @@ public static class OracleManaBinder
         // the source-agnostic {T}-cost mana clauses). Each colour binds as its
         // own pay-life ManaAbility (CR 119.4 life-floor gate). Only Land cards
         // carry this shape, so it's a no-op on non-lands.
-        if (card is Land horizonLand)
+        if (card is Land payLifeLand)
         {
             var payLife = PayLifeDualManaRegex.Match(text);
             if (payLife.Success)
             {
                 var colorA = payLife.Groups[1].Value.Replace("{", "").Replace("}", "");
                 var colorB = payLife.Groups[2].Value.Replace("{", "").Replace("}", "");
-                HorizonLandBinder.AttachPayLifeMana(horizonLand, controller, colorA);
-                HorizonLandBinder.AttachPayLifeMana(horizonLand, controller, colorB);
+                HorizonLandBinder.AttachPayLifeMana(payLifeLand, controller, colorA);
+                HorizonLandBinder.AttachPayLifeMana(payLifeLand, controller, colorB);
+                return;
+            }
+
+            // Mana Confluence: "{T}, Pay 1 life: Add one mana of any color."
+            // Five pay-life ManaAbility options (one per WUBRG). The life-floor
+            // gate is the precise CR 119.4 reading (>= 1 — payable at exactly
+            // 1 life), distinct from HorizonLandBinder's stricter > 1 gate, so
+            // it is built inline here rather than reusing AttachPayLifeMana.
+            if (PayLifeAnyColorRegex.IsMatch(text))
+            {
+                foreach (var color in new[] { "W", "U", "B", "R", "G" })
+                {
+                    var mana = ManaCost.Parse(color);
+                    payLifeLand.AddAbility(new ManaAbility(
+                        source: payLifeLand,
+                        controller: controller,
+                        manaGenerated: mana,
+                        canActivateCheck: () =>
+                        {
+                            if (payLifeLand.IsTapped) return false;
+                            var c = payLifeLand.Controller ?? controller;
+                            return c.LifeTotal >= 1;
+                        },
+                        additionalCostPayer: c => c.LoseLife(1)));
+                }
+                return;
+            }
+
+            // Gemstone Mine: "{T}, Remove a mining counter from this land: Add
+            // one mana of any color. If there are no mining counters on this
+            // land, sacrifice it." Five counter-cost ManaAbility options + the
+            // "enters with three mining counters" ETB trigger.
+            if (GemstoneMineCounterManaRegex.IsMatch(text))
+            {
+                BindGemstoneMine(payLifeLand, text, controller);
                 return;
             }
         }
@@ -184,4 +254,97 @@ public static class OracleManaBinder
             card.AddAbility(new ManaAbility(card, controller, cost));
         }
     }
+
+    /// <summary>
+    /// Wire Gemstone Mine's counter-cost any-colour mana abilities plus its
+    /// "enters with three mining counters" ETB trigger.
+    ///
+    /// <para>Mana: five <see cref="ManaAbility"/> options (one per WUBRG). Each
+    /// is gated on the land being untapped, on the battlefield, and carrying at
+    /// least one <see cref="Majik.Core.Counters.CounterType.Mining"/> counter
+    /// (the remove-a-mining-counter cost must be payable — CR 119.4). The
+    /// additional-cost payer removes one mining counter and, when none remain,
+    /// sacrifices the land to its owner's graveyard (CR 701.16) — both happen
+    /// atomically in the mana ability's activation (CR 605.1, no stack). This
+    /// mirrors <c>GemstoneMineFactory</c>'s shape exactly (the factory is
+    /// test-only; lands bind through this binder in prod).</para>
+    ///
+    /// <para>ETB: a self-<see cref="TriggeredAbility"/> over
+    /// <see cref="Triggers.OnEnterBattlefieldSelf"/> that adds N mining
+    /// counters. A true CR 614.1d "enters with N counters" replacement only
+    /// models +1/+1 counters today, so non-+1/+1 counter loads use the
+    /// trigger-shape (same posture as Blast Zone / Aether Hub).</para>
+    /// </summary>
+    private static void BindGemstoneMine(Land land, string text, Player controller)
+    {
+        // ETB: "This land enters with three mining counters on it."
+        var etbMatch = EntersWithMiningCountersRegex.Match(text);
+        if (etbMatch.Success)
+        {
+            var n = WordToInt(etbMatch.Groups["n"].Value);
+            if (n > 0)
+            {
+                var etbEffect = new Effect(
+                    $"{land.Name}: enters with {n} mining counters",
+                    () =>
+                    {
+                        if (land.Zone != Majik.Core.Zones.ZoneType.Battlefield) return;
+                        land.Counters.Add(Majik.Core.Counters.CounterType.Mining, n);
+                    });
+
+                land.AddAbility(new TriggeredAbility(
+                    source: land,
+                    controller: controller,
+                    condition: Triggers.OnEnterBattlefieldSelf(land),
+                    effects: new IEffect[] { etbEffect },
+                    activeZones: new[] { Majik.Core.Zones.ZoneType.Battlefield }));
+            }
+        }
+
+        // {T}, Remove a mining counter from this land: Add one mana of any
+        // color. If there are no mining counters on this land, sacrifice it.
+        foreach (var color in new[] { "W", "U", "B", "R", "G" })
+        {
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerated: ManaCost.Parse(color),
+                canActivateCheck: () =>
+                    !land.IsTapped
+                    && land.Zone == Majik.Core.Zones.ZoneType.Battlefield
+                    && land.Counters.Count(Majik.Core.Counters.CounterType.Mining) >= 1,
+                additionalCostPayer: _ => RemoveMiningCounterAndMaybeSacrifice(land, controller)));
+        }
+    }
+
+    /// <summary>
+    /// Pay Gemstone Mine's "Remove a mining counter from this land" activation
+    /// cost, then enforce "If there are no mining counters on this land,
+    /// sacrifice it" (CR 701.16). Uses the inline self-sacrifice move
+    /// (controller's battlefield → owner's graveyard) — the same posture every
+    /// other binder/factory self-sacrifice takes, since the generic sacrifice
+    /// path is a no-op stub.
+    /// </summary>
+    private static void RemoveMiningCounterAndMaybeSacrifice(Land land, Player controller)
+    {
+        land.Counters.Remove(Majik.Core.Counters.CounterType.Mining, 1);
+
+        if (land.Counters.Count(Majik.Core.Counters.CounterType.Mining) > 0) return;
+        if (land.Zone != Majik.Core.Zones.ZoneType.Battlefield) return;
+
+        var holder = land.Controller ?? controller;
+        var graveyardOwner = land.Owner ?? controller;
+        holder.Zones.Battlefield.RemoveCard(land);
+        graveyardOwner.Zones.Graveyard.AddCard(land);
+        land.SetZone(Majik.Core.Zones.ZoneType.Graveyard);
+    }
+
+    private static int WordToInt(string s) =>
+        s.ToLowerInvariant() switch
+        {
+            "a" or "an" or "one" => 1,
+            "two" => 2, "three" => 3, "four" => 4, "five" => 5,
+            "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
+            _ => int.TryParse(s, out var v) ? v : 0,
+        };
 }

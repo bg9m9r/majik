@@ -107,6 +107,31 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 603.2 — "Whenever ~ becomes tapped, …" self-tap trigger. Fires on a
+    /// <see cref="PermanentTappedEvent"/> whose <see cref="PermanentTappedEvent.Permanent"/>
+    /// IS <paramref name="source"/> (reference match), regardless of WHO caused
+    /// the tap (City of Brass deals 1 damage to its controller whenever it
+    /// becomes tapped for ANY reason — its own mana ability, an opponent's "tap
+    /// target land", the attack tap, …). Distinct from
+    /// <see cref="OnYouTapCreatureAnOpponentControls"/>, which keys on the
+    /// <em>tapper</em> ("whenever you tap …"); this keys on the
+    /// <em>permanent becoming tapped</em>, so <see cref="PermanentTappedEvent.CausedBy"/>
+    /// is not read. <see cref="Permanent.Tap(Player?)"/> only publishes the
+    /// event on a real state change (it throws if already tapped), so this never
+    /// double-fires for a single tap.
+    /// </summary>
+    public static ITriggerCondition OnThisBecomesTapped(ICard source)
+    {
+        if (source == null)
+        {
+            throw new ArgumentNullException(nameof(source));
+        }
+
+        return new EventTriggerCondition<PermanentTappedEvent>(
+            (e, _) => ReferenceEquals(e.Permanent, source));
+    }
+
+    /// <summary>
     /// "Whenever PLAYER draws a card" — fires when the given player draws.
     /// </summary>
     public static ITriggerCondition OnCardDrawnByPlayer(Player player)
