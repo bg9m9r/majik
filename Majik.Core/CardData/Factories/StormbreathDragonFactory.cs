@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
@@ -42,27 +43,44 @@ namespace Majik.Core.CardData.Factories;
 ///   this creature isn't monstrous"). A future Monstrosity primitive
 ///   PR can lift the marker onto <see cref="Creature"/> and reuse the
 ///   gate.
-/// - <b>"Becomes monstrous" trigger (CR 603.1)</b> — when the monstrosity
-///   activation resolves, the closure invokes the becomes-monstrous
-///   trigger inline: the dragon deals damage to EACH opponent equal to
-///   the number of cards in THAT opponent's own hand (a per-opponent
-///   variable — opponents with empty hands take zero; the controller's
-///   hand size is irrelevant). There is no hand-size threshold gate (the
-///   pre-errata "if you have seven or more cards in hand, 3 damage"
-///   wording is no longer printed). The per-opponent hand count is read
-///   at resolution time of the monstrosity activation (one stage simpler
-///   than firing as a separate triggered ability on the stack — v1
-///   convenience, see "Deferred" below).
+/// - <b>"Becomes monstrous" trigger (CR 603.1)</b> — a real
+///   <see cref="TriggeredAbility"/> (carried in <c>card.Abilities</c> so
+///   the pool-wide audit's When/Whenever/At → <see cref="ITriggeredAbility"/>
+///   check is satisfied). It deals damage to EACH opponent equal to the
+///   number of cards in THAT opponent's own hand (a per-opponent variable
+///   — opponents with empty hands take zero; the controller's hand size
+///   is irrelevant). There is no hand-size threshold gate (the pre-errata
+///   "if you have seven or more cards in hand, 3 damage" wording is no
+///   longer printed). The opponents + their hand sizes are read from the
+///   LIVE game at RESOLUTION via the effect's
+///   <see cref="ResolutionContext.Game"/> (<c>ctx.Game.AllPlayers</c>) —
+///   the same context-driven idiom as
+///   <see cref="AmaliaBenavidesAguirreFactory"/> — so it works on the
+///   single-arg shape build AND the production routed build with no
+///   captured opponents resolver. The trigger's condition is
+///   <see cref="Triggers.Never()"/> (it is never re-fired off the event
+///   bus — no "becomes monstrous" engine event exists); instead the
+///   monstrosity activation drives its effect inline when the creature
+///   becomes monstrous, threading the live resolution context through
+///   (the same "enqueue directly" posture the engine uses for Saga
+///   chapter abilities, CR 714.2b).
 ///
 /// ## Wiring overloads
 ///
-/// - <see cref="Create(Player)"/> — card shape only. Suitable for
-///   dispatcher / structural tests.
-/// - <see cref="Create(Player, Func{IReadOnlyList{Player}}?)"/> — supplies
-///   an opponents resolver so the becomes-monstrous trigger can iterate
-///   the table. Without one the damage hits no opponents (defensive —
-///   keeps shape tests from silently dealing damage to a fake opponent
-///   list).
+/// - <see cref="Create(Player)"/> — canonical build. Wires the full
+///   ability set including the real becomes-monstrous
+///   <see cref="TriggeredAbility"/>. The trigger reads opponents from the
+///   live resolution context, so the damage is correct here too.
+/// - <see cref="Create(Player, ContinuousEffectsService?)"/> — the
+///   effects-aware overload the source generator recognises and the
+///   production <c>GameFacade</c> routed build dispatches to (via
+///   <see cref="NamedCardFactory.Create(string, Player, ContinuousEffectsService?)"/>).
+///   Stormbreath has no continuous effect to register, so this forwards
+///   straight to the canonical overload — its ONLY purpose is to make the
+///   generator emit the effects-aware dispatch arm so the routed prod
+///   build wires the trigger (mirrors the
+///   <see cref="FestivalCrasherFactory"/> / <see cref="KilnFiendFactory"/>
+///   fix).
 ///
 /// ## Deferred (v1 gaps)
 ///
@@ -73,26 +91,15 @@ namespace Majik.Core.CardData.Factories;
 ///   ("Hold the Monastery", etc.) would need to subscribe to a future
 ///   primitive's event. Same posture as the Plot deferral noted on
 ///   <see cref="SlickshotShowOffFactory"/>.
-/// - <b>Becomes-monstrous trigger as a real <see cref="TriggeredAbility"/>
-///   on the stack</b>: today the damage runs inline at the end of the
-///   monstrosity activation resolve. A future PR can split this into a
-///   proper triggered ability that queues on the stack after the
+/// - <b>Becomes-monstrous trigger queued on the stack</b>: today the
+///   damage runs inline at the end of the monstrosity activation resolve
+///   rather than queuing as a separate object on the stack after the
 ///   monstrosity activation finishes resolving (CR 603.3 — put on the
-///   stack the next time a player would receive priority), so the
-///   per-opponent hand count is locked in when the ability resolves
-///   rather than at the moment monstrosity resolves. The two snapshots
-///   are indistinguishable for any card that doesn't change an
-///   opponent's hand size in between, which is the typical case.
-/// - <b>Opponents resolution in the production routed build</b>: the
-///   becomes-monstrous damage needs the live opponent list, supplied via
-///   the <see cref="Create(Player, Func{IReadOnlyList{Player}}?)"/>
-///   overload's <c>opponentsResolver</c>. The GameFacade routed build
-///   currently dispatches the single-arg <see cref="Create(Player)"/>
-///   overload (resolver = null), so the damage is inert in a live match
-///   — the SAME latent gap as Yawgmoth / Priest of Forgotten Gods, which
-///   also iterate opponents via an injected resolver the routed build
-///   doesn't wire. Lifting a shared game-context resolver into the routed
-///   build is its own cross-cutting PR.
+///   stack the next time a player would receive priority). The
+///   per-opponent hand count is therefore locked in at the moment
+///   monstrosity resolves rather than when a split trigger would resolve.
+///   The two snapshots are indistinguishable for any card that doesn't
+///   change an opponent's hand size in between, which is the typical case.
 /// </summary>
 [CardName("Stormbreath Dragon")]
 public static class StormbreathDragonFactory
@@ -105,16 +112,12 @@ public static class StormbreathDragonFactory
     public const int MonstrosityCounters = 3;
 
     /// <summary>
-    /// Construct Stormbreath Dragon with no opponents resolver. The
-    /// becomes-monstrous damage finds no opponents (defensive no-op).
+    /// Canonical build. Wires Flying / Haste / protection-from-white, the
+    /// Monstrosity 3 activated ability, AND the real becomes-monstrous
+    /// <see cref="TriggeredAbility"/> whose damage reads opponents from the
+    /// live resolution context.
     /// </summary>
-    public static Creature Create(Player owner) => Create(owner, opponentsResolver: null);
-
-    /// <summary>
-    /// Construct Stormbreath Dragon with an optional opponents resolver
-    /// used by the becomes-monstrous trigger.
-    /// </summary>
-    public static Creature Create(Player owner, Func<IReadOnlyList<Player>>? opponentsResolver)
+    public static Creature Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -137,6 +140,57 @@ public static class StormbreathDragonFactory
         // shape as Phyrexian Crusader's red/white pair).
         card.AddAbility(new ProtectionAbility("white"));
 
+        // ----------------------------------------------------------------
+        // CR 603.1 — becomes-monstrous trigger.
+        //   "When this creature becomes monstrous, it deals damage to each
+        //    opponent equal to the number of cards in that player's hand."
+        // A real TriggeredAbility (so the pool-wide audit sees it in
+        // card.Abilities). Its damage effect reads opponents + hand sizes
+        // from the LIVE game at RESOLUTION via ctx.Game.AllPlayers — no
+        // captured opponents resolver — so it is correct on BOTH the
+        // single-arg shape build and the production routed build (same
+        // context-driven idiom as Amalia Benavides Aguirre). Condition is
+        // Triggers.Never(): no "becomes monstrous" engine event exists, so
+        // the trigger is never re-fired off the event bus; the monstrosity
+        // activation drives its effect inline (the "enqueue directly"
+        // posture the engine uses for Saga chapter abilities, CR 714.2b).
+        // ----------------------------------------------------------------
+        var becomesMonstrousEffect = new Effect(
+            $"{CardName}: deal each opponent damage equal to that opponent's hand size (becomes monstrous)",
+            ctx =>
+            {
+                var controller = card.Controller ?? owner;
+
+                // CR 603.1 — read opponents from the live game at resolution.
+                // No game context (shape-only Resolve/Execute) ⇒ no opponents
+                // to hit, so the effect is a safe no-op.
+                var players = ctx.Game?.AllPlayers;
+                if (players == null) return ValueTask.CompletedTask;
+
+                foreach (var opp in players)
+                {
+                    if (ReferenceEquals(opp, controller)) continue; // CR 102.1 — opponents only
+                    if (opp.HasLost) continue;
+                    // CR 701.31 — damage = the number of cards in THAT
+                    // player's hand (per-opponent variable). Empty hand ⇒ 0.
+                    var damage = opp.Zones.Hand.GetCards().Count();
+                    if (damage <= 0) continue;
+                    opp.RecordDamageDealt(damage); // CR 120.3
+                    opp.LoseLife(damage);
+                }
+
+                return ValueTask.CompletedTask;
+            });
+
+        var becomesMonstrousTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: Triggers.Never(),
+            effects: new IEffect[] { becomesMonstrousEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(becomesMonstrousTrigger);
+
         // CR 702.95 — Monstrosity 3. Modelled as a bespoke activated
         // ability since no Monstrosity primitive exists yet. The
         // ability owns its own "monstrous" flag (see
@@ -146,7 +200,7 @@ public static class StormbreathDragonFactory
         StormbreathDragonAbility? monstrosity = null;
         var monstrosityEffect = new Effect(
             $"{CardName}: become monstrous — +3/+3 counters, then deal each opponent damage equal to that opponent's hand size",
-            () =>
+            async ctx =>
             {
                 if (monstrosity == null) return;
                 if (monstrosity.IsMonstrous) return; // CR 702.95b — self-gate
@@ -155,26 +209,15 @@ public static class StormbreathDragonFactory
                 card.Counters.Add(CounterType.PlusOnePlusOne, MonstrosityCounters);
                 monstrosity.IsMonstrous = true;
 
-                // CR 603.1 — "When this creature becomes monstrous, it
-                // deals damage to each opponent equal to the number of
-                // cards in that player's hand." Resolved inline; the
-                // per-opponent hand count is read from each opponent's
-                // live hand zone at activation resolution time (see class
-                // xmldoc "Deferred" for the split-trigger gap). No
-                // hand-size threshold — an opponent with an empty hand
-                // simply takes zero.
-                var controller = card.Controller ?? owner;
-
-                var opponents = opponentsResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // CR 603.1 — the becomes-monstrous trigger fires. There is no
+                // engine "becomes monstrous" event, so drive the real
+                // TriggeredAbility's effect inline, threading THIS activation's
+                // live resolution context (ctx.Game / agent) so the damage
+                // reads opponents from the live game. (See class xmldoc
+                // "Deferred" for the split-on-stack gap.)
+                foreach (var effect in becomesMonstrousTrigger.Effects)
                 {
-                    if (ReferenceEquals(opp, controller)) continue; // defensive
-                    if (opp.HasLost) continue;
-                    var damage = opp.Zones.Hand.GetCards().Count();
-                    if (damage <= 0) continue;
-                    opp.LoseLife(damage);
+                    await effect.ExecuteAsync(ctx).ConfigureAwait(false);
                 }
             });
 
@@ -188,6 +231,23 @@ public static class StormbreathDragonFactory
 
         return card;
     }
+
+    /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, ContinuousEffectsService?)"/>).
+    /// Stormbreath registers no continuous effect, so this forwards straight
+    /// to the canonical <see cref="Create(Player)"/> — its sole purpose is to
+    /// make the generator emit the effects-aware dispatch arm so the routed
+    /// prod build wires the becomes-monstrous trigger (without it the routed
+    /// build fell through to single-arg dispatch — same fix as Festival
+    /// Crasher / Kiln Fiend). The <paramref name="effects"/> service is
+    /// intentionally unused; the becomes-monstrous damage reads opponents
+    /// from the live resolution context at resolution time, not from a
+    /// registered continuous effect.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner);
 }
 
 /// <summary>
