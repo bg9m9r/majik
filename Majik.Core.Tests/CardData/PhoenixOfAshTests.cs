@@ -12,10 +12,10 @@ namespace Majik.Core.Tests.CardData;
 
 /// <summary>
 /// Tests for <see cref="PhoenixOfAshFactory"/> (Throne of Eldraine,
-/// {2}{R}{R}).
+/// {1}{R}{R}).
 ///
 /// Covers:
-///   - Identity: name, type, Phoenix subtype, P/T 3/2, mana cost,
+///   - Identity: name, type, Phoenix subtype, P/T 2/2, mana cost,
 ///     owner/controller.
 ///   - Haste keyword marker (CR 702.10).
 ///   - <see cref="NamedCardFactory"/> dispatch hands back the same shape.
@@ -31,7 +31,7 @@ public class PhoenixOfAshTests
     private readonly Player _alice = new("Alice", 20);
 
     [Fact]
-    public void PhoenixOfAsh_Identity_Phoenix_3_2_AtCost2RR_WithHaste()
+    public void PhoenixOfAsh_Identity_Phoenix_2_2_AtCost1RR_WithHaste()
     {
         var phoenix = PhoenixOfAshFactory.Create(_alice);
 
@@ -39,7 +39,7 @@ public class PhoenixOfAshTests
         phoenix.ManaCost.Should().Be("{1}{R}{R}");
         phoenix.HasType(CardType.Creature).Should().BeTrue();
         phoenix.HasSubtype(CardSubtype.Phoenix).Should().BeTrue();
-        phoenix.BasePower.Should().Be(3);
+        phoenix.BasePower.Should().Be(2);
         phoenix.BaseToughness.Should().Be(2);
         phoenix.Owner.Should().BeSameAs(_alice);
         phoenix.Controller.Should().BeSameAs(_alice);

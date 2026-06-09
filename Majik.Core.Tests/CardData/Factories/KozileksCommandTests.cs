@@ -223,13 +223,16 @@ public class KozileksCommandTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Create_HasKindredInstantEldraziShape_Colorless()
+    public void Create_HasInstantEldraziShape_Colorless()
     {
         var kc = KozileksCommandFactory.Create(_alice);
 
         kc.Name.Should().Be("Kozilek's Command");
         kc.HasType(CardType.Instant).Should().BeTrue();
-        kc.HasType(CardType.Tribal).Should().BeTrue(); // Kindred (CR 308)
+        // CR 205.3 — Kindred/Tribal was removed by the 2024 errata; the seed
+        // type line is "Instant — Eldrazi" and the engine no longer stamps
+        // the Tribal card type. The Eldrazi subtype rides on the spell.
+        kc.HasType(CardType.Tribal).Should().BeFalse();
         kc.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
         // {X}{C}{C} is colorless (CR 105.2c).
         CardColors.GetColors(kc).Should().BeEmpty();

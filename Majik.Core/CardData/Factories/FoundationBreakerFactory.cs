@@ -11,15 +11,15 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Foundation Breaker (Modern Horizons 2, {2}{G}).
+/// Named-card factory for Foundation Breaker (Modern Horizons 2, {3}{G}).
 ///
-/// Creature — Elemental 3/2. Oracle text:
+/// Creature — Elemental 2/2. Oracle text:
 ///   "When this creature enters, you may destroy target artifact or
 ///    enchantment.
 ///    Evoke {1}{G}"
 ///
 /// ## Implemented (v1)
-/// - 3/2 Elemental, mana cost {2}{G}.
+/// - 2/2 Elemental, mana cost {3}{G}.
 /// - Evoke keyword marker via <see cref="KeywordAbility"/> ("Evoke") so the
 ///   data-driven importer surface lines up with the named factory.
 /// - Pure-mana evoke alt-cost wired via
@@ -52,7 +52,7 @@ public static class FoundationBreakerFactory
 {
     public const string CardName = "Foundation Breaker";
     public const string PrintedManaCost = "{3}{G}";
-    public const int Power = 3;
+    public const int Power = 2;
     public const int Toughness = 2;
 
     /// <summary>Construct Foundation Breaker owned and controlled by

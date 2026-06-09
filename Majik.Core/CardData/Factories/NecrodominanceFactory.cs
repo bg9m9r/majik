@@ -20,7 +20,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// Printed oracle text (per the embedded seed):
 ///
-///   Enchantment — {B}{B}{B}
+///   Legendary Enchantment — {B}{B}{B}
 ///   "Skip your draw step.
 ///    At the beginning of your end step, you may pay any amount of life.
 ///    If you do, draw that many cards.
@@ -133,7 +133,10 @@ public static class NecrodominanceFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Enchantment(CardName, "{B}{B}{B}");
+        var card = new Enchantment(
+            CardName,
+            "{B}{B}{B}",
+            supertypes: new[] { CardSupertype.Legendary });
         card.SetOwner(owner);
         card.SetController(owner);
 

@@ -15,8 +15,7 @@ using Xunit;
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// End-to-end tests for Ocelot Pride (MH3) — Legendary Creature — Cat {W}
-/// 1/1.
+/// End-to-end tests for Ocelot Pride (MH3) — Creature — Cat {W} 1/1.
 ///   "Lifelink"
 ///   "Whenever Ocelot Pride attacks, create a 1/1 white Cat creature
 ///    token. If you have the city's blessing, instead create two of those
@@ -26,7 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    return it to the battlefield under its owner's control."
 ///
 /// Validates:
-///   * Card identity (legendary Cat at {W}, 1/1) + dispatcher entry.
+///   * Card identity (Cat at {W}, 1/1 — NOT legendary) + dispatcher entry.
 ///   * Lifelink keyword marker attached (CR 702.15).
 ///   * CR 508.1f attack trigger creates a single 1/1 Cat token (city's
 ///     blessing / Ascend gate is stubbed — always 1, see factory xmldoc).
@@ -46,14 +45,15 @@ public class OcelotPrideFactoryTests
     // ------------------------------------------------------------------
 
     [Fact]
-    public void OcelotPride_IsLegendaryCreatureCat_AtCostW_1_1()
+    public void OcelotPride_IsCreatureCat_AtCostW_1_1()
     {
         var ocelot = OcelotPrideFactory.Create(_alice);
 
         ocelot.Name.Should().Be("Ocelot Pride");
         ocelot.HasType(CardType.Creature).Should().BeTrue();
-        ocelot.HasSupertype(CardSupertype.Legendary).Should().BeTrue(
-            "Ocelot Pride is Legendary (MH3 print)");
+        ocelot.HasSupertype(CardSupertype.Legendary).Should().BeFalse(
+            "Ocelot Pride is NOT Legendary (MH3 print — the seed type line " +
+            "is 'Creature — Cat')");
         ocelot.HasSubtype(CardSubtype.Cat).Should().BeTrue();
         ocelot.ManaCost.Should().Be("{W}");
         ocelot.Power.Should().Be(1);

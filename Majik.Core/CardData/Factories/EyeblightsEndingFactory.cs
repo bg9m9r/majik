@@ -45,7 +45,13 @@ public static class EyeblightsEndingFactory
     /// <summary>CardDef DSL — card shape only. Resolve behaviour (destroy
     /// target non-Elf creature) is built on demand via
     /// <see cref="BuildDefinition"/>.</summary>
-    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
+    // CR 205.3 — seed type line is "Kindred Instant — Elf"; the Kindred
+    // (legacy Tribal) card type is not modelled (TypeLineParser drops it and
+    // the engine no longer stamps it — see the Tribal product decision), but
+    // the Elf creature subtype rides on the spell itself and IS carried.
+    public static CardDef Define() => CardDef
+        .Instant(CardName, PrintedManaCost)
+        .WithSubtype(CardSubtype.Elf);
 
     public static Instant Create(Player owner) =>
         (Instant)CardDefRuntime.Build(Define(), owner);

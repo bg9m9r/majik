@@ -14,7 +14,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Ocelot Pride (Modern Horizons 3, {W}).
 ///
-/// Legendary Creature — Cat 1/1. Oracle text:
+/// Creature — Cat 1/1. Oracle text:
 ///   "Lifelink"
 ///   "Whenever Ocelot Pride attacks, create a 1/1 white Cat creature token.
 ///    If you have the city's blessing, instead create two of those tokens."
@@ -23,7 +23,7 @@ namespace Majik.Core.CardData.Factories;
 ///    to the battlefield under its owner's control."
 ///
 /// ## Implemented (v1)
-/// - 1/1 Legendary Creature — Cat at {W}, owner / controller set.
+/// - 1/1 Creature — Cat at {W}, owner / controller set.
 /// - <see cref="KeywordAbility"/> Lifelink marker (CR 702.15), consumed by
 ///   the standard combat-damage life-gain pipeline.
 /// - <b>Attack trigger</b> (CR 508.1f / CR 603.1): "Whenever Ocelot Pride
@@ -101,7 +101,6 @@ public static class OcelotPrideFactory
             manaCost: PrintedManaCost,
             power: 1,
             toughness: 1,
-            supertypes: new[] { CardSupertype.Legendary },
             subtypes: new[] { CardSubtype.Cat });
 
         card.SetOwner(owner);

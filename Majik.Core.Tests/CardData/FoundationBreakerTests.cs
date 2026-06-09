@@ -19,8 +19,8 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for Foundation Breaker (Modern Horizons 2, {2}{G}, Creature —
-/// Elemental 3/2).
+/// Tests for Foundation Breaker (Modern Horizons 2, {3}{G}, Creature —
+/// Elemental 2/2).
 ///
 /// Oracle:
 ///   "When this creature enters, you may destroy target artifact or
@@ -71,7 +71,7 @@ public class FoundationBreakerTests
 
         fb.Name.Should().Be("Foundation Breaker");
         fb.ManaCost.Should().Be("{3}{G}");
-        fb.BasePower.Should().Be(3);
+        fb.BasePower.Should().Be(2);
         fb.BaseToughness.Should().Be(2);
         fb.HasType(CardType.Creature).Should().BeTrue();
         fb.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
@@ -95,7 +95,7 @@ public class FoundationBreakerTests
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Foundation Breaker");
         var creature = (Creature)card;
-        creature.BasePower.Should().Be(3);
+        creature.BasePower.Should().Be(2);
         creature.BaseToughness.Should().Be(2);
         creature.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
     }

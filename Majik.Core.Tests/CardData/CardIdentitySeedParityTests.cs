@@ -56,6 +56,20 @@ public class CardIdentitySeedParityTests
         "Deceiver Exarch", "Necropede", "Plague Engineer", "Plague Stinger",
         "Sheoldred, Whispering One", "Skithiryx, the Blight Dragon",
         "Spellskite", "Vault Skirge",
+        // Bucket C — semantic-parity-tail creatures (wrong base P/T and/or
+        // wrong/missing subtype). Demilich Skeleton (not Zombie); World
+        // Breaker 5/7 (not 5/5); Legion Warboss 2/2 (not 2/1); Pashalik Mons
+        // 2/2 (not 3/3); Foundation Breaker 2/2 power (not 3); Yawgmoth no
+        // Phyrexian; Phoenix of Ash 2/2 power (not 3); Rattlechains 2/1
+        // toughness (not 2); Boreal Druid Snow; Ocelot Pride non-Legendary;
+        // Harbinger of the Seas + Merfolk; Matter Reshaper no Drone;
+        // Munitions Expert no Warrior; Sojourner's Companion Salamander (not
+        // Thopter Knight); Street Wraith no Zombie (Wraith has no enum value).
+        "Demilich", "World Breaker", "Legion Warboss", "Pashalik Mons",
+        "Foundation Breaker", "Yawgmoth, Thran Physician", "Phoenix of Ash",
+        "Rattlechains", "Boreal Druid", "Ocelot Pride",
+        "Harbinger of the Seas", "Matter Reshaper", "Munitions Expert",
+        "Sojourner's Companion", "Street Wraith",
     };
 
     [Theory]
@@ -89,5 +103,61 @@ public class CardIdentitySeedParityTests
         var actual = creature.Subtypes.Distinct().OrderBy(s => s).ToList();
         actual.Should().Equal(expected,
             $"'{name}' printed creature subtypes must match the seed type line");
+
+        // --- Supertypes (Snow / Legendary). Boreal Druid is Snow; Ocelot
+        // Pride is NOT Legendary — both must match the seed exactly. ---
+        var expectedSupers = parsed.Supertypes.Distinct().OrderBy(s => s).ToList();
+        var actualSupers = creature.Supertypes.Distinct().OrderBy(s => s).ToList();
+        actualSupers.Should().Equal(expectedSupers,
+            $"'{name}' printed supertypes must match the seed type line");
+    }
+
+    // ------------------------------------------------------------------
+    // Non-creature semantic-parity-tail cards (Instants / Sorceries /
+    // Enchantment): full printed-characteristics parity — card types,
+    // supertypes, subtypes — vs the seed. Covers the Kindred/Tribal product
+    // decision (the engine no longer stamps CardType.Tribal — see the
+    // semantic-parity-tail PR) plus the Necrodominance (Legendary) and the
+    // Arcane / Elf spell-subtype fixes.
+    // ------------------------------------------------------------------
+    public static TheoryData<string> FixedNonCreatures() => new()
+    {
+        // Kindred/Tribal removal — must be a plain Instant/Sorcery/Enchantment.
+        "All Is Dust", "Bitterblossom", "Kozilek's Command",
+        "Nameless Inversion", "Tarfire",
+        // Supertype + spell-subtype fixes.
+        "Necrodominance",          // + Legendary supertype
+        "Eyeblight's Ending",      // + Elf subtype on the spell
+        "Footsteps of the Goryo",  // + Arcane subtype
+        "Otherworldly Journey",    // + Arcane subtype
+    };
+
+    [Theory]
+    [MemberData(nameof(FixedNonCreatures))]
+    public void BuiltNonCreature_PrintedTypesSupertypesSubtypes_MatchSeed(string name)
+    {
+        var entity = Repo.GetByName(name);
+        entity.Should().NotBeNull($"'{name}' must be present in the seed");
+
+        var built = NamedCardFactory.Create(name, new Player("Alice", 20));
+        var parsed = TypeLineParser.Parse(entity!.TypeLine);
+
+        // Card types — the parser drops the removed Kindred/Tribal type, so
+        // the built card must carry exactly the seed's types (no Tribal).
+        var expectedTypes = parsed.Types.Distinct().OrderBy(t => t).ToList();
+        var actualTypes = built.CardTypes.Distinct().OrderBy(t => t).ToList();
+        actualTypes.Should().Equal(expectedTypes,
+            $"'{name}' printed card types must match the seed (no removed " +
+            "Kindred/Tribal type)");
+
+        var expectedSupers = parsed.Supertypes.Distinct().OrderBy(s => s).ToList();
+        var actualSupers = built.Supertypes.Distinct().OrderBy(s => s).ToList();
+        actualSupers.Should().Equal(expectedSupers,
+            $"'{name}' printed supertypes must match the seed type line");
+
+        var expectedSubs = parsed.Subtypes.Distinct().OrderBy(s => s).ToList();
+        var actualSubs = built.Subtypes.Distinct().OrderBy(s => s).ToList();
+        actualSubs.Should().Equal(expectedSubs,
+            $"'{name}' printed subtypes must match the seed type line");
     }
 }

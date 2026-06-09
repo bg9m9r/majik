@@ -8,9 +8,9 @@ using Majik.Core.ValueObjects;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Phoenix of Ash (Throne of Eldraine, {2}{R}{R}).
+/// Named-card factory for Phoenix of Ash (Throne of Eldraine, {1}{R}{R}).
 ///
-/// Creature — Phoenix 3/2. Oracle text:
+/// Creature — Phoenix 2/2. Oracle text:
 ///   "Phoenix of Ash can attack as though it didn't have summoning sickness
 ///    as long as it has haste.
 ///    Haste.
@@ -18,7 +18,7 @@ namespace Majik.Core.CardData.Factories;
 ///    (You may cast this card from your graveyard for its escape cost.)"
 ///
 /// ## Implemented (v1)
-/// - 3/2 Creature — Phoenix, mana cost {2}{R}{R}.
+/// - 2/2 Creature — Phoenix, mana cost {1}{R}{R}.
 /// - <see cref="Majik.Core.Abilities.KeywordAbility"/> marker for Haste
 ///   (CR 702.10). The "can attack as though it didn't have summoning
 ///   sickness as long as it has haste" rider collapses observationally
@@ -57,7 +57,7 @@ public static class PhoenixOfAshFactory
         new(ValueObjects.ManaCost.Parse(EscapeManaCost), EscapeExileCount);
 
     public static CardDef Define() => CardDef
-        .Creature(CardName, PrintedManaCost, power: 3, toughness: 2)
+        .Creature(CardName, PrintedManaCost, power: 2, toughness: 2)
         .WithSubtype(CardSubtype.Phoenix)
         // CR 702.10 — Haste.
         .WithKeyword("Haste");

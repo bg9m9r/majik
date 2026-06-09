@@ -15,15 +15,15 @@ namespace Majik.Core.Tests.CardData;
 /// <summary>
 /// Tests for <see cref="DemilichFactory"/>.
 ///
-/// Demilich (engine-spec, MODERN_COVERAGE row #10, {3}{U}{U}{U}):
-///   Creature — Zombie Wizard 4/3. Flying.
+/// Demilich (engine-spec, MODERN_COVERAGE row #10, {U}{U}{U}{U}):
+///   Creature — Skeleton Wizard 4/3. Flying.
 ///   This spell costs {U} less to cast for each instant or sorcery card in
 ///   your graveyard.
 ///   When you cast this spell, exile two instants or sorceries from your
 ///   graveyard.
 ///
 /// Covers:
-///   - Card identity: Zombie Wizard 4/3, mana cost {3}{U}{U}{U}, Flying.
+///   - Card identity: Skeleton Wizard 4/3, mana cost {U}{U}{U}{U}, Flying.
 ///   - <see cref="NamedCardFactory"/> dispatcher entry.
 ///   - Cost reduction at 0 / 3 / 5 instants+sorceries in the caster's
 ///     graveyard (floor at the three blue pips per CR 117.7c).
@@ -38,14 +38,14 @@ public class DemilichTests
     private readonly Player _alice = new("Alice", 20);
 
     [Fact]
-    public void Demilich_IsZombieWizard_4_3_WithFlying_At_UUUU()
+    public void Demilich_IsSkeletonWizard_4_3_WithFlying_At_UUUU()
     {
         var demi = DemilichFactory.Create(_alice);
 
         demi.Name.Should().Be("Demilich");
         demi.ManaCost.Should().Be("{U}{U}{U}{U}");
         demi.HasType(CardType.Creature).Should().BeTrue();
-        demi.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
+        demi.HasSubtype(CardSubtype.Skeleton).Should().BeTrue();
         demi.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         demi.BasePower.Should().Be(4);
         demi.BaseToughness.Should().Be(3);
@@ -64,7 +64,7 @@ public class DemilichTests
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Demilich");
         card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Skeleton).Should().BeTrue();
         card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         ((Creature)card).BasePower.Should().Be(4);
         ((Creature)card).BaseToughness.Should().Be(3);

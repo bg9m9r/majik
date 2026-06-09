@@ -20,8 +20,8 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// Tests for <see cref="LegionWarbossFactory"/> (Guilds of Ravnica, {1}{R}).
-/// Creature — Goblin Soldier, 2/1:
+/// Tests for <see cref="LegionWarbossFactory"/> (Guilds of Ravnica, {2}{R}).
+/// Creature — Goblin Soldier, 2/2:
 ///   "Mentor (Whenever this creature attacks, put a +1/+1 counter on target
 ///    attacking creature with lesser power.)
 ///    At the beginning of combat on your turn, create a 1/1 red Goblin
@@ -29,7 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    this combat if able."
 ///
 /// Covers:
-/// - Identity (Creature, Goblin + Soldier subtypes, {1}{R}, 2/1, owner/controller).
+/// - Identity (Creature, Goblin + Soldier subtypes, {2}{R}, 2/2, owner/controller).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - Mentor attack trigger: matches Warboss only (CR 508.1f self-match);
 ///   a 1..1 "target attacking creature with lesser power" TargetRequest;
@@ -79,7 +79,7 @@ public class LegionWarbossFactoryTests
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
         c.BasePower.Should().Be(2);
-        c.BaseToughness.Should().Be(1);
+        c.BaseToughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }

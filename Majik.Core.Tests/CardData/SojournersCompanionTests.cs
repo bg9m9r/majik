@@ -17,7 +17,7 @@ namespace Majik.Core.Tests.CardData;
 /// <summary>
 /// Unit tests for <see cref="SojournersCompanionFactory"/>.
 ///
-/// Card: Sojourner's Companion — Artifact Creature — Thopter Knight {6} 4/4
+/// Card: Sojourner's Companion — Artifact Creature — Salamander {6} 4/4
 /// (Modern Horizons 2).
 ///   "Affinity for artifacts (This spell costs {1} less to cast for each
 ///    artifact you control.)
@@ -25,8 +25,8 @@ namespace Majik.Core.Tests.CardData;
 ///    basic land card, put it onto the battlefield tapped, then shuffle."
 ///
 /// Covers:
-///   - Identity (name, dual types Artifact + Creature, subtypes Thopter +
-///     Knight, mana cost {6}, 4/4, owner/controller).
+///   - Identity (name, dual types Artifact + Creature, subtype Salamander,
+///     mana cost {6}, 4/4, owner/controller).
 ///   - NamedCardFactory dispatch returns a Creature with the Affinity
 ///     cost reducer + Affinity keyword marker.
 ///   - Affinity for artifacts (CR 702.40) — generic reduction; floor-at-
@@ -86,8 +86,10 @@ public class SojournersCompanionTests
         c.ManaCost.Should().Be("{7}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasType(CardType.Artifact).Should().BeTrue("Sojourner's Companion is an Artifact Creature (CR 301.1 / 302.1)");
-        c.HasSubtype(CardSubtype.Thopter).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        // CR 205.3m — seed type line is "Artifact Creature — Salamander".
+        c.HasSubtype(CardSubtype.Salamander).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Thopter).Should().BeFalse();
+        c.HasSubtype(CardSubtype.Knight).Should().BeFalse();
         c.Power.Should().Be(4);
         c.Toughness.Should().Be(4);
         c.Owner.Should().BeSameAs(_alice);
@@ -102,8 +104,9 @@ public class SojournersCompanionTests
         c.Should().BeOfType<Creature>();
         c.Name.Should().Be("Sojourner's Companion");
         c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Thopter).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Salamander).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Thopter).Should().BeFalse();
+        c.HasSubtype(CardSubtype.Knight).Should().BeFalse();
         c.Abilities.OfType<CostReductionAbility>().Should().HaveCount(1,
             "the Affinity-for-artifacts cost reducer is attached");
         c.Abilities.OfType<KeywordAbility>()

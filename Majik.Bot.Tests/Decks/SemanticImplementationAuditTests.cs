@@ -144,13 +144,20 @@ public class SemanticImplementationAuditTests
             "Living End",
             "Glimpse of Tomorrow",
 
-            // NOTE — the "Tribal"-stamp bucket (All Is Dust, Bitterblossom,
-            // Kozilek's Command, Nameless Inversion, Tarfire) is left OUT of
-            // this allowlist on purpose. CardType.Tribal was removed from the
-            // game (the 2024 type-line errata folded it into the card's other
-            // types), and whether the engine should stop stamping it is a
-            // separate product decision, tracked in the PR. It stays a
-            // report-only mismatch until that decision is made.
+            // NOTE — the former "Tribal"-stamp bucket (All Is Dust,
+            // Bitterblossom, Kozilek's Command, Nameless Inversion, Tarfire)
+            // is NOT allowlisted: it was a real fix, not an intentional
+            // difference. The Kindred (formerly "Tribal") card type was
+            // removed from the game by the 2024 type-line errata (the seed
+            // type lines carry no Kindred/Tribal type), so the engine stopped
+            // stamping CardType.Tribal on these five factories. The only
+            // mechanical consumer was Emrakul, the Promised End's
+            // graveyard-card-type cost reducer, which under current rules must
+            // NOT count a (now non-existent) Tribal type; lords/tribal-matters
+            // effects key off creature SUBTYPES, never the removed card type.
+            // The cards' subtypes (Eldrazi / Faerie / Shapeshifter / Goblin)
+            // ride on the spell via the type line and are unaffected. (Tribal
+            // product decision — resolved in the semantic-parity-tail PR.)
         };
 
     internal sealed record ParityMismatch(string Name, string Field, string Expected, string Actual);

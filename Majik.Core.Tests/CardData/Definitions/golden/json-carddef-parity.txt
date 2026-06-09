@@ -12633,7 +12633,9 @@
     "Sorcery"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Arcane"
+  ],
   "power": null,
   "toughness": null,
   "loyalty": null,
@@ -21174,7 +21176,7 @@
     "Soldier"
   ],
   "power": 2,
-  "toughness": 1,
+  "toughness": 2,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -24074,8 +24076,7 @@
   "manaCost": "{1}{B}",
   "primaryType": "Instant",
   "cardTypes": [
-    "Instant",
-    "Tribal"
+    "Instant"
   ],
   "supertypes": [],
   "subtypes": [
@@ -37556,8 +37557,7 @@
   "manaCost": "{R}",
   "primaryType": "Instant",
   "cardTypes": [
-    "Instant",
-    "Tribal"
+    "Instant"
   ],
   "supertypes": [],
   "subtypes": [
