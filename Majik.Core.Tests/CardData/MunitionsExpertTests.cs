@@ -52,7 +52,7 @@ public class MunitionsExpertTests
         var me = MunitionsExpertFactory.Create(_alice);
 
         me.Name.Should().Be("Munitions Expert");
-        me.ManaCost.Should().Be("{R}");
+        me.ManaCost.Should().Be("{B}{R}");
         me.HasType(CardType.Creature).Should().BeTrue();
         me.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         me.HasSubtype(CardSubtype.Warrior).Should().BeTrue();

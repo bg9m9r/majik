@@ -36,7 +36,7 @@ namespace Majik.Core.CardData.Factories;
 public static class HidetsugusSecondRiteFactory
 {
     public const string CardName = "Hidetsugu's Second Rite";
-    public const string PrintedManaCost = "{2}{R}";
+    public const string PrintedManaCost = "{3}{R}";
 
     /// <summary>The printed life-total threshold for the conditional
     /// damage clause (CR 608.2c — checked at resolution).</summary>

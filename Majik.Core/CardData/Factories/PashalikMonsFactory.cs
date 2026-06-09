@@ -72,7 +72,7 @@ namespace Majik.Core.CardData.Factories;
 public static class PashalikMonsFactory
 {
     public const string CardName = "Pashalik Mons";
-    public const string PrintedManaCost = "{3}{R}{R}";
+    public const string PrintedManaCost = "{2}{R}";
     public const int Power = 3;
     public const int Toughness = 3;
     public const int PingDamage = 1;

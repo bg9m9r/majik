@@ -33,7 +33,7 @@ public class SigardaHostOfHeronsFactoryTests
         var c = SigardaHostOfHeronsFactory.Create(_alice);
 
         c.Name.Should().Be("Sigarda, Host of Herons");
-        c.ManaCost.Should().Be("{2}{G}{W}");
+        c.ManaCost.Should().Be("{2}{G}{W}{W}");
         c.Power.Should().Be(5);
         c.Toughness.Should().Be(5);
         c.HasType(CardType.Creature).Should().BeTrue();

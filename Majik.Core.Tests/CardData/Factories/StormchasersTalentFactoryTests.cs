@@ -64,12 +64,12 @@ public class StormchasersTalentFactoryTests
     {
         var c = StormchasersTalentFactory.Create(_alice);
 
-        // Printed cost is {U}{R}. ManaCost.Parse round-trips via one blue
-        // pip + one red pip (total mana value 2).
+        // Printed cost is {U}. ManaCost.Parse round-trips via one blue
+        // pip (total mana value 1).
         var parsed = ManaCost.Parse(StormchasersTalentFactory.PrintedManaCost);
         parsed.Blue.Should().Be(1, "the printed cost is one blue pip");
-        parsed.Red.Should().Be(1, "the printed cost is one red pip");
-        parsed.TotalValue.Should().Be(2);
+        parsed.Red.Should().Be(0, "Stormchaser's Talent is mono-blue");
+        parsed.TotalValue.Should().Be(1);
         c.ManaCost.Should().Be(StormchasersTalentFactory.PrintedManaCost);
     }
 

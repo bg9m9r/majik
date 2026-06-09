@@ -37,7 +37,7 @@ public class ScionOfOonaTests
         var c = ScionOfOonaFactory.Create(_alice);
 
         c.Name.Should().Be("Scion of Oona");
-        c.ManaCost.Should().Be("{1}{U}");
+        c.ManaCost.Should().Be("{2}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
         c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();

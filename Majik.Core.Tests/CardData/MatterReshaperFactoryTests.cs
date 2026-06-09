@@ -34,7 +34,7 @@ public class MatterReshaperFactoryTests
         var mr = MatterReshaperFactory.Create(_alice);
 
         mr.Name.Should().Be("Matter Reshaper");
-        mr.ManaCost.Should().Be("{3}{C}");
+        mr.ManaCost.Should().Be("{2}{C}");
         mr.HasType(CardType.Creature).Should().BeTrue();
         mr.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
         mr.HasSubtype(CardSubtype.Drone).Should().BeTrue();

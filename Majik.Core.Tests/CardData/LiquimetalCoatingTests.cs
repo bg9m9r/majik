@@ -39,7 +39,7 @@ public class LiquimetalCoatingTests
         var coating = LiquimetalCoatingFactory.Create(_alice);
 
         coating.Name.Should().Be("Liquimetal Coating");
-        coating.ManaCost.Should().Be("{3}");
+        coating.ManaCost.Should().Be("{2}");
         coating.HasType(CardType.Artifact).Should().BeTrue();
         coating.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
         coating.Owner.Should().BeSameAs(_alice);

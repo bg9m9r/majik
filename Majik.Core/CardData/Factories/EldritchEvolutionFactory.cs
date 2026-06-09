@@ -66,7 +66,7 @@ namespace Majik.Core.CardData.Factories;
 public static class EldritchEvolutionFactory
 {
     public const string CardName = "Eldritch Evolution";
-    public const string PrintedManaCost = "{1}{G}";
+    public const string PrintedManaCost = "{1}{G}{G}";
 
     /// <summary>
     /// Build an Eldritch Evolution sorcery owned by <paramref name="owner"/>.

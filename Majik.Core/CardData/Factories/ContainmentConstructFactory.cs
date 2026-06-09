@@ -91,7 +91,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ContainmentConstructFactory
 {
     public const string CardName = "Containment Construct";
-    public const string PrintedManaCost = "{1}";
+    public const string PrintedManaCost = "{2}";
     public const int Power = 2;
     public const int Toughness = 1;
 

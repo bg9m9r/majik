@@ -74,7 +74,7 @@ public class OmnathLocusOfCreationTests
         var omnath = OmnathLocusOfCreationFactory.Create(_alice);
 
         omnath.Name.Should().Be("Omnath, Locus of Creation");
-        omnath.ManaCost.Should().Be("{1}{R}{G}{W}{U}");
+        omnath.ManaCost.Should().Be("{R}{G}{W}{U}");
         omnath.HasType(CardType.Creature).Should().BeTrue();
         omnath.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         omnath.HasSubtype(CardSubtype.Elemental).Should().BeTrue();

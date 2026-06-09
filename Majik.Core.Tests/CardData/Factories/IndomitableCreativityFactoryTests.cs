@@ -37,7 +37,7 @@ public class IndomitableCreativityFactoryTests
         var card = IndomitableCreativityFactory.Create(_alice);
 
         card.Name.Should().Be("Indomitable Creativity");
-        card.ManaCost.Should().Be("{X}{R}{R}");
+        card.ManaCost.Should().Be("{X}{R}{R}{R}");
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.Owner.Should().Be(_alice);
         card.Controller.Should().Be(_alice);

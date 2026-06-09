@@ -48,12 +48,12 @@ public class DriftOfPhantasmsTests
         var drift = DriftOfPhantasmsFactory.Create(_alice);
 
         drift.Name.Should().Be("Drift of Phantasms");
-        drift.ManaCost.Should().Be("{3}{U}");
+        drift.ManaCost.Should().Be("{2}{U}");
         drift.HasType(CardType.Creature).Should().BeTrue();
         drift.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
         drift.BasePower.Should().Be(0);
         drift.BaseToughness.Should().Be(5);
-        drift.ManaCostValue.TotalValue.Should().Be(4);
+        drift.ManaCostValue.TotalValue.Should().Be(3);
         drift.Owner.Should().BeSameAs(_alice);
         drift.Controller.Should().BeSameAs(_alice);
     }
@@ -133,11 +133,10 @@ public class DriftOfPhantasmsTests
         drift.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(drift);
 
-        // Library seed: one card with matching MV 4 (Living End {2}{B}{B}
-        // analogue — but printed costs only matter for ManaCostValue here),
-        // plus two MV-3 and MV-5 distractors.
-        var target = new Card("MV4 Match", "{2}{U}{U}", new[] { CardType.Sorcery });
-        var distractorLow = new Card("MV3", "{1}{U}{U}", new[] { CardType.Sorcery });
+        // Library seed: one card with matching MV 3 (printed costs only
+        // matter for ManaCostValue here), plus MV-2 and MV-5 distractors.
+        var target = new Card("MV3 Match", "{1}{U}{U}", new[] { CardType.Sorcery });
+        var distractorLow = new Card("MV2", "{U}{U}", new[] { CardType.Sorcery });
         var distractorHigh = new Card("MV5", "{3}{U}{U}", new[] { CardType.Sorcery });
         target.SetOwner(_alice);
         distractorLow.SetOwner(_alice);
@@ -146,8 +145,8 @@ public class DriftOfPhantasmsTests
         _alice.Zones.Library.AddCard(target);
         _alice.Zones.Library.AddCard(distractorHigh);
 
-        // Sanity: Drift's MV is 4.
-        drift.ManaCostValue.TotalValue.Should().Be(4);
+        // Sanity: Drift's MV is 3.
+        drift.ManaCostValue.TotalValue.Should().Be(3);
 
         // Resolve the transmute body directly. We bypass cost payment in
         // this test (cost-paying is exercised by ActivatedAbility flow

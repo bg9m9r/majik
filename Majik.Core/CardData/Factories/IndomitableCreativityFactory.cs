@@ -68,7 +68,7 @@ namespace Majik.Core.CardData.Factories;
 public static class IndomitableCreativityFactory
 {
     public const string CardName = "Indomitable Creativity";
-    public const string PrintedManaCost = "{X}{R}{R}";
+    public const string PrintedManaCost = "{X}{R}{R}{R}";
 
     /// <summary>
     /// Construct an Indomitable Creativity sorcery owned and controlled

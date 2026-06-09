@@ -35,7 +35,7 @@ public class ConclaveTribunalFactoryTests
         var c = ConclaveTribunalFactory.Create(_alice);
 
         c.Name.Should().Be("Conclave Tribunal");
-        c.ManaCost.Should().Be("{4}{W}");
+        c.ManaCost.Should().Be("{3}{W}");
         c.HasType(CardType.Enchantment).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

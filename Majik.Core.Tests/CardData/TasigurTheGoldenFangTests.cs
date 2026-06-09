@@ -40,7 +40,7 @@ public class TasigurTheGoldenFangTests
         var t = TasigurTheGoldenFangFactory.Create(_alice);
 
         t.Name.Should().Be("Tasigur, the Golden Fang");
-        t.ManaCost.Should().Be("{4}{B/G}");
+        t.ManaCost.Should().Be("{5}{B}");
         t.HasType(CardType.Creature).Should().BeTrue();
         t.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         t.HasSubtype(CardSubtype.Human).Should().BeTrue();
@@ -91,7 +91,7 @@ public class TasigurTheGoldenFangTests
         card.Name.Should().Be("Tasigur, the Golden Fang");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.ManaCost.Should().Be("{4}{B/G}");
+        card.ManaCost.Should().Be("{5}{B}");
         card.Owner.Should().BeSameAs(_alice);
         card.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword).Should().Contain("Delve");

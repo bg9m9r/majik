@@ -74,7 +74,7 @@ namespace Majik.Core.CardData.Factories;
 public static class YawgmothFactory
 {
     public const string CardName = "Yawgmoth, Thran Physician";
-    public const string PrintedManaCost = "{2}{B}";
+    public const string PrintedManaCost = "{2}{B}{B}";
 
     /// <summary>Canonical build — see class xmldoc.</summary>
     public static Creature Create(Player owner)

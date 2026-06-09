@@ -38,12 +38,12 @@ public class DemilichTests
     private readonly Player _alice = new("Alice", 20);
 
     [Fact]
-    public void Demilich_IsZombieWizard_4_3_WithFlying_At_3UUU()
+    public void Demilich_IsZombieWizard_4_3_WithFlying_At_UUUU()
     {
         var demi = DemilichFactory.Create(_alice);
 
         demi.Name.Should().Be("Demilich");
-        demi.ManaCost.Should().Be("{3}{U}{U}{U}");
+        demi.ManaCost.Should().Be("{U}{U}{U}{U}");
         demi.HasType(CardType.Creature).Should().BeTrue();
         demi.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
         demi.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
@@ -78,43 +78,44 @@ public class DemilichTests
     [Fact]
     public void Demilich_EmptyGraveyard_PaysFullCost()
     {
-        // 0 instants / sorceries in graveyard → no reduction. Pays
-        // {3}{U}{U}{U}: generic = 3, U pips = 3.
+        // Printed cost {U}{U}{U}{U} has no generic pip. Empty graveyard
+        // → no reduction either way. Pays {U}{U}{U}{U}: generic = 0, U pips = 4.
         var demi = DemilichFactory.Create(_alice);
 
         var effective = CostReduction.GetEffectiveCost(demi, _alice);
 
-        effective.Generic.Should().Be(3);
-        effective.Blue.Should().Be(3);
+        effective.Generic.Should().Be(0);
+        effective.Blue.Should().Be(4);
     }
 
     [Fact]
     public void Demilich_ThreeInstantsOrSorceriesInGraveyard_ReducesToUUU()
     {
-        // 3 instants / sorceries in graveyard → reduction by 3 generic.
-        // Pays {U}{U}{U}: generic = 0, U pips = 3.
+        // 3 instants / sorceries in graveyard → reduction of up to 3
+        // generic, but the printed {U}{U}{U}{U} cost has no generic to
+        // reduce (CR 117.7c — coloured pips untouched). Pays {U}{U}{U}{U}.
         var demi = DemilichFactory.Create(_alice);
         SeedGraveyardWithSpells(_alice, instants: 2, sorceries: 1);
 
         var effective = CostReduction.GetEffectiveCost(demi, _alice);
 
         effective.Generic.Should().Be(0);
-        effective.Blue.Should().Be(3);
+        effective.Blue.Should().Be(4);
     }
 
     [Fact]
     public void Demilich_FiveInstantsOrSorceriesInGraveyard_FloorsAtColouredPips()
     {
-        // 5 instants/sorceries → reduction = 5 generic. Printed generic is
-        // 3, so reduction floors at 0 generic. Coloured pips untouched
-        // (CR 117.7c) — still pays {U}{U}{U}.
+        // 5 instants/sorceries → reduction of up to 5 generic. Printed
+        // {U}{U}{U}{U} has no generic; reduction floors at 0. Coloured
+        // pips untouched (CR 117.7c) — still pays {U}{U}{U}{U}.
         var demi = DemilichFactory.Create(_alice);
         SeedGraveyardWithSpells(_alice, instants: 3, sorceries: 2);
 
         var effective = CostReduction.GetEffectiveCost(demi, _alice);
 
         effective.Generic.Should().Be(0);
-        effective.Blue.Should().Be(3);
+        effective.Blue.Should().Be(4);
     }
 
     [Fact]
@@ -129,8 +130,8 @@ public class DemilichTests
 
         var effective = CostReduction.GetEffectiveCost(demi, _alice);
 
-        effective.Generic.Should().Be(3, "non-instant/sorcery cards don't trigger Demilich's reduction");
-        effective.Blue.Should().Be(3);
+        effective.Generic.Should().Be(0, "Demilich's printed cost {U}{U}{U}{U} has no generic to reduce");
+        effective.Blue.Should().Be(4);
     }
 
     [Fact]

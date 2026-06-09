@@ -32,7 +32,7 @@ public class WelkinTernFactoryTests
         var c = WelkinTernFactory.Create(_alice);
 
         c.Name.Should().Be("Welkin Tern");
-        c.ManaCost.Should().Be("{U}");
+        c.ManaCost.Should().Be("{1}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Bird).Should().BeTrue();
         c.BasePower.Should().Be(2);

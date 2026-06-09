@@ -79,7 +79,7 @@ namespace Majik.Core.CardData.Factories;
 public static class EtaliPrimalStormFactory
 {
     public const string CardName = "Etali, Primal Storm";
-    public const string PrintedManaCost = "{4}{R}";
+    public const string PrintedManaCost = "{4}{R}{R}";
     public const int Power = 6;
     public const int Toughness = 6;
 

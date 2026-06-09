@@ -41,7 +41,7 @@ public class WhirlerVirtuosoFactoryTests
         var card = WhirlerVirtuosoFactory.Create(_alice);
 
         card.Name.Should().Be("Whirler Virtuoso");
-        card.ManaCost.ToString().Should().Be("{2}{U}{R}");
+        card.ManaCost.ToString().Should().Be("{1}{U}{R}");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasType(CardType.Artifact).Should().BeFalse(
             "Whirler Virtuoso is a plain Creature — Human Artificer, not an Artifact Creature");

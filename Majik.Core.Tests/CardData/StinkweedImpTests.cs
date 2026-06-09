@@ -36,7 +36,7 @@ public class StinkweedImpTests
         var imp = StinkweedImpFactory.Create(_alice);
 
         imp.Name.Should().Be("Stinkweed Imp");
-        imp.ManaCost.Should().Be("{1}{B}");
+        imp.ManaCost.Should().Be("{2}{B}");
         imp.BasePower.Should().Be(1);
         imp.BaseToughness.Should().Be(2);
         imp.HasType(CardType.Creature).Should().BeTrue();

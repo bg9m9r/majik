@@ -57,7 +57,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ForceOfDespairFactory
 {
     public const string CardName = "Force of Despair";
-    public const string PrintedManaCost = "{3}{B}";
+    public const string PrintedManaCost = "{1}{B}{B}";
 
     /// <summary>CardDef DSL — card shape only. The destroy-all-creatures-
     /// that-ETB'd-this-turn body lives in <see cref="BuildSpellDefinition"/>.</summary>

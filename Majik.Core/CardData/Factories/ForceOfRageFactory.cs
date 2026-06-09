@@ -63,7 +63,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ForceOfRageFactory
 {
     public const string CardName = "Force of Rage";
-    public const string PrintedManaCost = "{2}{R}{R}";
+    public const string PrintedManaCost = "{1}{R}{R}";
 
     /// <summary>Token P/T (CR 111.4). 3/1 red Elemental, trample + haste.</summary>
     public const int TokenCount = 3;

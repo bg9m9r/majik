@@ -60,7 +60,7 @@ public class PersistCardFactoryTests
 
         c.Name.Should().Be("Persist");
         c.Should().BeOfType<Sorcery>();
-        c.ManaCost.Should().Be("{2}{B}");
+        c.ManaCost.Should().Be("{1}{B}");
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
@@ -72,7 +72,7 @@ public class PersistCardFactoryTests
 
         c.Should().BeOfType<Sorcery>();
         c.Name.Should().Be("Persist");
-        c.ManaCost.Should().Be("{2}{B}");
+        c.ManaCost.Should().Be("{1}{B}");
     }
 
     [Fact]

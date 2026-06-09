@@ -40,7 +40,7 @@ namespace Majik.Core.CardData.Factories;
 public static class PhoenixOfAshFactory
 {
     public const string CardName = "Phoenix of Ash";
-    public const string PrintedManaCost = "{2}{R}{R}";
+    public const string PrintedManaCost = "{1}{R}{R}";
 
     /// <summary>CR 702.138 — printed Escape mana cost: {3}{R}{R}.</summary>
     public const string EscapeManaCost = "{3}{R}{R}";

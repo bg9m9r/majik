@@ -43,7 +43,7 @@ namespace Majik.Core.CardData.Factories;
 public static class LurkingRoperFactory
 {
     public const string CardName = "Lurking Roper";
-    public const string PrintedManaCost = "{3}{B}";
+    public const string PrintedManaCost = "{2}{G}";
     public const int Power = 4;
     public const int Toughness = 5;
     public const int MillAmount = 3;

@@ -73,7 +73,7 @@ namespace Majik.Core.CardData.Factories;
 public static class WhirlerVirtuosoFactory
 {
     public const string CardName = "Whirler Virtuoso";
-    public const string PrintedManaCost = "{2}{U}{R}";
+    public const string PrintedManaCost = "{1}{U}{R}";
     public const int Power = 2;
     public const int Toughness = 3;
     public const int EtbEnergyGain = 3;

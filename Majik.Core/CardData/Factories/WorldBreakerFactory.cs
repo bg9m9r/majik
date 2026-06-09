@@ -70,7 +70,7 @@ namespace Majik.Core.CardData.Factories;
 public static class WorldBreakerFactory
 {
     public const string CardName = "World Breaker";
-    public const string PrintedManaCost = "{5}{G}";
+    public const string PrintedManaCost = "{6}{G}";
     public const string GraveyardReturnManaCost = "{G}";
     public const int Power = 5;
     public const int Toughness = 5;

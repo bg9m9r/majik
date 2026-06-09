@@ -56,7 +56,7 @@ public class DelveAltCostProbeTests
     public void CandidatesFor_GurmagAngler_PartialDelve_ReducesGenericOnly()
     {
         var angler = InHand(_alice, GurmagAnglerFactory.Create(_alice));
-        // 7 generic pips on {7}{B}, only 3 fodder available → partial delve.
+        // 6 generic pips on {6}{B}, only 3 fodder available → partial delve.
         for (var i = 0; i < 3; i++)
         {
             ToYard(_alice, new Instant($"Thoughtseize {i}", "{B}"));
@@ -69,7 +69,7 @@ public class DelveAltCostProbeTests
         candidates.Should().HaveCount(1);
         var delve = candidates[0].Should().BeOfType<DelveAlternativeCost>().Subject;
         delve.Chosen.Should().HaveCount(3);
-        delve.AlternativeManaCost.Generic.Should().Be(4); // 7 - 3 = 4
+        delve.AlternativeManaCost.Generic.Should().Be(3); // 6 - 3 = 3
         delve.AlternativeManaCost.Black.Should().Be(1);
     }
 

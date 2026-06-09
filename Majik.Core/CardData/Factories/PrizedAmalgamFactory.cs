@@ -65,7 +65,7 @@ namespace Majik.Core.CardData.Factories;
 public static class PrizedAmalgamFactory
 {
     public const string CardName = "Prized Amalgam";
-    public const string PrintedManaCost = "{3}{U/B}";
+    public const string PrintedManaCost = "{1}{U}{B}";
 
     /// <summary>
     /// Construct Prized Amalgam with no runtime service wiring. Shape /

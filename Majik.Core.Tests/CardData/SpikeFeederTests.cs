@@ -42,7 +42,7 @@ public class SpikeFeederTests
         var c = SpikeFeederFactory.Create(_alice);
 
         c.Name.Should().Be("Spike Feeder");
-        c.ManaCost.Should().Be("{1}{G}");
+        c.ManaCost.Should().Be("{1}{G}{G}");
         c.Power.Should().Be(0);
         c.Toughness.Should().Be(0);
         c.HasType(CardType.Creature).Should().BeTrue();

@@ -47,7 +47,7 @@ public class AtraxaGrandUnifierTests
         c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
         c.BasePower.Should().Be(7);
         c.BaseToughness.Should().Be(7);
-        c.ManaCost.Should().Be("{3}{W}{U}{B}{R}{G}");
+        c.ManaCost.Should().Be("{3}{G}{W}{U}{B}");
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }

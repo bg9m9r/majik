@@ -2,7 +2,7 @@
   "name": "Palladium Myr",
   "types": ["Creature", "Artifact"],
   "subtypes": ["Myr"],
-  "manaCost": "{4}",
+  "manaCost": "{3}",
   "power": 2,
   "toughness": 2,
   "abilities": [

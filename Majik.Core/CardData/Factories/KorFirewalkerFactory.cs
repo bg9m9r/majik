@@ -70,7 +70,7 @@ namespace Majik.Core.CardData.Factories;
 public static class KorFirewalkerFactory
 {
     public const string CardName = "Kor Firewalker";
-    public const string PrintedManaCost = "{W}";
+    public const string PrintedManaCost = "{W}{W}";
     public const int Power = 2;
     public const int Toughness = 2;
 

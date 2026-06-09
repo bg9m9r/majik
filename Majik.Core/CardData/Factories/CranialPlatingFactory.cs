@@ -87,7 +87,7 @@ namespace Majik.Core.CardData.Factories;
 public static class CranialPlatingFactory
 {
     public const string CardName = "Cranial Plating";
-    public const string Cost = "{1}";
+    public const string Cost = "{2}";
     public const string EquipCost = "{1}";
     public const string AttachActivationCost = "{B}{B}";
 

@@ -1,7 +1,7 @@
 {
   "name": "Conclave Tribunal",
   "types": ["Enchantment"],
-  "manaCost": "{4}{W}",
+  "manaCost": "{3}{W}",
   "abilities": [
     {
       "kind": "triggered",

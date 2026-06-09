@@ -57,7 +57,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SanguineBondFactory
 {
     public const string CardName = "Sanguine Bond";
-    public const string PrintedManaCost = "{4}{B}{B}";
+    public const string PrintedManaCost = "{3}{B}{B}";
 
     /// <summary>
     /// Construct Sanguine Bond. The lifegain trigger is attached to the

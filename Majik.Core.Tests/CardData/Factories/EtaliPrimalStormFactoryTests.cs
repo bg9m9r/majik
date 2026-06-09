@@ -45,7 +45,7 @@ public class EtaliPrimalStormFactoryTests
         var c = EtaliPrimalStormFactory.Create(_alice);
 
         c.Name.Should().Be("Etali, Primal Storm");
-        c.ManaCost.Should().Be("{4}{R}");
+        c.ManaCost.Should().Be("{4}{R}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         c.HasSubtype(CardSubtype.Elder).Should().BeTrue();

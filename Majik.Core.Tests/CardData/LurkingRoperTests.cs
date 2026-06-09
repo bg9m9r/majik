@@ -34,7 +34,7 @@ public class LurkingRoperTests
         var c = LurkingRoperFactory.Create(_alice);
 
         c.Name.Should().Be("Lurking Roper");
-        c.ManaCost.Should().Be("{3}{B}");
+        c.ManaCost.Should().Be("{2}{G}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.BasePower.Should().Be(4);
         c.BaseToughness.Should().Be(5);

@@ -36,7 +36,7 @@ namespace Majik.Core.CardData.Factories;
 public static class HarbingerOfTheSeasFactory
 {
     public const string CardName = "Harbinger of the Seas";
-    public const string Cost = "{1}{U}";
+    public const string Cost = "{1}{U}{U}";
 
     private static readonly IReadOnlySet<CardSubtype> IslandOnly =
         new HashSet<CardSubtype> { CardSubtype.Island };

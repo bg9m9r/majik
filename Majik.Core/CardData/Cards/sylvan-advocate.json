@@ -2,7 +2,7 @@
   "name": "Sylvan Advocate",
   "types": ["Creature"],
   "subtypes": ["Elf", "Druid", "Ally"],
-  "manaCost": "{2}{G}",
+  "manaCost": "{1}{G}",
   "power": 2,
   "toughness": 3,
   "abilities": []

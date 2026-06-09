@@ -62,7 +62,7 @@ public class SaiMasterThopteristFactoryTests
         var sai = SaiMasterThopteristFactory.Create(_alice);
 
         sai.Name.Should().Be("Sai, Master Thopterist");
-        sai.ManaCost.Should().Be("{1}{U}");
+        sai.ManaCost.Should().Be("{2}{U}");
         sai.HasType(CardType.Creature).Should().BeTrue();
         sai.HasSubtype(CardSubtype.Human).Should().BeTrue();
         sai.HasSubtype(CardSubtype.Artificer).Should().BeTrue();

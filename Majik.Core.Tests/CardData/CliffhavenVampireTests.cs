@@ -44,7 +44,7 @@ public class CliffhavenVampireTests
         var c = CliffhavenVampireFactory.Create(_alice);
 
         c.Name.Should().Be("Cliffhaven Vampire");
-        c.ManaCost.Should().Be("{1}{W}{B}");
+        c.ManaCost.Should().Be("{2}{W}{B}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
         c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();

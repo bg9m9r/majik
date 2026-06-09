@@ -49,7 +49,7 @@ public class ContainmentConstructTests
         var c = ContainmentConstructFactory.Create(_alice);
 
         c.Name.Should().Be("Containment Construct");
-        c.ManaCost.Should().Be("{1}");
+        c.ManaCost.Should().Be("{2}");
         c.HasType(CardType.Creature).Should().BeTrue("Containment Construct is a creature");
         c.HasType(CardType.Artifact).Should().BeTrue("Containment Construct is also an artifact");
         c.HasSubtype(CardSubtype.Construct).Should().BeTrue();

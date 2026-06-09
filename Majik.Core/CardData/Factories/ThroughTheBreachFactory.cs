@@ -73,7 +73,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ThroughTheBreachFactory
 {
     public const string CardName = "Through the Breach";
-    public const string PrintedManaCost = "{2}{R}{R}";
+    public const string PrintedManaCost = "{4}{R}";
 
     /// <summary>Granted keyword. CR 702.10 — Haste.</summary>
     public const string GrantedKeyword = "Haste";
