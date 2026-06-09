@@ -286,52 +286,5 @@ public class PoolWideImplementationAuditTests
     // ---------------------------------------------------------------------
 
     private static ICard MaterializeReal(CardEntity entity)
-    {
-        var parsed = TypeLineParser.Parse(entity.TypeLine);
-        var manaCost = entity.ManaCost ?? "";
-
-        ICard card = PickPrimaryType(parsed.Types) switch
-        {
-            CardType.Creature => new Creature(
-                entity.Name, manaCost,
-                ParseStat(entity.Power), ParseStat(entity.Toughness),
-                parsed.Supertypes, parsed.Subtypes),
-            CardType.Land => new Land(entity.Name, parsed.Supertypes, parsed.Subtypes),
-            CardType.Instant => new Instant(entity.Name, manaCost),
-            CardType.Sorcery => new Sorcery(entity.Name, manaCost),
-            CardType.Enchantment => new Enchantment(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Artifact => new Artifact(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Planeswalker => new Planeswalker(
-                entity.Name, manaCost,
-                startingLoyalty: entity.Loyalty ?? 0,
-                parsed.Supertypes, parsed.Subtypes),
-            _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
-        };
-
-        // CR 202.2c — stamp the printed color indicator so the shell mirrors the
-        // server loader before GameFacade rebinds.
-        if (card is Card concrete)
-        {
-            var colors = CardColors.ParseScryfallColors(entity.Colors);
-            if (colors.Count > 0) concrete.SetColorIndicator(colors);
-        }
-
-        return card;
-    }
-
-    private static CardType? PickPrimaryType(IReadOnlyList<CardType> types)
-    {
-        foreach (var p in new[]
-        {
-            CardType.Creature, CardType.Land, CardType.Instant, CardType.Sorcery,
-            CardType.Enchantment, CardType.Artifact, CardType.Planeswalker,
-        })
-        {
-            if (types.Contains(p)) return p;
-        }
-        return null;
-    }
-
-    private static int ParseStat(string? s)
-        => int.TryParse(s, out var v) ? v : 0;
+        => DeckCardShellBuilder.Build(entity);
 }
