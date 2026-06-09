@@ -119,11 +119,83 @@ internal static class LegalActionEnumerator
         => ManaCost.Parse(card.ManaCost ?? string.Empty).TotalValue;
 
     /// <summary>
-    /// Count of untapped lands (rough mana-available proxy). Matches
-    /// <see cref="Majik.Bot.Heuristic.PriorityPolicy"/>'s UntappedManaSources.
+    /// Total mana available to <paramref name="self"/> RIGHT NOW — the
+    /// correct affordability gate for enumeration-time cast decisions.
+    ///
+    /// <para>Three components (all colour-blind approximations, consistent
+    /// with the existing <see cref="ApproxCmc"/> colour-blind check):</para>
+    /// <list type="number">
+    ///   <item>
+    ///     <description><b>Floating pool</b> — <c>ManaPool.Total</c>:
+    ///     mana already produced by rituals, dorks activated earlier,
+    ///     etc. Available immediately with no further action.</description>
+    ///   </item>
+    ///   <item>
+    ///     <description><b>Untapped mana-source permanents</b> — every
+    ///     untapped permanent whose <see cref="IManaAbility"/> is currently
+    ///     activatable (i.e. <c>CanActivate()</c> returns true, which already
+    ///     gates summoning-sickness for creatures via
+    ///     <c>SummoningSicknessTapGate</c>). This subsumes the old
+    ///     lands-only count and correctly adds mana dorks, mana rocks, and
+    ///     Treasure tokens. The mana counted per source is
+    ///     <c>ability.ManaGenerated.Total</c> clamped to ≥ 1; dynamic
+    ///     generators report <see cref="ManaCost.Zero"/> until activated, so
+    ///     the clamp ensures we never under-count them.</description>
+    ///   </item>
+    /// </list>
+    ///
+    /// <para>Matches the discovery logic in
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> (lines 109–122),
+    /// which also iterates untapped permanents and calls
+    /// <see cref="IManaAbility.CanActivate"/>. This method is called without
+    /// a <c>ContinuousEffectsService</c>, so Blood-Moon / Spreading-Seas
+    /// subtype rewrites are ignored here; that is an acceptable approximation
+    /// for enumeration speed.</para>
     /// </summary>
     internal static int UntappedManaSources(Player self)
-        => self.Zones.Battlefield.GetCards().OfType<Land>().Count(l => !l.IsTapped);
+    {
+        // 1. Floating mana — already available.
+        int total = self.ManaPool.Total;
+
+        // 2. Untapped permanents with an activatable mana ability.
+        //    Mirrors ManaPaymentResolver's candidate scan (lines 109–122):
+        //    iterate battlefield, skip tapped, check IManaAbility.CanActivate().
+        //    CanActivate() internally calls SummoningSicknessTapGate so
+        //    summoning-sick creatures correctly return false here.
+        foreach (var card in self.Zones.Battlefield.GetCards())
+        {
+            if (card is not Permanent perm) continue;
+            if (perm.IsTapped) continue;
+
+            // Use printed abilities directly (no layer service at enum-time —
+            // acceptable approximation; mirrors EffectiveManaAbilities.For
+            // with layers=null which falls back to the same list).
+            var manaAbilities = perm.Abilities.OfType<IManaAbility>().ToList();
+
+            if (manaAbilities.Count == 0)
+            {
+                // Fallback for bare Land instances (e.g. in unit tests) that
+                // have no explicit mana ability attached: any Land can in
+                // principle produce 1 mana. Non-land permanents without a mana
+                // ability produce nothing and are skipped.
+                if (perm is Land)
+                    total += 1;
+                continue;
+            }
+
+            foreach (var ability in manaAbilities)
+            {
+                if (!ability.CanActivate()) continue;
+
+                // ManaGenerated.TotalValue is 0 for dynamic generators (Cabal
+                // Coffers, etc.) until actually activated. Clamp to 1 so
+                // every activatable source contributes at least 1 mana.
+                total += Math.Max(1, ability.ManaGenerated.TotalValue);
+            }
+        }
+
+        return total;
+    }
 
     /// <summary>
     /// Instant-speed cast eligibility — Instants, and Flash permanents
