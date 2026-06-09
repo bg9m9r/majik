@@ -150,6 +150,42 @@ public class SearchStrategyDeterminizationTests
         act.Should().NotThrow("null opponent = perfect-info, no decklist resolution");
     }
 
+    // ── Budget split (pin) ──────────────────────────────────────────────────────
+    // Pins that the determinized per-world Mcts genuinely SPLITS the total budget:
+    // its MaxMillis is the per-world budget (not the full total), and its
+    // MaxIterations is scaled down by the perWorld/total fraction — so K worlds
+    // divide the budget instead of each running a full-budget search. This is the
+    // cheapest guard against regressing the per-world bound back to the full total.
+
+    [Fact]
+    public void DeterminizedConfigFrom_SplitsBudget_PerWorld()
+    {
+        // total=1500, perWorld=400, iterations=200 → expect MaxMillis=400 and
+        // MaxIterations = round(200 * 400/1500) = round(53.3) = 53.
+        var full = new MctsConfig(MaxIterations: 200, MaxMillis: 1500, DepthTurns: 1, ExplorationC: 1.41);
+
+        var perWorld = SearchStrategy.DeterminizedConfigFrom(full, perWorldBudgetMs: 400);
+
+        perWorld.MaxMillis.Should().Be(400,
+            "the per-world Mcts must be bounded to the per-world budget, not the full total");
+        perWorld.MaxIterations.Should().Be(53,
+            "iterations split by the perWorld/total fraction so K worlds divide the iteration budget");
+        // Non-budget knobs are preserved unchanged.
+        perWorld.DepthTurns.Should().Be(full.DepthTurns);
+        perWorld.ExplorationC.Should().Be(full.ExplorationC);
+    }
+
+    [Fact]
+    public void DeterminizedConfigFrom_IterationScale_FloorsAtOne()
+    {
+        // A tiny iteration count must still search at least one iteration per world.
+        var full = new MctsConfig(MaxIterations: 1, MaxMillis: 1500, DepthTurns: 1, ExplorationC: 1.41);
+
+        var perWorld = SearchStrategy.DeterminizedConfigFrom(full, perWorldBudgetMs: 400);
+
+        perWorld.MaxIterations.Should().Be(1, "iteration split is floored at 1");
+    }
+
     // ── PickAttackers ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -199,17 +235,31 @@ public class SearchStrategyDeterminizationTests
         action.Should().NotBeNull();
 
         // Whatever the search picked must reference LIVE objects, not sandbox clones.
+        //
+        // NOTE — we DO NOT assert "not a Pass" here, despite trying to force it.
+        // Verified empirically (during this fix): on this board the MCTS search
+        // returns Pass even when the inner heuristic alone correctly picks the
+        // CastSpell — AND even on a strictly-dominant board (a Burn deck holding a
+        // lethal Shock vs an opponent at 1–2 life with mana up, the unambiguous
+        // best play). The perfect-info path Passes there too. The cause is the
+        // MCTS rollout/sandbox under-crediting a same-step cast at DepthTurns=1
+        // (a search-quality limitation of the sim harness, not the determinized
+        // wiring or the remap — a remap fallback would surface the heuristic's
+        // CastSpell, not Pass). Forcing a non-Pass through this harness is therefore
+        // impractical without a search-quality change out of scope for this budget
+        // fix, so we keep the ref-equality assertion guarded by the action kind:
+        // if the search DOES surface a play, it must point at a LIVE object.
         switch (action)
         {
             case PriorityAction.CastSpell cs:
                 self.Zones.Hand.GetCards().Should().Contain(
                     c => ReferenceEquals(c, cs.Card),
-                    "the cast card must be the live hand card");
+                    "the cast card must be reference-equal to the live hand card");
                 break;
             case PriorityAction.PlayLand pl:
                 self.Zones.Hand.GetCards().Should().Contain(
                     c => ReferenceEquals(c, pl.Land),
-                    "the played land must be the live hand card");
+                    "the played land must be reference-equal to the live hand card");
                 break;
             // Pass / other heuristic-fallback actions are acceptable (still live-safe).
         }

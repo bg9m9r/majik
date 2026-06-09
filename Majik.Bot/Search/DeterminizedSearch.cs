@@ -16,8 +16,12 @@ namespace Majik.Bot.Search;
 /// <para>
 /// K is adaptive: a pure function of the two budget ints (see <see cref="KFor"/>).
 /// There is no wall-clock branching in <see cref="Run"/> itself — the per-world
-/// time budget is conveyed to the <see cref="Mcts"/> via its config by the caller;
-/// here each world runs a full <see cref="Mcts.SearchWithStats"/>.
+/// time budget is conveyed to the <see cref="Mcts"/> via its config by the caller.
+/// The caller MUST pass an <see cref="Mcts"/> bounded to <c>perWorldBudgetMs</c>
+/// (not the full total): each world runs one <see cref="Mcts.SearchWithStats"/>
+/// bounded to per-world, so the K worlds SPLIT the total budget
+/// (total ≈ K × perWorldBudgetMs ≈ the configured total, modulo the K clamp) —
+/// they do NOT each consume the full total.
 /// </para>
 /// </summary>
 internal static class DeterminizedSearch
@@ -43,7 +47,11 @@ internal static class DeterminizedSearch
     /// Searches K independently-sampled worlds of <paramref name="determinizedRoot"/>
     /// and returns the summed-robust-child move.
     /// </summary>
-    /// <param name="mcts">The search engine (its config carries the per-world budget).</param>
+    /// <param name="mcts">
+    /// The search engine. Its <c>MctsConfig</c> MUST be bounded to
+    /// <paramref name="perWorldBudgetMs"/> (not the full total) so the K worlds
+    /// split the total budget instead of each running a full-budget search.
+    /// </param>
     /// <param name="determinizedRoot">
     /// A determinized root — <see cref="SimState.WorldSeed"/> and
     /// <see cref="SimState.OpponentDecklist"/> must both be set. (The perfect-info
