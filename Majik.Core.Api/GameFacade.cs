@@ -976,6 +976,14 @@ public sealed class GameFacade : IDisposable
                 EntersAsCopyBinder.Bind(card, entity, replacements, effects);
                 OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
                 OracleLoyaltyAbilityBinder.Bind(card, entity, controller);
+                // CR 305.7 — additive land-retype static ("Each land is a
+                // [basic] in addition to its other land types"): Urborg, Tomb
+                // of Yawgmoth / Yavimaya, Cradle of Growth. Lands are never
+                // routed through their [CardName] factory (FactoryRouting), so
+                // the factory's effects-aware overload that wires this static
+                // is never reached in prod — this binder wires it against the
+                // live per-game CES + event bus instead.
+                AdditiveLandSubtypeBinder.Bind(card, entity, effects, eventBus);
                 return;
             }
         }
