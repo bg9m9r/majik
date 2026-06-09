@@ -129,7 +129,152 @@ public sealed class DeckStrategyLiftTests
             $"deck={Archetype} iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns}");
     }
 
-    // ── Helper ─────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Controlled lift probe: Belcher mirror, MCTS both seats.
+    /// Seat A = WITH real <see cref="BelcherStrategy"/> (DIRECTIVE atomic kill);
+    /// Seat B = WITH <see cref="NullDeckStrategy"/> (strategy disabled).
+    /// Seeds alternate which seat holds the strategy so seat bias cancels.
+    ///
+    /// <para>
+    /// This is the decisive test of whether DIRECTIVE strategies help on combo
+    /// decks the search cannot pilot: the Charbelcher activation deals ~50
+    /// damage in one resolution — the MCTS search cannot see this line (eval
+    /// does not model "activate artifact = lethal"). The strategy fires the
+    /// activation when it is payable; without it the bot never activates
+    /// Charbelcher.
+    /// </para>
+    ///
+    /// <para>Logs a <c>[LIFT]</c> summary line and a combo-fired count.
+    /// Un-skip + run to measure.</para>
+    /// </summary>
+    [Fact(Skip = "on-demand strength probe — run manually with --filter FullyQualifiedName~DeckStrategyLift to measure Belcher directive atomic-kill strategy lift")]
+    public async Task Belcher_WithStrategy_BeatsWithoutStrategy()
+    {
+        const string BelcherArchetype = "Belcher";
+
+        int withWins = 0, withoutWins = 0, draws = 0, inconclusive = 0;
+        int comboFired = 0;
+
+        for (int i = 0; i < Games; i++)
+        {
+            bool withStrategyIsAlice = i % 2 == 0;
+            int seed = BaseSeed + 100 + i; // distinct seed family from GrixisReanimator probe
+
+            var (outcome, firedThisGame) = await PlayBelcherGame(
+                withStrategyIsAlice: withStrategyIsAlice,
+                seed: seed,
+                gameIndex: i,
+                output: _out);
+
+            if (firedThisGame) comboFired++;
+
+            switch (outcome)
+            {
+                case GameWinner.WithStrategy:    withWins++;     break;
+                case GameWinner.WithoutStrategy: withoutWins++;  break;
+                case GameWinner.Draw:            draws++;        break;
+                case GameWinner.Inconclusive:    inconclusive++; break;
+            }
+
+            _out.WriteLine(
+                $"  game {i,2}: seed={seed} withStrategy={(withStrategyIsAlice ? "Alice" : "Bob")} " +
+                $"result={outcome} comboFiredThisGame={firedThisGame}  " +
+                $"cumulative: with={withWins} without={withoutWins} draw={draws} inconclusive={inconclusive}");
+        }
+
+        int decided = withWins + withoutWins;
+        double winRate = decided > 0 ? (double)withWins / decided : 0.0;
+
+        _out.WriteLine(
+            $"[LIFT] withStrategy {withWins}/{decided} decided ({Games} played, {draws} draws, {inconclusive} inconclusive) " +
+            $"winrate={winRate:P1}  combo-fired(directive-activated)={comboFired} games  " +
+            $"deck={BelcherArchetype} iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns}");
+    }
+
+    // ── Helper — Belcher game ──────────────────────────────────────────────────
+
+    private static async Task<(GameWinner Winner, bool ComboFired)> PlayBelcherGame(
+        bool withStrategyIsAlice,
+        int seed,
+        int gameIndex,
+        ITestOutputHelper output)
+    {
+        const string BelcherArchetype = "Belcher";
+
+        string aliceName = withStrategyIsAlice ? "WithStrategy" : "WithoutStrategy";
+        string bobName   = withStrategyIsAlice ? "WithoutStrategy" : "WithStrategy";
+
+        var facade = GameFacade.Create(
+            aliceName: aliceName,
+            bobName:   bobName,
+            aliceDeck: DeckLoader.LoadReal(BelcherArchetype, Repo),
+            bobDeck:   DeckLoader.LoadReal(BelcherArchetype, Repo),
+            cardRepo:  Repo);
+
+        var mctsConfig = new BotConfig(
+            BelcherArchetype,
+            Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: MctsIterations,
+            MaxMctsBudgetMs: MctsBudgetMs,
+            PrioritySearchEnabled: true);
+
+        var instrumented = new InstrumentedDeckStrategy(new BelcherStrategy());
+        var withStrat    = new SearchStrategy(mctsConfig, deckOverride: instrumented);
+        var withoutStrat = new SearchStrategy(mctsConfig, deckOverride: new NullDeckStrategy());
+
+        Player withStrategyPlayer;
+        Player withoutStrategyPlayer;
+
+        if (withStrategyIsAlice)
+        {
+            facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, withStrat));
+            facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   withoutStrat));
+            withStrategyPlayer    = facade.Alice;
+            withoutStrategyPlayer = facade.Bob;
+        }
+        else
+        {
+            facade.ReplaceAliceAgent(new BotPlayerAgent(facade.Alice, withoutStrat));
+            facade.ReplaceBobAgent(  new BotPlayerAgent(facade.Bob,   withStrat));
+            withStrategyPlayer    = facade.Bob;
+            withoutStrategyPlayer = facade.Alice;
+        }
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+
+        try
+        {
+            await facade.StartFullGameAsync(
+                maxTurns: MaxTurns,
+                ct: cts.Token,
+                rng: new Majik.Core.Random.GameRandom(seed));
+
+            var result = await facade.FullGameTask!;
+
+            GameWinner winner;
+            if (result.Winner == null)
+            {
+                winner = GameWinner.Draw;
+            }
+            else
+            {
+                bool withWon = ReferenceEquals(result.Winner, withStrategyPlayer);
+                winner = withWon ? GameWinner.WithStrategy : GameWinner.WithoutStrategy;
+            }
+
+            return (winner, instrumented.WinLineEverFired);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine(
+                $"  game {gameIndex,2}: INCONCLUSIVE — {ex.GetType().Name}: {ex.Message}");
+            output.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+            return (GameWinner.Inconclusive, instrumented.WinLineEverFired);
+        }
+    }
+
+    // ── Helper — GrixisReanimator game ─────────────────────────────────────────
 
     /// <summary>
     /// Build and run one game. Returns the winner enum plus a flag indicating
