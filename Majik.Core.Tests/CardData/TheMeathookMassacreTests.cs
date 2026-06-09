@@ -101,8 +101,6 @@ public class TheMeathookMassacreTests
 
         var massacre = TheMeathookMassacreFactory.Create(
             _alice,
-            opponentResolver: null,
-            allPlayersResolver: () => new[] { _alice, _bob },
             eventBus: null,
             triggers: null);
 
@@ -117,7 +115,9 @@ public class TheMeathookMassacreTests
         var etbTrigger = triggers.Single(t => t.Condition is EventTriggerCondition<CardMovedEvent>
             && t.IsTriggered(new CardMovedEvent(massacre, ZoneType.Stack, ZoneType.Battlefield)));
 
-        foreach (var e in etbTrigger.Effects) e.Execute();
+        // Resolve through a live game so the ETB sweep reads ALL players'
+        // battlefields off the context (resolver-null bug-class fix).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(etbTrigger, _alice, _alice, _bob);
 
         // Both creatures see -2/-2 — CR 613 Layer 7c.
         bear.Power.Should().Be(0, "Grizzly Bears starts 2/2, gets -2/-2 ⇒ 0/0");
@@ -148,8 +148,6 @@ public class TheMeathookMassacreTests
 
         var massacre = TheMeathookMassacreFactory.Create(
             _alice,
-            opponentResolver: null,
-            allPlayersResolver: () => new[] { _alice },
             eventBus: null,
             triggers: null);
 
@@ -174,8 +172,6 @@ public class TheMeathookMassacreTests
     {
         var massacre = TheMeathookMassacreFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
-            allPlayersResolver: null,
             eventBus: null,
             triggers: null);
 
@@ -205,8 +201,6 @@ public class TheMeathookMassacreTests
     {
         var massacre = TheMeathookMassacreFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
-            allPlayersResolver: null,
             eventBus: null,
             triggers: null);
 
@@ -223,7 +217,8 @@ public class TheMeathookMassacreTests
         var ownDiesTrigger = massacre.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(diesEvent));
 
-        foreach (var e in ownDiesTrigger.Effects) e.Execute();
+        // Resolve through a live game (resolver-null bug-class fix).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(ownDiesTrigger, _alice, _alice, _bob);
 
         _alice.LifeTotal.Should().Be(20, "controller is not drained by their own creature dying");
         _bob.LifeTotal.Should().Be(19, "each opponent loses 1 life when an own-creature dies");
@@ -263,8 +258,6 @@ public class TheMeathookMassacreTests
         // either dies-trigger predicate.
         var massacre = TheMeathookMassacreFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
-            allPlayersResolver: null,
             eventBus: null,
             triggers: null);
 

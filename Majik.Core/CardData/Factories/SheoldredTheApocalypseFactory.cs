@@ -40,27 +40,25 @@ namespace Majik.Core.CardData.Factories;
 public static class SheoldredTheApocalypseFactory
 {
     /// <summary>
-    /// Construct Sheoldred, the Apocalypse with no live bus / trigger-manager
-    /// wiring and no opponent resolver. The draw trigger is attached for
-    /// shape and gains 2 life for the controller on execute; the "each
-    /// opponent loses 2" clause no-ops without a resolver. Suitable for
-    /// shape / dispatcher tests.
+    /// Construct Sheoldred, the Apocalypse. The draw trigger gains 2 life for
+    /// the controller and drains 2 from each opponent, read from the LIVE
+    /// resolution context at resolution (<see cref="ContextOpponents"/>) — so
+    /// the drain is correct on the production routed build (which dispatches
+    /// this single-arg overload and auto-binds the trigger via
+    /// <see cref="TriggerManager.BindCard"/>).
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Sheoldred, the Apocalypse with optional opponent resolver +
-    /// event bus + trigger manager. When <paramref name="opponentResolver"/>
-    /// is supplied, the draw trigger drains 2 life from every player it
-    /// returns (typically every <c>Game.Players</c> entry that isn't the
-    /// controller). When <paramref name="triggers"/> is supplied, the trigger
-    /// is registered so <see cref="CardDrawnEvent"/> for the controller
-    /// places it on the stack automatically.
+    /// Construct Sheoldred, the Apocalypse with an optional event bus +
+    /// trigger manager. When <paramref name="triggers"/> is supplied, the
+    /// trigger is registered so <see cref="CardDrawnEvent"/> for the controller
+    /// places it on the stack automatically. "Each opponent" is always read
+    /// from the live resolution context at resolution.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -92,19 +90,24 @@ public static class SheoldredTheApocalypseFactory
         // CR 603.1: "you" means the controller of the triggered ability).
         // Fires once per drawn card (multiple draws stack — CR 603.2c).
         // ----------------------------------------------------------------
+        // "Each opponent" is read from the LIVE resolution context
+        // (ctx.Game.AllPlayers, filtered to non-controller / not-lost) — NOT a
+        // captured resolver. The production routed build dispatches the
+        // single-arg shape build (resolver-null), so the prior resolver read
+        // made the drain INERT in real games; reading the context fixes it
+        // (mirrors Stormbreath #2540 / Yawgmoth + Priest #2543 / Grist #2549).
         var drainEffect = new Effect(
             "Sheoldred, the Apocalypse: you gain 2 life and each opponent loses 2 life",
-            () =>
+            ctx =>
             {
-                owner.GainLife(2);
+                var controller = card.Controller ?? owner;
+                controller.GainLife(2);
 
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     opp.LoseLife(2);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var drawTrigger = new TriggeredAbility(

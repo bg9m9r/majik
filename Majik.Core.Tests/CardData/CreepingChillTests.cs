@@ -113,8 +113,7 @@ public class CreepingChillTests
             _alice,
             zoneService: zones,
             triggers: triggers,
-            agent: null, // auto-accept the "you may exile"
-            opponentResolver: () => new[] { _bob });
+            agent: null); // auto-accept the "you may exile"
 
         // Mill from library to graveyard via ZoneService so the event fires.
         _alice.Zones.Library.AddCard(card);
@@ -126,7 +125,9 @@ public class CreepingChillTests
 
         triggers.PutPendingTriggersOnStack(activePlayer: _alice);
         var triggerOnStack = (TriggeredAbility)stack.Pop()!;
-        triggerOnStack.Resolve();
+        // Resolve through a live game so the burn reads "each opponent" off the
+        // resolution context (resolver-null bug-class fix).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(triggerOnStack, _alice, _alice, _bob);
 
         card.Zone.Should().Be(ZoneType.Exile,
             "Creeping Chill is exiled when its mill trigger resolves");
@@ -146,8 +147,7 @@ public class CreepingChillTests
             _alice,
             zoneService: zones,
             triggers: triggers,
-            agent: null,
-            opponentResolver: () => new[] { _bob });
+            agent: null);
 
         _alice.Zones.Hand.AddCard(card);
         card.SetZone(ZoneType.Hand);

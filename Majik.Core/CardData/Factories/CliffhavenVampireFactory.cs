@@ -66,18 +66,18 @@ public static class CliffhavenVampireFactory
     /// tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Cliffhaven Vampire. When <paramref name="opponentResolver"/>
-    /// is supplied, the lifegain trigger drains 1 life from every player
-    /// it returns (filtered to non-controller). When <paramref name="triggers"/>
-    /// is supplied, the trigger is registered so a controller-scoped
+    /// Construct Cliffhaven Vampire. When <paramref name="triggers"/> is
+    /// supplied, the trigger is registered so a controller-scoped
     /// <see cref="LifeChangedEvent"/> places it on the stack automatically.
+    /// "Each opponent" is read from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so the drain is correct on the
+    /// production routed build.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -110,16 +110,18 @@ public static class CliffhavenVampireFactory
         // ----------------------------------------------------------------
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses {LifeLossPerOpponent} life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the drain INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opp == null) continue;
-                    if (ReferenceEquals(opp, owner)) continue;
                     opp.LoseLife(LifeLossPerOpponent);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var lifegainTrigger = new TriggeredAbility(

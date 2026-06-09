@@ -65,25 +65,22 @@ public static class GuttersnipeFactory
     /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
     /// Construct Guttersnipe with optional runtime services.
-    /// <paramref name="opponentResolver"/> supplies the player list the
-    /// damage trigger hits (typically every <c>Game.Players</c> entry that
-    /// isn't the controller). <paramref name="triggers"/> registers the
-    /// triggered ability so the bus drives it automatically.
+    /// <paramref name="triggers"/> registers the triggered ability so the bus
+    /// drives it automatically. "Each opponent" is read from the live
+    /// resolution context at resolution (<see cref="ContextOpponents"/>), so the
+    /// damage is correct on the production routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="opponentResolver">Resolves the opponent list at
-    /// resolution time. May be null — the damage side then no-ops.</param>
     /// <param name="eventBus">Reserved for future lifecycle subscribers
     /// (e.g. LTB unregister); not used directly by this factory.</param>
     /// <param name="triggers">TriggerManager for the damage trigger. May be
     /// null — the trigger is still attached to the card shape.</param>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -107,20 +104,21 @@ public static class GuttersnipeFactory
 
         var damageEffect = new Effect(
             $"{CardName}: deal {Damage} damage to each opponent (whenever you cast an instant or sorcery spell)",
-            () =>
+            ctx =>
             {
                 // CR 102.4 — "each opponent" = every other player.
-                // CR 119.3 / 119.8 — damage to a player reduces life total
-                // via Fx.DealDamage → Player.LoseLife. The resolver
-                // typically supplies every Game.Players entry; we still
-                // skip the controller defensively.
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                // CR 119.3 / 119.8 — damage to a player reduces life total via
+                // Fx.DealDamage → Player.LoseLife. "Each opponent" is read from
+                // the LIVE resolution context — NOT a captured resolver, which
+                // was null on the routed prod build and made the damage INERT in
+                // real games (resolver-null bug class; mirrors Stormbreath
+                // #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamage(opp, Damage);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var damageTrigger = new TriggeredAbility(

@@ -73,11 +73,14 @@ public static class CreepingChillFactory
     /// inspection but not bus-driven.
     /// </summary>
     public static Sorcery Create(Player owner) =>
-        Create(owner, zoneService: null, triggers: null, agent: null,
-            opponentResolver: null);
+        Create(owner, zoneService: null, triggers: null, agent: null);
 
     /// <summary>
-    /// Construct Creeping Chill with full runtime wiring.
+    /// Construct Creeping Chill with full runtime wiring. The mill trigger's
+    /// burn reads "each opponent" from the live resolution context at
+    /// resolution (<see cref="ContextOpponents"/>), so it is correct on the
+    /// production routed build (which builds the single-arg shape + auto-binds
+    /// the graveyard-resident trigger via <see cref="TriggerManager.BindCard"/>).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="zoneService">Zone-service for the "exile it" half of
@@ -88,15 +91,11 @@ public static class CreepingChillFactory
     /// <param name="agent">Optional agent for the "you may exile" prompt
     /// (<see cref="BotIntent.LoseLife"/> | <see cref="BotIntent.Heal"/>).
     /// Null → legacy auto-accept.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent"
-    /// for the burn half (mill trigger). Without a resolver the burn half
-    /// no-ops; the life-gain half always fires.</param>
     public static Sorcery Create(
         Player owner,
         ZoneService? zoneService,
         TriggerManager? triggers,
-        IPlayerAgent? agent,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        IPlayerAgent? agent)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -142,7 +141,12 @@ public static class CreepingChillFactory
                 }
 
                 // "If you do" — burn + life-gain only on successful exile.
-                ApplyBurnAndLifeGain(owner, opponentResolver);
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the burn INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                ApplyBurnAndLifeGain(card.Controller ?? owner,
+                    ContextOpponents.Of(ctx, card.Controller ?? owner));
             });
 
         var millCondition = new EventTriggerCondition<CardMovedEvent>((e, _) =>
@@ -181,21 +185,17 @@ public static class CreepingChillFactory
         {
             new Effect(
                 $"{CardName}: deal {Damage} to each opponent + gain {LifeGain} life",
-                () => ApplyBurnAndLifeGain(controller, () => opponents)),
+                () => ApplyBurnAndLifeGain(controller, opponents)),
         };
     }
 
     private static void ApplyBurnAndLifeGain(
-        Player controller, Func<IReadOnlyList<Player>>? opponentResolver)
+        Player controller, IEnumerable<Player> opponents)
     {
-        var opps = opponentResolver?.Invoke();
-        if (opps != null)
+        foreach (var opp in opponents)
         {
-            foreach (var opp in opps)
-            {
-                if (ReferenceEquals(opp, controller)) continue;
-                Fx.DealDamageAny(opp, Damage);
-            }
+            if (ReferenceEquals(opp, controller)) continue;
+            Fx.DealDamageAny(opp, Damage);
         }
 
         Fx.GainLife(controller, LifeGain);

@@ -85,23 +85,23 @@ public static class WarleadersCallFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Enchantment Create(Player owner)
-        => Create(owner, continuousEffects: null, triggers: null, opponentResolver: null);
+        => Create(owner, continuousEffects: null, triggers: null);
 
     /// <summary>
-    /// Construct a fully-wired Warleader's Call.
+    /// Construct a fully-wired Warleader's Call. The ETB-damage trigger reads
+    /// "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="continuousEffects">Layers service to register the
     /// all-creatures anthem (+1/+1) against. May be null — no live bonus.</param>
     /// <param name="triggers">Trigger manager for registration. May be null —
     /// the ETB trigger attaches structurally but is not enrolled.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent" for
-    /// the ETB-damage trigger. Without a resolver the burn half no-ops.</param>
     public static Enchantment Create(
         Player owner,
         ContinuousEffectsService? continuousEffects,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -135,16 +135,18 @@ public static class WarleadersCallFactory
         // ----------------------------------------------------------------
         var damageEffect = new Effect(
             $"{CardName}: deal {EtbDamageAmount} damage to each opponent (a creature you control entered)",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the burn INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamageAny(opp, EtbDamageAmount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var entersTrigger = new TriggeredAbility(

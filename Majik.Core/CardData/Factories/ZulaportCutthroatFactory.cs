@@ -71,26 +71,24 @@ public static class ZulaportCutthroatFactory
     public const int GainAmount = 1;
 
     /// <summary>
-    /// Construct Zulaport Cutthroat with no live runtime services. The
-    /// death-trigger is attached to the card shape but not registered
-    /// with a <see cref="TriggerManager"/>, and no opponent resolver is
-    /// wired (so the opponent-drain side is a no-op while the lifegain
-    /// side still fires). Suitable for shape / dispatcher tests.
+    /// Construct Zulaport Cutthroat. The death-trigger drains 1 life from
+    /// each opponent (read from the LIVE resolution context at resolution via
+    /// <see cref="ContextOpponents"/>) and gains the controller 1 life. On the
+    /// production routed build (which dispatches this single-arg overload and
+    /// auto-binds the trigger via <see cref="TriggerManager.BindCard"/>) the
+    /// drain is correct — it is no longer inert.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
     /// Construct Zulaport Cutthroat with optional runtime services.
-    /// <paramref name="opponentResolver"/> supplies the player list the
-    /// death-trigger drains 1 life from (typically every
-    /// <c>Game.Players</c> entry that isn't the controller).
-    /// <paramref name="triggers"/> registers the triggered ability so
-    /// the bus drives it automatically.
+    /// <paramref name="triggers"/> registers the triggered ability so the bus
+    /// drives it automatically. "Each opponent" is always read from the live
+    /// resolution context at resolution.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -122,20 +120,22 @@ public static class ZulaportCutthroatFactory
             return ReferenceEquals(e.Card.Controller, owner);
         });
 
+        // "Each opponent" is read from the LIVE resolution context
+        // (ctx.Game.AllPlayers, filtered to non-controller / not-lost) — NOT a
+        // captured resolver, which was null on the routed prod build and made
+        // the drain INERT in real games (mirrors Stormbreath #2540 / Yawgmoth +
+        // Priest #2543 / Grist #2549). The lifegain side always fires.
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses 1 life + controller gains 1 life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents != null)
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    foreach (var opp in opponents)
-                    {
-                        if (ReferenceEquals(opp, owner)) continue;
-                        opp.LoseLife(DrainAmount);
-                    }
+                    opp.LoseLife(DrainAmount);
                 }
-                owner.GainLife(GainAmount);
+                controller.GainLife(GainAmount);
+                return ValueTask.CompletedTask;
             });
 
         var diesTrigger = new TriggeredAbility(

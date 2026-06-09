@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -113,7 +114,7 @@ public class DominatorDroneFactoryTests
         _bob.Zones.Library.AddCard(topCard);
         topCard.SetZone(ZoneType.Library);
 
-        var drone = DominatorDroneFactory.Create(_alice, triggers, opponentResolver: null);
+        var drone = DominatorDroneFactory.Create(_alice, triggers);
         _alice.Zones.Battlefield.AddCard(drone);
         drone.SetZone(ZoneType.Battlefield);
 
@@ -142,7 +143,7 @@ public class DominatorDroneFactoryTests
         _bob.Zones.Battlefield.AddCard(blocker);
         blocker.SetZone(ZoneType.Battlefield);
 
-        var drone = DominatorDroneFactory.Create(_alice, triggers, opponentResolver: null);
+        var drone = DominatorDroneFactory.Create(_alice, triggers);
         _alice.Zones.Battlefield.AddCard(drone);
         drone.SetZone(ZoneType.Battlefield);
 
@@ -160,7 +161,7 @@ public class DominatorDroneFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var drone = DominatorDroneFactory.Create(_alice, triggers, opponentResolver: null);
+        var drone = DominatorDroneFactory.Create(_alice, triggers);
         _alice.Zones.Battlefield.AddCard(drone);
         drone.SetZone(ZoneType.Battlefield);
 
@@ -275,23 +276,35 @@ public class DominatorDroneFactoryTests
     [Fact]
     public void Etb_Drain_EachOpponentLosesTwoLife()
     {
-        var drone = DominatorDroneFactory.Create(
-            _alice,
-            triggers: null,
-            opponentResolver: () => new[] { _bob });
+        var drone = DominatorDroneFactory.Create(_alice);
 
         var etb = drone.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.InterveningIf != null);
 
-        // Simulate the drain resolving.
-        foreach (var e in etb.Effects) e.Execute();
+        // Resolve through the live game context (resolver-null bug-class fix).
+        ContextResolve.Resolve(etb, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(18,
             "Dominator Drone's ETB drains 2 life from each opponent");
     }
 
+    /// <summary>PROD-PATH guard (resolver-null bug class).</summary>
     [Fact]
-    public void Etb_Drain_NoResolver_NoOps()
+    public void Etb_Drain_EachOpponentLosesTwoLife_OnProdBuild()
+    {
+        var drone = (Creature)NamedCardFactory.Create("Dominator Drone", _alice);
+
+        var etb = drone.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.InterveningIf != null);
+
+        ContextResolve.Resolve(etb, _alice, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(18,
+            "the prod-built ETB drain reads opponents from the live context (not inert)");
+    }
+
+    [Fact]
+    public void Etb_Drain_NoLiveGame_NoOps()
     {
         var drone = DominatorDroneFactory.Create(_alice);
 
@@ -300,6 +313,6 @@ public class DominatorDroneFactoryTests
 
         foreach (var e in etb.Effects) e.Execute();
 
-        _bob.LifeTotal.Should().Be(20, "no opponent resolver ⇒ drain no-ops");
+        _bob.LifeTotal.Should().Be(20, "no live game ⇒ drain no-ops");
     }
 }

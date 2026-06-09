@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -92,11 +93,7 @@ public class SheoldredTheApocalypseTests
     [Fact]
     public void Sheoldred_ControllerDraws_GainsTwoLifeAndOpponentLosesTwo()
     {
-        var sheoldred = SheoldredTheApocalypseFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var sheoldred = SheoldredTheApocalypseFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(sheoldred);
         sheoldred.SetZone(ZoneType.Battlefield);
@@ -108,10 +105,32 @@ public class SheoldredTheApocalypseTests
         trigger.IsTriggered(draw).Should().BeTrue(
             "Whenever you (controller) draw a card — CR 603.1");
 
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _alice.LifeTotal.Should().Be(22, "Alice gains 2 life on each of her draws");
         _bob.LifeTotal.Should().Be(18, "Bob (the opponent) loses 2 life on each of Alice's draws");
+    }
+
+    /// <summary>
+    /// PROD-PATH guard (resolver-null bug class) — the routed
+    /// <see cref="NamedCardFactory.Create(string, Player)"/> build drains each
+    /// opponent read off the live <see cref="GameContext"/>.
+    /// </summary>
+    [Fact]
+    public void Sheoldred_ControllerDraws_DrainsOpponent_OnProdBuild()
+    {
+        var sheoldred = (Creature)NamedCardFactory.Create("Sheoldred, the Apocalypse", _alice);
+
+        _alice.Zones.Battlefield.AddCard(sheoldred);
+        sheoldred.SetZone(ZoneType.Battlefield);
+
+        var trigger = sheoldred.Abilities.OfType<TriggeredAbility>().Single();
+
+        ResolveWithGame(trigger, _alice, _alice, _bob);
+
+        _alice.LifeTotal.Should().Be(22, "controller gains 2 life");
+        _bob.LifeTotal.Should().Be(18,
+            "the prod-built draw trigger reads opponents from the live context (not inert)");
     }
 
     [Fact]
@@ -119,11 +138,7 @@ public class SheoldredTheApocalypseTests
     {
         // CR 603.2c — the triggered ability fires once per drawn card. Three
         // draws ⇒ three resolutions ⇒ +6 life for Alice / -6 life for Bob.
-        var sheoldred = SheoldredTheApocalypseFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var sheoldred = SheoldredTheApocalypseFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(sheoldred);
         sheoldred.SetZone(ZoneType.Battlefield);
@@ -132,7 +147,7 @@ public class SheoldredTheApocalypseTests
 
         for (var i = 0; i < 3; i++)
         {
-            foreach (var e in trigger.Effects) e.Execute();
+            ResolveWithGame(trigger, _alice, _alice, _bob);
         }
 
         _alice.LifeTotal.Should().Be(26, "three draws ⇒ +6 life");
@@ -145,11 +160,7 @@ public class SheoldredTheApocalypseTests
         // "Whenever you draw a card" — CR 603.1, the trigger condition is
         // scoped to the controller of the ability. Opponent draws must not
         // satisfy IsTriggered.
-        var sheoldred = SheoldredTheApocalypseFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var sheoldred = SheoldredTheApocalypseFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(sheoldred);
         sheoldred.SetZone(ZoneType.Battlefield);
@@ -176,5 +187,19 @@ public class SheoldredTheApocalypseTests
         trigger.ActiveZones.Should().NotContain(ZoneType.Hand,
             "the draw trigger is a battlefield-only ability — CR 113.6");
         trigger.ActiveZones.Should().NotContain(ZoneType.Graveyard);
+    }
+
+    private static void ResolveWithGame(
+        TriggeredAbility trigger, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new EventBus()));
+
+        trigger.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -106,23 +107,43 @@ public class VitoThornOfTheDuskRoseTests
     [Fact]
     public void Vito_ControllerGainsThree_EachOpponentLosesThree()
     {
-        var c = VitoThornOfTheDuskRoseFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var c = VitoThornOfTheDuskRoseFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(c);
         c.SetZone(ZoneType.Battlefield);
 
         // Without a bus the amount slot is empty — stamp manually via the
-        // test hook (shape-only path).
+        // test hook.
         VitoThornOfTheDuskRoseFactory.SetPendingGainAmount(c, 3);
 
         var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(17, "each opponent loses 3 — 'that much'");
+    }
+
+    /// <summary>
+    /// PROD-PATH guard (resolver-null bug class) — the routed
+    /// <see cref="NamedCardFactory.Create(string, Player)"/> build drains each
+    /// opponent read off the live <see cref="GameContext"/>. The amount slot is
+    /// stamped via the test hook (the live engine stamps it via the event bus
+    /// it wires when Vito enters).
+    /// </summary>
+    [Fact]
+    public void Vito_DrainsEachOpponent_OnProdBuild()
+    {
+        var c = (Creature)NamedCardFactory.Create("Vito, Thorn of the Dusk Rose", _alice);
+
+        _alice.Zones.Battlefield.AddCard(c);
+        c.SetZone(ZoneType.Battlefield);
+
+        VitoThornOfTheDuskRoseFactory.SetPendingGainAmount(c, 4);
+
+        var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(16,
+            "the prod-built lifegain trigger reads opponents from the live context (not inert)");
     }
 
     [Fact]
@@ -131,7 +152,6 @@ public class VitoThornOfTheDuskRoseTests
         var bus = new EventBus();
         var c = VitoThornOfTheDuskRoseFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: bus,
             triggers: null);
 
@@ -143,7 +163,7 @@ public class VitoThornOfTheDuskRoseTests
         bus.Publish(new LifeChangedEvent(_alice, 20, 25));
 
         var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(15, "opponent loses 5 — controller gained 5 life");
     }
@@ -151,17 +171,16 @@ public class VitoThornOfTheDuskRoseTests
     [Fact]
     public void Vito_NoAmountStamp_DrainNoOps()
     {
-        var c = VitoThornOfTheDuskRoseFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var c = VitoThornOfTheDuskRoseFactory.Create(_alice);
+
+        _alice.Zones.Battlefield.AddCard(c);
+        c.SetZone(ZoneType.Battlefield);
 
         var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
 
         // No amount stamped — the drain clause must no-op without
         // touching opponent life totals.
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(20);
     }
@@ -174,5 +193,19 @@ public class VitoThornOfTheDuskRoseTests
         var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
         trigger.ActiveZones.Should().NotContain(ZoneType.Graveyard);
+    }
+
+    private static void ResolveWithGame(
+        TriggeredAbility trigger, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new EventBus()));
+
+        trigger.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }
