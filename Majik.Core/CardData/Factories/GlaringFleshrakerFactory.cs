@@ -97,10 +97,13 @@ public static class GlaringFleshrakerFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, zoneService: null, opponentResolver: null);
+        => Create(owner, triggers: null, zoneService: null);
 
     /// <summary>
-    /// Construct a fully-wired Glaring Fleshraker.
+    /// Construct a fully-wired Glaring Fleshraker. The second trigger's burn
+    /// reads "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager for registration. May be null
@@ -109,14 +112,10 @@ public static class GlaringFleshrakerFactory
     /// Spawn token so any "whenever a creature/token enters" trigger fires
     /// (notably the Fleshraker's own second trigger). May be null — raw
     /// zone move performed instead.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent"
-    /// for the second trigger's burn half. Without a resolver the damage
-    /// half no-ops.</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ZoneService? zoneService,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ZoneService? zoneService)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -173,21 +172,19 @@ public static class GlaringFleshrakerFactory
 
         var damageEffect = new Effect(
             $"{CardName}: deal {EtbDamageAmount} damage to each opponent (another colorless creature entered)",
-            () =>
+            ctx =>
             {
-                // CR 119 — damage to a player is life loss. The Player
-                // aggregate exposes no opponents list at v1, so the caller
-                // threads "each opponent" through opponentResolver (shared
-                // with Voldaren Epicure / Creeping Chill). Without a
-                // resolver the burn half no-ops.
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // CR 119 — damage to a player is life loss. "Each opponent" is
+                // read from the LIVE resolution context — NOT a captured
+                // resolver, which was null on the routed prod build and made the
+                // burn INERT in real games (resolver-null bug class; mirrors
+                // Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamageAny(opp, EtbDamageAmount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var entersTrigger = new TriggeredAbility(

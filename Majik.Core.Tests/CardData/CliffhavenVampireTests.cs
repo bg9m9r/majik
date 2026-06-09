@@ -108,7 +108,6 @@ public class CliffhavenVampireTests
     {
         var c = CliffhavenVampireFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: null,
             triggers: null);
 
@@ -117,8 +116,8 @@ public class CliffhavenVampireTests
 
         var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
 
-        // Simulate the trigger resolving (controller gained life).
-        foreach (var e in trigger.Effects) e.Execute();
+        // Resolve through a live game (resolver-null bug-class fix).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19,
             "Cliffhaven Vampire: each opponent loses 1 life when controller gains life");
@@ -130,7 +129,6 @@ public class CliffhavenVampireTests
         // CR 603.2c — the triggered ability fires once per life-gain event.
         var c = CliffhavenVampireFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: null,
             triggers: null);
 
@@ -141,7 +139,7 @@ public class CliffhavenVampireTests
 
         for (var i = 0; i < 4; i++)
         {
-            foreach (var e in trigger.Effects) e.Execute();
+            Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
         }
 
         _bob.LifeTotal.Should().Be(16, "four resolutions ⇒ -4 life for Bob");

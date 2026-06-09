@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -23,9 +24,9 @@ namespace Majik.Core.Tests.CardData;
 ///   control (CR 603.1 + CR 700.4).
 /// - Death trigger does NOT fire for an opponent's creature.
 /// - Death trigger does NOT fire on non-creature permanents dying.
-/// - Drain side: each opponent loses 1 + controller gains 1 (with
-///   resolver).
-/// - Drain side: lifegain still fires without resolver.
+/// - Drain side reads each opponent from the LIVE resolution context
+///   (resolver-null bug class): each opponent loses 1 + controller gains 1,
+///   verified on the PROD build (NamedCardFactory.Create) too.
 /// </summary>
 public class ZulaportCutthroatTests
 {
@@ -63,11 +64,7 @@ public class ZulaportCutthroatTests
     [Fact]
     public void ZulaportCutthroat_OwnCreatureDies_DrainsEachOpponentAndGains()
     {
-        var cutthroat = ZulaportCutthroatFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var cutthroat = ZulaportCutthroatFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(cutthroat);
         cutthroat.SetZone(ZoneType.Battlefield);
@@ -81,20 +78,49 @@ public class ZulaportCutthroatTests
         var trigger = cutthroat.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(diesEvent));
 
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19, "each opponent loses 1 life");
+        _alice.LifeTotal.Should().Be(21, "controller gains 1 life");
+    }
+
+    /// <summary>
+    /// PROD-PATH guard (the resolver-null bug class). The production
+    /// <c>GameFacade</c> routed build dispatches the single-arg
+    /// <see cref="NamedCardFactory.Create(string, Player)"/>; the drain must
+    /// read each opponent off the live <see cref="GameContext"/> the trigger
+    /// threads through <see cref="TriggeredAbility.ResolveAsync"/> — not a
+    /// captured (null) resolver.
+    /// </summary>
+    [Fact]
+    public void ZulaportCutthroat_DrainsEachOpponent_OnProdBuild()
+    {
+        var built = NamedCardFactory.Create("Zulaport Cutthroat", _alice);
+        built.Should().BeOfType<Creature>();
+        var cutthroat = (Creature)built;
+
+        _alice.Zones.Battlefield.AddCard(cutthroat);
+        cutthroat.SetZone(ZoneType.Battlefield);
+
+        var aliceBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        aliceBear.SetOwner(_alice);
+        aliceBear.SetController(_alice);
+
+        var diesEvent = new CardMovedEvent(aliceBear, ZoneType.Battlefield, ZoneType.Graveyard);
+        var trigger = cutthroat.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.IsTriggered(diesEvent));
+
+        ResolveWithGame(trigger, _alice, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(19,
+            "the prod-built dies trigger reads opponents from the live context (not inert)");
         _alice.LifeTotal.Should().Be(21, "controller gains 1 life");
     }
 
     [Fact]
     public void ZulaportCutthroat_OpponentCreatureDies_DoesNotFire()
     {
-        var cutthroat = ZulaportCutthroatFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var cutthroat = ZulaportCutthroatFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(cutthroat);
         cutthroat.SetZone(ZoneType.Battlefield);
@@ -113,11 +139,7 @@ public class ZulaportCutthroatTests
     [Fact]
     public void ZulaportCutthroat_NonCreatureDies_DoesNotFire()
     {
-        var cutthroat = ZulaportCutthroatFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var cutthroat = ZulaportCutthroatFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(cutthroat);
         cutthroat.SetZone(ZoneType.Battlefield);
@@ -136,11 +158,7 @@ public class ZulaportCutthroatTests
     [Fact]
     public void ZulaportCutthroat_NonGraveyardDestination_DoesNotFire()
     {
-        var cutthroat = ZulaportCutthroatFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var cutthroat = ZulaportCutthroatFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(cutthroat);
         cutthroat.SetZone(ZoneType.Battlefield);
@@ -157,7 +175,7 @@ public class ZulaportCutthroatTests
     }
 
     [Fact]
-    public void ZulaportCutthroat_OwnCreatureDies_WithoutResolver_GainsLifeOnly()
+    public void ZulaportCutthroat_OwnCreatureDies_WithoutLiveGame_GainsLifeOnly()
     {
         var cutthroat = ZulaportCutthroatFactory.Create(_alice);
 
@@ -173,9 +191,25 @@ public class ZulaportCutthroatTests
         var trigger = cutthroat.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(diesEvent));
 
+        // No live GameContext → no opponents to read → drain is a safe no-op,
+        // but the lifegain side still fires unconditionally.
         foreach (var e in trigger.Effects) e.Execute();
 
         _alice.LifeTotal.Should().Be(21, "lifegain side fires unconditionally");
-        _bob.LifeTotal.Should().Be(20, "no opponentResolver ⇒ opponent-drain silently no-ops");
+        _bob.LifeTotal.Should().Be(20, "no live game ⇒ opponent-drain silently no-ops");
+    }
+
+    private static void ResolveWithGame(
+        TriggeredAbility trigger, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new EventBus()));
+
+        trigger.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

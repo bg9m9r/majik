@@ -145,7 +145,7 @@ public static class KaitoBaneOfNightmaresFactory
     /// dispatches to.
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, opponentsResolver: null, tapTargetResolver: null,
+        Create(owner, tapTargetResolver: null,
                effects: null, isControllersTurn: null, eventBus: null);
 
     /// <summary>
@@ -162,19 +162,18 @@ public static class KaitoBaneOfNightmaresFactory
     /// LIVE on resolution (CR 114 / 613.7c) instead of being merely structural.
     /// </summary>
     public static Planeswalker Create(Player owner, ContinuousEffectsService effects) =>
-        Create(owner, opponentsResolver: null, tapTargetResolver: null,
+        Create(owner, tapTargetResolver: null,
                effects: effects, isControllersTurn: null, eventBus: null);
 
     /// <summary>
     /// Construct Kaito, Bane of Nightmares.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="opponentsResolver">Returns the opponents of Kaito's
-    /// controller for the 0 ability's "draw a card for each opponent who lost
-    /// life this turn" clause. May be null — the clause draws nothing.</param>
     /// <param name="tapTargetResolver">Returns candidate creatures for the −2.
     /// v1 taps the first creature on the battlefield. May be null — the clause
-    /// no-ops.</param>
+    /// no-ops. DEFERRED (resolver-null on the routed prod build): the −2 needs
+    /// the ITarget / TargetResolver system to pick a live target, same posture
+    /// as Grist's destroy-target deferral.</param>
     /// <param name="effects">When supplied, the "becomes a 3/4 Ninja creature
     /// during your turn while it has loyalty" animation registers its Layer-4
     /// type-grant + Layer-7b P/T continuous effects. May be null — the
@@ -188,7 +187,6 @@ public static class KaitoBaneOfNightmaresFactory
     /// registered bus (if any) is used.</param>
     public static Planeswalker Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentsResolver,
         Func<IReadOnlyList<Permanent>>? tapTargetResolver,
         ContinuousEffectsService? effects,
         Func<bool>? isControllersTurn,
@@ -241,29 +239,36 @@ public static class KaitoBaneOfNightmaresFactory
         // -- 0: Surveil 2. Then draw a card for each opponent who lost life
         //    this turn. ------------------------------------------------------
         // CR 606 + CR 701.42 (surveil) + CR 121 (draw).
-        kaito.AddAbility(new LoyaltyAbility(kaito, ZeroLoyalty, () =>
+        kaito.AddAbility(new LoyaltyAbility(kaito, ZeroLoyalty, new[]
         {
-            var controller = kaito.Controller ?? owner;
-
-            // "Surveil 2" — v1 deterministic decision: keep both peeked cards
-            // on top in their seen order (no graveyard). The peek is published
-            // via the SurveilEvent so an agent / log observes it.
-            var peeked = SurveilAction.Peek(controller, SurveilCount);
-            var decision = new SurveilAction.SurveilDecision(
-                ToGraveyard: Array.Empty<ICard>(),
-                TopOrder: peeked);
-            Fx.Surveil(controller, SurveilCount, decision, eventBus);
-
-            // "Then draw a card for each opponent who lost life this turn."
-            // CR 121 — count opponents whose LifeLostThisTurn > 0 (the same
-            // source of truth Spectacle reads).
-            var opponents = opponentsResolver?.Invoke();
-            if (opponents == null) return;
-            var lostLifeCount = opponents.Count(p => p != null && p.LifeLostThisTurn > 0);
-            if (lostLifeCount > 0)
+            Fx.Inline($"Loyalty 0: surveil {SurveilCount}, draw for each opponent who lost life this turn", rc =>
             {
-                Fx.DrawCards(controller, lostLifeCount);
-            }
+                var controller = kaito.Controller ?? owner;
+
+                // "Surveil 2" — v1 deterministic decision: keep both peeked
+                // cards on top in their seen order (no graveyard). The peek is
+                // published via the SurveilEvent so an agent / log observes it.
+                var peeked = SurveilAction.Peek(controller, SurveilCount);
+                var decision = new SurveilAction.SurveilDecision(
+                    ToGraveyard: Array.Empty<ICard>(),
+                    TopOrder: peeked);
+                Fx.Surveil(controller, SurveilCount, decision, eventBus);
+
+                // "Then draw a card for each opponent who lost life this turn."
+                // CR 121 — count opponents whose LifeLostThisTurn > 0 (the same
+                // source of truth Spectacle reads). "Each opponent" is read from
+                // the LIVE resolution context — NOT a captured resolver, which
+                // was null on the routed prod build and made the draw clause
+                // INERT in real games (resolver-null bug class; mirrors
+                // Stormbreath #2540 / Grist #2549).
+                var lostLifeCount = ContextOpponents.Of(rc, controller)
+                    .Count(p => p.LifeLostThisTurn > 0);
+                if (lostLifeCount > 0)
+                {
+                    Fx.DrawCards(controller, lostLifeCount);
+                }
+                return default;
+            }),
         }));
 
         // -- −2: Tap target creature. Put two stun counters on it. ----------

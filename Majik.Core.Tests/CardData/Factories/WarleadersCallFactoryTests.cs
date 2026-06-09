@@ -55,7 +55,7 @@ public class WarleadersCallFactoryTests
         var bear = MakeCreature("Bear", _alice, svc, 2, 2);
 
         var call = WarleadersCallFactory.Create(
-            _alice, continuousEffects: svc, triggers: null, opponentResolver: null);
+            _alice, continuousEffects: svc, triggers: null);
         call.SetZone(ZoneType.Battlefield);
         call.ActiveEffects = svc;
         _alice.Zones.Battlefield.AddCard(call);
@@ -73,7 +73,7 @@ public class WarleadersCallFactoryTests
         var bobBear = MakeCreature("Bob's Bear", _bob, svc, 2, 2);
 
         var call = WarleadersCallFactory.Create(
-            _alice, continuousEffects: svc, triggers: null, opponentResolver: null);
+            _alice, continuousEffects: svc, triggers: null);
         call.SetZone(ZoneType.Battlefield);
         call.ActiveEffects = svc;
         _alice.Zones.Battlefield.AddCard(call);
@@ -91,7 +91,7 @@ public class WarleadersCallFactoryTests
         var bear = MakeCreature("Bear", _alice, svc, 2, 2);
 
         var call = WarleadersCallFactory.Create(
-            _alice, continuousEffects: svc, triggers: null, opponentResolver: null);
+            _alice, continuousEffects: svc, triggers: null);
         call.SetZone(ZoneType.Battlefield);
         call.ActiveEffects = svc;
         _alice.Zones.Battlefield.AddCard(call);
@@ -121,13 +121,12 @@ public class WarleadersCallFactoryTests
     public void EntersTrigger_DealsOneDamageToEachOpponent()
     {
         var call = WarleadersCallFactory.Create(
-            _alice, continuousEffects: null, triggers: null,
-            opponentResolver: () => new[] { _bob });
+            _alice, continuousEffects: null, triggers: null);
 
         // Drive the trigger's effect directly (matching the Glaring
         // Fleshraker / Voldaren Epicure test posture).
         var entersTrigger = FindEntersTrigger(call);
-        foreach (var e in entersTrigger.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(entersTrigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19,
             "a creature you control entering deals 1 damage to each opponent");
@@ -137,7 +136,7 @@ public class WarleadersCallFactoryTests
     public void EntersTrigger_WithoutResolver_NoOps()
     {
         var call = WarleadersCallFactory.Create(
-            _alice, continuousEffects: null, triggers: null, opponentResolver: null);
+            _alice, continuousEffects: null, triggers: null);
 
         var entersTrigger = FindEntersTrigger(call);
         foreach (var e in entersTrigger.Effects) e.Execute();
@@ -149,8 +148,7 @@ public class WarleadersCallFactoryTests
     public void EntersTrigger_FiresWhenControllersCreatureEnters_ButNotOpponents()
     {
         var call = WarleadersCallFactory.Create(
-            _alice, continuousEffects: null, triggers: null,
-            opponentResolver: () => new[] { _bob });
+            _alice, continuousEffects: null, triggers: null);
         call.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(call);
 

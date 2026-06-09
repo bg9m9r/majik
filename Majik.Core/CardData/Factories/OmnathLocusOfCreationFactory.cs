@@ -82,25 +82,19 @@ public static class OmnathLocusOfCreationFactory
     /// </summary>
     public static Creature Create(Player owner) =>
         Create(owner,
-            opponentResolver: null,
-            foreignPlaneswalkerResolver: null,
             eventBus: null,
             triggers: null);
 
     /// <summary>
-    /// Construct Omnath fully wired. <paramref name="opponentResolver"/>
-    /// supplies "each opponent" for the 3rd-resolution damage clause.
-    /// <paramref name="foreignPlaneswalkerResolver"/> supplies "each
-    /// planeswalker you don't control" (typically every planeswalker on
-    /// the battlefield whose controller != Omnath's controller).
-    /// <paramref name="eventBus"/> drives the per-turn counter reset.
-    /// <paramref name="triggers"/> registers both abilities so live bus
-    /// events queue them.
+    /// Construct Omnath fully wired. <paramref name="eventBus"/> drives the
+    /// per-turn counter reset. <paramref name="triggers"/> registers both
+    /// abilities so live bus events queue them. "Each opponent" and "each
+    /// planeswalker you don't control" are read from the live resolution
+    /// context at resolution (<see cref="ContextOpponents"/>), so the
+    /// 3rd-landfall damage is correct on the production routed build.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
-        Func<IReadOnlyList<Planeswalker>>? foreignPlaneswalkerResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -143,54 +137,54 @@ public static class OmnathLocusOfCreationFactory
 
         var landfallEffect = new Effect(
             $"{CardName}: landfall — 1st gains 4 life, 2nd adds {{R}}{{G}}{{W}}{{U}}, 3rd deals 4 to each opp + foreign planeswalker",
-            () =>
+            ctx =>
             {
                 landfallResolutionsThisTurn[0]++;
                 var n = landfallResolutionsThisTurn[0];
+                var controller = card.Controller ?? owner;
 
                 if (n == 1)
                 {
-                    Fx.GainLife(owner, FirstLandfallLifeGain);
-                    return;
+                    Fx.GainLife(controller, FirstLandfallLifeGain);
+                    return ValueTask.CompletedTask;
                 }
 
                 if (n == 2)
                 {
                     // CR 106.4 — mana goes into the pool. Each pip is
                     // a single coloured mana; produce {R}{G}{W}{U}.
-                    owner.AddManaToPool(ManaCost.Parse(SecondLandfallManaProduced));
-                    return;
+                    controller.AddManaToPool(ManaCost.Parse(SecondLandfallManaProduced));
+                    return ValueTask.CompletedTask;
                 }
 
                 if (n == 3)
                 {
                     // CR 119 — damage to each opponent (player) + each
-                    // planeswalker the controller doesn't control.
-                    var opponents = opponentResolver?.Invoke();
-                    if (opponents is not null)
+                    // planeswalker the controller doesn't control. Both are
+                    // read from the LIVE resolution context — NOT captured
+                    // resolvers, which were null on the routed prod build and
+                    // made the 3rd-landfall burn INERT in real games
+                    // (resolver-null bug class; mirrors Stormbreath #2540 /
+                    // Grist #2549).
+                    foreach (var opp in ContextOpponents.Of(ctx, controller))
                     {
-                        foreach (var opp in opponents)
-                        {
-                            if (ReferenceEquals(opp, owner)) continue;
-                            Fx.DealDamageAny(opp, ThirdLandfallDamage);
-                        }
-                    }
+                        Fx.DealDamageAny(opp, ThirdLandfallDamage);
 
-                    var foreignPws = foreignPlaneswalkerResolver?.Invoke();
-                    if (foreignPws is not null)
-                    {
-                        foreach (var pw in foreignPws)
+                        // "each planeswalker you don't control" — every
+                        // planeswalker an opponent controls on the battlefield.
+                        foreach (var pw in opp.Zones.Battlefield.GetCards()
+                            .OfType<Planeswalker>())
                         {
-                            if (ReferenceEquals(pw.Controller, owner)) continue;
                             Fx.DealDamageAny(pw, ThirdLandfallDamage);
                         }
                     }
-                    return;
+                    return ValueTask.CompletedTask;
                 }
 
                 // n >= 4: no further effect this turn — CR 603.10. The
                 // counter keeps incrementing only so the predicate stays
                 // observable; the cap is implicit in the if-cascade.
+                return ValueTask.CompletedTask;
             });
 
         var landfallTrigger = new TriggeredAbility(

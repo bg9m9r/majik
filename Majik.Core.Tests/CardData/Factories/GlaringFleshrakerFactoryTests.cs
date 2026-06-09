@@ -76,7 +76,7 @@ public class GlaringFleshrakerFactoryTests
         var triggers = new TriggerManager(new Majik.Core.Stack.Stack(), bus);
 
         var card = GlaringFleshrakerFactory.Create(
-            _alice, triggers, zones, opponentResolver: () => new[] { _bob });
+            _alice, triggers, zones);
 
         var castTrigger = FindCastColorlessTrigger(card);
         foreach (var e in castTrigger.Effects) e.Execute();
@@ -104,14 +104,13 @@ public class GlaringFleshrakerFactoryTests
     public void EntersTrigger_DealsOneDamageToEachOpponent_WhenAnotherColorlessCreatureEnters()
     {
         var card = GlaringFleshrakerFactory.Create(
-            _alice, triggers: null, zoneService: null,
-            opponentResolver: () => new[] { _bob });
+            _alice, triggers: null, zoneService: null);
 
         // Directly execute the enters-trigger effect (matching the Voldaren
         // Epicure test posture — drive the closure independently of the
         // priority / stack drain).
         var entersTrigger = FindColorlessEntersTrigger(card);
-        foreach (var e in entersTrigger.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(entersTrigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19,
             "another colorless creature entering deals 1 damage to each opponent");
@@ -121,7 +120,7 @@ public class GlaringFleshrakerFactoryTests
     public void EntersTrigger_WithoutResolver_NoOps()
     {
         var card = GlaringFleshrakerFactory.Create(
-            _alice, triggers: null, zoneService: null, opponentResolver: null);
+            _alice, triggers: null, zoneService: null);
 
         var entersTrigger = FindColorlessEntersTrigger(card);
         foreach (var e in entersTrigger.Effects) e.Execute();

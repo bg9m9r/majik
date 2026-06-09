@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -67,11 +68,7 @@ public class CruelCelebrantTests
     [Fact]
     public void CruelCelebrant_OwnCreatureDies_DrainsAndGains()
     {
-        var celebrant = CruelCelebrantFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var celebrant = CruelCelebrantFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(celebrant);
         celebrant.SetZone(ZoneType.Battlefield);
@@ -86,10 +83,39 @@ public class CruelCelebrantTests
         var trigger = celebrant.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(diesEvent));
 
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19, "each opponent loses 1 life");
         _alice.LifeTotal.Should().Be(21, "controller gains 1 life");
+    }
+
+    /// <summary>
+    /// PROD-PATH guard (resolver-null bug class) — the routed
+    /// <see cref="NamedCardFactory.Create(string, Player)"/> build drains each
+    /// opponent read off the live <see cref="GameContext"/>.
+    /// </summary>
+    [Fact]
+    public void CruelCelebrant_DrainsEachOpponent_OnProdBuild()
+    {
+        var built = NamedCardFactory.Create("Cruel Celebrant", _alice);
+        var celebrant = (Creature)built;
+
+        _alice.Zones.Battlefield.AddCard(celebrant);
+        celebrant.SetZone(ZoneType.Battlefield);
+
+        var aliceBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        aliceBear.SetOwner(_alice);
+        aliceBear.SetController(_alice);
+
+        var diesEvent = new CardMovedEvent(aliceBear, ZoneType.Battlefield, ZoneType.Graveyard);
+        var trigger = celebrant.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.IsTriggered(diesEvent));
+
+        ResolveWithGame(trigger, _alice, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(19,
+            "the prod-built dies trigger reads opponents from the live context (not inert)");
+        _alice.LifeTotal.Should().Be(21);
     }
 
     [Fact]
@@ -99,11 +125,7 @@ public class CruelCelebrantTests
         // is put into a graveyard" but the printed text bundles them
         // together for trigger purposes. The condition fires on a
         // controlled planeswalker moving Battlefield → Graveyard.
-        var celebrant = CruelCelebrantFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var celebrant = CruelCelebrantFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(celebrant);
         celebrant.SetZone(ZoneType.Battlefield);
@@ -119,7 +141,7 @@ public class CruelCelebrantTests
         trigger.IsTriggered(diesEvent).Should().BeTrue(
             "the printed 'creature or planeswalker you control dies' union covers planeswalkers");
 
-        foreach (var e in trigger.Effects) e.Execute();
+        ResolveWithGame(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
         _alice.LifeTotal.Should().Be(21);
@@ -128,11 +150,7 @@ public class CruelCelebrantTests
     [Fact]
     public void CruelCelebrant_OpponentCreatureDies_DoesNotFire()
     {
-        var celebrant = CruelCelebrantFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var celebrant = CruelCelebrantFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(celebrant);
         celebrant.SetZone(ZoneType.Battlefield);
@@ -152,11 +170,7 @@ public class CruelCelebrantTests
     [Fact]
     public void CruelCelebrant_NonCreatureNonPlaneswalkerDies_DoesNotFire()
     {
-        var celebrant = CruelCelebrantFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var celebrant = CruelCelebrantFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(celebrant);
         celebrant.SetZone(ZoneType.Battlefield);
@@ -177,11 +191,7 @@ public class CruelCelebrantTests
     [Fact]
     public void CruelCelebrant_NonGraveyardDestination_DoesNotFire()
     {
-        var celebrant = CruelCelebrantFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null);
+        var celebrant = CruelCelebrantFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(celebrant);
         celebrant.SetZone(ZoneType.Battlefield);
@@ -200,13 +210,11 @@ public class CruelCelebrantTests
     }
 
     [Fact]
-    public void CruelCelebrant_OwnCreatureDies_WithoutResolver_GainsLifeOnly()
+    public void CruelCelebrant_OwnCreatureDies_WithoutLiveGame_GainsLifeOnly()
     {
-        // Single-arg dispatcher path — no opponentResolver wired. The
-        // opponent-drain side silently no-ops but the controller's
-        // lifegain still fires (Celebrant's lifegain side is
-        // unconditional on the resolver). Mirrors Sheoldred / Meathook's
-        // resolver convention but with the lifegain split out.
+        // No live GameContext → no opponents to read. The opponent-drain side
+        // silently no-ops but the controller's lifegain still fires (Celebrant's
+        // lifegain side is unconditional).
         var celebrant = CruelCelebrantFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(celebrant);
@@ -224,6 +232,20 @@ public class CruelCelebrantTests
         foreach (var e in trigger.Effects) e.Execute();
 
         _alice.LifeTotal.Should().Be(21, "lifegain side fires unconditionally on resolution");
-        _bob.LifeTotal.Should().Be(20, "no opponentResolver ⇒ opponent-drain silently no-ops");
+        _bob.LifeTotal.Should().Be(20, "no live game ⇒ opponent-drain silently no-ops");
+    }
+
+    private static void ResolveWithGame(
+        TriggeredAbility trigger, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new EventBus()));
+
+        trigger.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

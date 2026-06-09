@@ -78,23 +78,20 @@ public static class TheMeathookMassacreFactory
     /// dispatcher tests.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, opponentResolver: null, allPlayersResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
     /// Construct The Meathook Massacre with optional runtime services.
-    /// <paramref name="opponentResolver"/> supplies the player list the
-    /// own-creature dies trigger drains 1 life from (typically every
-    /// <c>Game.Players</c> entry that isn't the controller).
-    /// <paramref name="allPlayersResolver"/> widens the ETB sweep to
-    /// every player's battlefield; without it the sweep scans only the
-    /// controller's battlefield (same convention as Pernicious Deed).
-    /// <paramref name="triggers"/> registers all three triggered
-    /// abilities so the bus drives them automatically.
+    /// <paramref name="triggers"/> registers all three triggered abilities so
+    /// the bus drives them automatically. The ETB sweep (all players' creatures)
+    /// and the own-creature-dies drain (each opponent) both read the live game
+    /// off the resolution context at resolution (<see cref="ContextOpponents"/>
+    /// / <c>rc.Game.AllPlayers</c>), so they are correct on the production
+    /// routed build — the ETB sweep no longer silently scans only the
+    /// controller's battlefield, and the drain is no longer inert.
     /// </summary>
     public static Enchantment Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -124,14 +121,20 @@ public static class TheMeathookMassacreFactory
         // ----------------------------------------------------------------
         var etbSweepEffect = new Effect(
             "The Meathook Massacre — all creatures get -X/-X until end of turn",
-            () =>
+            rc =>
             {
                 var x = card.PendingCastX ?? 0;
                 card.ClearPendingCastX();
-                if (x <= 0) return;
+                if (x <= 0) return ValueTask.CompletedTask;
 
-                var players = allPlayersResolver?.Invoke()
-                    ?? (IReadOnlyList<Player>)new[] { owner };
+                // "ALL creatures" — every player's battlefield, read from the
+                // LIVE resolution context. Previously a captured
+                // allPlayersResolver (null on the routed prod build) made the
+                // sweep silently scan ONLY the controller's creatures
+                // (resolver-null bug class). Fall back to controller-only when
+                // no live game is available (shape path).
+                var players = rc.Game?.AllPlayers
+                    ?? (IReadOnlyList<Player>)new[] { card.Controller ?? owner };
 
                 foreach (var p in players)
                 {
@@ -143,6 +146,7 @@ public static class TheMeathookMassacreFactory
                         }
                     }
                 }
+                return ValueTask.CompletedTask;
             });
 
         var etbTrigger = new TriggeredAbility(
@@ -208,15 +212,18 @@ public static class TheMeathookMassacreFactory
 
         var ownDiesEffect = new Effect(
             "The Meathook Massacre — each opponent loses 1 life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the drain INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     opp.LoseLife(1);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var ownDiesTrigger = new TriggeredAbility(

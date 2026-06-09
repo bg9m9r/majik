@@ -76,10 +76,13 @@ public static class VoldarenEpicureFactory
     /// and the damage half no-ops at resolution (no opponent resolver).
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null, zoneService: null, opponentResolver: null);
+        Create(owner, triggers: null, zoneService: null);
 
     /// <summary>
-    /// Construct Voldaren Epicure with full runtime wiring.
+    /// Construct Voldaren Epicure with full runtime wiring. The ETB burn reads
+    /// "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager for ETB registration. May be
@@ -88,14 +91,10 @@ public static class VoldarenEpicureFactory
     /// <see cref="TokenFactory.CreateBlood"/> when seating the token so any
     /// token-enters trigger fires. May be null — raw zone move performed
     /// instead.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent"
-    /// for the burn half. Without a resolver the damage half no-ops; the
-    /// Blood-creation half always fires.</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ZoneService? zoneService,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ZoneService? zoneService)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -120,24 +119,22 @@ public static class VoldarenEpicureFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: deal {EtbDamageAmount} to each opponent + create a Blood token",
-            () =>
+            ctx =>
             {
                 // Clause 1 — "deals 1 damage to each opponent".
-                // CR 119 — life loss / damage to each opponent. The Epicure
-                // is the source (printed "it deals 1 damage"), so any
-                // damage-source-watching trigger (e.g. lifelink on a future
-                // grant) should observe the Epicure as the source — but the
-                // current Fx.DealDamageAny target-side helper doesn't yet
-                // thread the source through, matching Creeping Chill's
-                // shape (deferred at the primitive level).
-                var opponents = opponentResolver?.Invoke();
-                if (opponents != null)
+                // CR 119 — life loss / damage to each opponent. "Each opponent"
+                // is read from the LIVE resolution context — NOT a captured
+                // resolver, which was null on the routed prod build and made the
+                // burn INERT in real games (resolver-null bug class; mirrors
+                // Stormbreath #2540 / Grist #2549). The Epicure is the source
+                // (printed "it deals 1 damage"), but the current Fx.DealDamageAny
+                // target-side helper doesn't yet thread the source through,
+                // matching Creeping Chill's shape (deferred at the primitive
+                // level).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    foreach (var opp in opponents)
-                    {
-                        if (ReferenceEquals(opp, owner)) continue;
-                        Fx.DealDamageAny(opp, EtbDamageAmount);
-                    }
+                    Fx.DealDamageAny(opp, EtbDamageAmount);
                 }
 
                 // Clause 2 — "you create a Blood token". CR 111.10 —
@@ -145,7 +142,8 @@ public static class VoldarenEpicureFactory
                 // CreateBlood handles the sentinel-library → battlefield
                 // pattern so any "whenever a token enters" trigger
                 // (Academy Manufactor, etc.) observes the move.
-                TokenFactory.CreateBlood(owner, zoneService);
+                TokenFactory.CreateBlood(controller, zoneService);
+                return ValueTask.CompletedTask;
             });
 
         var etbTrigger = new TriggeredAbility(

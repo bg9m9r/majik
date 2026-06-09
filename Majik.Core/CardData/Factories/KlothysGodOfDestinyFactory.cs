@@ -151,27 +151,13 @@ public static class KlothysGodOfDestinyFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, effects: null, opponentsResolver: null);
+        => Create(owner, triggers: null, effects: null);
 
     /// <summary>
-    /// Construct Klothys with an opponents resolver for the nonland-branch
-    /// burn but no trigger registration / devotion type-strip. Convenience
-    /// overload for trigger-resolution tests.
-    /// </summary>
-    public static Creature Create(Player owner, Func<IReadOnlyList<Player>>? opponentsResolver)
-        => Create(owner, triggers: null, effects: null, opponentsResolver);
-
-    /// <summary>
-    /// Construct Klothys with the first-main-phase trigger registered
-    /// against <paramref name="triggers"/> (when supplied) and the Layer-4
-    /// devotion type-strip registered against <paramref name="effects"/>
-    /// (when supplied).
-    /// </summary>
-    public static Creature Create(Player owner, TriggerManager? triggers, ContinuousEffectsService? effects)
-        => Create(owner, triggers, effects, opponentsResolver: null);
-
-    /// <summary>
-    /// Construct a fully-wired Klothys, God of Destiny.
+    /// Construct a fully-wired Klothys, God of Destiny. The nonland-branch burn
+    /// reads "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">When supplied, the first-main-phase
@@ -182,14 +168,10 @@ public static class KlothysGodOfDestinyFactory
     /// <c>ComputeDevotionToRedAndGreen(controller) &lt; 7</c> (CR 205.2 /
     /// 613.1d). The service is also stamped onto Klothys's
     /// <see cref="Creature.ActiveEffects"/>.</param>
-    /// <param name="opponentsResolver">Live opponents list used by the
-    /// nonland-branch burn at resolve time. Pass null — the burn then finds
-    /// no opponents (defensive no-op).</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ContinuousEffectsService? effects,
-        Func<IReadOnlyList<Player>>? opponentsResolver)
+        ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -217,14 +199,14 @@ public static class KlothysGodOfDestinyFactory
         TriggeredAbility? trigger = null;
         var triggerEffect = new Effect(
             $"{CardName}: exile target graveyard card; land -> add {{R}}/{{G}}, else gain {LifeGain} life + {DamageToEachOpponent} to each opponent",
-            () =>
+            ctx =>
             {
-                if (trigger == null) return;
+                if (trigger == null) return ValueTask.CompletedTask;
                 var chosen = trigger.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (chosen.Count == 0 || chosen[0].Count == 0) return ValueTask.CompletedTask;
 
-                if (chosen[0][0] is not ICard target) return;
-                if (target.Zone != ZoneType.Graveyard) return; // CR 608.2b
+                if (chosen[0][0] is not ICard target) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask; // CR 608.2b
 
                 var wasLand = target.HasType(CardType.Land);
 
@@ -244,16 +226,17 @@ public static class KlothysGodOfDestinyFactory
                     // CR 119.3 — you gain 2 life.
                     Fx.GainLife(controller, LifeGain);
 
-                    // CR 119 — Klothys deals 2 damage to each opponent.
-                    var opponents = opponentsResolver?.Invoke();
-                    if (opponents == null) return;
-                    foreach (var opp in opponents)
+                    // CR 119 — Klothys deals 2 damage to each opponent. "Each
+                    // opponent" is read from the LIVE resolution context — NOT
+                    // a captured resolver, which was null on the routed prod
+                    // build and made the burn INERT in real games (resolver-null
+                    // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                    foreach (var opp in ContextOpponents.Of(ctx, controller))
                     {
-                        if (ReferenceEquals(opp, controller)) continue; // defensive
-                        if (opp.HasLost) continue;
                         Fx.DealDamageAny(opp, DamageToEachOpponent);
                     }
                 }
+                return ValueTask.CompletedTask;
             });
 
         trigger = new TriggeredAbility(

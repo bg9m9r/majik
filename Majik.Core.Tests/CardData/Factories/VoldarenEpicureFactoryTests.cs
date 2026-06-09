@@ -70,8 +70,7 @@ public class VoldarenEpicureFactoryTests
         var card = VoldarenEpicureFactory.Create(
             _alice,
             triggers,
-            zones,
-            opponentResolver: () => new[] { _bob });
+            zones);
 
         // Seat the Epicure so subsequent zone-targeted effects observe it
         // on the battlefield (token creation moves a different card; the
@@ -84,7 +83,7 @@ public class VoldarenEpicureFactoryTests
         // Neonate / Bloodghast tests that drive the effect closure
         // independently of priority / stack mechanics.
         var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in trigger.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         // Burn half — Bob lost 1 life (CR 119.3 — damage to a player is
         // life loss).
@@ -112,8 +111,7 @@ public class VoldarenEpicureFactoryTests
         var card = VoldarenEpicureFactory.Create(
             _alice,
             triggers,
-            zones,
-            opponentResolver: null);
+            zones);
 
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);

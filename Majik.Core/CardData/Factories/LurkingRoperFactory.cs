@@ -54,22 +54,21 @@ public static class LurkingRoperFactory
     /// targets. Suitable for shape / dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null, opponentResolver: null);
+        Create(owner, triggers: null);
 
     /// <summary>
-    /// Construct Lurking Roper with optional runtime wiring.
+    /// Construct Lurking Roper with optional runtime wiring. The ETB mill
+    /// reads "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager to register the ETB
     /// mill trigger against. May be null — the trigger is still
     /// attached structurally.</param>
-    /// <param name="opponentResolver">Live enumerator of "each
-    /// opponent" for the mill half. Without a resolver the mill
-    /// silently no-ops (same posture as Creeping Chill).</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -97,15 +96,18 @@ public static class LurkingRoperFactory
 
         var etbEffect = new Effect(
             $"{CardName}: each opponent mills {MillAmount}",
-            () =>
+            ctx =>
             {
-                var opps = opponentResolver?.Invoke();
-                if (opps == null) return;
-                foreach (var opp in opps)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the mill INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     MillAction.Apply(opp, MillAmount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var etbTrigger = new TriggeredAbility(

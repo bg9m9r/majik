@@ -69,25 +69,23 @@ public static class ElectrostaticFieldFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null, opponentResolver: null);
+        Create(owner, triggers: null);
 
     /// <summary>
-    /// Construct Electrostatic Field with optional TriggerManager + opponent
-    /// resolver. When <paramref name="triggers"/> is supplied the cast
-    /// trigger is registered so a matching <see cref="SpellCastEvent"/>
-    /// (an instant or sorcery cast by the controller) queues the
-    /// 1-damage-to-each-opponent effect on the stack.
+    /// Construct Electrostatic Field with an optional TriggerManager. When
+    /// <paramref name="triggers"/> is supplied the cast trigger is registered
+    /// so a matching <see cref="SpellCastEvent"/> (an instant or sorcery cast
+    /// by the controller) queues the 1-damage-to-each-opponent effect on the
+    /// stack. "Each opponent" is read from the live resolution context at
+    /// resolution (<see cref="ContextOpponents"/>), so the damage is correct on
+    /// the production routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">TriggerManager for the cast trigger. May be
     /// null — the trigger is still attached to the card shape.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent" for
-    /// the damage half. Without a resolver the damage half no-ops; the
-    /// trigger still fires.</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -119,22 +117,21 @@ public static class ElectrostaticFieldFactory
 
         var damageEffect = new Effect(
             $"{CardName}: deal {DamageAmount} damage to each opponent (whenever you cast an instant or sorcery spell)",
-            () =>
+            ctx =>
             {
                 // CR 800.4 — iterate every opponent and deal 1 damage.
                 // CR 119.3 — damage to a player reduces their life total;
                 // Fx.DealDamage routes Player → Player.LoseLife (CR 119.8).
-                // Without a resolver the player aggregate exposes no opponents
-                // list at v1, so the damage half no-ops (same posture as
-                // Voldaren Epicure / Sizzle).
-                var opponents = opponentResolver?.Invoke();
-                if (opponents is null) return;
-
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the damage INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, card.Controller ?? owner)) continue;
                     Fx.DealDamage(opp, DamageAmount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var trigger = new TriggeredAbility(

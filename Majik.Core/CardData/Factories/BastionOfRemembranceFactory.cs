@@ -88,20 +88,19 @@ public static class BastionOfRemembranceFactory
     /// lifegain side still fires). Suitable for shape / dispatcher tests.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null, zoneService: null);
+        Create(owner, eventBus: null, triggers: null, zoneService: null);
 
     /// <summary>
     /// Construct Bastion of Remembrance with optional runtime services.
-    /// <paramref name="opponentResolver"/> supplies the player list the
-    /// death-trigger drains 1 life from (typically every
-    /// <c>Game.Players</c> entry that isn't the controller).
     /// <paramref name="triggers"/> registers both triggered abilities so
     /// the bus drives them automatically. <paramref name="zoneService"/>
-    /// threads CardMovedEvent through the ETB token spawn.
+    /// threads CardMovedEvent through the ETB token spawn. "Each opponent"
+    /// is read from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so the drain is correct on the
+    /// production routed build.
     /// </summary>
     public static Enchantment Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers,
         ZoneService? zoneService)
@@ -148,18 +147,20 @@ public static class BastionOfRemembranceFactory
 
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses 1 life + controller gains 1 life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents != null)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the drain INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549). The
+                // lifegain side always fires.
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    foreach (var opp in opponents)
-                    {
-                        if (ReferenceEquals(opp, owner)) continue;
-                        opp.LoseLife(DrainAmount);
-                    }
+                    opp.LoseLife(DrainAmount);
                 }
-                owner.GainLife(GainAmount);
+                controller.GainLife(GainAmount);
+                return ValueTask.CompletedTask;
             });
 
         var diesTrigger = new TriggeredAbility(
