@@ -74,6 +74,32 @@ internal static class LegalActionEnumerator
                 if (ApproxCmc(card) <= manaAvailable)
                     result.Add(new PriorityAction.CastSpell(card, Array.Empty<object>()));
             }
+
+            // CR 118.9 — cast-from-exile runtime grants (madness / Ragavan /
+            // foretell / impulse). A card in our EXILE zone carrying a
+            // RuntimeExileCast grant that nominates US is a legal cast at the
+            // granted cost via ExileCastAlternativeCost. The live priority loop
+            // surfaces these for human / remote agents; without this loop the
+            // search bot is blind to them. Mirror the hand-cast gates: instant
+            // vs. sorcery speed and colour-blind affordability.
+            foreach (var card in self.Zones.Exile.GetCards())
+            {
+                if (card is not Card c) continue;
+                if (!ReferenceEquals(c.RuntimeExileCastAllowedCaster, self)) continue;
+                if (c.RuntimeExileCastCost is not { } exileCost) continue;
+                if (c is Land) continue;
+
+                var instantSpeed = IsInstantSpeed(c);
+                if (!instantSpeed && !sorceryWindow) continue;
+
+                if (exileCost.TotalValue > manaAvailable) continue;
+
+                result.Add(new PriorityAction.CastSpell(
+                    card,
+                    Array.Empty<object>(),
+                    AlternativeCost: new Majik.Core.Costs.ExileCastAlternativeCost(
+                        $"Cast {c.Name} from exile ({exileCost})", exileCost)));
+            }
         }
 
         // CR 602 — activated abilities of permanents the player controls.
