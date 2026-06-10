@@ -151,6 +151,98 @@ public class PriorityKindsTests
         PriorityKinds.IsPassOnly(kinds).Should().BeTrue();
     }
 
+    private Planeswalker GristOnBattlefield(int loyalty, params int[] loyaltyChanges)
+    {
+        var grist = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", loyalty);
+        grist.SetOwner(_alice);
+        grist.SetController(_alice);
+        foreach (var change in loyaltyChanges)
+        {
+            grist.AddAbility(new LoyaltyAbility(grist, change, () => { }));
+        }
+        _alice.Zones.Battlefield.AddCard(grist);
+        grist.SetZone(ZoneType.Battlefield);
+        return grist;
+    }
+
+    [Fact]
+    public void LoyaltyAbility_SorceryWindow_Payable_OffersLoyaltyKind()
+    {
+        // CR 606.3 — own main phase, empty stack, a payable not-yet-used
+        // loyalty ability → loyalty-activation kind must be advertised.
+        GristOnBattlefield(3, +1, -2, -5);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, StepStateType.PreCombatMain, _stack);
+
+        PriorityKinds.Build(ctx).Should().Contain(typeof(ActivateLoyaltyAbilityCommand));
+    }
+
+    [Fact]
+    public void LoyaltyAbility_AllCostsTooHigh_DoesNotOfferLoyaltyKind()
+    {
+        // CR 606.5 — a minus ability can't reduce loyalty below 0. With loyalty
+        // 1 and only −2 / −5 abilities, NONE is payable → kind excluded.
+        GristOnBattlefield(1, -2, -5);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, StepStateType.PreCombatMain, _stack);
+
+        PriorityKinds.Build(ctx).Should().NotContain(typeof(ActivateLoyaltyAbilityCommand));
+    }
+
+    [Fact]
+    public void LoyaltyAbility_AlreadyActivatedThisTurn_DoesNotOfferLoyaltyKind()
+    {
+        // CR 606.3 — only one loyalty ability per planeswalker per turn.
+        var grist = GristOnBattlefield(3, +1, -2);
+        grist.LoyaltyAbilityActivatedThisTurn = true;
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, StepStateType.PreCombatMain, _stack);
+
+        PriorityKinds.Build(ctx).Should().NotContain(typeof(ActivateLoyaltyAbilityCommand));
+    }
+
+    [Fact]
+    public void LoyaltyAbility_NonEmptyStack_DoesNotOfferLoyaltyKind()
+    {
+        // CR 606.3 — sorcery speed requires an empty stack.
+        GristOnBattlefield(3, +1, -2);
+        var bolt = new Instant("Bolt", "R") { Owner = _alice };
+        _stack.Push(new Majik.Core.Spells.Spell(bolt, _alice));
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, StepStateType.PreCombatMain, _stack);
+
+        PriorityKinds.Build(ctx).Should().NotContain(typeof(ActivateLoyaltyAbilityCommand));
+    }
+
+    [Fact]
+    public void LoyaltyAbility_OpponentTurn_DoesNotOfferLoyaltyKind()
+    {
+        // CR 606.3 — loyalty abilities are sorcery-speed: active player only.
+        // (An instant-speed window on the opponent's turn must not offer it.)
+        GristOnBattlefield(3, +1, -2);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _bob,
+            turnNumber: 2, StepStateType.PreCombatMain, _stack);
+
+        PriorityKinds.Build(ctx).Should().NotContain(typeof(ActivateLoyaltyAbilityCommand));
+    }
+
+    [Fact]
+    public void LoyaltyAbility_NonMainPhase_DoesNotOfferLoyaltyKind()
+    {
+        // CR 606.3 — sorcery speed is a MAIN phase. Own upkeep must not offer it.
+        GristOnBattlefield(3, +1, -2);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, StepStateType.Upkeep, _stack);
+
+        PriorityKinds.Build(ctx).Should().NotContain(typeof(ActivateLoyaltyAbilityCommand));
+    }
+
     [Fact]
     public void UntappedLandWithManaAbility_AdvertisesManaAbilityKind()
     {

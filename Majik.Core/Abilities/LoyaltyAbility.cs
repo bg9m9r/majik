@@ -57,6 +57,18 @@ public sealed class LoyaltyAbility : IAbility
     public int LoyaltyChange { get; }
 
     /// <summary>
+    /// Stable identity for this loyalty ability, assigned at construction.
+    /// A loyalty ability is not an <see cref="IStackObject"/> (its cost is
+    /// pre-paid and the dispatch path builds a fresh
+    /// <see cref="ActivatedAbility"/> stack object from this template), so it
+    /// carries its own id purely so the wire layer can address ONE specific
+    /// loyalty ability on a planeswalker (a card has several: +1 / −2 / −5).
+    /// Surfaced on the snapshot ability DTO and echoed back by
+    /// <c>ActivateLoyaltyAbilityCommand.LoyaltyAbilityId</c>.
+    /// </summary>
+    public Guid Id { get; } = Guid.NewGuid();
+
+    /// <summary>
     /// The effects this loyalty ability resolves off the stack (CR 608).
     /// Read by the dispatch path when it builds the stack object.
     /// </summary>

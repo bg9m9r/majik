@@ -346,6 +346,40 @@ public sealed class RemoteAgent : IPlayerAgent
                     new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
                 break;
             }
+            case ActivateLoyaltyAbilityCommand lac:
+            {
+                // CR 606 — translate the wire command into the engine's
+                // PriorityAction.ActivateLoyaltyAbility. Validate locally only
+                // the bits that gate command-routing (source exists, is a
+                // permanent the caller controls, carries the named loyalty
+                // ability). Sorcery-speed timing, once-per-turn, and loyalty-
+                // cost payability are engine concerns and are re-verified by
+                // TurnDriver.DispatchLoyalty when the activation runs.
+                var source = ResolveCard(lac.PermanentInstanceId);
+                if (source is not Permanent permanent)
+                {
+                    throw new InvalidOperationException(
+                        $"ActivateLoyaltyAbilityCommand source {lac.PermanentInstanceId} is not a Permanent ({source.GetType().Name}).");
+                }
+                if (permanent.Controller != null && !ReferenceEquals(permanent.Controller, _player))
+                {
+                    throw new InvalidOperationException(
+                        $"Player {_player.Id} does not control permanent {permanent.Name}.");
+                }
+                var loyaltyAbility = permanent.Abilities
+                    .OfType<LoyaltyAbility>()
+                    .FirstOrDefault(a => a.Id == lac.LoyaltyAbilityId);
+                if (loyaltyAbility == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Permanent {permanent.Name} has no loyalty ability with id {lac.LoyaltyAbilityId}.");
+                }
+                // Targets are not pre-resolved here — DispatchLoyalty re-prompts
+                // via ChooseTargetsAsync (CR 602.2b; mirrors ActivateAbilityCommand).
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                    new PriorityAction.ActivateLoyaltyAbility(loyaltyAbility, Array.Empty<object>()));
+                break;
+            }
             case OrderTriggersCommand ot:
                 // CR 603.3b — APNAP-controller orders their own simultaneous
                 // triggers onto the stack. The wire command carries only

@@ -118,6 +118,23 @@ public static class PriorityKinds
             kinds.Add(typeof(ActivateAbilityCommand));
         }
 
+        // CR 606.3 — loyalty abilities are sorcery-speed (own main phase,
+        // empty stack), once-per-turn per planeswalker, and (for a minus
+        // ability) require enough loyalty to pay the cost without dropping
+        // below 0 (CR 606.5). Surface the loyalty-activation kind only when
+        // the active player controls a planeswalker (or effective planeswalker)
+        // with at least one CURRENTLY-activatable loyalty ability. LoyaltyAbility
+        // .CanActivate() already wraps the once-per-turn + payability checks; the
+        // sorcery-speed window is the same `sorceryWindow` gate the spell/land
+        // kinds use. Excluding it outside that window stops the portal from
+        // offering loyalty at instant speed / on a non-empty stack / on the
+        // opponent's turn / when the cost can't be paid.
+        if (sorceryWindow && battlefield.Any(c =>
+                c.Abilities.OfType<LoyaltyAbility>().Any(la => la.CanActivate())))
+        {
+            kinds.Add(typeof(ActivateLoyaltyAbilityCommand));
+        }
+
         return kinds.ToArray();
     }
 

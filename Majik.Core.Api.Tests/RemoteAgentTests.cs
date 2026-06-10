@@ -910,6 +910,59 @@ public class RemoteAgentTests
     }
 
     [Fact]
+    public async Task ActivateLoyaltyAbility_Submitted_ResolvesToLoyaltyActionWithSameAbility()
+    {
+        // CR 606 — round-trip the wire command: (PermanentInstanceId,
+        // LoyaltyAbilityId) must map back to the same LoyaltyAbility the engine
+        // sees on the planeswalker, surfaced as PriorityAction.ActivateLoyaltyAbility.
+        var grist = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", 3);
+        grist.SetOwner(_alice);
+        grist.SetController(_alice);
+        var plus1 = new LoyaltyAbility(grist, +1, () => { });
+        var minus2 = new LoyaltyAbility(grist, -2, () => { });
+        grist.AddAbility(plus1);
+        grist.AddAbility(minus2);
+        _alice.Zones.Battlefield.AddCard(grist);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == grist.InstanceId ? (ICard)grist : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new ActivateLoyaltyAbilityCommand(grist.InstanceId, minus2.Id)
+        {
+            PlayerId = _alice.Id,
+        });
+
+        var action = await task;
+        var act = action.Should().BeOfType<PriorityAction.ActivateLoyaltyAbility>().Subject;
+        act.Ability.Should().BeSameAs(minus2);
+    }
+
+    [Fact]
+    public async Task ActivateLoyaltyAbility_UnknownAbilityId_Throws()
+    {
+        var grist = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", 3);
+        grist.SetOwner(_alice);
+        grist.SetController(_alice);
+        grist.AddAbility(new LoyaltyAbility(grist, +1, () => { }));
+        _alice.Zones.Battlefield.AddCard(grist);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == grist.InstanceId ? (ICard)grist : null);
+        _ = agent.ChoosePriorityActionAsync(NewContext());
+
+        var act = () => agent.Submit(new ActivateLoyaltyAbilityCommand(grist.InstanceId, Guid.NewGuid())
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*no loyalty ability*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task ActivateAbility_UnknownAbilityId_Throws()
     {
         // Defence: client must not be able to smuggle an AbilityId that

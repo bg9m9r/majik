@@ -472,6 +472,81 @@ public sealed class GameFacade : IDisposable
             }
         }
 
+        async Task DispatchLoyalty(Player actor, PriorityAction.ActivateLoyaltyAbility activate, GameContext ctx)
+        {
+            // CR 606.3 — activate a planeswalker loyalty ability. Mirrors
+            // TurnDriver.DispatchLoyalty (Majik.Core/Game/TurnDriver.cs) so the
+            // legacy single-round StartAsync path accepts
+            // ActivateLoyaltyAbilityCommand instead of throwing
+            // "PriorityLoop received ActivateLoyaltyAbility but no loyaltyDispatcher".
+            // Loyalty abilities are sorcery-speed (active player + main phase +
+            // empty stack) and once-per-turn; re-verify here so a stale / out-
+            // of-window proposal is swallowed rather than mutating state.
+            var loyalty = activate.Ability;
+            if (!loyalty.CanActivate()) return;
+            var inSorceryWindow = ReferenceEquals(ctx.ActivePlayer, actor)
+                && ctx.CurrentPhase is { } phase && phase.IsMain()
+                && ctx.Stack.Count == 0
+                && ReferenceEquals(loyalty.Source.Controller, actor);
+            if (!inSorceryWindow) return;
+
+            // CR 602.2b — collect targets from the loyalty ability's
+            // TargetRequests via the activating player's agent.
+            var chosenTargets = new List<IReadOnlyList<object>>();
+            var targetWrappers = new List<Majik.Core.Targeting.ITarget>();
+            foreach (var req in loyalty.TargetRequests)
+            {
+                var live = req.ResolveCandidates(ctx);
+                var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                    ? req
+                    : req.WithCandidates(live);
+                var chosen = await agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                chosenTargets.Add(chosen);
+                foreach (var obj in chosen)
+                {
+                    Majik.Core.Targeting.ITarget? wrapper = obj switch
+                    {
+                        Majik.Core.Cards.Permanent perm => Majik.Core.Targeting.Target.Permanent(perm),
+                        Majik.Core.Cards.ICard card => Majik.Core.Targeting.Target.Card(card),
+                        Player p => Majik.Core.Targeting.Target.Player(p),
+                        Majik.Core.Spells.ISpell spell => Majik.Core.Targeting.Target.Spell(spell),
+                        Majik.Core.Abilities.IActivatedAbility ab => Majik.Core.Targeting.Target.Ability(ab),
+                        _ => null,
+                    };
+                    if (wrapper != null) targetWrappers.Add(wrapper);
+                }
+            }
+
+            // CR 606.3/606.5 — pay the loyalty cost as the ability is put on the
+            // stack (add/remove loyalty + mark once-per-turn).
+            try
+            {
+                loyalty.PayLoyaltyCost();
+            }
+            catch (InvalidOperationException)
+            {
+                return; // raced out of the activation window — no state change.
+            }
+
+            // Build the ActivatedAbility stack object from the loyalty template
+            // (loyalty cost pre-paid; effects resolve later off the stack).
+            var stackObject = new Majik.Core.Abilities.ActivatedAbility(
+                source: loyalty.Source,
+                controller: actor,
+                targets: targetWrappers.Count > 0 ? targetWrappers : null,
+                costs: null,
+                effects: loyalty.Effects,
+                targetRequests: loyalty.TargetRequests.Count > 0 ? loyalty.TargetRequests : null,
+                sorcerySpeed: true);
+            if (chosenTargets.Count > 0)
+            {
+                stackObject.SetChosenTargets(chosenTargets);
+            }
+
+            _stack.Push(stackObject);
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.AbilityActivatedEvent(stackObject));
+        }
+
         var manaActivator = new ManaAbilityActivator(_bus);
         void DispatchManaAbility(Player actor, PriorityAction.ActivateManaAbility ma)
         {
@@ -507,6 +582,7 @@ public sealed class GameFacade : IDisposable
             landDropTracker: LandDrops,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
+            loyaltyDispatcher: DispatchLoyalty,
             manaAbilityDispatcher: DispatchManaAbility,
             // CR 704.1 — check SBAs before priority + after each resolution on
             // the legacy single-round StartAsync path too, so a 0/0 dies
