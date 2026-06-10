@@ -1000,6 +1000,14 @@ public sealed class GameFacade : IDisposable
                 EntersWithCountersBinder.Bind(card, entity, replacements);
                 EntersAsCopyBinder.Bind(card, entity, replacements, effects);
                 OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
+                // Generic utility-land activated abilities (scry / draw / +1/+1
+                // counter / token / damage / gain-life / return-from-graveyard /
+                // destroy-target-land). Lands are NEVER routed through their
+                // [CardName] factory, so these abilities were DEAD in prod —
+                // this binder is the ONLY path that makes them fire in a real
+                // match (v1-deferrals #12). Runs AFTER the fetch/Horizon binder
+                // (those patterns are claimed first) and BEFORE ManlandBinder.
+                LandActivatedAbilityBinder.Bind(card, entity, controller, effects, triggers);
                 // Manland (creature-land) animate + Restless attack triggers.
                 // Lands are NEVER routed through their [CardName] factory (the
                 // factory instance-swap is gated on !shell.HasType(Land)), so
