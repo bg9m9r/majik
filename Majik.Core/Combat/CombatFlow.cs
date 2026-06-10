@@ -247,7 +247,7 @@ public sealed class CombatFlow
             {
                 DealDamageToPlayer(attacker, p, attacker.Power);
             }
-            else if (decl.DefendingPlayerOrPlaneswalker is Planeswalker pw)
+            else if (decl.DefendingPlayerOrPlaneswalker is Permanent pw && pw.IsEffectivePlaneswalker())
             {
                 DealDamageToPlaneswalker(attacker, pw, attacker.Power);
             }
@@ -375,7 +375,7 @@ public sealed class CombatFlow
         _bus.Publish(new CombatDamageDealtEvent(source, target, intent.Amount));
     }
 
-    private void DealDamageToPlaneswalker(Creature source, Planeswalker target, int amount)
+    private void DealDamageToPlaneswalker(Creature source, Permanent target, int amount)
     {
         var intent = new Majik.Core.Effects.DamageIntent(
             source, amount, TargetPlaneswalker: target)
@@ -384,11 +384,13 @@ public sealed class CombatFlow
         if (intent == null || intent.Amount <= 0) return;
 
         // CR 120.3 — a planeswalker dealt damage (loyalty removal) "was dealt
-        // damage this turn" too. RemoveLoyalty is shared with loyalty-ability
-        // costs (NOT damage), so the flag is stamped here at the damage seam,
-        // not inside RemoveLoyalty.
+        // damage this turn" too. RemoveTransientLoyalty is shared with
+        // loyalty-ability costs (NOT damage), so the flag is stamped here at
+        // the damage seam. The removal routes to a real Planeswalker's own
+        // loyalty field OR the transient body of a flipped creature-front DFC
+        // (CR 711) — both via the Permanent-level surface.
         target.RecordDamageDealt(intent.Amount);
-        target.RemoveLoyalty(intent.Amount);
+        target.RemoveTransientLoyalty(intent.Amount);
         if (CombatAbilities.HasLifelink(source) && source.Controller != null)
         {
             source.Controller.GainLife(intent.Amount);

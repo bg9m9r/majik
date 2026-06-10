@@ -1340,6 +1340,49 @@ public class Card : ICard
         if (perm is Planeswalker) return;
         var backLoyalty = state.BackFaceCharacteristics?.Loyalty;
         perm.SetTransientLoyalty(state.IsBackFace ? backLoyalty : null);
+        SyncBackFaceLoyaltyAbilities(perm, state);
+    }
+
+    /// <summary>Loyalty abilities attached to this permanent by the back-face
+    /// transform (CR 711 / 606). Tracked so flip-back detaches exactly the
+    /// abilities flip attached — see <see cref="SyncBackFaceLoyaltyAbilities"/>.</summary>
+    private readonly List<Majik.Core.Abilities.LoyaltyAbility> _backFaceLoyaltyAbilities = new();
+
+    /// <summary>
+    /// CR 711 / 606 — attach the back face's loyalty abilities ([+1]/[−2]/…)
+    /// when a creature-front DFC transforms to its planeswalker back, and
+    /// detach them on flip-back. The abilities are built against this
+    /// permanent's Permanent-typed loyalty surface (4A) via
+    /// <see cref="Majik.Core.CardData.OracleLoyaltyAbilityBinder.BindOracleText"/>,
+    /// so they read/pay through its transient loyalty body without re-classing.
+    /// No-op when the back face carries no oracle text (loyalty body + death
+    /// still work via the transient surface). Idempotent: re-syncing the same
+    /// face does not duplicate abilities.
+    /// </summary>
+    private static void SyncBackFaceLoyaltyAbilities(
+        Permanent perm, Majik.Core.CardData.MDFCs.MdfcState state)
+    {
+        var shouldHave = state.IsBackFace
+            && state.BackFaceCharacteristics is { Loyalty: not null }
+            && !string.IsNullOrWhiteSpace(state.BackFaceCharacteristics.OracleText);
+
+        var has = perm._backFaceLoyaltyAbilities.Count > 0;
+        if (shouldHave == has) return; // already in the desired state
+
+        if (shouldHave)
+        {
+            var controller = perm.Controller;
+            if (controller == null) return; // can't bind effects without a controller
+            var attached = Majik.Core.CardData.OracleLoyaltyAbilityBinder.BindOracleText(
+                perm, state.BackFaceCharacteristics!.OracleText!, controller);
+            perm._backFaceLoyaltyAbilities.AddRange(attached);
+        }
+        else
+        {
+            foreach (var ability in perm._backFaceLoyaltyAbilities)
+                perm.RemoveAbility(ability);
+            perm._backFaceLoyaltyAbilities.Clear();
+        }
     }
 
     /// <summary>

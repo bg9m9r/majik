@@ -25,7 +25,10 @@ public sealed record DamageIntent(
     int Amount,
     Creature? TargetCreature = null,
     Player? TargetPlayer = null,
-    Planeswalker? TargetPlaneswalker = null)
+    // Typed Permanent (not Planeswalker) so combat damage to a creature-front
+    // DFC flipped to its planeswalker back (CR 711, IsEffectivePlaneswalker)
+    // flows through the same replacement pipeline as a real planeswalker.
+    Permanent? TargetPlaneswalker = null)
 {
     /// <summary>
     /// True when the intent was raised by combat damage assignment

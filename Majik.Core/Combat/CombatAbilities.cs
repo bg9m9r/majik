@@ -100,10 +100,16 @@ public static class CombatAbilities
     {
         if (creature == null) return false;
 
-        // Layer system source-of-truth, when wired (CR 613).
+        // Layer system source-of-truth, when wired (CR 613). Compute via the
+        // PERMANENT overload (not Compute(Creature)) — a creature-front DFC
+        // flipped to a NON-creature back (CR 711, e.g. a planeswalker back)
+        // computes a plain PermanentCharacteristics, and Compute(Creature)
+        // would throw casting it to CreatureCharacteristics. The keyword set
+        // lives on the base PermanentCharacteristics, so this reads correctly
+        // for both shapes.
         if (creature.ActiveEffects != null)
         {
-            return creature.ActiveEffects.Compute(creature).Keywords
+            return creature.ActiveEffects.Compute((Permanent)creature).Keywords
                 .Contains(keyword);
         }
 

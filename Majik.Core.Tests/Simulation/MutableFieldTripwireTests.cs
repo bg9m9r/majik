@@ -33,6 +33,7 @@ public sealed class MutableFieldTripwireTests
         {
             // ── raw backing fields ──────────────────────────────────────────
             "_abilities",                           // COPIED (AddRange — shared ability refs, definition)
+            "_backFaceLoyaltyAbilities",            // SKIPPED-DEFER: derived from _mdfcState (itself SKIPPED-DEFER); back-face loyalty abilities are sub-refs of _abilities (AddRange-copied), re-synced on transform
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)
             "_mdfcState",                           // SKIPPED-DEFER: complex, has lambda callbacks — see Task 8 concern

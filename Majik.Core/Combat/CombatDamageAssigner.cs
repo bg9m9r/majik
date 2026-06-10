@@ -142,7 +142,13 @@ public sealed class CombatDamageAssigner
                 }
                 else if (attacker.TargetPlaneswalker != null)
                 {
-                    attacker.TargetPlaneswalker.RemoveLoyalty(targetDamage);
+                    // CR 120.3 / 306.7 — combat damage to a (real or effective)
+                    // planeswalker removes loyalty. RecordDamageDealt stamps the
+                    // "dealt damage this turn" flag; RemoveTransientLoyalty
+                    // routes to the real PW's loyalty field OR the transient
+                    // body of a flipped creature-front DFC (CR 711).
+                    attacker.TargetPlaneswalker.RecordDamageDealt(targetDamage);
+                    attacker.TargetPlaneswalker.RemoveTransientLoyalty(targetDamage);
                     _eventBus?.Publish(new CombatDamageDealtEvent(
                         attacker.Creature, attacker.TargetPlaneswalker, targetDamage, isFirstStrike));
                 }
