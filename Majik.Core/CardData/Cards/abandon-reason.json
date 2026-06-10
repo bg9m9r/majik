@@ -1,0 +1,5 @@
+{
+  "name": "Abandon Reason",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}"
+}
