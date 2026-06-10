@@ -56,7 +56,18 @@ public sealed record ArchetypeWeights(
     /// primary inevitability engine. Aggro archetypes weight it LOW because
     /// they rarely cast planeswalkers and the term would just add noise.</para>
     /// </summary>
-    double PlaneswalkerEngine = 0.0)
+    double PlaneswalkerEngine = 0.0,
+    /// <summary>
+    /// Weight for the hidden-burn-reach penalty in <see cref="BoardEval"/>:
+    /// how strongly the eval punishes being within burn reach of the
+    /// opponent's (sandbox) hand. In determinized worlds that hand is
+    /// SAMPLED — the bot's own honest guess — so dangerous sampled worlds
+    /// eval dangerous (see <see cref="BoardEval.HiddenReachPenalty"/>).
+    ///
+    /// <para>0 = kill-switch: fully disables the term. All presets start at
+    /// 1.0; per-archetype tuning comes later.</para>
+    /// </summary>
+    double HiddenReach = 1.0)
 {
     public static readonly ArchetypeWeights Burn = new(
         LifeDelta:           3.0,
@@ -69,7 +80,8 @@ public sealed record ArchetypeWeights(
         KeyCardInPlay:       2.0,
         LethalProximity:     3.0,  // burn races hard — every point closer to 0 is precious
         CardAdvantage:       0.1,  // aggro: nearly indifferent to card parity
-        PlaneswalkerEngine:  0.0); // burn never runs walkers
+        PlaneswalkerEngine:  0.0,  // burn never runs walkers
+        HiddenReach:         1.0); // untuned baseline — per-archetype tuning later
 
     public static readonly ArchetypeWeights Prowess = new(
         LifeDelta:           1.0,
@@ -82,7 +94,8 @@ public sealed record ArchetypeWeights(
         KeyCardInPlay:       2.5,
         LethalProximity:     2.5,  // prowess converts board advantage to kills
         CardAdvantage:       0.2,  // tempo deck: card parity matters a little but not the focus
-        PlaneswalkerEngine:  0.0); // prowess is spell-based, not walker-based
+        PlaneswalkerEngine:  0.0,  // prowess is spell-based, not walker-based
+        HiddenReach:         1.0); // untuned baseline — per-archetype tuning later
 
     public static readonly ArchetypeWeights BorosEnergy = new(
         LifeDelta:           1.5,
@@ -95,7 +108,8 @@ public sealed record ArchetypeWeights(
         KeyCardInPlay:       2.0,
         LethalProximity:     2.0,  // midrange — still wants to close games
         CardAdvantage:       1.0,  // midrange: card parity matters moderately
-        PlaneswalkerEngine:  0.3); // some walkers in the sideboard / flex slots
+        PlaneswalkerEngine:  0.3,  // some walkers in the sideboard / flex slots
+        HiddenReach:         1.0); // untuned baseline — per-archetype tuning later
 
     /// <summary>
     /// Azorius Control weights — attrition and inevitability. The plan is
@@ -119,7 +133,8 @@ public sealed record ArchetypeWeights(
         KeyCardInPlay:       1.5,   // Solitude / Subtlety on board is impactful
         LethalProximity:     0.8,   // control doesn't race — but closing is still good
         CardAdvantage:       3.0,   // THE key signal: being up cards = winning at control
-        PlaneswalkerEngine:  1.5);  // Teferi loyalty = accumulated card advantage
+        PlaneswalkerEngine:  1.5,   // Teferi loyalty = accumulated card advantage
+        HiddenReach:         1.0);  // untuned baseline — per-archetype tuning later
 
     /// <summary>
     /// Neutral midrange baseline for any archetype that does not (yet) have a
@@ -145,7 +160,8 @@ public sealed record ArchetypeWeights(
         KeyCardInPlay:       2.0,
         LethalProximity:     1.5,  // sensible default: reward closing games
         CardAdvantage:       0.5,  // moderate: card parity is a weak positive signal
-        PlaneswalkerEngine:  0.2); // small bonus for any walkers on board
+        PlaneswalkerEngine:  0.2,  // small bonus for any walkers on board
+        HiddenReach:         1.0); // untuned baseline — per-archetype tuning later
 
     /// <summary>Resolve the eval weights for an archetype, falling back to
     /// <see cref="Default"/> for any archetype without a bespoke table. Never

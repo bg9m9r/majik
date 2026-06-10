@@ -93,6 +93,16 @@ namespace Majik.Bot;
 /// explicit <c>OpponentArchetype</c> is set (the known-archetype path takes
 /// precedence). Default false preserves today's perfect-info behaviour for every
 /// existing caller.</para>
+///
+/// <para><c>RiskVoteThreshold</c> optional (default null). Catastrophe threshold
+/// for the risk-aware two-tier vote in <see cref="Search.DeterminizedSearch"/>:
+/// determinized lines whose worst per-world mean falls at or below this value are
+/// demoted below safe lines. Null resolves to
+/// <see cref="Search.DeterminizedSearch.DefaultCatastropheThreshold"/> (-500);
+/// <see cref="double.NegativeInfinity"/> is the kill switch — it disables the
+/// risk filter entirely (no line can score at or below it). Only consulted by
+/// <see cref="Search.SearchStrategy"/> on the determinized paths; the perfect-info
+/// search ignores it.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -107,4 +117,5 @@ public sealed record BotConfig(
     bool PrioritySearchEnabled = true,
     ArchetypeWeights? WeightsOverride = null,
     string? OpponentArchetype = null,
-    bool InferOpponentArchetype = false);
+    bool InferOpponentArchetype = false,
+    double? RiskVoteThreshold = null);
