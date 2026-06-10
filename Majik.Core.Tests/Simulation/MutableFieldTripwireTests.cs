@@ -66,6 +66,7 @@ public sealed class MutableFieldTripwireTests
             "PendingCastX",                         // COPIED (PendingCastX = src.PendingCastX)
             "PendingDelveExiledCount",              // COPIED (PendingDelveExiledCount = src.PendingDelveExiledCount)
             "ReturnToHandOnResolution",             // COPIED (ReturnToHandOnResolution = src.ReturnToHandOnResolution)
+            "SelfManagesEntersWithCounters",        // COPIED (SelfManagesEntersWithCounters = src.SelfManagesEntersWithCounters — factory self-manages X counters)
             "RuntimeEscapeCost",                    // COPIED (immutable value-object ref)
             "RuntimeEscapeExileCount",              // COPIED (RuntimeEscapeExileCount = src.RuntimeEscapeExileCount)
             "RuntimeExileCastAllowedCaster",        // COPIED + relinked via RelinkReferences (GrantRuntimeExileCast → cloned player)
