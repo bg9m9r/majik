@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Threading.Tasks;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
@@ -53,30 +55,28 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="CountersService.Add"/> (so Hardened Scales / Doubling Season
 ///   replacements and the post-commit <see cref="CounterAddedEvent"/> apply).
 ///   * <b>"Activate only if an opponent lost life this turn" (CR 602.5c)</b>
-///     — modelled as the ability's <c>canActivateCheck</c> gate: true iff some
-///     opponent's <see cref="Player.LifeLostThisTurn"/> is &gt; 0. The opponent
-///     set is read live through <paramref name="opponentResolver"/>.
+///     — modelled as the ability's CONTEXT-AWARE <c>canActivateCheckCtx</c>
+///     gate: true iff some opponent's <see cref="Player.LifeLostThisTurn"/> is
+///     &gt; 0. The opponent set is read live off the
+///     <see cref="Majik.Core.Game.GameContext.Opponents"/> the engine threads
+///     into the activation-legality check (the bot's <c>LegalActionEnumerator</c>
+///     and the live driver both supply a GameContext), so the gate WORKS on the
+///     production routed build — unlike the old build-time <c>opponentResolver</c>,
+///     which was null on prod and made the ability permanently un-activatable.
 ///   * <b>"only once each turn" (CR 602.5e)</b> — an <c>int[1]{0}</c> per-turn
-///     lock folded into the same <c>canActivateCheck</c> gate, flipped to 1 by
-///     the resolve body and reset to 0 by a <see cref="TurnStartedEvent"/>
-///     handler (CR 500.1). Same lock shape as
-///     <see cref="WirewoodSymbioteFactory"/>, but folded into the activation
-///     gate rather than a cost because the cost here is plain mana.
+///     lock folded into the same context-aware gate, flipped to 1 by the
+///     resolve body and reset to 0 by a <see cref="TurnStartedEvent"/> handler
+///     (CR 500.1). Same lock shape as <see cref="WirewoodSymbioteFactory"/>,
+///     but folded into the activation gate rather than a cost because the cost
+///     here is plain mana.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Live "target opponent" / opponent enumeration</b>: no
-///   <c>Player.Opponents</c> accessor exists at v1, so both the attack
-///   trigger's damage half and the activation's "an opponent lost life"
-///   gate read the opponent set through <paramref name="opponentResolver"/>.
-///   Without a resolver the damage half no-ops (the trigger still fires and is
-///   observable as pending) and the activation gate treats "an opponent lost
-///   life" as false (the ability simply can't be activated). Same
-///   resolver-injection posture as <see cref="ElectrostaticFieldFactory"/> /
-///   <see cref="SoaringThoughtThiefFactory"/>.
 /// - <b>Trigger-on-stack targeting</b>: the attack trigger's target opponent
 ///   is honoured from <see cref="TriggeredAbility.ChosenTargets"/> when the
-///   trigger was dispatched with one, else the first opponent in the resolver
-///   list (same fallback as <see cref="SoaringThoughtThiefFactory"/>).
+///   trigger was dispatched with one (the prod async trigger-drain prompts the
+///   controller's agent), else the first opponent off the live
+///   <see cref="ContextOpponents.Of"/> at resolution (CR 102.1) — no captured
+///   resolver, so it is never inert on prod.
 /// </summary>
 [CardName("Hired Claw")]
 public static class HiredClawFactory
@@ -89,15 +89,20 @@ public static class HiredClawFactory
     public const int CounterAmount = 1;
 
     /// <summary>
-    /// Construct Hired Claw with no live runtime services. Both abilities are
-    /// attached to the card shape for dispatcher / structural tests; the attack
-    /// trigger's damage half no-ops (no opponent resolver), the +1/+1 ability's
-    /// "an opponent lost life this turn" gate evaluates false (no opponent
-    /// resolver), and the once-per-turn lock is never reset (no event bus).
-    /// This is the overload <see cref="NamedCardFactory"/> dispatches to.
+    /// Construct Hired Claw with no live runtime services. This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to on the production routed
+    /// build. Both abilities are fully live on prod: the attack-trigger damage
+    /// reads its target off the trigger's <c>ChosenTargets</c> (falling back to
+    /// the first live opponent off <see cref="ContextOpponents.Of"/>) at
+    /// resolution, and the +1/+1 ability's "an opponent lost life this turn"
+    /// gate reads the opponent set off the live
+    /// <see cref="Majik.Core.Game.GameContext"/> the engine threads into the
+    /// activation check — neither depends on a build-time resolver any longer.
+    /// (The once-per-turn lock is only reset when an event bus is supplied;
+    /// see the multi-arg overload.)
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null, replacements: null, opponentResolver: null);
+        Create(owner, eventBus: null, triggers: null, replacements: null);
 
     /// <summary>
     /// Construct Hired Claw with optional runtime services.
@@ -112,16 +117,11 @@ public static class HiredClawFactory
     /// <param name="replacements">Optional <see cref="ReplacementBus"/> routed
     /// through <see cref="CountersService.Add"/> for the +1/+1 placement
     /// (Hardened Scales / Doubling Season — CR 614).</param>
-    /// <param name="opponentResolver">Live enumerator of the player list. Used
-    /// to pick the attack trigger's target opponent AND to evaluate the
-    /// activation's "an opponent lost life this turn" gate. Without a resolver
-    /// the damage half no-ops and the activation gate is false.</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
         TriggerManager? triggers,
-        ReplacementBus? replacements,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -131,8 +131,8 @@ public static class HiredClawFactory
         var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);
         var card = (Creature)CardDefinitionFactory.Build(definition, owner);
 
-        BuildAttackTrigger(card, owner, triggers, opponentResolver);
-        BuildCounterAbility(card, owner, eventBus, replacements, opponentResolver);
+        BuildAttackTrigger(card, owner, triggers);
+        BuildCounterAbility(card, owner, eventBus, replacements);
 
         return card;
     }
@@ -142,8 +142,7 @@ public static class HiredClawFactory
     private static void BuildAttackTrigger(
         Creature card,
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         // CR 603.1 / CR 508.1f — "Whenever you attack with one or more Lizards,
         // this creature deals 1 damage to target opponent." Fires on
@@ -152,15 +151,17 @@ public static class HiredClawFactory
         TriggeredAbility? attackTrigger = null;
         var damageEffect = new Effect(
             $"{CardName}: deal {DamageAmount} damage to target opponent (whenever you attack with one or more Lizards)",
-            () =>
+            rc =>
             {
                 // CR 119.3 — damage to a player reduces their life total;
                 // Fx.DealDamage routes Player → Player.LoseLife (CR 119.8).
-                // Without a resolver the player aggregate exposes no opponents
-                // list at v1, so the damage half no-ops.
-                var opponent = ResolveTargetOpponent(attackTrigger, card, owner, opponentResolver);
-                if (opponent == null) return;
-                Fx.DealDamage(opponent, DamageAmount);
+                // The target is read off the trigger's ChosenTargets (the prod
+                // async trigger-drain prompts the agent), falling back to the
+                // first live opponent off ContextOpponents.Of — never a captured
+                // build-time resolver, so it is live on the prod routed build.
+                var opponent = ResolveTargetOpponent(attackTrigger, card, owner, rc);
+                if (opponent != null) Fx.DealDamage(opponent, DamageAmount);
+                return ValueTask.CompletedTask;
             });
 
         attackTrigger = new TriggeredAbility(
@@ -200,12 +201,12 @@ public static class HiredClawFactory
         TriggeredAbility? attackTrigger,
         Creature card,
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ResolutionContext rc)
     {
         var controller = card.Controller ?? owner;
 
         // CR 115 — honour an explicit target if the trigger was dispatched with
-        // one (ChosenTargets[0][0] is the agent / resolver-picked opponent).
+        // one (ChosenTargets[0][0] is the agent-picked opponent).
         if (attackTrigger != null
             && attackTrigger.ChosenTargets.Count > 0
             && attackTrigger.ChosenTargets[0].Count > 0
@@ -215,15 +216,9 @@ public static class HiredClawFactory
             return chosenPlayer;
         }
 
-        // v1 fallback — first opponent in the resolver list.
-        var players = opponentResolver?.Invoke();
-        if (players == null) return null;
-        foreach (var p in players)
-        {
-            if (ReferenceEquals(p, controller)) continue;
-            return p;
-        }
-        return null;
+        // CR 102.1 — fall back to the first live opponent read off the
+        // resolution context (no captured resolver — live on the prod build).
+        return ContextOpponents.Of(rc, controller).FirstOrDefault();
     }
 
     // --- {1}{R}: +1/+1 counter (CR 602.1 / 121.1 / 602.5c / 602.5e) --------
@@ -232,20 +227,21 @@ public static class HiredClawFactory
         Creature card,
         Player owner,
         IEventBus? eventBus,
-        ReplacementBus? replacements,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ReplacementBus? replacements)
     {
         // CR 602.5e — "Activate only ... once each turn." Closure shared
         // between the activation gate and the TurnStartedEvent reset handler.
         var usedThisTurn = new int[] { 0 };
 
         // CR 602.5c — "Activate only if an opponent lost life this turn, and
-        // only once each turn." Both riders fold into a single canActivateCheck
-        // gate evaluated against live state on every consult.
-        bool CanActivate()
+        // only once each turn." Both riders fold into a single CONTEXT-AWARE
+        // gate evaluated against the live GameContext on every consult — the
+        // opponent set is read off ctx.Opponents (live on prod), not a captured
+        // build-time resolver.
+        bool CanActivate(Majik.Core.Game.GameContext ctx)
         {
             if (usedThisTurn[0] != 0) return false; // once-per-turn lock closed.
-            return OpponentLostLifeThisTurn(card, owner, opponentResolver);
+            return ctx.Opponents.Any(o => o.LifeLostThisTurn > 0);
         }
 
         // CR 121.1 — "Put a +1/+1 counter on this creature." Routes through
@@ -273,7 +269,7 @@ public static class HiredClawFactory
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{1}{R}") },
             effects: new IEffect[] { counterEffect },
-            canActivateCheck: CanActivate);
+            canActivateCheckCtx: CanActivate);
 
         card.AddAbility(counterAbility);
 
@@ -284,28 +280,5 @@ public static class HiredClawFactory
         {
             eventBus.Subscribe<TurnStartedEvent>(_ => usedThisTurn[0] = 0);
         }
-    }
-
-    /// <summary>
-    /// CR 602.5c — true iff at least one opponent of the source's controller
-    /// has lost life this turn (<see cref="Player.LifeLostThisTurn"/> &gt; 0).
-    /// Opponents are read live through <paramref name="opponentResolver"/>;
-    /// without a resolver this is false (the ability can't be activated).
-    /// </summary>
-    private static bool OpponentLostLifeThisTurn(
-        Creature card,
-        Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver)
-    {
-        var players = opponentResolver?.Invoke();
-        if (players == null) return false;
-
-        var controller = card.Controller ?? owner;
-        foreach (var p in players)
-        {
-            if (ReferenceEquals(p, controller)) continue;
-            if (p.LifeLostThisTurn > 0) return true;
-        }
-        return false;
     }
 }

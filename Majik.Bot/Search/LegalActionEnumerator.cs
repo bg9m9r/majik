@@ -109,6 +109,16 @@ internal static class LegalActionEnumerator
             foreach (var ability in card.Abilities.OfType<IActivatedAbility>())
             {
                 if (ability is IManaAbility) continue;
+                // CR 602.5c — respect the "Activate only if <condition>" gate.
+                // Prefer the context-aware overload (ctx is in scope) so a gate
+                // that reads live game state — Hired Claw's "an opponent lost life
+                // this turn" — is honoured here, matching the live driver. A
+                // context-less gate still evaluates via the same overload's
+                // fallback.
+                var canActivate = ability is Majik.Core.Abilities.ActivatedAbility aa
+                    ? aa.CanActivateNow(ctx)
+                    : ability.CanActivateNow();
+                if (!canActivate) continue;
                 if (ability.Costs.All(cost => cost.CanPay(self)))
                     result.Add(new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
             }

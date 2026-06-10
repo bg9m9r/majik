@@ -194,25 +194,21 @@ public sealed class ResolverNullInertEffectAuditTests
     private static readonly IReadOnlyDictionary<string, string> Allowlist =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            // === Tier 1: genuine engine-infra exemption (v1-deferrals #3b) =====
-            // Hired Claw — the attack-trigger Effect deals 1 damage to "target
-            // opponent" (CR 115). On prod the target arrives via the trigger's
-            // ChosenTargets (targeting system); the resolver is only a v1 fallback
-            // when no target was chosen. Reaching opponents at resolve time without
-            // a chosen target needs the ITarget / TargetResolver system, not a
-            // bare ContextOpponents read. v1-deferrals #3b.
-            ["HiredClawFactory.cs"] =
-                "attack-trigger Effect deals damage to 'target opponent'; prod supplies the target via ChosenTargets, resolver is a v1 fallback — needs the targeting system, not a context-read. v1-deferrals #3b.",
-
-            // NOTE: Teferi, Hero of Dominaria was REMOVED from this allowlist once
-            // its −3 / +1-untap / emblem clauses were wired to the agent-target
-            // infra: the −3 / +1 read the activating player's CHOSEN objects off
-            // the live ResolutionContext (ChosenTargets) via real TargetRequests
-            // on the loyalty abilities, and the emblem's exile reads ChosenTargets
-            // with a ContextOpponents.Of live-context fallback (never a build-time
-            // resolver). The factory no longer declares a Func<…Permanent…>
-            // resolver param, so it no longer matches the inert signature.
-            // Allowlist is now Hired Claw only.
+            // EMPTY — the resolver-null inert-on-prod bug class is fully closed.
+            //
+            // Hired Claw was the LAST entry; it was REMOVED once its abilities
+            // were made context-aware (v1-deferrals #3 / Task 3.2). The attack
+            // trigger's damage reads its target off the trigger's ChosenTargets,
+            // falling back to ContextOpponents.Of(rc, controller) at resolution;
+            // the {1}{R} +1/+1 ability's "an opponent lost life this turn" gate
+            // reads the opponent set off the live GameContext via a context-aware
+            // canActivateCheckCtx (the bot's LegalActionEnumerator + the live
+            // driver both supply a GameContext). The factory declares NO
+            // Func<…Player…> resolver param any longer, so it no longer matches
+            // the inert signature — keeping it here would now fail
+            // Allowlist_EntriesStillTripTheGate.
+            //
+            // Teferi, Hero of Dominaria was removed earlier (agent-target infra).
         };
 
     /// <summary>

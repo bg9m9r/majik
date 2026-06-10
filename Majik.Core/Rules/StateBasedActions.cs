@@ -51,6 +51,7 @@ public class StateBasedActions
     public static IEnumerable<IStateBasedActionCheck> DefaultChecks()
     {
         yield return new PlayerLifeCheck();
+        yield return new CommanderDamageCheck();
         yield return new CounterCancellationCheck();
         yield return new TokensCeaseToExistCheck();
         yield return new AttachmentLegalityCheck();

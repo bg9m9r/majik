@@ -224,7 +224,9 @@ public static class HopeOfGhirapurFactory
         sacAbility = new ActivatedAbility(
             source: card,
             controller: owner,
-            costs: new ICost[] { AdditionalCost.Sacrifice(card) },
+            // CR 701.16a — pass the in-scope bus so paying the sac cost
+            // publishes PermanentSacrificedEvent for aristocrat payoffs.
+            costs: new ICost[] { AdditionalCost.Sacrifice(card, eventBus) },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]
             {

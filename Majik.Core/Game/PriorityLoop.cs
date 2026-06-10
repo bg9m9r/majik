@@ -29,6 +29,12 @@ public sealed class PriorityLoop
     private readonly IReadOnlyDictionary<Player, IPlayerAgent> _agents;
     private readonly Func<int> _turnNumberAccessor;
     private readonly Func<StepStateType?> _phaseAccessor;
+    // Live per-turn tally accessor. Threaded into every GameContext this loop
+    // builds so resolution-time effects (dynamic-X connive) and context-aware
+    // activation gates can read per-turn counts off rc.Game.TurnState. Null in
+    // legacy harnesses that don't own a TurnState (the GameContext then carries
+    // a null TurnState — consumers null-guard).
+    private readonly Func<TurnState?>? _turnStateAccessor;
     private readonly LandDropTracker _landDropTracker;
     private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
@@ -91,7 +97,8 @@ public sealed class PriorityLoop
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         IEventBus? eventBus = null,
         Func<DateTime>? clock = null,
-        Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null)
+        Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
+        Func<TurnState?>? turnStateAccessor = null)
     {
         _castDispatcher = castDispatcher;
         _asyncTriggerDrain = asyncTriggerDrain;
@@ -114,6 +121,7 @@ public sealed class PriorityLoop
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _turnNumberAccessor = turnNumberAccessor;
         _phaseAccessor = phaseAccessor;
+        _turnStateAccessor = turnStateAccessor;
         // CR 305.2 — the per-turn one-land cap is engine-level and unconditional.
         // PriorityLoop must always own a tracker so PlayLand consumption is gated
         // uniformly for every actor (bot or human). Callers that don't otherwise
@@ -503,7 +511,9 @@ public sealed class PriorityLoop
         // only reject (the old over-include flooded logs / spun the round).
         var landPlayAvailable = phase is { } ph
             && _landDropTracker.CanPlayLand(self, activePlayer, ph, _stack.IsEmpty, out _);
-        return new(self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable);
+        return new(
+            self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable,
+            turnState: _turnStateAccessor?.Invoke());
     }
 
     // PLAN 01 — resolve the agent for a stack object's controller when
