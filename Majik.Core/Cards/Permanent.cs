@@ -652,6 +652,23 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// CR 606.3/306.5b — add <paramref name="amount"/> loyalty to a transient
+    /// loyalty body (a "+N" loyalty-ability cost on a creature-front DFC
+    /// flipped to its planeswalker back). No-op when this permanent has no
+    /// transient body. A real <see cref="Planeswalker"/> overrides this to add
+    /// to its own authoritative field. Returns <c>true</c> if a transient body
+    /// absorbed the addition.
+    /// </summary>
+    public virtual bool AddTransientLoyalty(int amount)
+    {
+        if (amount < 0)
+            throw new ArgumentException("Loyalty addition cannot be negative", nameof(amount));
+        if (_transientLoyalty is not { } current) return false;
+        _transientLoyalty = current + amount;
+        return true;
+    }
+
+    /// <summary>
     /// CR 305.2 / 720 — the number of <em>additional</em> land plays this
     /// permanent grants its controller each turn while it is on the
     /// battlefield ("you may play N additional land(s) on each of your
