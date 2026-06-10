@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -97,6 +98,26 @@ public static class DressDownFactory
 
         // CR 702.8 — Flash. Allows casting at instant speed.
         card.AddAbility(new KeywordAbility("Flash", card, owner));
+
+        // CR 603.1 — "When this enchantment enters, draw a card." A standing
+        // self-ETB triggered ability; resolution draws one card for the
+        // controller via Fx.DrawCards (publishes CardDrawnEvent). Registered on
+        // the supplied TriggerManager when present so it surfaces on the stack
+        // in real games; the shape-only path still attaches it so dispatcher /
+        // identity tests see the cantrip.
+        var drawEffect = new Effect(
+            $"{CardName}: enters — draw a card",
+            () => Fx.DrawCards(owner, 1));
+
+        var etbDraw = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: Triggers.OnEnterBattlefieldSelf(card),
+            effects: new IEffect[] { drawEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(etbDraw);
+        triggers?.RegisterTriggeredAbility(etbDraw);
 
         // CR 500.4 / CR 603.1 — "At the beginning of the end step,
         // sacrifice Dress Down." Triggers.OnStepBegin filters

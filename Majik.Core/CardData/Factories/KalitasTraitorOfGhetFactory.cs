@@ -1,8 +1,11 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
+using Majik.Core.Counters;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
@@ -88,6 +91,13 @@ public static class KalitasTraitorOfGhetFactory
     public const string PrintedManaCost = "{2}{B}{B}";
     public const int Power = 3;
     public const int Toughness = 4;
+
+    /// <summary>Mana cost of the "{2}{B}, Sacrifice another Vampire or
+    /// Zombie: Put two +1/+1 counters on Kalitas" activated ability.</summary>
+    public const string PumpActivationCost = "{2}{B}";
+
+    /// <summary>+1/+1 counters placed by the pump activated ability.</summary>
+    public const int PumpCounters = 2;
 
     /// <summary>
     /// Construct Kalitas with no live runtime services. The triggered
@@ -236,6 +246,35 @@ public static class KalitasTraitorOfGhetFactory
 
         card.AddAbility(diesTrigger);
         triggers?.RegisterTriggeredAbility(diesTrigger);
+
+        // ----------------------------------------------------------------
+        // Activated ability — CR 602.1.
+        //   "{2}{B}, Sacrifice another Vampire or Zombie:
+        //    Put two +1/+1 counters on Kalitas."
+        // Cost = ManaCostCost("{2}{B}") + a filtered sacrifice (another —
+        // i.e. NOT Kalitas itself — Vampire OR Zombie the controller
+        // controls). Effect = place two +1/+1 counters on Kalitas
+        // (CR 122 / CR 121.6) via Fx.PlaceCounter.
+        // ----------------------------------------------------------------
+        var pumpEffect = new Effect(
+            $"{CardName}: put two +1/+1 counters on self",
+            () => Fx.PlaceCounter(card, CounterType.PlusOnePlusOne, PumpCounters));
+
+        var pumpAbility = new ActivatedAbility(
+            source: card,
+            controller: owner,
+            costs: new ICost[]
+            {
+                new ManaCostCost(PumpActivationCost),
+                new SacrificeFilteredCost(
+                    p => !ReferenceEquals(p, card)
+                         && (p.HasSubtype(CardSubtype.Vampire) || p.HasSubtype(CardSubtype.Zombie)),
+                    "sacrifice another Vampire or Zombie",
+                    eventBus),
+            },
+            effects: new IEffect[] { pumpEffect });
+
+        card.AddAbility(pumpAbility);
 
         return card;
     }

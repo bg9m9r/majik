@@ -283,14 +283,91 @@ public class SemanticImplementationAuditTests
     // ==================================================================
 
     /// <summary>
-    /// Cards whose oracle effect-signal legitimately has no on-card bound
-    /// mechanic the classifier can see — provably-working off-card effects, or
-    /// effects the engine models elsewhere. Keeps the suspicious list honest.
+    /// Residual provable false positives the structural suppressions (loyalty
+    /// closures / reminder text / self-pain damage / trigger-condition phrasing)
+    /// can't programmatically reach. Each is a permanent whose flagged
+    /// effect-signal IS implemented but is invisible to the
+    /// <see cref="CardMechanicBlob"/> proxy because the effect lives on a
+    /// continuous/replacement SERVICE (no standing ability), rides a mana
+    /// ability's cost, or carries a rich description that simply omits the
+    /// signal's keyword. Each entry verified working via the prod GameFacade
+    /// path (the same build LiveCards uses) — re-confirm before adding here.
+    ///
+    /// <para>NOTE — the 42 binder-chain-only LANDS that remain flagged
+    /// (Castle Vantress scry, the Panorama / channel / sac-to-destroy / utility
+    /// lands, …) are NOT allowlisted: their special activated abilities are
+    /// genuinely DEAD in prod. Their <c>[CardName]</c> factories implement the
+    /// ability but lands are never routed through factories
+    /// (<c>GameFacade.BuildDeckCard</c> gates the instance-swap on
+    /// <c>!shell.HasType(Land)</c>), and the binder chain
+    /// (<c>OracleLandActivatedAbilityBinder</c> / <c>SagaBinder</c> / …) only
+    /// covers fetch / horizon / saga / manland patterns — not these. They are
+    /// the genuine-gap backlog this report exists to surface (see v1-deferrals,
+    /// "land special-activated-ability binder coverage"). Keeping them flagged
+    /// is the honest state.</para>
     /// </summary>
     private static readonly HashSet<string> EffectCoverageAllowlist =
         new(StringComparer.Ordinal)
         {
-            // Filled from the first report run with justifications.
+            // --- Token-doubling / counter-doubling / life-doubling REPLACEMENT
+            // effects (CR 614). Modeled as a continuous replacement on the
+            // game's replacement bus / CountersService, NOT a standing ability —
+            // the card carries zero card.Abilities, so the blob is empty. All
+            // verified to alter the relevant event in their own factory tests. ---
+            "Anointed Procession",   // doubles tokens you'd create (replacement)
+            "Doubling Season",       // doubles tokens + counters (replacement)
+            "Parallel Lives",        // doubles tokens you'd create (replacement)
+            "Boon Reflection",       // doubles life you'd gain (replacement)
+            "Branching Evolution",   // doubles +1/+1 counters placed (replacement)
+            "Hardened Scales",       // +1 extra +1/+1 counter (replacement)
+            "Conclave Mentor",       // +1 extra +1/+1 counter (replacement) — the
+                                     // dies-gain-life half IS a bound trigger; the
+                                     // flagged +1/+1 is the counter replacement.
+
+            // --- "Each <X> enters with an additional +1/+1 counter" / copy- or
+            // revolt-enters-with-counter statics & replacements (CR 614.1d). The
+            // counter rides the ETB pipeline / a static, not a standing
+            // ability. ---
+            "Grumgully, the Generous", // other non-Humans enter with +1/+1 (static)
+            "Metallic Mimic",          // chosen-type creatures enter with +1/+1 (static)
+            "Narnam Renegade",         // Revolt: enters with a +1/+1 counter (ETB replacement)
+            "Spark Double",            // enters-as-copy with an extra +1/+1 counter (cast-time copy)
+            "Phoenix of Ash",          // escapes WITH a +1/+1 counter — a cast-time
+                                       // (escape) rider, off the permanent.
+
+            // --- Effect IS bound but the rich Fx.Inline DESCRIPTION omits the
+            // signal's keyword, so the blob's text match misses it. Verified the
+            // ability + effect are present on the live card. ---
+            "Boggart Harbinger",       // search bound; desc reads "stack a Goblin … on top"
+            "Klothys, God of Destiny", // deals 2 to each opponent bound via Fx.DealDamageAny; desc says "2 to each opponent"
+            "Nurturing Pixie",         // +1/+1 bound in the ETB trigger; desc reads "then grow if returned"
+            "Phelia, Exuberant Shepherd", // +1/+1-on-Phelia bound in the attack trigger; desc omits "counter"
+            "Ragavan, Nimble Pilferer", // creates a Treasure TOKEN bound; desc reads "Treasure"
+            "Tasigur, the Golden Fang", // the {…}: Mill two … ability is bound; desc omits "mill"
+            "Stormchaser's Talent",    // Level-2 "return target instant/sorcery to hand" bound on the level-up trigger; desc names the level
+            "Generous Ent",            // ETB Food TOKEN bound (investigate-style); desc focuses on the gain-life rider
+            "Old-Growth Troll",        // the Troll TOKEN is created by the granted Aura ability after it dies — off-card (granted-ability), not a standing ability
+
+            // --- Mana-ability COST/RIDER (CR 605) the blob can't see. ---
+            "Chromatic Sphere",        // "Sacrifice: Add any color. Draw a card" — the draw rides the ManaAbility additionalCostPayer
+
+            // --- Token-rider effects that live on the CREATED TOKEN, not the
+            // source permanent (off-card). ---
+            "Weapons Manufacturing",   // the Munitions TOKEN deals the damage on leaving; the enchantment only creates it (bound)
+            "Sedgemoor Witch",         // the Pest TOKEN's dies-trigger gains 1 life; the magecraft token-create is bound
+
+            // --- Aura that GRANTS an activated ability to the enchanted creature
+            // (CR 613 granted ability) — the token-creating ability is on the
+            // host creature, not Splinter Twin itself. ---
+            "Splinter Twin",
+
+            // --- Saga chapter effects (CR 714) live in an off-card SagaState
+            // (lore-counter triggers), NOT standing card.Abilities. Verified:
+            // the live Urza's Saga carries a SagaState whose chapter II creates
+            // the 0/0 Construct TOKEN and chapter III SEARCHES for an artifact
+            // (SagaBinder.MakeUrzasSagaChapterHandler). The blob only sees the
+            // chapter-I {T}: Add {C} mana ability. ---
+            "Urza's Saga",
         };
 
     private sealed record EffectSignal(string Label, Func<string, bool> Oracle, string[] MechanicFragments);
@@ -302,9 +379,14 @@ public class SemanticImplementationAuditTests
         new("draw a card",    o => Has(o, "draw a card") || Has(o, "draw two") || Has(o, "draw three"),
                                                                                      new[] { "Draw" }),
         new("mill",           o => Has(o, "mill "),                                  new[] { "Mill" }),
-        new("create a token", o => Has(o, "create ") && Has(o, "token"),            new[] { "Token" }),
-        new("+1/+1 counter",  o => Has(o, "+1/+1 counter"),                         new[] { "Counter", "Plus1" }),
-        new("deals N damage", o => HasDamage(o),                                     new[] { "Damage", "Deal" }),
+        // Effect DESCRIPTIONS use the natural-language verb ("create a 1/1 white
+        // Cat Soldier", "put a +1/+1 counter", "deal 1 damage") rather than the
+        // C# class name, so credit the verb token too — a token/counter/damage
+        // ability whose closure is anonymous (no telling class name) is still
+        // recognised by its rich Fx.Inline description.
+        new("create a token", o => Has(o, "create ") && Has(o, "token"),            new[] { "Token", "create " }),
+        new("+1/+1 counter",  o => Has(o, "+1/+1 counter"),                         new[] { "Counter", "Plus1", "+1/+1" }),
+        new("deals N damage", o => HasDamage(o),                                     new[] { "Damage", "Deal", "damage" }),
         new("gain N life",    o => Has(o, "gain ") && Has(o, "life"),               new[] { "Life", "Gain" }),
         new("destroy target", o => Has(o, "destroy target"),                        new[] { "Destroy" }),
         new("exile target",   o => Has(o, "exile target"),                          new[] { "Exile" }),
@@ -313,6 +395,183 @@ public class SemanticImplementationAuditTests
     };
 
     private sealed record Suspicious(string Name, IReadOnlyList<string> MissingSignals);
+
+    /// <summary>
+    /// Per-card detection, factored out so the false-positive-suppression rules
+    /// are unit-testable in isolation (see <c>EffectCoverage_*</c> tests).
+    /// Returns the effect signals the card's oracle promises but whose bound
+    /// mechanic the classifier cannot see — AFTER the structural false-positive
+    /// suppressions below. Empty list = not flagged.
+    ///
+    /// <para>The suppressions (each kills a provable false-positive CLASS the
+    /// blob can't see but which IS implemented off-card):</para>
+    /// <list type="number">
+    ///   <item><b>Loyalty closures (CR 606).</b> A planeswalker's loyalty
+    ///   abilities ARE standing <see cref="LoyaltyAbility"/> entries, but their
+    ///   effects are opaque <c>Fx.Inline</c> closures whose Description is just
+    ///   "Loyalty +N" — the blob can't read the create-token / draw / damage
+    ///   body. Loyalty abilities are dispatched + resolved end-to-end through the
+    ///   priority loop, so a card carrying ANY <see cref="LoyaltyAbility"/> has
+    ///   its loyalty-derived oracle signals covered. Almost all of a
+    ///   planeswalker's oracle text is loyalty abilities, so we treat such a card
+    ///   as covered.</item>
+    ///   <item><b>Reminder text (CR 207.2).</b> Keyword reminder text in
+    ///   parentheses (Lifelink "(Damage … causes you to gain that much life)",
+    ///   Infect/Wither, First strike, Dredge, Connive, Explore, Bloodthirst,
+    ///   Cycling "({cost}, Discard this card: Draw a card.)", Investigate / Food
+    ///   / Blood token reminders) mentions an effect that belongs to a keyword
+    ///   that IS bound elsewhere — never an on-card ability of this card. We scan
+    ///   only the NON-parenthetical text so a reminder-only signal is not
+    ///   flagged.</item>
+    ///   <item><b>Self-pain mana riders (CR 120).</b> "This land/artifact deals
+    ///   1 damage to you" on the painland / Talisman cycle is bound as a
+    ///   <see cref="ManaAbility"/> additional-cost (LoseLife) the blob can't see.
+    ///   When the ONLY damage in the oracle is self-directed ("damage to you"),
+    ///   the "deals N damage" signal is suppressed.</item>
+    /// </list>
+    /// </summary>
+    internal static IReadOnlyList<string> DetectMissingEffectSignals(ICard card, CardEntity entity)
+    {
+        // PERMANENTS only — instants/sorceries resolve their effects at cast
+        // time off the card, so an empty on-card mechanic set is expected.
+        if (!IsPermanent(card)) return Array.Empty<string>();
+
+        var rawOracle = (entity.OracleText ?? "").ToLowerInvariant();
+        if (rawOracle.Length == 0) return Array.Empty<string>();
+
+        // Suppression #1 — loyalty closures. A planeswalker's loyalty bodies are
+        // opaque Fx.Inline closures (Description == "Loyalty +N"); they ARE bound
+        // + dispatched, just invisible to the blob. Treat the whole card as
+        // covered.
+        if (card.Abilities.OfType<LoyaltyAbility>().Any())
+            return Array.Empty<string>();
+
+        // Suppression #2 — strip parenthetical reminder text (CR 207.2) before
+        // scanning. Keyword/cycling/token reminders describe an effect that
+        // belongs to a bound keyword, not an on-card ability of this card.
+        var oracle = StripReminderText(rawOracle);
+
+        var blob = CardMechanicBlob(card);
+        var missing = new List<string>();
+        foreach (var sig in Signals)
+        {
+            if (!sig.Oracle(oracle)) continue;
+
+            // Suppression #3 — self-pain mana rider. If the only damage in the
+            // (reminder-stripped) oracle is "deals N damage to you", the painland
+            // / Talisman LoseLife mana-cost rider covers it.
+            if (sig.Label == "deals N damage" && IsOnlySelfPainDamage(oracle))
+                continue;
+
+            // Suppression #4 — the signal word is a TRIGGER CONDITION, not an
+            // effect the card produces. "Whenever you gain life, …" / "Whenever
+            // you draw a card, …" / "If you would gain life, …" name the EVENT
+            // the ability keys off; the EFFECT is the rider (a +1/+1 counter, a
+            // life-doubling replacement, …) which is bound (or is a continuous
+            // replacement on a service). Suppress the gain/draw signal when its
+            // only occurrence is such a condition clause.
+            if (sig.Label == "gain N life" && IsOnlyGainLifeCondition(oracle))
+                continue;
+            if (sig.Label == "draw a card" && IsOnlyDrawCondition(oracle))
+                continue;
+
+            if (!sig.MechanicFragments.Any(f => blob.Contains(f, StringComparison.OrdinalIgnoreCase)))
+                missing.Add(sig.Label);
+        }
+        return missing;
+    }
+
+    /// <summary>CR 207.2 — remove every parenthesized reminder-text span. The
+    /// effect words inside reminder text (e.g. lifelink's "gain that much life",
+    /// cycling's "Draw a card") name a bound keyword's behaviour, never an
+    /// on-card ability the blob should have to carry.</summary>
+    private static string StripReminderText(string oracle)
+        => System.Text.RegularExpressions.Regex.Replace(oracle, @"\([^)]*\)", " ");
+
+    /// <summary>True when EVERY "deal(s) N damage" occurrence in the oracle is
+    /// self-directed ("... damage to you") — the painland / Talisman LoseLife
+    /// mana-cost rider, which the blob can't see. A card that also deals damage
+    /// to "any target" / "each opponent" / a creature is NOT suppressed.</summary>
+    private static bool IsOnlySelfPainDamage(string oracle)
+    {
+        bool sawDamage = false;
+        foreach (var verb in new[] { "deals ", "deal " })
+        {
+            int idx = oracle.IndexOf(verb, StringComparison.OrdinalIgnoreCase);
+            while (idx >= 0)
+            {
+                var rest = oracle.Substring(idx + verb.Length);
+                int dmg = rest.IndexOf("damage", StringComparison.OrdinalIgnoreCase);
+                if (dmg >= 0 && dmg < 12)
+                {
+                    sawDamage = true;
+                    // Look at the words right after "damage" for the recipient.
+                    var after = rest.Substring(dmg);
+                    if (!after.StartsWith("damage to you", StringComparison.OrdinalIgnoreCase))
+                        return false; // a non-self damage target exists
+                }
+                idx = oracle.IndexOf(verb, idx + verb.Length, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        return sawDamage;
+    }
+
+    /// <summary>True when every "gain … life" phrase in the oracle is a TRIGGER
+    /// CONDITION ("whenever you gain life", "if you would gain life") rather than
+    /// an effect that gains life. The card's actual effect is the rider (bound),
+    /// or a life-gain-doubling replacement (continuous, off-card).</summary>
+    private static bool IsOnlyGainLifeCondition(string oracle)
+        => OnlyMatchesCondition(
+            oracle,
+            valuePattern: @"gain\b[^.]*?\blife",
+            conditionPatterns: new[]
+            {
+                @"whenever\s+\w+\s+gain[s]?\b[^.]*?\blife",   // "whenever you gain life"
+                @"if\s+\w+\s+would\s+gain\b[^.]*?\blife",     // "if you would gain life"
+                @"can'?t\s+gain\b[^.]*?\blife",               // "players can't gain life"
+            });
+
+    /// <summary>True when every "draw a card" phrase in the oracle is a TRIGGER
+    /// CONDITION ("whenever you draw a card", "if you would draw a card")
+    /// rather than an effect that draws. (Cycling reminders are already stripped
+    /// upstream.)</summary>
+    private static bool IsOnlyDrawCondition(string oracle)
+        => OnlyMatchesCondition(
+            oracle,
+            valuePattern: @"draw\s+(a\s+card|two|three)",
+            conditionPatterns: new[]
+            {
+                @"whenever\s+\w+(\s+\w+)?\s+draw[s]?\s+(a\s+card|their)",  // "whenever you/an opponent draw(s) a card"
+                @"if\s+\w+\s+would\s+draw\s+a\s+card",                     // "if you would draw a card"
+            });
+
+    /// <summary>Generic: true when at least one occurrence of
+    /// <paramref name="valuePattern"/> exists AND every such occurrence is part
+    /// of one of the <paramref name="conditionPatterns"/> (a trigger/replacement
+    /// CONDITION clause), so the signal names an event the card keys off, not an
+    /// effect it produces.</summary>
+    private static bool OnlyMatchesCondition(
+        string oracle, string valuePattern, string[] conditionPatterns)
+    {
+        var opts = System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        var valueMatches = System.Text.RegularExpressions.Regex.Matches(oracle, valuePattern, opts);
+        if (valueMatches.Count == 0) return false;
+
+        // Build the set of character spans covered by any condition clause.
+        var condSpans = new List<(int Start, int End)>();
+        foreach (var pat in conditionPatterns)
+            foreach (System.Text.RegularExpressions.Match m in
+                     System.Text.RegularExpressions.Regex.Matches(oracle, pat, opts))
+                condSpans.Add((m.Index, m.Index + m.Length));
+
+        foreach (System.Text.RegularExpressions.Match v in valueMatches)
+        {
+            int vs = v.Index, ve = v.Index + v.Length;
+            bool covered = condSpans.Any(s => vs >= s.Start && ve <= s.End);
+            if (!covered) return false; // a value occurrence that is NOT a condition → a real effect
+        }
+        return true;
+    }
 
     [Fact]
     public void PrintOracleEffectCoverage()
@@ -326,22 +585,7 @@ public class SemanticImplementationAuditTests
             if (entity == null) continue;
             if (!LiveCards.TryGetValue(name, out var card)) continue;
 
-            // PERMANENTS only — instants/sorceries resolve their effects at cast
-            // time off the card, so an empty on-card mechanic set is expected.
-            if (!IsPermanent(card)) continue;
-
-            var oracle = (entity.OracleText ?? "").ToLowerInvariant();
-            if (oracle.Length == 0) continue;
-
-            var blob = CardMechanicBlob(card);
-            var missing = new List<string>();
-            foreach (var sig in Signals)
-            {
-                if (sig.Oracle(oracle)
-                    && !sig.MechanicFragments.Any(f => blob.Contains(f, StringComparison.OrdinalIgnoreCase)))
-                    missing.Add(sig.Label);
-            }
-
+            var missing = DetectMissingEffectSignals(card, entity);
             if (missing.Count > 0)
                 suspicious.Add(new(name, missing));
         }
@@ -354,12 +598,124 @@ public class SemanticImplementationAuditTests
 
         _out.WriteLine("===== LAYER B: ORACLE-EFFECT COVERAGE (heuristic report — NOT a gate) =====");
         _out.WriteLine("Permanents whose oracle promises an effect with no matching bound mechanic.");
-        _out.WriteLine("Expect false positives: effects on the cast-time stack, off-card continuous");
-        _out.WriteLine("effects, or mechanics the classifier's keyword set doesn't recognize.");
+        _out.WriteLine("Loyalty closures, parenthetical reminder text (CR 207.2), and self-pain mana");
+        _out.WriteLine("riders are suppressed structurally; the EffectCoverageAllowlist removes the");
+        _out.WriteLine("residual provable off-card false positives. The remaining flags are the");
+        _out.WriteLine("genuine-gap backlog (mostly the binder-chain-only land activated abilities");
+        _out.WriteLine("whose [CardName] factories are dead in prod — see v1-deferrals land-routing).");
         _out.WriteLine($"Suspicious permanents : {ranked.Count}");
         _out.WriteLine("");
         foreach (var s in ranked)
             _out.WriteLine($"  [{s.MissingSignals.Count}] {s.Name} — missing: {string.Join(", ", s.MissingSignals)}");
+    }
+
+    // ==================================================================
+    // LAYER B — heuristic-honesty GATES (these DO gate; tiny + targeted).
+    // They prove the false-positive suppressions fire and a genuine gap
+    // still surfaces, without pinning the whole noisy backlog.
+    // ==================================================================
+
+    /// <summary>A planeswalker (loyalty closures) must NOT be flagged — every
+    /// effect signal it carries is inside a <see cref="LoyaltyAbility"/> body
+    /// the blob can't read. Jace, the Mind Sculptor promises "draw … / return
+    /// to hand"; suppression #1 covers it.</summary>
+    [Fact]
+    public void Heuristic_Planeswalker_LoyaltyClosures_NotFlagged()
+    {
+        var entity = Repo.GetByName("Jace, the Mind Sculptor");
+        entity.Should().NotBeNull();
+        LiveCards.TryGetValue("Jace, the Mind Sculptor", out var card).Should().BeTrue();
+        card!.Abilities.OfType<LoyaltyAbility>().Should().NotBeEmpty(
+            "Jace carries standing LoyaltyAbility entries");
+
+        DetectMissingEffectSignals(card, entity!).Should().BeEmpty(
+            "a planeswalker's loyalty-closure effects are bound + dispatched, just invisible to the blob");
+    }
+
+    /// <summary>An instant/sorcery is never a permanent, so its cast-time
+    /// effects are always excluded — Lightning Bolt ("deals 3 damage") must not
+    /// be flagged.</summary>
+    [Fact]
+    public void Heuristic_Instant_CastTimeEffect_NotFlagged()
+    {
+        // Pick any implemented instant/sorcery with a damage signal.
+        var instant = ImplementedCardNames.All
+            .Select(n => (Name: n, Entity: Repo.GetByName(n)))
+            .FirstOrDefault(x => x.Entity != null
+                && LiveCards.TryGetValue(x.Name, out var c)
+                && !IsPermanent(c)
+                && (x.Entity.OracleText ?? "").Contains("damage", StringComparison.OrdinalIgnoreCase));
+        instant.Entity.Should().NotBeNull("the pool has at least one damage-dealing instant/sorcery");
+
+        var card = LiveCards[instant.Name];
+        DetectMissingEffectSignals(card, instant.Entity!).Should().BeEmpty(
+            "instant/sorcery effects resolve at cast time off the card — never flagged");
+    }
+
+    /// <summary>A pain land ("deals 1 damage to you" mana rider) must NOT be
+    /// flagged — suppression #3 covers the self-pain mana cost.</summary>
+    [Fact]
+    public void Heuristic_PainLand_SelfDamageRider_NotFlagged()
+    {
+        var entity = Repo.GetByName("Adarkar Wastes");
+        entity.Should().NotBeNull();
+        LiveCards.TryGetValue("Adarkar Wastes", out var card).Should().BeTrue();
+
+        DetectMissingEffectSignals(card!, entity!).Should().BeEmpty(
+            "'deals 1 damage to you' is a ManaAbility cost rider (LoseLife), not a missing ping");
+    }
+
+    /// <summary>A cycling land ("Cycling … Draw a card" reminder) must NOT be
+    /// flagged for "draw a card" — suppression #2 strips the reminder text.
+    /// (The land may still be flagged for OTHER genuine gaps; this asserts only
+    /// the cycling-draw false positive is gone.)</summary>
+    [Fact]
+    public void Heuristic_CyclingLand_ReminderDraw_NotFlaggedForDraw()
+    {
+        var entity = Repo.GetByName("Tranquil Thicket");
+        entity.Should().NotBeNull();
+        LiveCards.TryGetValue("Tranquil Thicket", out var card).Should().BeTrue();
+
+        DetectMissingEffectSignals(card!, entity!).Should().NotContain("draw a card",
+            "cycling's 'Draw a card' lives in parenthetical reminder text (CR 207.2)");
+    }
+
+    /// <summary>The genuine-gap sentinel — a binder-chain-only land whose
+    /// special activated ability is DEAD in prod (its [CardName] factory is not
+    /// routed for lands) MUST stay flagged. Castle Vantress promises "Scry 2"
+    /// with no bound scry. If this ever stops flagging, the land was either
+    /// fixed (remove from this assertion) or the heuristic over-suppressed.</summary>
+    [Fact]
+    public void Heuristic_GenuineLandGap_StillFlagged()
+    {
+        var entity = Repo.GetByName("Castle Vantress");
+        entity.Should().NotBeNull();
+        LiveCards.TryGetValue("Castle Vantress", out var card).Should().BeTrue();
+        card!.Abilities.Should().NotContain(a => a.GetType().Name.Contains("Scry"),
+            "Castle Vantress's scry ability is genuinely unbound in the prod build");
+
+        DetectMissingEffectSignals(card, entity!).Should().Contain("scry",
+            "the genuine missing scry must remain in the backlog (binder-chain-only land, factory dead in prod)");
+    }
+
+    /// <summary>The EffectCoverageAllowlist must stay HONEST: every entry must
+    /// be a card that the detector would otherwise flag. A stale entry (one the
+    /// suppressions or a later fix already cleared) is a silent bug, so fail if
+    /// any allowlisted name no longer produces a missing signal.</summary>
+    [Fact]
+    public void Heuristic_Allowlist_EntriesStillTripTheDetector()
+    {
+        var stale = new List<string>();
+        foreach (var name in EffectCoverageAllowlist)
+        {
+            var entity = Repo.GetByName(name);
+            if (entity == null) { stale.Add($"{name} (not in seed)"); continue; }
+            if (!LiveCards.TryGetValue(name, out var card)) { stale.Add($"{name} (not built)"); continue; }
+            if (DetectMissingEffectSignals(card, entity).Count == 0)
+                stale.Add($"{name} (no longer flagged — remove it)");
+        }
+        stale.Should().BeEmpty(
+            "every allowlist entry must still trip the detector; remove stale entries");
     }
 
     // ------------------------------------------------------------------
@@ -368,22 +724,24 @@ public class SemanticImplementationAuditTests
     private static bool Has(string oracle, string needle)
         => oracle.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
-    private static bool HasDamage(string oracle)
-    {
-        // "deals N damage" / "deal N damage" — require "damage" close after the verb.
-        foreach (var verb in new[] { "deals ", "deal " })
-        {
-            int idx = oracle.IndexOf(verb, StringComparison.OrdinalIgnoreCase);
-            while (idx >= 0)
-            {
-                var rest = oracle.Substring(idx + verb.Length);
-                int dmg = rest.IndexOf("damage", StringComparison.OrdinalIgnoreCase);
-                if (dmg >= 0 && dmg < 12) return true;
-                idx = oracle.IndexOf(verb, idx + verb.Length, StringComparison.OrdinalIgnoreCase);
-            }
-        }
-        return false;
-    }
+    // "deal(s) <N> damage" where N is a number / X — the signature of an ACTIVE
+    // damage effect (a ping). Deliberately excludes:
+    //   - "deals COMBAT damage" — a TRIGGER CONDITION ("Whenever equipped
+    //     creature deals combat damage to a player, …"); combat damage is dealt
+    //     by the combat system, never as an ability effect, and the bound effect
+    //     is the trigger's RIDER (gain life / draw / etc.), not a ping.
+    //   - "would deal … damage … deals double/that damage" — a damage-altering
+    //     REPLACEMENT effect (Furnace of Rath / Gisela), modeled continuously on
+    //     a service, not an on-card ping ability.
+    // Requiring an explicit numeric amount right after the verb keeps both of
+    // those out (they read "deals combat damage" / "deals double that damage",
+    // no leading digit).
+    private static readonly System.Text.RegularExpressions.Regex DamagePingRegex =
+        new(@"deals?\s+(\d+|x)\s+damage",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static bool HasDamage(string oracle) => DamagePingRegex.IsMatch(oracle);
 
     /// <summary>"What does this card do" proxy: the runtime-type names of every
     /// ability the card carries, the type names of every bound
