@@ -235,7 +235,15 @@ public static class KnightOfTheWhiteOrchidFactory
             var zones = ZoneServiceRegistry.Get(player);
             if (zones != null)
             {
-                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+                // Async move so the ResolutionContext (carrying the agent)
+                // reaches a prompting ETB replacement — a Plains-typed shock
+                // land (Hallowed Fountain, Sacred Foundry, …) must offer the
+                // "pay 2 life?" choice (ShockLandReplacement.ReplaceAsync)
+                // instead of auto-paying via the synchronous replacement
+                // path. The land enters untapped, so the prompt is
+                // load-bearing.
+                await zones.MoveCardToAsync(pick, ZoneType.Battlefield, ctx, controller: player)
+                    .ConfigureAwait(false);
             }
             else
             {

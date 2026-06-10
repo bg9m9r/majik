@@ -187,7 +187,17 @@ public static class KnightOfTheReliquaryFactory
                             ?? Majik.Core.Services.ZoneServiceRegistry.Get(controller);
                         if (zones != null)
                         {
-                            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+                            // Async move so the ResolutionContext (carrying
+                            // the controller's agent) reaches a prompting ETB
+                            // replacement — a tutored shock land must offer
+                            // the "pay 2 life?" choice
+                            // (ShockLandReplacement.ReplaceAsync) instead of
+                            // auto-paying via the synchronous replacement
+                            // path. Knight puts the land in untapped, so the
+                            // prompt's outcome is load-bearing.
+                            await zones.MoveCardToAsync(
+                                pick, ZoneType.Battlefield, ctx, controller: controller)
+                                .ConfigureAwait(false);
                         }
                         else
                         {
