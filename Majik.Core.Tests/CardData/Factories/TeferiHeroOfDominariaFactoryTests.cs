@@ -8,6 +8,7 @@ using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
+using System.Threading.Tasks;
 using Xunit;
 using MajikStack = Majik.Core.Stack.Stack;
 
@@ -25,13 +26,11 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    −8: You get an emblem with 'Whenever you draw a card, exile target
 ///        permanent an opponent controls.'"
 ///
-/// Covers:
-///   - Card identity (Legendary Planeswalker — Teferi, loyalty 4, {3}{W}{U}),
-///     materialised from the embedded JSON definition.
-///   - +1: draw + delayed-trigger untap-up-to-two-lands at the next end step.
-///   - −3: target nonland permanent → owner's library third from the top.
-///   - −8: emblem with a draw-trigger that exiles an opponent's permanent.
-///   - NamedCardFactory dispatch.
+/// These are FACTORY-level (shape / structure / direct-activation) tests. The
+/// agent-targeted prod-path tests — the −3 puts the CHOSEN permanent third from
+/// top, the +1 untaps the CHOSEN lands at the next end step — live in
+/// <see cref="Majik.Core.Tests.Game.LoyaltyAbilityDispatchTests"/>, driven
+/// through a real <c>TurnDriver</c> turn with a target-choosing agent.
 /// </summary>
 [Trait("Color", "M")]
 public class TeferiHeroOfDominariaFactoryTests
@@ -69,13 +68,54 @@ public class TeferiHeroOfDominariaFactoryTests
         loyalty.Select(a => a.LoyaltyChange)
             .Should().BeEquivalentTo(new[] { +1, -3, -8 });
     }
+
+    [Fact]
+    public void NamedCardFactory_DispatchesTeferi()
+    {
+        var teferi = NamedCardFactory.Create("Teferi, Hero of Dominaria", _alice);
+
+        teferi.Should().BeOfType<Planeswalker>();
+        teferi.Name.Should().Be("Teferi, Hero of Dominaria");
+        teferi.HasSubtype(CardSubtype.Teferi).Should().BeTrue();
+    }
+
     // -----------------------------------------------------------------------
-    // +1: Draw a card; at the beginning of the next end step untap up to two
-    //     lands.
+    // Loyalty abilities declare real TargetRequests (the agent-target infra
+    // the prod loyalty path consumes).
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Plus1_DrawsACard_AndSchedulesNextEndStepUntap()
+    public void Plus1_DeclaresUpToTwoLandsTargetRequest()
+    {
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice);
+        var plus1 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1);
+
+        plus1.TargetRequests.Should().HaveCount(1);
+        var req = plus1.TargetRequests[0];
+        req.MinTargets.Should().Be(0, "\"up to\" two lands");
+        req.MaxTargets.Should().Be(2);
+    }
+
+    [Fact]
+    public void Minus3_DeclaresTargetNonlandPermanentRequest()
+    {
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice);
+        var minus3 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -3);
+
+        minus3.TargetRequests.Should().HaveCount(1);
+        var req = minus3.TargetRequests[0];
+        req.MinTargets.Should().Be(1, "−3 targets a single nonland permanent");
+        req.MaxTargets.Should().Be(1);
+    }
+
+    // -----------------------------------------------------------------------
+    // +1: Draw a card; at the beginning of the next end step untap up to two
+    //     chosen lands. (Direct activation: simulate the chosen-targets the
+    //     prod loyalty path would supply.)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Plus1_DrawsACard_AndSchedulesNextEndStepUntap_OfChosenLands()
     {
         var top = new Card("Top", "{1}") { Owner = _alice };
         _alice.Zones.Library.AddCard(top);
@@ -92,30 +132,30 @@ public class TeferiHeroOfDominariaFactoryTests
         var bus = new EventBus();
         var triggers = new TriggerManager(new MajikStack(bus), bus);
 
-        var teferi = TeferiHeroOfDominariaFactory.Create(
-            _alice,
-            landUntapResolver: () => new[] { land1, land2 },
-            targetPermanentResolver: null,
-            opponentPermanentResolver: null,
-            triggers: triggers);
-
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice, triggers);
         var plus1 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1);
-        plus1.Activate();
+
+        // Resolve the +1 with the two lands chosen (what DispatchLoyalty supplies).
+        plus1.PayLoyaltyCost();
+        var rc = ResolutionContext.For(
+            _alice, agent: null, game: null,
+            chosenTargets: new[] { new object[] { land1, land2 } },
+            ct: default);
+        foreach (var e in plus1.Effects) await e.ExecuteAsync(rc);
 
         // Draw happened.
         _alice.Zones.Hand.GetCards().Should().Contain(top);
         teferi.Loyalty.Should().Be(5); // 4 + 1
 
         // A delayed end-step trigger is now registered.
-        triggers.IsRegistered(teferi.Abilities.OfType<DelayedTriggeredAbility>().Last())
-            .Should().BeTrue();
+        var delayed = teferi.Abilities.OfType<DelayedTriggeredAbility>().Last();
+        triggers.IsRegistered(delayed).Should().BeTrue();
 
         // Lands still tapped until the trigger resolves.
         land1.IsTapped.Should().BeTrue();
         land2.IsTapped.Should().BeTrue();
 
         // Resolve the delayed trigger's effect (the untap clause).
-        var delayed = teferi.Abilities.OfType<DelayedTriggeredAbility>().Last();
         foreach (var e in delayed.Effects) e.Execute();
 
         land1.IsTapped.Should().BeFalse();
@@ -123,41 +163,37 @@ public class TeferiHeroOfDominariaFactoryTests
     }
 
     [Fact]
-    public void Plus1_UntapsAtMostTwoLands()
+    public async Task Plus1_NoChosenLands_DrawsButSchedulesNoUntap()
     {
-        var lands = new List<Land>();
-        for (var i = 0; i < 4; i++)
-        {
-            var l = new Land($"Forest{i}", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest });
-            l.SetOwner(_alice); _alice.Zones.Battlefield.AddCard(l);
-            l.SetZone(ZoneType.Battlefield); l.SetController(_alice); l.Tap();
-            lands.Add(l);
-        }
+        var top = new Card("Top", "{1}") { Owner = _alice };
+        _alice.Zones.Library.AddCard(top);
+        top.SetZone(ZoneType.Library);
 
         var bus = new EventBus();
         var triggers = new TriggerManager(new MajikStack(bus), bus);
-        var teferi = TeferiHeroOfDominariaFactory.Create(
-            _alice,
-            landUntapResolver: () => lands,
-            targetPermanentResolver: null,
-            opponentPermanentResolver: null,
-            triggers: triggers);
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice, triggers);
+        var plus1 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1);
 
-        teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1).Activate();
-        var delayed = teferi.Abilities.OfType<DelayedTriggeredAbility>().Last();
-        foreach (var e in delayed.Effects) e.Execute();
+        plus1.PayLoyaltyCost();
+        var rc = ResolutionContext.For(
+            _alice, agent: null, game: null,
+            chosenTargets: System.Array.Empty<IReadOnlyList<object>>(),
+            ct: default);
+        foreach (var e in plus1.Effects) await e.ExecuteAsync(rc);
 
-        // "up to two" — exactly two untapped.
-        lands.Count(l => !l.IsTapped).Should().Be(2);
+        _alice.Zones.Hand.GetCards().Should().Contain(top, "the draw always happens");
+        teferi.Loyalty.Should().Be(5);
+        teferi.Abilities.OfType<DelayedTriggeredAbility>().Should()
+            .BeEmpty("\"up to two\" — choosing zero lands schedules no untap");
     }
 
     // -----------------------------------------------------------------------
     // −3: Put target nonland permanent into its owner's library third from the
-    //     top.
+    //     top. (Direct activation with the chosen target supplied.)
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Minus3_PutsTargetNonlandPermanent_ThirdFromTopOfOwnersLibrary()
+    public async Task Minus3_PutsChosenNonlandPermanent_ThirdFromTopOfOwnersLibrary()
     {
         // Bob's library has two cards on top.
         var libTop = new Card("LibTop", "{1}") { Owner = _bob };
@@ -169,14 +205,15 @@ public class TeferiHeroOfDominariaFactoryTests
         bears.SetOwner(_bob); _bob.Zones.Battlefield.AddCard(bears);
         bears.SetZone(ZoneType.Battlefield); bears.SetController(_bob);
 
-        var teferi = TeferiHeroOfDominariaFactory.Create(
-            _alice,
-            landUntapResolver: null,
-            targetPermanentResolver: () => new[] { (Permanent)bears },
-            opponentPermanentResolver: null,
-            triggers: null);
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice);
+        var minus3 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -3);
 
-        teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -3).Activate();
+        minus3.PayLoyaltyCost();
+        var rc = ResolutionContext.For(
+            _alice, agent: null, game: null,
+            chosenTargets: new[] { new object[] { bears } },
+            ct: default);
+        foreach (var e in minus3.Effects) await e.ExecuteAsync(rc);
 
         teferi.Loyalty.Should().Be(1); // 4 - 3
         _bob.Zones.Battlefield.GetCards().Should().NotContain(bears);
@@ -190,34 +227,13 @@ public class TeferiHeroOfDominariaFactoryTests
         lib[2].Should().BeSameAs(bears);
     }
 
-    [Fact]
-    public void Minus3_DoesNotTargetLands()
-    {
-        var land = new Land("Mountain", new[] { CardSupertype.Basic }, new[] { CardSubtype.Mountain });
-        land.SetOwner(_bob); _bob.Zones.Battlefield.AddCard(land);
-        land.SetZone(ZoneType.Battlefield); land.SetController(_bob);
-
-        var teferi = TeferiHeroOfDominariaFactory.Create(
-            _alice,
-            landUntapResolver: null,
-            targetPermanentResolver: () => new[] { (Permanent)land },
-            opponentPermanentResolver: null,
-            triggers: null);
-
-        teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -3).Activate();
-
-        // "nonland permanent" — the land is skipped.
-        _bob.Zones.Battlefield.GetCards().Should().Contain(land);
-        _bob.Zones.Library.GetCards().Should().NotContain(land);
-    }
-
     // -----------------------------------------------------------------------
     // −8: emblem with "Whenever you draw a card, exile target permanent an
     //     opponent controls."
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Minus8_CreatesEmblem_WithDrawTriggerThatExilesOpponentPermanent()
+    public async Task Minus8_CreatesEmblem_WithTargetedDrawTrigger_ThatExilesChosenPermanent()
     {
         // Bob controls a permanent the emblem can exile.
         var goblin = new Creature("Goblin", "{R}", 1, 1);
@@ -227,12 +243,7 @@ public class TeferiHeroOfDominariaFactoryTests
         var bus = new EventBus();
         var triggers = new TriggerManager(new MajikStack(bus), bus);
 
-        var teferi = TeferiHeroOfDominariaFactory.Create(
-            _alice,
-            landUntapResolver: null,
-            targetPermanentResolver: null,
-            opponentPermanentResolver: () => new[] { (Permanent)goblin },
-            triggers: triggers);
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice, triggers);
 
         teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -8)
             .CanActivate().Should().BeFalse("4 loyalty is not enough for −8");
@@ -244,14 +255,19 @@ public class TeferiHeroOfDominariaFactoryTests
 
         teferi.Loyalty.Should().Be(0); // 8 - 8
 
-        // Emblem minted in Alice's command zone.
+        // Emblem minted in Alice's command zone with a TARGETED draw trigger.
         _alice.Emblems.Should().HaveCount(1);
         var emblem = _alice.Emblems.Single();
-        emblem.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-
-        // Fire the emblem's draw trigger effect — exiles the opponent's permanent.
         var drawTrigger = emblem.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in drawTrigger.Effects) e.Execute();
+        drawTrigger.TargetRequests.Should().HaveCount(1,
+            "the emblem's draw trigger targets a permanent an opponent controls");
+
+        // Fire the emblem's draw trigger with the chosen target supplied.
+        var rc = ResolutionContext.For(
+            _alice, agent: null, game: null,
+            chosenTargets: new[] { new object[] { goblin } },
+            ct: default);
+        foreach (var e in drawTrigger.Effects) await e.ExecuteAsync(rc);
 
         _bob.Zones.Battlefield.GetCards().Should().NotContain(goblin);
         _bob.Zones.Exile.GetCards().Should().Contain(goblin);

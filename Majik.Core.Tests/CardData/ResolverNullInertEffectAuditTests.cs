@@ -204,32 +204,15 @@ public sealed class ResolverNullInertEffectAuditTests
             ["HiredClawFactory.cs"] =
                 "attack-trigger Effect deals damage to 'target opponent'; prod supplies the target via ChosenTargets, resolver is a v1 fallback — needs the targeting system, not a context-read. v1-deferrals #3b.",
 
-            // === Tier 2: genuine targeting-infra deferral — #2551b sweep tail ===
-            // The #2551b sweep (this PR) cleared the REST of the routed-factory
-            // resolver-null class that #2551 did not touch — board-wipes that
-            // enumerate all players to reach the battlefield (Pernicious Deed,
-            // Engineered Explosives, Oblivion Stone, Ratchet Bomb, Steel Hellkite,
-            // Kozilek's Return), graveyard-hate that enumerates graveyards (Relic of
-            // Progenitus, Rest in Peace, Sanctifier en-Vec, Sentinel Totem,
-            // Scavenging Ooze, Ruin Crab), opponents-mill (Soaring Thought-Thief,
-            // Thieves' Guild Enforcer), each-player edicts / discard / search with
-            // per-player choice (Smallpox, Plaguecrafter, Exhume, Veteran Explorer),
-            // and the all-players enumeration cards (Adeline, Etched Oracle, Faerie
-            // Mastermind, Knight of the Ebon Legion, Ranger-Captain of Eos,
-            // Reanimate, Roiling Vortex, Scourge of the Skyclaves, Goblin Welder,
-            // Etali Primal Storm) — all now read ContextOpponents.Of / ctx.Game.
-            // AllPlayers at resolution (per-player "of their choice" picks read that
-            // player's AgentRegistry agent).
-            //
-            // What REMAINS is the one card that needs MORE than a context-read +
-            // AgentRegistry: Teferi's ultimate exiles "target permanent an opponent
-            // controls" (CR 110.4a) — a true chosen TARGET, which on the routed
-            // build arrives via the trigger's ChosenTargets (the ITarget /
-            // TargetResolver pipeline the binder triggers use), not a bare
-            // ContextOpponents read. Reaching opponent permanents at resolve time
-            // without a chosen target needs the targeting system. v1-deferrals #3b.
-            ["TeferiHeroOfDominariaFactory.cs"] =
-                "−3 ultimate exiles 'target permanent an opponent controls' (CR 110.4a) via opponentPermanentResolver; prod must supply the target via the ITarget/TargetResolver pipeline (ChosenTargets), not a context-read — same posture as Hired Claw. v1-deferrals #3b.",
+            // NOTE: Teferi, Hero of Dominaria was REMOVED from this allowlist once
+            // its −3 / +1-untap / emblem clauses were wired to the agent-target
+            // infra: the −3 / +1 read the activating player's CHOSEN objects off
+            // the live ResolutionContext (ChosenTargets) via real TargetRequests
+            // on the loyalty abilities, and the emblem's exile reads ChosenTargets
+            // with a ContextOpponents.Of live-context fallback (never a build-time
+            // resolver). The factory no longer declares a Func<…Permanent…>
+            // resolver param, so it no longer matches the inert signature.
+            // Allowlist is now Hired Claw only.
         };
 
     /// <summary>

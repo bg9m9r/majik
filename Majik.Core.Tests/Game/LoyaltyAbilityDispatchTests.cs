@@ -60,7 +60,8 @@ public class LoyaltyAbilityDispatchTests
             stackResolver: _resolver,
             stateBasedActions: _sba,
             priorityManager: _priority,
-            combatFlow: new CombatFlow(_bus, _sba));
+            combatFlow: new CombatFlow(_bus, _sba),
+            eventBus: _bus);
 
     private static void SeedLibrary(Player p, int n)
     {
@@ -239,6 +240,100 @@ public class LoyaltyAbilityDispatchTests
         _bob.Zones.Battlefield.GetCards().Should().Contain(decoy, "the non-chosen creature survived");
     }
 
+    [Fact]
+    public async Task TeferiMinus3_PromptsForTargetNonlandPermanent_ChosenGoesThirdFromTop()
+    {
+        SeedLibrary(_alice, 5);
+        // Bob's library: two cards on top so "third from the top" is observable.
+        var libTop = NamedCardFactory.Create("Mountain", _bob);
+        var libSecond = NamedCardFactory.Create("Mountain", _bob);
+        _bob.Zones.Library.AddCard(libTop); libTop.SetZone(ZoneType.Library);
+        _bob.Zones.Library.AddCard(libSecond); libSecond.SetZone(ZoneType.Library);
+
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice, _triggers);
+        teferi.ChangeOwner(_alice);
+        teferi.ChangeController(_alice);
+        _alice.Zones.Battlefield.AddCard(teferi);
+        teferi.SetZone(ZoneType.Battlefield);
+
+        // Bob controls two nonland permanents; the agent chooses the SECOND.
+        var decoy = new Creature("Llanowar Elves", "{G}", 1, 1);
+        decoy.ChangeOwner(_bob);
+        decoy.ChangeController(_bob);
+        _bob.Zones.Battlefield.AddCard(decoy);
+        decoy.SetZone(ZoneType.Battlefield);
+
+        var victim = new Creature("Tarmogoyf", "{1}{G}", 4, 5);
+        victim.ChangeOwner(_bob);
+        victim.ChangeController(_bob);
+        _bob.Zones.Battlefield.AddCard(victim);
+        victim.SetZone(ZoneType.Battlefield);
+
+        var alice = new LoyaltyActivatingAgent(teferi, loyaltyChange: -3)
+        { TargetChoice = victim };
+        var driver = NewDriver(alice, new PassAgent());
+
+        await driver.RunTurnAsync(_alice, turnNumber: 2);
+
+        teferi.Loyalty.Should().Be(1, "−3 lowers loyalty 4 -> 1");
+        _bob.Zones.Battlefield.GetCards().Should().Contain(decoy, "the non-chosen permanent survived");
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(victim, "the CHOSEN permanent left the battlefield");
+
+        // The CHOSEN permanent is third from the top of its OWNER's library.
+        var lib = _bob.Zones.Library.GetCards().ToList();
+        lib[0].Should().BeSameAs(libTop);
+        lib[1].Should().BeSameAs(libSecond);
+        lib[2].Should().BeSameAs(victim, "the chosen nonland permanent is third from the top");
+    }
+
+    [Fact]
+    public async Task TeferiPlus1_PromptsForUpToTwoLands_ChosenLandsUntapAtNextEndStep()
+    {
+        SeedLibrary(_alice, 5);
+        SeedLibrary(_bob, 5);
+
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice, _triggers);
+        teferi.ChangeOwner(_alice);
+        teferi.ChangeController(_alice);
+        _alice.Zones.Battlefield.AddCard(teferi);
+        teferi.SetZone(ZoneType.Battlefield);
+
+        // Three lands; the agent chooses two of them. They are re-tapped just
+        // before activation (the untap step would otherwise have untapped them)
+        // so the next-end-step untap of the CHOSEN lands is observable.
+        var land1 = (Land)NamedCardFactory.Create("Island", _alice);
+        land1.ChangeController(_alice);
+        _alice.Zones.Battlefield.AddCard(land1);
+        land1.SetZone(ZoneType.Battlefield);
+
+        var land2 = (Land)NamedCardFactory.Create("Plains", _alice);
+        land2.ChangeController(_alice);
+        _alice.Zones.Battlefield.AddCard(land2);
+        land2.SetZone(ZoneType.Battlefield);
+
+        var land3 = (Land)NamedCardFactory.Create("Swamp", _alice);
+        land3.ChangeController(_alice);
+        _alice.Zones.Battlefield.AddCard(land3);
+        land3.SetZone(ZoneType.Battlefield);
+
+        var alice = new LoyaltyActivatingAgent(teferi, loyaltyChange: +1)
+        {
+            TargetChoices = new object[] { land1, land2 },
+            BeforeActivation = () => { land1.Tap(); land2.Tap(); land3.Tap(); },
+        };
+        var driver = NewDriver(alice, new PassAgent());
+
+        await driver.RunTurnAsync(_alice, turnNumber: 2);
+
+        teferi.Loyalty.Should().Be(5, "+1 raises loyalty 4 -> 5");
+        teferi.Abilities.OfType<DelayedTriggeredAbility>().Should()
+            .ContainSingle("the +1 scheduled a delayed untap trigger for the chosen lands");
+        // The end step has passed inside the turn; the delayed trigger resolved.
+        land1.IsTapped.Should().BeFalse("the first CHOSEN land untapped at the end step");
+        land2.IsTapped.Should().BeFalse("the second CHOSEN land untapped at the end step");
+        land3.IsTapped.Should().BeTrue("the non-chosen land stayed tapped");
+    }
+
     // -----------------------------------------------------------------------
     // Test agents.
     // -----------------------------------------------------------------------
@@ -253,6 +348,10 @@ public class LoyaltyAbilityDispatchTests
         private bool _activated;
 
         public object? TargetChoice { get; init; }
+
+        /// <summary>Multi-target choice (e.g. Teferi +1 "up to two lands"). When
+        /// set, takes precedence over <see cref="TargetChoice"/>.</summary>
+        public IReadOnlyList<object>? TargetChoices { get; init; }
 
         /// <summary>Side-effect run once, immediately before the activation is
         /// proposed (e.g. re-tap lands the untap step cleared).</summary>
@@ -287,6 +386,8 @@ public class LoyaltyAbilityDispatchTests
         public override Task<IReadOnlyList<object>> ChooseTargetsAsync(
             GameContext ctx, TargetRequest request, CancellationToken ct = default)
         {
+            if (TargetChoices != null)
+                return Task.FromResult<IReadOnlyList<object>>(TargetChoices);
             if (TargetChoice != null)
                 return Task.FromResult<IReadOnlyList<object>>(new[] { TargetChoice });
             return Task.FromResult<IReadOnlyList<object>>(System.Array.Empty<object>());
