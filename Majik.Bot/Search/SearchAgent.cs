@@ -339,6 +339,50 @@ public sealed class SearchAgent : IPlayerAgent
         return remapped.Count == 0 ? CombatPlan.None : new CombatPlan(remapped);
     }
 
+    /// <summary>
+    /// Re-maps a <see cref="BlockPlan"/> from a foreign sandbox to the current
+    /// sandbox — the blocker-side mirror of <see cref="RemapCombatPlan"/>.
+    ///
+    /// <para>
+    /// A scripted plan may reference creatures from a DIFFERENT sandbox (the
+    /// Advance sandbox that generated the move list). The engine matches block
+    /// assignments by object reference (<c>CombatFlow</c> groups blockers with
+    /// <c>GroupBy(b =&gt; b.Attacker)</c> against THIS game's declared attackers),
+    /// so foreign objects never match and the block silently no-ops. Per
+    /// (Blocker, Attacker) pair, BOTH ends are resolved against the current
+    /// sandbox by <see cref="Card.InstanceId"/> (stable across clones —
+    /// <see cref="Majik.Core.Simulation.GameStateCloner"/> preserves it): the
+    /// blocker among <paramref name="eligibleBlockers"/> (this seat's eligible
+    /// battlefield creatures) and the attacker among <paramref name="attackers"/>
+    /// (the opposing creatures actually declared this combat). Any pair with an
+    /// unmappable end is silently dropped — the same graceful degradation as the
+    /// attack remap; if every pair drops the plan degrades to
+    /// <see cref="BlockPlan.None"/>.
+    /// </para>
+    /// </summary>
+    internal static BlockPlan RemapBlockPlan(
+        BlockPlan foreignPlan,
+        IReadOnlyList<Creature> attackers,
+        IReadOnlyList<Creature> eligibleBlockers)
+    {
+        // Lookups from InstanceId to current-sandbox creatures.
+        var attackersById = attackers.ToDictionary(c => c.InstanceId);
+        var blockersById = eligibleBlockers.ToDictionary(c => c.InstanceId);
+
+        var remapped = new List<BlockerDeclaration>(foreignPlan.Blockers.Count);
+        foreach (var decl in foreignPlan.Blockers)
+        {
+            if (!blockersById.TryGetValue(decl.Blocker.InstanceId, out var localBlocker))
+                continue; // blocker not eligible in this sandbox → drop the pair
+            if (!attackersById.TryGetValue(decl.Attacker.InstanceId, out var localAttacker))
+                continue; // attacker not declared in this sandbox → drop the pair
+
+            remapped.Add(new BlockerDeclaration(localBlocker, localAttacker));
+        }
+
+        return remapped.Count == 0 ? BlockPlan.None : new BlockPlan(remapped);
+    }
+
     /// <inheritdoc/>
     public async Task<BlockPlan> DeclareBlockersAsync(
         GameContext ctx,
@@ -355,7 +399,15 @@ public sealed class SearchAgent : IPlayerAgent
 
         var chosen = await DecideAsync(decision, ct).ConfigureAwait(false);
 
-        return chosen.BlockPlan ?? BlockPlan.None;
+        // Materialize the BlockPlan. As with attacks (see DeclareAttackersAsync),
+        // the scripted plan may reference creatures from a different sandbox —
+        // re-map every (Blocker, Attacker) pair to THIS sandbox's objects via
+        // InstanceId so the engine's reference-keyed matching actually fires.
+        var rawPlan = chosen.BlockPlan;
+        if (rawPlan == null || rawPlan.Blockers.Count == 0)
+            return BlockPlan.None;
+
+        return RemapBlockPlan(rawPlan, attackers, eligibleBlockers);
     }
 
     /// <inheritdoc/>
