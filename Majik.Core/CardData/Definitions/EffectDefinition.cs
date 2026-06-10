@@ -1079,8 +1079,23 @@ public sealed class ConniveSelfEffectDef : EffectDefinition
 /// </summary>
 public sealed class ConniveTargetEffectDef : EffectDefinition
 {
-    /// <summary>Number of connives (default 1; the "connive N" form).</summary>
+    /// <summary>Number of connives (default 1; the "connive N" form). Ignored
+    /// when <see cref="AmountSource"/> is set (the live count wins).</summary>
     public int Amount { get; set; } = 1;
+
+    /// <summary>
+    /// Optional DYNAMIC-X source. When set, the connive amount is read live from
+    /// the resolving <see cref="GameContext.TurnState"/> instead of the fixed
+    /// <see cref="Amount"/> (CR 700.6 per-turn tally). Recognised values:
+    /// <list type="bullet">
+    ///   <item><c>creatures_died_this_turn</c> — Spymaster's Vault (X = creatures
+    ///     that died this turn, CR 702.104b).</item>
+    ///   <item><c>attackers_this_turn</c> — Raffine, Scheming Seer (X = number of
+    ///     attacking creatures declared this turn).</item>
+    /// </list>
+    /// Null ⇒ fixed <see cref="Amount"/>.
+    /// </summary>
+    public string? AmountSource { get; set; }
 
     /// <summary>Target filter (default <c>"creature_you_control"</c>).</summary>
     public string TargetFilter { get; set; } = "creature_you_control";

@@ -163,16 +163,15 @@ public class HiredClawFactoryTests
     [Fact]
     public void AttackTrigger_Body_Deals1DamageToTargetOpponent()
     {
-        var card = HiredClawFactory.Create(
-            _alice,
-            eventBus: null,
-            triggers: null,
-            replacements: null,
-            opponentResolver: () => new List<Player> { _alice, _bob });
+        // PROD PATH — dispatch the single-arg overload the routed build uses
+        // (no resolver), then resolve the trigger through a live GameContext so
+        // the damage reads its target off ContextOpponents.Of (the resolver-null
+        // fix). Bob (the live opponent) takes 1.
+        var card = (Creature)NamedCardFactory.Create("Hired Claw", _alice);
         card.SetZone(ZoneType.Battlefield);
 
         var trigger = GetAttackTrigger(card);
-        foreach (var e in trigger.Effects) e.Execute();
+        Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19, "CR 119.3 — the target opponent takes 1 damage.");
         _alice.LifeTotal.Should().Be(20, "the controller is never the damage target.");
@@ -180,52 +179,47 @@ public class HiredClawFactoryTests
 
     // -----------------------------------------------------------------------
     // {1}{R}: +1/+1 counter — gated on opponent life loss, once per turn
-    // (CR 602.5c / 602.5e)
+    // (CR 602.5c / 602.5e) — context-aware gate, prod path.
     // -----------------------------------------------------------------------
+
+    private static Majik.Core.Game.GameContext Ctx(Player self, params Player[] all) =>
+        new(
+            self: self,
+            allPlayers: all,
+            activePlayer: self,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
 
     [Fact]
     public void CounterAbility_CannotActivate_WhenNoOpponentLostLife()
     {
-        var card = HiredClawFactory.Create(
-            _alice,
-            eventBus: null,
-            triggers: null,
-            replacements: null,
-            opponentResolver: () => new List<Player> { _alice, _bob });
+        // PROD PATH — single-arg dispatch + context-aware activation check.
+        var card = (Creature)NamedCardFactory.Create("Hired Claw", _alice);
         card.SetZone(ZoneType.Battlefield);
 
         var ability = GetCounterAbility(card);
-        ability.CanActivateNow().Should().BeFalse(
+        ability.CanActivateNow(Ctx(_alice, _alice, _bob)).Should().BeFalse(
             "CR 602.5c — no opponent has lost life this turn.");
     }
 
     [Fact]
     public void CounterAbility_CanActivate_AfterOpponentLostLife()
     {
-        var card = HiredClawFactory.Create(
-            _alice,
-            eventBus: null,
-            triggers: null,
-            replacements: null,
-            opponentResolver: () => new List<Player> { _alice, _bob });
+        var card = (Creature)NamedCardFactory.Create("Hired Claw", _alice);
         card.SetZone(ZoneType.Battlefield);
 
         _bob.LoseLife(3);
 
         var ability = GetCounterAbility(card);
-        ability.CanActivateNow().Should().BeTrue(
-            "CR 602.5c — an opponent (Bob) lost life this turn.");
+        ability.CanActivateNow(Ctx(_alice, _alice, _bob)).Should().BeTrue(
+            "CR 602.5c — an opponent (Bob) lost life this turn, read off ctx.Opponents.");
     }
 
     [Fact]
     public void CounterAbility_Resolution_PutsPlusOnePlusOneCounter()
     {
-        var card = HiredClawFactory.Create(
-            _alice,
-            eventBus: null,
-            triggers: null,
-            replacements: null,
-            opponentResolver: () => new List<Player> { _alice, _bob });
+        var card = (Creature)NamedCardFactory.Create("Hired Claw", _alice);
         card.SetZone(ZoneType.Battlefield);
 
         var ability = GetCounterAbility(card);
@@ -243,26 +237,26 @@ public class HiredClawFactoryTests
             _alice,
             eventBus: bus,
             triggers: null,
-            replacements: null,
-            opponentResolver: () => new List<Player> { _alice, _bob });
+            replacements: null);
         card.SetZone(ZoneType.Battlefield);
 
         _bob.LoseLife(2);
+        var ctx = Ctx(_alice, _alice, _bob);
 
         var ability = GetCounterAbility(card);
-        ability.CanActivateNow().Should().BeTrue("first activation this turn is allowed.");
+        ability.CanActivateNow(ctx).Should().BeTrue("first activation this turn is allowed.");
 
         // Resolve once — flips the once-per-turn lock (CR 602.5e).
         foreach (var e in ability.Effects) e.Execute();
 
         // Opponent still down life this turn, but the per-turn lock is closed.
-        ability.CanActivateNow().Should().BeFalse(
+        ability.CanActivateNow(ctx).Should().BeFalse(
             "CR 602.5e — 'only once each turn' closes after the first activation.");
 
         // New turn resets the lock (CR 500.1). Bob must again have lost life.
         bus.Publish(new TurnStartedEvent(_alice, turnNumber: 2));
         _bob.LoseLife(1);
-        ability.CanActivateNow().Should().BeTrue(
+        ability.CanActivateNow(ctx).Should().BeTrue(
             "after the turn boundary the once-per-turn lock reopens.");
     }
 }

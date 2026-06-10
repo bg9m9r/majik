@@ -138,25 +138,31 @@ public static class SpymastersVaultFactory
         ActivatedAbility? ability = null;
         var conniveEffect = new Effect(
             $"{CardName}: target creature you control connives X (X = creatures died this turn)",
-            () =>
+            rc =>
             {
-                if (ability == null) return;
+                if (ability == null) return System.Threading.Tasks.ValueTask.CompletedTask;
                 var chosen = ability.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-                if (chosen[0][0] is not Creature target) return;
+                if (chosen.Count == 0 || chosen[0].Count == 0) return System.Threading.Tasks.ValueTask.CompletedTask;
+                if (chosen[0][0] is not Creature target) return System.Threading.Tasks.ValueTask.CompletedTask;
 
                 // CR 608.2b — resolution-time legality re-check: the target
                 // must still be a creature on the battlefield controlled by
                 // the activating player.
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (target.Zone != ZoneType.Battlefield) return System.Threading.Tasks.ValueTask.CompletedTask;
                 var controller = land.Controller ?? owner;
-                if (!ReferenceEquals(target.Controller, controller)) return;
+                if (!ReferenceEquals(target.Controller, controller)) return System.Threading.Tasks.ValueTask.CompletedTask;
 
-                // X = creatures that died this turn (CR 702.104b). 0 when no
-                // TurnState is wired or none died — Fx.Connive no-ops on
-                // amount <= 0.
-                var x = turnState?.CreaturesDiedThisTurn ?? 0;
+                // X = creatures that died this turn (CR 702.104b), read LIVE off
+                // the resolving GameContext.TurnState (Task 3.1) — NOT a captured
+                // build-time TurnState (which is null on the prod routed build,
+                // making X always 0 in real games). 0 when no live TurnState or
+                // none died — Fx.Connive no-ops on amount <= 0. The legacy
+                // captured `turnState` (when supplied by a factory-direct test)
+                // is used as a fallback only when no live context is available.
+                var x = rc.Game?.TurnState?.CreaturesDiedThisTurn
+                    ?? turnState?.CreaturesDiedThisTurn ?? 0;
                 Fx.Connive(target, x);
+                return System.Threading.Tasks.ValueTask.CompletedTask;
             });
 
         ability = new ActivatedAbility(

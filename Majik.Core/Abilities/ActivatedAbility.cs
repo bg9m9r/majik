@@ -62,11 +62,43 @@ public class ActivatedAbility : IActivatedAbility
     private readonly Func<bool>? _canActivateCheck;
 
     /// <summary>
+    /// CR 602.5c / 605.1a — context-aware variant of the "Activate only if"
+    /// gate. When set, it is preferred over the context-less
+    /// <see cref="_canActivateCheck"/> IF a live <see cref="GameContext"/> is
+    /// available at the activation-legality check (the bot's
+    /// <c>LegalActionEnumerator</c> and the live driver both have one in scope).
+    /// Lets the gate read live game state — the opponent set, per-turn tallies —
+    /// that a captured build-time resolver can't reach on the production routed
+    /// build (Hired Claw's "an opponent lost life this turn"). Null ⇒ no
+    /// context-aware gate; the engine falls back to <see cref="_canActivateCheck"/>.
+    /// </summary>
+    private readonly Func<GameContext, bool>? _canActivateCheckCtx;
+
+    /// <summary>
     /// CR 602.5c — true iff this ability's "Activate only if" condition (if
     /// any) is currently satisfied. Always true when no gate was supplied.
-    /// Re-evaluates the predicate on each call.
+    /// Re-evaluates the predicate on each call. Context-less form; callers that
+    /// hold a <see cref="GameContext"/> should prefer
+    /// <see cref="CanActivateNow(GameContext)"/> so a context-aware gate fires.
     /// </summary>
-    public bool CanActivateNow() => _canActivateCheck?.Invoke() ?? true;
+    public bool CanActivateNow() => CanActivateNow(null);
+
+    /// <summary>
+    /// CR 602.5c — context-aware overload. Prefers the context-aware gate
+    /// (<see cref="_canActivateCheckCtx"/>) when one was supplied AND a non-null
+    /// <paramref name="game"/> is available; otherwise falls back to the
+    /// context-less <see cref="_canActivateCheck"/> (so call sites without a
+    /// GameContext still gate correctly). Always true when neither gate was
+    /// supplied.
+    /// </summary>
+    public bool CanActivateNow(GameContext? game)
+    {
+        if (_canActivateCheckCtx != null && game != null)
+        {
+            return _canActivateCheckCtx(game);
+        }
+        return _canActivateCheck?.Invoke() ?? true;
+    }
 
     /// <summary>
     /// The "Activate only if" gate predicate, exposed so the activation
@@ -75,6 +107,13 @@ public class ActivatedAbility : IActivatedAbility
     /// original). Null when no gate was supplied.
     /// </summary>
     public Func<bool>? CanActivateCheck => _canActivateCheck;
+
+    /// <summary>
+    /// The context-aware "Activate only if" gate predicate, exposed so the
+    /// activation service can mirror it onto the stack copy (CR 602.4). Null
+    /// when no context-aware gate was supplied.
+    /// </summary>
+    public Func<GameContext, bool>? CanActivateCheckCtx => _canActivateCheckCtx;
 
     /// <summary>
     /// The targets chosen by the activating player's agent (parallel
@@ -118,7 +157,8 @@ public class ActivatedAbility : IActivatedAbility
         IEnumerable<TargetRequest>? targetRequests = null,
         bool sorcerySpeed = false,
         Func<bool>? canActivateCheck = null,
-        bool rebindSafe = false)
+        bool rebindSafe = false,
+        Func<GameContext, bool>? canActivateCheckCtx = null)
     {
         if (source == null)
         {
@@ -140,6 +180,7 @@ public class ActivatedAbility : IActivatedAbility
         IsSorcerySpeed = sorcerySpeed;
         RebindSafe = rebindSafe;
         _canActivateCheck = canActivateCheck;
+        _canActivateCheckCtx = canActivateCheckCtx;
         _resolutionState = ResolutionState.NotResolving();
 
         TargetRequests = targetRequests is null
@@ -206,7 +247,8 @@ public class ActivatedAbility : IActivatedAbility
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
             sorcerySpeed: IsSorcerySpeed,
             canActivateCheck: _canActivateCheck,
-            rebindSafe: RebindSafe);
+            rebindSafe: RebindSafe,
+            canActivateCheckCtx: _canActivateCheckCtx);
 
     /// <summary>
     /// Store the targets chosen by the activating player's agent. Called by

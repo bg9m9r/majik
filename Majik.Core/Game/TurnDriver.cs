@@ -157,6 +157,7 @@ public sealed class TurnDriver
         _eventBus?.Subscribe<CardDrawnEvent>(OnCardDrawn);
         _eventBus?.Subscribe<Majik.Core.Domain.DomainEvents.SpellCastEvent>(OnSpellCast);
         _eventBus?.Subscribe<CardCycledEvent>(OnCardCycled);
+        _eventBus?.Subscribe<Majik.Core.Domain.DomainEvents.AttackersDeclaredEvent>(OnAttackersDeclared);
     }
 
     // -----------------------------------------------------------------
@@ -241,6 +242,15 @@ public sealed class TurnDriver
         // (see Hollow One rulings — cycling counts as both a cycle and a
         // discard for cards that reference either).
         TurnState.RecordCardCycled(e.Player);
+    }
+
+    private void OnAttackersDeclared(Majik.Core.Domain.DomainEvents.AttackersDeclaredEvent e)
+    {
+        // CR 508.1 — tally the declared attacking creatures for the turn. Read
+        // by dynamic-X "number of attacking creatures" effects (Raffine,
+        // Scheming Seer's connive X). Mirrors how CreaturesDiedThisTurn is fed
+        // off CardMovedEvent — event-driven, not polled.
+        TurnState.RecordAttackersDeclared(e.Combat.Attackers.Count);
     }
 
     private void OnSpellCast(Majik.Core.Domain.DomainEvents.SpellCastEvent e)
@@ -951,7 +961,7 @@ public sealed class TurnDriver
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _eventBus);
             try
             {
-                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs);
+                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs, ctx);
             }
             catch (InvalidOperationException)
             {
@@ -1103,7 +1113,12 @@ public sealed class TurnDriver
             // happens once, here, not target-lessly inside PriorityManager.
             asyncTriggerDrain: (activePlayerForDrain, drainCtx, drainCt) =>
                 _triggerManager.PutPendingTriggersOnStackAsync(
-                    activePlayerForDrain, _agents, drainCtx, drainCt));
+                    activePlayerForDrain, _agents, drainCtx, drainCt),
+            // Thread the driver-owned live TurnState into every GameContext the
+            // loop builds, so rc.Game.TurnState is non-null at resolution in real
+            // games — dynamic-X connive reads per-turn counts off it, and
+            // context-aware activation gates see live state.
+            turnStateAccessor: () => TurnState);
 
         try
         {

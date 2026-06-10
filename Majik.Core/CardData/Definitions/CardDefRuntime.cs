@@ -1435,9 +1435,11 @@ public static class CardDefRuntime
         // body connive_self runs — the agent-driven discard sink + CountersService
         // counter placement — so the targeted verb is pure schema wiring.
         var amount = def.Amount;
+        var amountSource = def.AmountSource;
         var filter = def.TargetFilter;
+        var label = amountSource is null ? amount.ToString() : $"X ({amountSource})";
         return new Effect(
-            $"{card.Name}: target {filter} connives {amount}",
+            $"{card.Name}: target {filter} connives {label}",
             ctx =>
             {
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
@@ -1445,10 +1447,36 @@ public static class CardDefRuntime
                     && target.Zone == ZoneType.Battlefield
                     && TargetFilters.Matches(filter, target))
                 {
-                    Fx.Connive(target, amount);
+                    // CR 700.6 — dynamic-X connive reads the live per-turn count
+                    // off the resolving GameContext.TurnState (Task 3.1 exposed
+                    // it) instead of the fixed def.Amount. A null source ⇒ the
+                    // fixed amount; an unknown / unavailable count ⇒ 0 (Fx.Connive
+                    // no-ops on amount <= 0).
+                    var x = ResolveConniveAmount(amountSource, amount, ctx);
+                    Fx.Connive(target, x);
                 }
                 return ValueTask.CompletedTask;
             });
+    }
+
+    /// <summary>
+    /// Resolve a connive count. When <paramref name="amountSource"/> is null the
+    /// fixed <paramref name="fixedAmount"/> wins. Otherwise read the live per-turn
+    /// tally off <c>ctx.Game.TurnState</c> (CR 700.6). Unknown source name or no
+    /// live TurnState ⇒ 0 (a clean no-op).
+    /// </summary>
+    private static int ResolveConniveAmount(
+        string? amountSource, int fixedAmount, ResolutionContext ctx)
+    {
+        if (amountSource is null) return fixedAmount;
+        var ts = ctx.Game?.TurnState;
+        if (ts is null) return 0;
+        return amountSource switch
+        {
+            "creatures_died_this_turn" => ts.CreaturesDiedThisTurn,
+            "attackers_this_turn" => ts.AttackersDeclaredThisTurn,
+            _ => 0,
+        };
     }
 
     private static IEffect BuildAmassSelfEffect(AmassSelfEffectDef def, ICard card, Player controller)

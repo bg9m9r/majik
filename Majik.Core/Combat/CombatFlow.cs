@@ -429,13 +429,15 @@ public sealed class CombatFlow
         }
 
         // CR 903.10a — track commander damage per-attacker on the defender.
+        // The loss itself is NOT flipped here: it is a DEFERRED state-based
+        // action (CR 704.5j) handled by CommanderDamageCheck, consistent with
+        // how CR 704.5a life-loss is a deferred SBA rather than an eager flip
+        // at the damage site. Eagerly setting HasLost here was inconsistent
+        // with that deferred model (the accumulated total is converted to the
+        // loss on the next SBA sweep).
         if (source.IsCommander && target.Commander != null)
         {
             target.Commander.TakeCommanderDamage(source, intent.Amount);
-            if (target.Commander.HasLostToCommanderDamage())
-            {
-                target.HasLost = true;
-            }
         }
 
         _bus.Publish(new CombatDamageDealtEvent(source, target, intent.Amount));
