@@ -52,6 +52,14 @@ public sealed class SimState
     /// </summary>
     public int? WorldSeed { get; }
 
+    /// <summary>
+    /// Per-world public observations (e.g. opponent cards already revealed on the
+    /// battlefield / in the graveyard) threaded to the resampler so the sampled
+    /// hidden zones are made consistent with what has been observed. <c>null</c>
+    /// means no observation augmentation (the perfect-info / unaugmented path).
+    /// </summary>
+    public IReadOnlyList<string>? ObservedPublic { get; }
+
     private SimState(
         IReadOnlyList<Player> livePlayers,
         Player activePlayer,
@@ -59,7 +67,8 @@ public sealed class SimState
         PhaseStateType phase,
         Player searchedSeat,
         IReadOnlyList<string>? opponentDecklist = null,
-        int? worldSeed = null)
+        int? worldSeed = null,
+        IReadOnlyList<string>? observedPublic = null)
     {
         LivePlayers = livePlayers;
         ActivePlayer = activePlayer;
@@ -68,6 +77,7 @@ public sealed class SimState
         SearchedSeat = searchedSeat;
         OpponentDecklist = opponentDecklist;
         WorldSeed = worldSeed;
+        ObservedPublic = observedPublic;
     }
 
     /// <summary>
@@ -76,7 +86,17 @@ public sealed class SimState
     /// resampled (hidden zones re-drawn) before it is searched. Every other field
     /// is preserved unchanged.
     /// </summary>
-    public SimState WithDeterminization(IReadOnlyList<string> opponentDecklist, int worldSeed)
+    public SimState WithDeterminization(IReadOnlyList<string> opponentDecklist, int worldSeed) =>
+        WithDeterminization(opponentDecklist, observedPublic: null, worldSeed);
+
+    /// <summary>
+    /// As <see cref="WithDeterminization(IReadOnlyList{string}, int)"/> but also attaches
+    /// a per-world <see cref="ObservedPublic"/> list, threaded to the resampler so the
+    /// sampled hidden zones are made consistent with the observed public cards. Every
+    /// other field is preserved unchanged.
+    /// </summary>
+    public SimState WithDeterminization(
+        IReadOnlyList<string> opponentDecklist, IReadOnlyList<string>? observedPublic, int worldSeed)
     {
         ArgumentNullException.ThrowIfNull(opponentDecklist);
         // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat
@@ -87,7 +107,8 @@ public sealed class SimState
             phase: Phase,
             searchedSeat: SearchedSeat,
             opponentDecklist: opponentDecklist,
-            worldSeed: worldSeed);
+            worldSeed: worldSeed,
+            observedPublic: observedPublic);
     }
 
     /// <summary>
@@ -106,7 +127,7 @@ public sealed class SimState
     /// </summary>
     public SimState WithWorldSeed(int worldSeed)
     {
-        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, OpponentDecklist
+        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, OpponentDecklist, ObservedPublic
         return new SimState(
             livePlayers: LivePlayers,
             activePlayer: ActivePlayer,
@@ -114,7 +135,8 @@ public sealed class SimState
             phase: Phase,
             searchedSeat: SearchedSeat,
             opponentDecklist: OpponentDecklist,
-            worldSeed: worldSeed);
+            worldSeed: worldSeed,
+            observedPublic: ObservedPublic);
     }
 
     /// <summary>

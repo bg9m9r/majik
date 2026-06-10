@@ -392,7 +392,8 @@ public sealed class EngineSimulator : ISearchSimulator
         if (root.WorldSeed is int seed && root.OpponentDecklist is { } deck)
         {
             DeterminizationSampler.Resample(
-                sandbox.State.Players, root.SearchedSeatId, deck, seed);
+                sandbox.State.Players, root.SearchedSeatId, deck, seed,
+                observedPublic: root.ObservedPublic);
         }
     }
 

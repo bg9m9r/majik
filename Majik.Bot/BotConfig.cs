@@ -80,6 +80,19 @@ namespace Majik.Bot;
 /// left exactly as captured. Null is the production-safe default: an unknown
 /// opponent must NOT route through determinization, which would invent a wrong
 /// hidden world.</para>
+///
+/// <para><c>InferOpponentArchetype</c> optional (default false). When true AND
+/// <c>OpponentArchetype</c> is null, <see cref="Search.SearchStrategy"/> reads the
+/// opponent's PUBLIC cards from the live <see cref="Majik.Core.Game.GameContext"/>,
+/// infers a normalized belief over the curated archetypes
+/// (<see cref="OpponentModel.ArchetypeInferencer"/>), allocates the determinized
+/// worlds across that belief (<see cref="OpponentModel.WorldAllocator"/>), and runs
+/// belief-driven determinized search (<see cref="Search.DeterminizedSearch.RunBelief"/>).
+/// This is the "honest-vs-human" path: the opponent's deck is unknown, so it is
+/// inferred from their revealed public cards rather than assumed. Ignored when an
+/// explicit <c>OpponentArchetype</c> is set (the known-archetype path takes
+/// precedence). Default false preserves today's perfect-info behaviour for every
+/// existing caller.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -93,4 +106,5 @@ public sealed record BotConfig(
     int? MaxMctsBudgetMs = null,
     bool PrioritySearchEnabled = true,
     ArchetypeWeights? WeightsOverride = null,
-    string? OpponentArchetype = null);
+    string? OpponentArchetype = null,
+    bool InferOpponentArchetype = false);
