@@ -45,6 +45,18 @@ public sealed class PriorityLoop
     // PriorityKinds.Build), passed in as a predicate to keep PriorityLoop
     // unaware of the wire command types.
     private readonly Func<GameContext, bool>? _isPassOnlyDeadWindow;
+    // CR 603.3 — agent-aware drain of pending triggered abilities. When
+    // supplied, PriorityLoop owns the drain (calling this delegate, which
+    // routes to TriggerManager.PutPendingTriggersOnStackAsync so the
+    // controller's agent is prompted for any targeted trigger's targets)
+    // and suppresses PriorityManager's built-in SYNC drain (which would
+    // otherwise auto-pick first-eligible). The delegate is invoked at the
+    // same logical points the sync drain fired — every time a player is
+    // about to receive priority and could act on a freshly-fired trigger.
+    // Null in legacy / unit harnesses (TurnDriver wires it in production):
+    // the loop then leaves PriorityManager's sync drain in charge, exactly
+    // preserving pre-change behaviour for those callers.
+    private readonly Func<Player, GameContext, CancellationToken, Task>? _asyncTriggerDrain;
     private readonly Func<DateTime> _clock;
     // Stack-mutation event subscriptions held so the loop can detach on
     // its way out. TurnDriver constructs a fresh PriorityLoop per round
@@ -78,9 +90,19 @@ public sealed class PriorityLoop
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         IEventBus? eventBus = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null)
     {
         _castDispatcher = castDispatcher;
+        _asyncTriggerDrain = asyncTriggerDrain;
+        // CR 603.3 — when an agent-aware async drain is supplied, this loop
+        // owns the drain; suppress PriorityManager's built-in sync drain so
+        // pending targeted triggers are NOT auto-picked first-eligible before
+        // we get a chance to prompt the controller's agent for targets.
+        if (asyncTriggerDrain != null)
+        {
+            priority.SuppressInternalTriggerDrain = true;
+        }
         _activateDispatcher = activateDispatcher;
         _loyaltyDispatcher = loyaltyDispatcher;
         _manaAbilityDispatcher = manaAbilityDispatcher;
@@ -154,6 +176,24 @@ public sealed class PriorityLoop
             {
                 var current = _priority.CurrentPlayer
                     ?? throw new InvalidOperationException("No current priority holder");
+
+                // CR 603.3 — drain any pending triggered abilities onto the
+                // stack on the agent-aware async path BEFORE the current
+                // holder decides, so a targeted trigger (e.g. Leyline of
+                // Lightning's "deal 1 to any target", a Restless land's
+                // attack trigger, an emblem) prompts its controller's agent
+                // for targets instead of auto-picking first-eligible. This
+                // is the same logical point PriorityManager's suppressed sync
+                // drain fired at (a player about to receive priority); the
+                // async drain groups by controller and preserves APNAP order
+                // (CR 603.3b). A no-op when nothing is pending. Built once per
+                // window off the active player's context (the async drain
+                // re-resolves each trigger's controller + candidates itself).
+                if (_asyncTriggerDrain != null)
+                {
+                    var drainCtx = MakeContext(activePlayer, activePlayer);
+                    await _asyncTriggerDrain(activePlayer, drainCtx, ct).ConfigureAwait(false);
+                }
 
                 // CR 800.4a — a player who has lost the game can no longer take
                 // any actions. Skip their priority window with a forced pass so the
