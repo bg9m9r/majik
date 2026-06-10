@@ -202,6 +202,21 @@ public sealed class InferenceVsPerfectInfoTests
         BotConfig HeuristicOpp(int seed) => new BotConfig(
             OppDeck, Strategy: "heuristic", RandomSeed: seed);
 
+        // Known-archetype determinized (Prowess seat): honest (no peek) but TOLD the
+        // opponent is Burn (OpponentArchetype set, inference off) → single-decklist
+        // determinized search, no belief spread. Diagnostic: isolates the no-peek
+        // honesty cost from inference quality. If this beats heuristic clearly while
+        // Inference (h1) lags, the gap is inference quality (wrong-archetype worlds);
+        // if this ≈ Inference, the gap is just the price of not peeking.
+        BotConfig KnownDeterminized(int seed) => new BotConfig(
+            BotDeck, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: MctsIterations,
+            MaxMctsBudgetMs: MctsBudgetMs,
+            PrioritySearchEnabled: true,
+            OpponentArchetype: OppDeck,
+            InferOpponentArchetype: false);
+
         // ── Head-to-head 1: Inference Prowess (A) vs Heuristic Burn (B) ──────────
         var (infWins, infDecided, infDraws, infInc) = await RunHeadToHead(
             label: "infer-vs-heuristic",
@@ -223,9 +238,17 @@ public sealed class InferenceVsPerfectInfoTests
             seatB: HeuristicOpp, seatBDeck: OppDeck,
             seedBlock: BaseSeed + 2000);
 
+        // ── Head-to-head 4 (diagnostic): Known-Burn Determinized Prowess (A) vs Heuristic Burn (B)
+        var (kdWins, kdDecided, kdDraws, kdInc) = await RunHeadToHead(
+            label: "knowndet-vs-heuristic",
+            seatA: KnownDeterminized, seatADeck: BotDeck,
+            seatB: HeuristicOpp, seatBDeck: OppDeck,
+            seedBlock: BaseSeed + 3000);
+
         double infRate = infDecided > 0 ? (double)infWins / infDecided : 0.0;
         double ipRate  = ipDecided  > 0 ? (double)ipWins  / ipDecided  : 0.0;
         double piRate  = piDecided  > 0 ? (double)piWins  / piDecided  : 0.0;
+        double kdRate  = kdDecided  > 0 ? (double)kdWins  / kdDecided  : 0.0;
 
         // ── Single grep-able summary line for the controller ─────────────────────
         _out.WriteLine(
@@ -233,8 +256,9 @@ public sealed class InferenceVsPerfectInfoTests
             $"infer-vs-heuristic={infRate:P0} ({infWins}/{infDecided})  " +
             $"infer-vs-perfectinfo={ipRate:P0} ({ipWins}/{ipDecided})  " +
             $"perfectinfo-vs-heuristic={piRate:P0} ({piWins}/{piDecided})  " +
-            $"draws=h1:{infDraws},h2:{ipDraws},h3:{piDraws}  " +
-            $"inconclusive=h1:{infInc},h2:{ipInc},h3:{piInc}  " +
+            $"knowndet-vs-heuristic={kdRate:P0} ({kdWins}/{kdDecided})  " +
+            $"draws=h1:{infDraws},h2:{ipDraws},h3:{piDraws},h4:{kdDraws}  " +
+            $"inconclusive=h1:{infInc},h2:{ipInc},h3:{piInc},h4:{kdInc}  " +
             $"iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns} prioritySearch=true");
 
         // ── Liveness-only assertions (NOT a win% threshold) ──────────────────────
