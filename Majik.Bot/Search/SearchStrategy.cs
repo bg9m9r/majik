@@ -81,6 +81,15 @@ internal sealed class SearchStrategy : IBotStrategy
     private readonly int _baseSeed;
 
     /// <summary>
+    /// Catastrophe threshold for the risk-aware two-tier vote, resolved ONCE from
+    /// <see cref="BotConfig.RiskVoteThreshold"/> at construction (null → the
+    /// <see cref="DeterminizedSearch.DefaultCatastropheThreshold"/> default;
+    /// <see cref="double.NegativeInfinity"/> disables the filter). Threaded into
+    /// BOTH determinized call sites in <see cref="SearchRoot"/>.
+    /// </summary>
+    private readonly double _riskThreshold;
+
+    /// <summary>
     /// Per-world budget (ms) for the determinized driver. The total budget is
     /// split across K worlds (K = round(total / perWorld), clamped 1..kMax inside
     /// <see cref="DeterminizedSearch"/>), so a larger total yields more worlds, not
@@ -194,7 +203,21 @@ internal sealed class SearchStrategy : IBotStrategy
 
         // Fixed, config-derived base seed → determinized runs are reproducible.
         _baseSeed = config.RandomSeed;
+
+        // RiskVoteThreshold: resolve the nullable knob once up front (null → the
+        // DeterminizedSearch default; -inf is the kill switch that disables the
+        // risk filter) so SearchRoot threads a plain double per decision.
+        _riskThreshold = ResolveRiskThreshold(config.RiskVoteThreshold);
     }
+
+    /// <summary>
+    /// Resolve <see cref="BotConfig.RiskVoteThreshold"/> to the effective
+    /// catastrophe threshold: null → <see cref="DeterminizedSearch.DefaultCatastropheThreshold"/>;
+    /// any explicit value (including <see cref="double.NegativeInfinity"/>, the
+    /// filter kill switch) passes through unchanged.
+    /// </summary>
+    internal static double ResolveRiskThreshold(double? cfg) =>
+        cfg ?? DeterminizedSearch.DefaultCatastropheThreshold;
 
     /// <summary>
     /// Runs the root search: determinized K-world search when the opponent's
@@ -217,7 +240,8 @@ internal sealed class SearchStrategy : IBotStrategy
                 _determinizedMcts!,   // non-null whenever _opponentDecklist is set
                 determinized,
                 totalBudgetMs: _totalBudgetMs,
-                perWorldBudgetMs: PerWorldBudgetMs);
+                perWorldBudgetMs: PerWorldBudgetMs,
+                catastropheThreshold: _riskThreshold);
         }
 
         // (2) Inference — "honest-vs-human". Read the opponent's public cards, infer
@@ -245,7 +269,8 @@ internal sealed class SearchStrategy : IBotStrategy
                 publicCards,
                 totalBudgetMs: _totalBudgetMs,
                 perWorldBudgetMs: PerWorldBudgetMs,
-                kMax: KMax);
+                kMax: KMax,
+                catastropheThreshold: _riskThreshold);
         }
 
         return _mcts.Search(root);   // perfect-info, unchanged
