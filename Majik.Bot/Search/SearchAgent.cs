@@ -426,9 +426,22 @@ public sealed class SearchAgent : IPlayerAgent
         CancellationToken ct = default)
         => _fallback.ChooseCardsToBottomAsync(ctx, hand, countToBottom, ct);
 
+    /// <summary>
+    /// Target choice is NOT a searched decision (it happens inside a cast the
+    /// search already chose). Non-empty candidate pools keep the deterministic
+    /// fallback (first-N pick — stable across identical sims). An EMPTY pool
+    /// with a required target goes through <see cref="Heuristic.TargetPolicy"/>,
+    /// whose label-driven synthesis (burn → opponent face, removal → biggest
+    /// enemy creature, …) is what lets in-sim targeted instants/sorceries
+    /// actually complete now that the sandbox carries a spell-definition
+    /// resolver — the deterministic fallback would supply zero targets and
+    /// CR 601.2c would reject every such cast.
+    /// </summary>
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(
         GameContext ctx, TargetRequest request, CancellationToken ct = default)
-        => _fallback.ChooseTargetsAsync(ctx, request, ct);
+        => request.LegalCandidates.Count == 0 && request.MinTargets > 0
+            ? Task.FromResult(Heuristic.TargetPolicy.Pick(ctx, _seat, request))
+            : _fallback.ChooseTargetsAsync(ctx, request, ct);
 
     public Task<int> ChooseXAsync(
         GameContext ctx, ICard source, CancellationToken ct = default)

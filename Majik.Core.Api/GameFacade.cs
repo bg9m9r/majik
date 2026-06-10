@@ -105,7 +105,6 @@ public sealed class GameFacade : IDisposable
     private readonly Player _alice;
     private readonly Player _bob;
     private ICardRepository? _cardRepo;
-    private ScryfallCardFactory? _spellFactory;
     private readonly RemoteAgent _aliceAgent;
     private readonly RemoteAgent _bobAgent;
     private IPlayerAgent _aliceAgentEffective;
@@ -612,21 +611,20 @@ public sealed class GameFacade : IDisposable
     /// repo was supplied at <see cref="Create"/> time — tests that build
     /// purely synthetic decks (no repo) keep their existing skip-rotate
     /// behaviour.
+    ///
+    /// <para>Thin delegation to the shared
+    /// <see cref="SpellDefinitionResolverFactory"/> so
+    /// <see cref="Majik.Core.Simulation.SandboxGame"/> builds the exact same
+    /// resolver shape over its sandbox-local subsystems.</para>
     /// </summary>
     private Func<ICard, Player, Majik.Core.Stack.Stack?, SpellDefinition?>? BuildSpellDefinitionResolver()
-    {
-        if (_cardRepo == null) return null;
-        _spellFactory ??= new ScryfallCardFactory(
+        => SpellDefinitionResolverFactory.Create(
             _cardRepo,
             replacements: Replacements,
             effects: ContinuousEffects,
             triggers: _triggers,
             eventBus: _bus,
             zones: _zones);
-
-        return (card, caster, stk) =>
-            _spellFactory.LookupSpellDefinition(card.Name, caster, raw => raw, stk);
-    }
 
     /// <summary>Replaces the Alice-seat agent (typically with a
     /// <see cref="Majik.Bot.BotPlayerAgent"/>). Must be called before

@@ -152,7 +152,8 @@ public sealed class EngineSimulator : ISearchSimulator
         var sandbox = SandboxGame.From(
             root.LivePlayers,
             new GameRandom(FixedSeed),
-            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy: null, ref searchAgent));
+            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy: null, ref searchAgent),
+            cardRepo: SharedCardData.Repo);
 
         // Determinization: when the root carries a world seed, re-draw the hidden
         // zones of this clone before it is searched. Null seed => perfect-info,
@@ -236,7 +237,8 @@ public sealed class EngineSimulator : ISearchSimulator
         var sandbox = SandboxGame.From(
             root.LivePlayers,
             new GameRandom(FixedSeed),
-            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy, ref searchAgent));
+            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy, ref searchAgent),
+            cardRepo: SharedCardData.Repo);
 
         // Determinization (see AdvanceCoreUnsafe). Null seed => no resample.
         MaybeResample(sandbox, root);
@@ -414,7 +416,8 @@ public sealed class EngineSimulator : ISearchSimulator
         var sandbox = SandboxGame.From(
             root.LivePlayers,
             new GameRandom(FixedSeed),
-            p => new SearchAgent(p));
+            p => new SearchAgent(p),
+            cardRepo: SharedCardData.Repo);
 
         MaybeResample(sandbox, root);
 

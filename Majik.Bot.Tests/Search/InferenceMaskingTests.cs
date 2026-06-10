@@ -237,6 +237,13 @@ public class InferenceMaskingTests
     {
         var (ctx1, self1) = BuildPriorityGame(new[] { "Lightning Bolt", "Lightning Bolt", "Goblin Guide" });
         var (ctx2, self2) = BuildPriorityGame(new[] { "Island", "Island", "Island" });
+        // Masking needs the two runs to do IDENTICAL search work, so the
+        // iteration cap (12/world after the 400 ms per-world split) must bind
+        // long before the wall clock: now that the sandbox carries a
+        // spell-definition resolver each iteration really CASTS sampled
+        // spells (heavier sims), and 40 iterations/world flirted with the
+        // 400 ms per-world wall under full-suite CPU contention — truncating
+        // the two runs asymmetrically and flaking the equality.
         var cfg = new BotConfig("Burn", Strategy: "mcts", RandomSeed: 7,
             MaxMctsIterations: 80, MaxMctsBudgetMs: 60_000, InferOpponentArchetype: true);
 

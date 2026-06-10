@@ -40,13 +40,13 @@ namespace Majik.Bot.Search;
 /// </summary>
 internal static class DeterminizationSampler
 {
-    // Lazily-constructed shared repo + factory for the default (no-injection) path.
-    // EmbeddedCardRepository loads its 22k-row seed lazily on first GetByName, so
-    // constructing this is cheap; one shared instance avoids re-reading the gz per call.
-    // Safe to share under concurrent Resample (parallel MCTS rollouts): Create is
-    // read-only over the immutable repo and builds a fresh Card instance per call.
+    // Lazily-constructed shared factory for the default (no-injection) path,
+    // built over the bot-wide shared repo (SharedCardData.Repo — ONE
+    // EmbeddedCardRepository instance for the whole bot). Safe to share under
+    // concurrent Resample (parallel MCTS rollouts): Create is read-only over
+    // the immutable repo and builds a fresh Card instance per call.
     private static readonly Lazy<ScryfallCardFactory> DefaultFactory =
-        new(() => new ScryfallCardFactory(new EmbeddedCardRepository()));
+        new(() => new ScryfallCardFactory(SharedCardData.Repo));
 
     /// <summary>
     /// Resample the hidden zones in place. See the type-level docs for semantics.

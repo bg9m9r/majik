@@ -99,13 +99,25 @@ public sealed class SandboxGame
     /// optional: pass them to snapshot a mid-game position. For a fresh-start
     /// simulation (the typical bot-search case) leave both null.
     /// </para>
+    ///
+    /// <para>
+    /// <paramref name="cardRepo"/> is optional: when non-null the sandbox's
+    /// <see cref="GameDriver"/>/<c>TurnDriver</c> receives the same cast-time
+    /// spell-definition resolver shape <c>GameFacade</c> wires (via the shared
+    /// <see cref="Majik.Core.CardData.SpellDefinitionResolverFactory"/>), so
+    /// in-sim instants/sorceries actually CAST and RESOLVE. When null
+    /// (default), the historical behaviour is preserved: TurnDriver's
+    /// "no SpellDef for instant/sorcery" branch rotates every non-permanent
+    /// spell back into hand.
+    /// </para>
     /// </summary>
     public static SandboxGame From(
         IReadOnlyList<Player> livePlayers,
         GameRandom rng,
         Func<Player, IPlayerAgent> agentFactory,
         Majik.Core.Stack.Stack? liveStack = null,
-        TurnState? liveTurnState = null)
+        TurnState? liveTurnState = null,
+        Majik.Core.CardData.ICardRepository? cardRepo = null)
     {
         // --- Clone -----------------------------------------------------------
         var cloned = GameStateCloner.Clone(livePlayers, liveStack, liveTurnState);
@@ -147,6 +159,19 @@ public sealed class SandboxGame
             combatFlow: combatFlow,
             rng: rng,
             eventBus: bus,
+            // Cast-time spell-definition resolver — same shared factory
+            // GameFacade.BuildSpellDefinitionResolver delegates to, built over
+            // the SANDBOX's own subsystems so bound definitions register
+            // their effects against this sandbox, never the live game.
+            // Null cardRepo → null resolver → pre-existing rotate-in-hand
+            // behaviour for instants/sorceries.
+            spellDefinitionResolver: Majik.Core.CardData.SpellDefinitionResolverFactory.Create(
+                cardRepo,
+                replacements: replacements,
+                effects: continuousEffects,
+                triggers: triggers,
+                eventBus: bus,
+                zones: zones),
             continuousEffects: continuousEffects,
             landDropTracker: new LandDropTracker());
 
