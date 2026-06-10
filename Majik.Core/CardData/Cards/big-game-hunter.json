@@ -1,0 +1,9 @@
+{
+  "name": "Big Game Hunter",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rebel", "Assassin"],
+  "manaCost": "{1}{B}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
