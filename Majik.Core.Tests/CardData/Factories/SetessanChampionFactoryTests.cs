@@ -26,7 +26,8 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="TriggerManager"/>:
 ///     * Self-ETB fires (Setessan Champion itself counts).
 ///     * Another enchantment ETB under controller fires.
-///     * Default no-agent posture = auto-accept: life is paid, card is drawn.
+///     * Resolution is unconditional: a +1/+1 counter is put on Setessan
+///       Champion and a card is drawn (no life payment in the current printing).
 /// - Negative cases: opponent enchantment ETB does not fire; non-
 ///   enchantment, non-self ETB under controller does not fire.
 /// - <see cref="NamedCardFactory"/> dispatch returns Setessan Champion with
@@ -78,7 +79,7 @@ public class SetessanChampionFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Constellation_FiresOnSelfEtb_PaysOneLifeAndDraws()
+    public void Constellation_FiresOnSelfEtb_PutsCounterAndDraws()
     {
         var zones = new ZoneService(_bus);
         var stack = new Majik.Core.Stack.Stack(_bus);
@@ -99,20 +100,21 @@ public class SetessanChampionFactoryTests
         zones.MoveCardTo(champion, ZoneType.Battlefield, _alice);
 
         triggers.PendingCount.Should().Be(1,
-            "self-ETB qualifies under constellation — 'Setessan Champion or another " +
-            "enchantment enters'");
+            "self-ETB qualifies under constellation — 'an enchantment you control enters'");
 
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
-        _alice.LifeTotal.Should().Be(19,
-            "auto-accept posture (no agent) pays 1 life on the 'you may'");
+        _alice.LifeTotal.Should().Be(20,
+            "current printing has no life payment — life is unchanged");
+        champion.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne)
+            .Should().Be(1, "constellation puts a +1/+1 counter on Setessan Champion");
         _alice.Zones.Hand.GetCards().Should().Contain(libTop,
-            "'if you do, draw a card' — paid the life, drew the top");
+            "constellation also draws a card");
     }
 
     [Fact]
-    public void Constellation_FiresOnAnotherEnchantmentEtb_PaysOneLifeAndDraws()
+    public void Constellation_FiresOnAnotherEnchantmentEtb_PutsCounterAndDraws()
     {
         var zones = new ZoneService(_bus);
         var stack = new Majik.Core.Stack.Stack(_bus);
@@ -143,7 +145,9 @@ public class SetessanChampionFactoryTests
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
-        _alice.LifeTotal.Should().Be(19);
+        _alice.LifeTotal.Should().Be(20, "no life payment in the current printing");
+        champion.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne)
+            .Should().Be(1, "+1/+1 counter on Setessan Champion");
         _alice.Zones.Hand.GetCards().Should().Contain(libTop);
     }
 

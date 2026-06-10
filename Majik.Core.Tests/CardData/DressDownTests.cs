@@ -244,6 +244,11 @@ public class DressDownTests
         StartInLibrary(dd, _alice);
         _zones.MoveCard(dd, ZoneType.Library, ZoneType.Battlefield, _alice);
 
+        // ETB cantrip fires on entry — drain it so this test isolates the
+        // end-step sacrifice trigger.
+        triggers.PutPendingTriggersOnStack(_alice);
+        while (stack.Count > 0) stack.Pop()!.Resolve();
+
         // Fire End step on the controller's turn — the trigger should
         // queue, resolve to a sacrifice (Battlefield → Graveyard).
         _bus.Publish(new StepStartedEvent(StepStateType.End, _alice));
@@ -261,6 +266,41 @@ public class DressDownTests
         _alice.Zones.Battlefield.GetCards().Should().NotContain(dd);
     }
 
+    // ------------------------------------------------------------------
+    // ETB cantrip — "When this enchantment enters, draw a card." This is
+    // the missing-effect the Layer-B audit surfaced (only the end-step
+    // sacrifice + lose-abilities static were previously bound).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void DressDown_OnEnter_DrawsACard()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var dd = DressDownFactory.Create(
+            _alice, _effects, _bus, triggers, AllBattlefieldCreatures);
+        StartInLibrary(dd, _alice);
+
+        // A separate card on top of the library so the draw is observable.
+        var libTop = new Creature("Llanowar Elves", "{G}", 1, 1);
+        libTop.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(libTop);
+        libTop.SetZone(ZoneType.Library);
+
+        // ETB via ZoneService so the self-ETB trigger fires.
+        _zones.MoveCard(dd, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        triggers.PendingCount.Should().Be(1,
+            "Dress Down's 'when this enchantment enters, draw a card' trigger fires on ETB");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.Zones.Hand.GetCards().Should().Contain(libTop,
+            "the ETB cantrip drew the top of the controller's library");
+    }
+
     /// <summary>
     /// End step on the OPPONENT's turn must not fire the trigger
     /// (Triggers.OnStepBegin filters on controller). Other steps on the
@@ -276,6 +316,11 @@ public class DressDownTests
             _alice, _effects, _bus, triggers, AllBattlefieldCreatures);
         StartInLibrary(dd, _alice);
         _zones.MoveCard(dd, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        // Drain the ETB cantrip trigger that fires on entry so this test
+        // isolates the (non-firing) end-step path.
+        triggers.PutPendingTriggersOnStack(_alice);
+        while (stack.Count > 0) stack.Pop()!.Resolve();
 
         // Opponent's end step + controller's non-end steps — none of these
         // should fire the trigger.
