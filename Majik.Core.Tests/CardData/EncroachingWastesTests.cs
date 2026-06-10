@@ -145,8 +145,10 @@ public class EncroachingWastesTests
         _alice.Zones.Battlefield.GetCards().Should().NotContain(wastes);
         wastes.Zone.Should().Be(ZoneType.Graveyard);
 
-        // The tap cost ran before resolution.
-        wastes.IsTapped.Should().BeTrue();
+        // CR 400.7 / 614 — Encroaching Wastes sacrificed itself; the tap cost
+        // ran on the battlefield, but in the graveyard it is a new object and
+        // is no longer tapped.
+        wastes.IsTapped.Should().BeFalse();
     }
 
     [Fact]

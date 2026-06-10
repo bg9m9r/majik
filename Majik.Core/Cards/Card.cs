@@ -127,7 +127,25 @@ public class Card : ICard
         get => _zone;
         internal set
         {
+            var previousZone = _zone;
             _zone = value;
+            // CR 400.7 / 613.7 / 614 — a permanent that leaves the battlefield
+            // becomes a NEW object in its destination zone and loses all status
+            // it had on the battlefield, including its tapped/untapped state.
+            // This is the single chokepoint every zone move funnels through
+            // (ZoneService.CommitMove, the binder/factory direct-move paths,
+            // sacrifice costs, fetch effects, …), so resetting here guarantees
+            // a card in any non-battlefield zone is never reported as tapped.
+            // Cleared without going through Permanent.Untap (which throws when
+            // already untapped) so it is safe on every exit. The simulation
+            // copy-constructor assigns the backing field directly, bypassing
+            // this setter, so clone tap-state fidelity is preserved.
+            if (this is Permanent leaving
+                && previousZone == ZoneType.Battlefield
+                && value != ZoneType.Battlefield)
+            {
+                leaving.ResetOnLeaveBattlefield();
+            }
             // CR 613 — a permanent's battlefield presence is an input to the
             // layer system: lords/anthems/CDAs scoped to "permanents you
             // control" change as ANY permanent enters/leaves play, and an
