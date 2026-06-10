@@ -293,18 +293,19 @@ public class SemanticImplementationAuditTests
     /// signal's keyword. Each entry verified working via the prod GameFacade
     /// path (the same build LiveCards uses) — re-confirm before adding here.
     ///
-    /// <para>NOTE — the 42 binder-chain-only LANDS that remain flagged
-    /// (Castle Vantress scry, the Panorama / channel / sac-to-destroy / utility
-    /// lands, …) are NOT allowlisted: their special activated abilities are
-    /// genuinely DEAD in prod. Their <c>[CardName]</c> factories implement the
-    /// ability but lands are never routed through factories
-    /// (<c>GameFacade.BuildDeckCard</c> gates the instance-swap on
-    /// <c>!shell.HasType(Land)</c>), and the binder chain
-    /// (<c>OracleLandActivatedAbilityBinder</c> / <c>SagaBinder</c> / …) only
-    /// covers fetch / horizon / saga / manland patterns — not these. They are
-    /// the genuine-gap backlog this report exists to surface (see v1-deferrals,
-    /// "land special-activated-ability binder coverage"). Keeping them flagged
-    /// is the honest state.</para>
+    /// <para>NOTE — the binder-chain-only utility LANDS were the bulk of this
+    /// backlog: their <c>[CardName]</c> factories implement the ability, but
+    /// lands are never routed through factories (<c>GameFacade.BuildDeckCard</c>
+    /// gates the instance-swap on <c>!shell.HasType(Land)</c>), so the ability
+    /// was DEAD in prod. <c>LandActivatedAbilityBinder</c> (v1-deferrals #12) now
+    /// binds the bulk of them on the live binder chain — scry / draw / +1/+1
+    /// counter / token / damage / gain-life / return-from-graveyard /
+    /// destroy-target-land / Panorama search — so they no longer flag. The
+    /// residual land entries in the allowlist below (Channel family, creature-
+    /// land quoted granted abilities, count-linked / attack-rider tokens, mass
+    /// keyword grant, end-of-combat-timed ping) are the deliberate deferrals
+    /// that still need an engine primitive; they stay flagged-but-allowlisted as
+    /// the honest deferral state.</para>
     /// </summary>
     private static readonly HashSet<string> EffectCoverageAllowlist =
         new(StringComparer.Ordinal)
@@ -368,6 +369,46 @@ public class SemanticImplementationAuditTests
             // (SagaBinder.MakeUrzasSagaChapterHandler). The blob only sees the
             // chapter-I {T}: Add {C} mana ability. ---
             "Urza's Saga",
+
+            // === GENUINELY-DEFERRED UTILITY LANDS (v1-deferrals #12) ==========
+            // LandActivatedAbilityBinder now binds the bulk of the binder-chain-
+            // only utility-land activated abilities in prod (scry / draw /
+            // +1/+1 counter / token / damage / gain-life / return-from-graveyard
+            // / destroy-target-land / Panorama search). The entries below are the
+            // residual deferrals it deliberately does NOT bind — each needs an
+            // engine primitive that doesn't exist on the binder-reachable path
+            // yet. They stay flagged-but-allowlisted (honest deferral, not a
+            // silent gap). See v1-deferrals #12 for the running list.
+
+            // -- Channel family: the cost is "{cost}, Discard this card" (a
+            // discard-from-HAND activation, NOT a battlefield {T} activation).
+            // No binder-reachable "discard this card to activate" cost seam
+            // exists, so the whole family is deferred rather than modelled wrong. --
+            "Boseiju, Who Endures",          // Channel: destroy target artifact/enchantment/nonbasic land
+            "Otawara, Soaring City",         // Channel: return target permanent to hand
+            "Takenuma, Abandoned Mire",      // Channel: mill 3, return creature/PW from GY
+            "Eiganjo, Seat of the Empire",   // Channel: 4 damage to attacking/blocking creature
+            "Sokenzan, Crucible of Defiance",// Channel: create two 1/1 Spirit tokens with haste
+
+            // -- Creature-land quoted granted abilities / conditional animate.
+            // The N/N animate body binds via ManlandBinder; the QUOTED attack
+            // trigger (token / counter / exile) is a granted-on-animate ability
+            // with no generic primitive (same posture ManlandBinder defers).
+            // Crawling Barrens is a conditional animate (counter step first). --
+            "Den of the Bugbear",            // quoted "create a Goblin token" attack trigger on the animated body
+            "Raging Ravine",                 // quoted "+1/+1 counter on it" attack trigger on the animated body
+            "Hive of the Eye Tyrant",        // quoted "exile target card from defending player's GY" attack trigger
+            "Crawling Barrens",              // counters-then-conditional-animate (no fixed-subtype animate)
+
+            // -- Token riders with no generic primitive on the binder path. --
+            "Treasure Vault",                // "{X}{X}, …: Create X Treasure tokens" — count-linked mass token
+            "Dalkovan Encampment",           // delayed "Whenever you attack this turn, create two tapped+attacking Warriors" rider
+            "Mirrex",                         // token carries toxic 1 + a quoted "can't block" ability (richer token shape)
+
+            // -- Other residual deferrals. --
+            "Demolition Field",              // destroy binds; the both-players "search for a basic land" rider is deferred
+            "Desert",                         // "{T}: deal 1 to target attacking creature" gated to the end-of-combat step — no binder-reachable timing seam
+            "Vault of the Archangel",        // "Creatures you control gain deathtouch and lifelink until EOT" — mass until-EOT keyword grant, no primitive
         };
 
     private sealed record EffectSignal(string Label, Func<string, bool> Oracle, string[] MechanicFragments);
@@ -681,21 +722,32 @@ public class SemanticImplementationAuditTests
     }
 
     /// <summary>The genuine-gap sentinel — a binder-chain-only land whose
-    /// special activated ability is DEAD in prod (its [CardName] factory is not
-    /// routed for lands) MUST stay flagged. Castle Vantress promises "Scry 2"
-    /// with no bound scry. If this ever stops flagging, the land was either
-    /// fixed (remove from this assertion) or the heuristic over-suppressed.</summary>
+    /// special effect is GENUINELY DEAD in prod MUST stay flagged. Vault of the
+    /// Archangel promises "Creatures you control gain deathtouch and lifelink"
+    /// (a mass until-EOT keyword grant) — there is no binder-reachable
+    /// keyword-grant primitive, so it is a deliberate deferral
+    /// (<see cref="EffectCoverageAllowlist"/> entry, v1-deferrals #12). If this
+    /// ever stops flagging, the land was either fixed (move it off the deferral
+    /// list) or the heuristic over-suppressed.
+    ///
+    /// <para>NOTE — Castle Vantress's "Scry 2" was the prior sentinel; it is now
+    /// BOUND in prod via <c>LandActivatedAbilityBinder</c> (v1-deferrals #12), so
+    /// the sentinel moved to a still-genuinely-deferred land.</para></summary>
     [Fact]
     public void Heuristic_GenuineLandGap_StillFlagged()
     {
-        var entity = Repo.GetByName("Castle Vantress");
+        var entity = Repo.GetByName("Vault of the Archangel");
         entity.Should().NotBeNull();
-        LiveCards.TryGetValue("Castle Vantress", out var card).Should().BeTrue();
-        card!.Abilities.Should().NotContain(a => a.GetType().Name.Contains("Scry"),
-            "Castle Vantress's scry ability is genuinely unbound in the prod build");
+        LiveCards.TryGetValue("Vault of the Archangel", out var card).Should().BeTrue();
 
-        DetectMissingEffectSignals(card, entity!).Should().Contain("scry",
-            "the genuine missing scry must remain in the backlog (binder-chain-only land, factory dead in prod)");
+        DetectMissingEffectSignals(card!, entity!).Should().Contain("gain N life",
+            "the mass deathtouch/lifelink keyword grant is genuinely unbound (no keyword-grant primitive — v1-deferrals #12)");
+
+        // Castle Vantress's scry, by contrast, is now BOUND in prod.
+        var vantress = Repo.GetByName("Castle Vantress");
+        LiveCards.TryGetValue("Castle Vantress", out var vantressCard).Should().BeTrue();
+        DetectMissingEffectSignals(vantressCard!, vantress!).Should().NotContain("scry",
+            "Castle Vantress's Scry 2 now binds via LandActivatedAbilityBinder");
     }
 
     /// <summary>The EffectCoverageAllowlist must stay HONEST: every entry must
