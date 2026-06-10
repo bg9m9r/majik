@@ -507,7 +507,13 @@ public sealed class GameFacade : IDisposable
             landDropTracker: LandDrops,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
-            manaAbilityDispatcher: DispatchManaAbility);
+            manaAbilityDispatcher: DispatchManaAbility,
+            // CR 704.1 — check SBAs before priority + after each resolution on
+            // the legacy single-round StartAsync path too, so a 0/0 dies
+            // immediately rather than lingering. Mirrors the TurnDriver wiring.
+            checkStateBasedActions: () => _sba.CheckStateBasedActions(
+                new[] { _alice, _bob },
+                new[] { _alice, _bob }.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
     }
 
     /// <summary>

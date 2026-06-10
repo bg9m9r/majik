@@ -1118,7 +1118,18 @@ public sealed class TurnDriver
             // loop builds, so rc.Game.TurnState is non-null at resolution in real
             // games — dynamic-X connive reads per-turn counts off it, and
             // context-aware activation gates see live state.
-            turnStateAccessor: () => TurnState);
+            turnStateAccessor: () => TurnState,
+            // CR 704.1 / 704.3 / 704.4 — check state-based actions in the live
+            // priority flow (before a player receives priority AND after each
+            // stack object resolves), looping until none apply. The driver owns
+            // the StateBasedActions service + the player list, so it supplies
+            // the check the loop invokes. Without this, a 0/0 creature (Walking
+            // Ballista cast with X=0) or a creature reduced to 0 toughness by a
+            // noncombat effect lingered on the battlefield until the next turn
+            // boundary instead of dying immediately.
+            checkStateBasedActions: () => _sba.CheckStateBasedActions(
+                _players,
+                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
 
         try
         {
