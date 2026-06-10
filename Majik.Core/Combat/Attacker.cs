@@ -23,9 +23,13 @@ public class Attacker
     public Player? TargetPlayer { get; }
 
     /// <summary>
-    /// The planeswalker being attacked (if attacking planeswalker).
+    /// The planeswalker being attacked (if attacking planeswalker). Typed
+    /// <see cref="Permanent"/> (not <see cref="Planeswalker"/>) so a
+    /// creature-front DFC flipped to its planeswalker back — a
+    /// <see cref="Creature"/> instance with an effective loyalty body (CR 711,
+    /// <see cref="Permanent.IsEffectivePlaneswalker"/>) — can be attacked too.
     /// </summary>
-    public Planeswalker? TargetPlaneswalker { get; }
+    public Permanent? TargetPlaneswalker { get; }
 
     /// <summary>
     /// The creatures blocking this attacker.
@@ -73,8 +77,8 @@ public class Attacker
     /// </summary>
     public bool HasVigilance { get; }
 
-    public Attacker(Creature creature, Player? targetPlayer = null, Planeswalker? targetPlaneswalker = null, 
-        bool hasFirstStrike = false, bool hasDoubleStrike = false, bool hasTrample = false, 
+    public Attacker(Creature creature, Player? targetPlayer = null, Permanent? targetPlaneswalker = null,
+        bool hasFirstStrike = false, bool hasDoubleStrike = false, bool hasTrample = false,
         bool hasDeathtouch = false, bool hasVigilance = false)
     {
         if (creature == null)

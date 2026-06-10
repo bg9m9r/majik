@@ -183,11 +183,23 @@ public class CombatValidator
     }
 
     /// <summary>
-    /// Check if a planeswalker can be attacked.
+    /// Check if a (possibly effective) planeswalker can be attacked. Typed
+    /// <see cref="Permanent"/> so a creature-front DFC flipped to its
+    /// planeswalker back (CR 711) is a legal target: it must currently carry a
+    /// loyalty body (<see cref="Permanent.IsEffectivePlaneswalker"/>) — a real
+    /// <see cref="Planeswalker"/> always does — be on the battlefield, not
+    /// controlled by the attacker, and not at 0 loyalty.
     /// </summary>
-    public bool CanAttackPlaneswalker(Planeswalker target, Player attacker)
+    public bool CanAttackPlaneswalker(Permanent target, Player attacker)
     {
         if (target == null || attacker == null)
+        {
+            return false;
+        }
+
+        // Must currently be a planeswalker (real, or a flipped creature-front
+        // DFC carrying a transient loyalty body — CR 711).
+        if (!target.IsEffectivePlaneswalker())
         {
             return false;
         }
@@ -204,8 +216,8 @@ public class CombatValidator
             return false;
         }
 
-        // Planeswalker must not be dead
-        if (target.IsDead())
+        // Planeswalker must not be dead (0 effective loyalty)
+        if (target.IsLoyaltyDead())
         {
             return false;
         }
@@ -216,7 +228,7 @@ public class CombatValidator
     /// <summary>
     /// Validate a collection of attacker declarations.
     /// </summary>
-    public bool IsValidAttackDeclaration(IEnumerable<Creature> attackers, Player activePlayer, Player? targetPlayer, Planeswalker? targetPlaneswalker)
+    public bool IsValidAttackDeclaration(IEnumerable<Creature> attackers, Player activePlayer, Player? targetPlayer, Permanent? targetPlaneswalker)
     {
         if (attackers == null || activePlayer == null)
         {

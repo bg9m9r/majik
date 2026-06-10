@@ -629,6 +629,23 @@ public class Permanent : Card
     public bool IsEffectivePlaneswalker() => GetEffectiveLoyalty().HasValue;
 
     /// <summary>
+    /// CR 613.1c / 711 — true when this permanent's EFFECTIVE (layer-computed)
+    /// card types include <see cref="Types.CardType.Creature"/>. Distinct from
+    /// the C# instance type: a <see cref="Creature"/> instance flipped to a
+    /// non-creature DFC back (a planeswalker back) is NOT effectively a
+    /// creature, and a <see cref="Land"/> animated by a Layer-4 grant IS. When
+    /// <see cref="ActiveEffects"/> is null this falls back to the printed
+    /// types. Consulted by the creature-death SBA (CR 704.5f) so a flipped
+    /// creature-front DFC is governed by the planeswalker-death SBA instead.
+    /// </summary>
+    public bool IsEffectivelyCreature()
+    {
+        if (ActiveEffects == null)
+            return CardTypes.Contains(Types.CardType.Creature);
+        return ActiveEffects.Compute(this).Types.Contains(Types.CardType.Creature);
+    }
+
+    /// <summary>
     /// CR 704.5j — true when this permanent has a loyalty body that has dropped
     /// to 0 (so the planeswalker-death SBA destroys it). False when it carries
     /// no loyalty body.

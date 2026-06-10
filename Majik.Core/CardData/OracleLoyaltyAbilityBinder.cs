@@ -44,7 +44,29 @@ public static class OracleLoyaltyAbilityBinder
         if (card is not Planeswalker pw) return;
         if (entity?.OracleText is not string text) return;
 
-        foreach (Match m in LoyaltyLine.Matches(text))
+        BindOracleText(pw, text, controller, allPlayers);
+    }
+
+    /// <summary>
+    /// CR 711 / 606 — parse <paramref name="oracleText"/> and attach a
+    /// <see cref="LoyaltyAbility"/> to <paramref name="permanent"/> for every
+    /// loyalty-cost line found, on ANY <see cref="Permanent"/> (not just a
+    /// <see cref="Planeswalker"/>). This is the entry point the transform path
+    /// uses for a creature-front DFC flipped to its planeswalker back: the
+    /// back face's loyalty abilities are built against the flipped permanent's
+    /// Permanent-typed loyalty surface (4A), so they read/pay through its
+    /// transient loyalty body. Returns the abilities attached (so the transform
+    /// path can detach them on flip-back).
+    /// </summary>
+    public static IReadOnlyList<LoyaltyAbility> BindOracleText(
+        Permanent permanent, string oracleText, Player controller,
+        IReadOnlyList<Player>? allPlayers = null)
+    {
+        if (permanent == null) throw new ArgumentNullException(nameof(permanent));
+        if (string.IsNullOrWhiteSpace(oracleText)) return Array.Empty<LoyaltyAbility>();
+
+        var attached = new List<LoyaltyAbility>();
+        foreach (Match m in LoyaltyLine.Matches(oracleText))
         {
             var sign = m.Groups["sign"].Value;
             var n = int.Parse(m.Groups["n"].Value);
@@ -59,8 +81,11 @@ public static class OracleLoyaltyAbilityBinder
             };
 
             Action effect = BuildEffect(body, controller, allPlayers);
-            pw.AddAbility(new LoyaltyAbility(pw, loyaltyChange, effect));
+            var ability = new LoyaltyAbility(permanent, loyaltyChange, effect);
+            permanent.AddAbility(ability);
+            attached.Add(ability);
         }
+        return attached;
     }
 
     // --- effect pattern regexes ---
