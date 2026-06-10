@@ -243,6 +243,10 @@ public enum CardSubtype
     /// <summary>Assassin creature subtype — Murderous Redcap (Shadowmoor),
     /// Royal Assassin, Garna, Bloodfist of Keral. CR 205.3m.</summary>
     Assassin,
+    /// <summary>Rebel creature subtype — Big Game Hunter (Time Spiral),
+    /// Lin Sivvi, Defiant Hero, and the Masques-block Rebel searcher chain.
+    /// CR 205.3m.</summary>
+    Rebel,
     /// <summary>Homunculus creature subtype — Fblthp, the Lost (War of the
     /// Spark), and the broader homunculus lineage. CR 205.3m.</summary>
     Homunculus,
