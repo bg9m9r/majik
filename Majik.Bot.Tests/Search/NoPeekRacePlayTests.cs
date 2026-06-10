@@ -335,8 +335,10 @@ public class NoPeekRacePlayTests
         // Defaults for BOTH new terms: RiskVoteThreshold null (→ −500 default
         // risk filter ON) and no WeightsOverride (→ HiddenReach 1.0). Inference
         // ON, fixed seed → identical sampled worlds across the two games.
+        // 60 s budget so the deterministic iteration cap governs, not the wall
+        // clock (low budgets flake on slow CI hosts).
         var cfg = new BotConfig("Burn", Strategy: "mcts", RandomSeed: 7,
-            MaxMctsIterations: 80, MaxMctsBudgetMs: 800, InferOpponentArchetype: true);
+            MaxMctsIterations: 80, MaxMctsBudgetMs: 60_000, InferOpponentArchetype: true);
         cfg.RiskVoteThreshold.Should().BeNull("the risk filter must be at its ON default");
         cfg.WeightsOverride.Should().BeNull("HiddenReach must be at its 1.0 default");
 
