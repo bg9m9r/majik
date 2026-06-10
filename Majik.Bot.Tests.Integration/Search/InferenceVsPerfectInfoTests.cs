@@ -251,7 +251,7 @@ public sealed class InferenceVsPerfectInfoTests
         double kdRate  = kdDecided  > 0 ? (double)kdWins  / kdDecided  : 0.0;
 
         // ── Single grep-able summary line for the controller ─────────────────────
-        _out.WriteLine(
+        var inferLine =
             $"[INFER] botDeck={BotDeck} oppDeck={OppDeck} N={Games}  " +
             $"infer-vs-heuristic={infRate:P0} ({infWins}/{infDecided})  " +
             $"infer-vs-perfectinfo={ipRate:P0} ({ipWins}/{ipDecided})  " +
@@ -259,7 +259,9 @@ public sealed class InferenceVsPerfectInfoTests
             $"knowndet-vs-heuristic={kdRate:P0} ({kdWins}/{kdDecided})  " +
             $"draws=h1:{infDraws},h2:{ipDraws},h3:{piDraws},h4:{kdDraws}  " +
             $"inconclusive=h1:{infInc},h2:{ipInc},h3:{piInc},h4:{kdInc}  " +
-            $"iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns} prioritySearch=true");
+            $"iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns} prioritySearch=true";
+        _out.WriteLine(inferLine);
+        ProbeProgress.Log(inferLine);
 
         // ── Liveness-only assertions (NOT a win% threshold) ──────────────────────
         // Each head-to-head must have produced at least one decided game so the
@@ -319,16 +321,20 @@ public sealed class InferenceVsPerfectInfoTests
                 case SeatAWinner.Inconclusive: inconclusive++;  break;
             }
 
-            _out.WriteLine(
+            var gameLine =
                 $"  [{label}] game {i,2}: seed={seed} A={(aIsAlice ? "Alice" : "Bob")} " +
-                $"result={outcome}  cumulative: A {aWins} B {bWins} draw {draws} inconclusive {inconclusive}");
+                $"result={outcome}  cumulative: A {aWins} B {bWins} draw {draws} inconclusive {inconclusive}";
+            _out.WriteLine(gameLine);
+            ProbeProgress.Log(gameLine);   // streams live; xUnit buffers _out until the test ends
         }
 
         int decided = aWins + bWins;
         double winRate = decided > 0 ? (double)aWins / decided : 0.0;
-        _out.WriteLine(
+        var summaryLine =
             $"[STRENGTH] [{label}] A {aWins}/{decided} decided " +
-            $"({Games} played, {draws} draws, {inconclusive} inconclusive) win-rate={winRate:P1}");
+            $"({Games} played, {draws} draws, {inconclusive} inconclusive) win-rate={winRate:P1}";
+        _out.WriteLine(summaryLine);
+        ProbeProgress.Log(summaryLine);
 
         return (aWins, decided, draws, inconclusive);
     }

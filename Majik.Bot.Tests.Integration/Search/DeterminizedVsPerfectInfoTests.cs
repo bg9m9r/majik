@@ -177,14 +177,16 @@ public sealed class DeterminizedVsPerfectInfoTests
         double piRate  = piDecided  > 0 ? (double)piWins  / piDecided  : 0.0;
 
         // ── Single grep-able summary line for the controller ─────────────────────
-        _out.WriteLine(
+        var detLine =
             $"[DET] deck={Archetype} N={Games}  " +
             $"det-vs-heuristic={detRate:P0} ({detWins}/{detDecided})  " +
             $"det-vs-perfectinfo={dpRate:P0} ({dpWins}/{dpDecided})  " +
             $"perfectinfo-vs-heuristic={piRate:P0} ({piWins}/{piDecided})  " +
             $"draws=h1:{detDraws},h2:{dpDraws},h3:{piDraws}  " +
             $"inconclusive=h1:{detInc},h2:{dpInc},h3:{piInc}  " +
-            $"iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns} prioritySearch=true");
+            $"iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns} prioritySearch=true";
+        _out.WriteLine(detLine);
+        ProbeProgress.Log(detLine);
 
         // ── Liveness-only assertions (NOT a win% threshold) ──────────────────────
         // Each head-to-head must have produced at least one decided game so the
@@ -238,16 +240,20 @@ public sealed class DeterminizedVsPerfectInfoTests
                 case SeatAWinner.Inconclusive: inconclusive++;  break;
             }
 
-            _out.WriteLine(
+            var gameLine =
                 $"  [{label}] game {i,2}: seed={seed} A={(aIsAlice ? "Alice" : "Bob")} " +
-                $"result={outcome}  cumulative: A {aWins} B {bWins} draw {draws} inconclusive {inconclusive}");
+                $"result={outcome}  cumulative: A {aWins} B {bWins} draw {draws} inconclusive {inconclusive}";
+            _out.WriteLine(gameLine);
+            ProbeProgress.Log(gameLine);   // streams live; xUnit buffers _out until the test ends
         }
 
         int decided = aWins + bWins;
         double winRate = decided > 0 ? (double)aWins / decided : 0.0;
-        _out.WriteLine(
+        var summaryLine =
             $"[STRENGTH] [{label}] A {aWins}/{decided} decided " +
-            $"({Games} played, {draws} draws, {inconclusive} inconclusive) win-rate={winRate:P1}");
+            $"({Games} played, {draws} draws, {inconclusive} inconclusive) win-rate={winRate:P1}";
+        _out.WriteLine(summaryLine);
+        ProbeProgress.Log(summaryLine);
 
         return (aWins, decided, draws, inconclusive);
     }
