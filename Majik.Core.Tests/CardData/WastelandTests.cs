@@ -131,8 +131,10 @@ public class WastelandTests
         _alice.Zones.Battlefield.GetCards().Should().NotContain(wasteland);
         wasteland.Zone.Should().Be(ZoneType.Graveyard);
 
-        // The tap cost ran before resolution.
-        wasteland.IsTapped.Should().BeTrue();
+        // CR 400.7 / 614 — Wasteland sacrificed itself; the tap cost ran on
+        // the battlefield, but in the graveyard it is a new object and is no
+        // longer tapped.
+        wasteland.IsTapped.Should().BeFalse();
     }
 
     [Fact]

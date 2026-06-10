@@ -536,6 +536,20 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// CR 400.7 / 613.7 / 614 — a permanent that changes zones becomes a NEW
+    /// object and loses all status it had on the battlefield, including its
+    /// tapped/untapped state. Called by the zone-move pipeline when a
+    /// permanent leaves the battlefield. Clears the tapped flag directly
+    /// (without going through <see cref="Untap"/>, which throws when the
+    /// permanent is already untapped) so it is safe to call blindly on every
+    /// battlefield exit regardless of the prior tap state.
+    /// </summary>
+    internal void ResetOnLeaveBattlefield()
+    {
+        _isTapped = false;
+    }
+
+    /// <summary>
     /// Untap the permanent.
     /// </summary>
     public void Untap()

@@ -149,8 +149,10 @@ public class BuriedRuinTests
         _alice.Zones.Battlefield.GetCards().Should().NotContain(land);
         land.Zone.Should().Be(ZoneType.Graveyard);
 
-        // The tap cost ran before resolution.
-        land.IsTapped.Should().BeTrue();
+        // CR 400.7 / 614 — Buried Ruin sacrificed itself; the tap cost ran on
+        // the battlefield, but in the graveyard it is a new object and is no
+        // longer tapped.
+        land.IsTapped.Should().BeFalse();
     }
 
     [Fact]
