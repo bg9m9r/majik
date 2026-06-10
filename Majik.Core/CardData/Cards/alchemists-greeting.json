@@ -1,0 +1,5 @@
+{
+  "name": "Alchemist's Greeting",
+  "types": ["Sorcery"],
+  "manaCost": "{4}{R}"
+}
