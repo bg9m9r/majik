@@ -1085,7 +1085,25 @@ public sealed class TurnDriver
             autoPassPrefsProvider: _autoPassPrefsProvider,
             isPassOnlyDeadWindow: _isPassOnlyDeadWindow,
             eventBus: _eventBus,
-            clock: _clock);
+            clock: _clock,
+            // CR 603.3 — agent-aware trigger drain. The driver owns the
+            // TriggerManager + the seat agents, so it supplies the async
+            // drain the PriorityLoop calls each time a player is about to
+            // receive priority. Routing through PutPendingTriggersOnStackAsync
+            // (not the sync PutPendingTriggersOnStack PriorityManager used)
+            // means any pending TARGETED triggered ability prompts its
+            // controller's agent for targets (CR 603.3) before it goes on the
+            // stack — emblems, Leyline-of-Lightning-style "deal 1 to any
+            // target", Restless-land attack triggers, Valakut, utility-land
+            // ETB triggers — instead of silently auto-picking first-eligible.
+            // Non-targeted triggers behave exactly as before; APNAP order
+            // (CR 603.3b) is preserved by the async drain's controller
+            // grouping. Supplying this delegate also flips
+            // PriorityManager.SuppressInternalTriggerDrain so the drain
+            // happens once, here, not target-lessly inside PriorityManager.
+            asyncTriggerDrain: (activePlayerForDrain, drainCtx, drainCt) =>
+                _triggerManager.PutPendingTriggersOnStackAsync(
+                    activePlayerForDrain, _agents, drainCtx, drainCt));
 
         try
         {
