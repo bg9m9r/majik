@@ -15,7 +15,9 @@ namespace Majik.Bot.Tests.Integration.Tuning;
 /// IMPROVES, without running to convergence (which would take hours). The
 /// smoke proof uses:
 /// <list type="bullet">
-///   <item>A deliberately bad starting vector (all zeros except LifeDelta=0.1).
+///   <item>A deliberately bad starting vector
+///     (<see cref="WeightTuner.DegenerateWeights"/> — scrambled ratios:
+///     hoards cards, never casts instants/sorceries, barely races).
 ///     This is clearly sub-optimal for any MTG archetype.</item>
 ///   <item>A small game count (6-8 games per eval) for speed.</item>
 ///   <item>Heuristic-vs-heuristic strategy (fast: no MCTS overhead).</item>
@@ -80,27 +82,14 @@ public sealed class WeightTunerSmokeTests
         const int    rounds     = 3;
         const double step       = 0.5;
 
-        // Deliberately bad starting vector: Prowess production weights ×0.05.
-        // Signs are preserved (bot still attacks when it should) but weight
-        // magnitudes are so small the eval barely discriminates, producing
-        // near-random play. The optimizer should quickly scale them back up
-        // toward the productive range. All-zero / wrong-sign vectors create
-        // pathologically flat landscapes where bots refuse to attack and every
-        // game draws 20-20 at turn cap — giving zero gradient.
-        var prod = ArchetypeWeights.ForArchetype(deck);
-        const double scale = 0.05;
-        var badStart = new ArchetypeWeights(
-            LifeDelta:           prod.LifeDelta           * scale,
-            BoardPower:          prod.BoardPower          * scale,
-            BoardToughness:      prod.BoardToughness      * scale,
-            OpponentThreats:     prod.OpponentThreats     * scale,
-            ManaSources:         prod.ManaSources         * scale,
-            HandSize:            prod.HandSize            * scale,
-            Tempo:               prod.Tempo               * scale,
-            KeyCardInPlay:       prod.KeyCardInPlay       * scale,
-            LethalProximity:     prod.LethalProximity     * scale,
-            CardAdvantage:       prod.CardAdvantage       * scale,
-            PlaneswalkerEngine:  prod.PlaneswalkerEngine  * scale);
+        // Deliberately bad starting vector: scrambled ratios (hoards cards,
+        // never casts instants/sorceries, barely races). NOTE: must be
+        // scale-VARIANT bad — an earlier version used "production × 0.05",
+        // which is decision-equivalent to production (heuristic decisions are
+        // argmax over weight-linear deltas) and gave the optimizer nothing to
+        // climb. All-zero / fully-wrong-sign vectors are equally useless:
+        // neither bot attacks and every game draws at the turn cap.
+        var badStart = WeightTuner.DegenerateWeights();
 
         _out.WriteLine($"[SMOKE] Starting from bad weight vector: {WeightTuner.Format(badStart)}");
 
@@ -165,21 +154,10 @@ public sealed class WeightTunerSmokeTests
         const int    games = 8;
 
         var production = ArchetypeWeights.ForArchetype(deck);
-        // Scaled-down version (×0.05) — same shape, near-zero magnitude.
-        // Production weights should clearly beat this garbage vector.
-        const double garbageScale = 0.05;
-        var garbage = new ArchetypeWeights(
-            LifeDelta:           production.LifeDelta           * garbageScale,
-            BoardPower:          production.BoardPower          * garbageScale,
-            BoardToughness:      production.BoardToughness      * garbageScale,
-            OpponentThreats:     production.OpponentThreats     * garbageScale,
-            ManaSources:         production.ManaSources         * garbageScale,
-            HandSize:            production.HandSize            * garbageScale,
-            Tempo:               production.Tempo               * garbageScale,
-            KeyCardInPlay:       production.KeyCardInPlay       * garbageScale,
-            LethalProximity:     production.LethalProximity     * garbageScale,
-            CardAdvantage:       production.CardAdvantage       * garbageScale,
-            PlaneswalkerEngine:  production.PlaneswalkerEngine  * garbageScale);
+        // Scrambled-ratio garbage (see WeightTuner.DegenerateWeights for why
+        // a uniformly scaled-down production vector is NOT usable here: it is
+        // decision-equivalent to production under the argmax heuristic).
+        var garbage = WeightTuner.DegenerateWeights();
 
         _out.WriteLine($"[EVAL] Production: {WeightTuner.Format(production)}");
         _out.WriteLine($"[EVAL] Garbage:    {WeightTuner.Format(garbage)}");
