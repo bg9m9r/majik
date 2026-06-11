@@ -39,13 +39,17 @@ namespace Majik.Core.CardData.Factories;
 ///   still on the stack). On resolution:
 ///   1. <b>"any player may sacrifice a creature of their choice"</b>: each
 ///      player (the controller first, then opponents — a simple APNAP-ish
-///      order, CR 603.3b) is prompted, via
-///      <see cref="IPlayerAgent.ChooseFromBattlefieldAsync"/>, to pick one
-///      creature THEY control to sacrifice, or decline (null). A chosen
-///      creature is sacrificed via <see cref="Fx.Sacrifice(ICard, Player, Majik.Core.Events.IEventBus)"/>
-///      when an event bus is available (so aristocrat "whenever a player
-///      sacrifices" triggers fire — CR 701.16), else the bus-free
-///      <see cref="Fx.Sacrifice(ICard)"/>.
+///      order, CR 603.3b) with at least one creature is given an explicit "may"
+///      gate via <see cref="IPlayerAgent.ChooseYesNoAsync(string,BotIntent,System.Threading.CancellationToken)"/>
+///      classified <see cref="BotIntent.CostToDecline"/> (the default heuristic
+///      agent declines — sacrificing your own creature is a cost). On accept the
+///      player picks the creature THEY control to sacrifice via
+///      <see cref="IPlayerAgent.ChooseFromBattlefieldAsync"/>; it is sacrificed
+///      via <see cref="Fx.Sacrifice(ICard)"/> (CR 701.16). The may gate is kept
+///      SEPARATE from the pick because <c>ChooseFromBattlefieldAsync</c> is not
+///      optional on the production agent (it always returns a candidate), so
+///      folding "whether" into the pick would force every player with a creature
+///      to always sacrifice.
 ///   2. <b>"If a player does, counter Brain Gorgers"</b>: if AT LEAST ONE
 ///      player sacrificed, the Brain Gorgers spell is countered (CR 701.5a —
 ///      removed from the stack and put into its owner's graveyard) via
@@ -139,6 +143,8 @@ public static class BrainGorgersFactory
 
                 foreach (var player in players)
                 {
+                    if (player.HasLost) continue;
+
                     // "a creature of their choice" — only creatures the
                     // prompted player controls on the battlefield are legal.
                     var creatures = player.Zones.Battlefield.GetCards()
@@ -150,22 +156,44 @@ public static class BrainGorgersFactory
                     if (creatures.Count == 0) continue;
 
                     var agent = AgentRegistry.Get(player);
-                    if (agent == null) continue;
+                    if (agent == null) continue; // no agent → declines the "may".
 
-                    // ChooseFromBattlefieldAsync returns null to DECLINE — the
-                    // "may" is folded into the optional pick (CR 117.x).
-                    // DiscardCost intent → heuristic bots decline by default
-                    // (sacrificing your own creature is a downside).
+                    // "any player MAY sacrifice …" — an explicit may gate
+                    // (CR 117.x). Classified BotIntent.CostToDecline: sacrificing
+                    // one of your own creatures to counter the spell is a cost,
+                    // so the default heuristic agent declines (Brain Gorgers
+                    // resolves; the controller keeps the 4/2 — the printed-
+                    // favourable, opponent-neutral default). The may gate is
+                    // SEPARATE from the creature pick because
+                    // ChooseFromBattlefieldAsync is NOT optional (its production
+                    // shim always returns the first candidate when one exists),
+                    // so folding "whether" into the pick would force every player
+                    // with a creature to always sacrifice.
+                    var accepts = await agent
+                        .ChooseYesNoAsync(
+                            $"Sacrifice a creature to counter {CardName}?",
+                            BotIntent.CostToDecline,
+                            rc.Ct)
+                        .ConfigureAwait(false);
+                    if (!accepts) continue;
+
+                    // "… a creature of their choice."
                     var pick = await agent.ChooseFromBattlefieldAsync(
-                        player, creatures, BotIntent.DiscardCost, rc.Ct).ConfigureAwait(false);
+                        player, creatures, BotIntent.None, rc.Ct).ConfigureAwait(false);
 
-                    if (pick is Creature chosen && chosen.Zone == ZoneType.Battlefield)
+                    // Validate the pick is a creature the chooser still controls;
+                    // otherwise fall back deterministically (CR 701.16).
+                    if (pick is not Creature
+                        || pick.Zone != ZoneType.Battlefield
+                        || !ReferenceEquals(pick.Controller, player))
                     {
-                        // CR 701.16 — sacrifice. The sacrificing player is the
-                        // permanent's controller (the prompted player).
-                        Fx.Sacrifice(chosen);
-                        anyoneSacrificed = true;
+                        pick = creatures[0];
                     }
+
+                    // CR 701.16 — sacrifice. The sacrificing player is the
+                    // permanent's controller (the prompted player).
+                    Fx.Sacrifice(pick);
+                    anyoneSacrificed = true;
                 }
 
                 // CR 701.5a — "If a player does, counter Brain Gorgers." A
