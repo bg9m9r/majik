@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -16,16 +17,29 @@ namespace Majik.Core.Tests.CardData;
 /// Covers:
 /// - Card identity (name, Enchantment type, owner/controller)
 /// - Two triggered abilities: ETB mill-and-pick, and lifegain-on-graveyard-leave
-/// - ETB effect: mills 4, picks first artifact/creature/land from milled cards
+/// - ETB effect (CR 116.1b "you may"): mills 4, then PROMPTS the controller to
+///   put one matching (artifact/creature/land) milled card into hand — or decline
+/// - ETB effect: the no-agent fallback auto-picks the first matching card so
+///   bot self-play / agentless harnesses stay deterministic
 /// - ETB effect: non-matching cards remain in graveyard
 /// - ETB effect: empty library is a no-op
 /// - Lifegain trigger fires on artifact/creature leaving controller's graveyard
 /// - Lifegain trigger does NOT fire for non-artifact/creature cards leaving
 /// - Lifegain trigger does NOT fire for opponent's graveyard
 /// </summary>
-public class DredgersInsightTests
+public class DredgersInsightTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
+
+    public DredgersInsightTests()
+    {
+        AgentRegistry.Clear();
+    }
+
+    public void Dispose()
+    {
+        AgentRegistry.Clear();
+    }
 
     // -----------------------------------------------------------------------
     // Card identity
@@ -75,7 +89,12 @@ public class DredgersInsightTests
     }
 
     // -----------------------------------------------------------------------
-    // ETB trigger: mill 4, pick first artifact/creature/land
+    // ETB trigger: mill 4, then prompt to put one matching card into hand.
+    //
+    // The legacy synchronous Execute() path used below registers no agent, so
+    // it exercises the DETERMINISTIC FALLBACK (auto-pick the first matching
+    // milled card). The interactive, agent-driven behaviour — the actual CR
+    // 116.1b "you may" choice — is covered in the agent section further down.
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -192,6 +211,135 @@ public class DredgersInsightTests
         var act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
 
         act.Should().NotThrow("milling an empty library is a no-op");
+    }
+
+    // -----------------------------------------------------------------------
+    // ETB trigger: agent-driven "you may put one … into your hand" (CR 116.1b)
+    // -----------------------------------------------------------------------
+
+    private static async Task RunEtbAsync(Enchantment enchant, Player controller, IPlayerAgent agent)
+    {
+        var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
+        var ctx = ResolutionContext.For(
+            controller, agent, game: null, chosenTargets: null);
+        foreach (var effect in etb.Effects)
+        {
+            await effect.ExecuteAsync(ctx);
+        }
+    }
+
+    [Fact]
+    public async Task DredgersInsight_EtbEffect_ScriptedAgentPicksSpecificCard_GoesToHand()
+    {
+        var alice = new Player("Alice", 20);
+        // Two creatures milled — the agent must be able to pick the SECOND
+        // one, proving a real choice rather than the auto-pick-first default.
+        var bear1 = new Creature("Bear 1", "1G", 2, 2);
+        var bear2 = new Creature("Bear 2", "1G", 2, 2);
+        bear1.SetOwner(alice);
+        bear2.SetOwner(alice);
+        alice.Zones.Library.AddCard(bear1);
+        bear1.SetZone(ZoneType.Library);
+        alice.Zones.Library.AddCard(bear2);
+        bear2.SetZone(ZoneType.Library);
+
+        var agent = new ScriptedAgent();
+        agent.QueueFromRevealed(bear2);
+
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
+        await RunEtbAsync(enchant, alice, agent);
+
+        alice.Zones.Hand.GetCards().Should().Contain(bear2,
+            "the agent's chosen card goes to hand, not the first matching one");
+        alice.Zones.Hand.GetCards().Should().NotContain(bear1);
+        alice.Zones.Graveyard.GetCards().Should().Contain(bear1,
+            "the unchosen milled card stays in the graveyard");
+    }
+
+    [Fact]
+    public async Task DredgersInsight_EtbEffect_AgentDeclines_AllMilledStayInGraveyard()
+    {
+        var alice = new Player("Alice", 20);
+        // Two matching cards milled; the player still declines (it's a "may").
+        var artifact = new Artifact("Sol Ring", "1");
+        var land = new Land("Forest");
+        artifact.SetOwner(alice);
+        land.SetOwner(alice);
+        alice.Zones.Library.AddCard(artifact);
+        artifact.SetZone(ZoneType.Library);
+        alice.Zones.Library.AddCard(land);
+        land.SetZone(ZoneType.Library);
+
+        var agent = new ScriptedAgent();
+        agent.QueueFromRevealed((ICard?)null); // CR 116.1b — decline.
+
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
+        await RunEtbAsync(enchant, alice, agent);
+
+        alice.Zones.Hand.GetCards().Should().BeEmpty(
+            "the controller declined the 'you may' clause — nothing to hand");
+        alice.Zones.Graveyard.GetCards().Should().Contain(new ICard[] { artifact, land },
+            "all milled cards remain in the graveyard when the player declines");
+    }
+
+    [Fact]
+    public async Task DredgersInsight_EtbEffect_PromptsAgentEvenWithNoMatch_NothingToHand()
+    {
+        var alice = new Player("Alice", 20);
+        // Four non-matching cards (instants) — no eligible pick, but the
+        // player is still prompted so they see the milled pile.
+        var insts = new[] { "A", "B", "C", "D" }
+            .Select(n => { var c = new Instant(n, ""); c.SetOwner(alice); return c; })
+            .ToList();
+        foreach (var c in insts) { alice.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library); }
+
+        var prompted = false;
+        var agent = new ScriptedAgent();
+        agent.QueueFromRevealed((revealed, eligible) =>
+        {
+            prompted = true;
+            eligible.Should().BeEmpty("no artifact/creature/land was milled");
+            revealed.Should().HaveCount(4, "the player still sees the milled pile");
+            return null;
+        });
+
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
+        await RunEtbAsync(enchant, alice, agent);
+
+        prompted.Should().BeTrue(
+            "the controller is prompted even when no milled card is eligible");
+        alice.Zones.Hand.GetCards().Should().BeEmpty();
+        alice.Zones.Graveyard.GetCards().Should().Contain(insts);
+    }
+
+    [Fact]
+    public async Task DredgersInsight_EtbEffect_AgentFromRegistry_IsPromptedOnSyncPath()
+    {
+        // Even the legacy synchronous Execute() path must prompt a REGISTERED
+        // agent (resolved via AgentRegistry when ctx.Agent is null) — this is
+        // the live-match posture where the effect runs context-free but the
+        // player must still choose.
+        var alice = new Player("Alice", 20);
+        var bear1 = new Creature("Bear 1", "1G", 2, 2);
+        var bear2 = new Creature("Bear 2", "1G", 2, 2);
+        bear1.SetOwner(alice);
+        bear2.SetOwner(alice);
+        alice.Zones.Library.AddCard(bear1);
+        bear1.SetZone(ZoneType.Library);
+        alice.Zones.Library.AddCard(bear2);
+        bear2.SetZone(ZoneType.Library);
+
+        var agent = new ScriptedAgent();
+        agent.QueueFromRevealed(bear2);
+        AgentRegistry.Set(alice, agent);
+
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
+        var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
+        foreach (var effect in etb.Effects) effect.Execute();
+
+        alice.Zones.Hand.GetCards().Should().Contain(bear2,
+            "the registered agent's choice is honoured on the sync path too");
+        alice.Zones.Graveyard.GetCards().Should().Contain(bear1);
     }
 
     // -----------------------------------------------------------------------
