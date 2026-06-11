@@ -162,6 +162,12 @@ internal static class ProbeHarness
     /// the world split differs. Distinct from every other family's blocks.</summary>
     internal const int WorldSplitMirrorBaseSeed = 60000;
 
+    /// <summary>Base seed for the ASYMMETRIC heuristic-vs-heuristic ANCHOR
+    /// (<c>AnchorProbes.cs</c>) — heuristic Prowess vs heuristic Burn, the
+    /// matchup baseline the MCTS asymmetric numbers are read against. Distinct
+    /// from every other family's blocks.</summary>
+    internal const int AnchorBaseSeed = 70000;
+
     /// <summary>Which seat's strategy won a single game (or a draw / crash).</summary>
     internal enum SeatAWinner { SeatA, SeatB, Draw, Inconclusive }
 
@@ -214,6 +220,13 @@ internal static class ProbeHarness
     /// <summary>Heuristic Burn opponent.</summary>
     internal static BotConfig HeuristicOpp(int seed) => new BotConfig(
         AsymmetricOppDeck, Strategy: "heuristic", RandomSeed: seed);
+
+    /// <summary>Heuristic Prowess seat — the ANCHOR's bot-under-test seat
+    /// (<c>AnchorProbes.cs</c>): the same deck the MCTS bots play in this
+    /// family, but with the heuristic strategy, so the matchup's intrinsic
+    /// win-rate can be measured with the search bot out of the picture.</summary>
+    internal static BotConfig HeuristicBot(int seed) => new BotConfig(
+        AsymmetricBotDeck, Strategy: "heuristic", RandomSeed: seed);
 
     /// <summary>Known-archetype determinized (Prowess seat): honest (no peek) but
     /// TOLD the opponent is Burn (OpponentArchetype set, inference off) →
