@@ -128,6 +128,17 @@ namespace Majik.Bot;
 /// (fail-fast, mirroring the strategy-name validation). This is the #2596
 /// rollout-cost lever — the live flip of a probe-gate winner is config-only
 /// (<c>Bot__RolloutDepth</c>).</para>
+///
+/// <para><c>TreeStateReuse</c> optional (default null = off, today's
+/// behaviour). When <c>Strategy="mcts"</c>, enables tree-state reuse inside
+/// each search (see <see cref="Search.MctsConfig"/>): tree-node states are
+/// snapshot-cached and each iteration expands / rolls out from the nearest
+/// cached ancestor instead of replaying the whole root path —
+/// iteration-for-iteration EQUIVALENT to the root-replay loop (equivalence-
+/// gated), only cheaper. Resolved by <see cref="Search.SearchStrategy"/> at
+/// construction (null → false) and inherited by every per-world determinized
+/// search. The live flip of the probe-gate winner is config-only
+/// (<c>Bot__TreeStateReuse</c>).</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -145,4 +156,5 @@ public sealed record BotConfig(
     bool InferOpponentArchetype = false,
     double? RiskVoteThreshold = null,
     int? SearchConcurrency = null,
-    string? RolloutDepth = null);
+    string? RolloutDepth = null,
+    bool? TreeStateReuse = null);

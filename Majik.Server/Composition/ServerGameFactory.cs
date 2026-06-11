@@ -73,7 +73,9 @@ public sealed class ServerGameFactory
     /// splitting the core; the heuristic strategy never searches, so it stays
     /// null (ungated) there. <c>RolloutDepth</c> is likewise set ONLY under
     /// <c>mcts</c> (default "FullTurnPlus" = today's playout): the heuristic
-    /// never rolls out, so it stays null there.
+    /// never rolls out, so it stays null there. <c>TreeStateReuse</c> follows
+    /// the same rule (default false = today's root-replay loop): the
+    /// heuristic never searches, so it stays null there.
     /// Internal so tests can assert the exact installed config without digging
     /// the agent out of a facade.
     /// </summary>
@@ -90,6 +92,9 @@ public sealed class ServerGameFactory
                 : null,
             RolloutDepth: _botOptions.Strategy == "mcts"
                 ? _botOptions.RolloutDepth
+                : null,
+            TreeStateReuse: _botOptions.Strategy == "mcts"
+                ? _botOptions.TreeStateReuse
                 : null);
 
     /// <summary>

@@ -145,6 +145,15 @@ internal static class ProbeHarness
     /// each cell uses its own +1000 block.</summary>
     internal const int MatrixAsymmetricBaseSeed = 30000;
 
+    /// <summary>Base seed for the MIRROR tree-state-reuse cells
+    /// (<c>TreeReuseProbes.cs</c>) — each cell uses its own +1000 block,
+    /// distinct from every other family's blocks.</summary>
+    internal const int ReuseMirrorBaseSeed = 40000;
+
+    /// <summary>Base seed for the ASYMMETRIC tree-state-reuse cells —
+    /// each cell uses its own +1000 block.</summary>
+    internal const int ReuseAsymmetricBaseSeed = 50000;
+
     /// <summary>Which seat's strategy won a single game (or a draw / crash).</summary>
     internal enum SeatAWinner { SeatA, SeatB, Draw, Inconclusive }
 
@@ -282,6 +291,51 @@ internal static class ProbeHarness
             OpponentArchetype: null,
             InferOpponentArchetype: true,
             RolloutDepth: depth.ToString());
+
+    // ── BotConfig factories — TREE-STATE-REUSE cells ────────────────────────────
+    // Reuse variants of MirrorDeterminized / Inference: same honest search,
+    // wall-clock-bound at the live budget (MatrixBudgetMs = 1500 ms) with
+    // TreeStateReuse ON. Two iteration caps per head: the live 150 (latency
+    // read — reuse finishes the same iterations FASTER) and the measured
+    // 1-core capacity (strength read — reuse converts the SAME live budget
+    // into ~5× the iterations; see the decisionReuse profiler cells).
+
+    /// <summary>
+    /// Reuse-cell variant of <see cref="MirrorDeterminized"/> (honest,
+    /// resamples from the known mirror decklist; no peek) with
+    /// <c>TreeStateReuse</c> ON at the given <paramref name="iterations"/>,
+    /// wall-clock-bound at <see cref="MatrixBudgetMs"/>. <c>preserves:
+    /// MirrorArchetype, Strategy, PrioritySearchEnabled, OpponentArchetype</c>
+    /// from the live factory.
+    /// </summary>
+    internal static Func<int, BotConfig> MirrorDeterminizedReuseAt(int iterations) =>
+        seed => new BotConfig(
+            MirrorArchetype, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: iterations,
+            MaxMctsBudgetMs: MatrixBudgetMs,
+            PrioritySearchEnabled: true,
+            OpponentArchetype: MirrorArchetype,
+            TreeStateReuse: true);
+
+    /// <summary>
+    /// Reuse-cell variant of <see cref="Inference"/> (honest — no peek, no
+    /// assumed deck; infers the opponent's archetype from public cards) with
+    /// <c>TreeStateReuse</c> ON at the given <paramref name="iterations"/>,
+    /// wall-clock-bound at <see cref="MatrixBudgetMs"/>. <c>preserves:
+    /// AsymmetricBotDeck, Strategy, PrioritySearchEnabled, OpponentArchetype,
+    /// InferOpponentArchetype</c> from the live factory.
+    /// </summary>
+    internal static Func<int, BotConfig> InferenceReuseAt(int iterations) =>
+        seed => new BotConfig(
+            AsymmetricBotDeck, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: iterations,
+            MaxMctsBudgetMs: MatrixBudgetMs,
+            PrioritySearchEnabled: true,
+            OpponentArchetype: null,
+            InferOpponentArchetype: true,
+            TreeStateReuse: true);
 
     // ── Head-to-head runner ─────────────────────────────────────────────────────
 

@@ -410,6 +410,39 @@ public sealed class DecisionProfileTests
             }
         }
 
+        // ── 4a2. Tree-state reuse cells (the snapshot/restore lever) ──────────
+        // Same board, reuse OFF vs ON at two shapes:
+        //   live     — 150it/1500ms, the production cell: realized ms/iter +
+        //              alloc delta when the iteration cap binds.
+        //   capacity — 2000it/1500ms, wall-clock-bound: how many iterations
+        //              the LIVE budget fits in each mode (the iters@1500ms
+        //              number the reuse strength probes raise their cap to).
+        foreach (var reuse in new[] { false, true })
+        {
+            foreach (var (cell, iters) in new[] { ("live", 150), ("capacity", 2000) })
+            {
+                var mcts = new Mcts(sim, new MctsConfig(
+                    MaxIterations: iters, MaxMillis: 1500, DepthTurns: 1, ExplorationC: 1.41,
+                    TreeStateReuse: reuse));
+                mcts.SearchWithStats(root); // warm rep (untimed)
+                for (int rep = 1; rep <= 3; rep++)
+                {
+                    double wsBefore = WorkingSetMb();
+                    long a0 = GC.GetTotalAllocatedBytes(precise: true);
+                    long t0 = Stopwatch.GetTimestamp();
+                    var result = mcts.SearchWithStats(root);
+                    double wallMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+                    long alloc = GC.GetTotalAllocatedBytes(precise: true) - a0;
+                    int done = result.RootStats.Sum(s => s.Visits);
+                    Log($"[PROF] decisionReuse cell={cell} reuse={(reuse ? "on" : "off")} " +
+                        $"cfg={iters}it/1500ms rep={rep} wall={wallMs:F0}ms " +
+                        $"iters={done} ms/iter={(done > 0 ? wallMs / done : double.NaN):F2} " +
+                        $"allocMB={alloc / (1024.0 * 1024.0):F0} best={result.Best.Key} " +
+                        $"ws={wsBefore:F0}->{WorkingSetMb():F0}MB");
+                }
+            }
+        }
+
         // ── 4b. Combat-phase decision at the live default (context) ───────────
         {
             var combatRoot = SimState.Capture(
