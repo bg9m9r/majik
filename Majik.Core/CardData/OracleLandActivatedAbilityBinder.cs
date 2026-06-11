@@ -232,10 +232,17 @@ public static class OracleLandActivatedAbilityBinder
 
         if (pick != null)
         {
+            // ASYNC move so a prompting ETB replacement on the fetched land
+            // (shock land "may pay 2 life") consults the searching player's
+            // seat agent off ctx, matching the play-from-hand path. Prismatic
+            // Vista names "a basic land card", so a shock land is not a legal
+            // target here today, but the async move keeps every fetch path
+            // uniformly agent-aware. Falls back to raw mutation with no service.
             var zones = ZoneServiceRegistry.Get(controller);
             if (zones != null)
             {
-                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+                await zones.MoveCardToAsync(pick, ZoneType.Battlefield, ctx, controller)
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -415,10 +422,22 @@ public static class OracleLandActivatedAbilityBinder
             // untap) and ETB-tapped replacements (shock lands paying 2 life,
             // bounce/surveil lands always tapped) run. Falls back to raw zone
             // mutation for the no-service test paths.
+            //
+            // Use the ASYNC move so the ResolutionContext (carrying the
+            // searching player's seat agent, threaded from the StackResolver)
+            // reaches a PROMPTING ETB replacement: a fetched shock land's "you
+            // may pay 2 life" must consult the agent (ShockLandReplacement
+            // .ReplaceAsync) exactly like the play-from-hand path. The sync
+            // MoveCard routes through ShockLandReplacement.Replace, which (per
+            // CR 614.1c) cannot await a prompt and silently declines (enters
+            // tapped) — THAT was the live bug: fetching a shock land never
+            // asked the human. FetchLandCycleFactory (test-only) already used
+            // the async move; the live binder path did not.
             var zones = ZoneServiceRegistry.Get(controller);
             if (zones != null)
             {
-                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+                await zones.MoveCardToAsync(pick, ZoneType.Battlefield, ctx, controller)
+                    .ConfigureAwait(false);
             }
             else
             {
