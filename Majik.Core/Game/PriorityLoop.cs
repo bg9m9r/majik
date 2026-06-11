@@ -175,6 +175,17 @@ public sealed class PriorityLoop
     }
 
     /// <summary>
+    /// CR 104.1 / 104.2a — true when at most one player is still in the game
+    /// (everyone else has <see cref="Player.HasLost"/>). The game has ended;
+    /// the loop must stop granting priority and stop resolving the stack.
+    /// Same survivor-count rule <c>GameDriver.TryFinalizeOnSurvivorCount</c>
+    /// uses to finalize the <see cref="GameResult"/>, so the halt here and
+    /// the winner declaration there always agree (and a 3+ player game with
+    /// one casualty correctly continues).
+    /// </summary>
+    private bool GameIsOver() => _players.Count(p => !p.HasLost) <= 1;
+
+    /// <summary>
     /// Runs priority rounds until the stack is empty AND all players pass in
     /// succession on an empty stack (Rule 117.4 — phase can end).
     /// </summary>
@@ -207,6 +218,15 @@ public sealed class PriorityLoop
                 // this window's holder can act. No-op when not wired (legacy
                 // unit harnesses).
                 _checkStateBasedActions?.Invoke();
+
+                // CR 104.1 / 104.2a — the game ends IMMEDIATELY when at most
+                // one player remains (in a two-player game, the survivor wins
+                // the moment the SBA sweep above marks the other player lost).
+                // Stop the round right here: no more priority windows, no
+                // trigger drain, and — critically — no further stack
+                // resolution (the resolve below must never run a second burn
+                // spell into a player who already lost to the first one).
+                if (GameIsOver()) return;
 
                 // CR 603.3 — drain any pending triggered abilities onto the
                 // stack on the agent-aware async path BEFORE the current
@@ -328,6 +348,15 @@ public sealed class PriorityLoop
             // caused it, and matches the 704.3 "repeat until none apply" point
             // right after a game event). The SBA service loops internally.
             _checkStateBasedActions?.Invoke();
+
+            // CR 104.1 / 104.2a — the resolution just performed (plus the SBA
+            // sweep) may have ended the game (lethal burn, a drain trigger,
+            // empty-library draw). The game ends immediately — do NOT loop
+            // back to resolve the rest of the stack: any remaining object
+            // would resolve into a player who has already left the game
+            // (CR 800.4a) — the exact "Cannot lose life after losing the
+            // game" crash this halt exists to prevent.
+            if (GameIsOver()) return;
 
             // Loop back: start a fresh priority round with active player.
         }

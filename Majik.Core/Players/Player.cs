@@ -522,9 +522,17 @@ public class Player
             throw new ArgumentException("Amount must be non-negative", nameof(amount));
         }
 
+        // CR 800.4a — a player who has lost has left the game; an effect
+        // that would have them gain life simply does as much as it can and
+        // skips them (graceful no-op, NOT a throw). The primary defence is
+        // the game-over halt in PriorityLoop / TurnDriver (CR 104.1 /
+        // 104.2a — the game ends immediately once only one player remains);
+        // this backstop keeps a straggling resolution (lifelink damage from
+        // a simultaneous-death exchange, a second spell already past the
+        // halt) from crashing a live match.
         if (_hasLost)
         {
-            throw new Domain.Exceptions.InvalidPlayerActionException("Cannot gain life after losing the game");
+            return;
         }
 
         // CR 614 — when a replacement bus is attached, route the intent
@@ -554,9 +562,19 @@ public class Player
             throw new ArgumentException("Amount must be non-negative", nameof(amount));
         }
 
+        // CR 800.4a — a player who has lost has left the game; damage / life
+        // loss that still resolves at them is a graceful no-op, NOT a throw
+        // (resolution "does as much as possible" and simply skips the departed
+        // player). The rules-correct primary defence is the game-over halt in
+        // PriorityLoop / TurnDriver (CR 104.1 / 104.2a — in a two-player game
+        // the game ends immediately when one player loses, so nothing should
+        // resolve at all); this backstop covers any residual caller — 150+
+        // call sites reach LoseLife (burn spells, triggers, drain effects)
+        // and a single unguarded one used to crash a live match ("Cannot
+        // lose life after losing the game").
         if (_hasLost)
         {
-            throw new Domain.Exceptions.InvalidPlayerActionException("Cannot lose life after losing the game");
+            return;
         }
 
         _lifeTotal = _lifeTotal.Subtract(amount);
