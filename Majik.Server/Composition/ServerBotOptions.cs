@@ -95,6 +95,20 @@ public sealed class ServerBotOptions
     public string RolloutDepth { get; set; } = "FullTurnPlus";
 
     /// <summary>
+    /// Tree-state reuse inside each MCTS search (env
+    /// <c>Bot__TreeStateReuse</c>; only read when <see cref="Strategy"/> is
+    /// <c>mcts</c>). When true the UCT loop snapshot-caches tree-node states
+    /// and expands / rolls out from the nearest cached ancestor instead of
+    /// replaying the whole root path — iteration-for-iteration EQUIVALENT to
+    /// the root-replay loop (equivalence-gated), only cheaper per iteration.
+    /// Default <c>false</c> = today's behaviour; this is the tree-reuse
+    /// lever, flipped to a probe-gate winner via config only. A non-boolean
+    /// env value fails fast at registration (the config-binder conversion
+    /// error crashes the boot, mirroring the other knobs' fail-fast).
+    /// </summary>
+    public bool TreeStateReuse { get; set; }
+
+    /// <summary>
     /// Fail fast on a bad knob (called at registration so a typo'd env var
     /// crashes the boot, not the first vs-bot match creation).
     /// </summary>

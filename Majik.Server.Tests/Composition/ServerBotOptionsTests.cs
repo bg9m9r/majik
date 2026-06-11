@@ -129,6 +129,51 @@ public class ServerBotOptionsTests
         act.Should().NotThrow();
     }
 
+    // ── TreeStateReuse (tree-state reuse knob) ─────────────────────────────────
+
+    [Fact]
+    public void DefaultOptions_TreeStateReuse_IsFalse_AndStaysNullUnderHeuristic()
+    {
+        new ServerBotOptions().TreeStateReuse.Should().BeFalse(
+            "the code default is today's root-replay UCT loop — zero behaviour change");
+
+        var cfg = FactoryWith(null).BuildBotConfig("Burn", decisionSink: null);
+        cfg.TreeStateReuse.Should().BeNull(
+            "the heuristic strategy never searches — only mcts threads the knob");
+    }
+
+    [Fact]
+    public void MctsOptions_BuildBotConfig_CarriesTreeStateReuse()
+    {
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            TreeStateReuse = true,
+        });
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .TreeStateReuse.Should().BeTrue(
+                "the live flip of the reuse-gate winner is config-only (Bot__TreeStateReuse)");
+    }
+
+    [Fact]
+    public void MctsOptions_WithTreeStateReuse_BotPlayerAgent_Constructs()
+    {
+        // Proves the wired knob resolves downstream (SearchStrategy threads it
+        // into the MctsConfig at construction).
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            TreeStateReuse = true,
+        });
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        var seat = new Majik.Core.Players.Player("Bob", 20);
+        var act = () => new Majik.Bot.BotPlayerAgent(seat, cfg);
+
+        act.Should().NotThrow();
+    }
+
     // ── Fail fast on a bad knob ────────────────────────────────────────────────
 
     [Theory]
@@ -245,6 +290,34 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
+    public void AddMajikEngine_BotSection_BindsTreeStateReuse()
+    {
+        var factory = ResolveFactory(
+            ("Bot:Strategy", "mcts"),
+            ("Bot:TreeStateReuse", "true"));
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .TreeStateReuse.Should().BeTrue(
+                "env Bot__TreeStateReuse must reach the installed bot");
+    }
+
+    [Fact]
+    public void AddMajikEngine_NonBooleanTreeStateReuse_FailsFastAtRegistration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Bot:TreeStateReuse"] = "wat" })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var act = () => services.AddMajikEngine(configuration);
+
+        act.Should().Throw<InvalidOperationException>(
+            "a typo'd Bot__TreeStateReuse env var must crash the boot (config-binder " +
+            "conversion failure), not the first vs-bot match");
+    }
+
+    [Fact]
     public void AddMajikEngine_UnknownRolloutDepth_FailsFastAtRegistration()
     {
         var configuration = new ConfigurationBuilder()
@@ -278,6 +351,9 @@ public class ServerBotOptionsTests
         cfg.RolloutDepth.Should().Be("FullTurnPlus",
             "the rollout-depth default is today's full playout — the probe gate " +
             "flips it later via Bot__RolloutDepth only");
+        cfg.TreeStateReuse.Should().BeFalse(
+            "the tree-reuse default is today's root-replay loop — the probe gate " +
+            "flips it later via Bot__TreeStateReuse only");
     }
 
     [Fact]

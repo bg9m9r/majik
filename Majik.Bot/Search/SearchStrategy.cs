@@ -132,13 +132,20 @@ internal sealed class SearchStrategy : IBotStrategy
     /// fast at construction, mirroring the strategy-name validation. Internal
     /// so tests can assert the exact BotConfig → MctsConfig threading.
     /// </para>
+    ///
+    /// <para>
+    /// <c>TreeStateReuse</c> resolves <see cref="BotConfig.TreeStateReuse"/>
+    /// (null = off, the byte-identical default) — the equivalence-gated
+    /// snapshot/restore lever (see <see cref="MctsConfig.TreeStateReuse"/>).
+    /// </para>
     /// </summary>
     internal static MctsConfig ConfigFrom(BotConfig bot) => new(
         MaxIterations: bot.MaxMctsIterations ?? 200,
         MaxMillis: bot.MaxMctsBudgetMs ?? 1500,
         DepthTurns: 1,
         ExplorationC: 1.41,
-        RolloutDepth: ParseRolloutDepth(bot.RolloutDepth));
+        RolloutDepth: ParseRolloutDepth(bot.RolloutDepth),
+        TreeStateReuse: bot.TreeStateReuse ?? false);
 
     /// <summary>
     /// Resolve <see cref="BotConfig.RolloutDepth"/> (string?, the config-surface
@@ -173,8 +180,9 @@ internal sealed class SearchStrategy : IBotStrategy
     ///     (min 1) so an iteration-bounded config also splits across worlds rather
     ///     than running the full iteration count K times.</item>
     /// </list>
-    /// <c>DepthTurns</c> / <c>ExplorationC</c> / <c>RolloutDepth</c> are preserved
-    /// unchanged — every per-world search INHERITS the configured rollout depth.
+    /// <c>DepthTurns</c> / <c>ExplorationC</c> / <c>RolloutDepth</c> /
+    /// <c>TreeStateReuse</c> are preserved unchanged — every per-world search
+    /// INHERITS the configured rollout depth and reuse mode.
     /// </summary>
     internal static MctsConfig DeterminizedConfigFrom(MctsConfig full, int perWorldBudgetMs)
     {
@@ -185,7 +193,7 @@ internal sealed class SearchStrategy : IBotStrategy
             ? full.MaxIterations
             : Math.Max(1, (int)Math.Round((double)full.MaxIterations * perWorldBudgetMs / total));
 
-        // preserves: DepthTurns, ExplorationC, RolloutDepth; splits: MaxMillis, MaxIterations
+        // preserves: DepthTurns, ExplorationC, RolloutDepth, TreeStateReuse; splits: MaxMillis, MaxIterations
         return full with
         {
             MaxMillis = perWorldBudgetMs,

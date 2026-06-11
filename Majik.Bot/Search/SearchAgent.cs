@@ -416,26 +416,34 @@ public sealed class SearchAgent : IPlayerAgent
     /// (Task D2). The full legal set (Pass + land drops + castable spells + activated
     /// abilities) is surfaced as MCTS decision nodes.
     ///
-    /// Priority decisions do NOT consume script moves — the script is keyed
-    /// on substantive decisions (DeclareAttackers / DeclareBlockers). A
-    /// Priority call while the script is non-empty means we are still
-    /// replaying the path to a target node; we auto-pass so that combat /
-    /// main-phase decisions can be reached without consuming the scripted
-    /// non-Priority move prematurely.
+    /// Script consumption is aligned to SUBSTANTIVE windows (BREAK-4 fix): a
+    /// scripted priority move is consumed only where capture mode would pause
+    /// — i.e. where <see cref="LegalActionEnumerator.ForPriority"/> offers
+    /// more than Pass. Pass-only windows (the mid-stack re-ask after a cast,
+    /// the seat's own combat asks with nothing castable, …) are auto-drained
+    /// by <c>EngineSimulator.DriveToDecisionUnsafe</c> in capture mode and
+    /// never become tree nodes, so replay must auto-pass them WITHOUT
+    /// consuming. Pre-fix the next scripted move was consumed at the next
+    /// priority ask whatever it was; after a cast that is the mid-stack
+    /// re-ask, where a sorcery is rejected (CR 117.1) and treated as a pass —
+    /// the move was silently wasted, so multi-window paths replayed as if
+    /// their later moves never happened.
     /// </remarks>
     public async Task<PriorityAction> ChoosePriorityActionAsync(
         GameContext ctx,
         CancellationToken ct = default)
     {
         // If the script is non-empty:
-        //   - If the next scripted move is a Priority move, dequeue and replay it,
+        //   - If the next scripted move is a Priority move AND this window is
+        //     substantive (capture mode would pause here), dequeue and replay it,
         //     remapping any card/ability references from the live objects (which
         //     authored the move) to the sandbox-cloned equivalents by InstanceId.
-        //   - Otherwise, the next move is for DeclareAttackers or DeclareBlockers;
-        //     auto-pass so we don't consume the combat script move prematurely.
+        //   - Otherwise auto-pass without consuming: either the next move is for
+        //     DeclareAttackers / DeclareBlockers, or this is a pass-only window
+        //     that capture mode would have auto-drained (no tree node here).
         if (_script.Count > 0)
         {
-            if (_script.Peek().PriorityAction != null)
+            if (_script.Peek().PriorityAction != null && IsSubstantivePriorityWindow(ctx))
                 return RemapPriorityActionToSandbox(_script.Dequeue().PriorityAction!, ctx);
             return PriorityAction.Pass;
         }
@@ -465,6 +473,18 @@ public sealed class SearchAgent : IPlayerAgent
 
         return chosen.PriorityAction ?? PriorityAction.Pass;
     }
+
+    /// <summary>
+    /// True when this priority window is SUBSTANTIVE — i.e. capture mode would
+    /// pause here and the tree has a node for it. Uses the SAME classification
+    /// as capture mode: capture builds its move list from
+    /// <see cref="LegalActionEnumerator.ForPriority"/> (Pass always included,
+    /// always first) and <c>EngineSimulator.DriveToDecisionUnsafe</c>
+    /// auto-drains any decision whose move list is exactly [Pass]. So a window
+    /// is substantive iff the enumerator offers anything beyond Pass.
+    /// </summary>
+    private bool IsSubstantivePriorityWindow(GameContext ctx) =>
+        LegalActionEnumerator.ForPriority(ctx, _seat).Count > 1;
 
     // ── Non-searched prompts — delegate to fallback ───────────────────────────
 
