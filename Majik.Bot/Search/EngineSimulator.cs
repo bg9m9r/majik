@@ -148,6 +148,23 @@ public sealed class EngineSimulator : ISearchSimulator
         => WithNullSyncContext(() => DriveToDecisionUnsafe(root, pathFromRoot).Decision);
 
     /// <summary>
+    /// Tree-state-reuse SPIKE seam (additive, internal): the same drive as
+    /// <see cref="Advance"/> but ALSO returns the paused sandbox so a caller can
+    /// snapshot the reached position (clone the paused players), and optionally
+    /// observes the sandbox right after construction — BEFORE the engine starts —
+    /// so bus subscriptions (turn/phase tracking) see every event of the drive.
+    /// </summary>
+    internal (SimDecision Decision, SandboxGame Sandbox) AdvanceWithSandbox(
+        SimState root,
+        IReadOnlyList<SimMove> pathFromRoot,
+        Action<SandboxGame>? onSandboxBuilt = null)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(pathFromRoot);
+        return WithNullSyncContext(() => DriveToDecisionUnsafe(root, pathFromRoot, onSandboxBuilt));
+    }
+
+    /// <summary>
     /// The shared Advance/LeafEval drive: replay the path in a fresh sandbox and
     /// stop at the next substantive decision (or game over). Returns the decision
     /// (terminal marker when the game ended first) TOGETHER with the sandbox so
@@ -155,7 +172,7 @@ public sealed class EngineSimulator : ISearchSimulator
     /// exact point.
     /// </summary>
     private (SimDecision Decision, SandboxGame Sandbox) DriveToDecisionUnsafe(
-        SimState root, IReadOnlyList<SimMove> pathFromRoot)
+        SimState root, IReadOnlyList<SimMove> pathFromRoot, Action<SandboxGame>? onSandboxBuilt = null)
     {
         var cts = new CancellationTokenSource();
 
@@ -175,6 +192,10 @@ public sealed class EngineSimulator : ISearchSimulator
 
         var agent = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
+
+        // Spike seam: let the caller observe (subscribe to) the sandbox BEFORE
+        // the engine starts so no event of this drive is missed.
+        onSandboxBuilt?.Invoke(sandbox);
 
         // Resolve the cloned active player from the root's active player by Id
         // (Player.Id survives cloning; the clone SOURCE may be the world base,
