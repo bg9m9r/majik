@@ -47,29 +47,27 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
     /// no-resolution-context path (shape-only callers, non-cast zone moves).
     /// CR 614 prompting is INTENTIONALLY NOT done here: a player choice must
     /// be <c>await</c>ed, never bridged sync-over-async, so the prompt lives
-    /// exclusively on <see cref="ReplaceAsync"/> (the production cast-
-    /// resolution path). This sync path applies the deterministic no-prompt
-    /// posture: auto-pay 2 life when the controller has life to spare
-    /// (CR 119.4 — refuse at LifeTotal &lt;= 2), else enter tapped. Identical
-    /// to the historical no-agent fallback.
+    /// exclusively on <see cref="ReplaceAsync"/> (the production entry path —
+    /// play-from-hand, fetch, ramp, any "put onto the battlefield").
+    /// <para>
+    /// This sync path is reached only when a caller moves the land WITHOUT a
+    /// <see cref="ResolutionContext"/> (so it cannot prompt). Per CR 614.1c
+    /// ("you may pay 2 life. <b>If you don't, it enters tapped.</b>") the
+    /// safe, rules-correct default for "no payment made" is to enter TAPPED —
+    /// NOT to silently auto-pay 2 life untapped. Auto-paying here was the
+    /// live-play bug: any sync land-into-play path (Growth Spiral / Uro /
+    /// Cultivator Colossus, etc.) entered the shock land untapped and debited
+    /// 2 life with no prompt. Production land-into-play paths now carry a
+    /// <see cref="ResolutionContext"/> and route through <see cref="ReplaceAsync"/>
+    /// so the controller is genuinely prompted; this sync fallback simply
+    /// declines (enters tapped, pays nothing).
+    /// </para>
     /// </summary>
     public ZoneMoveIntent? Replace(ZoneMoveIntent intent, IReadOnlyList<object> history)
     {
-        var controller = intent.Controller ?? _land.Owner;
-        if (controller is null)
-        {
-            // No controller known — shape-only path, enter tapped.
-            return intent with { EntersTapped = true };
-        }
-
-        // CR 119.4 — refuse the auto-suicide at low life.
-        if (controller.LifeTotal <= 2)
-        {
-            return intent with { EntersTapped = true };
-        }
-
-        // No prompt on the sync path — deterministic auto-pay posture.
-        return ApplyDecision(intent, controller, wantsToPay: true);
+        // No context to prompt on — decline the optional payment (CR 614.1c:
+        // "if you don't [pay], it enters tapped"). Never auto-pay sync.
+        return intent with { EntersTapped = true };
     }
 
     /// <summary>
@@ -99,9 +97,13 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
         var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         if (agent is null)
         {
-            // No agent — legacy MVP posture (auto-pay when life > 2).
-            controller.LoseLife(2);
-            return intent with { EntersTapped = false };
+            // No agent to prompt — decline the optional payment so the land
+            // enters tapped (CR 614.1c "if you don't [pay], it enters tapped").
+            // The old "auto-pay when life > 2" posture silently spent the
+            // player's life with no prompt — that WAS the bug. A no-agent
+            // path is a shape-only / non-interactive caller, so the safe
+            // default is the no-payment branch.
+            return intent with { EntersTapped = true };
         }
 
         bool wantsToPay;

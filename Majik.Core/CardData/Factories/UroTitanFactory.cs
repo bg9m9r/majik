@@ -164,7 +164,7 @@ public static class UroTitanFactory
         // alt-zone). Sequenced exactly as printed.
         // ----------------------------------------------------------------
         IEffect BuildGainDrawPlayLandEffect(string label) =>
-            new Effect(label, () => GainDrawPlayLand(owner, zoneService));
+            new Effect(label, ctx => GainDrawPlayLandAsync(owner, zoneService, ctx));
 
         // ----------------------------------------------------------------
         // ETB triggered ability — CR 603.1.
@@ -207,7 +207,8 @@ public static class UroTitanFactory
     /// ETB triggers / replacements on the played land fire (CR 603.6a);
     /// otherwise raw zone manipulation (test/shape path).
     /// </summary>
-    private static void GainDrawPlayLand(Player controller, ZoneService? zoneService)
+    private static async ValueTask GainDrawPlayLandAsync(
+        Player controller, ZoneService? zoneService, ResolutionContext ctx)
     {
         // CR 119.3 — "gain 3 life".
         controller.GainLife(3);
@@ -242,7 +243,13 @@ public static class UroTitanFactory
             ?? Majik.Core.Services.ZoneServiceRegistry.Get(controller);
         if (effectiveZones != null)
         {
-            effectiveZones.MoveCard(land, ZoneType.Hand, ZoneType.Battlefield, controller);
+            // CR 614 — async move so a prompting ETB replacement on the land
+            // (shock-land "pay 2 life?") awaits the controller's agent off the
+            // ResolutionContext instead of silently auto-deciding on the sync
+            // path.
+            await effectiveZones.MoveCardAsync(
+                land, ZoneType.Hand, ZoneType.Battlefield, ctx, controller)
+                .ConfigureAwait(false);
         }
         else
         {

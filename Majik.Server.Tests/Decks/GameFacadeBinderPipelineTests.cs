@@ -219,8 +219,13 @@ public class GameFacadeBinderPipelineTests
         repo.Add("Overgrown Tomb", "Land — Swamp Forest", oracleText: ShockOracleText);
         repo.Add("Forest", "Basic Land — Forest");
 
-        // Alice starts at 20 life — above the "pay 2" threshold so the
-        // replacement should elect to pay 2 life and let the land enter untapped.
+        // Alice starts at 20 life. The SYNC replacement path can't prompt the
+        // controller (CR 614 choices must be awaited, never bridged
+        // sync-over-async), so it takes CR 614.1c's "if you don't [pay], it
+        // enters tapped" default. Verifying the replacement is WIRED is the
+        // point of this test — not auto-paying (the old auto-pay-untapped
+        // posture was the reported live-play bug; the interactive entry paths
+        // route through the async move and genuinely prompt).
         var tomb = new Land("Overgrown Tomb",
             supertypes: Array.Empty<CardSupertype>(),
             subtypes: new[] { CardSubtype.Swamp, CardSubtype.Forest });
@@ -242,10 +247,13 @@ public class GameFacadeBinderPipelineTests
         var intent = new ZoneMoveIntent(tomb, ZoneType.Hand, ZoneType.Battlefield, Controller: alice);
         var result = facade.Replacements.Apply(intent);
 
-        // With 20 life (> 2), policy pays 2 life and lets land enter untapped.
+        // The replacement fired (it's wired). On the sync path it can't prompt,
+        // so it applies the CR 614.1c "enters tapped, no payment" default.
         result.Should().NotBeNull("the replacement should not cancel the move");
-        alice.LifeTotal.Should().Be(18, "shock land pays 2 life when controller has > 2 life (CR 702.18)");
-        result!.EntersTapped.Should().BeFalse("land enters untapped when life was paid");
+        result!.EntersTapped.Should().BeTrue(
+            "the wired shock replacement fired; the sync path can't prompt → enters tapped");
+        alice.LifeTotal.Should().Be(20,
+            "no life is silently paid on the sync (non-prompting) path");
     }
 
     [Fact]

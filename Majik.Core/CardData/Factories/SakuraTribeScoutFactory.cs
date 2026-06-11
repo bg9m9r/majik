@@ -166,7 +166,12 @@ public static class SakuraTribeScoutFactory
                 // emits). Raw zone manipulation fallback for shape tests.
                 if (zoneService != null)
                 {
-                    zoneService.MoveCard(land, ZoneType.Hand, ZoneType.Battlefield, controller);
+                    // CR 614 — async move so a prompting ETB replacement on the
+                    // land (shock-land "pay 2 life?") awaits the controller's
+                    // agent off the ResolutionContext instead of auto-deciding.
+                    await zoneService.MoveCardAsync(
+                        land, ZoneType.Hand, ZoneType.Battlefield, ctx, controller)
+                        .ConfigureAwait(false);
                 }
                 else
                 {

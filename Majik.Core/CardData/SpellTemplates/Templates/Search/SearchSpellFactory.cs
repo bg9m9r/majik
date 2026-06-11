@@ -132,15 +132,21 @@ internal static class SearchSpellFactory
                 var zones = ZoneServiceRegistry.Get(caster);
                 if (zones != null)
                 {
-                    zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                    // CR 614 — async move so a prompting ETB replacement on the
+                    // tutored land (shock-land "pay 2 life?", which Farseek can
+                    // fetch untapped) awaits the caster's agent off the
+                    // ResolutionContext instead of auto-deciding on the sync path.
+                    await zones.MoveCardAsync(
+                        pick, ZoneType.Library, ZoneType.Battlefield, ctx, caster)
+                        .ConfigureAwait(false);
                     if (tapped && pick is Permanent permTapped && !permTapped.IsTapped)
                     {
-                        // Printed "tapped" rider — tap AFTER ZoneService.MoveCard
-                        // so any ETB-tapped replacement (shock lands, bounce
-                        // lands) has already applied. Double-tapping a tapped
-                        // permanent is a no-op; an Amulet-of-Vigor untap trigger
-                        // is already pending from the move, so the post-move
-                        // tap doesn't suppress it.
+                        // Printed "tapped" rider — tap AFTER the move so any
+                        // ETB-tapped replacement (shock lands, bounce lands) has
+                        // already applied. Double-tapping a tapped permanent is a
+                        // no-op; an Amulet-of-Vigor untap trigger is already
+                        // pending from the move, so the post-move tap doesn't
+                        // suppress it.
                         permTapped.Tap();
                     }
                 }
