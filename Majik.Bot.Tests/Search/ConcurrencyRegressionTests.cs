@@ -6,6 +6,7 @@ using Majik.Core.Players;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Majik.Bot.Tests.Search;
@@ -63,7 +64,7 @@ public class ConcurrencyRegressionTests
     /// AND a wall-clock timeout to catch any future hang regression.
     /// </summary>
     [Fact(Timeout = 15_000 /* ms — any hang is a regression */)]
-    public void EngineSimulator_Advance_And_Rollout_CompleteWithoutDeadlock_UnderPoolPressure()
+    public Task EngineSimulator_Advance_And_Rollout_CompleteWithoutDeadlock_UnderPoolPressure() => Task.Run(() =>
     {
         // ── Board setup ──────────────────────────────────────────────────────
         var alice = new Player("Alice", 20);
@@ -114,7 +115,7 @@ public class ConcurrencyRegressionTests
         swingValue.Should().BeGreaterThan(passValue,
             because: "swinging 4 damage into Bob's 3 life wins immediately, " +
                      "which must outvalue doing nothing");
-    }
+    });
 
     /// <summary>
     /// Stress variant: run Advance back-to-back many times on a blocked thread
@@ -122,7 +123,7 @@ public class ConcurrencyRegressionTests
     /// would cause the [Fact(Timeout=15_000)] to fail.
     /// </summary>
     [Fact(Timeout = 30_000 /* ms */)]
-    public void EngineSimulator_Advance_RepeatedCalls_NeverDeadlock()
+    public Task EngineSimulator_Advance_RepeatedCalls_NeverDeadlock() => Task.Run(() =>
     {
         const int Iterations = 20;
 
@@ -158,5 +159,5 @@ public class ConcurrencyRegressionTests
             d.IsTerminal.Should().BeFalse($"iteration {i}");
             d.Kind.Should().Be(SimDecisionKind.DeclareAttackers, $"iteration {i}");
         }
-    }
+    });
 }

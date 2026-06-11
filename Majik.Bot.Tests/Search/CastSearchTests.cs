@@ -9,6 +9,7 @@ using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Majik.Bot.Tests.Search;
@@ -49,7 +50,7 @@ public sealed class CastSearchTests
     /// </para>
     /// </summary>
     [Fact(Timeout = 30_000)]
-    public void SearchStrategy_CastsRemoval_OnOpponentThreat_ViaSearch()
+    public Task SearchStrategy_CastsRemoval_OnOpponentThreat_ViaSearch() => Task.Run(() =>
     {
         // ── Board setup ────────────────────────────────────────────────────
         var alice = new Player("Alice", 20);
@@ -122,7 +123,7 @@ public sealed class CastSearchTests
         var castAction = (PriorityAction.CastSpell)action;
         castAction.Card.InstanceId.Should().Be(goblinGuide.InstanceId,
             because: "the remap must return the LIVE Goblin Guide object, not a sandbox clone");
-    }
+    });
 
     /// <summary>
     /// Regression guard: when PrioritySearchEnabled=false the remap path is
@@ -132,7 +133,7 @@ public sealed class CastSearchTests
     /// is returned so the heuristic path is reachable).
     /// </summary>
     [Fact(Timeout = 10_000)]
-    public void SearchStrategy_WithPrioritySearchDisabled_DelegatesToHeuristic()
+    public Task SearchStrategy_WithPrioritySearchDisabled_DelegatesToHeuristic() => Task.Run(() =>
     {
         var alice = new Player("Alice", 20);
         var bob   = new Player("Bob",   20);
@@ -172,7 +173,7 @@ public sealed class CastSearchTests
 
         // Just ensure a valid action is returned — no crash.
         action.Should().NotBeNull();
-    }
+    });
 
     /// <summary>
     /// Guard: when MCTS is used for priority but only Pass is legal (empty
@@ -181,7 +182,7 @@ public sealed class CastSearchTests
     /// with the Pass short-circuit path.
     /// </summary>
     [Fact(Timeout = 10_000)]
-    public void SearchStrategy_PassesWhenNothingToCast_NoBoardOrHand()
+    public Task SearchStrategy_PassesWhenNothingToCast_NoBoardOrHand() => Task.Run(() =>
     {
         var alice = new Player("Alice", 20);
         var bob   = new Player("Bob",   20);
@@ -218,7 +219,7 @@ public sealed class CastSearchTests
 
         action.Should().BeOfType<PriorityAction.PassAction>(
             because: "with no legal actions other than Pass, the search must short-circuit to Pass");
-    }
+    });
 
     /// <summary>
     /// Untargeted creature cast via search:  bot has a Goblin Guide ({R}) in
@@ -226,7 +227,7 @@ public sealed class CastSearchTests
     /// return the LIVE creature card.
     /// </summary>
     [Fact(Timeout = 30_000)]
-    public void SearchStrategy_CastsCreature_ViaSearch_LiveCardReturned()
+    public Task SearchStrategy_CastsCreature_ViaSearch_LiveCardReturned() => Task.Run(() =>
     {
         var alice = new Player("Alice", 20);
         var bob   = new Player("Bob",   20);
@@ -280,7 +281,7 @@ public sealed class CastSearchTests
         var castAction = (PriorityAction.CastSpell)action;
         castAction.Card.InstanceId.Should().Be(goblin.InstanceId,
             because: "the remap must return the LIVE Goblin Guide, not a sandbox clone");
-    }
+    });
 
     /// <summary>
     /// No-deadlock / no-spin guard: with a castable spell in hand the 2-core
@@ -288,7 +289,7 @@ public sealed class CastSearchTests
     /// livelock regression test but specifically for the cast-search path.
     /// </summary>
     [Fact(Timeout = 20_000)]
-    public void SearchStrategy_CastSearch_DoesNotDeadlockOrSpin()
+    public Task SearchStrategy_CastSearch_DoesNotDeadlockOrSpin() => Task.Run(() =>
     {
         var alice = new Player("Alice", 20);
         var bob   = new Player("Bob",   20);
@@ -336,5 +337,5 @@ public sealed class CastSearchTests
         // Just verifying it completes (the Fact Timeout is the deadlock guard).
         var action = strategy.PickPriorityAction(ctx, alice);
         action.Should().NotBeNull("search must return a valid action without deadlocking");
-    }
+    });
 }

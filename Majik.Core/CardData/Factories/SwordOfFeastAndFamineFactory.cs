@@ -272,7 +272,11 @@ public static class SwordOfFeastAndFamineFactory
     /// </summary>
     public static class ProtectionGrants
     {
-        private static readonly System.Collections.Generic.Dictionary<
+        // Thread-safe: parallel test collections (and any future parallel game
+        // hosts) can build this card concurrently, so the lifecycle stash must
+        // tolerate concurrent writes/reads. A plain Dictionary corrupts its
+        // internal state under a concurrent SetLifecycles race.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<
             Artifact,
             (AttachedAuraAbilityGrantStaticEffect Black, AttachedAuraAbilityGrantStaticEffect Green)>
             _lifecycles = new();

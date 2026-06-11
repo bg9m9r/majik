@@ -61,7 +61,7 @@ public class GameDriverTests
         var result = await driver.RunGameAsync(maxTurns: 10);
 
         result.Winner.Should().BeSameAs(_alice);
-        result.TurnsPlayed.Should().BeLessOrEqualTo(2);
+        result.TurnsPlayed.Should().BeLessThanOrEqualTo(2);
     }
 
     [Theory]

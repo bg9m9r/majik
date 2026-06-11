@@ -254,7 +254,7 @@ public class HeliodSunCrownedTests
         triplePip.SetZone(ZoneType.Battlefield);
 
         HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice)
-            .Should().BeGreaterOrEqualTo(HeliodSunCrownedFactory.DevotionToWhiteThreshold);
+            .Should().BeGreaterThanOrEqualTo(HeliodSunCrownedFactory.DevotionToWhiteThreshold);
     }
 
     [Fact]
@@ -347,7 +347,7 @@ public class HeliodSunCrownedTests
         triplePip.SetZone(ZoneType.Battlefield);
 
         HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice)
-            .Should().BeGreaterOrEqualTo(HeliodSunCrownedFactory.DevotionToWhiteThreshold);
+            .Should().BeGreaterThanOrEqualTo(HeliodSunCrownedFactory.DevotionToWhiteThreshold);
 
         service.Compute((Permanent)heliod).Types.Should().Contain(CardType.Creature);
     }

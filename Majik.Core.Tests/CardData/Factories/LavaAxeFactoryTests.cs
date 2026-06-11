@@ -100,7 +100,7 @@ public class LavaAxeFactoryTests
         // CR 306.7 — damage to a planeswalker is dealt as loyalty removal.
         // 4 loyalty − 5 = -1 → clamped to 0 by SBAs, but RemoveLoyalty itself
         // should yield a negative or zero value; test for ≤ 0.
-        pw.Loyalty.Should().BeLessOrEqualTo(0,
+        pw.Loyalty.Should().BeLessThanOrEqualTo(0,
             "Lava Axe deals 5 damage to target planeswalker as loyalty removal (CR 306.7)");
         _bob.LifeTotal.Should().Be(20,
             "damage to a planeswalker does not reduce its controller's life total");
