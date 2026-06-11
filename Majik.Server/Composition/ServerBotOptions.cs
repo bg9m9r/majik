@@ -109,6 +109,29 @@ public sealed class ServerBotOptions
     public bool TreeStateReuse { get; set; }
 
     /// <summary>
+    /// Upper clamp (<c>kMax</c>) on the determinized world count K (env
+    /// <c>Bot__MaxWorlds</c>; only read when <see cref="Strategy"/> is
+    /// <c>mcts</c>). Null (the default) keeps the engine default of 8. NOTE: K
+    /// still DERIVES from the budget split — <c>K = clamp(round(MaxMctsBudgetMs /
+    /// PerWorldBudgetMs), 1, MaxWorlds)</c> — so raising this alone changes
+    /// nothing unless <see cref="PerWorldBudgetMs"/> is small enough for the
+    /// budget to want that many worlds. Must be &gt; 0 when set.
+    /// </summary>
+    public int? MaxWorlds { get; set; }
+
+    /// <summary>
+    /// Per-world wall-clock budget (ms) for the determinized K-world split (env
+    /// <c>Bot__PerWorldBudgetMs</c>; only read when <see cref="Strategy"/> is
+    /// <c>mcts</c>). Null (the default) keeps the engine default of 400 ms. K =
+    /// clamp(round(MaxMctsBudgetMs / this), 1, <see cref="MaxWorlds"/>), and the
+    /// per-world iteration cap scales by the SAME perWorld/total fraction — at
+    /// the live 1500 ms / cap 800: the default 400 → K=4 × ~213 iters/world;
+    /// 200 + <c>Bot__MaxWorlds=8</c> → K=8 × ~107 iters/world (the K-tuning
+    /// probe winner shape). Must be &gt; 0 when set.
+    /// </summary>
+    public int? PerWorldBudgetMs { get; set; }
+
+    /// <summary>
     /// Fail fast on a bad knob (called at registration so a typo'd env var
     /// crashes the boot, not the first vs-bot match creation).
     /// </summary>
@@ -136,6 +159,18 @@ public sealed class ServerBotOptions
         {
             throw new ArgumentException(
                 $"Bot__SearchConcurrency must be >= 1 (got {SearchConcurrency}).");
+        }
+
+        if (MaxWorlds is <= 0)
+        {
+            throw new ArgumentException(
+                $"Bot__MaxWorlds must be positive (got {MaxWorlds}).");
+        }
+
+        if (PerWorldBudgetMs is <= 0)
+        {
+            throw new ArgumentException(
+                $"Bot__PerWorldBudgetMs must be positive (got {PerWorldBudgetMs}).");
         }
 
         // Validate against the enum NAMES (case-insensitive) — never numeric

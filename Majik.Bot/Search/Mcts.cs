@@ -49,6 +49,11 @@ internal sealed class Mcts
     /// </summary>
     internal Action<string, double>? OnIterationTrace { get; set; }
 
+    /// <summary>The bounds this search runs under (test instrumentation — lets
+    /// config-threading tests pin the per-world determinized split without
+    /// running a search).</summary>
+    internal MctsConfig Config => _config;
+
     /// <summary>How many expansions went through the reuse path
     /// (<see cref="EngineSimulator.AdvanceFrom"/>) — 0 unless reuse is active.</summary>
     internal int ReuseExpansions { get; private set; }
