@@ -21,9 +21,21 @@ namespace Majik.Bot.Search;
 /// lever). Default <see cref="Search.RolloutDepth.FullTurnPlus"/> = today's
 /// behaviour, byte-identical.
 /// </param>
+/// <param name="TreeStateReuse">
+/// Tree-state reuse (the snapshot/restore lever): when true, the UCT loop
+/// caches each cache-eligible node's state (frozen players + resume context)
+/// and expands / rolls out from the NEAREST CACHED ANCESTOR via
+/// <see cref="EngineSimulator.AdvanceFrom"/> — replaying only the move
+/// suffix instead of the whole root path. Iteration-for-iteration equivalent
+/// to the root-replay path (see <c>TreeReuseEquivalenceTests</c>); only the
+/// cost changes. Default <b>false</b> = today's behaviour, byte-identical.
+/// Requires the simulator to be an <see cref="EngineSimulator"/>; with any
+/// other <see cref="ISearchSimulator"/> the flag is inert (root replay).
+/// </param>
 internal sealed record MctsConfig(
     int MaxIterations = 200,
     int MaxMillis = 2000,
     int DepthTurns = 2,
     double ExplorationC = 1.41,
-    RolloutDepth RolloutDepth = RolloutDepth.FullTurnPlus);
+    RolloutDepth RolloutDepth = RolloutDepth.FullTurnPlus,
+    bool TreeStateReuse = false);

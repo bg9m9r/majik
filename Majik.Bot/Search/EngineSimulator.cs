@@ -197,18 +197,73 @@ public sealed class EngineSimulator : ISearchSimulator
         ArgumentNullException.ThrowIfNull(ctx);
         ArgumentNullException.ThrowIfNull(suffix);
 
+        var state = StateFromCache(cachedPlayers, ctx, searchedSeatId);
+
+        return WithNullSyncContext(() => DriveWithSnapshotUnsafe(state, suffix, ctx.LandDropsUsed));
+    }
+
+    /// <summary>
+    /// Rollout from a CACHED tree-node state instead of the search root (the
+    /// reuse counterpart of <see cref="Rollout"/>): clone
+    /// <paramref name="cachedPlayers"/>, rebuild a sandbox at
+    /// <paramref name="ctx"/>'s turn/phase with the recorded per-seat land
+    /// drops seeded (spike BREAK 2 — without it the playout re-offers a
+    /// consumed land drop), replay ONLY <paramref name="suffix"/>, then play
+    /// out per <paramref name="rolloutDepth"/> and return the leaf score.
+    /// Launching the playout from the leaf's own cache (empty suffix) skips
+    /// the whole root-path replay every iteration.
+    /// </summary>
+    /// <param name="cachedPlayers">Frozen players at the cached position (NOT mutated — cloned internally).</param>
+    /// <param name="ctx">Resume context recorded when the cache was captured.</param>
+    /// <param name="suffix">Moves to replay from the cached position (empty when the cache IS the leaf).</param>
+    /// <param name="searchedSeatId">The searched seat (stable <see cref="Player.Id"/> across clones).</param>
+    /// <param name="depthTurns">Playout cap in full turns beyond the SEARCH ROOT's turn (as <see cref="Rollout"/>).</param>
+    /// <param name="anchorTurnNumber">
+    /// The SEARCH ROOT's turn number — the playout horizon is the ABSOLUTE
+    /// turn cap <c>anchorTurnNumber + depthTurns</c>, exactly the cap a
+    /// root-replay <see cref="Rollout"/> computes. Anchoring at the cache's
+    /// own (possibly later) turn instead would silently grant cross-turn
+    /// leaves a LONGER playout than the root path gives them — a divergence
+    /// the equivalence gate caught.
+    /// </param>
+    /// <param name="rolloutDepth">Playout truncation (as <see cref="Rollout"/>).</param>
+    internal double RolloutFrom(
+        IReadOnlyList<Player> cachedPlayers,
+        ResumeCtx ctx,
+        IReadOnlyList<SimMove> suffix,
+        Guid searchedSeatId,
+        int depthTurns,
+        int anchorTurnNumber,
+        RolloutDepth rolloutDepth = RolloutDepth.FullTurnPlus)
+    {
+        ArgumentNullException.ThrowIfNull(cachedPlayers);
+        ArgumentNullException.ThrowIfNull(ctx);
+        ArgumentNullException.ThrowIfNull(suffix);
+        if (depthTurns < 0)
+            throw new ArgumentOutOfRangeException(nameof(depthTurns), "depthTurns must be >= 0.");
+
+        var state = StateFromCache(cachedPlayers, ctx, searchedSeatId);
+
+        return WithNullSyncContext(
+            () => RolloutCoreUnsafe(
+                state, suffix, depthTurns, rolloutDepth, ctx.LandDropsUsed, anchorTurnNumber));
+    }
+
+    /// <summary>
+    /// Wraps a cached node state in a SimState so the shared drives can clone
+    /// + resume + replay from it. The cached players ARE the position: a
+    /// perfect-info SimState (snapshots of determinized worlds are already
+    /// materialized, so no WorldSeed/decklist is attached).
+    /// </summary>
+    private static SimState StateFromCache(
+        IReadOnlyList<Player> cachedPlayers, ResumeCtx ctx, Guid searchedSeatId)
+    {
         var active = cachedPlayers.FirstOrDefault(p => p.Id == ctx.ActivePlayerId)
             ?? throw new InvalidOperationException("Active player not found in cached players.");
         var searched = cachedPlayers.FirstOrDefault(p => p.Id == searchedSeatId)
             ?? throw new InvalidOperationException("Searched seat not found in cached players.");
 
-        // The cached players ARE the position: wrap them in a perfect-info
-        // SimState (snapshots of determinized worlds are already materialized,
-        // so no WorldSeed/decklist is attached) and let the shared drive clone
-        // + resume + replay.
-        var state = SimState.Capture(cachedPlayers, active, ctx.TurnNumber, ctx.Phase, searched);
-
-        return WithNullSyncContext(() => DriveWithSnapshotUnsafe(state, suffix, ctx.LandDropsUsed));
+        return SimState.Capture(cachedPlayers, active, ctx.TurnNumber, ctx.Phase, searched);
     }
 
     /// <summary>
@@ -388,15 +443,31 @@ public sealed class EngineSimulator : ISearchSimulator
         SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns, RolloutDepth rolloutDepth)
         => WithNullSyncContext(() => RolloutCoreUnsafe(root, pathFromRoot, depthTurns, rolloutDepth));
 
+    /// <summary>
+    /// <paramref name="landDropsUsed"/> (tree-state reuse, spike BREAK 2):
+    /// per-seat land drops already consumed in the resumed turn, seeded into
+    /// the playout sandbox's fresh <c>LandDropTracker</c> — launching a
+    /// rollout from a node cache without it would re-offer a consumed drop to
+    /// the playout policy. <paramref name="anchorTurnNumber"/> (tree-state
+    /// reuse): the turn the playout horizon is anchored at — see
+    /// <see cref="RolloutFrom"/>; may sit BELOW <paramref name="root"/>'s own
+    /// turn for a cross-turn cache, in which case the driver plays the
+    /// resumed partial turn and stops (the same truncation the root-replay
+    /// path applies when its turn cap lands mid-path). Null defaults
+    /// (every pre-existing caller) = fresh tally / root-anchored horizon,
+    /// byte-identical to before.
+    /// </summary>
     private double RolloutCoreUnsafe(
-        SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns, RolloutDepth rolloutDepth)
+        SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns, RolloutDepth rolloutDepth,
+        IReadOnlyDictionary<Guid, int>? landDropsUsed = null,
+        int? anchorTurnNumber = null)
     {
         // LeafEval: NO playout. Drive to the decision point the path leads to
         // (the same drive Advance performs — pass-only priority windows drain,
         // so the path's spells RESOLVE before evaluation) and score that
         // position. The expensive both-seats heuristic playout is skipped.
         if (rolloutDepth == RolloutDepth.LeafEval)
-            return LeafEvalUnsafe(root, pathFromRoot);
+            return LeafEvalUnsafe(root, pathFromRoot, landDropsUsed);
 
         // EndOfTurn narrows the existing turn-cap machinery to the current-turn
         // boundary (maxTurns = TurnNumber + 0: the resumed partial turn always
@@ -415,7 +486,8 @@ public sealed class EngineSimulator : ISearchSimulator
             ResolveCloneSource(root),
             new GameRandom(FixedSeed),
             p => BuildAgent(p, root, pathFromRoot, rolloutStrategy, ref searchAgent),
-            cardRepo: SharedCardData.Repo);
+            cardRepo: SharedCardData.Repo,
+            landDropsUsed: landDropsUsed);
 
         _ = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
@@ -429,7 +501,7 @@ public sealed class EngineSimulator : ISearchSimulator
             root.Phase,
             clonedActive,
             root.TurnNumber,
-            maxTurns: root.TurnNumber + effectiveDepthTurns,
+            maxTurns: (anchorTurnNumber ?? root.TurnNumber) + effectiveDepthTurns,
             ct: CancellationToken.None);
 
         // Synchronously wait — this is intentional (MCTS rollouts are
@@ -446,10 +518,13 @@ public sealed class EngineSimulator : ISearchSimulator
     /// <see cref="BoardEval.Score"/> there — no playout. If the game ended
     /// before a decision was reached, the terminal value is returned instead
     /// (same scale as the playout's <see cref="ComputeTerminalValue"/>).
+    /// <paramref name="landDropsUsed"/>: see <see cref="RolloutCoreUnsafe"/>.
     /// </summary>
-    private double LeafEvalUnsafe(SimState root, IReadOnlyList<SimMove> pathFromRoot)
+    private double LeafEvalUnsafe(
+        SimState root, IReadOnlyList<SimMove> pathFromRoot,
+        IReadOnlyDictionary<Guid, int>? landDropsUsed = null)
     {
-        var (decision, sandbox) = DriveToDecisionUnsafe(root, pathFromRoot);
+        var (decision, sandbox) = DriveToDecisionUnsafe(root, pathFromRoot, landDropsUsed: landDropsUsed);
 
         if (decision.IsTerminal)
             return decision.TerminalValue;

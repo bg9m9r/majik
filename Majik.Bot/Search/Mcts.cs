@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Majik.Core.Players;
 
 namespace Majik.Bot.Search;
 
@@ -21,11 +22,40 @@ internal sealed class Mcts
     private readonly ISearchSimulator _sim;
     private readonly MctsConfig _config;
 
+    /// <summary>
+    /// Non-null iff <see cref="MctsConfig.TreeStateReuse"/> is enabled AND the
+    /// simulator is the real <see cref="EngineSimulator"/> (the only sim with
+    /// snapshot/restore — <c>AdvanceFrom</c>/<c>RolloutFrom</c>). With any
+    /// other <see cref="ISearchSimulator"/> the flag is inert and the loop
+    /// stays on the root-replay path.
+    /// </summary>
+    private readonly EngineSimulator? _reuseSim;
+
     public Mcts(ISearchSimulator sim, MctsConfig config)
     {
         _sim = sim ?? throw new ArgumentNullException(nameof(sim));
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _reuseSim = config.TreeStateReuse ? sim as EngineSimulator : null;
     }
+
+    // ── Instrumentation (equivalence gate + diagnostics) ─────────────────────
+
+    /// <summary>
+    /// Iteration-trace hook (test instrumentation, null in production): called
+    /// once per UCT iteration with the evaluated node's path key
+    /// (<see cref="SimMove.Key"/>s joined root→node) and the value that was
+    /// backpropagated. The equivalence gate records this sequence for reuse
+    /// OFF vs ON and asserts identity.
+    /// </summary>
+    internal Action<string, double>? OnIterationTrace { get; set; }
+
+    /// <summary>How many expansions went through the reuse path
+    /// (<see cref="EngineSimulator.AdvanceFrom"/>) — 0 unless reuse is active.</summary>
+    internal int ReuseExpansions { get; private set; }
+
+    /// <summary>How many rollouts launched from a cached node state
+    /// (<see cref="EngineSimulator.RolloutFrom"/>) — 0 unless reuse is active.</summary>
+    internal int ReuseRollouts { get; private set; }
 
     /// <summary>
     /// Run UCT from the given root state and return the best (robust-child)
@@ -72,6 +102,17 @@ internal sealed class Mcts
         // ── Build root node ────────────────────────────────────────────────────
         var rootNode = new MctsNode(incomingMove: null, rootDecision.LegalMoves);
 
+        // Tree-state reuse: the root is ALWAYS cached — its state IS the
+        // search's clone source (for determinized roots this materializes the
+        // world base once, exactly as the first Advance would), paired with
+        // the root's own resume context. Every descent therefore always finds
+        // a cached ancestor.
+        if (_reuseSim is not null)
+        {
+            rootNode.CachedPlayers = EngineSimulator.ResolveCloneSource(root);
+            rootNode.ResumeContext = ResumeCtx.ForRoot(root);
+        }
+
         var sw = Stopwatch.StartNew();
         int iterations = 0;
 
@@ -109,7 +150,23 @@ internal sealed class Mcts
                 var childPath = new List<SimMove>(pathMoves) { move };
 
                 // Advance the simulator to get the child's legal moves.
-                var childDecision = _sim.Advance(root, childPath);
+                // Reuse path: expand from the NEAREST CACHED ANCESTOR (the
+                // parent when it is cached; the root at the latest) replaying
+                // only the move suffix, and capture the child's snapshot.
+                SimDecision childDecision;
+                NodeSnapshot? childSnapshot = null;
+                if (_reuseSim is { } reuseSim)
+                {
+                    var (cache, ctx, movesFromRoot) = NearestCachedAncestor(nodePath);
+                    var suffix = SuffixFrom(pathMoves, movesFromRoot, move);
+                    (childDecision, childSnapshot) =
+                        reuseSim.AdvanceFrom(cache, ctx, suffix, root.SearchedSeatId);
+                    ReuseExpansions++;
+                }
+                else
+                {
+                    childDecision = _sim.Advance(root, childPath);
+                }
 
                 if (childDecision.IsTerminal)
                 {
@@ -122,6 +179,16 @@ internal sealed class Mcts
                 else
                 {
                     evaluatedNode = node.AddChild(move, childDecision.LegalMoves);
+                }
+
+                // Cache the child's state when AdvanceFrom captured one
+                // (cache-eligible positions only — see SnapshotPolicy;
+                // ineligible/terminal positions stay uncached and later
+                // descents fall back to this node's nearest cached ancestor).
+                if (childSnapshot is not null)
+                {
+                    evaluatedNode.CachedPlayers = childSnapshot.Players;
+                    evaluatedNode.ResumeContext = childSnapshot.Ctx;
                 }
 
                 nodePath.Add(evaluatedNode);
@@ -141,11 +208,33 @@ internal sealed class Mcts
             {
                 value = terminalValue;
             }
-            else if (evaluatedNode.IsFullyExpanded && evaluatedNode.IsLeaf)
+            else if (_reuseSim is { } rolloutSim)
             {
-                // Truly terminal node (no legal moves, already expanded empty).
-                // Run a rollout from this position.
-                value = _sim.Rollout(root, evaluatedPath, _config.DepthTurns, _config.RolloutDepth);
+                // Reuse path: launch the playout from the evaluated node's own
+                // cache when it has one (empty suffix — the cache IS the leaf),
+                // else from the nearest cached ancestor with the accumulated
+                // suffix. nodePath and evaluatedPath are aligned here:
+                // nodePath[i] is reached by the first i moves of evaluatedPath.
+                //
+                // Horizon guard: the playout's turn cap is ABSOLUTE
+                // (root turn + depth — see RolloutFrom's anchor), and the
+                // root-replay path TRUNCATES mid-path when a node sits beyond
+                // it. A cache in a turn past the horizon can therefore not
+                // reproduce that playout — restrict the walk to ancestors at
+                // or below the horizon (the root always qualifies). LeafEval
+                // runs no playout, so any cache works.
+                var horizonTurn = _config.RolloutDepth switch
+                {
+                    RolloutDepth.LeafEval => int.MaxValue,
+                    RolloutDepth.EndOfTurn => root.TurnNumber,
+                    _ => root.TurnNumber + _config.DepthTurns,
+                };
+                var (cache, ctx, movesFromRoot) = NearestCachedAncestor(nodePath, horizonTurn);
+                var suffix = SuffixFrom(evaluatedPath, movesFromRoot, extraMove: null);
+                value = rolloutSim.RolloutFrom(
+                    cache, ctx, suffix, root.SearchedSeatId,
+                    _config.DepthTurns, anchorTurnNumber: root.TurnNumber, _config.RolloutDepth);
+                ReuseRollouts++;
             }
             else
             {
@@ -156,6 +245,11 @@ internal sealed class Mcts
             // All nodes are bot-POV; accumulate without sign flip.
             foreach (var n in nodePath)
                 n.Update(value);
+
+            // Equivalence-gate instrumentation (null in production — the path
+            // key is only built when a trace consumer is attached).
+            if (OnIterationTrace is { } trace)
+                trace(string.Join(" > ", evaluatedPath.Select(m => m.Key)), value);
 
             iterations++;
         }
@@ -177,5 +271,56 @@ internal sealed class Mcts
             .ToList();
 
         return new SearchResult(best, rootStats);
+    }
+
+    // ── Tree-state reuse descent helpers ──────────────────────────────────────
+
+    /// <summary>
+    /// Walks <paramref name="nodePath"/> (root → current) backwards to the
+    /// nearest node carrying a cached state in a turn at or below
+    /// <paramref name="horizonTurn"/>, and returns that cache together with
+    /// the number of moves from the root it sits at — i.e. how many leading
+    /// moves of the current path are already "inside" the cache and must NOT
+    /// be replayed. The root is always cached under reuse (set in
+    /// <see cref="SearchWithStats"/>) and always sits at or below any
+    /// horizon, so this always finds one. Expansion passes
+    /// <see cref="int.MaxValue"/> (the Advance drive has no meaningful turn
+    /// cap); rollouts pass the playout horizon.
+    /// </summary>
+    private static (IReadOnlyList<Player> Cache, ResumeCtx Ctx, int MovesFromRoot)
+        NearestCachedAncestor(List<MctsNode> nodePath, int horizonTurn = int.MaxValue)
+    {
+        for (var i = nodePath.Count - 1; i >= 0; i--)
+        {
+            if (nodePath[i] is { CachedPlayers: { } cache, ResumeContext: { } ctx }
+                && ctx.TurnNumber <= horizonTurn)
+            {
+                return (cache, ctx, i);
+            }
+        }
+
+        throw new InvalidOperationException(
+            "No cached ancestor found — the root must always be cached under tree-state reuse.");
+    }
+
+    /// <summary>
+    /// The move suffix to replay from a cached ancestor sitting
+    /// <paramref name="movesFromRoot"/> moves below the root: the remainder
+    /// of <paramref name="path"/> past the ancestor, plus the optional
+    /// <paramref name="extraMove"/> being expanded. Empty when the cache IS
+    /// the current node (the frozen players already sit at the decision).
+    /// </summary>
+    private static IReadOnlyList<SimMove> SuffixFrom(
+        IReadOnlyList<SimMove> path, int movesFromRoot, SimMove? extraMove)
+    {
+        if (extraMove is null && movesFromRoot == path.Count)
+            return Array.Empty<SimMove>();
+
+        var suffix = new List<SimMove>(path.Count - movesFromRoot + (extraMove is null ? 0 : 1));
+        for (var i = movesFromRoot; i < path.Count; i++)
+            suffix.Add(path[i]);
+        if (extraMove is not null)
+            suffix.Add(extraMove);
+        return suffix;
     }
 }
