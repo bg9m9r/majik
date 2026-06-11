@@ -162,6 +162,14 @@ internal static class ProbeHarness
     /// the world split differs. Distinct from every other family's blocks.</summary>
     internal const int WorldSplitMirrorBaseSeed = 60000;
 
+    /// <summary>Base seed for the MIRROR cap-raise (iteration-cap tuning)
+    /// cells (<c>CapRaiseProbes.cs</c>). Deliberately SHARED by both cells —
+    /// like <see cref="WorldSplitMirrorBaseSeed"/> — so the cap=1200 head and
+    /// its cap=800 control play the SAME game seeds (same decks, same
+    /// shuffles, same heuristic opponent): a paired comparison in which only
+    /// the iteration cap differs. Distinct from every other family's blocks.</summary>
+    internal const int CapRaiseMirrorBaseSeed = 80000;
+
     /// <summary>Base seed for the ASYMMETRIC heuristic-vs-heuristic ANCHOR
     /// (<c>AnchorProbes.cs</c>) — heuristic Prowess vs heuristic Burn, the
     /// matchup baseline the MCTS asymmetric numbers are read against. Distinct
