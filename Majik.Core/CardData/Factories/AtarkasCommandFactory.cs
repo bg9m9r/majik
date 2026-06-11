@@ -210,7 +210,7 @@ public static class AtarkasCommandFactory
     private static IEffect BuildPutLandEffect(
         Player caster,
         ZoneService? zoneService) =>
-        new Effect("Atarka's Command — you may put a land from hand onto the battlefield", () =>
+        new Effect("Atarka's Command — you may put a land from hand onto the battlefield", async ctx =>
         {
             // CR 113.6c — putting a land onto the battlefield via an effect is
             // NOT a land play; it bypasses the per-turn land-drop cap
@@ -221,14 +221,18 @@ public static class AtarkasCommandFactory
                 .FirstOrDefault(c => c.HasType(CardType.Land));
             if (land == null) return;
 
-            // CR 603.6a — prefer ZoneService.MoveCard so ETB triggers /
+            // CR 603.6a — prefer ZoneService.MoveCardAsync so ETB triggers /
             // replacements on the played land fire (bounce-land ETB bounce,
-            // Lotus Cobra landfall). Fall back to the registry, then raw zone
-            // manipulation for the shape/test path.
+            // Lotus Cobra landfall) AND a prompting ETB replacement (shock-land
+            // "pay 2 life?") awaits the controller's agent off the
+            // ResolutionContext instead of auto-deciding on the sync path.
+            // Fall back to the registry, then raw zone manipulation (test path).
             var effectiveZones = zoneService ?? ZoneServiceRegistry.Get(caster);
             if (effectiveZones != null)
             {
-                effectiveZones.MoveCard(land, ZoneType.Hand, ZoneType.Battlefield, caster);
+                await effectiveZones.MoveCardAsync(
+                    land, ZoneType.Hand, ZoneType.Battlefield, ctx, caster)
+                    .ConfigureAwait(false);
             }
             else
             {

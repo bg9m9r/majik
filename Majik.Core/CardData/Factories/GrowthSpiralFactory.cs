@@ -161,7 +161,13 @@ public static class GrowthSpiralFactory
         var effectiveZones = zoneService ?? ZoneServiceRegistry.Get(controller);
         if (effectiveZones != null)
         {
-            effectiveZones.MoveCard(land, ZoneType.Hand, ZoneType.Battlefield, controller);
+            // CR 614 — async move so a prompting ETB replacement on the land
+            // (shock-land "pay 2 life?") awaits the controller's agent off the
+            // ResolutionContext instead of silently auto-deciding on the sync
+            // path.
+            await effectiveZones.MoveCardAsync(
+                land, ZoneType.Hand, ZoneType.Battlefield, ctx, controller)
+                .ConfigureAwait(false);
         }
         else
         {

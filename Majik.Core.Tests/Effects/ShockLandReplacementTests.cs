@@ -14,11 +14,13 @@ using Land = Majik.Core.Cards.Land;
 namespace Majik.Core.Tests.Effects;
 
 /// <summary>
-/// CR 614.1c — production binder-chain replacement. Mirrors the test-only
-/// <c>ShockLandCycleFactory</c> shape: when an agent is registered for the
-/// land's controller the replacement consults <c>ChooseYesNoAsync</c>; with
-/// no agent it preserves the legacy "pay-if-life&gt;2, else tapped" fallback
-/// so pre-agent integration tests / no-agent paths don't regress.
+/// CR 614.1c — production binder-chain replacement. The async path
+/// (<c>ReplaceAsync</c>, the production entry path) consults
+/// <c>ChooseYesNoAsync</c> when an agent is present; the sync path and the
+/// no-agent fallback cannot prompt, so they take CR 614.1c's "if you don't
+/// [pay], it enters tapped" default — enter TAPPED, pay nothing. (The former
+/// "auto-pay when life &gt; 2" posture silently spent the player's life with
+/// no prompt — that was the reported live-play bug.)
 /// </summary>
 public class ShockLandReplacementTests : IDisposable
 {
@@ -49,7 +51,7 @@ public class ShockLandReplacementTests : IDisposable
     // -----------------------------------------------------------------
 
     [Fact]
-    public void NoAgent_HighLife_AutoPays2Life_EntersUntapped()
+    public void NoAgent_HighLife_DeclinesPayment_EntersTapped()
     {
         var (alice, land, bus) = MakeWorld(life: 20);
         // No AgentRegistry.Set — explicit no-agent fallback.
@@ -57,9 +59,11 @@ public class ShockLandReplacementTests : IDisposable
         var after = bus.Apply(EtbIntent(land, alice));
 
         after.Should().NotBeNull();
-        after!.EntersTapped.Should().BeFalse();
-        alice.LifeTotal.Should().Be(18,
-            "no-agent fallback preserves legacy auto-pay-2-life posture");
+        after!.EntersTapped.Should().BeTrue(
+            "no-agent / sync path can't prompt → CR 614.1c default: enter TAPPED " +
+            "(the old auto-pay-untapped posture WAS the live-play bug)");
+        alice.LifeTotal.Should().Be(20,
+            "no payment is made when the optional can't be prompted — no silent life loss");
     }
 
     [Fact]
@@ -82,19 +86,22 @@ public class ShockLandReplacementTests : IDisposable
     // -----------------------------------------------------------------
 
     [Fact]
-    public void SyncApply_DoesNotPrompt_AutoPaysWhenLifeToSpare()
+    public void SyncApply_DoesNotPrompt_DeclinesAndEntersTapped()
     {
         var (alice, land, bus) = MakeWorld(life: 20);
-        // Even with an agent registered, the SYNC path never prompts — it
-        // auto-pays. (A throwing agent would surface if it were consulted.)
+        // Even with an agent registered, the SYNC path never prompts (CR 614
+        // choices must be awaited, never bridged sync-over-async). A throwing
+        // agent would surface if it were consulted — it must NOT be.
         var agent = new ScriptedAgent(); // empty queue: Pop throws if prompted
         AgentRegistry.Set(alice, agent);
 
         var after = bus.Apply(EtbIntent(land, alice));
 
         after.Should().NotBeNull();
-        after!.EntersTapped.Should().BeFalse("sync path auto-pays when life > 2");
-        alice.LifeTotal.Should().Be(18, "deterministic auto-pay-2-life posture");
+        after!.EntersTapped.Should().BeTrue(
+            "sync path can't prompt → CR 614.1c default is to enter TAPPED, " +
+            "never to silently auto-pay 2 life untapped");
+        alice.LifeTotal.Should().Be(20, "no payment when the optional can't be prompted");
     }
 
     // -----------------------------------------------------------------

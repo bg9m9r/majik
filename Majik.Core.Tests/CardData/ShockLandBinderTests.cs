@@ -13,8 +13,15 @@ public class ShockLandBinderTests
     private readonly Player _alice = new("Alice", 20);
 
     [Fact]
-    public void ShockLand_HighLife_EntersUntapped_Pays2Life()
+    public void ShockLand_SyncMove_CannotPrompt_EntersTapped_NoLifePaid()
     {
+        // The SYNC ZoneService.MoveCard path cannot prompt the controller
+        // (CR 614 choices must be awaited, never bridged sync-over-async).
+        // Per CR 614.1c "if you don't [pay], it enters tapped" the safe default
+        // is to enter TAPPED, paying nothing — NOT to silently auto-pay 2 life
+        // untapped (the latter was the reported live-play bug). Interactive
+        // entry paths carry a ResolutionContext and use the async move, which
+        // genuinely prompts (see ShockLandReplacementTests async cases).
         var bus = new ReplacementBus();
         var sacredFoundry = new Land("Sacred Foundry") { Owner = _alice, Zone = ZoneType.Hand };
         ShockLandBinder.Bind(sacredFoundry,
@@ -26,8 +33,8 @@ public class ShockLandBinderTests
         zones.MoveCard(sacredFoundry, ZoneType.Hand, ZoneType.Battlefield, controller: _alice);
 
         sacredFoundry.Zone.Should().Be(ZoneType.Battlefield);
-        ((Permanent)sacredFoundry).IsTapped.Should().BeFalse();
-        _alice.LifeTotal.Should().Be(18);
+        ((Permanent)sacredFoundry).IsTapped.Should().BeTrue();
+        _alice.LifeTotal.Should().Be(20);
     }
 
     [Fact]
