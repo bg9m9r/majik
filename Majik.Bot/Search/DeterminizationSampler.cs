@@ -40,13 +40,13 @@ namespace Majik.Bot.Search;
 /// </summary>
 internal static class DeterminizationSampler
 {
-    // Lazily-constructed shared repo + factory for the default (no-injection) path.
-    // EmbeddedCardRepository loads its 22k-row seed lazily on first GetByName, so
-    // constructing this is cheap; one shared instance avoids re-reading the gz per call.
-    // Safe to share under concurrent Resample (parallel MCTS rollouts): Create is
-    // read-only over the immutable repo and builds a fresh Card instance per call.
+    // Lazily-constructed shared factory for the default (no-injection) path,
+    // built over the bot-wide shared repo (SharedCardData.Repo — ONE
+    // EmbeddedCardRepository instance for the whole bot). Safe to share under
+    // concurrent Resample (parallel MCTS rollouts): Create is read-only over
+    // the immutable repo and builds a fresh Card instance per call.
     private static readonly Lazy<ScryfallCardFactory> DefaultFactory =
-        new(() => new ScryfallCardFactory(new EmbeddedCardRepository()));
+        new(() => new ScryfallCardFactory(SharedCardData.Repo));
 
     /// <summary>
     /// Resample the hidden zones in place. See the type-level docs for semantics.
@@ -70,13 +70,19 @@ internal static class DeterminizationSampler
     /// <param name="factory">Optional card-build factory. Defaults to a shared
     /// <see cref="ScryfallCardFactory"/> over the embedded repo. Inject a factory
     /// wired with live services if you need fully-live sampled cards.</param>
+    /// <param name="buildCard">Optional per-card build delegate
+    /// <c>(name, owner) -&gt; ICard</c>. When supplied it constructs EVERY sampled
+    /// opponent card, replacing the shell-factory path entirely — the injection
+    /// point for the prod deck-card build (<c>DeckCardBuilder.Build</c>). Null
+    /// keeps the <paramref name="factory"/> shell path byte-identical.</param>
     public static void Resample(
         IReadOnlyList<Player> players,
         Guid searchedSeatId,
         IReadOnlyList<string> opponentDecklist,
         int worldSeed,
         IReadOnlyList<string>? observedPublic = null,
-        ScryfallCardFactory? factory = null)
+        ScryfallCardFactory? factory = null,
+        Func<string, Player, ICard>? buildCard = null)
     {
         ArgumentNullException.ThrowIfNull(players);
         ArgumentNullException.ThrowIfNull(opponentDecklist);
@@ -94,7 +100,7 @@ internal static class DeterminizationSampler
         // reshuffle, so the whole operation is a pure function of worldSeed.
         var rng = new GameRandom(worldSeed);
 
-        ResampleOpponentHidden(opp, opponentDecklist, observedPublic, build, rng);
+        ResampleOpponentHidden(opp, opponentDecklist, observedPublic, build, buildCard, rng);
         ReshuffleSelfLibrary(self, rng);
     }
 
@@ -108,6 +114,7 @@ internal static class DeterminizationSampler
         IReadOnlyList<string> opponentDecklist,
         IReadOnlyList<string>? observedPublic,
         ScryfallCardFactory factory,
+        Func<string, Player, ICard>? buildCard,
         GameRandom rng)
     {
         // Unknown multiset = decklist counts MINUS the opponent's VISIBLE cards by
@@ -163,7 +170,7 @@ internal static class DeterminizationSampler
         var dealtToHand = Math.Min(handSize, pool.Count);
         for (var i = 0; i < pool.Count; i++)
         {
-            var live = factory.Create(pool[i], opp);
+            var live = buildCard?.Invoke(pool[i], opp) ?? factory.Create(pool[i], opp);
             var zone = i < dealtToHand ? ZoneType.Hand : ZoneType.Library;
             opp.Zones.GetZone(zone).AddCard(live);
         }

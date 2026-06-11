@@ -44,6 +44,46 @@ public class TargetPolicyTests
         TargetPolicy.Pick(s.Context, s.Self, req).Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Empty candidate pool + REQUIRED target: synthesize engine-side defaults
+    /// (mirrors HeuristicBotAgent's fallback) instead of returning an empty
+    /// pick that makes every such cast illegal under CR 601.2c. The damage-any
+    /// spell templates build TargetRequest("any target", 1, 1, []) with no
+    /// gathering pass — without this, Lightning Bolt could never be cast by
+    /// any TargetPolicy-backed bot seat (live or sandbox).
+    /// </summary>
+    [Fact]
+    public void Pick_EmptyCandidates_RequiredAnyTarget_SynthesizesOpponentFace()
+    {
+        var s = new BotTestScenario();
+        var req = new TargetRequest("any target", 1, 1, Array.Empty<object>());
+        TargetPolicy.Pick(s.Context, s.Self, req)
+            .Should().ContainSingle().Which.Should().BeSameAs(s.Opponent);
+    }
+
+    [Fact]
+    public void Pick_EmptyCandidates_RequiredCreature_SynthesizesBiggestEnemyCreature()
+    {
+        var s = new BotTestScenario();
+        var small = s.AddCreatureToBattlefield(s.Opponent, "Small", 1, 1);
+        var big   = s.AddCreatureToBattlefield(s.Opponent, "Big", 5, 5);
+        _ = small;
+
+        var req = new TargetRequest("destroy target creature", 1, 1, Array.Empty<object>());
+        TargetPolicy.Pick(s.Context, s.Self, req)
+            .Should().ContainSingle().Which.Should().BeSameAs(big);
+    }
+
+    [Fact]
+    public void Pick_EmptyCandidates_RequiredCreature_EmptyBoard_ReturnsUnderfilled()
+    {
+        var s = new BotTestScenario();
+        var req = new TargetRequest("destroy target creature", 1, 1, Array.Empty<object>());
+        // Nothing to synthesize — under-filled pick correctly makes the cast
+        // illegal (CR 601.2c) and the engine skips it.
+        TargetPolicy.Pick(s.Context, s.Self, req).Should().BeEmpty();
+    }
+
     [Fact]
     public void Pick_RespectsMaxTargets()
     {

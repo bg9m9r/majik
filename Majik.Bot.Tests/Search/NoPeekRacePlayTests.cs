@@ -21,21 +21,22 @@ namespace Majik.Bot.Tests.Search;
 /// → clone → <see cref="DeterminizationSampler"/> → engine sandbox → eval.
 ///
 /// <para>
-/// <b>Scope finding (verified empirically while building these tests — see PR
-/// notes):</b> a defaults-vs-kill-switches DECISION flip is not constructible
-/// against the current sandbox, because sampled hidden cards are built by
-/// <see cref="ScryfallCardFactory"/> WITHOUT keyword markers (the embedded
-/// seed has no keywords field) and without named-factory routing — so sampled
-/// burn can never be cast in the sandbox (no spell-definition resolver in
-/// <c>SandboxGame</c>) and sampled creatures have no haste (they can never
-/// attack on the opponent's first turn of the horizon). Hand-conditional
-/// catastrophes therefore cannot differentiate root moves. These tests pin the
-/// strongest TRUE end-to-end behaviors instead: (1) the eval lever shifts
-/// every sampled world's search values by EXACTLY the sampled-hand penalty and
-/// the kill-switch zeroes it; (2) sampled hidden hands drive REAL win/death
-/// divergence across determinized worlds, consumed by the risk vote (including
-/// its documented all-catastrophic collapse); (3) masking survives the new
-/// terms.
+/// <b>Scope finding (updated for the sandbox spell-definition resolver):</b>
+/// <c>SandboxGame</c> now carries a cast-time spell-definition resolver, so
+/// sampled burn IS castable in-sim — the original "sampled burn can never be
+/// cast" limitation is gone. The eval-lever fixture therefore makes the
+/// opponent LANDLESS so he can never pay for the sampled Bolts at any search
+/// horizon: with castable burn and reachable mana the engine plays the threat
+/// out for REAL (a 5-life searched seat dies in the tree — genuine terminal
+/// −1000s in every world, on/off alike) and the leaf-eval lever can no longer
+/// be isolated. Residual gap: sampled creatures still have no haste (the
+/// embedded seed has no keywords field), see the Hellrider fixture comment.
+/// These tests pin:
+/// (1) the eval lever shifts every sampled world's search values by EXACTLY
+/// the sampled-hand penalty and the kill-switch zeroes it; (2) sampled hidden
+/// hands drive REAL win/death divergence across determinized worlds, consumed
+/// by the risk vote (including its documented all-catastrophic collapse);
+/// (3) masking survives the new terms.
 /// </para>
 /// </summary>
 public class NoPeekRacePlayTests
@@ -61,11 +62,17 @@ public class NoPeekRacePlayTests
 
     /// <summary>
     /// Priority-decision root: Alice (searched, active) at 5 life with a
-    /// castable Grizzly Bears; Bob is inert (creatureless; his hidden zones
-    /// hold ONLY Lightning Bolts, which the sandbox cannot cast). The hidden
-    /// pool is exactly 8 Bolts (hand 4 + library 4) after subtracting Bob's 2
-    /// visible Mountains, so EVERY world's sampled hand is 4 Bolts regardless
-    /// of seed: reach 12, penalty = 12 − (5 − 1) = 8.
+    /// castable Grizzly Bears; Bob is fully inert: creatureless and LANDLESS.
+    /// The sandbox CAN cast instants now that it carries a spell-definition
+    /// resolver, so the only way to isolate the leaf-eval lever is an opponent
+    /// who can never produce mana at ANY search horizon — with even one
+    /// untapped (or untappable-next-turn) Mountain the engine plays the
+    /// sampled burn out for REAL and kills 5-life Alice in the tree (genuine
+    /// terminal −1000s drown the ±penalty diff this test pins). The opponent
+    /// decklist is exactly 8 Bolts and nothing of Bob's is visible, so EVERY
+    /// world's sampled hand is 4 Bolts (library 4) regardless of seed: reach
+    /// 12 (the castable-soon gate is MV 1 ≤ 0 lands + 2), penalty
+    /// = 12 − (5 − 1) = 8.
     /// </summary>
     private static SimState BuildBoltReachRoot(int baseSeed)
     {
@@ -76,12 +83,12 @@ public class NoPeekRacePlayTests
             alice.Zones.Battlefield.AddCard(Build("Forest", alice));
         alice.Zones.Hand.AddCard(Build("Grizzly Bears", alice));
 
-        for (var i = 0; i < 2; i++)
-            bob.Zones.Battlefield.AddCard(Build("Mountain", bob));
+        // Real hidden zones only set the SIZES the sampler re-draws (4 + 4);
+        // their contents are discarded on resample in every seeded world.
         for (var i = 0; i < 4; i++)
-            bob.Zones.Hand.AddCard(Build("Mountain", bob));       // sampler refills
+            bob.Zones.Hand.AddCard(Build("Lightning Bolt", bob));
         for (var i = 0; i < 4; i++)
-            bob.Zones.GetZone(ZoneType.Library).AddCard(Build("Mountain", bob));
+            bob.Zones.GetZone(ZoneType.Library).AddCard(Build("Lightning Bolt", bob));
 
         foreach (var _ in Enumerable.Range(0, 10))
             alice.Zones.GetZone(ZoneType.Library).AddCard(Build("Forest", alice));
@@ -91,7 +98,6 @@ public class NoPeekRacePlayTests
 
         var deck = new List<string>();
         deck.AddRange(Enumerable.Repeat("Lightning Bolt", 8));
-        deck.AddRange(Enumerable.Repeat("Mountain", 2)); // the 2 visible ones
         return root.WithDeterminization(deck, baseSeed);
     }
 

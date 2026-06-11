@@ -1,5 +1,8 @@
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
+using Majik.Core.CardData;
+using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -148,22 +151,23 @@ public sealed class EngineSimulator : ISearchSimulator
 
         // Build the sandbox. The SearchAgent gets the path as its script so
         // that the first |path| decisions are answered instantly, then capture
-        // mode kicks in for the next decision.
+        // mode kicks in for the next decision. Determinized roots clone from the
+        // per-world MATERIALIZED base (sampled zones already carry prod-built
+        // cards); perfect-info roots clone the live players, byte-identical to
+        // before.
         var sandbox = SandboxGame.From(
-            root.LivePlayers,
+            ResolveCloneSource(root),
             new GameRandom(FixedSeed),
-            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy: null, ref searchAgent));
-
-        // Determinization: when the root carries a world seed, re-draw the hidden
-        // zones of this clone before it is searched. Null seed => perfect-info,
-        // byte-identical to before (no resample happens).
-        MaybeResample(sandbox, root);
+            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy: null, ref searchAgent),
+            cardRepo: SharedCardData.Repo);
 
         var agent = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
 
-        // Resolve the cloned active player from the root's active player.
-        var clonedActive = sandbox.State.PlayerFor(root.ActivePlayer);
+        // Resolve the cloned active player from the root's active player by Id
+        // (Player.Id survives cloning; the clone SOURCE may be the world base,
+        // whose players are not reference-keys for root.ActivePlayer).
+        var clonedActive = ClonedActivePlayer(sandbox, root);
 
         // CRITICAL: capture the pending decision TCS BEFORE starting the engine.
         // ResumeAsync runs synchronously on this thread until the engine first
@@ -232,19 +236,19 @@ public sealed class EngineSimulator : ISearchSimulator
             ArchetypeName: "Burn")); // Burn weights drive aggressive play in rollout
 
         // Build the sandbox. The SearchAgent has the path as its script and
-        // the heuristic rollout strategy for post-script decisions.
+        // the heuristic rollout strategy for post-script decisions. Clone
+        // source: per-world materialized base for determinized roots (see
+        // AdvanceCoreUnsafe), live players for perfect-info roots.
         var sandbox = SandboxGame.From(
-            root.LivePlayers,
+            ResolveCloneSource(root),
             new GameRandom(FixedSeed),
-            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy, ref searchAgent));
-
-        // Determinization (see AdvanceCoreUnsafe). Null seed => no resample.
-        MaybeResample(sandbox, root);
+            p => BuildAgent(p, root, pathFromRoot, rolloutStrategy, ref searchAgent),
+            cardRepo: SharedCardData.Repo);
 
         _ = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
 
-        var clonedActive = sandbox.State.PlayerFor(root.ActivePlayer);
+        var clonedActive = ClonedActivePlayer(sandbox, root);
 
         // In rollout mode we AWAIT the run to completion — no decision capture
         // needed because the SearchAgent never pauses (rollout strategy answers
@@ -379,31 +383,70 @@ public sealed class EngineSimulator : ISearchSimulator
     }
 
     /// <summary>
-    /// Determinization hook shared by <see cref="AdvanceCoreUnsafe"/> and
-    /// <see cref="RolloutCoreUnsafe"/>. When the root carries BOTH a
-    /// <see cref="SimState.WorldSeed"/> and a <see cref="SimState.OpponentDecklist"/>,
-    /// the freshly-cloned players inside <paramref name="sandbox"/> have their hidden
-    /// zones (opponent hand + both libraries) re-drawn deterministically per the world
-    /// seed BEFORE the sandbox is searched / rolled out. When the world seed is null
-    /// this is a no-op — the perfect-info path is left byte-identical to before.
+    /// The clone source every sandbox is built from. Perfect-info roots (no
+    /// WorldSeed / decklist) clone the LIVE players — byte-identical to before.
+    /// Determinized roots clone the per-world MATERIALIZED base: the live players
+    /// cloned ONCE, hidden zones resampled ONCE with REAL prod-built cards
+    /// (<see cref="DeckCardBuilder"/>), cached on
+    /// <see cref="SimState.MaterializedWorldPlayers"/>. Every per-sim clone of the
+    /// base preserves the sampled zones, so the old per-clone shell resample is
+    /// gone — same determinism (one seeded resample instead of K identical ones),
+    /// far better fidelity (sampled cards are castable prod cards).
+    ///
+    /// <para><b>Stack / turn-state mirroring:</b> the world base is built via the
+    /// players-only <see cref="GameStateCloner.Clone(IReadOnlyList{Player})"/>
+    /// overload — deliberately mirroring the per-sim path, which also passes
+    /// null stack / null turn-state to <see cref="SandboxGame.From"/>. Nothing
+    /// to mirror until the sim path itself starts carrying them.</para>
     /// </summary>
-    private static void MaybeResample(SandboxGame sandbox, SimState root)
+    private static IReadOnlyList<Player> ResolveCloneSource(SimState root)
     {
-        if (root.WorldSeed is int seed && root.OpponentDecklist is { } deck)
-        {
-            DeterminizationSampler.Resample(
-                sandbox.State.Players, root.SearchedSeatId, deck, seed,
-                observedPublic: root.ObservedPublic);
-        }
+        if (root.WorldSeed is not int seed || root.OpponentDecklist is not { } deck)
+            return root.LivePlayers;                                   // perfect-info: unchanged
+        if (root.MaterializedWorldPlayers is { } cached) return cached;
+
+        var worldBase = GameStateCloner.Clone(root.LivePlayers);
+        DeterminizationSampler.Resample(worldBase.Players, root.SearchedSeatId, deck, seed,
+            observedPublic: root.ObservedPublic,
+            buildCard: BuildSampledCard);
+        root.MaterializedWorldPlayers = worldBase.Players;
+        return worldBase.Players;
     }
 
     /// <summary>
+    /// Builds one sampled opponent card EXACTLY like a live-deck card: the prod
+    /// <see cref="DeckCardBuilder"/> path (repo shell + named-factory routing +
+    /// binder chain). A scratch ReplacementBus / ContinuousEffectsService per call
+    /// is fine — materialization happens once per world, and per-call scratch
+    /// services rule out any cross-world state bleed. Triggers / zones / eventBus
+    /// are null with full surface parity (the sandbox wires its own live services
+    /// when the card is later cloned into a sim and cast).
+    /// </summary>
+    private static ICard BuildSampledCard(string name, Player owner) =>
+        DeckCardBuilder.Build(name, owner, SharedCardData.Repo,
+            new ReplacementBus(), new ContinuousEffectsService(),
+            triggers: null, zones: null, eventBus: null, routeThroughNamedFactories: true);
+
+    /// <summary>
+    /// Resolves the cloned active player by <see cref="Player.Id"/> (stable across
+    /// clones). Reference-keyed <see cref="ClonedGame.PlayerFor"/> cannot be used:
+    /// for determinized roots the sandbox is cloned from the world BASE, so
+    /// <c>root.ActivePlayer</c> (a live player) is not a key in its PlayerMap.
+    /// </summary>
+    private static Player ClonedActivePlayer(SandboxGame sandbox, SimState root)
+        => sandbox.State.Players.FirstOrDefault(p => p.Id == root.ActivePlayer.Id)
+            ?? throw new InvalidOperationException(
+                "Active player not found in cloned players.");
+
+    /// <summary>
     /// Test-only observation hook (no game is driven): performs ONE clone via the
-    /// same <see cref="SandboxGame.From"/> path used by the search, applies the
-    /// resample-when-WorldSeed-set logic, then returns the cloned opponent's hand
-    /// card names. With a null world seed the opponent's ACTUAL hand is returned
-    /// (proving the perfect-info path is untouched). Lets the determinization wiring
-    /// be verified without running a whole game.
+    /// same <see cref="SandboxGame.From"/> + <see cref="ResolveCloneSource"/> path
+    /// used by the search, then returns the cloned opponent's hand card names.
+    /// For a determinized root this materializes (and caches) the world base, so
+    /// the returned hand is the sampled hand from a clone of that base. With a
+    /// null world seed the opponent's ACTUAL hand is returned (proving the
+    /// perfect-info path is untouched). Lets the determinization wiring be
+    /// verified without running a whole game.
     /// </summary>
     internal IReadOnlyList<string> DebugSampledOpponentHand(SimState root)
     {
@@ -412,11 +455,10 @@ public sealed class EngineSimulator : ISearchSimulator
         // The sandbox is never run here, so the agent choice is irrelevant; a
         // bare SearchAgent (empty script) satisfies SandboxGame.From's factory.
         var sandbox = SandboxGame.From(
-            root.LivePlayers,
+            ResolveCloneSource(root),
             new GameRandom(FixedSeed),
-            p => new SearchAgent(p));
-
-        MaybeResample(sandbox, root);
+            p => new SearchAgent(p),
+            cardRepo: SharedCardData.Repo);
 
         var opp = sandbox.State.Players.FirstOrDefault(p => p.Id != root.SearchedSeatId)
             ?? throw new InvalidOperationException("No opponent seat in cloned players.");

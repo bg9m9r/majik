@@ -210,6 +210,58 @@ public class DeterminizationSamplerTests
     }
 
     [Fact]
+    public void Resample_WithBuildCardDelegate_UsesItForEverySampledCard()
+    {
+        var (self, opp) = BuildFixture();
+        var builtNames = new List<string>();
+        // The delegate spies on every build AND still produces a real card via the
+        // same fixture factory, so the sampled zones stay live/castable.
+        Func<string, Player, ICard> spy = (name, owner) =>
+        {
+            builtNames.Add(name);
+            return Factory.Create(name, owner);
+        };
+
+        DeterminizationSampler.Resample(
+            Players(self, opp), self.Id, OppDecklist, worldSeed: 321,
+            observedPublic: null, factory: null, buildCard: spy);
+
+        var sampled = opp.Zones.Hand.GetCards()
+            .Concat(opp.Zones.GetZone(ZoneType.Library).GetCards())
+            .Select(c => c.Name)
+            .ToList();
+
+        // EVERY sampled opponent card (hand + library) must have come from the
+        // delegate — no card may slip through the shell-factory path.
+        builtNames.Should().NotBeEmpty();
+        builtNames.Should().HaveCount(sampled.Count);
+        builtNames.OrderBy(n => n, StringComparer.Ordinal).Should().Equal(
+            sampled.OrderBy(n => n, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Resample_NullDelegate_ByteIdenticalToShellPath()
+    {
+        var (selfA, oppA) = BuildFixture();
+        var (selfB, oppB) = BuildFixture();
+
+        // Legacy 6-arg call (pre-delegate surface) vs explicit buildCard:null —
+        // under the same worldSeed both must yield identical opp hand + library
+        // name sequences (back-compat snapshot).
+        DeterminizationSampler.Resample(
+            Players(selfA, oppA), selfA.Id, OppDecklist, worldSeed: 2026,
+            observedPublic: null, factory: null);
+        DeterminizationSampler.Resample(
+            Players(selfB, oppB), selfB.Id, OppDecklist, worldSeed: 2026,
+            observedPublic: null, factory: null, buildCard: null);
+
+        oppA.Zones.Hand.GetCards().Select(c => c.Name).Should().Equal(
+            oppB.Zones.Hand.GetCards().Select(c => c.Name));
+        oppA.Zones.GetZone(ZoneType.Library).GetCards().Select(c => c.Name).Should().Equal(
+            oppB.Zones.GetZone(ZoneType.Library).GetCards().Select(c => c.Name));
+    }
+
+    [Fact]
     public void Resample_SampledOppCards_AreOwnedByOpp()
     {
         var (self, opp) = BuildFixture();

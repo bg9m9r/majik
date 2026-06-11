@@ -20,14 +20,6 @@ namespace Majik.Bot.Search;
 /// </summary>
 internal static class DirectDamageRecognizer
 {
-    /// <summary>
-    /// Shared lazy repo for the oracle-text lookup. EmbeddedCardRepository loads its
-    /// 22k-row seed lazily on first GetByName; one shared instance avoids re-reading
-    /// the gz. Safe under concurrent DamageToPlayer calls (parallel MCTS rollouts):
-    /// GetByName is read-only over the immutable in-memory dictionary.
-    /// </summary>
-    private static readonly Lazy<EmbeddedCardRepository> Repo = new(() => new EmbeddedCardRepository());
-
     /// <summary>Per-name result cache — oracle text is static per name, so the scan runs once.</summary>
     private static readonly ConcurrentDictionary<string, int> Cache = new();
 
@@ -44,8 +36,10 @@ internal static class DirectDamageRecognizer
     /// The maximum direct damage <paramref name="card"/> can deal to a player per the
     /// recognized patterns, or 0 when none match (creatures, lands, creature-only burn).
     /// </summary>
+    // SharedCardData.Repo: the bot-wide shared EmbeddedCardRepository — safe
+    // under concurrent DamageToPlayer calls (read-only immutable dictionary).
     public static int DamageToPlayer(ICard card) =>
-        Cache.GetOrAdd(card.Name, static name => Scan(Repo.Value.GetByName(name)?.OracleText));
+        Cache.GetOrAdd(card.Name, static name => Scan(SharedCardData.Repo.GetByName(name)?.OracleText));
 
     /// <summary>
     /// Scan oracle text for the burn-reach patterns; modal cards (multiple matches)

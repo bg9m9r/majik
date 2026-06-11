@@ -60,6 +60,26 @@ public sealed class SimState
     /// </summary>
     public IReadOnlyList<string>? ObservedPublic { get; }
 
+    /// <summary>
+    /// Cache of this world's MATERIALIZED base: the live players cloned once and
+    /// resampled with REAL prod-built cards (<c>DeckCardBuilder</c>), set lazily by
+    /// <see cref="EngineSimulator"/>'s <c>ResolveCloneSource</c> on the first
+    /// determinized Advance / Rollout. Every subsequent per-sim sandbox clones FROM
+    /// this base instead of shell-resampling per clone. Always <c>null</c> for
+    /// perfect-info roots (no WorldSeed / decklist).
+    ///
+    /// <para><b>Mutability + threading contract:</b> deliberately a MUTABLE field
+    /// (not a get-only prop) so the simulator can set it once after construction.
+    /// <c>Mcts</c> is single-threaded per search and each determinized world gets
+    /// its OWN SimState instance (via <see cref="WithWorldSeed"/> /
+    /// <see cref="WithDeterminization"/>), so no synchronization is needed: all
+    /// reads/writes of this field happen on that world's single search thread.</para>
+    ///
+    /// <para><b>NOT preserved by any copy helper by design</b> — a new world copy
+    /// (new seed) must re-materialize its own base.</para>
+    /// </summary>
+    internal IReadOnlyList<Player>? MaterializedWorldPlayers;
+
     private SimState(
         IReadOnlyList<Player> livePlayers,
         Player activePlayer,
@@ -100,6 +120,7 @@ public sealed class SimState
     {
         ArgumentNullException.ThrowIfNull(opponentDecklist);
         // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat
+        // NOT preserved by design: MaterializedWorldPlayers (world cache — a new world copy must re-materialize)
         return new SimState(
             livePlayers: LivePlayers,
             activePlayer: ActivePlayer,
@@ -128,6 +149,7 @@ public sealed class SimState
     public SimState WithWorldSeed(int worldSeed)
     {
         // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, OpponentDecklist, ObservedPublic
+        // NOT preserved by design: MaterializedWorldPlayers (world cache — a new world copy must re-materialize)
         return new SimState(
             livePlayers: LivePlayers,
             activePlayer: ActivePlayer,

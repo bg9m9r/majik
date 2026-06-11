@@ -18,7 +18,21 @@ public static class TargetPolicy
         IBotDecisionSink? sink = null)
     {
         if (request.LegalCandidates.Count == 0)
-            return Array.Empty<object>();
+        {
+            // Empty candidate pool + a REQUIRED target: card binders that lack a
+            // candidate-gathering pass (e.g. the damage-any spell templates build
+            // TargetRequest("any target", 1, 1, []) with no CandidateGatherer)
+            // would otherwise make every targeted cast illegal — CR 601.2c's
+            // min-cardinality check throws and TurnDriver rotates the spell back
+            // into hand. Synthesize engine-side defaults from the request label,
+            // mirroring HeuristicBotAgent's empty-candidate fallback, so the bot
+            // (live seats, sandbox opponents and rollouts alike) can actually
+            // complete targeted instant/sorcery casts. MinTargets == 0 keeps the
+            // historical empty pick — nothing is required, choose nothing.
+            return request.MinTargets > 0
+                ? SynthesizeDefaults(ctx, self, request)
+                : Array.Empty<object>();
+        }
 
         // Score every candidate so we can both rank-pick and emit alternatives.
         var scored = request.LegalCandidates
@@ -75,6 +89,48 @@ public static class TargetPolicy
                 Context: ctxFlags));
         }
         catch { /* observer fault must not abort engine */ }
+    }
+
+    /// <summary>
+    /// Engine-side default picks for a required-target request whose candidate
+    /// pool is empty (no binder-side gathering pass). Mirrors
+    /// <see cref="Majik.Core.Players.Agents.HeuristicBotAgent"/>'s
+    /// empty-candidate fallback: damage/removal labels aim at the opponent
+    /// (face, biggest creature, most expensive permanent); "spell" labels take
+    /// the top of the stack. Returns however many picks could be synthesized —
+    /// when the board offers nothing (e.g. "target creature" on an empty
+    /// board) the under-filled pick correctly makes the cast illegal
+    /// (CR 601.2c) and the engine skips it.
+    /// </summary>
+    private static IReadOnlyList<object> SynthesizeDefaults(
+        GameContext ctx, Player self, TargetRequest request)
+    {
+        var label = request.Description?.ToLowerInvariant() ?? string.Empty;
+        var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
+
+        var picked = new List<object>();
+        for (var i = 0; i < request.MinTargets; i++)
+        {
+            object? choice = label switch
+            {
+                _ when label.Contains("player") || label.Contains("any target")
+                    => opponent,
+                _ when label.Contains("creature")
+                    => opponent?.Zones.Battlefield.GetCards().OfType<Creature>()
+                        .OrderByDescending(c => c.Power * 10 + c.Toughness)
+                        .FirstOrDefault(),
+                _ when label.Contains("permanent")
+                    => opponent?.Zones.Battlefield.GetCards()
+                        .OrderByDescending(c =>
+                            Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+                        .FirstOrDefault(),
+                _ when label.Contains("spell")
+                    => ctx.Stack.Top,
+                _ => opponent,
+            };
+            if (choice != null) picked.Add(choice);
+        }
+        return picked;
     }
 
     private static string LabelCandidate(object c) => c switch
