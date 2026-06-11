@@ -3,6 +3,32 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>majik-server-dev</UserSecretsId>
+    <!--
+      GC mode, made EXPLICIT for the 1-vCPU production box (Render standard).
+
+      The Web SDK defaults ServerGarbageCollection to true, but on a single
+      logical CPU the runtime silently falls back to workstation GC anyway
+      (verified empirically: gcServer=1 + taskset -c 0 => IsServerGC=false;
+      2 cores => true). So prod has been running workstation GC by accident
+      of that fallback. Pinning it here (a) documents the measured reality,
+      and (b) removes the hazard of server GC engaging with N heaps if the
+      container is ever scheduled with >1 visible processor while still
+      CPU-quota-limited to ~1 vCPU (cgroup quota and visible-processor count
+      are not the same thing).
+
+      ConcurrentGC (background GC) is disabled: on 1 core the background
+      GC thread competes with the search thread for the only core during
+      gen2 sweeps of a churn-heavy heap. Measured (DecisionProfile,
+      Release, taskset -c 0, reuse-ON 2000it/1500ms wall-bound cell,
+      2 runs x 3 reps each): non-concurrent 1273/1352 avg iters@1500ms vs
+      concurrent 1164/1165 — a consistent ~10-15% search-throughput win.
+      Trade-off: gen2 collections become blocking pauses; acceptable for a
+      turn-based game server where bot search throughput is the scarce
+      resource. Revisit BOTH settings if the instance is ever upgraded to
+      multiple dedicated vCPUs.
+    -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>
