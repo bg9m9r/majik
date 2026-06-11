@@ -139,6 +139,36 @@ namespace Majik.Bot;
 /// construction (null → false) and inherited by every per-world determinized
 /// search. The live flip of the probe-gate winner is config-only
 /// (<c>Bot__TreeStateReuse</c>).</para>
+///
+/// <para><c>MaxWorlds</c> optional (default null = 8, today's behaviour). When
+/// <c>Strategy="mcts"</c> on a DETERMINIZED path (known
+/// <c>OpponentArchetype</c> or <c>InferOpponentArchetype</c>), the upper clamp
+/// (<c>kMax</c>) on the determinized world count K. NOTE: K still DERIVES from
+/// the budget split — <c>K = clamp(round(total / perWorld), 1, MaxWorlds)</c>
+/// (see <see cref="Search.DeterminizedSearch.KFor"/>) — so raising
+/// <c>MaxWorlds</c> alone does nothing unless <c>PerWorldBudgetMs</c> is small
+/// enough for the budget to want that many worlds. The perfect-info path
+/// ignores it.</para>
+///
+/// <para><c>PerWorldBudgetMs</c> optional (default null = 400 ms, today's
+/// behaviour). Per-world wall-clock budget for the determinized K-world split
+/// when <c>Strategy="mcts"</c>. Governs BOTH halves of the split:
+/// <list type="bullet">
+///   <item>the WORLD COUNT — <c>K = clamp(round(MaxMctsBudgetMs / PerWorldBudgetMs),
+///     1, MaxWorlds)</c>; and</item>
+///   <item>the PER-WORLD <see cref="Search.MctsConfig"/> — <c>MaxMillis</c> is
+///     bounded to this value and <c>MaxIterations</c> is scaled by the SAME
+///     <c>perWorld / total</c> fraction (see
+///     <see cref="Search.SearchStrategy.DeterminizedConfigFrom"/>), so K worlds
+///     genuinely SPLIT the total budget rather than each running the full
+///     search.</item>
+/// </list>
+/// Arithmetic at the LIVE regime (total 1500 ms, iteration cap 800, reuse on):
+/// the default 400 ms → K = round(1500/400) = 4 worlds × round(800×400/1500)
+/// = 213 iterations each; 200 ms + <c>MaxWorlds=8</c> → K = clamp(round(7.5),
+/// 1, 8) = 8 worlds × round(800×200/1500) = 107 iterations each — the
+/// more-worlds-fewer-iterations trade the K-tuning probes measure. The
+/// perfect-info path ignores it.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -157,4 +187,6 @@ public sealed record BotConfig(
     double? RiskVoteThreshold = null,
     int? SearchConcurrency = null,
     string? RolloutDepth = null,
-    bool? TreeStateReuse = null);
+    bool? TreeStateReuse = null,
+    int? MaxWorlds = null,
+    int? PerWorldBudgetMs = null);

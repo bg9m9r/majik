@@ -75,7 +75,10 @@ public sealed class ServerGameFactory
     /// <c>mcts</c> (default "FullTurnPlus" = today's playout): the heuristic
     /// never rolls out, so it stays null there. <c>TreeStateReuse</c> follows
     /// the same rule (default false = today's root-replay loop): the
-    /// heuristic never searches, so it stays null there.
+    /// heuristic never searches, so it stays null there. <c>MaxWorlds</c> /
+    /// <c>PerWorldBudgetMs</c> follow the same rule (default null = today's
+    /// kMax 8 / 400 ms determinized world split): the heuristic never
+    /// determinizes, so they stay null there.
     /// Internal so tests can assert the exact installed config without digging
     /// the agent out of a facade.
     /// </summary>
@@ -95,6 +98,12 @@ public sealed class ServerGameFactory
                 : null,
             TreeStateReuse: _botOptions.Strategy == "mcts"
                 ? _botOptions.TreeStateReuse
+                : null,
+            MaxWorlds: _botOptions.Strategy == "mcts"
+                ? _botOptions.MaxWorlds
+                : null,
+            PerWorldBudgetMs: _botOptions.Strategy == "mcts"
+                ? _botOptions.PerWorldBudgetMs
                 : null);
 
     /// <summary>

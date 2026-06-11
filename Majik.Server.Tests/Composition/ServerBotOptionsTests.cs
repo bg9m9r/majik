@@ -174,6 +174,81 @@ public class ServerBotOptionsTests
         act.Should().NotThrow();
     }
 
+    // ── MaxWorlds / PerWorldBudgetMs (determinized world-split knobs) ──────────
+
+    [Fact]
+    public void DefaultOptions_WorldSplitKnobs_AreNull_AndStayNullUnderHeuristic()
+    {
+        var options = new ServerBotOptions();
+        options.MaxWorlds.Should().BeNull(
+            "null = the engine default (kMax 8) — zero behaviour change");
+        options.PerWorldBudgetMs.Should().BeNull(
+            "null = the engine default (400 ms per world → K=4 at the live 1500 ms) — " +
+            "zero behaviour change");
+
+        var cfg = FactoryWith(null).BuildBotConfig("Burn", decisionSink: null);
+        cfg.MaxWorlds.Should().BeNull(
+            "the heuristic strategy never determinizes — only mcts threads the knob");
+        cfg.PerWorldBudgetMs.Should().BeNull(
+            "the heuristic strategy never determinizes — only mcts threads the knob");
+    }
+
+    [Fact]
+    public void MctsOptions_BuildBotConfig_CarriesWorldSplitKnobs()
+    {
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            MaxWorlds = 8,
+            PerWorldBudgetMs = 200,
+        });
+
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        cfg.MaxWorlds.Should().Be(8,
+            "the live flip of a K-tuning probe winner is config-only (Bot__MaxWorlds)");
+        cfg.PerWorldBudgetMs.Should().Be(200,
+            "the live flip of a K-tuning probe winner is config-only (Bot__PerWorldBudgetMs)");
+    }
+
+    [Fact]
+    public void HeuristicOptions_WorldSplitKnobs_StayNullEvenWhenSet()
+    {
+        // mcts-only: a heuristic deployment with stray world-split env vars must
+        // not thread them (mirrors the SearchConcurrency / RolloutDepth /
+        // TreeStateReuse mcts-only rule).
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "heuristic",
+            MaxWorlds = 8,
+            PerWorldBudgetMs = 200,
+        });
+
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        cfg.MaxWorlds.Should().BeNull();
+        cfg.PerWorldBudgetMs.Should().BeNull();
+    }
+
+    [Fact]
+    public void MctsOptions_WithWorldSplitKnobs_BotPlayerAgent_Constructs()
+    {
+        // Proves the wired knobs resolve downstream (SearchStrategy threads them
+        // into the determinized split at construction).
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            MaxWorlds = 8,
+            PerWorldBudgetMs = 200,
+        });
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        var seat = new Majik.Core.Players.Player("Bob", 20);
+        var act = () => new Majik.Bot.BotPlayerAgent(seat, cfg);
+
+        act.Should().NotThrow();
+    }
+
     // ── Fail fast on a bad knob ────────────────────────────────────────────────
 
     [Theory]
@@ -209,6 +284,36 @@ public class ServerBotOptionsTests
         });
 
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void NonPositiveMaxWorlds_Throws(int maxWorlds)
+    {
+        var act = () => FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            MaxWorlds = maxWorlds,
+        });
+
+        act.Should().Throw<ArgumentException>().WithMessage("*MaxWorlds*",
+            "a nonsensical Bot__MaxWorlds must fail at registration and NAME the knob");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void NonPositivePerWorldBudgetMs_Throws(int perWorldBudgetMs)
+    {
+        var act = () => FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            PerWorldBudgetMs = perWorldBudgetMs,
+        });
+
+        act.Should().Throw<ArgumentException>().WithMessage("*PerWorldBudgetMs*",
+            "a nonsensical Bot__PerWorldBudgetMs must fail at registration and NAME the knob");
     }
 
     [Theory]
@@ -302,6 +407,41 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
+    public void AddMajikEngine_BotSection_BindsWorldSplitKnobs()
+    {
+        var factory = ResolveFactory(
+            ("Bot:Strategy", "mcts"),
+            ("Bot:MaxWorlds", "8"),
+            ("Bot:PerWorldBudgetMs", "200"));
+
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        cfg.MaxWorlds.Should().Be(8,
+            "env Bot__MaxWorlds must reach the installed bot");
+        cfg.PerWorldBudgetMs.Should().Be(200,
+            "env Bot__PerWorldBudgetMs must reach the installed bot");
+    }
+
+    [Fact]
+    public void AddMajikEngine_NonPositivePerWorldBudgetMs_FailsFastAtRegistration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Bot:Strategy"] = "mcts",
+                ["Bot:PerWorldBudgetMs"] = "0",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var act = () => services.AddMajikEngine(configuration);
+
+        act.Should().Throw<ArgumentException>(
+            "a zero Bot__PerWorldBudgetMs env var must crash the boot, not the first vs-bot match");
+    }
+
+    [Fact]
     public void AddMajikEngine_NonBooleanTreeStateReuse_FailsFastAtRegistration()
     {
         var configuration = new ConfigurationBuilder()
@@ -354,6 +494,12 @@ public class ServerBotOptionsTests
         cfg.TreeStateReuse.Should().BeFalse(
             "the tree-reuse default is today's root-replay loop — the probe gate " +
             "flips it later via Bot__TreeStateReuse only");
+        cfg.MaxWorlds.Should().BeNull(
+            "the world-split defaults are today's 400 ms / kMax 8 — the probe gate " +
+            "flips them later via Bot__MaxWorlds / Bot__PerWorldBudgetMs only");
+        cfg.PerWorldBudgetMs.Should().BeNull(
+            "the world-split defaults are today's 400 ms / kMax 8 — the probe gate " +
+            "flips them later via Bot__MaxWorlds / Bot__PerWorldBudgetMs only");
     }
 
     [Fact]

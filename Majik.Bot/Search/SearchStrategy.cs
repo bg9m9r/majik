@@ -39,7 +39,7 @@ internal sealed class SearchStrategy : IBotStrategy
 
     /// <summary>
     /// The Mcts used for the K-world determinized loop, bounded PER WORLD to
-    /// <see cref="PerWorldBudgetMs"/> (and a proportionally-scaled iteration cap)
+    /// <see cref="_perWorldBudgetMs"/> (and a proportionally-scaled iteration cap)
     /// so K worlds × per-world ≈ the configured total budget. Non-null when EITHER
     /// determinized path is active — a known <see cref="_opponentDecklist"/> OR
     /// <see cref="_inferOpponent"/>; the perfect-info path always uses the original
@@ -90,29 +90,41 @@ internal sealed class SearchStrategy : IBotStrategy
     private readonly double _riskThreshold;
 
     /// <summary>
-    /// Per-world budget (ms) for the determinized driver. The total budget is
-    /// split across K worlds (K = round(total / perWorld), clamped 1..kMax inside
-    /// <see cref="DeterminizedSearch"/>), so a larger total yields more worlds, not
-    /// longer per-world searches. 400 ms matches <see cref="DeterminizedSearch.Run"/>'s
-    /// default and gives a sensible 1..few worlds at the production 1500 ms total.
+    /// Per-world budget (ms) for the determinized driver, resolved ONCE from
+    /// <see cref="BotConfig.PerWorldBudgetMs"/> at construction (null →
+    /// <see cref="DefaultPerWorldBudgetMs"/> = 400, today's behaviour). The total
+    /// budget is split across K worlds (K = round(total / perWorld), clamped
+    /// 1..<see cref="_kMax"/> inside <see cref="DeterminizedSearch"/>), so a larger
+    /// total — or a SMALLER per-world budget — yields more worlds, not longer
+    /// per-world searches.
     ///
     /// <para>
     /// Each per-world <see cref="Mcts.SearchWithStats"/> call is ALSO bounded to this
     /// value (see <see cref="_determinizedMcts"/> / <see cref="DeterminizedConfigFrom"/>),
     /// so the K worlds genuinely SPLIT the total budget — total wall-clock ≈
-    /// K × PerWorldBudgetMs ≈ the configured total (modulo the K clamp). It does NOT
+    /// K × perWorld ≈ the configured total (modulo the K clamp). It does NOT
     /// run K full-budget searches.
     /// </para>
     /// </summary>
-    private const int PerWorldBudgetMs = 400;
+    private readonly int _perWorldBudgetMs;
 
     /// <summary>
-    /// Upper clamp on the determinized world count K, matching
+    /// Upper clamp on the determinized world count K, resolved ONCE from
+    /// <see cref="BotConfig.MaxWorlds"/> at construction (null →
+    /// <see cref="DefaultKMax"/> = 8, today's behaviour — matching
     /// <see cref="DeterminizedSearch.Run"/> / <see cref="DeterminizedSearch.RunBelief"/>'s
-    /// default kMax. Threaded through both determinized paths so the K-world budget split
-    /// is identical whether the archetype is known or inferred.
+    /// default kMax). Threaded through both determinized paths so the K-world budget
+    /// split is identical whether the archetype is known or inferred.
     /// </summary>
-    private const int KMax = 8;
+    private readonly int _kMax;
+
+    /// <summary>The per-world budget <see cref="BotConfig.PerWorldBudgetMs"/> = null
+    /// resolves to — today's 400 ms split.</summary>
+    internal const int DefaultPerWorldBudgetMs = 400;
+
+    /// <summary>The world-count clamp <see cref="BotConfig.MaxWorlds"/> = null
+    /// resolves to — today's kMax of 8.</summary>
+    internal const int DefaultKMax = 8;
 
     /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
@@ -249,17 +261,23 @@ internal sealed class SearchStrategy : IBotStrategy
         _inferOpponent = config.InferOpponentArchetype && config.OpponentArchetype is null;
         _inferencer = _inferOpponent ? new ArchetypeInferencer() : null;
 
+        // World-split knobs: resolve the nullable config once up front (null →
+        // today's 400 ms / kMax 8 — byte-identical defaults). K derives from the
+        // budget split: clamp(round(total / perWorld), 1, kMax).
+        _perWorldBudgetMs = config.PerWorldBudgetMs ?? DefaultPerWorldBudgetMs;
+        _kMax = config.MaxWorlds ?? DefaultKMax;
+
         // Determinized total budget reuses the same wall-clock budget the MCTS
         // config already computes (MaxMctsBudgetMs ?? 1500). The K-world driver
-        // splits this total across worlds via PerWorldBudgetMs, and the per-world
-        // Mcts it runs (_determinizedMcts) is bounded to PerWorldBudgetMs PER WORLD
+        // splits this total across worlds via _perWorldBudgetMs, and the per-world
+        // Mcts it runs (_determinizedMcts) is bounded to _perWorldBudgetMs PER WORLD
         // (not the full total), so K worlds × per-world ≈ the total budget — NOT
         // K full searches. Built whenever a determinized path is active (known
         // archetype OR inference); the perfect-info path keeps using _mcts untouched.
         _totalBudgetMs = mctsConfig.MaxMillis;
         _determinizedMcts = (_opponentDecklist is null && !_inferOpponent)
             ? null
-            : new Mcts(sim, DeterminizedConfigFrom(mctsConfig, PerWorldBudgetMs));
+            : new Mcts(sim, DeterminizedConfigFrom(mctsConfig, _perWorldBudgetMs));
 
         // Fixed, config-derived base seed → determinized runs are reproducible.
         _baseSeed = config.RandomSeed;
@@ -282,6 +300,19 @@ internal sealed class SearchStrategy : IBotStrategy
 
     /// <summary>The resolved gate (test instrumentation — null means ungated).</summary>
     internal SearchGate? Gate => _gate;
+
+    /// <summary>The resolved per-world budget (test instrumentation —
+    /// <see cref="BotConfig.PerWorldBudgetMs"/> ?? <see cref="DefaultPerWorldBudgetMs"/>).</summary>
+    internal int PerWorldBudgetMsResolved => _perWorldBudgetMs;
+
+    /// <summary>The resolved world-count clamp (test instrumentation —
+    /// <see cref="BotConfig.MaxWorlds"/> ?? <see cref="DefaultKMax"/>).</summary>
+    internal int KMaxResolved => _kMax;
+
+    /// <summary>The per-world Mcts's config (test instrumentation — null when no
+    /// determinized path is active). Pins that the per-world search is genuinely
+    /// bounded to the configured split.</summary>
+    internal MctsConfig? DeterminizedMctsConfig => _determinizedMcts?.Config;
 
     /// <summary>
     /// Resolve <see cref="BotConfig.RiskVoteThreshold"/> to the effective
@@ -306,14 +337,15 @@ internal sealed class SearchStrategy : IBotStrategy
         if (_opponentDecklist is { } deck)
         {
             var determinized = root.WithDeterminization(deck, worldSeed: _baseSeed);
-            // _determinizedMcts is bounded to PerWorldBudgetMs PER WORLD, so the
+            // _determinizedMcts is bounded to _perWorldBudgetMs PER WORLD, so the
             // K-world loop SPLITS the total budget (K × per-world ≈ total) instead
             // of running K full-budget searches.
             return DeterminizedSearch.Run(
                 _determinizedMcts!,   // non-null whenever _opponentDecklist is set
                 determinized,
                 totalBudgetMs: _totalBudgetMs,
-                perWorldBudgetMs: PerWorldBudgetMs,
+                perWorldBudgetMs: _perWorldBudgetMs,
+                kMax: _kMax,
                 catastropheThreshold: _riskThreshold);
         }
 
@@ -325,7 +357,7 @@ internal sealed class SearchStrategy : IBotStrategy
         {
             var publicCards = OpponentPublicCardNames(ctx, self);
             var belief = _inferencer!.Infer(publicCards);
-            int k = DeterminizedSearch.KFor(_totalBudgetMs, PerWorldBudgetMs, KMax);
+            int k = DeterminizedSearch.KFor(_totalBudgetMs, _perWorldBudgetMs, _kMax);
             var alloc = WorldAllocator.Allocate(belief, k, topM: 4)
                 .Select(x => ((IReadOnlyList<string>)BotDeckCatalog.Get(x.Archetype), x.Worlds))
                 .ToList();
@@ -341,8 +373,8 @@ internal sealed class SearchStrategy : IBotStrategy
                 alloc,
                 publicCards,
                 totalBudgetMs: _totalBudgetMs,
-                perWorldBudgetMs: PerWorldBudgetMs,
-                kMax: KMax,
+                perWorldBudgetMs: _perWorldBudgetMs,
+                kMax: _kMax,
                 catastropheThreshold: _riskThreshold);
         }
 
