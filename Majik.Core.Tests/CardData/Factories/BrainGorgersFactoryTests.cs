@@ -118,12 +118,14 @@ public class BrainGorgersFactoryTests
         var stack = new Majik.Core.Stack.Stack();
         using var scope = AgentRegistry.PushScope();
 
+        var aliceCreature = MakeCreature(_alice);
         var aliceAgent = new ScriptedAgent();
-        aliceAgent.QueueFromBattlefield((ICard?)null);              // Alice declines
+        aliceAgent.QueueYesNo(false);                                  // Alice declines the "may"
 
         var bobCreature = MakeCreature(_bob);
         var bobAgent = new ScriptedAgent();
-        bobAgent.QueueFromBattlefield(c => c.Count > 0 ? c[0] : null); // Bob sacrifices
+        bobAgent.QueueYesNo(true);                                     // Bob accepts the "may"
+        bobAgent.QueueFromBattlefield(c => c.Count > 0 ? c[0] : null); // … and picks his creature
 
         AgentRegistry.Set(_alice, aliceAgent);
         AgentRegistry.Set(_bob, bobAgent);
@@ -142,6 +144,7 @@ public class BrainGorgersFactoryTests
         foreach (var e in trigger.Effects) await e.ExecuteAsync(rc);
 
         bobCreature.Zone.Should().Be(ZoneType.Graveyard, "Bob sacrificed his creature.");
+        aliceCreature.Zone.Should().Be(ZoneType.Battlefield, "Alice declined the 'may' — her creature is untouched.");
         stack.GetAll().Should().NotContain(spell, "Brain Gorgers is countered when a player sacrifices.");
         card.Zone.Should().Be(ZoneType.Graveyard,
             "a countered spell goes to its owner's graveyard (CR 701.5a).");
@@ -156,10 +159,11 @@ public class BrainGorgersFactoryTests
         using var scope = AgentRegistry.PushScope();
 
         var aliceAgent = new ScriptedAgent();
-        aliceAgent.QueueFromBattlefield((ICard?)null);
+        aliceAgent.QueueYesNo(false);
         var bobAgent = new ScriptedAgent();
-        bobAgent.QueueFromBattlefield((ICard?)null);
+        bobAgent.QueueYesNo(false);
 
+        var aliceCreature = MakeCreature(_alice);
         var bobCreature = MakeCreature(_bob);
 
         AgentRegistry.Set(_alice, aliceAgent);
@@ -176,6 +180,7 @@ public class BrainGorgersFactoryTests
             _alice, AgentRegistry.Get(_alice), Game(_alice, stack, _alice, _bob), chosenTargets: null);
         foreach (var e in trigger.Effects) await e.ExecuteAsync(rc);
 
+        aliceCreature.Zone.Should().Be(ZoneType.Battlefield, "no player chose to sacrifice.");
         bobCreature.Zone.Should().Be(ZoneType.Battlefield, "no player chose to sacrifice.");
         stack.GetAll().Should().Contain(spell, "Brain Gorgers is not countered when nobody sacrifices.");
     }
