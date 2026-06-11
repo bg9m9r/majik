@@ -224,10 +224,20 @@ public static class TokenFactory
         foreach (var color in new[] { "W", "U", "B", "R", "G" })
         {
             var pip = color;
-            token.AddAbility(new ManaAbility(token, controller,
+            // "{T}, Sacrifice this artifact: …" — taps AND sacrifices (CR
+            // 701.16). The dynamic-generator + additionalCostPayer ctor taps
+            // the source ({T}) and then runs the sacrifice payer, so a Treasure
+            // is consumed on its first use (not a repeatable free mana rock).
+            // canActivateCheck gates on untapped AND still-on-battlefield so a
+            // sibling colour option can't be re-activated after the sacrifice.
+            token.AddAbility(new ManaAbility(
+                source: token,
+                controller: controller,
                 manaGenerator: () => BuildTreasureMana(pip, controller),
-                canActivateCheck: null,
-                // Inspection seed = the printed ONE pip of this colour, so the
+                canActivateCheck: () => !token.IsTapped
+                                        && token.Zone == ZoneType.Battlefield,
+                additionalCostPayer: _ => SacrificeToken(token),
+                // Inspection seed = the printed ONE pip of this colour so the
                 // bot's mana picker / UI see the colour before activation; the
                 // generator still applies the live Goldspan multiplier on tap.
                 printedManaGenerated: ManaCost.Parse(pip)));
@@ -397,10 +407,12 @@ public static class TokenFactory
             spell => spell?.Card != null && spell.Card.HasType(CardType.Artifact));
 
     /// <summary>Eldrazi Spawn (CR 111.10): colorless creature token, 0/1, with
-    /// "Sacrifice this token: Add {C}." mana ability.
-    /// v1: ManaAbility produces {C} without enforcing the sacrifice cost — the
-    /// sacrifice restriction is documented but deferred pending a sac-cost ManaAbility
-    /// cost extension.</summary>
+    /// "Sacrifice this creature: Add {C}." mana ability. CR 605.1 — the
+    /// sacrifice rides the activation as a non-{T} additional cost (no tap):
+    /// activating the ability sacrifices the token (CR 701.16, battlefield →
+    /// owner's graveyard) and adds {C}. Because the cost has no {T}, the
+    /// ability is usable even while the token is tapped or summoning-sick
+    /// (CR 605.3a only gates {T} costs).</summary>
     public static Creature CreateEldraziSpawn(Player controller, ZoneService? zones = null)
     {
         if (controller == null) throw new ArgumentNullException(nameof(controller));
@@ -417,12 +429,19 @@ public static class TokenFactory
         // CR 111.10 — Eldrazi Spawn tokens are colourless creatures.
         token.SetTokenColors(Array.Empty<ManaColor>());
 
-        // "Sacrifice this token: Add {C}."
-        // v1: wired as a plain ManaAbility that produces {C}.
-        // Sacrifice cost enforcement is deferred until ManaAbility supports
-        // additional costs (same gap as Treasure/Food token sac cost).
-        token.AddAbility(new ManaAbility(token, controller,
-            Majik.Core.ValueObjects.ManaCost.Parse("C")));
+        // "Sacrifice this creature: Add {C}." — a sacrifice-cost (no-tap) mana
+        // ability. tapsAsCost:false so summoning sickness / a tapped state
+        // don't gate it; the additionalCostPayer performs the sacrifice
+        // (CR 701.16) inline. canActivateCheck guards against a second
+        // activation once the token has left the battlefield. Same pattern as
+        // Lotus Petal, minus the tap.
+        token.AddAbility(new ManaAbility(
+            source: token,
+            controller: controller,
+            manaGenerated: Majik.Core.ValueObjects.ManaCost.Parse("C"),
+            canActivateCheck: () => token.Zone == ZoneType.Battlefield,
+            additionalCostPayer: _ => SacrificeToken(token),
+            tapsAsCost: false));
 
         // Put the token onto the battlefield using the sentinel-library pattern
         // shared by CreateTreasure / CreateFood so CardMovedEvent fires correctly.
@@ -458,6 +477,27 @@ public static class TokenFactory
     {
         var multiplier = TreasureManaModifierStaticAbility.ManaMultiplierFor(controller);
         return ManaCost.Parse(string.Concat(Enumerable.Repeat($"{{{pip}}}", multiplier)));
+    }
+
+    /// <summary>
+    /// CR 701.16 — sacrifice a permanent: its controller moves it from the
+    /// battlefield to its owner's graveyard. Shared by the sacrifice-cost mana
+    /// abilities on Eldrazi Spawn / Eldrazi Scion / Treasure (same zone-move
+    /// pattern Lotus Petal uses inline). Idempotent: if the permanent has
+    /// already left the battlefield (defensive — the canActivateCheck gate
+    /// should prevent it) this is a no-op.
+    /// </summary>
+    internal static void SacrificeToken(Permanent permanent)
+    {
+        if (permanent.Zone != ZoneType.Battlefield) return;
+
+        var controller = permanent.Controller;
+        var owner = permanent.Owner;
+        if (controller == null || owner == null) return;
+
+        controller.Zones.Battlefield.RemoveCard(permanent);
+        owner.Zones.Graveyard.AddCard(permanent);
+        permanent.SetZone(ZoneType.Graveyard);
     }
 
     private static ActivatedAbility BuildClueDrawAbility(Artifact source, Player controller)

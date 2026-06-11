@@ -37,12 +37,9 @@ namespace Majik.Core.CardData.Factories;
 ///   Spawn token's ETB routes through <paramref name="zones"/> so its own
 ///   <see cref="CardMovedEvent"/> publishes.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"Sacrifice this token: Add {C}." cost</b> on the Spawn tokens: the
-///   <see cref="ManaAbility"/> primitive doesn't currently carry a sac cost
-///   (same gap as Eldrazi Scion / Treasure / Food). Each Spawn produces {C}
-///   without enforcing the sac. When the cost extension lands the helper
-///   picks up the rider for free.
+/// Each Spawn carries its "Sacrifice this creature: Add {C}." mana ability
+/// (sacrifice-cost, no-tap) via the shared
+/// <see cref="TokenFactory.CreateEldraziSpawn"/> helper.
 /// </summary>
 [CardName("Emrakul's Hatcher")]
 public static class EmrakulsHatcherFactory
@@ -108,8 +105,8 @@ public static class EmrakulsHatcherFactory
                 for (var i = 0; i < SpawnCount; i++)
                 {
                     // CR 111.10 — Eldrazi Spawn: 0/1 colourless creature token
-                    // with "Sacrifice this token: Add {C}." (sac-cost rider
-                    // deferred — see TokenFactory.CreateEldraziSpawn xmldoc).
+                    // with "Sacrifice this creature: Add {C}." (sacrifice-cost
+                    // mana ability — see TokenFactory.CreateEldraziSpawn).
                     TokenFactory.CreateEldraziSpawn(controller, zones);
                 }
             });

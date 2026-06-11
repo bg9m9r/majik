@@ -73,12 +73,9 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Live "each opponent" enumeration</b> — no <c>Player.Opponents</c>
 ///   accessor at v1; resolver-injection shared with
 ///   <see cref="VoldarenEpicureFactory"/> / <see cref="CreepingChillFactory"/>.
-/// - <b>Eldrazi Spawn sacrifice cost</b> — the minted Spawn's
-///   "Sacrifice this token: Add {C}." is wired as a plain
-///   <see cref="ManaAbility"/> producing {C} without enforcing the
-///   sacrifice cost (documented deferral inherited from
-///   <see cref="TokenFactory.CreateEldraziSpawn"/>, same gap as Treasure /
-///   Food sac costs).
+/// The minted Spawn carries its "Sacrifice this creature: Add {C}."
+/// (sacrifice-cost, no-tap) mana ability via the shared
+/// <see cref="TokenFactory.CreateEldraziSpawn"/> helper.
 /// </summary>
 [CardName("Glaring Fleshraker")]
 public static class GlaringFleshrakerFactory

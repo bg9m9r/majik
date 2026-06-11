@@ -112,13 +112,45 @@ public class EldraziSkyspawnerFactoryTests
 
         var manaAbilities = scion.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
-            "the Scion ships with one mana ability — \"Sacrifice this creature: Add {C}.\"" +
-            " (sac cost rider is deferred — see factory xmldoc)");
+            "the Scion ships with one mana ability — \"Sacrifice this creature: Add {C}.\"");
         // The produced ManaCost is one colourless ({C}). v1 — ManaCost.Parse
         // folds {C} into the Generic bucket (same posture as Eldrazi Spawn /
         // Urza's Saga; see ManaCost.cs comment on the 'C' case).
         manaAbilities[0].ManaGenerated.Generic.Should().Be(1);
         manaAbilities[0].ManaGenerated.TotalValue.Should().Be(1);
+    }
+
+    [Fact]
+    public void EldraziScionToken_ManaAbility_SacrificesForC_WithoutTapping()
+    {
+        var scion = EldraziSkyspawnerFactory.CreateEldraziScionToken(_alice);
+        var mana = scion.Abilities.OfType<ManaAbility>().Single();
+
+        // CR 605 / 701.16 — "Sacrifice this creature: Add {C}." The cost is a
+        // sacrifice, NOT a tap.
+        var produced = mana.Activate();
+
+        produced.Generic.Should().Be(1, "the ability adds {C}");
+        scion.Zone.Should().Be(ZoneType.Graveyard,
+            "the sacrifice cost moves the Scion to the graveyard (CR 701.16)");
+        scion.IsTapped.Should().BeFalse(
+            "no {T} in the cost — the Scion sacrifices itself, it does not tap");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(scion);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(scion);
+    }
+
+    [Fact]
+    public void EldraziScionToken_ManaAbility_ActivatableWhileTappedAndSummoningSick()
+    {
+        var scion = EldraziSkyspawnerFactory.CreateEldraziScionToken(_alice);
+        scion.Tap();
+        scion.HasSummoningSickness = true;
+
+        var mana = scion.Abilities.OfType<ManaAbility>().Single();
+        mana.CanActivate().Should().BeTrue(
+            "a sacrifice-cost mana ability has no {T} — summoning sickness / tapped state do not gate it");
+        mana.Activate().Generic.Should().Be(1);
+        scion.Zone.Should().Be(ZoneType.Graveyard);
     }
 
     // -----------------------------------------------------------------------

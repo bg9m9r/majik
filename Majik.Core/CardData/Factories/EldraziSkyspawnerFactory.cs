@@ -47,12 +47,8 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="CardMovedEvent"/> publishes (downstream ETB subscribers
 ///   like Soul Warden see the Scion's arrival).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"Sacrifice this creature: Add {C}." cost</b> on the Scion token: the
-///   <see cref="ManaAbility"/> primitive doesn't currently carry a sac cost
-///   (same gap as Eldrazi Spawn / Treasure / Food). The Scion produces {C}
-///   without enforcing the sac. When the cost extension lands the helper
-///   picks up the rider for free.
+/// The Scion token's "Sacrifice this creature: Add {C}." is a sacrifice-cost
+/// (no-tap) mana ability — see <see cref="CreateEldraziScionToken"/>.
 /// </summary>
 [CardName("Eldrazi Skyspawner")]
 public static class EldraziSkyspawnerFactory
@@ -143,12 +139,12 @@ public static class EldraziSkyspawnerFactory
     /// "Sacrifice this creature: Add {C}." bound as a
     /// <see cref="ManaAbility"/> producing one colourless.
     ///
-    /// <para>v1 gap: the sacrifice cost on the mana ability is documented
-    /// but unenforced — same posture as
-    /// <see cref="TokenFactory.CreateEldraziSpawn"/>, Treasure, Food. The
-    /// Scion still produces {C} when its mana ability is activated; the
-    /// sac cost is wired separately once the
-    /// <see cref="ManaAbility"/> cost extension lands.</para>
+    /// <para>CR 605.1 — the sacrifice rides the activation as a non-{T}
+    /// additional cost (no tap): activating the ability sacrifices the Scion
+    /// (CR 701.16, battlefield → owner's graveyard) and adds {C}. Because the
+    /// cost has no {T}, the ability is usable even while the Scion is tapped or
+    /// summoning-sick (CR 605.3a only gates {T} costs). Shares
+    /// <see cref="TokenFactory.SacrificeToken"/> with Eldrazi Spawn.</para>
     /// </summary>
     public static Creature CreateEldraziScionToken(
         Player controller,
@@ -168,12 +164,19 @@ public static class EldraziSkyspawnerFactory
 
         var scion = TokenFactory.CreateOnBattlefield(spec, controller, zones);
 
-        // "Sacrifice this creature: Add {C}."
-        // v1: wired as a plain ManaAbility producing one colourless.
-        // Sacrifice-cost enforcement is deferred until ManaAbility
-        // supports additional costs (same gap as
-        // TokenFactory.CreateEldraziSpawn / Treasure / Food's sac riders).
-        scion.AddAbility(new ManaAbility(scion, controller, ManaCost.Parse("C")));
+        // "Sacrifice this creature: Add {C}." — a sacrifice-cost (no-tap) mana
+        // ability. tapsAsCost:false so summoning sickness / a tapped state
+        // don't gate it; the additionalCostPayer sacrifices the Scion
+        // (CR 701.16) inline. canActivateCheck guards a second activation once
+        // it has left the battlefield. Shared SacrificeToken helper with
+        // Eldrazi Spawn / Treasure.
+        scion.AddAbility(new ManaAbility(
+            source: scion,
+            controller: controller,
+            manaGenerated: ManaCost.Parse("C"),
+            canActivateCheck: () => scion.Zone == ZoneType.Battlefield,
+            additionalCostPayer: _ => TokenFactory.SacrificeToken(scion),
+            tapsAsCost: false));
 
         return scion;
     }
