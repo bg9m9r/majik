@@ -52,15 +52,15 @@ namespace Majik.Bot.Tests.Search;
 ///     (3) mid-combat sub-state (declared attackers are tapped in the snapshot,
 ///     so resuming at the Combat phase start cannot re-declare them).</item>
 ///   <item>BREAK #4 — NOT a snapshot problem but a PRE-EXISTING script-replay
-///     window-alignment artifact: <see cref="SearchAgent"/> consumes a scripted
-///     priority move at the NEXT priority ask, which after a cast is the
-///     mid-stack re-ask. A scripted sorcery there is rejected by the engine and
-///     "treated as a pass" (PriorityLoop) — silently WASTED. Capture mode pauses
-///     at the post-resolution window instead, so full root-replay diverges from
-///     the tree's own node model TODAY. A restore replays the suffix at the
-///     captured decision (the node-consistent window) and therefore cannot — and
-///     should not — reproduce the wasted-move behaviour. Task 3's equivalence
-///     gate must align script consumption to substantive windows first.</item>
+///     window-alignment artifact, since FIXED: <see cref="SearchAgent"/> used to
+///     consume a scripted priority move at the NEXT priority ask, which after a
+///     cast is the mid-stack re-ask. A scripted sorcery there was rejected by
+///     the engine and "treated as a pass" (PriorityLoop) — silently WASTED,
+///     while capture mode pauses at the post-resolution window instead. Script
+///     consumption is now aligned to substantive windows (consume only where
+///     capture mode would pause — see <c>ScriptWindowAlignmentTests</c>), so
+///     full root-replay agrees with the tree's own node model and with a
+///     suffix-restore (the Task 3 equivalence precondition).</item>
 /// </list>
 /// </para>
 /// </summary>
@@ -289,8 +289,9 @@ public sealed class TreeStateReuseSpikeTests
     /// root-replay of the whole path. This is the exact <c>AdvanceFrom</c>
     /// contract Task 2 productizes. The suffix here (a cast after a land play)
     /// is consumed at the SAME window by both drives — see
-    /// <see cref="CastThenSorcerySuffix_FullReplayWastesIt_AlignmentArtifact"/>
-    /// for the path shape where today's full replay misconsumes.
+    /// <see cref="CastThenSorcerySuffix_FullReplayMatchesRestore_AfterAlignment"/>
+    /// for the path shape where the full replay used to misconsume (BREAK #4,
+    /// fixed).
     /// </summary>
     [Fact(Timeout = 120_000)]
     public async Task SuffixAdvance_FromSnapshot_EqualsFullRootReplay()
@@ -333,25 +334,24 @@ public sealed class TreeStateReuseSpikeTests
     }
 
     /// <summary>
-    /// BREAK #4 (pre-existing replay artifact, NOT a snapshot defect): in a
-    /// [cast, cast-sorcery] path, today's full root-replay consumes the second
-    /// scripted move at the MID-STACK priority re-ask that follows the first
-    /// cast — where a sorcery is illegal, so <c>PriorityLoop</c> rejects it and
-    /// "treats it as a pass": the move is silently WASTED and the path's own
-    /// child decision re-offers the very spell the path was supposed to have
-    /// cast. The restore replays the suffix at the CAPTURED decision (empty
-    /// stack) where it legally resolves — node-consistent, but divergent from
-    /// today's replay.
+    /// BREAK #4 — FIXED (the alignment prerequisite this spike demanded): in a
+    /// [cast, cast-sorcery] path, the full root-replay used to consume the
+    /// second scripted move at the MID-STACK priority re-ask that follows the
+    /// first cast — where a sorcery is illegal, so <c>PriorityLoop</c> rejected
+    /// it and "treated it as a pass": the move was silently WASTED, divergent
+    /// from the restore (which replays the suffix at the CAPTURED empty-stack
+    /// decision, where it legally resolves).
     ///
-    /// <para>This means per-iteration equivalence (Task 3 gate) CANNOT hold for
-    /// such paths until <see cref="SearchAgent"/>'s script consumption is
-    /// aligned to substantive windows (consume only where capture mode would
-    /// pause). That alignment fix is a prerequisite — and a strength bugfix in
-    /// its own right (today's tree silently evaluates multi-cast lines as if
-    /// the later sorcery was never cast).</para>
+    /// <para><see cref="SearchAgent"/> script consumption is now aligned to
+    /// substantive windows (consume only where capture mode would pause — see
+    /// <c>ScriptWindowAlignmentTests</c>). The new expectation is the provably
+    /// correct one: the tree's node model pauses at the post-resolution
+    /// empty-stack window, so BOTH the full replay and the suffix-restore
+    /// consume the spike there and BOTH resolve it. Full replay == restore —
+    /// exactly the per-iteration equivalence Task 3's gate requires.</para>
     /// </summary>
     [Fact(Timeout = 120_000)]
-    public async Task CastThenSorcerySuffix_FullReplayWastesIt_AlignmentArtifact()
+    public async Task CastThenSorcerySuffix_FullReplayMatchesRestore_AfterAlignment()
     {
         await Task.Yield();
 
@@ -378,16 +378,19 @@ public sealed class TreeStateReuseSpikeTests
         var (full, fullSandbox, _) = TrackedAdvance(sim, root, new[] { castBolt, castSpike });
         var (rest, restSandbox, _) = TrackedAdvance(sim, snap, new[] { castSpike });
 
-        // FINDING (artifact): the full replay WASTED the spike — its reached
-        // decision still offers Cast:Lava Spike and Bob only took bolt damage.
-        Fingerprint(full).Should().Be(Fingerprint(n1),
-            "today's replay misconsumes the sorcery at the mid-stack re-ask, so the " +
-            "child decision re-offers the spell the path supposedly cast");
-        fullSandbox.State.Players.First(p => p.Id == bob.Id).LifeTotal.Should().Be(27);
+        // The full replay no longer wastes the spike: it is consumed at the
+        // post-resolution empty-stack window (the captured decision) and
+        // resolves — Bob takes bolt (3) + spike (3).
+        fullSandbox.State.Players.First(p => p.Id == bob.Id).LifeTotal.Should().Be(24,
+            "the scripted sorcery must resolve, not be misconsumed at the mid-stack re-ask");
+        full.LegalMoves.Select(m => m.Key).Should().NotContain("Cast:Lava Spike",
+            "the path's child decision must not re-offer the spell the path cast");
 
-        // The restore consumed the suffix at the captured decision: spike resolved.
+        // The restore consumed the suffix at the same captured decision:
+        // full replay and restore now agree (Task 3 equivalence precondition).
         restSandbox.State.Players.First(p => p.Id == bob.Id).LifeTotal.Should().Be(24);
-        Fingerprint(rest).Should().NotBe(Fingerprint(full));
+        Fingerprint(rest).Should().Be(Fingerprint(full));
+        StateHash(restSandbox.State.Players).Should().Be(StateHash(fullSandbox.State.Players));
     }
 
     /// <summary>
