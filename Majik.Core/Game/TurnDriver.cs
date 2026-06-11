@@ -341,10 +341,21 @@ public sealed class TurnDriver
 
         var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
 
+        // CR 104.1 / 104.2a — the game ends IMMEDIATELY when at most one
+        // player remains. Each phase block can end the game (lethal burn in
+        // a main phase, combat damage, an upkeep trigger), so re-check
+        // between blocks and abandon the rest of the turn instead of
+        // marching a finished game through more phases (where step actions /
+        // stale stack objects would resolve into a player who has left the
+        // game, CR 800.4a).
         await RunBeginningPhaseAsync(activePlayer, turnNumber, ct);
+        if (GameIsOver()) return;
         await RunPreCombatMainAsync(activePlayer, ct);
+        if (GameIsOver()) return;
         await RunCombatPhaseAsync(activePlayer, defender, ct);
+        if (GameIsOver()) return;
         await RunPostCombatMainAsync(activePlayer, ct);
+        if (GameIsOver()) return;
         await RunEndingPhaseAsync(activePlayer, ct);
     }
 
@@ -361,11 +372,25 @@ public sealed class TurnDriver
         var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
 
         var resume = NormalizeResumePhase(resumePhase);
+        // CR 104.1 / 104.2a — same between-phase game-over halt as
+        // RunTurnAsync (this is the bot-search resume path; a cloned position
+        // can end mid-turn too).
         if (resume <= ResumePoint.PreCombatMain) await RunPreCombatMainAsync(activePlayer, ct);
+        if (GameIsOver()) return;
         if (resume <= ResumePoint.Combat)        await RunCombatPhaseAsync(activePlayer, defender, ct);
+        if (GameIsOver()) return;
         if (resume <= ResumePoint.PostCombatMain) await RunPostCombatMainAsync(activePlayer, ct);
+        if (GameIsOver()) return;
         await RunEndingPhaseAsync(activePlayer, ct);
     }
+
+    /// <summary>
+    /// CR 104.1 / 104.2a — true when at most one player is still in the game.
+    /// Mirrors <see cref="PriorityLoop"/>'s in-round halt and
+    /// <c>GameDriver.TryFinalizeOnSurvivorCount</c>'s survivor-count rule so
+    /// the turn stops advancing the moment the game has a winner.
+    /// </summary>
+    private bool GameIsOver() => _players.Count(p => !p.HasLost) <= 1;
 
     // -----------------------------------------------------------------
     // Phase-block helpers — ONE source of truth per phase block.
@@ -396,6 +421,11 @@ public sealed class TurnDriver
 
         SetPhase(StepStateType.Upkeep);
         await PriorityRound(activePlayer, ct);
+
+        // CR 104.1 / 104.2a — an upkeep trigger can end the game (The One
+        // Ring burdens, Eidolon damage on a 1-life player). Don't draw / run
+        // the draw step for a finished game.
+        if (GameIsOver()) return;
 
         SetPhase(StepStateType.Draw);
         // CR 117.5 / 614.12 — "Skip your draw step" replacement effects
@@ -435,8 +465,18 @@ public sealed class TurnDriver
         SetPhase(StepStateType.BeginningOfCombat);
         await PriorityRound(activePlayer, ct);
 
+        // CR 104.1 / 104.2a — a beginning-of-combat window can end the game
+        // (instant-speed burn). Don't declare attackers in a finished game.
+        if (GameIsOver()) return;
+
         SetPhase(StepStateType.DeclareAttackers);
         await RunCombat(activePlayer, defender, ct);
+
+        // CR 104.1 / 104.2a — combat damage is the most common game-ender.
+        // Skip the additional-combat drain + end-of-combat step machinery
+        // when the defender (or attacker, via Eidolon-style triggers) has
+        // lost; GameDriver finalizes the result from the survivor count.
+        if (GameIsOver()) return;
 
         // CR 506.4 / CR 505.1b — additional combat phases drain the queue.
         // Each grant re-enters the full combat sequence; grants created by
@@ -450,8 +490,10 @@ public sealed class TurnDriver
             SetTurnState(PhaseStateType.Combat);
             SetPhase(StepStateType.BeginningOfCombat);
             await PriorityRound(activePlayer, ct);
+            if (GameIsOver()) return; // CR 104.1 — same halt as the first combat
             SetPhase(StepStateType.DeclareAttackers);
             await RunCombat(activePlayer, defender, ct);
+            if (GameIsOver()) return; // CR 104.1 — extra combat ended the game
 
             // CR 511 — every combat phase has its own end-of-combat step, so
             // "until end of combat" durations expire per extra combat too.
@@ -941,6 +983,24 @@ public sealed class TurnDriver
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
         {
+            // CR 601.2h-analogue for abilities (CR 602.2b) — re-validate
+            // affordability AT DISPATCH, before prompting for targets or
+            // mutating anything. The bot enumerates activations against
+            // POTENTIAL mana (floating pool + untapped sources, colour-blind
+            // — LegalActionEnumerator.CanAffordAbility), but payment here
+            // draws from the FLOATING POOL only (ManaCostCost.CanPay →
+            // ManaPool.CanPay). A proposal whose mana never got floated (or
+            // whose pool emptied between proposal and execution) is a STALE
+            // proposal: swallow it like the PlayLand / loyalty paths do
+            // instead of letting CostPayment.PayCosts throw
+            // InvalidPlayerActionException("Cannot pay cost: R") through the
+            // priority pump — that crashed live matches. The bot's per-turn
+            // failed-proposal memo prevents a re-propose spin.
+            if (!new Majik.Core.Costs.CostPayment().CanPayCosts(actor, activate.Ability.Costs))
+            {
+                return;
+            }
+
             // CR 602.2 — activate an ability via AbilityActivator. For each
             // TargetRequest on the ability, ask the agent to choose targets
             // (the bot's ChooseTargetsAsync ranks intelligently); wrap each
@@ -988,6 +1048,17 @@ public sealed class TurnDriver
                 // Cost-payment or zone-gate failed — swallow and let the
                 // priority pump move on. Bot's per-turn memo prevents
                 // re-proposing this same ability.
+            }
+            catch (Majik.Core.Domain.Exceptions.InvalidPlayerActionException)
+            {
+                // AbilityActivator's own validation throws (CanActivate
+                // false, CostPayment "Cannot pay cost: …") are
+                // InvalidPlayerActionException — NOT InvalidOperationException
+                // — so the catch above never saw them and a stale proposal
+                // tore down the whole game. Same swallow posture as
+                // DispatchManaAbility: CostPayment validates every cost
+                // BEFORE paying any (atomic), so nothing was mutated when
+                // this throw fires.
             }
         }
 

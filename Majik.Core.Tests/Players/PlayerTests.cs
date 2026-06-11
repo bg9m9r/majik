@@ -78,20 +78,21 @@ public class PlayerTests
     }
 
     [Fact]
-    public void GainLife_AfterLosing_ThrowsException()
+    public void GainLife_AfterLosing_IsGracefulNoOp()
     {
         // Arrange — a player who has FORMALLY lost (marked by the SBA loop,
-        // i.e. left the game) must reject life gain. CR 704.5a — loss is the
-        // SBA, so the "has lost" state comes from MarkLost(), not from
-        // LoseLife's life arithmetic.
+        // i.e. left the game, CR 800.4a) is simply skipped by life gain: a
+        // graceful no-op, NOT a throw. A straggling resolution (lifelink from
+        // a simultaneous-death exchange) must not crash a live match; the
+        // primary defence is the CR 104.1 game-over halt in PriorityLoop /
+        // TurnDriver — this is the backstop.
         var player = new Player("Alice", 20);
         player.MarkLost();
         player.HasLost.Should().BeTrue();
 
-        // Act & Assert
-        player.Invoking(p => p.GainLife(5))
-            .Should().Throw<InvalidPlayerActionException>()
-            .WithMessage("*Cannot gain life after losing*");
+        // Act & Assert — no throw, no life change.
+        player.Invoking(p => p.GainLife(5)).Should().NotThrow();
+        player.LifeTotal.Should().Be(20);
     }
 
     [Fact]
@@ -182,18 +183,22 @@ public class PlayerTests
     }
 
     [Fact]
-    public void LoseLife_AfterLosing_ThrowsException()
+    public void LoseLife_AfterLosing_IsGracefulNoOp()
     {
-        // Arrange — a player who has FORMALLY lost (left the game via the SBA)
-        // rejects further life loss. The "has lost" state is established by
-        // MarkLost(), not by LoseLife's arithmetic (CR 704.5a).
+        // Arrange — a player who has FORMALLY lost (left the game via the
+        // SBA, CR 800.4a) is simply skipped by further life loss: a graceful
+        // no-op, NOT a throw. This was the dominant live-match crash class
+        // ("Cannot lose life after losing the game") when a second burn spell
+        // resolved after a lethal first one; the primary defence is the
+        // CR 104.1 game-over halt in PriorityLoop / TurnDriver — this is the
+        // backstop for the 150+ direct LoseLife call sites.
         var player = new Player("Alice", 20);
         player.MarkLost();
 
-        // Act & Assert
-        player.Invoking(p => p.LoseLife(5))
-            .Should().Throw<InvalidPlayerActionException>()
-            .WithMessage("*Cannot lose life after losing*");
+        // Act & Assert — no throw, no life change, no per-turn tally bump.
+        player.Invoking(p => p.LoseLife(5)).Should().NotThrow();
+        player.LifeTotal.Should().Be(20);
+        player.LifeLostThisTurn.Should().Be(0);
     }
 
     [Fact]
