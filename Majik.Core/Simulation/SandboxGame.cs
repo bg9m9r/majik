@@ -71,14 +71,23 @@ public sealed class SandboxGame
     /// <summary>The cloned game state produced by <see cref="GameStateCloner.Clone"/>.</summary>
     public ClonedGame State { get; }
 
+    /// <summary>
+    /// The sandbox's <see cref="LandDropTracker"/> (CR 305.2). Exposed so the
+    /// bot search can read per-seat drops-used at a snapshot point (tree-state
+    /// reuse) — the tally lives on the driver, not on the players, so a
+    /// players-only snapshot cannot carry it otherwise.
+    /// </summary>
+    public LandDropTracker LandDrops { get; }
+
     /// <summary>Always false — by construction this sandbox has no IO bridge.</summary>
     public bool HasIoBridge => false;
 
-    private SandboxGame(EventBus bus, GameDriver driver, ClonedGame state)
+    private SandboxGame(EventBus bus, GameDriver driver, ClonedGame state, LandDropTracker landDrops)
     {
         Bus = bus;
         Driver = driver;
         State = state;
+        LandDrops = landDrops;
     }
 
     /// <summary>
@@ -101,6 +110,16 @@ public sealed class SandboxGame
     /// </para>
     ///
     /// <para>
+    /// <paramref name="landDropsUsed"/> is optional (tree-state-reuse seam,
+    /// CR 305.2): per-seat (by <see cref="Player.Id"/>) land drops already used
+    /// in the resumed turn. When supplied, the sandbox's fresh
+    /// <see cref="LandDropTracker"/> is seeded for the matching CLONED players
+    /// so a restored mid-turn position does not re-offer a land drop the
+    /// snapshot's turn already consumed. Null/empty (default) = today's
+    /// behaviour: a fresh tally.
+    /// </para>
+    ///
+    /// <para>
     /// <paramref name="cardRepo"/> is optional: when non-null the sandbox's
     /// <see cref="GameDriver"/>/<c>TurnDriver</c> receives the same cast-time
     /// spell-definition resolver shape <c>GameFacade</c> wires (via the shared
@@ -117,7 +136,8 @@ public sealed class SandboxGame
         Func<Player, IPlayerAgent> agentFactory,
         Majik.Core.Stack.Stack? liveStack = null,
         TurnState? liveTurnState = null,
-        Majik.Core.CardData.ICardRepository? cardRepo = null)
+        Majik.Core.CardData.ICardRepository? cardRepo = null,
+        IReadOnlyDictionary<Guid, int>? landDropsUsed = null)
     {
         // --- Clone -----------------------------------------------------------
         var cloned = GameStateCloner.Clone(livePlayers, liveStack, liveTurnState);
@@ -144,6 +164,22 @@ public sealed class SandboxGame
         foreach (var clonePlayer in cloned.Players)
         {
             agents[clonePlayer] = agentFactory(clonePlayer);
+        }
+
+        // CR 305.2 — tree-state-reuse seam: seed the fresh tracker with the
+        // per-seat drops already used in the resumed (snapshot) turn, keyed by
+        // stable Player.Id onto the CLONED players. Default (null) = fresh
+        // tally, byte-identical to before.
+        var landDropTracker = new LandDropTracker();
+        if (landDropsUsed != null)
+        {
+            foreach (var clonePlayer in cloned.Players)
+            {
+                if (landDropsUsed.TryGetValue(clonePlayer.Id, out var used) && used > 0)
+                {
+                    landDropTracker.SeedDropsUsed(clonePlayer, used);
+                }
+            }
         }
 
         // --- GameDriver (mirrors GameFacade's game-driver construction block) ------
@@ -173,9 +209,9 @@ public sealed class SandboxGame
                 eventBus: bus,
                 zones: zones),
             continuousEffects: continuousEffects,
-            landDropTracker: new LandDropTracker());
+            landDropTracker: landDropTracker);
 
-        return new SandboxGame(bus, driver, cloned);
+        return new SandboxGame(bus, driver, cloned, landDropTracker);
     }
 
     /// <summary>

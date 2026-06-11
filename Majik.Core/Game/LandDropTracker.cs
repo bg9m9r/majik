@@ -123,6 +123,22 @@ public sealed class LandDropTracker
         _used[player] = DropsUsedThisTurn(player) + 1;
     }
 
+    /// <summary>
+    /// Sim-resume seam (tree-state reuse): seed this tracker with the number of
+    /// land drops <paramref name="player"/> has already used in the CURRENT
+    /// (resumed) turn. A mid-turn snapshot restored into a fresh sandbox would
+    /// otherwise start with a fresh tally and re-offer a land drop the
+    /// snapshot's turn already consumed (CR 305.2). The seed is naturally
+    /// cleared by <see cref="ResetTurn"/> when the next turn starts — exactly
+    /// the live semantics.
+    /// </summary>
+    public void SeedDropsUsed(Player player, int dropsUsed)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        if (dropsUsed < 0) throw new ArgumentOutOfRangeException(nameof(dropsUsed));
+        _used[player] = dropsUsed;
+    }
+
     /// <summary>Reset on turn change. Also resets any bumped per-turn max
     /// (extra-land effects re-evaluate each turn).</summary>
     public void ResetTurn()

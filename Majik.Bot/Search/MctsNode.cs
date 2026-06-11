@@ -1,3 +1,5 @@
+using Majik.Core.Players;
+
 namespace Majik.Bot.Search;
 
 /// <summary>
@@ -16,6 +18,25 @@ internal sealed class MctsNode
 
     /// <summary>The move that led to this node from its parent (null at the root).</summary>
     public SimMove? IncomingMove { get; }
+
+    // ── Tree-state reuse cache (Task 2 fields; set by the Mcts descent in
+    //    Task 3 — nothing reads them yet, zero behavior change) ──────────────
+
+    /// <summary>
+    /// Frozen players at this node's decision point (a defensive
+    /// <c>GameStateCloner.Clone</c> taken when the node's position was
+    /// cache-eligible — see <see cref="SnapshotPolicy"/>), or null when the
+    /// node is not cached (ineligible position, or not yet expanded via the
+    /// reuse path). Per-search lifetime; never shared across nodes.
+    /// </summary>
+    internal IReadOnlyList<Player>? CachedPlayers { get; set; }
+
+    /// <summary>
+    /// Resume context paired with <see cref="CachedPlayers"/> (turn / phase /
+    /// active seat / per-seat land drops + the suffix replayed from the
+    /// nearest cached ancestor). Null iff <see cref="CachedPlayers"/> is null.
+    /// </summary>
+    internal ResumeCtx? ResumeContext { get; set; }
 
     // ── Statistics ────────────────────────────────────────────────────────────
 

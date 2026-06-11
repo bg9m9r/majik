@@ -164,15 +164,139 @@ public sealed class EngineSimulator : ISearchSimulator
         return WithNullSyncContext(() => DriveToDecisionUnsafe(root, pathFromRoot, onSandboxBuilt));
     }
 
+    // ── Tree-state reuse (Task 2): AdvanceFrom + node snapshots ──────────────
+
+    /// <summary>
+    /// Advance from a CACHED tree-node state instead of the search root: clone
+    /// <paramref name="cachedPlayers"/> (the frozen players of a
+    /// <see cref="NodeSnapshot"/>, or the root clone source itself — the root
+    /// is always a valid cache), rebuild a sandbox at
+    /// <paramref name="ctx"/>'s turn/phase with the recorded per-seat land
+    /// drops seeded, replay ONLY <paramref name="suffix"/>, and stop at the
+    /// next substantive decision — exactly the position a full
+    /// <c>Advance(root, fullPath)</c> would reach, at the cost of the
+    /// inter-node gap instead of the whole path (spike-proven ≈3× at depth 6).
+    ///
+    /// <para>Returns the reached decision plus the NEW position's snapshot —
+    /// or a null snapshot when the position is terminal or cache-ineligible
+    /// (<see cref="SnapshotPolicy.IsCacheEligible"/>: non-empty stack /
+    /// mid-combat — spike BREAKs 1 and 3). Ineligible positions simply don't
+    /// cache; Task 3's descent falls back to the nearest cached ancestor.</para>
+    /// </summary>
+    /// <param name="cachedPlayers">Frozen players at the cached position (NOT mutated — cloned internally).</param>
+    /// <param name="ctx">Resume context recorded when the cache was captured.</param>
+    /// <param name="suffix">Moves to replay from the cached position (often a single move).</param>
+    /// <param name="searchedSeatId">The searched seat (stable <see cref="Player.Id"/> across clones).</param>
+    internal (SimDecision Decision, NodeSnapshot? Snapshot) AdvanceFrom(
+        IReadOnlyList<Player> cachedPlayers,
+        ResumeCtx ctx,
+        IReadOnlyList<SimMove> suffix,
+        Guid searchedSeatId)
+    {
+        ArgumentNullException.ThrowIfNull(cachedPlayers);
+        ArgumentNullException.ThrowIfNull(ctx);
+        ArgumentNullException.ThrowIfNull(suffix);
+
+        var active = cachedPlayers.FirstOrDefault(p => p.Id == ctx.ActivePlayerId)
+            ?? throw new InvalidOperationException("Active player not found in cached players.");
+        var searched = cachedPlayers.FirstOrDefault(p => p.Id == searchedSeatId)
+            ?? throw new InvalidOperationException("Searched seat not found in cached players.");
+
+        // The cached players ARE the position: wrap them in a perfect-info
+        // SimState (snapshots of determinized worlds are already materialized,
+        // so no WorldSeed/decklist is attached) and let the shared drive clone
+        // + resume + replay.
+        var state = SimState.Capture(cachedPlayers, active, ctx.TurnNumber, ctx.Phase, searched);
+
+        return WithNullSyncContext(() => DriveWithSnapshotUnsafe(state, suffix, ctx.LandDropsUsed));
+    }
+
+    /// <summary>
+    /// The snapshot-capturing drive: <see cref="DriveToDecisionUnsafe"/> with
+    /// the spike's observer seam tracking turn / phase / active seat via the
+    /// sandbox bus, followed by capture of the reached position when it is
+    /// cache-eligible. Capture = one <see cref="GameStateCloner.Clone"/> of the
+    /// paused players (~0.12 ms) + the per-seat land-drop tally read off the
+    /// sandbox's tracker (spike BREAK 2).
+    /// </summary>
+    private (SimDecision Decision, NodeSnapshot? Snapshot) DriveWithSnapshotUnsafe(
+        SimState state,
+        IReadOnlyList<SimMove> path,
+        IReadOnlyDictionary<Guid, int>? landDropsUsed)
+    {
+        var turnNumber = state.TurnNumber;
+        var phase = state.Phase;
+        var activePlayerId = state.ActivePlayer.Id;
+
+        var (decision, sandbox) = DriveToDecisionUnsafe(
+            state,
+            path,
+            onSandboxBuilt: sb =>
+            {
+                sb.Bus.Subscribe<TurnStartedEvent>(e =>
+                {
+                    turnNumber = e.TurnNumber;
+                    activePlayerId = e.Player.Id;
+                });
+                sb.Bus.Subscribe<PhaseStateChangedEvent>(e => phase = e.CurrentState);
+            },
+            landDropsUsed: landDropsUsed);
+
+        if (decision.IsTerminal
+            || !SnapshotPolicy.IsCacheEligible(sandbox.State.Players, decision, phase))
+        {
+            return (decision, null);
+        }
+
+        // Freeze the paused position: one defensive clone so later engine
+        // activity (or the caller) can never mutate the cache.
+        var frozen = GameStateCloner.Clone(sandbox.State.Players).Players;
+
+        var resumeCtx = new ResumeCtx(
+            turnNumber, phase, activePlayerId,
+            SuffixFromParent: path,
+            LandDropsUsed: CaptureLandDrops(sandbox));
+
+        return (decision, new NodeSnapshot(frozen, resumeCtx, IsCacheEligible: true));
+    }
+
+    /// <summary>
+    /// Per-seat land drops consumed in the sandbox's CURRENT turn, keyed by
+    /// stable <see cref="Player.Id"/> (spike BREAK 2 — the tally lives on the
+    /// driver, not the players, so the snapshot must carry it explicitly).
+    /// </summary>
+    private static IReadOnlyDictionary<Guid, int> CaptureLandDrops(SandboxGame sandbox)
+    {
+        Dictionary<Guid, int>? drops = null;
+        foreach (var p in sandbox.State.Players)
+        {
+            var used = sandbox.LandDrops.DropsUsedThisTurn(p);
+            if (used > 0)
+                (drops ??= new Dictionary<Guid, int>())[p.Id] = used;
+        }
+        return drops ?? EmptyLandDrops;
+    }
+
+    private static readonly IReadOnlyDictionary<Guid, int> EmptyLandDrops =
+        new Dictionary<Guid, int>();
+
     /// <summary>
     /// The shared Advance/LeafEval drive: replay the path in a fresh sandbox and
     /// stop at the next substantive decision (or game over). Returns the decision
     /// (terminal marker when the game ended first) TOGETHER with the sandbox so
     /// <see cref="RolloutDepth.LeafEval"/> can evaluate the position at that
     /// exact point.
+    ///
+    /// <para><paramref name="landDropsUsed"/> (tree-state reuse, spike BREAK 2):
+    /// per-seat land drops already consumed in the resumed turn, seeded into the
+    /// sandbox's fresh <c>LandDropTracker</c>. Null (default, every pre-existing
+    /// caller) = fresh tally, byte-identical to before.</para>
     /// </summary>
     private (SimDecision Decision, SandboxGame Sandbox) DriveToDecisionUnsafe(
-        SimState root, IReadOnlyList<SimMove> pathFromRoot, Action<SandboxGame>? onSandboxBuilt = null)
+        SimState root,
+        IReadOnlyList<SimMove> pathFromRoot,
+        Action<SandboxGame>? onSandboxBuilt = null,
+        IReadOnlyDictionary<Guid, int>? landDropsUsed = null)
     {
         var cts = new CancellationTokenSource();
 
@@ -188,7 +312,8 @@ public sealed class EngineSimulator : ISearchSimulator
             ResolveCloneSource(root),
             new GameRandom(FixedSeed),
             p => BuildAgent(p, root, pathFromRoot, rolloutStrategy: null, ref searchAgent),
-            cardRepo: SharedCardData.Repo);
+            cardRepo: SharedCardData.Repo,
+            landDropsUsed: landDropsUsed);
 
         var agent = searchAgent
             ?? throw new InvalidOperationException("SearchAgent was not created — searched seat not found in cloned players.");
@@ -471,8 +596,13 @@ public sealed class EngineSimulator : ISearchSimulator
     /// overload — deliberately mirroring the per-sim path, which also passes
     /// null stack / null turn-state to <see cref="SandboxGame.From"/>. Nothing
     /// to mirror until the sim path itself starts carrying them.</para>
+    ///
+    /// <para><b>Tree-state reuse:</b> internal (not private) because this list
+    /// IS the search root's cache — <see cref="AdvanceFrom"/> on it with
+    /// <see cref="ResumeCtx.ForRoot"/> is the root-level entry of the reuse
+    /// chain (Task 3 descent + the AdvanceFrom equivalence tests).</para>
     /// </summary>
-    private static IReadOnlyList<Player> ResolveCloneSource(SimState root)
+    internal static IReadOnlyList<Player> ResolveCloneSource(SimState root)
     {
         if (root.WorldSeed is not int seed || root.OpponentDecklist is not { } deck)
             return root.LivePlayers;                                   // perfect-info: unchanged
