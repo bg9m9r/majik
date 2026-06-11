@@ -983,6 +983,24 @@ public sealed class TurnDriver
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
         {
+            // CR 601.2h-analogue for abilities (CR 602.2b) — re-validate
+            // affordability AT DISPATCH, before prompting for targets or
+            // mutating anything. The bot enumerates activations against
+            // POTENTIAL mana (floating pool + untapped sources, colour-blind
+            // — LegalActionEnumerator.CanAffordAbility), but payment here
+            // draws from the FLOATING POOL only (ManaCostCost.CanPay →
+            // ManaPool.CanPay). A proposal whose mana never got floated (or
+            // whose pool emptied between proposal and execution) is a STALE
+            // proposal: swallow it like the PlayLand / loyalty paths do
+            // instead of letting CostPayment.PayCosts throw
+            // InvalidPlayerActionException("Cannot pay cost: R") through the
+            // priority pump — that crashed live matches. The bot's per-turn
+            // failed-proposal memo prevents a re-propose spin.
+            if (!new Majik.Core.Costs.CostPayment().CanPayCosts(actor, activate.Ability.Costs))
+            {
+                return;
+            }
+
             // CR 602.2 — activate an ability via AbilityActivator. For each
             // TargetRequest on the ability, ask the agent to choose targets
             // (the bot's ChooseTargetsAsync ranks intelligently); wrap each
@@ -1030,6 +1048,17 @@ public sealed class TurnDriver
                 // Cost-payment or zone-gate failed — swallow and let the
                 // priority pump move on. Bot's per-turn memo prevents
                 // re-proposing this same ability.
+            }
+            catch (Majik.Core.Domain.Exceptions.InvalidPlayerActionException)
+            {
+                // AbilityActivator's own validation throws (CanActivate
+                // false, CostPayment "Cannot pay cost: …") are
+                // InvalidPlayerActionException — NOT InvalidOperationException
+                // — so the catch above never saw them and a stale proposal
+                // tore down the whole game. Same swallow posture as
+                // DispatchManaAbility: CostPayment validates every cost
+                // BEFORE paying any (atomic), so nothing was mutated when
+                // this throw fires.
             }
         }
 
