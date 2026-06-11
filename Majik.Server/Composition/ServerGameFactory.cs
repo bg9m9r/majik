@@ -16,17 +16,21 @@ public sealed class ServerGameFactory
     private readonly GameRegistry _registry;
     private readonly ICardRepository? _cardRepo;
     private readonly IBotDecisionSink? _botDecisionSink;
+    private readonly ServerBotOptions _botOptions;
 
     public ServerGameFactory(
         GameRegistry registry,
         ICardRepository? cardRepo = null,
         IBotDecisionSink? botDecisionSink = null,
-        bool botDecisionLoggingEnabled = false)
+        bool botDecisionLoggingEnabled = false,
+        ServerBotOptions? botOptions = null)
     {
         _registry = registry;
         _cardRepo = cardRepo;
         _botDecisionSink = botDecisionSink;
         BotDecisionLoggingEnabled = botDecisionLoggingEnabled;
+        _botOptions = botOptions ?? new ServerBotOptions();
+        _botOptions.Validate();
     }
 
     /// <summary>
@@ -57,8 +61,30 @@ public sealed class ServerGameFactory
     }
 
     /// <summary>
+    /// Builds the <see cref="Majik.Bot.BotConfig"/> for a vs-bot seat from this
+    /// server's <see cref="ServerBotOptions"/>. The strategy / MCTS knobs come
+    /// from configuration (see <see cref="ServerBotOptions"/> for the live-flip
+    /// rationale + profiled parameters); the MCTS-only fields are inert under
+    /// the heuristic default. <c>OpponentArchetype</c> is deliberately never
+    /// set — a human opponent's deck is unknown, and the honest search path is
+    /// inference (<see cref="ServerBotOptions.InferOpponentArchetype"/>).
+    /// Internal so tests can assert the exact installed config without digging
+    /// the agent out of a facade.
+    /// </summary>
+    internal Majik.Bot.BotConfig BuildBotConfig(
+        string botSeatArchetype, IBotDecisionSink? decisionSink) =>
+        new(botSeatArchetype,
+            Strategy: _botOptions.Strategy,
+            DecisionSink: decisionSink,
+            MaxMctsIterations: _botOptions.MaxMctsIterations,
+            MaxMctsBudgetMs: _botOptions.MaxMctsBudgetMs,
+            InferOpponentArchetype: _botOptions.InferOpponentArchetype);
+
+    /// <summary>
     /// vs-Bot match: install the Bob-seat <see cref="Majik.Bot.BotPlayerAgent"/>
-    /// (driven by HeuristicStrategy). onBotThinking lets the caller (MatchService)
+    /// (strategy selected by <see cref="ServerBotOptions.Strategy"/> — the
+    /// deterministic heuristic by default, MCTS search when the deployment
+    /// opts in). onBotThinking lets the caller (MatchService)
     /// bridge the engine-internal callback to the SignalR hub without making
     /// Majik.Bot depend on Majik.Server. Shared between fresh match creation
     /// (<see cref="Create"/>) and rehydration (<see cref="BuildUnregisteredFacade"/>)
@@ -87,7 +113,7 @@ public sealed class ServerGameFactory
     {
         var composed = CompositeBotDecisionSink.Compose(_botDecisionSink, extraDecisionSink);
         var effectiveSink = ReferenceEquals(composed, NullBotDecisionSink.Instance) ? null : composed;
-        var botCfg = new Majik.Bot.BotConfig(botSeatArchetype, DecisionSink: effectiveSink);
+        var botCfg = BuildBotConfig(botSeatArchetype, effectiveSink);
         facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking));
     }
 
@@ -108,6 +134,10 @@ public sealed class ServerGameFactory
     /// bot re-makes identical in-engine decisions, and its prompts never consume
     /// a logged human command (the bot drives itself via ChooseAsync; only human
     /// commands were ever logged). Omitting it on a bot match desyncs the replay.
+    /// NOTE: the identical-decision guarantee holds for the heuristic strategy;
+    /// a wall-clock-budgeted MCTS bot (<see cref="ServerBotOptions"/>) is not
+    /// run-to-run deterministic, so its rehydration replay may diverge — the
+    /// failure path is graceful (rehydrate fails, match lost, never wedged).
     /// onBotThinking is null on rehydrate — there is no live thinking indicator to
     /// drive during a fast-forward.</para>
     /// </summary>

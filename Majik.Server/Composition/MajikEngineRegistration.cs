@@ -43,6 +43,15 @@ public static class MajikEngineRegistration
             });
         }
 
+        // Bot brain selection (the live MCTS-flip lever — see ServerBotOptions).
+        // Bound from the same "Bot" section as the decision-logging flag; env:
+        // Bot__Strategy=mcts (render.yaml) flips prod to the search bot at the
+        // #2596-profiled 150it/1500ms + honest archetype inference. Validated
+        // HERE so a typo'd env var crashes the boot, not the first vs-bot match.
+        var botOptions = configuration.GetSection(ServerBotOptions.SectionName)
+            .Get<ServerBotOptions>() ?? new ServerBotOptions();
+        botOptions.Validate();
+
         // ServerGameFactory takes ICardRepository so it can run the full binder
         // pipeline at game-start. Registered after ICardRepository so the DI
         // container can satisfy the constructor dependency.
@@ -51,7 +60,8 @@ public static class MajikEngineRegistration
                 sp.GetRequiredService<GameRegistry>(),
                 sp.GetRequiredService<ICardRepository>(),
                 botDecisionSink: sp.GetService<IBotDecisionSink>(),
-                botDecisionLoggingEnabled: decisionLoggingEnabled));
+                botDecisionLoggingEnabled: decisionLoggingEnabled,
+                botOptions: botOptions));
 
         // Validate bot decks against ICardRepository at startup. Logs only;
         // never throws — keeps the server bootable even if a single bot
