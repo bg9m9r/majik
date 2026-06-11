@@ -64,8 +64,9 @@ public static class TuneBotWeightsCommand
                        eval quality rather than pure heuristic eval).
           --step V     Initial perturbation step size (default 0.5). Shrinks by
                        0.8x each round.
-          --bad-start  Start from a deliberately bad weight vector (all 0.0 except
-                       LifeDelta=0.1) instead of the current archetype weights.
+          --bad-start  Start from a deliberately bad weight vector (scrambled
+                       ratios: hoards cards, never casts instants/sorceries,
+                       barely races) instead of the current archetype weights.
                        Use to smoke-test that the optimizer climbs.
 
         Example (smoke test — proves optimizer climbs from bad start, ~2-4 min):
@@ -177,40 +178,23 @@ public static class TuneBotWeightsCommand
     }
 
     /// <summary>
-    /// Deliberately bad starting weight vector for smoke testing: the
-    /// Prowess production weights with all values scaled to near-zero
-    /// (×0.05). Signs are preserved so the bot still makes directionally
-    /// correct decisions (it will still attack when ahead on board), but
-    /// the weights are so weak that the eval has almost no discrimination
-    /// power — the bot plays nearly uniformly. The tuner should quickly
-    /// accept perturbations that scale weights toward their productive range.
+    /// Deliberately bad starting weight vector for smoke testing the
+    /// optimizer's ability to climb. Delegates to
+    /// <see cref="WeightTuner.DegenerateWeights"/> — a scrambled-RATIO vector
+    /// (hand-hoarder that never casts instants/sorceries, undervalues power,
+    /// barely races).
     ///
     /// <para>
-    /// Design rationale: all-zero weights create a completely flat evaluation
-    /// landscape; wrong-sign weights make the bot refuse to attack (so games
-    /// draw at turn cap, giving a 0.5 signal for every perturbation). A
-    /// "scaled-down production" vector preserves the landscape shape but
-    /// compresses it, producing decisions that are slightly better than random
-    /// and sufficiently different from the full-scale vector that the optimizer
-    /// can detect improvements with a modest game budget.
+    /// Design rationale: the bad start must be scale-VARIANT bad. An earlier
+    /// version used "production × 0.05", which is a no-op — every heuristic
+    /// decision is an argmax over weight-LINEAR deltas, so a uniformly scaled
+    /// vector makes byte-identical decisions and the optimizer had nothing to
+    /// climb. All-zero / fully-wrong-sign vectors are also unusable: neither
+    /// bot attacks, every game draws at the turn cap, and every perturbation
+    /// scores the same. The degenerate vector keeps weak-positive racing
+    /// terms (games still end) while being decisively bad, so single ±step
+    /// perturbations measurably change decisions.
     /// </para>
     /// </summary>
-    public static ArchetypeWeights BadStartWeights()
-    {
-        // Prowess production weights ×0.05 — "ghost" of the right shape.
-        var prod = ArchetypeWeights.ForArchetype("Prowess");
-        const double scale = 0.05;
-        return new ArchetypeWeights(
-            LifeDelta:           prod.LifeDelta           * scale,
-            BoardPower:          prod.BoardPower          * scale,
-            BoardToughness:      prod.BoardToughness      * scale,
-            OpponentThreats:     prod.OpponentThreats     * scale,
-            ManaSources:         prod.ManaSources         * scale,
-            HandSize:            prod.HandSize            * scale,
-            Tempo:               prod.Tempo               * scale,
-            KeyCardInPlay:       prod.KeyCardInPlay       * scale,
-            LethalProximity:     prod.LethalProximity     * scale,
-            CardAdvantage:       prod.CardAdvantage       * scale,
-            PlaneswalkerEngine:  prod.PlaneswalkerEngine  * scale);
-    }
+    public static ArchetypeWeights BadStartWeights() => WeightTuner.DegenerateWeights();
 }

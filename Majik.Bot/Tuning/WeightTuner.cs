@@ -254,9 +254,27 @@ public sealed class WeightTuner
     /// <see cref="ArchetypeWeights"/>, tries <c>+step</c> and <c>−step</c>
     /// perturbations, evaluating each against the current best via
     /// <see cref="EvaluateWeights"/>. Accepts the perturbation when the
-    /// candidate's score &gt; 0.5 + <see cref="_acceptMargin"/>. Shrinks the
-    /// step each round. Stops after <see cref="_maxRounds"/> rounds or when a
-    /// full round produces no accepted change.
+    /// candidate's score beats the CALIBRATED NULL (the self-mirror score of
+    /// the current best, see below) by <see cref="_acceptMargin"/>. Shrinks
+    /// the step each round. Stops after <see cref="_maxRounds"/> rounds or
+    /// when a full round produces no accepted change.
+    ///
+    /// <para>
+    /// <b>Calibrated acceptance null.</b> Heuristic self-play is fully
+    /// deterministic per seed (the heuristic strategy ignores
+    /// <c>BotConfig.RandomSeed</c>), so a perturbation that does not change
+    /// any decision reproduces <c>EvaluateWeights(best, best)</c> EXACTLY —
+    /// and that self-mirror score is NOT 0.5 on a finite seed set (seat /
+    /// shuffle advantage skews it; e.g. 0.37 on one observed 6-seed block).
+    /// Comparing against a fixed 0.5 therefore mis-fires in both directions:
+    /// when the self-mirror score is &gt; 0.5 + margin every behaviorally
+    /// inert perturbation would be accepted (random drift on dimensions the
+    /// heuristic never reads, e.g. CardAdvantage); when it is below, real
+    /// improvements get rejected. The tuner instead measures
+    /// <c>nullScore = EvaluateWeights(best, best, baseSeed)</c> (recomputed
+    /// whenever <c>best</c> changes) and accepts only candidates that beat
+    /// THAT by the margin.
+    /// </para>
     ///
     /// <para>
     /// The returned vector is the best found; it may differ from
@@ -278,6 +296,12 @@ public sealed class WeightTuner
         _log($"[TUNE] start  step={step:F3} deck={_deck} games={_games} rounds={_maxRounds} strategy={_strategy}");
         _log($"[TUNE] start  weights={Format(best)}");
 
+        // Calibrated acceptance null: the score an exactly-equivalent candidate
+        // reproduces on this seed set (see <remarks> — deterministic heuristic
+        // self-play makes this the correct zero, not 0.5).
+        double nullScore = await EvaluateWeights(best, best, baseSeed);
+        _log($"[TUNE] null   self-mirror score={nullScore:F4} (calibrated acceptance null; 0.5 only in expectation)");
+
         for (int round = 0; round < _maxRounds; round++)
         {
             bool anyAccepted = false;
@@ -287,28 +311,30 @@ public sealed class WeightTuner
                 // Try +step
                 var plusCandidate  = Perturb(best, field, +step);
                 double plusScore   = await EvaluateWeights(plusCandidate, best, baseSeed);
-                bool plusAccepted  = plusScore > 0.5 + _acceptMargin;
+                bool plusAccepted  = plusScore > nullScore + _acceptMargin;
 
-                _log($"[TUNE] round={round} field={field,20} delta=+{step:F3} score={plusScore:F4} accepted={plusAccepted}");
+                _log($"[TUNE] round={round} field={field,20} delta=+{step:F3} score={plusScore:F4} null={nullScore:F4} accepted={plusAccepted}");
 
                 if (plusAccepted)
                 {
                     best = plusCandidate;
                     anyAccepted = true;
+                    nullScore = await EvaluateWeights(best, best, baseSeed);
                     continue; // Skip −step: we already improved on this dimension.
                 }
 
                 // Try −step
                 var minusCandidate = Perturb(best, field, -step);
                 double minusScore  = await EvaluateWeights(minusCandidate, best, baseSeed);
-                bool minusAccepted = minusScore > 0.5 + _acceptMargin;
+                bool minusAccepted = minusScore > nullScore + _acceptMargin;
 
-                _log($"[TUNE] round={round} field={field,20} delta=-{step:F3} score={minusScore:F4} accepted={minusAccepted}");
+                _log($"[TUNE] round={round} field={field,20} delta=-{step:F3} score={minusScore:F4} null={nullScore:F4} accepted={minusAccepted}");
 
                 if (minusAccepted)
                 {
                     best = minusCandidate;
                     anyAccepted = true;
+                    nullScore = await EvaluateWeights(best, best, baseSeed);
                 }
             }
 
@@ -326,6 +352,54 @@ public sealed class WeightTuner
         _log($"[TUNE] done   final weights={Format(best)}");
         return best;
     }
+
+    /// <summary>
+    /// A genuinely-bad weight vector for harness proofs (FastProof test,
+    /// <c>tune-bot-weights --bad-start</c>): production weights should beat it
+    /// decisively in self-play, and the optimizer should climb away from it.
+    ///
+    /// <para>
+    /// <b>Why not "production × 0.05"?</b> The previous bad vector scaled the
+    /// production weights uniformly. That is a NO-OP: every heuristic decision
+    /// is an argmax over deltas that are LINEAR in the weights (BoardEval,
+    /// CombatEval, the cast/ability projections), so a uniformly scaled vector
+    /// makes byte-identical decisions — the only scale-variant input is the
+    /// vanilla-shell CMC penalty, and the curated decks no longer contain
+    /// vanilla shells. Mirror games between production and the scaled vector
+    /// were literally the same deterministic games as production-vs-production
+    /// (verified game-by-game), so the old "proof" measured pure seat/shuffle
+    /// variance.
+    /// </para>
+    ///
+    /// <para>
+    /// This vector instead scrambles the RATIOS (scale-variant badness):
+    /// <list type="bullet">
+    ///   <item><c>HandSize 2.5</c> + <c>Tempo 0.05</c> — hoards: every cast
+    ///     costs −2.5; instants/sorceries (delta ≈ −2.5 + 0.05·cmc) are NEVER
+    ///     cast — crippling for spell decks.</item>
+    ///   <item><c>BoardPower 0.1</c> + <c>BoardToughness 2.0</c> — only
+    ///     casts high-toughness bodies; undervalues every threat.</item>
+    ///   <item><c>LifeDelta 0.2</c> + <c>LethalProximity 0.1</c> — barely
+    ///     races; attacks only when nearly free (keeps games game-ending:
+    ///     the PRODUCTION side still closes every game well before the turn
+    ///     cap, so the objective gets decisive signal instead of draws).</item>
+    ///   <item><c>OpponentThreats +0.5</c> — wrong sign: removal abilities
+    ///     project NEGATIVE, so it never removes threats.</item>
+    /// </list>
+    /// </para>
+    /// </summary>
+    public static ArchetypeWeights DegenerateWeights() => new(
+        LifeDelta:           0.2,
+        BoardPower:          0.1,
+        BoardToughness:      2.0,
+        OpponentThreats:     0.5,   // wrong sign — likes opposing threats
+        ManaSources:         0.1,
+        HandSize:            2.5,   // hoarder: refuses to spend cards
+        Tempo:               0.05,  // never casts instants/sorceries
+        KeyCardInPlay:       0.0,
+        LethalProximity:     0.1,
+        CardAdvantage:       0.0,
+        PlaneswalkerEngine:  0.0);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

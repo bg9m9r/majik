@@ -20,8 +20,9 @@ namespace Majik.Bot.Tests.Integration.Tuning;
 ///   <item>The <see cref="WeightTuner"/> + <see cref="BotConfig.WeightsOverride"/>
 ///     injection plumbing works end-to-end.</item>
 ///   <item>The objective function <see cref="WeightTuner.EvaluateWeights"/>
-///     returns a score &gt; 0.5 when production weights play against an
-///     all-zeros garbage vector (sanity: the eval is not inverted).</item>
+///     returns a score &gt; 0.5 when production weights play against the
+///     scrambled-ratio garbage vector <see cref="WeightTuner.DegenerateWeights"/>
+///     (sanity: the eval is not inverted).</item>
 /// </list>
 /// The full climb smoke (bad-start → tuned → verify improvement) is in
 /// <see cref="WeightTunerSmokeTests.TuneWeights_ClimbsFromBadStart_TunedBeatsStart"/>
@@ -68,29 +69,24 @@ public sealed class WeightTunerFastProofTest
 
         var production = ArchetypeWeights.ForArchetype(deck);
 
-        // Deliberately garbage vector: production weights scaled ×0.05.
-        // Signs preserved (directionally correct but near-zero magnitude) so
-        // the bot still makes vaguely sensible decisions but with almost no
-        // discrimination power — nearly random play. Production weights should
-        // clearly beat this in self-play (detectable in 6 games).
+        // Deliberately garbage vector with SCRAMBLED RATIOS (hand-hoarder that
+        // never casts instants/sorceries, undervalues power, barely races).
         //
-        // Design note: all-zero / wrong-sign weights create pathological
-        // landscapes where bots refuse to attack → all games draw 20-20 →
-        // objective always returns 0.5 (no gradient). Scaled-down production
-        // preserves the game-ending potential needed for a signal.
-        const double garbageScale = 0.05;
-        var garbage = new ArchetypeWeights(
-            LifeDelta:           production.LifeDelta           * garbageScale,
-            BoardPower:          production.BoardPower          * garbageScale,
-            BoardToughness:      production.BoardToughness      * garbageScale,
-            OpponentThreats:     production.OpponentThreats     * garbageScale,
-            ManaSources:         production.ManaSources         * garbageScale,
-            HandSize:            production.HandSize            * garbageScale,
-            Tempo:               production.Tempo               * garbageScale,
-            KeyCardInPlay:       production.KeyCardInPlay       * garbageScale,
-            LethalProximity:     production.LethalProximity     * garbageScale,
-            CardAdvantage:       production.CardAdvantage       * garbageScale,
-            PlaneswalkerEngine:  production.PlaneswalkerEngine  * garbageScale);
+        // Design note 1: the garbage must be scale-VARIANT bad. The previous
+        // vector here ("production × 0.05") was a no-op: every heuristic
+        // decision is an argmax over weight-LINEAR deltas, so uniform scaling
+        // produced byte-identical decisions — the games were literally the
+        // same deterministic games as production-vs-production and the test
+        // measured pure seat/shuffle variance (it failed at 0.3667 because
+        // the second seat happens to win 4/6 on this seed block). See
+        // WeightTuner.DegenerateWeights for the full analysis.
+        //
+        // Design note 2: all-zero / fully-wrong-sign weights create
+        // pathological landscapes where NEITHER bot attacks → all games draw
+        // 20-20 → objective always returns 0.5 (no gradient). The degenerate
+        // vector keeps weak-positive racing terms, and the PRODUCTION side
+        // closes every game well before the turn cap, so games stay decisive.
+        var garbage = WeightTuner.DegenerateWeights();
 
         _out.WriteLine($"[PROOF] Production: {WeightTuner.Format(production)}");
         _out.WriteLine($"[PROOF] Garbage:    {WeightTuner.Format(garbage)}");
@@ -101,7 +97,8 @@ public sealed class WeightTunerFastProofTest
             games:     games,
             maxRounds: 1,
             strategy:  "heuristic",
-            log:       msg => _out.WriteLine(msg));
+            log:       msg => _out.WriteLine(msg),
+            verbose:   true);
 
         double score = await tuner.EvaluateWeights(production, garbage, baseSeed: 5555);
 
@@ -113,9 +110,10 @@ public sealed class WeightTunerFastProofTest
         score.Should().BeGreaterThan(0.5,
             because:
                 $"production Prowess weights (BoardPower=2.0, LethalProximity=2.5, etc.) " +
-                $"must beat an all-zero garbage vector in self-play. " +
-                $"A score at or below 0.5 means the eval objective is inverted or the " +
-                $"WeightsOverride injection is broken. Score={score:F4}. " +
+                $"must beat the degenerate hoarder garbage vector in self-play. " +
+                $"A score at or below 0.5 means the eval objective is inverted, the " +
+                $"WeightsOverride injection is broken, or the garbage vector has become " +
+                $"decision-equivalent to production again. Score={score:F4}. " +
                 $"Deck={deck}, Games={games}, Seed=5555.");
     }
 }
