@@ -116,6 +116,18 @@ namespace Majik.Bot;
 /// with first-configured-permits-wins semantics. Null keeps unit tests, the
 /// PARALLEL strength probes, and sim-internal searches completely ungated.
 /// Heuristic-strategy decisions are never gated (they are microseconds).</para>
+///
+/// <para><c>RolloutDepth</c> optional (default null = <c>FullTurnPlus</c>, today's
+/// behaviour). When <c>Strategy="mcts"</c>, selects how far each MCTS rollout
+/// plays the sandbox out before evaluating (see
+/// <see cref="Search.RolloutDepth"/>): <c>"LeafEval"</c> (no playout — eval at
+/// the decision point), <c>"EndOfTurn"</c> (remainder of the current turn only)
+/// or <c>"FullTurnPlus"</c> (current turn plus one full turn — the default).
+/// Parsed case-insensitively by <see cref="Search.SearchStrategy"/> at
+/// construction; an unknown value throws <see cref="ArgumentException"/>
+/// (fail-fast, mirroring the strategy-name validation). This is the #2596
+/// rollout-cost lever — the live flip of a probe-gate winner is config-only
+/// (<c>Bot__RolloutDepth</c>).</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -132,4 +144,5 @@ public sealed record BotConfig(
     string? OpponentArchetype = null,
     bool InferOpponentArchetype = false,
     double? RiskVoteThreshold = null,
-    int? SearchConcurrency = null);
+    int? SearchConcurrency = null,
+    string? RolloutDepth = null);

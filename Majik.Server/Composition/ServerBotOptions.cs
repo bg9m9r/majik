@@ -82,6 +82,19 @@ public sealed class ServerBotOptions
     public int SearchConcurrency { get; set; } = 1;
 
     /// <summary>
+    /// How far each MCTS rollout plays the sandbox out before evaluating (env
+    /// <c>Bot__RolloutDepth</c>; only read when <see cref="Strategy"/> is
+    /// <c>mcts</c>). One of <c>"LeafEval"</c> (no playout — eval at the
+    /// decision point, the cheapest variant), <c>"EndOfTurn"</c> (remainder of
+    /// the current turn only) or <c>"FullTurnPlus"</c> (current turn plus one
+    /// full turn) — case-insensitive, validated against
+    /// <see cref="Majik.Bot.Search.RolloutDepth"/> at registration. Default
+    /// <c>"FullTurnPlus"</c> = today's behaviour; this is the #2596
+    /// rollout-cost lever, flipped to a probe-gate winner via config only.
+    /// </summary>
+    public string RolloutDepth { get; set; } = "FullTurnPlus";
+
+    /// <summary>
     /// Fail fast on a bad knob (called at registration so a typo'd env var
     /// crashes the boot, not the first vs-bot match creation).
     /// </summary>
@@ -109,6 +122,16 @@ public sealed class ServerBotOptions
         {
             throw new ArgumentException(
                 $"Bot__SearchConcurrency must be >= 1 (got {SearchConcurrency}).");
+        }
+
+        // Validate against the enum NAMES (case-insensitive) — never numeric
+        // values — mirroring SearchStrategy.ParseRolloutDepth's fail-fast.
+        if (!Enum.GetNames<Majik.Bot.Search.RolloutDepth>()
+                .Any(n => n.Equals(RolloutDepth, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ArgumentException(
+                $"Unknown Bot__RolloutDepth '{RolloutDepth}' — expected 'LeafEval', " +
+                "'EndOfTurn' or 'FullTurnPlus'.");
         }
     }
 }

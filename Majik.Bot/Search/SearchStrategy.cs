@@ -124,12 +124,42 @@ internal sealed class SearchStrategy : IBotStrategy
     /// within the iteration budget. MaxIterations is capped at 200 to keep
     /// combat decisions within the engine's synchronous call budget.
     /// </para>
+    ///
+    /// <para>
+    /// <c>RolloutDepth</c> parses <see cref="BotConfig.RolloutDepth"/>
+    /// case-insensitively (null = <see cref="RolloutDepth.FullTurnPlus"/>, the
+    /// byte-identical default); an unknown value throws here so a typo fails
+    /// fast at construction, mirroring the strategy-name validation. Internal
+    /// so tests can assert the exact BotConfig → MctsConfig threading.
+    /// </para>
     /// </summary>
-    private static MctsConfig ConfigFrom(BotConfig bot) => new(
+    internal static MctsConfig ConfigFrom(BotConfig bot) => new(
         MaxIterations: bot.MaxMctsIterations ?? 200,
         MaxMillis: bot.MaxMctsBudgetMs ?? 1500,
         DepthTurns: 1,
-        ExplorationC: 1.41);
+        ExplorationC: 1.41,
+        RolloutDepth: ParseRolloutDepth(bot.RolloutDepth));
+
+    /// <summary>
+    /// Resolve <see cref="BotConfig.RolloutDepth"/> (string?, the config-surface
+    /// shape) to the <see cref="RolloutDepth"/> enum: null →
+    /// <see cref="RolloutDepth.FullTurnPlus"/> (today's behaviour); enum NAMES
+    /// match case-insensitively; anything else (including bare numerics) throws
+    /// an <see cref="ArgumentException"/> NAMING the bad value — fail-fast at
+    /// construction, mirroring the strategy-name validation.
+    /// </summary>
+    internal static RolloutDepth ParseRolloutDepth(string? value) => value switch
+    {
+        null => RolloutDepth.FullTurnPlus,
+        _ when value.Equals(nameof(RolloutDepth.LeafEval), StringComparison.OrdinalIgnoreCase)
+            => RolloutDepth.LeafEval,
+        _ when value.Equals(nameof(RolloutDepth.EndOfTurn), StringComparison.OrdinalIgnoreCase)
+            => RolloutDepth.EndOfTurn,
+        _ when value.Equals(nameof(RolloutDepth.FullTurnPlus), StringComparison.OrdinalIgnoreCase)
+            => RolloutDepth.FullTurnPlus,
+        _ => throw new ArgumentException(
+            $"Unknown RolloutDepth '{value}' — expected 'LeafEval', 'EndOfTurn' or 'FullTurnPlus'."),
+    };
 
     /// <summary>
     /// Derive the PER-WORLD MctsConfig for the determinized K-world loop from the
@@ -143,7 +173,8 @@ internal sealed class SearchStrategy : IBotStrategy
     ///     (min 1) so an iteration-bounded config also splits across worlds rather
     ///     than running the full iteration count K times.</item>
     /// </list>
-    /// <c>DepthTurns</c> / <c>ExplorationC</c> are preserved unchanged.
+    /// <c>DepthTurns</c> / <c>ExplorationC</c> / <c>RolloutDepth</c> are preserved
+    /// unchanged — every per-world search INHERITS the configured rollout depth.
     /// </summary>
     internal static MctsConfig DeterminizedConfigFrom(MctsConfig full, int perWorldBudgetMs)
     {
@@ -154,7 +185,7 @@ internal sealed class SearchStrategy : IBotStrategy
             ? full.MaxIterations
             : Math.Max(1, (int)Math.Round((double)full.MaxIterations * perWorldBudgetMs / total));
 
-        // preserves: DepthTurns, ExplorationC; splits: MaxMillis, MaxIterations
+        // preserves: DepthTurns, ExplorationC, RolloutDepth; splits: MaxMillis, MaxIterations
         return full with
         {
             MaxMillis = perWorldBudgetMs,
