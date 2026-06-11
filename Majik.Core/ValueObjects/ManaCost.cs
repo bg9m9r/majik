@@ -108,6 +108,30 @@ public class ManaCost : IEquatable<ManaCost>
         PhyrexianPips = phyrexian;
     }
 
+    // ── Parse hot path (bot-search measured) ────────────────────────────────
+    // Parse sits on the MCTS legality hot path (LegalActionEnumerator.ApproxCmc
+    // calls it for every hand card at every priority window of every sandbox
+    // sim — ~17% of all per-iteration allocations pre-fix). Two boring wins:
+    //   1. the brace/digit regexes are static + compiled (Parse used to
+    //      construct a brand-new Regex object per call);
+    //   2. results are memoized per cost string — ManaCost is immutable and
+    //      value-equal, so a shared instance is indistinguishable from a
+    //      fresh one. The cache is capped (distinct cost strings are bounded
+    //      by the card pool, but a cap removes any unbounded-growth concern).
+    private static readonly System.Text.RegularExpressions.Regex BraceSymbolRegex =
+        new(@"\{([^}]+)\}", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex LeadingDigitsRegex =
+        new(@"^(\d+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex AnyDigitsRegex =
+        new(@"(\d+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ManaCost>
+        ParseCache = new(StringComparer.Ordinal);
+
+    private const int ParseCacheCapacity = 4096;
+
     /// <summary>
     /// Create a mana cost from a string representation.
     /// Examples: "3", "2RR", "1WU", "X", "3XRR"
@@ -119,14 +143,30 @@ public class ManaCost : IEquatable<ManaCost>
             return Zero;
         }
 
+        if (ParseCache.TryGetValue(manaCost, out var cached))
+        {
+            return cached;
+        }
+
+        var parsed = ParseUncached(manaCost);
+        // Soft cap: stop inserting once full (no eviction needed — the set of
+        // distinct cost strings a process sees is small and stable).
+        if (ParseCache.Count < ParseCacheCapacity)
+        {
+            ParseCache.TryAdd(manaCost, parsed);
+        }
+        return parsed;
+    }
+
+    private static ManaCost ParseUncached(string manaCost)
+    {
         int generic = 0, white = 0, blue = 0, black = 0, red = 0, green = 0, colorless = 0;
         bool hasX = false;
         var hybrid = new List<HybridPip>();
         var phyrexian = new List<ManaColor>();
 
         // Extract braced symbols first: {R/G}, {2/W}, {U/P}, {W}, {2}, {X}.
-        var braceRegex = new System.Text.RegularExpressions.Regex(@"\{([^}]+)\}");
-        var stripped = braceRegex.Replace(manaCost, m =>
+        var stripped = BraceSymbolRegex.Replace(manaCost, m =>
         {
             var inner = m.Groups[1].Value.ToUpperInvariant();
             if (inner.Contains('/'))
@@ -159,7 +199,7 @@ public class ManaCost : IEquatable<ManaCost>
         }
 
         // Parse generic mana (digits at the start — also handles unbraced "2").
-        var genericMatch = System.Text.RegularExpressions.Regex.Match(upper, @"^(\d+)");
+        var genericMatch = LeadingDigitsRegex.Match(upper);
         if (genericMatch.Success)
         {
             generic = int.Parse(genericMatch.Groups[1].Value);
@@ -168,7 +208,7 @@ public class ManaCost : IEquatable<ManaCost>
 
         // Parse remaining digit clusters that may appear after symbols (rare,
         // but Parse used to be position-tolerant).
-        var trailing = System.Text.RegularExpressions.Regex.Match(upper, @"(\d+)");
+        var trailing = AnyDigitsRegex.Match(upper);
         if (trailing.Success && trailing.Index > 0)
         {
             generic += int.Parse(trailing.Groups[1].Value);
@@ -218,9 +258,11 @@ public class ManaCost : IEquatable<ManaCost>
     }
 
     /// <summary>
-    /// Zero mana cost.
+    /// Zero mana cost. Singleton — ManaCost is immutable and value-equal, so a
+    /// shared instance is indistinguishable from a fresh one (Zero is on the
+    /// Parse hot path via the empty-string short-circuit).
     /// </summary>
-    public static ManaCost Zero => new(0, 0, 0, 0, 0, 0, false);
+    public static ManaCost Zero { get; } = new(0, 0, 0, 0, 0, 0, false);
 
     /// <summary>
     /// Add N generic mana to this cost (e.g. paying X as part of a spell cost).
