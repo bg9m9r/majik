@@ -45,6 +45,18 @@ services:
       # ROLLBACK: set to `heuristic` and redeploy.
       - key: Bot__Strategy
         value: mcts
+      # Tree-state reuse (#2604): ~5.2x search capacity per CPU-second — tree
+      # nodes cache their states; iterations clone from the nearest cached
+      # ancestor instead of replaying the whole path. Probe-gated 2026-06-11:
+      # mirror 56% @800it vs 40% @150it at the same 1500 ms budget;
+      # equivalence/flip/masking gates green. The raised iteration cap spends
+      # the freed time inside the unchanged 1500 ms decision budget
+      # (~837 iters/s measured on this 1-vCPU plan).
+      # ROLLBACK: TreeStateReuse=false + MaxMctsIterations=150, redeploy.
+      - key: Bot__TreeStateReuse
+        value: "true"
+      - key: Bot__MaxMctsIterations
+        value: "800"
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
       - key: Mongo__Database
