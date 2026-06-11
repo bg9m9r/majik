@@ -154,6 +154,14 @@ internal static class ProbeHarness
     /// each cell uses its own +1000 block.</summary>
     internal const int ReuseAsymmetricBaseSeed = 50000;
 
+    /// <summary>Base seed for the MIRROR world-split (K-tuning) cells
+    /// (<c>WorldSplitProbes.cs</c>). Deliberately SHARED by both cells —
+    /// unlike every other family's +1000-per-cell blocks — so the K=8 head
+    /// and its K=4 control play the SAME game seeds (same decks, same
+    /// shuffles, same heuristic opponent): a paired comparison in which only
+    /// the world split differs. Distinct from every other family's blocks.</summary>
+    internal const int WorldSplitMirrorBaseSeed = 60000;
+
     /// <summary>Which seat's strategy won a single game (or a draw / crash).</summary>
     internal enum SeatAWinner { SeatA, SeatB, Draw, Inconclusive }
 
@@ -336,6 +344,37 @@ internal static class ProbeHarness
             OpponentArchetype: null,
             InferOpponentArchetype: true,
             TreeStateReuse: true);
+
+    // ── BotConfig factories — WORLD-SPLIT (K-tuning) cells ──────────────────────
+    // World-split variants of MirrorDeterminizedReuseAt: the LIVE production
+    // shape (reuse ON, wall-clock-bound at MatrixBudgetMs = 1500 ms, cap 800)
+    // with an EXPLICIT determinized world split. The cells' question: now that
+    // reuse makes iterations cheap, do MORE worlds beat more iterations per
+    // world at the SAME live budget? (See WorldSplitProbes.cs for the cells.)
+
+    /// <summary>
+    /// World-split cell variant of <see cref="MirrorDeterminizedReuseAt"/>
+    /// (honest, resamples from the known mirror decklist; no peek; reuse ON) at
+    /// an EXPLICIT (<paramref name="maxWorlds"/>, <paramref name="perWorldMs"/>)
+    /// split, wall-clock-bound at <see cref="MatrixBudgetMs"/> with the given
+    /// <paramref name="iterations"/> cap. K = clamp(round(<see cref="MatrixBudgetMs"/>
+    /// / perWorldMs), 1, maxWorlds); the per-world iteration cap scales by the
+    /// same perWorld/total fraction. <c>preserves: MirrorArchetype, Strategy,
+    /// PrioritySearchEnabled, OpponentArchetype, TreeStateReuse</c> from the
+    /// reuse-cell factory.
+    /// </summary>
+    internal static Func<int, BotConfig> MirrorDeterminizedWorldSplitAt(
+        int iterations, int maxWorlds, int perWorldMs) =>
+        seed => new BotConfig(
+            MirrorArchetype, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: iterations,
+            MaxMctsBudgetMs: MatrixBudgetMs,
+            PrioritySearchEnabled: true,
+            OpponentArchetype: MirrorArchetype,
+            TreeStateReuse: true,
+            MaxWorlds: maxWorlds,
+            PerWorldBudgetMs: perWorldMs);
 
     // ── Head-to-head runner ─────────────────────────────────────────────────────
 
