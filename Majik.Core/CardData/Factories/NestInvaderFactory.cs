@@ -56,14 +56,9 @@ namespace Majik.Core.CardData.Factories;
 ///   the Spawn's arrival).</item>
 /// </list>
 ///
-/// ## Deferred (v1 gaps)
-/// <list type="bullet">
-///   <item><b>"Sacrifice this token: Add {C}." cost</b> on the Eldrazi Spawn
-///   token: <see cref="ManaAbility"/> doesn't carry a sac cost yet (same gap
-///   as Eldrazi Skyspawner's Scion / Glaring Fleshraker / Treasure / Food).
-///   The Spawn produces {C} without enforcing the sacrifice — see
-///   <see cref="TokenFactory.CreateEldraziSpawn"/>.</item>
-/// </list>
+/// The Eldrazi Spawn token carries its "Sacrifice this creature: Add {C}."
+/// mana ability (sacrifice-cost, no-tap) via the shared
+/// <see cref="TokenFactory.CreateEldraziSpawn"/> helper.
 /// </summary>
 [CardName("Nest Invader")]
 public static class NestInvaderFactory
@@ -122,8 +117,8 @@ public static class NestInvaderFactory
             $"{CardName}: create a 0/1 colourless Eldrazi Spawn creature token with \"Sacrifice this token: Add {{C}}.\"",
             () =>
             {
-                // CR 111.10 — 0/1 colourless Eldrazi Spawn with the
-                // (deferred-cost) "Sacrifice this token: Add {C}." mana
+                // CR 111.10 — 0/1 colourless Eldrazi Spawn with its
+                // "Sacrifice this creature: Add {C}." (sacrifice-cost) mana
                 // ability. Created under the controller's control.
                 var controller = card.Controller ?? owner;
                 TokenFactory.CreateEldraziSpawn(controller, zones);

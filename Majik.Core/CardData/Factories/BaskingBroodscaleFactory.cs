@@ -88,14 +88,9 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="CardMovedEvent"/> publishes.</item>
 /// </list>
 ///
-/// ## Deferred (v1 gaps)
-/// <list type="bullet">
-///   <item><b>"Sacrifice this token: Add {C}." cost</b> on the Eldrazi
-///   Spawn token: <see cref="ManaAbility"/> doesn't carry a sac cost yet
-///   (same gap as Eldrazi Skyspawner's Scion / Writhing Chrysalis /
-///   Treasure / Food). The Spawn produces {C} without enforcing the
-///   sacrifice — see <see cref="TokenFactory.CreateEldraziSpawn"/>.</item>
-/// </list>
+/// The Eldrazi Spawn token carries its "Sacrifice this creature: Add {C}."
+/// mana ability (sacrifice-cost, no-tap) via the shared
+/// <see cref="TokenFactory.CreateEldraziSpawn"/> helper.
 /// </summary>
 [CardName("Basking Broodscale")]
 public static class BaskingBroodscaleFactory
@@ -201,9 +196,9 @@ public static class BaskingBroodscaleFactory
 
                 if (!create) return;
 
-                // CR 111.10 — 0/1 colourless Eldrazi Spawn with the
-                // (deferred-cost) "Sacrifice this token: Add {C}." mana
-                // ability. Shared helper — see class xmldoc gap note.
+                // CR 111.10 — 0/1 colourless Eldrazi Spawn with its
+                // "Sacrifice this creature: Add {C}." (sacrifice-cost) mana
+                // ability via the shared helper.
                 TokenFactory.CreateEldraziSpawn(controller, zones);
             });
 

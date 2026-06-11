@@ -37,7 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   posture as <see cref="SowingMycospawnFactory"/>'s cast triggers). The
 ///   resolution body creates two Eldrazi Spawn tokens via the shared
 ///   <see cref="TokenFactory.CreateEldraziSpawn"/> helper (0/1 colourless with
-///   the deferred "Sacrifice this token: Add {C}." mana ability).
+///   the "Sacrifice this creature: Add {C}." sacrifice-cost mana ability).
 /// - <b>Sacrifice trigger (CR 603.1)</b> — "Whenever you sacrifice another
 ///   Eldrazi, put a +1/+1 counter on this creature." A
 ///   <see cref="TriggeredAbility"/> over the dedicated
@@ -53,13 +53,6 @@ namespace Majik.Core.CardData.Factories;
 /// - <see cref="Create(Player, ZoneService?, TriggerManager?)"/> — fully
 ///   wired; the triggers register so the bus drives them. The Spawn tokens'
 ///   ETB routes through <paramref name="zones"/>.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>"Sacrifice this token: Add {C}." cost</b> on the Eldrazi Spawn
-///   tokens: <see cref="ManaAbility"/> doesn't carry a sac cost yet (same gap
-///   as Eldrazi Skyspawner's Scion / Treasure / Food). The Spawn produces
-///   {C} without enforcing the sacrifice — see
-///   <see cref="TokenFactory.CreateEldraziSpawn"/>.
 /// </summary>
 [CardName("Writhing Chrysalis")]
 public static class WrithingChrysalisFactory

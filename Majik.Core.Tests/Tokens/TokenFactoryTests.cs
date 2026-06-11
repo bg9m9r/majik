@@ -286,4 +286,107 @@ public class TokenFactoryTests
             Majik.Core.Services.ZoneServiceRegistry.Clear();
         }
     }
+
+    // ── Eldrazi Spawn token (CR 111.10) ──────────────────────────────────────
+    // "Sacrifice this token: Add {C}." — the cost is a SACRIFICE, not a tap.
+
+    [Fact]
+    public void CreateEldraziSpawn_HasColorlessManaAbility_WithSacrificeCost()
+    {
+        var spawn = TokenFactory.CreateEldraziSpawn(_alice, _zones);
+
+        spawn.Name.Should().Be("Eldrazi Spawn");
+        spawn.Power.Should().Be(0);
+        spawn.Toughness.Should().Be(1);
+        spawn.Zone.Should().Be(ZoneType.Battlefield);
+
+        var mana = spawn.Abilities.OfType<ManaAbility>().Single();
+        mana.ManaGenerated.Generic.Should().Be(1, "the ability adds {C}");
+    }
+
+    [Fact]
+    public void CreateEldraziSpawn_ManaAbility_SacrificesForC_WithoutTapping()
+    {
+        var spawn = TokenFactory.CreateEldraziSpawn(_alice, _zones);
+        var mana = spawn.Abilities.OfType<ManaAbility>().Single();
+
+        var produced = mana.Activate();
+
+        produced.Generic.Should().Be(1, "the ability adds {C}");
+        spawn.Zone.Should().Be(ZoneType.Graveyard,
+            "the sacrifice cost moves the token to the graveyard (CR 701.16)");
+        spawn.IsTapped.Should().BeFalse(
+            "no {T} in the cost — the token sacrifices itself, it does not tap");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(spawn);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(spawn);
+    }
+
+    [Fact]
+    public void CreateEldraziSpawn_ManaAbility_ActivatableWhileTappedAndSummoningSick()
+    {
+        var spawn = TokenFactory.CreateEldraziSpawn(_alice, _zones);
+        spawn.Tap();
+        spawn.HasSummoningSickness = true;
+
+        var mana = spawn.Abilities.OfType<ManaAbility>().Single();
+        mana.CanActivate().Should().BeTrue(
+            "a sacrifice-cost mana ability has no {T} — summoning sickness / tapped state do not gate it");
+        mana.Activate().Generic.Should().Be(1);
+        spawn.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void CreateEldraziSpawn_ManaAbility_CannotActivateTwice()
+    {
+        var spawn = TokenFactory.CreateEldraziSpawn(_alice, _zones);
+        var mana = spawn.Abilities.OfType<ManaAbility>().Single();
+
+        mana.Activate();
+        // Already sacrificed — no longer on the battlefield, so a second
+        // activation is illegal (the token is gone).
+        mana.CanActivate().Should().BeFalse(
+            "the token left the battlefield via its sacrifice — it cannot be sacrificed again");
+    }
+
+    // ── Treasure token (CR 111.10) ───────────────────────────────────────────
+    // "{T}, Sacrifice this artifact: Add one mana of any color." — taps AND
+    // sacrifices; must not be a repeatable free mana rock.
+
+    [Fact]
+    public void CreateTreasure_ManaAbility_TapsAndSacrifices()
+    {
+        var treasure = TokenFactory.CreateTreasure(_alice, _zones);
+        var redOption = treasure.Abilities.OfType<ManaAbility>()
+            .Single(m => m.ManaGenerated.Red == 1);
+
+        var produced = redOption.Activate();
+
+        produced.Red.Should().Be(1, "the chosen option adds one red");
+        // CR 701.16 — Treasure's cost includes 'Sacrifice this artifact', so
+        // it is consumed and moves to the graveyard. (Its {T} cost taps it
+        // first, but CR 400.7 clears tapped status the instant it leaves the
+        // battlefield, so a sacrificed Treasure reports untapped in the
+        // graveyard — the load-bearing observable is the zone change.)
+        treasure.Zone.Should().Be(ZoneType.Graveyard,
+            "Treasure's cost includes 'Sacrifice this artifact' — it is consumed (CR 701.16)");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(treasure);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(treasure);
+    }
+
+    [Fact]
+    public void CreateTreasure_ManaAbility_CannotBeReusedAfterSacrifice()
+    {
+        var treasure = TokenFactory.CreateTreasure(_alice, _zones);
+        var options = treasure.Abilities.OfType<ManaAbility>().ToList();
+
+        options[0].Activate();
+
+        // After the first activation the Treasure is sacrificed — no sibling
+        // colour option may be activated again (no infinite mana rock).
+        foreach (var opt in options)
+        {
+            opt.CanActivate().Should().BeFalse(
+                "Treasure was sacrificed on its first use — no further activations");
+        }
+    }
 }

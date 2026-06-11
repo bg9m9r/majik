@@ -48,9 +48,8 @@ namespace Majik.Core.CardData.Factories;
 ///   2. One 0/1 colourless Eldrazi Spawn creature token is created for each
 ///      card moved to the graveyard this way (CR 111 / CR 111.4) via
 ///      <see cref="TokenFactory.CreateEldraziSpawn"/>. Each token carries
-///      "Sacrifice this token: Add {C}." (v1: ManaAbility producing {C};
-///      the sac cost rider is a deferred gap shared with EldraziSkyspawner
-///      and TokenFactory.CreateEldraziSpawn).
+///      "Sacrifice this creature: Add {C}." (a sacrifice-cost, no-tap mana
+///      ability — see TokenFactory.CreateEldraziSpawn).
 ///   3. The exile-cast grants on any exiled cards that were NOT cast are
 ///      cleared (they're now in the graveyard anyway; this is belt-and-
 ///      suspenders cleanup matching LightUpTheStage's ClearRuntimeExileCast
@@ -61,9 +60,6 @@ namespace Majik.Core.CardData.Factories;
 ///   spell-casting; playing a land from exile would need a separate
 ///   "play this land from exile" grant. Same posture as LightUpTheStage /
 ///   RecklessImpulse v1.
-/// - <b>Sac cost on Spawn token's mana ability</b>: same gap documented in
-///   <see cref="TokenFactory.CreateEldraziSpawn"/> and EldraziSkyspawner —
-///   the ManaAbility produces {C} without enforcing sacrifice.
 /// - <b>Empty-library mid-exile</b>: v1 stops at library underflow without
 ///   raising an SBA flag (CR 701.20 does not impose one for exile, matching
 ///   RecklessImpulse / LightUpTheStage posture).

@@ -163,6 +163,48 @@ public class MalevolentRumbleFactoryTests
                 "Eldrazi Spawn's 'Sacrifice: Add {C}' is wired as a ManaAbility producing 1 colourless");
     }
 
+    [Fact]
+    public void Resolve_SpawnToken_ManaAbility_SacrificesForC_WithoutTapping()
+    {
+        Resolve();
+
+        var spawn = FindSpawn(_alice);
+        spawn.Should().NotBeNull();
+        var mana = spawn!.Abilities.OfType<ManaAbility>().Single();
+
+        // CR 605 / 701.16 — "Sacrifice this token: Add {C}." The cost is a
+        // sacrifice, NOT a tap. Activating it must add {C} and move the token
+        // to the owner's graveyard; the token must NOT tap.
+        var produced = mana.Activate();
+        produced.Generic.Should().Be(1, "the ability adds {C}");
+        spawn.Zone.Should().Be(ZoneType.Graveyard,
+            "the sacrifice cost moves the token from battlefield to graveyard (CR 701.16)");
+        spawn.IsTapped.Should().BeFalse(
+            "Eldrazi Spawn's ability has no {T} in its cost — it sacrifices, it does not tap");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(spawn);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(spawn);
+    }
+
+    [Fact]
+    public void Resolve_SpawnToken_ManaAbility_ActivatableWhileTappedOrSummoningSick()
+    {
+        Resolve();
+
+        var spawn = FindSpawn(_alice);
+        spawn.Should().NotBeNull();
+        // Sacrifice-cost mana abilities are not gated by {T}, so summoning
+        // sickness / a tapped state must not block activation (CR 605.3a only
+        // gates abilities that include {T} in their cost).
+        spawn!.Tap();
+        spawn.HasSummoningSickness = true;
+
+        var mana = spawn.Abilities.OfType<ManaAbility>().Single();
+        mana.CanActivate().Should().BeTrue(
+            "no {T} in the cost — summoning sickness / tapped state do not gate the sacrifice");
+        mana.Activate().Generic.Should().Be(1);
+        spawn.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------

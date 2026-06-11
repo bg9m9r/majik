@@ -131,14 +131,20 @@ public class ManaAbility : IManaAbility
         Player controller,
         Func<ManaCost> manaGenerator,
         Func<bool> canActivateCheck,
-        Action<Player> additionalCostPayer)
+        Action<Player> additionalCostPayer,
+        ManaCost? printedManaGenerated = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
         _canActivateCheck = canActivateCheck ?? throw new ArgumentNullException(nameof(canActivateCheck));
         _additionalCostPayer = additionalCostPayer ?? throw new ArgumentNullException(nameof(additionalCostPayer));
-        ManaGenerated = ManaCost.Zero; // Will be set when activated
+        // Inspection seed (printed amount) when provided so pre-activation
+        // readers (bot mana picker / UI mana-source hints) see the produced
+        // colour; else Zero until the generator runs at Activate time. The
+        // generator still computes the real (possibly Goldspan-modified) amount
+        // on activation.
+        ManaGenerated = printedManaGenerated ?? ManaCost.Zero;
         _tapsAsCost = true;
     }
 
