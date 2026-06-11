@@ -33,6 +33,10 @@ public sealed class MutableFieldTripwireTests
         {
             // ── raw backing fields ──────────────────────────────────────────
             "_abilities",                           // COPIED (AddRange — shared ability refs, definition)
+            "_abilitiesView",                       // DERIVED-CACHE: lazy AsReadOnly wrapper over _abilities; not copied — clone re-creates lazily over its OWN list
+            "_cardTypesView",                       // DERIVED-CACHE: lazy AsReadOnly wrapper over _cardTypes; not copied — clone re-creates lazily
+            "_supertypesView",                      // DERIVED-CACHE: lazy AsReadOnly wrapper over _supertypes; not copied — clone re-creates lazily
+            "_subtypesView",                        // DERIVED-CACHE: lazy AsReadOnly wrapper over _subtypes; not copied — clone re-creates lazily
             "_backFaceLoyaltyAbilities",            // SKIPPED-DEFER: derived from _mdfcState (itself SKIPPED-DEFER); back-face loyalty abilities are sub-refs of _abilities (AddRange-copied), re-synced on transform
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)

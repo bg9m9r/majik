@@ -47,9 +47,22 @@ public static class GameStateCloner
         Majik.Core.Stack.Stack? liveStack = null,
         TurnState? liveTurnState = null)
     {
-        var playerMap = new Dictionary<Player, Player>();
-        var cardMap = new Dictionary<Guid, ICard>();
-        var originalById = new Dictionary<Guid, Card>();   // InstanceId → original Card (for Pass 2c)
+        // Pre-size the remap tables to the exact card count — this method runs
+        // up to 3× per MCTS iteration, and growing the dictionaries from the
+        // default capacity re-allocates the entry/bucket arrays ~7 times each
+        // (measured ~4% of all per-iteration allocations).
+        var totalCards = 0;
+        foreach (var p in players)
+        {
+            foreach (var zoneType in AllZoneTypes)
+            {
+                totalCards += p.Zones.GetZone(zoneType).Count;
+            }
+        }
+
+        var playerMap = new Dictionary<Player, Player>(players.Count);
+        var cardMap = new Dictionary<Guid, ICard>(totalCards);
+        var originalById = new Dictionary<Guid, Card>(totalCards);   // InstanceId → original Card (for Pass 2c)
 
         // Pass 1: empty player shells (life/name copied; zones empty).
         foreach (var p in players)
@@ -60,14 +73,18 @@ public static class GameStateCloner
 
         // Pass 2a: clone cards into zones, preserving InstanceId and order.
         // Build originalById in parallel so Pass 2c can look up originals cheaply.
+        // CardsView (no-copy) instead of GetCards (defensive copy per zone per
+        // clone): safe here — nothing mutates the SOURCE zones during the walk
+        // (clones are added to the CLONE player's zones).
         foreach (var p in players)
         {
             var clonePlayer = playerMap[p];
             foreach (var zoneType in AllZoneTypes)
             {
-                foreach (var card in p.Zones.GetZone(zoneType).GetCards())
+                var zoneCards = p.Zones.GetZone(zoneType).CardsView;
+                for (var i = 0; i < zoneCards.Count; i++)
                 {
-                    var src = (Card)card;
+                    var src = (Card)zoneCards[i];
                     originalById[src.InstanceId] = src;
                     var cc = src.CloneForSim();
                     cardMap[cc.InstanceId] = cc;
@@ -128,9 +145,10 @@ public static class GameStateCloner
         {
             foreach (var p in players)
             {
-                foreach (var card in p.Zones.GetZone(ZoneType.Battlefield).GetCards())
+                var bf = p.Zones.GetZone(ZoneType.Battlefield).CardsView;
+                for (var i = 0; i < bf.Count; i++)
                 {
-                    if (card is Permanent perm && perm.ActiveEffects != null)
+                    if (bf[i] is Permanent perm && perm.ActiveEffects != null)
                         return perm.ActiveEffects;
                 }
             }
@@ -183,9 +201,10 @@ public static class GameStateCloner
             // their own).
             foreach (var cp in clonedPlayers)
             {
-                foreach (var card in cp.Zones.GetZone(ZoneType.Battlefield).GetCards())
+                var bf = cp.Zones.GetZone(ZoneType.Battlefield).CardsView;
+                for (var i = 0; i < bf.Count; i++)
                 {
-                    if (card is Permanent cperm)
+                    if (bf[i] is Permanent cperm)
                         cperm.ActiveEffects = freshCes;
                 }
             }
