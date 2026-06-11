@@ -346,10 +346,15 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
         // Returns null if no sub-template's TryExtractParams matches.
 
     {
+        // Memoized per (template, clause) — TryExtractParams is contractually
+        // pure, and the same clause strings ("Draw a card.", …) recur across
+        // cards and across every in-sim cast of the same card. Pre-memo this
+        // scan was the single largest allocation site in MCTS sandbox runs.
+        var clauseText = clause + ".";
         foreach (var t in _registry!.OrderedTemplates)
         {
             if (ReferenceEquals(t, this)) continue;
-            var p = t.TryExtractParams(clause + ".");
+            var p = SpellTemplateBindHelper.CachedTryExtractParams(t, clauseText);
             if (p is null) continue;
             return new EncodedClause
             {

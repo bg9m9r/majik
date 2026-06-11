@@ -180,7 +180,50 @@ public static class SpellTemplateBindHelper
         ArgumentNullException.ThrowIfNull(ctx);
 
         if (!template.CanBind(ctx)) return null;
-        var @params = template.TryExtractParams(ctx.Text);
+        var @params = CachedTryExtractParams(template, ctx.Text);
         return @params is null ? null : template.Rehydrate(@params, ctx);
+    }
+
+    // ── TryExtractParams memo (bot-search measured hot path) ────────────────
+    // TryExtractParams is contractually PURE ("must NOT consult engine
+    // state — the result is cached in the compiled DB"), so its result for a
+    // given (template, text) pair never changes within a process. Every cast
+    // walks the whole registry (the offline compiled-template cache was
+    // deleted with the SQLite store), and the MCTS sandbox casts constantly —
+    // the registry's regex scan measured ~30% of all per-iteration
+    // allocations. Templates are process-wide singletons, so reference
+    // identity is a valid key half. The returned dictionary is shared across
+    // binds; Rehydrate implementations only read it (verified).
+    //
+    // Soft cap: insertion stops on a full cache (correctness unaffected) —
+    // the distinct key set is bounded by templates × distinct oracle texts.
+    private const int ExtractCacheCapacity = 65536;
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        TemplateTextKey, IReadOnlyDictionary<string, string>?> ExtractCache = new();
+
+    private readonly record struct TemplateTextKey(ISpellTemplate Template, string Text);
+
+    /// <summary>
+    /// Memoized <see cref="ISpellTemplate.TryExtractParams(string)"/> — same
+    /// contract, same result, computed once per (template, text) pair. Used
+    /// by <see cref="DefaultTryBind"/> and the clause composer's per-clause
+    /// template scan.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string>? CachedTryExtractParams(
+        ISpellTemplate template, string text)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(text);
+
+        var key = new TemplateTextKey(template, text);
+        if (ExtractCache.TryGetValue(key, out var hit)) return hit;
+
+        var @params = template.TryExtractParams(text);
+        if (ExtractCache.Count < ExtractCacheCapacity)
+        {
+            ExtractCache.TryAdd(key, @params);
+        }
+        return @params;
     }
 }
