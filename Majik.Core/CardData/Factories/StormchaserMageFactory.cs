@@ -14,14 +14,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Stormchaser Mage (Oath of the Gatewatch, {U}{R}).
 ///
-/// Creature — Human Wizard 1/2. Oracle text:
+/// Creature — Human Wizard 1/3. Oracle text:
 ///   "Flying
 ///    Haste
 ///    Prowess (Whenever you cast a noncreature spell, this creature gets
 ///    +1/+1 until end of turn.)"
 ///
 /// ## Implemented (v1)
-/// - 1/2 Human Wizard, mana cost {U}{R}.
+/// - 1/3 Human Wizard, mana cost {U}{R}.
 /// - <b>Flying (CR 702.9)</b> — wired as a <see cref="KeywordAbility"/>
 ///   marker so combat code reads it (same shape as
 ///   <see cref="SpriteDragonFactory"/>).
@@ -59,7 +59,7 @@ public static class StormchaserMageFactory
     public const string CardName = "Stormchaser Mage";
     public const string PrintedManaCost = "{U}{R}";
     public const int Power = 1;
-    public const int Toughness = 2;
+    public const int Toughness = 3;
 
     /// <summary>
     /// Construct Stormchaser Mage with no effects-service / bus / trigger-

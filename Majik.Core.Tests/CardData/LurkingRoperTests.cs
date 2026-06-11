@@ -34,11 +34,11 @@ public class LurkingRoperTests
         var c = LurkingRoperFactory.Create(_alice);
 
         c.Name.Should().Be("Lurking Roper");
-        c.ManaCost.Should().Be("{3}{B}");
+        c.ManaCost.Should().Be("{2}{G}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.BasePower.Should().Be(4);
-        c.BaseToughness.Should().Be(3);
-        c.Subtypes.Should().Contain(CardSubtype.Snake);
+        c.BaseToughness.Should().Be(5);
+        c.Subtypes.Should().NotContain(CardSubtype.Snake);
         c.Subtypes.Should().Contain(CardSubtype.Horror);
     }
 
@@ -69,15 +69,12 @@ public class LurkingRoperTests
             _bob.Zones.Library.AddCard(c);
         }
 
-        var roper = LurkingRoperFactory.Create(
-            _alice,
-            triggers: null,
-            opponentResolver: () => new[] { _bob });
+        var roper = LurkingRoperFactory.Create(_alice);
 
-        // Execute the ETB effect directly (same pattern HardenedScalesTests
-        // uses for Champion of the Parish / Sprite Dragon).
+        // Resolve through a live game so the mill reads "each opponent" off the
+        // resolution context (resolver-null bug-class fix).
         var trigger = roper.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var fx in trigger.Effects) fx.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.Zones.Graveyard.GetCards().Should().HaveCount(3,
             "Lurking Roper mills 3 from each opponent");
@@ -94,15 +91,12 @@ public class LurkingRoperTests
             _alice.Zones.Library.AddCard(c);
         }
 
-        var roper = LurkingRoperFactory.Create(
-            _alice,
-            triggers: null,
-            // Resolver mistakenly includes the controller — the factory
-            // skips ReferenceEquals matches.
-            opponentResolver: () => new[] { _alice });
+        var roper = LurkingRoperFactory.Create(_alice);
 
+        // A live game whose only players are the controller — "each opponent"
+        // is empty, so the controller is never milled (CR 102.1).
         var trigger = roper.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var fx in trigger.Effects) fx.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice);
 
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty(
             "Lurking Roper's ETB mills 'each opponent', never the controller");
@@ -131,13 +125,10 @@ public class LurkingRoperTests
         _bob.Zones.Library.AddCard(c1);
         _bob.Zones.Library.AddCard(c2);
 
-        var roper = LurkingRoperFactory.Create(
-            _alice,
-            triggers: null,
-            opponentResolver: () => new[] { _bob });
+        var roper = LurkingRoperFactory.Create(_alice);
 
         var trigger = roper.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var fx in trigger.Effects) fx.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.Zones.Graveyard.GetCards().Should().HaveCount(2,
             "CR 701.13 — fewer than N cards left, mill all remaining");

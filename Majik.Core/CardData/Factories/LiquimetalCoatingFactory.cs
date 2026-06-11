@@ -51,7 +51,7 @@ namespace Majik.Core.CardData.Factories;
 public static class LiquimetalCoatingFactory
 {
     public const string CardName = "Liquimetal Coating";
-    public const string Cost = "{3}";
+    public const string Cost = "{2}";
 
     /// <summary>
     /// Construct Liquimetal Coating with no live runtime wiring. The

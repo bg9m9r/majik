@@ -111,8 +111,12 @@ public class LotusPetalTests
         produced.Green.Should().Be(1);
         produced.TotalValue.Should().Be(1);
 
-        // Petal is tapped (cost) AND moved to owner's graveyard (sacrifice).
-        petal.IsTapped.Should().BeTrue("activation taps the petal");
+        // Petal is moved to owner's graveyard (sacrifice). Although the
+        // activation cost taps the petal, the sacrifice immediately moves it
+        // to the graveyard — CR 400.7 / 614, the card becomes a new object on
+        // the zone change and loses its tapped status.
+        petal.IsTapped.Should().BeFalse(
+            "CR 400.7 — the petal becomes a new object in the graveyard and is no longer tapped");
         petal.Zone.Should().Be(ZoneType.Graveyard,
             "CR 701.16 — sacrifice moves the petal from battlefield to its owner's graveyard");
         _alice.Zones.Battlefield.GetCards().Should().NotContain(petal,

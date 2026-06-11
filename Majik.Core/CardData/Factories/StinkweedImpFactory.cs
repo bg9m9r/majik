@@ -51,7 +51,7 @@ namespace Majik.Core.CardData.Factories;
 public static class StinkweedImpFactory
 {
     public const string CardName = "Stinkweed Imp";
-    public const string PrintedManaCost = "{1}{B}";
+    public const string PrintedManaCost = "{2}{B}";
     public const int Power = 1;
     public const int Toughness = 2;
     public const int DredgeValue = 5;

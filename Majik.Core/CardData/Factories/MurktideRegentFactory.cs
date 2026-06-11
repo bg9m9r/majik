@@ -9,7 +9,7 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Murktide Regent (Modern Horizons 2, {3}{U}{U}).
+/// Named-card factory for Murktide Regent (Modern Horizons 2, {5}{U}{U}).
 ///
 /// Creature — Dragon 3/3. Oracle text:
 ///   "Flying. Delve (Each card you exile from your graveyard while casting
@@ -82,7 +82,7 @@ public static class MurktideRegentFactory
 
         var card = new Creature(
             name: "Murktide Regent",
-            manaCost: "{3}{U}{U}",
+            manaCost: "{5}{U}{U}",
             power: 3,
             toughness: 3,
             subtypes: new[] { CardSubtype.Dragon });

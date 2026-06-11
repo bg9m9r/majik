@@ -29,9 +29,29 @@ internal sealed class Mcts
 
     /// <summary>
     /// Run UCT from the given root state and return the best (robust-child)
-    /// root move.
+    /// root move. Thin wrapper over <see cref="SearchWithStats"/>; behaviour is
+    /// identical (same UCT loop, same robust-child selection).
     /// </summary>
-    public SimMove Search(SimState root)
+    public SimMove Search(SimState root) => SearchWithStats(root).Best;
+
+    /// <summary>
+    /// Run UCT from the given root state and return both the best (robust-child)
+    /// root move and the per-root-child statistics that backed the choice.
+    ///
+    /// <para>
+    /// The K-world determinization loop calls this once per world and sums the
+    /// returned <see cref="RootStat.Visits"/> across worlds (grouped by
+    /// <see cref="SimMove.Key"/>) to vote on a single move.
+    /// </para>
+    ///
+    /// <para>
+    /// On a forced/trivial root (a single legal move) the search short-circuits
+    /// before building a tree: <see cref="SearchResult.Best"/> is that move and
+    /// <see cref="SearchResult.RootStats"/> is a single un-searched entry
+    /// (Visits = 0, TotalValue = 0) for it.
+    /// </para>
+    /// </summary>
+    public SearchResult SearchWithStats(SimState root)
     {
         ArgumentNullException.ThrowIfNull(root);
 
@@ -42,7 +62,12 @@ internal sealed class Mcts
             throw new InvalidOperationException("Root position is already terminal — no move to return.");
 
         if (rootDecision.LegalMoves.Count == 1)
-            return rootDecision.LegalMoves[0];
+        {
+            // Forced move: no tree is built. Surface it as Best with a single
+            // un-searched RootStat so callers always see a well-formed result.
+            var only = rootDecision.LegalMoves[0];
+            return new SearchResult(only, new[] { new RootStat(only, Visits: 0, TotalValue: 0.0) });
+        }
 
         // ── Build root node ────────────────────────────────────────────────────
         var rootNode = new MctsNode(incomingMove: null, rootDecision.LegalMoves);
@@ -137,10 +162,20 @@ internal sealed class Mcts
 
         // ── Robust child selection ─────────────────────────────────────────────
         // Most-visited root child; tie-break by higher mean value.
-        return rootNode.Children
+        var best = rootNode.Children
             .OrderByDescending(c => c.Visits)
             .ThenByDescending(c => c.MeanValue)
             .First()
             .IncomingMove!;
+
+        // ── Root-child stats ───────────────────────────────────────────────────
+        // One entry per expanded root child carrying a move (the root node itself
+        // has a null IncomingMove and is excluded).
+        var rootStats = rootNode.Children
+            .Where(c => c.IncomingMove is not null)
+            .Select(c => new RootStat(c.IncomingMove!, c.Visits, c.TotalValue))
+            .ToList();
+
+        return new SearchResult(best, rootStats);
     }
 }

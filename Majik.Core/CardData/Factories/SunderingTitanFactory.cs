@@ -12,13 +12,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Sundering Titan (Mirrodin, {8}).
 ///
-/// Artifact Creature — Phyrexian Golem 7/10. Oracle text:
+/// Artifact Creature — Golem 7/10. Oracle text:
 ///   "When Sundering Titan enters, choose one land of each basic land type,
 ///    then destroy those lands. When Sundering Titan leaves the battlefield,
 ///    choose one land of each basic land type, then destroy those lands."
 ///
 /// ## Implemented (v1)
-/// - 7/10 Artifact Creature — Phyrexian Golem at {8}. Both card types layered
+/// - 7/10 Artifact Creature — Golem at {8}. Both card types layered
 ///   on (CR 301.1 / 302.1) and both subtypes attached.
 /// - <b>ETB triggered ability (CR 603.6a)</b>: "choose one land of each basic
 ///   land type, then destroy those lands." For each of the five basic land
@@ -124,7 +124,7 @@ public static class SunderingTitanFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Golem });
+            subtypes: new[] { CardSubtype.Golem });
 
         // CR 301.1 / 302.1 — Artifact Creature shares both card types.
         card.AddCardType(CardType.Artifact);

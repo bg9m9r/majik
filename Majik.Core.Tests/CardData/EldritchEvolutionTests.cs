@@ -92,7 +92,7 @@ public class EldritchEvolutionTests
         var card = EldritchEvolutionFactory.Create(owner);
 
         card.Name.Should().Be("Eldritch Evolution");
-        card.ManaCost.Should().Be("{1}{G}");
+        card.ManaCost.Should().Be("{1}{G}{G}");
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.Owner.Should().Be(owner);
         card.Controller.Should().Be(owner);
@@ -106,7 +106,7 @@ public class EldritchEvolutionTests
 
         card.Should().BeOfType<Sorcery>();
         card.Name.Should().Be("Eldritch Evolution");
-        card.ManaCost.Should().Be("{1}{G}");
+        card.ManaCost.Should().Be("{1}{G}{G}");
         card.HasType(CardType.Sorcery).Should().BeTrue();
     }
 

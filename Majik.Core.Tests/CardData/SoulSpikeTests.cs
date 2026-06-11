@@ -57,7 +57,7 @@ public class SoulSpikeTests
         var ss = SoulSpikeFactory.Create(_alice);
 
         ss.Name.Should().Be("Soul Spike");
-        ss.ManaCost.Should().Be("{3}{B}{B}");
+        ss.ManaCost.Should().Be("{5}{B}{B}");
         ss.HasType(CardType.Instant).Should().BeTrue();
         ss.Owner.Should().BeSameAs(_alice);
         ss.Controller.Should().BeSameAs(_alice);
@@ -71,7 +71,7 @@ public class SoulSpikeTests
         card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Soul Spike");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}{B}{B}");
+        card.ManaCost.Should().Be("{5}{B}{B}");
     }
 
     // ── Resolution — damage + lifegain ───────────────────────────────────

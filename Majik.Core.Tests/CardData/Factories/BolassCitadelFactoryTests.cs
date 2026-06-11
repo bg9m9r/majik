@@ -133,11 +133,10 @@ public class BolassCitadelFactoryTests : IDisposable
     public void DrainAbility_ResolverProvided_EachOpponentLoses10()
     {
         var citadel = BolassCitadelFactory.Create(
-            _alice, continuousEffects: null,
-            opponentResolver: () => new[] { _bob });
+            _alice, continuousEffects: null);
         var ability = citadel.Abilities.OfType<ActivatedAbility>().Single();
 
-        foreach (var e in ability.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(10);
         _alice.LifeTotal.Should().Be(20, "the controller is not an opponent");

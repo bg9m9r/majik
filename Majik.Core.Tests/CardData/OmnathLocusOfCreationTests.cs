@@ -74,7 +74,7 @@ public class OmnathLocusOfCreationTests
         var omnath = OmnathLocusOfCreationFactory.Create(_alice);
 
         omnath.Name.Should().Be("Omnath, Locus of Creation");
-        omnath.ManaCost.Should().Be("{1}{R}{G}{W}{U}");
+        omnath.ManaCost.Should().Be("{R}{G}{W}{U}");
         omnath.HasType(CardType.Creature).Should().BeTrue();
         omnath.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         omnath.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
@@ -108,8 +108,6 @@ public class OmnathLocusOfCreationTests
 
         var omnath = OmnathLocusOfCreationFactory.Create(
             _alice,
-            opponentResolver: null,
-            foreignPlaneswalkerResolver: null,
             eventBus: bus,
             triggers: triggers);
 
@@ -140,8 +138,7 @@ public class OmnathLocusOfCreationTests
         var triggers = new TriggerManager(stack, bus);
 
         var omnath = OmnathLocusOfCreationFactory.Create(
-            _alice, opponentResolver: () => new[] { _bob },
-            foreignPlaneswalkerResolver: null, eventBus: bus, triggers: triggers);
+            _alice, eventBus: bus, triggers: triggers);
         _alice.Zones.Battlefield.AddCard(omnath);
         omnath.SetZone(ZoneType.Battlefield);
 
@@ -173,8 +170,7 @@ public class OmnathLocusOfCreationTests
         var triggers = new TriggerManager(stack, bus);
 
         var omnath = OmnathLocusOfCreationFactory.Create(
-            _alice, opponentResolver: () => new[] { _bob },
-            foreignPlaneswalkerResolver: null, eventBus: bus, triggers: triggers);
+            _alice, eventBus: bus, triggers: triggers);
         _alice.Zones.Battlefield.AddCard(omnath);
         omnath.SetZone(ZoneType.Battlefield);
 
@@ -215,8 +211,6 @@ public class OmnathLocusOfCreationTests
 
         var omnath = OmnathLocusOfCreationFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
-            foreignPlaneswalkerResolver: () => new[] { bobPw, alicePw },
             eventBus: bus,
             triggers: triggers);
         _alice.Zones.Battlefield.AddCard(omnath);
@@ -228,7 +222,9 @@ public class OmnathLocusOfCreationTests
             _alice.Zones.Battlefield.AddCard(l); l.SetZone(ZoneType.Battlefield);
             bus.Publish(new CardMovedEvent(l, ZoneType.Library, ZoneType.Battlefield));
             triggers.PutPendingTriggersOnStack(_alice);
-            stack.Pop()!.Resolve();
+            // Resolve through a live game so the 3rd landfall reads "each
+            // opponent" + their planeswalkers off the context (resolver-null fix).
+            Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
         }
 
         _bob.LifeTotal.Should().Be(16, "3rd landfall: Bob takes 4 damage");
@@ -246,8 +242,6 @@ public class OmnathLocusOfCreationTests
 
         var omnath = OmnathLocusOfCreationFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
-            foreignPlaneswalkerResolver: null,
             eventBus: bus,
             triggers: triggers);
         _alice.Zones.Battlefield.AddCard(omnath);
@@ -286,8 +280,7 @@ public class OmnathLocusOfCreationTests
         var triggers = new TriggerManager(stack, bus);
 
         var omnath = OmnathLocusOfCreationFactory.Create(
-            _alice, opponentResolver: () => new[] { _bob },
-            foreignPlaneswalkerResolver: null, eventBus: bus, triggers: triggers);
+            _alice, eventBus: bus, triggers: triggers);
         _alice.Zones.Battlefield.AddCard(omnath);
         omnath.SetZone(ZoneType.Battlefield);
 

@@ -14,19 +14,21 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Bitterblossom (Morningtide, {1}{B}).
 ///
-/// Tribal Enchantment — Faerie. Oracle text:
+/// Enchantment — Faerie (printed "Kindred Enchantment — Faerie"; see note
+/// below). Oracle text:
 ///   "At the beginning of your upkeep, you lose 1 life and create a 1/1
 ///    black Faerie Rogue creature token with flying."
 ///
 /// ## Implemented (v1)
-/// - Enchantment shape with mana cost {1}{B}. <see cref="CardType.Tribal"/>
-///   is added post-construction (the <see cref="Enchantment"/> ctor only
-///   stamps <see cref="CardType.Enchantment"/>; Morningtide's "Tribal
-///   Enchantment" line gets the second card type via
-///   <see cref="Card.AddCardType"/>). <see cref="CardSubtype.Faerie"/>
-///   subtype is wired so tribal-Faerie lords (Bitterblossom itself is
-///   famously a Faerie permanent thanks to the Tribal type — Spellstutter
-///   Sprite, Scion of Oona, etc. all see it).
+/// - Enchantment shape with mana cost {1}{B} and the
+///   <see cref="CardSubtype.Faerie"/> subtype. The printed type line is
+///   "Kindred Enchantment — Faerie", but the Kindred (formerly "Tribal")
+///   card type was removed by the 2024 type-line errata and the seed no
+///   longer carries it; the engine does NOT stamp
+///   <see cref="CardType.Tribal"/> (Tribal product decision — see the
+///   semantic-parity-tail PR). The Faerie SUBTYPE — not the removed Kindred
+///   card type — is what Faerie-matters effects (Spellstutter Sprite,
+///   Scion of Oona, etc.) key off, and it rides on the Enchantment ctor.
 /// - Upkeep triggered ability (CR 603.1, CR 500.4): "At the beginning of
 ///   your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue
 ///   creature token with flying." Built via <see cref="Triggers.OnStepBegin"/>
@@ -111,15 +113,18 @@ public static class BitterblossomFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        // Morningtide's "Tribal Enchantment — Faerie" line: Faerie subtype
-        // is wired via the Enchantment ctor; Tribal type is added after
-        // construction (the Enchantment ctor only registers Enchantment).
+        // Morningtide's printed line is "Kindred Enchantment — Faerie", but
+        // the Kindred (formerly "Tribal") card type was removed by the 2024
+        // type-line errata; the seed type line is just "Enchantment — Faerie"
+        // and the engine no longer stamps CardType.Tribal (Tribal product
+        // decision — see the semantic-parity-tail PR). The Faerie subtype
+        // rides on the Enchantment ctor and is what Faerie-matters effects
+        // (Spellstutter Sprite, Scion of Oona, etc.) key off.
         var card = new Enchantment(
             CardName,
             PrintedManaCost,
             supertypes: null,
             subtypes: new[] { CardSubtype.Faerie });
-        card.AddCardType(CardType.Tribal);
         card.SetOwner(owner);
         card.SetController(owner);
 

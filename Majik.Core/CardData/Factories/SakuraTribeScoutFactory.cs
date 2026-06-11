@@ -96,7 +96,7 @@ public static class SakuraTribeScoutFactory
             manaCost: PrintedManaCost,
             power: 1,
             toughness: 1,
-            subtypes: new[] { CardSubtype.Snake, CardSubtype.Scout });
+            subtypes: new[] { CardSubtype.Snake, CardSubtype.Shaman, CardSubtype.Scout });
 
         card.SetOwner(owner);
         card.SetController(owner);

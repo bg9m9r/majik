@@ -40,8 +40,33 @@ public sealed class LoyaltyAbility : IAbility
 {
     private readonly List<IEffect> _effects = new();
 
-    public Planeswalker Source { get; }
+    /// <summary>
+    /// CR 606 — the permanent this loyalty ability belongs to. Typed
+    /// <see cref="Permanent"/> (not <see cref="Planeswalker"/>) so a
+    /// creature-front DFC flipped to its planeswalker back — built as a
+    /// <see cref="Creature"/> C# instance carrying a transient loyalty body
+    /// (CR 711) — can host loyalty abilities too. A real
+    /// <see cref="Planeswalker"/> reads/writes its own authoritative loyalty
+    /// field through the same <see cref="Permanent"/>-level surface
+    /// (<see cref="Permanent.GetEffectiveLoyalty"/> /
+    /// <see cref="Permanent.AddTransientLoyalty"/> /
+    /// <see cref="Permanent.RemoveTransientLoyalty"/>), so both shapes behave
+    /// identically.
+    /// </summary>
+    public Permanent Source { get; }
     public int LoyaltyChange { get; }
+
+    /// <summary>
+    /// Stable identity for this loyalty ability, assigned at construction.
+    /// A loyalty ability is not an <see cref="IStackObject"/> (its cost is
+    /// pre-paid and the dispatch path builds a fresh
+    /// <see cref="ActivatedAbility"/> stack object from this template), so it
+    /// carries its own id purely so the wire layer can address ONE specific
+    /// loyalty ability on a planeswalker (a card has several: +1 / −2 / −5).
+    /// Surfaced on the snapshot ability DTO and echoed back by
+    /// <c>ActivateLoyaltyAbilityCommand.LoyaltyAbilityId</c>.
+    /// </summary>
+    public Guid Id { get; } = Guid.NewGuid();
 
     /// <summary>
     /// The effects this loyalty ability resolves off the stack (CR 608).
@@ -67,7 +92,7 @@ public sealed class LoyaltyAbility : IAbility
     /// <see cref="ResolutionContext"/>.
     /// </summary>
     public LoyaltyAbility(
-        Planeswalker source,
+        Permanent source,
         int loyaltyChange,
         IEnumerable<IEffect> effects,
         IEnumerable<TargetRequest>? targetRequests = null)
@@ -87,7 +112,7 @@ public sealed class LoyaltyAbility : IAbility
     /// that capture their controller / resolvers in a closure keep working
     /// unchanged; only the timing shifts from "immediate" to "on resolution".
     /// </summary>
-    public LoyaltyAbility(Planeswalker source, int loyaltyChange, Action effect)
+    public LoyaltyAbility(Permanent source, int loyaltyChange, Action effect)
         : this(
             source,
             loyaltyChange,
@@ -114,7 +139,11 @@ public sealed class LoyaltyAbility : IAbility
     public bool CanActivate()
     {
         if (Source.LoyaltyAbilityActivatedThisTurn) return false;
-        if (LoyaltyChange < 0 && Source.Loyalty + LoyaltyChange < 0) return false;
+        // CR 606.3 — read the EFFECTIVE loyalty (Planeswalker.Loyalty for a
+        // real planeswalker; the transient body for a flipped creature-front
+        // DFC). No loyalty body at all → cannot activate a loyalty ability.
+        if (Source.GetEffectiveLoyalty() is not { } loyalty) return false;
+        if (LoyaltyChange < 0 && loyalty + LoyaltyChange < 0) return false;
         return true;
     }
 
@@ -129,8 +158,12 @@ public sealed class LoyaltyAbility : IAbility
         if (!CanActivate())
             throw new InvalidOperationException("Loyalty ability cannot be activated");
 
-        if (LoyaltyChange > 0) Source.AddLoyalty(LoyaltyChange);
-        else if (LoyaltyChange < 0) Source.RemoveLoyalty(-LoyaltyChange);
+        // CR 606.3/606.5 — pay through the Permanent-level loyalty surface.
+        // For a real Planeswalker these route to its authoritative Loyalty
+        // field (overrides); for a flipped creature-front DFC they mutate the
+        // transient loyalty body.
+        if (LoyaltyChange > 0) Source.AddTransientLoyalty(LoyaltyChange);
+        else if (LoyaltyChange < 0) Source.RemoveTransientLoyalty(-LoyaltyChange);
 
         Source.LoyaltyAbilityActivatedThisTurn = true;
     }

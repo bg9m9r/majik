@@ -15,13 +15,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Eldrazi Skyspawner (Battle for Zendikar, {2}{U}).
 ///
-/// Creature — Eldrazi Drone 2/2. Oracle text (Scryfall, verified):
+/// Creature — Eldrazi Drone 2/1. Oracle text (Scryfall, verified):
 ///   "Flying
 ///    When this creature enters, create a 1/1 colorless Eldrazi Scion
 ///    creature token with \"Sacrifice this creature: Add {C}.\""
 ///
 /// ## Implemented (v1)
-/// - 2/2 Creature — Eldrazi Drone at {2}{U}.
+/// - 2/1 Creature — Eldrazi Drone at {2}{U}.
 /// - Flying (CR 702.9) attached as a <see cref="KeywordAbility"/> marker
 ///   so combat / colour-matters surfaces observe it (same posture as
 ///   Pinnacle Emissary's Drone token, Slickshot Show-Off's Flying).
@@ -60,7 +60,7 @@ public static class EldraziSkyspawnerFactory
     public const string CardName = "Eldrazi Skyspawner";
     public const string PrintedManaCost = "{2}{U}";
     public const int Power = 2;
-    public const int Toughness = 2;
+    public const int Toughness = 1;
     public const int TokenPower = 1;
     public const int TokenToughness = 1;
 

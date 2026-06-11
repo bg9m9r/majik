@@ -73,6 +73,7 @@ public static class SkithiryxTheBlightDragonFactory
             supertypes: new[] { CardSupertype.Legendary },
             subtypes: new[]
             {
+                CardSubtype.Phyrexian,
                 CardSubtype.Skeleton,
                 CardSubtype.Dragon,
             });

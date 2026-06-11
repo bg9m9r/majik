@@ -58,25 +58,29 @@ namespace Majik.Core.CardData.Factories;
 public static class PerniciousDeedFactory
 {
     /// <summary>
-    /// Construct Pernicious Deed with no live runtime wiring.
-    /// Activated ability resolves with X = 0 (single-arg path can't
-    /// know X); the sweep scans only the controller's battlefield.
-    /// Suitable for shape / dispatcher tests.
+    /// Construct Pernicious Deed. This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to on the production routed
+    /// build; the sweep reads every player's battlefield from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution, so it is
+    /// correct in real games. Activated ability resolves with X = 0 (single-arg
+    /// path can't know X — see <paramref name="xValueProvider"/> deferral).
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, xValueProvider: null, allPlayersResolver: null);
+        Create(owner, xValueProvider: null);
 
     /// <summary>
     /// Construct Pernicious Deed. When <paramref name="xValueProvider"/>
     /// is supplied, the activated ability uses that as the mv ceiling
-    /// at resolution time. When <paramref name="allPlayersResolver"/>
-    /// is supplied, the sweep scans every player's battlefield;
-    /// otherwise only the controller's battlefield is scanned.
+    /// at resolution time. The sweep scans every player's battlefield read
+    /// from the live resolution context (<c>ctx.Game.AllPlayers</c>) at
+    /// resolution — no captured player resolver, so it is correct on both the
+    /// shape build and the routed prod build (mirrors #2551 / Engineered
+    /// Explosives). With no live game context the sweep falls back to the
+    /// controller's battlefield (shape-only paths).
     /// </summary>
     public static Enchantment Create(
         Player owner,
-        Func<int>? xValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        Func<int>? xValueProvider)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -94,8 +98,9 @@ public static class PerniciousDeedFactory
         //   no-op stub at the engine level (see Engineered Explosives /
         //   Mishra's Bauble); the effect closure performs the zone move
         //   so visible state matches CR 701.16.
-        // - Effect: iterate every battlefield (resolver-supplied; falls
-        //   back to controller-only when no resolver). For each card on
+        // - Effect: iterate every battlefield (read from the live resolution
+        //   context — ctx.Game.AllPlayers — at resolution; falls back to
+        //   controller-only when no live game). For each card on
         //   the battlefield: if it is an Artifact, Creature, or
         //   Enchantment, and its mana value is ≤ X, destroy it
         //   (move to its owner's graveyard). Lands and Planeswalkers
@@ -103,7 +108,7 @@ public static class PerniciousDeedFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             "Pernicious Deed: destroy each artifact, creature, and enchantment with mv ≤ X",
-            () =>
+            ctx =>
             {
                 var x = xValueProvider?.Invoke() ?? 0;
 
@@ -117,7 +122,12 @@ public static class PerniciousDeedFactory
                     card.SetZone(ZoneType.Graveyard);
                 }
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each artifact, creature, and enchantment" — across every
+                // player's battlefield, read from the LIVE game at resolution
+                // (ctx.Game.AllPlayers). No captured resolver, so the sweep is
+                // correct on the routed prod build. Shape-only resolves (no
+                // game) fall back to the controller's battlefield.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -150,6 +160,8 @@ public static class PerniciousDeedFactory
                         v.SetZone(ZoneType.Graveyard);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var ability = new ActivatedAbility(

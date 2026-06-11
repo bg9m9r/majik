@@ -54,8 +54,8 @@ public class GoblinAnarchomancerTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         c.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        c.Power.Should().Be(1);
-        c.Toughness.Should().Be(3);
+        c.Power.Should().Be(2);
+        c.Toughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
 

@@ -54,7 +54,7 @@ public class GurmagAnglerTests
         var ang = GurmagAnglerFactory.Create(_alice);
 
         ang.Name.Should().Be("Gurmag Angler");
-        ang.ManaCost.Should().Be("{7}{B}");
+        ang.ManaCost.Should().Be("{6}{B}");
         ang.HasType(CardType.Creature).Should().BeTrue();
         ang.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
         ang.HasSubtype(CardSubtype.Fish).Should().BeTrue();
@@ -101,9 +101,9 @@ public class GurmagAnglerTests
     [Fact]
     public async Task GurmagAngler_CastWithDelve_ExilesGraveyardCards_AndResolvesToBattlefield()
     {
-        // Seed Alice's graveyard with 7 cards — enough to delve away the
-        // entire generic portion of {7}{B}, leaving only {B} to pay.
-        var fodder = SeedGraveyard(_alice, 7);
+        // Seed Alice's graveyard with 6 cards — enough to delve away the
+        // entire generic portion of {6}{B}, leaving only {B} to pay.
+        var fodder = SeedGraveyard(_alice, 6);
         var ang = AnglerInHand(_alice);
 
         var delve = new DelveCost(ang, fodder);
@@ -119,14 +119,14 @@ public class GurmagAnglerTests
             agent, ctx,
             delveCost: delve);
 
-        // All 7 delve-paid cards are now in exile.
-        _alice.Zones.Exile.GetCards().Should().HaveCount(7);
+        // All 6 delve-paid cards are now in exile.
+        _alice.Zones.Exile.GetCards().Should().HaveCount(6);
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
 
         // The cast flow stamps the delve count on the card per the
         // PendingDelveExiledCount contract — even though Gurmag Angler has
         // no consumer, the stamp lifecycle still runs.
-        ang.PendingDelveExiledCount.Should().Be(7);
+        ang.PendingDelveExiledCount.Should().Be(6);
 
         _resolver.ResolveTop(_stack);
         ang.Zone.Should().Be(ZoneType.Battlefield);

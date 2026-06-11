@@ -68,23 +68,21 @@ public static class KessigFlamebreatherFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Kessig Flamebreather with optional runtime services.
+    /// Construct Kessig Flamebreather with optional runtime services. "Each
+    /// opponent" is read from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so the damage is correct on the
+    /// production routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="opponentResolver">Supplies the player list the
-    /// noncreature-cast trigger deals 1 damage to (typically every
-    /// <c>Game.Players</c> entry that isn't the controller). When null the
-    /// damage side is a no-op (CR 800.4 — "each opponent").</param>
     /// <param name="eventBus">Reserved for future lifecycle subscribers
     /// (e.g. LTB unregister); not used directly by this factory.</param>
     /// <param name="triggers">TriggerManager for the damage trigger. May be
     /// null — the trigger is still attached to the card shape.</param>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -107,18 +105,20 @@ public static class KessigFlamebreatherFactory
 
         var damageEffect = new Effect(
             $"{CardName}: deal {Damage} damage to each opponent (whenever you cast a noncreature spell)",
-            () =>
+            ctx =>
             {
                 // CR 800.4 — "each opponent" = every player other than the
                 // controller. CR 119.3 / 119.8 — damage to a player reduces
-                // their life total / is dealt as life loss.
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                // their life total / is dealt as life loss. "Each opponent" is
+                // read from the LIVE resolution context — NOT a captured
+                // resolver, which was null on the routed prod build and made the
+                // damage INERT in real games (resolver-null bug class).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamage(opp, Damage);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var damageTrigger = new TriggeredAbility(

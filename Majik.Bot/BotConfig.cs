@@ -70,6 +70,39 @@ namespace Majik.Bot;
 /// games are slow (e.g., because the sandbox heuristic hits the priority-loop
 /// safety on unimplemented cards). The combat search (DeclareAttackers /
 /// DeclareBlockers) is unaffected by this flag.</para>
+///
+/// <para><c>OpponentArchetype</c> optional. When set to a known archetype name
+/// (a key in <see cref="Decks.BotDeckCatalog"/>), <see cref="Search.SearchStrategy"/>
+/// runs <em>determinized</em> MCTS: the search samples the opponent's hidden zones
+/// from that archetype's decklist across K worlds and votes by summed robust child
+/// (see <see cref="Search.DeterminizedSearch"/>). When null (the default), the bot
+/// uses today's perfect-info single-tree search — the opponent's hidden zones are
+/// left exactly as captured. Null is the production-safe default: an unknown
+/// opponent must NOT route through determinization, which would invent a wrong
+/// hidden world.</para>
+///
+/// <para><c>InferOpponentArchetype</c> optional (default false). When true AND
+/// <c>OpponentArchetype</c> is null, <see cref="Search.SearchStrategy"/> reads the
+/// opponent's PUBLIC cards from the live <see cref="Majik.Core.Game.GameContext"/>,
+/// infers a normalized belief over the curated archetypes
+/// (<see cref="OpponentModel.ArchetypeInferencer"/>), allocates the determinized
+/// worlds across that belief (<see cref="OpponentModel.WorldAllocator"/>), and runs
+/// belief-driven determinized search (<see cref="Search.DeterminizedSearch.RunBelief"/>).
+/// This is the "honest-vs-human" path: the opponent's deck is unknown, so it is
+/// inferred from their revealed public cards rather than assumed. Ignored when an
+/// explicit <c>OpponentArchetype</c> is set (the known-archetype path takes
+/// precedence). Default false preserves today's perfect-info behaviour for every
+/// existing caller.</para>
+///
+/// <para><c>RiskVoteThreshold</c> optional (default null). Catastrophe threshold
+/// for the risk-aware two-tier vote in <see cref="Search.DeterminizedSearch"/>:
+/// determinized lines whose worst per-world mean falls at or below this value are
+/// demoted below safe lines. Null resolves to
+/// <see cref="Search.DeterminizedSearch.DefaultCatastropheThreshold"/> (-500);
+/// <see cref="double.NegativeInfinity"/> is the kill switch — it disables the
+/// risk filter entirely (no line can score at or below it). Only consulted by
+/// <see cref="Search.SearchStrategy"/> on the determinized paths; the perfect-info
+/// search ignores it.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -82,4 +115,7 @@ public sealed record BotConfig(
     int? MaxMctsIterations = null,
     int? MaxMctsBudgetMs = null,
     bool PrioritySearchEnabled = true,
-    ArchetypeWeights? WeightsOverride = null);
+    ArchetypeWeights? WeightsOverride = null,
+    string? OpponentArchetype = null,
+    bool InferOpponentArchetype = false,
+    double? RiskVoteThreshold = null);

@@ -4,6 +4,7 @@ using Majik.Bot.Heuristic;
 using Majik.Bot.Tests.Helpers;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Game;
 using Majik.Core.Players.Agents;
@@ -323,6 +324,133 @@ public class ActivatedAbilityPolicyTests
         var action = pol.Pick(oppCtx, s.Self);
 
         action.Should().BeOfType<PriorityAction.ActivateAbility>();
+    }
+
+    // ----- Fetchland crack (live-bot bug: fetch played but never cracked) -----
+    //
+    // CR 602 (activated abilities) + CR 701.23 (search). The fetch shape —
+    // "{T}, Pay 1 life, Sacrifice: search library for a land, put onto
+    // battlefield" — is mana-NEUTRAL on the sacrifice (the fetched land
+    // replaces the cracked one) plus deck thinning / colour fixing, so
+    // cracking is almost always correct when a target exists. The generic
+    // cost/effect decomposition mis-scored it (full -ManaSources for the sac,
+    // tiny default effect bump) → the bot never cracked, playing one fewer
+    // land every game.
+
+    private static Land BuildFetch(BotTestScenario s, string name, string a, string b)
+    {
+        var fetch = Majik.Core.CardData.Factories.FetchLandCycleFactory.Create(
+            s.Self, new[] { name, a, b });
+        s.Self.Zones.Battlefield.AddCard(fetch);
+        return fetch;
+    }
+
+    private static void AddBasicToLibrary(BotTestScenario s, string name, CardSubtype subtype)
+    {
+        var basic = new Land(name,
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { subtype });
+        basic.ChangeOwner(s.Self);
+        s.Self.Zones.Library.AddCard(basic);
+    }
+
+    [Fact]
+    public void FetchAbility_WithTargetInLibrary_ScoresPositive()
+    {
+        var s = new BotTestScenario();
+        var fetch = BuildFetch(s, "Arid Mesa", "Plains", "Mountain");
+        AddBasicToLibrary(s, "Mountain", CardSubtype.Mountain);
+
+        var ability = fetch.Abilities.OfType<Majik.Core.Abilities.IActivatedAbility>().Single();
+        var delta = ActivatedAbilityPolicy.ProjectActivateDelta(
+            ability, s.Context, s.Self, ArchetypeWeights.Default);
+
+        delta.Should().BeGreaterThan(0,
+            "cracking a fetch with a target in library is mana-neutral free value — must beat Pass");
+    }
+
+    [Fact]
+    public void FetchAbility_WithTargetInLibrary_ScoresPositive_OnEveryArchetype()
+    {
+        // Burn's heavy LifeDelta weight must not sink the pay-1-life cost
+        // below Pass — real burn decks crack fetches all game long.
+        foreach (var archetype in new[] { "Burn", "Prowess", "BorosEnergy", "AzoriusControl", "Other" })
+        {
+            var s = new BotTestScenario();
+            var fetch = BuildFetch(s, "Bloodstained Mire", "Swamp", "Mountain");
+            AddBasicToLibrary(s, "Mountain", CardSubtype.Mountain);
+
+            var ability = fetch.Abilities.OfType<Majik.Core.Abilities.IActivatedAbility>().Single();
+            var delta = ActivatedAbilityPolicy.ProjectActivateDelta(
+                ability, s.Context, s.Self, ArchetypeWeights.ForArchetype(archetype));
+
+            delta.Should().BeGreaterThan(0, $"archetype {archetype} must crack fetches");
+        }
+    }
+
+    [Fact]
+    public void FetchAbility_NoFetchableTarget_DoesNotScorePositive()
+    {
+        // Library holds only a Plains — Bloodstained Mire (Swamp/Mountain)
+        // has no target. Cracking is a pure loss: pay 1 life + lose a land.
+        var s = new BotTestScenario();
+        var fetch = BuildFetch(s, "Bloodstained Mire", "Swamp", "Mountain");
+        AddBasicToLibrary(s, "Plains", CardSubtype.Plains);
+
+        var ability = fetch.Abilities.OfType<Majik.Core.Abilities.IActivatedAbility>().Single();
+        var delta = ActivatedAbilityPolicy.ProjectActivateDelta(
+            ability, s.Context, s.Self, ArchetypeWeights.Default);
+
+        delta.Should().BeLessThanOrEqualTo(0, "no fetchable target → hold the fetch");
+    }
+
+    [Fact]
+    public void PriorityPolicy_CracksFetchland_WhenTargetInLibrary()
+    {
+        // The argmax-level repro of the live bug: a crackable fetch on the
+        // battlefield + a target in library + priority in our main phase.
+        // The bot must propose the activation, not Pass forever.
+        var s = new BotTestScenario();
+        var fetch = BuildFetch(s, "Scalding Tarn", "Island", "Mountain");
+        AddBasicToLibrary(s, "Mountain", CardSubtype.Mountain);
+
+        var pol = new PriorityPolicy(ArchetypeWeights.Default);
+        var action = pol.Pick(s.Context, s.Self);
+
+        action.Should().BeOfType<PriorityAction.ActivateAbility>(
+            "a fetchland with a live target must be cracked");
+        ((PriorityAction.ActivateAbility)action).Ability.Source.Should().BeSameAs(fetch);
+    }
+
+    [Fact]
+    public void HeuristicStrategy_CracksFetchland_ProdConfig()
+    {
+        // Prod path: ServerGameFactory installs BotConfig(archetype) with
+        // Strategy="heuristic" → HeuristicStrategy.PickPriorityAction.
+        var s = new BotTestScenario();
+        BuildFetch(s, "Bloodstained Mire", "Swamp", "Mountain");
+        AddBasicToLibrary(s, "Mountain", CardSubtype.Mountain);
+
+        var strategy = new HeuristicStrategy(new BotConfig(ArchetypeName: "Burn"));
+        var action = strategy.PickPriorityAction(s.Context, s.Self);
+
+        action.Should().BeOfType<PriorityAction.ActivateAbility>();
+    }
+
+    [Fact]
+    public void PriorityPolicy_DoesNotCrackFetch_AtCriticallyLowLife()
+    {
+        // At 1 life the pay-1-life cost is unpayable (CanPay requires
+        // LifeTotal > amount); at 2 life it's legal but suicidal-adjacent —
+        // the policy should hold the fetch rather than burn the last buffer.
+        var s = new BotTestScenario(selfLife: 2);
+        BuildFetch(s, "Arid Mesa", "Plains", "Mountain");
+        AddBasicToLibrary(s, "Mountain", CardSubtype.Mountain);
+
+        var pol = new PriorityPolicy(ArchetypeWeights.Default);
+        var action = pol.Pick(s.Context, s.Self);
+
+        action.Should().BeOfType<PriorityAction.PassAction>();
     }
 
     [Fact]

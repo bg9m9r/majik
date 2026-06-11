@@ -1,6 +1,8 @@
 using Majik.Bot.Combat;
+using Majik.Bot.Decks;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Heuristic;
+using Majik.Bot.OpponentModel;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -34,8 +36,83 @@ internal sealed class SearchStrategy : IBotStrategy
 {
     private readonly HeuristicStrategy _heuristic;
     private readonly Mcts _mcts;
+
+    /// <summary>
+    /// The Mcts used for the K-world determinized loop, bounded PER WORLD to
+    /// <see cref="PerWorldBudgetMs"/> (and a proportionally-scaled iteration cap)
+    /// so K worlds × per-world ≈ the configured total budget. Non-null when EITHER
+    /// determinized path is active — a known <see cref="_opponentDecklist"/> OR
+    /// <see cref="_inferOpponent"/>; the perfect-info path always uses the original
+    /// <see cref="_mcts"/> and is unaffected by this instance.
+    /// </summary>
+    private readonly Mcts? _determinizedMcts;
+
     private readonly ArchetypeWeights _weights;
     private readonly bool _prioritySearchEnabled;
+
+    /// <summary>
+    /// The opponent's decklist when their archetype is known
+    /// (<see cref="BotConfig.OpponentArchetype"/>), else null. Non-null selects
+    /// the determinized K-world search path in <see cref="SearchRoot"/>; null keeps
+    /// today's perfect-info single-tree search.
+    /// </summary>
+    private readonly IReadOnlyList<string>? _opponentDecklist;
+
+    /// <summary>
+    /// True when the bot must INFER the opponent's archetype from their public cards
+    /// (<see cref="BotConfig.InferOpponentArchetype"/> set AND no explicit
+    /// <see cref="BotConfig.OpponentArchetype"/>). Selects the belief-driven
+    /// determinized path in <see cref="SearchRoot"/>; false keeps either the
+    /// known-archetype determinized path (when <see cref="_opponentDecklist"/> is set)
+    /// or today's perfect-info search.
+    /// </summary>
+    private readonly bool _inferOpponent;
+
+    /// <summary>
+    /// The archetype inferencer (idf precomputed once). Non-null only when
+    /// <see cref="_inferOpponent"/> is true.
+    /// </summary>
+    private readonly ArchetypeInferencer? _inferencer;
+
+    /// <summary>Total search budget (ms) handed to the K-world driver.</summary>
+    private readonly int _totalBudgetMs;
+
+    /// <summary>Reproducible base world seed for determinized sampling.</summary>
+    private readonly int _baseSeed;
+
+    /// <summary>
+    /// Catastrophe threshold for the risk-aware two-tier vote, resolved ONCE from
+    /// <see cref="BotConfig.RiskVoteThreshold"/> at construction (null → the
+    /// <see cref="DeterminizedSearch.DefaultCatastropheThreshold"/> default;
+    /// <see cref="double.NegativeInfinity"/> disables the filter). Threaded into
+    /// BOTH determinized call sites in <see cref="SearchRoot"/>.
+    /// </summary>
+    private readonly double _riskThreshold;
+
+    /// <summary>
+    /// Per-world budget (ms) for the determinized driver. The total budget is
+    /// split across K worlds (K = round(total / perWorld), clamped 1..kMax inside
+    /// <see cref="DeterminizedSearch"/>), so a larger total yields more worlds, not
+    /// longer per-world searches. 400 ms matches <see cref="DeterminizedSearch.Run"/>'s
+    /// default and gives a sensible 1..few worlds at the production 1500 ms total.
+    ///
+    /// <para>
+    /// Each per-world <see cref="Mcts.SearchWithStats"/> call is ALSO bounded to this
+    /// value (see <see cref="_determinizedMcts"/> / <see cref="DeterminizedConfigFrom"/>),
+    /// so the K worlds genuinely SPLIT the total budget — total wall-clock ≈
+    /// K × PerWorldBudgetMs ≈ the configured total (modulo the K clamp). It does NOT
+    /// run K full-budget searches.
+    /// </para>
+    /// </summary>
+    private const int PerWorldBudgetMs = 400;
+
+    /// <summary>
+    /// Upper clamp on the determinized world count K, matching
+    /// <see cref="DeterminizedSearch.Run"/> / <see cref="DeterminizedSearch.RunBelief"/>'s
+    /// default kMax. Threaded through both determinized paths so the K-world budget split
+    /// is identical whether the archetype is known or inferred.
+    /// </summary>
+    private const int KMax = 8;
 
     /// <summary>
     /// Map a <see cref="BotConfig"/> to a sensible <see cref="MctsConfig"/>.
@@ -54,6 +131,37 @@ internal sealed class SearchStrategy : IBotStrategy
         DepthTurns: 1,
         ExplorationC: 1.41);
 
+    /// <summary>
+    /// Derive the PER-WORLD MctsConfig for the determinized K-world loop from the
+    /// perfect-info <paramref name="full"/> config. Both bounds present in
+    /// <see cref="MctsConfig"/> are split so K worlds genuinely divide the total
+    /// budget instead of each running the full search:
+    /// <list type="bullet">
+    ///   <item><c>MaxMillis</c> → <paramref name="perWorldBudgetMs"/> (the wall-clock
+    ///     bound; K worlds × perWorld ≈ full.MaxMillis since K ≈ full.MaxMillis/perWorld).</item>
+    ///   <item><c>MaxIterations</c> → scaled by the <c>perWorld / total</c> fraction
+    ///     (min 1) so an iteration-bounded config also splits across worlds rather
+    ///     than running the full iteration count K times.</item>
+    /// </list>
+    /// <c>DepthTurns</c> / <c>ExplorationC</c> are preserved unchanged.
+    /// </summary>
+    internal static MctsConfig DeterminizedConfigFrom(MctsConfig full, int perWorldBudgetMs)
+    {
+        // Iteration split: same perWorld/total fraction as the time split, floored at 1
+        // so a tiny budget still searches at least one iteration per world.
+        var total = full.MaxMillis;
+        var scaledIterations = total <= 0
+            ? full.MaxIterations
+            : Math.Max(1, (int)Math.Round((double)full.MaxIterations * perWorldBudgetMs / total));
+
+        // preserves: DepthTurns, ExplorationC; splits: MaxMillis, MaxIterations
+        return full with
+        {
+            MaxMillis = perWorldBudgetMs,
+            MaxIterations = scaledIterations,
+        };
+    }
+
     public SearchStrategy(BotConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -62,8 +170,128 @@ internal sealed class SearchStrategy : IBotStrategy
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
+        var mctsConfig = ConfigFrom(config);
         var sim = new EngineSimulator(_weights);
-        _mcts = new Mcts(sim, ConfigFrom(config));
+        _mcts = new Mcts(sim, mctsConfig);
+
+        // OpponentArchetype: resolve the decklist ONCE up front. A known archetype
+        // selects determinized search; null = perfect-info (the production-safe
+        // default). An unknown name throws here (BotDeckCatalog.Get) so a typo
+        // fails fast at construction rather than silently degrading to perfect-info.
+        _opponentDecklist = config.OpponentArchetype is { } a
+            ? BotDeckCatalog.Get(a)
+            : null;
+
+        // InferOpponentArchetype: only the "honest-vs-human" inference path when no
+        // explicit archetype is given (an explicit OpponentArchetype takes precedence
+        // — we never override a known opponent with a guess). Build the inferencer
+        // ONCE up front (idf precomputed) so per-decision inference is cheap.
+        _inferOpponent = config.InferOpponentArchetype && config.OpponentArchetype is null;
+        _inferencer = _inferOpponent ? new ArchetypeInferencer() : null;
+
+        // Determinized total budget reuses the same wall-clock budget the MCTS
+        // config already computes (MaxMctsBudgetMs ?? 1500). The K-world driver
+        // splits this total across worlds via PerWorldBudgetMs, and the per-world
+        // Mcts it runs (_determinizedMcts) is bounded to PerWorldBudgetMs PER WORLD
+        // (not the full total), so K worlds × per-world ≈ the total budget — NOT
+        // K full searches. Built whenever a determinized path is active (known
+        // archetype OR inference); the perfect-info path keeps using _mcts untouched.
+        _totalBudgetMs = mctsConfig.MaxMillis;
+        _determinizedMcts = (_opponentDecklist is null && !_inferOpponent)
+            ? null
+            : new Mcts(sim, DeterminizedConfigFrom(mctsConfig, PerWorldBudgetMs));
+
+        // Fixed, config-derived base seed → determinized runs are reproducible.
+        _baseSeed = config.RandomSeed;
+
+        // RiskVoteThreshold: resolve the nullable knob once up front (null → the
+        // DeterminizedSearch default; -inf is the kill switch that disables the
+        // risk filter) so SearchRoot threads a plain double per decision.
+        _riskThreshold = ResolveRiskThreshold(config.RiskVoteThreshold);
+    }
+
+    /// <summary>
+    /// Resolve <see cref="BotConfig.RiskVoteThreshold"/> to the effective
+    /// catastrophe threshold: null → <see cref="DeterminizedSearch.DefaultCatastropheThreshold"/>;
+    /// any explicit value (including <see cref="double.NegativeInfinity"/>, the
+    /// filter kill switch) passes through unchanged.
+    /// </summary>
+    internal static double ResolveRiskThreshold(double? cfg) =>
+        cfg ?? DeterminizedSearch.DefaultCatastropheThreshold;
+
+    /// <summary>
+    /// Runs the root search: determinized K-world search when the opponent's
+    /// archetype is known, else today's perfect-info single-tree
+    /// <see cref="Mcts.Search"/>. Returns a <see cref="SimMove"/> of the SAME shape
+    /// either way — a representative move carrying sandbox object refs — so the
+    /// callers' existing InstanceId / Player.Id remap handles both paths unchanged.
+    /// </summary>
+    private SimMove SearchRoot(SimState root, GameContext ctx, Player self)
+    {
+        // (1) Known archetype — UNCHANGED. Determinize against the known decklist and
+        // run the K-world summed-robust-child driver.
+        if (_opponentDecklist is { } deck)
+        {
+            var determinized = root.WithDeterminization(deck, worldSeed: _baseSeed);
+            // _determinizedMcts is bounded to PerWorldBudgetMs PER WORLD, so the
+            // K-world loop SPLITS the total budget (K × per-world ≈ total) instead
+            // of running K full-budget searches.
+            return DeterminizedSearch.Run(
+                _determinizedMcts!,   // non-null whenever _opponentDecklist is set
+                determinized,
+                totalBudgetMs: _totalBudgetMs,
+                perWorldBudgetMs: PerWorldBudgetMs,
+                catastropheThreshold: _riskThreshold);
+        }
+
+        // (2) Inference — "honest-vs-human". Read the opponent's public cards, infer
+        // a belief over archetypes, allocate worlds across the top-M, and run the
+        // belief-driven determinized driver. baseRoot here is the PLAIN capture root
+        // (NOT pre-determinized) — RunBelief attaches each world's decklist + seed.
+        if (_inferOpponent)
+        {
+            var publicCards = OpponentPublicCardNames(ctx, self);
+            var belief = _inferencer!.Infer(publicCards);
+            int k = DeterminizedSearch.KFor(_totalBudgetMs, PerWorldBudgetMs, KMax);
+            var alloc = WorldAllocator.Allocate(belief, k, topM: 4)
+                .Select(x => ((IReadOnlyList<string>)BotDeckCatalog.Get(x.Archetype), x.Worlds))
+                .ToList();
+            // Defensive: Infer always returns a normalized belief (the metagame prior when
+            // no public cards are seen) and KFor is always >= 1, so a non-empty allocation
+            // is the norm — this guard only fires if the archetype catalog is empty or k<=0.
+            // Fall back to perfect-info search rather than routing an empty allocation
+            // through RunBelief (which requires a non-empty one).
+            if (alloc.Count == 0) return _mcts.Search(root);
+            return DeterminizedSearch.RunBelief(
+                _determinizedMcts!,   // non-null whenever _inferOpponent is true
+                root,
+                alloc,
+                publicCards,
+                totalBudgetMs: _totalBudgetMs,
+                perWorldBudgetMs: PerWorldBudgetMs,
+                kMax: KMax,
+                catastropheThreshold: _riskThreshold);
+        }
+
+        return _mcts.Search(root);   // perfect-info, unchanged
+    }
+
+    /// <summary>
+    /// The opponent's PUBLIC card names — battlefield + graveyard + exile of the
+    /// non-self player (the zones a human opponent has visibly revealed). Hidden zones
+    /// (hand / library) are deliberately NOT read: inference works only from what the
+    /// opponent has shown. Returns empty when there is no distinct opponent.
+    /// </summary>
+    private static IReadOnlyList<string> OpponentPublicCardNames(GameContext ctx, Player self)
+    {
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
+        if (opp is null) return Array.Empty<string>();
+
+        return opp.Zones.Battlefield.GetCards()
+            .Concat(opp.Zones.Graveyard.GetCards())
+            .Concat(opp.Zones.Exile.GetCards())
+            .Select(c => c.Name)
+            .ToList();
     }
 
     // ── Combat decisions — run the search ─────────────────────────────────────
@@ -88,7 +316,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = _mcts.Search(root);
+            chosen = SearchRoot(root, ctx, self);
         }
         catch
         {
@@ -251,7 +479,7 @@ internal sealed class SearchStrategy : IBotStrategy
         SimMove chosen;
         try
         {
-            chosen = _mcts.Search(root);
+            chosen = SearchRoot(root, ctx, self);
         }
         catch
         {

@@ -5,6 +5,6 @@
   "subtypes": ["Halfling", "Peasant"],
   "manaCost": "{1}{W}",
   "power": 2,
-  "toughness": 1,
+  "toughness": 2,
   "abilities": []
 }

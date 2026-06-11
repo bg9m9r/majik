@@ -15,7 +15,7 @@ namespace Majik.Core.Tests.CardData;
 /// (Oath of the Gatewatch, {3}{C}).
 ///
 /// Covers:
-/// - Identity (Creature — Eldrazi Drone, {3}{C}, 3/2, owner / controller).
+/// - Identity (Creature — Eldrazi, {2}{C}, 3/2, owner / controller).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - Dies trigger active-zones include Graveyard (Wurmcoil posture).
 /// - Resolution branches:
@@ -34,10 +34,11 @@ public class MatterReshaperFactoryTests
         var mr = MatterReshaperFactory.Create(_alice);
 
         mr.Name.Should().Be("Matter Reshaper");
-        mr.ManaCost.Should().Be("{3}{C}");
+        mr.ManaCost.Should().Be("{2}{C}");
         mr.HasType(CardType.Creature).Should().BeTrue();
         mr.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        mr.HasSubtype(CardSubtype.Drone).Should().BeTrue();
+        // CR 205.3m — seed type line is "Creature — Eldrazi"; NOT a Drone.
+        mr.HasSubtype(CardSubtype.Drone).Should().BeFalse();
         mr.BasePower.Should().Be(3);
         mr.BaseToughness.Should().Be(2);
         mr.Owner.Should().BeSameAs(_alice);
@@ -53,7 +54,7 @@ public class MatterReshaperFactoryTests
         card.Name.Should().Be("Matter Reshaper");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Drone).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Drone).Should().BeFalse();
     }
 
     [Fact]

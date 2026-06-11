@@ -84,27 +84,28 @@ public static class GrayMerchantOfAsphodelFactory
     public const int Toughness = 4;
 
     /// <summary>
-    /// Construct Gray Merchant of Asphodel with no live wiring. The ETB
-    /// devotion-drain trigger attaches structurally; it is NOT registered with
-    /// a <see cref="TriggerManager"/> and has no opponent resolver, so the
-    /// drain / lifegain no-op. This is the overload
-    /// <see cref="NamedCardFactory"/> dispatches to.
+    /// Construct Gray Merchant of Asphodel. The ETB devotion-drain trigger
+    /// reads "each opponent" from the LIVE resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build — which dispatches this single-arg overload and auto-binds
+    /// the trigger via <see cref="TriggerManager.BindCard"/> when the Merchant
+    /// enters. This is the overload <see cref="NamedCardFactory"/> dispatches
+    /// to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, opponentResolver: null);
+        => Create(owner, triggers: null);
 
     /// <summary>
-    /// Construct a fully-wired Gray Merchant of Asphodel.
+    /// Construct Gray Merchant of Asphodel, optionally registering the ETB
+    /// trigger against the supplied <paramref name="triggers"/> manager for
+    /// tests that drive the bus-fired trigger path directly.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager for registration. May be null —
     /// the trigger attaches structurally but isn't enrolled.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent" for the
-    /// ETB drain. Without a resolver the drain no-ops and no life is gained.</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -126,24 +127,25 @@ public static class GrayMerchantOfAsphodelFactory
         // counts (CR 700.5). Each opponent loses X; the controller gains the
         // total life lost this way (X × opponentCount in v1 — see class xmldoc
         // re: actual-loss accounting).
+        // "Each opponent" is read from the LIVE resolution context
+        // (ctx.Game.AllPlayers, filtered to non-controller / not-lost) — NOT a
+        // captured resolver. The production routed build dispatches the
+        // single-arg shape build (resolver-null), so the prior resolver read
+        // made the drain INERT in real games; reading the context fixes it
+        // (mirrors Stormbreath #2540 / Yawgmoth + Priest #2543 / Grist #2549).
         // ----------------------------------------------------------------
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses X (devotion to black); you gain that much life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
                 var controller = card.Controller ?? owner;
                 var x = NykthosShrineToNyxFactory.ComputeDevotionToColor(
                     controller, ManaColor.Black);
-                if (x <= 0) return; // CR 119.4 — losing 0 life is not losing life.
+                if (x <= 0) return ValueTask.CompletedTask; // CR 119.4 — losing 0 life is not losing life.
 
                 var lifeLost = 0;
-                foreach (var opp in opponents)
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opp == null) continue;
-                    if (ReferenceEquals(opp, controller)) continue; // "each opponent"
                     opp.LoseLife(x);
                     lifeLost += x;
                 }
@@ -151,6 +153,7 @@ public static class GrayMerchantOfAsphodelFactory
                 // CR 119.3 — "you gain life equal to the life lost this way" is
                 // a separate life-change event from the losses.
                 if (lifeLost > 0) controller.GainLife(lifeLost);
+                return ValueTask.CompletedTask;
             });
 
         var etbTrigger = new TriggeredAbility(

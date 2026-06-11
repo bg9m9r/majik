@@ -112,4 +112,14 @@ public class Planeswalker : Permanent
         RemoveLoyalty(amount);
         return true;
     }
+
+    /// <summary>
+    /// CR 606.3 — loyalty addition (a "+N" ability) on a real planeswalker
+    /// routes to its own authoritative field (not the transient surface).
+    /// </summary>
+    public override bool AddTransientLoyalty(int amount)
+    {
+        AddLoyalty(amount);
+        return true;
+    }
 }

@@ -99,9 +99,13 @@ public static class ScourgeOfTheSkyclavesFactory
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="allPlayersResolver">Returns the full player list at
-    /// evaluation time. The CDA reads the highest life among these; the cast
-    /// trigger applies the half-life loss to each. Null → the CDA seeds 0/0
-    /// and the cast trigger body no-ops (shape path).</param>
+    /// evaluation time. The cast trigger no longer uses this — it reads each
+    /// player from the live resolution context (<c>ctx.Game.AllPlayers</c>) so
+    /// the half-life loss is correct on prod. This resolver now feeds ONLY the
+    /// CDA's "highest life among players" lookup, which runs in the
+    /// continuous-effects layer (no resolution context available there). Null →
+    /// the CDA seeds 0/0 (a continuous-effect infra gap, not the each-player
+    /// effect-body bug).</param>
     /// <param name="effects">Continuous-effects service the CDA registers
     /// against on ETB. Pass null for shape-only P/T.</param>
     /// <param name="eventBus">Event bus for ETB/LTB CDA tracking. May be
@@ -146,14 +150,17 @@ public static class ScourgeOfTheSkyclavesFactory
         // ----------------------------------------------------------------
         var castEffect = new Effect(
             $"{CardName}: each player loses half their life, rounded up",
-            () =>
+            ctx =>
             {
                 // CR 603.4 — second-pass intervening-if. Defensive re-check
                 // at resolution mirrors Goblin Bushwhacker's posture.
-                if (!card.WasKicked) return;
+                if (!card.WasKicked) return ValueTask.CompletedTask;
 
-                var players = allPlayersResolver?.Invoke();
-                if (players == null) return; // shape path — no players wired.
+                // "Each player" — read every player from the LIVE game at
+                // resolution (ctx.Game.AllPlayers). No captured resolver, so
+                // the half-life loss is correct on the routed prod build.
+                var players = ctx.Game?.AllPlayers;
+                if (players == null) return ValueTask.CompletedTask;
 
                 // CR 608.2 — snapshot the loss per player at resolution; each
                 // is an independent life-loss (CR 119.3, not damage).
@@ -162,6 +169,8 @@ public static class ScourgeOfTheSkyclavesFactory
                     if (player == null) continue;
                     Fx.LoseLife(player, HalfRoundedUp(player.LifeTotal));
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var castTrigger = new TriggeredAbility(

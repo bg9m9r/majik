@@ -335,68 +335,17 @@ public sealed class WeightTuner
         return names.Select(n => LoadCard(n)).ToList();
     }
 
+    // Delegates to the shared DeckCardShellBuilder so the tuner's self-play
+    // decks materialize identically to the server's RealDeckLoader —
+    // preserving all printed card types (CR 205.1b) and the color indicator
+    // (CR 202.2c). GameFacade rebinds abilities during self-play.
     private Majik.Core.Cards.ICard LoadCard(string name)
     {
         var entity = _repo.GetByName(name)
             ?? throw new InvalidOperationException($"WeightTuner: card not in seed: '{name}'");
 
-        var parsed   = Majik.Core.CardData.TypeLineParser.Parse(entity.TypeLine);
-        var manaCost = entity.ManaCost ?? "";
-
-        var primaryType = PickPrimaryType(parsed.Types);
-        Majik.Core.Cards.ICard card = primaryType switch
-        {
-            Majik.Core.Cards.Types.CardType.Creature     =>
-                new Majik.Core.Cards.Creature(entity.Name, manaCost,
-                    ParseStat(entity.Power), ParseStat(entity.Toughness),
-                    parsed.Supertypes, parsed.Subtypes),
-            Majik.Core.Cards.Types.CardType.Land         =>
-                new Majik.Core.Cards.Land(entity.Name, parsed.Supertypes, parsed.Subtypes),
-            Majik.Core.Cards.Types.CardType.Instant      =>
-                new Majik.Core.Cards.Instant(entity.Name, manaCost),
-            Majik.Core.Cards.Types.CardType.Sorcery      =>
-                new Majik.Core.Cards.Sorcery(entity.Name, manaCost),
-            Majik.Core.Cards.Types.CardType.Enchantment  =>
-                new Majik.Core.Cards.Enchantment(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            Majik.Core.Cards.Types.CardType.Artifact     =>
-                new Majik.Core.Cards.Artifact(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            Majik.Core.Cards.Types.CardType.Planeswalker =>
-                new Majik.Core.Cards.Planeswalker(entity.Name, manaCost,
-                    startingLoyalty: entity.Loyalty ?? 0,
-                    parsed.Supertypes, parsed.Subtypes),
-            _ => new Majik.Core.Cards.Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
-        };
-
-        // Stamp color indicator (Dryad Arbor et al.) — mirrors DeckLoader.LoadReal.
-        if (card is Majik.Core.Cards.Card concrete)
-        {
-            var colors = Majik.Core.Cards.CardColors.ParseScryfallColors(entity.Colors);
-            if (colors.Count > 0) concrete.SetColorIndicator(colors);
-        }
-
-        return card;
+        return Majik.Core.CardData.DeckCardShellBuilder.Build(entity);
     }
-
-    private static Majik.Core.Cards.Types.CardType? PickPrimaryType(
-        IReadOnlyList<Majik.Core.Cards.Types.CardType> types)
-    {
-        // Priority order matches DeckLoader.LoadReal.
-        var priority = new[]
-        {
-            Majik.Core.Cards.Types.CardType.Creature,
-            Majik.Core.Cards.Types.CardType.Land,
-            Majik.Core.Cards.Types.CardType.Instant,
-            Majik.Core.Cards.Types.CardType.Sorcery,
-            Majik.Core.Cards.Types.CardType.Enchantment,
-            Majik.Core.Cards.Types.CardType.Artifact,
-            Majik.Core.Cards.Types.CardType.Planeswalker,
-        };
-        foreach (var p in priority)
-            if (types.Contains(p)) return p;
-        return null;
-    }
-
-    private static int ParseStat(string? s) => int.TryParse(s, out var v) ? v : 0;
 
     /// <summary>
     /// Returns the names of the 11 weight fields in a fixed order that covers

@@ -85,14 +85,17 @@ public static class ExhumeFactory
     /// <param name="zoneService">Optional. When supplied each graveyard →
     /// battlefield move routes through <see cref="ZoneService.MoveCard"/>
     /// so ETB triggers fire (CR 603.6a).</param>
-    /// <param name="allPlayersResolver">Optional. When supplied every
-    /// player it returns gets the choose-a-creature prompt; otherwise
-    /// only the caster does. Production callers thread the full table
-    /// here (CR 101.4 APNAP-ordered).</param>
+    /// <remarks>
+    /// "Each player" reads every player from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>, CR 101.4 APNAP) at resolution — no captured
+    /// player resolver, so it is correct on the production routed build
+    /// (mirrors #2551). With no live game context only the caster returns
+    /// (shape-only paths). Each affected player's "choose a creature card" pick
+    /// reads THAT player's agent from <see cref="AgentRegistry"/>.
+    /// </remarks>
     public static IReadOnlyList<IEffect> BuildResolveEffect(
         Player caster,
-        ZoneService? zoneService = null,
-        Func<IReadOnlyList<Player>>? allPlayersResolver = null)
+        ZoneService? zoneService = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
 
@@ -100,7 +103,11 @@ public static class ExhumeFactory
         {
             Fx.Inline(
                 $"{CardName}: each player returns a creature card from their graveyard to the battlefield",
-                () => Resolve(caster, zoneService, allPlayersResolver)),
+                ctx =>
+                {
+                    Resolve(caster, zoneService, ctx.Game?.AllPlayers);
+                    return ValueTask.CompletedTask;
+                }),
         };
     }
 
@@ -112,9 +119,9 @@ public static class ExhumeFactory
     private static void Resolve(
         Player caster,
         ZoneService? zoneService,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        IReadOnlyList<Player>? allPlayers)
     {
-        var players = allPlayersResolver?.Invoke()
+        var players = allPlayers
             ?? (IReadOnlyList<Player>)new[] { caster };
 
         foreach (var p in players)

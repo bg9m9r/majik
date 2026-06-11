@@ -135,8 +135,11 @@ public class LotusBloomTests
         produced.Red.Should().Be(3);
         produced.TotalValue.Should().Be(3);
 
-        // Tapped (cost) + sacrificed (additional cost).
-        bloom.IsTapped.Should().BeTrue("activation taps the bloom");
+        // Sacrificed (additional cost). The cost-tap ran on the battlefield,
+        // but CR 400.7 — in the graveyard the bloom is a new object and is no
+        // longer tapped.
+        bloom.IsTapped.Should().BeFalse(
+            "CR 400.7 — the sacrificed bloom is a new object in the graveyard and no longer tapped");
         bloom.Zone.Should().Be(ZoneType.Graveyard,
             "CR 701.16 — sacrifice moves the bloom to its owner's graveyard");
         _alice.Zones.Battlefield.GetCards().Should().NotContain(bloom);

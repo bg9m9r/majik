@@ -55,7 +55,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ConjurersBaubleFactory
 {
     public const string CardName = "Conjurer's Bauble";
-    public const string PrintedManaCost = "{0}";
+    public const string PrintedManaCost = "{1}";
 
     /// <summary>
     /// Construct Conjurer's Bauble owned and controlled by

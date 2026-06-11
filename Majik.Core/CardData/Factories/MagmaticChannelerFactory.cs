@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Magmatic Channeler (Core Set 2021, {1}{R}).
 ///
-/// Creature — Human Shaman 1/2. Oracle text:
+/// Creature — Human Wizard 1/3. Oracle text:
 ///   "{2}{R}, {T}: Look at the top four cards of your library. You may
 ///    reveal a creature or instant card from among them and put it into
 ///    your hand. Put the rest on the bottom of your library in any order.
@@ -20,9 +20,9 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 1/2 Creature — Human Shaman at {1}{R}; owner / controller wired.
-///   Subtypes <see cref="CardSubtype.Human"/> + <see cref="CardSubtype.Shaman"/>
-///   (CR 205.3m — same tribe as Young Pyromancer).
+/// - 1/3 Creature — Human Wizard at {1}{R}; owner / controller wired.
+///   Subtypes <see cref="CardSubtype.Human"/> + <see cref="CardSubtype.Wizard"/>
+///   (CR 205.3m).
 /// - <b>Activated ability (CR 602.1)</b>: <see cref="ActivatedAbility"/>
 ///   with two costs and one effect.
 ///   <list type="bullet">
@@ -116,7 +116,7 @@ public static class MagmaticChannelerFactory
     public const string CardName = "Magmatic Channeler";
     public const string PrintedManaCost = "{1}{R}";
     public const int Power = 1;
-    public const int Toughness = 2;
+    public const int Toughness = 3;
     public const string ActivationCost = "{2}{R}";
     public const int PeekCount = 4;
     public const int GraveyardThreshold = 4;
@@ -138,7 +138,7 @@ public static class MagmaticChannelerFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Shaman });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Wizard });
 
         card.SetOwner(owner);
         card.SetController(owner);

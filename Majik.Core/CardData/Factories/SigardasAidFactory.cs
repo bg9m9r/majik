@@ -58,7 +58,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SigardasAidFactory
 {
     public const string CardName = "Sigarda's Aid";
-    public const string Cost = "{1}{W}";
+    public const string Cost = "{W}";
 
     /// <summary>
     /// Construct Sigarda's Aid with no live event-bus / trigger-manager

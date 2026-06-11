@@ -43,8 +43,8 @@ public class ArcboundStingerTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasType(CardType.Artifact).Should().BeTrue();
         c.HasSubtype(CardSubtype.Insect).Should().BeTrue();
-        c.Power.Should().Be(1);
-        c.Toughness.Should().Be(1);
+        c.Power.Should().Be(0);
+        c.Toughness.Should().Be(0);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }

@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Hedron Crab (Zendikar, {U}).
 ///
-/// Creature — Homarid 0/2. Oracle text:
+/// Creature — Crab 0/2. Oracle text:
 ///   "Landfall — Whenever a land enters under your control, target player
 ///    puts the top three cards of their library into their graveyard."
 ///
@@ -23,7 +23,7 @@ namespace Majik.Core.CardData.Factories;
 /// TargetRequest in the Bojuka-Bog shape.
 ///
 /// ## Implemented (v1)
-/// - 0/2 Creature — Homarid, mana cost {U}, owner / controller wired.
+/// - 0/2 Creature — Crab, mana cost {U}, owner / controller wired.
 /// - <b>Landfall triggered ability</b> (CR 603.1 / 603.6a / CR 614 / CR 702.142)
 ///   — fires on <see cref="Majik.Core.Events.CardMovedEvent"/> filtered to
 ///   "land entering the battlefield under controller's control" via the
@@ -78,7 +78,7 @@ public static class HedronCrabFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Homarid });
+            subtypes: new[] { CardSubtype.Crab });
 
         card.SetOwner(owner);
         card.SetController(owner);

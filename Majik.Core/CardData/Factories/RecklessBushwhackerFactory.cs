@@ -15,14 +15,14 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Reckless Bushwhacker (Oath of the Gatewatch,
 /// {2}{R}).
 ///
-/// Creature — Goblin Berserker 2/1. Oracle text:
+/// Creature — Goblin Warrior Ally 2/1. Oracle text:
 ///   "Surge {R} (You may cast this spell for its surge cost if you or a
 ///    teammate has cast another spell this turn.)
 ///    When this creature enters, if its surge cost was paid, creatures
 ///    you control get +1/+0 and gain haste until end of turn."
 ///
 /// ## Implemented (v1)
-/// - <b>Card shape</b>: 2/1 Creature — Goblin Berserker at printed cost
+/// - <b>Card shape</b>: 2/1 Creature — Goblin Warrior Ally at printed cost
 ///   {2}{R}.
 /// - <b>Surge alternative cost (CR 702.115)</b>: <see cref="BuildAlternativeCost"/>
 ///   returns a <see cref="SurgeAlternativeCost"/> constructed against the
@@ -109,7 +109,7 @@ public static class RecklessBushwhackerFactory
             power: BasePower,
             toughness: BaseToughness,
             supertypes: null,
-            subtypes: new[] { CardSubtype.Goblin, CardSubtype.Berserker });
+            subtypes: new[] { CardSubtype.Goblin, CardSubtype.Warrior, CardSubtype.Ally });
 
         card.SetOwner(owner);
         card.SetController(owner);

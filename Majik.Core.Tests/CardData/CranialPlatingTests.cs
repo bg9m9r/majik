@@ -40,7 +40,7 @@ public class CranialPlatingTests
         var c = CranialPlatingFactory.Create(_alice);
 
         c.Name.Should().Be("Cranial Plating");
-        c.ManaCost.Should().Be("{1}");
+        c.ManaCost.Should().Be("{2}");
         c.HasType(CardType.Artifact).Should().BeTrue();
         c.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);

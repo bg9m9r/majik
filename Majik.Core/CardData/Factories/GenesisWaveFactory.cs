@@ -233,8 +233,15 @@ public static class GenesisWaveFactory
         {
             if (effectiveZones != null)
             {
-                effectiveZones.MoveCard(
-                    pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                // Async move so the ResolutionContext (carrying the caster's
+                // agent) reaches a prompting ETB replacement — a revealed
+                // shock land must offer the "pay 2 life?" choice
+                // (ShockLandReplacement.ReplaceAsync) instead of auto-paying
+                // via the synchronous replacement path. Genesis Wave puts
+                // permanents in untapped, so the prompt's outcome matters.
+                await effectiveZones.MoveCardToAsync(
+                    pick, ZoneType.Battlefield, ctx, controller: caster)
+                    .ConfigureAwait(false);
             }
             else
             {

@@ -33,6 +33,7 @@ public sealed class MutableFieldTripwireTests
         {
             // ── raw backing fields ──────────────────────────────────────────
             "_abilities",                           // COPIED (AddRange — shared ability refs, definition)
+            "_backFaceLoyaltyAbilities",            // SKIPPED-DEFER: derived from _mdfcState (itself SKIPPED-DEFER); back-face loyalty abilities are sub-refs of _abilities (AddRange-copied), re-synced on transform
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)
             "_mdfcState",                           // SKIPPED-DEFER: complex, has lambda callbacks — see Task 8 concern
@@ -65,6 +66,7 @@ public sealed class MutableFieldTripwireTests
             "PendingCastX",                         // COPIED (PendingCastX = src.PendingCastX)
             "PendingDelveExiledCount",              // COPIED (PendingDelveExiledCount = src.PendingDelveExiledCount)
             "ReturnToHandOnResolution",             // COPIED (ReturnToHandOnResolution = src.ReturnToHandOnResolution)
+            "SelfManagesEntersWithCounters",        // COPIED (SelfManagesEntersWithCounters = src.SelfManagesEntersWithCounters — factory self-manages X counters)
             "RuntimeEscapeCost",                    // COPIED (immutable value-object ref)
             "RuntimeEscapeExileCount",              // COPIED (RuntimeEscapeExileCount = src.RuntimeEscapeExileCount)
             "RuntimeExileCastAllowedCaster",        // COPIED + relinked via RelinkReferences (GrantRuntimeExileCast → cloned player)

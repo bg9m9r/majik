@@ -87,7 +87,6 @@ public class MaraudingBlightPriestTests
     {
         var c = MaraudingBlightPriestFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: null,
             triggers: null);
 
@@ -96,8 +95,8 @@ public class MaraudingBlightPriestTests
 
         var trigger = c.Abilities.OfType<TriggeredAbility>().Single();
 
-        // Simulate the trigger resolving (controller gained life).
-        foreach (var e in trigger.Effects) e.Execute();
+        // Resolve through a live game (resolver-null bug-class fix).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19,
             "Marauding Blight-Priest: each opponent loses 1 life when controller gains life");
@@ -109,7 +108,6 @@ public class MaraudingBlightPriestTests
         // CR 603.2c — the triggered ability fires once per life-gain event.
         var c = MaraudingBlightPriestFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: null,
             triggers: null);
 
@@ -120,7 +118,7 @@ public class MaraudingBlightPriestTests
 
         for (var i = 0; i < 4; i++)
         {
-            foreach (var e in trigger.Effects) e.Execute();
+            Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
         }
 
         _bob.LifeTotal.Should().Be(16, "four resolutions ⇒ -4 life for Bob");

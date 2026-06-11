@@ -52,7 +52,7 @@ namespace Majik.Core.CardData.Factories;
 public static class GlenElendraArchmageFactory
 {
     public const string CardName = "Glen Elendra Archmage";
-    public const string PrintedManaCost = "{1}{U}{U}";
+    public const string PrintedManaCost = "{3}{U}";
     public const int Power = 2;
     public const int Toughness = 2;
     public const string ActivationCost = "{U}";

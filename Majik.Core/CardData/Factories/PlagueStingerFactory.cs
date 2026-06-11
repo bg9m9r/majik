@@ -47,6 +47,7 @@ public static class PlagueStingerFactory
             {
                 CardSubtype.Phyrexian,
                 CardSubtype.Insect,
+                CardSubtype.Horror,
             });
 
         card.SetOwner(owner);

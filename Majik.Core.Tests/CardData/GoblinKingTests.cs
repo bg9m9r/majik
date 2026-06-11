@@ -39,7 +39,7 @@ public class GoblinKingTests
         var c = GoblinKingFactory.Create(_alice);
 
         c.Name.Should().Be("Goblin King");
-        c.ManaCost.Should().Be("{R}{R}");
+        c.ManaCost.Should().Be("{1}{R}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         c.BasePower.Should().Be(2);

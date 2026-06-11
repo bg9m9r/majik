@@ -1,0 +1,8 @@
+{
+  "name": "Bloodmad Vampire",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Berserker"],
+  "manaCost": "{2}{R}",
+  "power": 4,
+  "toughness": 1
+}

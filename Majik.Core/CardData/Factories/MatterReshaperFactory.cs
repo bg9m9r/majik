@@ -10,15 +10,15 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Matter Reshaper (Oath of the Gatewatch, {3}{C}).
+/// Named-card factory for Matter Reshaper (Oath of the Gatewatch, {2}{C}).
 ///
-/// Creature — Eldrazi Drone 3/2. Oracle text (Scryfall, verified):
+/// Creature — Eldrazi 3/2. Oracle text (Scryfall, verified):
 ///   "When this creature dies, reveal the top card of your library. If it's
 ///    a permanent card with mana value 3 or less, put it onto the
 ///    battlefield. Otherwise, put it into your hand."
 ///
 /// ## Implemented (v1)
-/// - 3/2 Creature — Eldrazi Drone at {3}{C}.
+/// - 3/2 Creature — Eldrazi at {2}{C}.
 /// - <b>Dies trigger (CR 603.6c / CR 700.4)</b>: Battlefield → Graveyard
 ///   <see cref="CardMovedEvent"/> filtered to this card. Active zones =
 ///   {Battlefield, Graveyard} so the trigger still matches once the card
@@ -76,7 +76,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MatterReshaperFactory
 {
     public const string CardName = "Matter Reshaper";
-    public const string PrintedManaCost = "{3}{C}";
+    public const string PrintedManaCost = "{2}{C}";
     public const int Power = 3;
     public const int Toughness = 2;
 
@@ -115,7 +115,7 @@ public static class MatterReshaperFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Eldrazi, CardSubtype.Drone });
+            subtypes: new[] { CardSubtype.Eldrazi });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -5,13 +5,13 @@ using Majik.Core.Players;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Palladium Myr (Scars of Mirrodin, {4}).
+/// Named-card factory for Palladium Myr (Scars of Mirrodin, {3}).
 ///
 /// Artifact Creature — Myr 2/2. Oracle text (verified against Scryfall):
 ///   "{T}: Add {C}{C}."
 ///
 /// The bigger cousin of the Mirrodin mana-Myr cycle (Gold / Silver / Iron /
-/// Copper / Leaden): a 2/2 at {4} that taps for two colourless rather than
+/// Copper / Leaden): a 2/2 at {3} that taps for two colourless rather than
 /// one coloured pip, so it nets one mana of ramp per activation.
 ///
 /// Loads <c>Majik.Core/CardData/Cards/palladium-myr.json</c> and lets

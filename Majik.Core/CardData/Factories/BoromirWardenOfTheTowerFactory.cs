@@ -14,7 +14,7 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Boromir, Warden of the Tower
 /// (The Lord of the Rings: Tales of Middle-earth, {2}{W}).
 ///
-/// Legendary Creature — Human Soldier 2/3. Oracle text:
+/// Legendary Creature — Human Soldier 3/3. Oracle text:
 ///   "Vigilance"
 ///   "Whenever an opponent casts a spell, if no mana was spent to cast it,
 ///    counter that spell."
@@ -71,7 +71,7 @@ public static class BoromirWardenOfTheTowerFactory
 {
     public const string CardName = "Boromir, Warden of the Tower";
     public const string PrintedManaCost = "{2}{W}";
-    public const int Power = 2;
+    public const int Power = 3;
     public const int Toughness = 3;
 
     /// <summary>

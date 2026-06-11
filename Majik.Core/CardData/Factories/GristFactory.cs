@@ -65,9 +65,16 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>−5: Each opponent loses life equal to the number of creature cards in
 ///   your graveyard (CR 606 + CR 119 life loss)</b>: counts the creature cards
 ///   in the controller's graveyard and applies that life loss to each opponent
-///   returned by <paramref name="opponentsResolver"/> via
-///   <see cref="Fx.LoseLife(Player, int)"/>. Zero creature cards ⇒ no life lost
-///   (CR 119.3 — losing 0 life is still an event but changes nothing).
+///   read from the LIVE resolution context (<c>rc.Game.AllPlayers</c>, filtered
+///   to non-controller / not-lost) at resolution time — NOT a captured
+///   resolver — via <see cref="Fx.LoseLife(Player, int)"/>. The routed prod
+///   build resolves the loyalty ability through the stack
+///   (<c>TurnDriver.DispatchLoyalty → ActivatedAbility.ResolveAsync</c>) which
+///   threads the live <see cref="Game.GameContext"/> into <c>rc.Game</c>, so a
+///   captured resolver was null there and this half was INERT in real games;
+///   reading context fixes the routed build (mirrors Stormbreath #2540 /
+///   Yawgmoth + Priest #2543). Zero creature cards ⇒ no life lost (CR 119.3 —
+///   losing 0 life is still an event but changes nothing).
 ///
 /// ## Loyalty abilities — −2 (sacrifice + prompted destroy)
 /// - <b>−2: You may sacrifice a creature. When you do, destroy target creature
@@ -117,17 +124,16 @@ public static class GristFactory
     /// <summary>
     /// Construct Grist with no resolvers / zone service wired — the +1 still
     /// creates a token (no ETB events without a ZoneService) and mills/repeats,
-    /// the −2 no-ops its sacrifice/destroy (no resolvers), and the −5 no-ops its
-    /// life loss (no opponents resolver). Loyalty changes still apply. Suitable
-    /// for shape / dispatcher tests. This is the overload the source generator
-    /// dispatches to.
+    /// the −2 no-ops its sacrifice/destroy (no resolvers), and the −5 reads its
+    /// opponents from the live resolution context (a safe no-op without one).
+    /// Loyalty changes still apply. Suitable for shape / dispatcher tests. This
+    /// is the overload the source generator dispatches to.
     /// </summary>
     public static Planeswalker Create(Player owner) =>
         Create(owner,
             zones: null,
             sacrificeResolver: null,
-            destroyTargetResolver: null,
-            opponentsResolver: null);
+            destroyTargetResolver: null);
 
     /// <summary>
     /// Construct Grist, the Hunger Tide with the live game services / resolvers.
@@ -142,14 +148,11 @@ public static class GristFactory
     /// <param name="destroyTargetResolver">Returns the creature / planeswalker
     /// the −2 destroys after the sacrifice. v1 picks the first. May be null —
     /// the destroy is skipped.</param>
-    /// <param name="opponentsResolver">Returns the −5's opponents (life-loss
-    /// recipients). May be null — the −5 loses Grist nothing.</param>
     public static Planeswalker Create(
         Player owner,
         ZoneService? zones,
         Func<IReadOnlyList<Creature>>? sacrificeResolver,
-        Func<IReadOnlyList<Permanent>>? destroyTargetResolver,
-        Func<IReadOnlyList<Player>>? opponentsResolver)
+        Func<IReadOnlyList<Permanent>>? destroyTargetResolver)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -268,21 +271,42 @@ public static class GristFactory
         //    in your graveyard. -------------------------------------------------
         // CR 606 (loyalty) + CR 119 (life loss). Counts the creature CARDS in
         // the controller's graveyard (CR 205.2a — type read off the card) and
-        // applies that loss to each opponent. Zero ⇒ no change (CR 119.3).
-        grist.AddAbility(new LoyaltyAbility(grist, Minus5Loyalty, () =>
+        // applies that loss to each opponent.
+        //
+        // The opponents are read from the LIVE game at RESOLUTION
+        // (rc.Game.AllPlayers, filtered to non-controller / not-lost) — NOT a
+        // captured opponentsResolver. The production routed build resolves the
+        // loyalty ability through the stack (TurnDriver.DispatchLoyalty →
+        // ActivatedAbility.ResolveAsync, which threads the live GameContext into
+        // rc.Game), so a captured resolver was null on that path and the
+        // each-opponent half was INERT in real games (only the resolver-
+        // injecting factory-direct tests saw it run). Reading the live context
+        // fixes the routed build (mirrors Stormbreath Dragon #2540 / Yawgmoth +
+        // Priest #2543). With no game context (shape-only Resolve) there are no
+        // opponents to hit, so the rider is a safe no-op. Zero creature cards ⇒
+        // no change (CR 119.3 — losing 0 life is still an event but changes
+        // nothing).
+        grist.AddAbility(new LoyaltyAbility(grist, Minus5Loyalty, new IEffect[]
         {
-            var controller = grist.Controller ?? owner;
-            var creatureCards = controller.Zones.Graveyard.GetCards()
-                .Count(c => c.HasType(CardType.Creature));
-            if (creatureCards <= 0) return; // CR 119.3 — losing 0 life is a no-op.
-
-            var opponents = opponentsResolver?.Invoke();
-            if (opponents == null) return;
-            foreach (var opponent in opponents)
+            Fx.Inline("Grist: each opponent loses life equal to the creature cards in your graveyard", rc =>
             {
-                if (opponent == null) continue;
-                Fx.LoseLife(opponent, creatureCards);
-            }
+                var controller = grist.Controller ?? owner;
+                var creatureCards = controller.Zones.Graveyard.GetCards()
+                    .Count(c => c.HasType(CardType.Creature));
+                if (creatureCards <= 0) return default; // CR 119.3 — losing 0 life is a no-op.
+
+                var players = rc.Game?.AllPlayers;
+                if (players == null) return default;
+                foreach (var opponent in players)
+                {
+                    // CR 102.1 — the controller is never an opponent.
+                    if (ReferenceEquals(opponent, controller)) continue;
+                    if (opponent.HasLost) continue;
+                    Fx.LoseLife(opponent, creatureCards);
+                }
+
+                return default;
+            }),
         }));
 
         return grist;

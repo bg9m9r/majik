@@ -12,13 +12,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Prized Amalgam (Shadows over Innistrad, {3}{U/B}).
 ///
-/// Creature — Zombie Horror 3/3. Oracle text:
+/// Creature — Zombie 3/3. Oracle text:
 ///   "Whenever another creature you control enters under your control,
 ///    if Prized Amalgam is in your graveyard, return Prized Amalgam to
 ///    the battlefield tapped at the beginning of the next end step."
 ///
 /// ## Implemented (v1)
-/// - 3/3 Zombie Horror. Printed mana cost <c>{3}{U/B}</c> rendered as a
+/// - 3/3 Zombie. Printed mana cost <c>{3}{U/B}</c> rendered as a
 ///   plain <c>{3}{U/B}</c> string. The factory does NOT wire a hybrid-
 ///   mana payment alternative — same simplification as
 ///   <see cref="VaultSkirgeFactory"/>'s Phyrexian rendering — the printed
@@ -65,7 +65,7 @@ namespace Majik.Core.CardData.Factories;
 public static class PrizedAmalgamFactory
 {
     public const string CardName = "Prized Amalgam";
-    public const string PrintedManaCost = "{3}{U/B}";
+    public const string PrintedManaCost = "{1}{U}{B}";
 
     /// <summary>
     /// Construct Prized Amalgam with no runtime service wiring. Shape /
@@ -97,7 +97,7 @@ public static class PrizedAmalgamFactory
             manaCost: PrintedManaCost,
             power: 3,
             toughness: 3,
-            subtypes: new[] { CardSubtype.Zombie, CardSubtype.Horror });
+            subtypes: new[] { CardSubtype.Zombie });
 
         card.SetOwner(owner);
         card.SetController(owner);

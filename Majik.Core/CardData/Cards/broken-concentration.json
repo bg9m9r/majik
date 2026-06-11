@@ -1,0 +1,5 @@
+{
+  "name": "Broken Concentration",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}{U}"
+}

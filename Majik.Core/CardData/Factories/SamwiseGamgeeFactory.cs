@@ -85,7 +85,7 @@ public static class SamwiseGamgeeFactory
     public const string Slug = "samwise-gamgee";
     public const string PrintedManaCost = "{1}{W}";
     public const int Power = 2;
-    public const int Toughness = 1;
+    public const int Toughness = 2;
 
     /// <summary>Number of Foods the graveyard-return ability sacrifices.</summary>
     public const int FoodSacrificeCount = 3;

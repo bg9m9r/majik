@@ -139,7 +139,8 @@ public sealed class SpellCastFlow
         IReadOnlyList<IAdditionalCost>? additionalCosts = null,
         IAlternativeCost? alternativeCost = null,
         Majik.Core.Players.Agents.ManaPayment? preChosenMana = null,
-        DelveCost? delveCost = null)
+        DelveCost? delveCost = null,
+        Func<ManaCost, bool>? payManaCost = null)
     {
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -216,6 +217,24 @@ public sealed class SpellCastFlow
         // CR 702.46 — Splice onto Arcane: fold each spliced rider's effects
         // into the spell's effect chain in announcement order.
         effects = ApplySpliceRiders(effects, mergedAdditional, caster);
+
+        // CR 601.2h — pay the mana cost LAST, after targets are chosen
+        // (CR 601.2c) and the total cost is determined (CR 601.2f). Callers
+        // that enforce mana payment (TurnDriver / GameFacade dispatchers)
+        // supply this callback; invoking it HERE — after every step that can
+        // make the cast illegal (sorcery-speed gate, unpayable additional
+        // costs, insufficient targets) has already thrown — means an illegal
+        // cast aborts with NO mana paid and no sources tapped, matching the
+        // CR 732.1 rewind ("the entire action is reversed and any payments
+        // already made are canceled"). Before this hook, dispatchers paid
+        // up front and a targeting failure stranded the payment: the live
+        // bot repeatedly tapped lands for casts that never happened. A false
+        // return (payment failed) makes the cast illegal too.
+        if (payManaCost != null && !payManaCost(totalCost))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: mana payment failed (CR 601.2h).");
+        }
 
         // CR 601.2 / CR 113.5 — capture source zone BEFORE the Hand → Stack
         // move so the "cast from hand" sentinel can branch on it.

@@ -37,7 +37,7 @@ public class InsolentNeonateTests
         card.ManaCost.Should().Be("{R}");
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Wizard).Should().BeFalse();
         card.BasePower.Should().Be(1);
         card.BaseToughness.Should().Be(1);
         card.Owner.Should().BeSameAs(_alice);
@@ -62,7 +62,7 @@ public class InsolentNeonateTests
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Insolent Neonate");
         card.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Wizard).Should().BeFalse();
     }
 
     [Fact]

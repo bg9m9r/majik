@@ -1,0 +1,5 @@
+{
+  "name": "Chilling Grasp",
+  "types": ["Instant"],
+  "manaCost": "{2}{U}"
+}

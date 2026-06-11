@@ -382,12 +382,128 @@ public static class Fx
         if (player is null) throw new ArgumentNullException(nameof(player));
         if (card is null) throw new ArgumentNullException(nameof(card));
 
-        player.Zones.Hand.RemoveCard(card);
-        player.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
-
         var bus = eventBus ?? EventBusRegistry.Get(player);
+
+        // CR 614 / CR 702.35b — a discard is a Hand → Graveyard move, so it must
+        // pass through the replacement bus before it commits. "Exile cards you'd
+        // discard" replacements (Necropotence — CR 614.13) and the Madness
+        // discard → exile rewrite (CR 702.35b) live there. The funnel previously
+        // did a RAW Hand → Graveyard move and bypassed the bus entirely, so an
+        // effect / cost discard (the common case) silently skipped both.
+        //
+        // CR 702.35b — Madness is intrinsic to the card while it is in hand, but
+        // the prod build path never calls the Create(owner, bus) overload that
+        // registers a per-card MadnessReplacement. So pre-resolve the destination
+        // from the catalog: a Madness discard is a Hand → EXILE move (no transient
+        // graveyard hop that a graveyard-entry trigger could mis-observe), while a
+        // registered replacement (Necropotence, or a pre-registered Madness card)
+        // is still honoured by the bus. Route the chosen move through the player's
+        // bus-wired ZoneService (preferred — fires CardMovedEvent) or, failing
+        // that, the player's own ReplacementBus inline, mirroring the draw funnel.
+        var replacements = ReplacementBusFor(player);
+        var requestedDest = MadnessCatalog.HasMadness(card) ? ZoneType.Exile : ZoneType.Graveyard;
+        var landedZone = requestedDest;
+
+        var zones = ZoneServiceRegistry.Get(player);
+        if (zones is not null && card.Zone == ZoneType.Hand)
+        {
+            // ZoneService owns the hand-removal + add-to-(replaced)-destination
+            // and the CardMovedEvent publish; do NOT pre-remove the card.
+            zones.MoveCard(card, ZoneType.Hand, requestedDest, controller: player);
+            landedZone = card.Zone;
+        }
+        else if (replacements is not null && card.Zone == ZoneType.Hand)
+        {
+            // No ZoneService in scope (direct-construction paths) but the player
+            // carries a ReplacementBus — apply the intent inline like DrawCards.
+            var intent = new ZoneMoveIntent(card, ZoneType.Hand, requestedDest, player);
+            var replaced = replacements.Apply(intent);
+            var dest = replaced?.ToZone ?? requestedDest;
+            player.Zones.Hand.RemoveCard(card);
+            AddToZone(player, card, dest);
+            landedZone = dest;
+        }
+        else if (card.Zone == ZoneType.Hand)
+        {
+            // Raw fallback (no bus) — still honour the catalog-resolved destination
+            // so Madness exiles even on direct-construction paths.
+            player.Zones.Hand.RemoveCard(card);
+            AddToZone(player, card, requestedDest);
+            landedZone = requestedDest;
+        }
+        else
+        {
+            // Card not in hand (defensive) — preserve the prior raw graveyard move.
+            player.Zones.Hand.RemoveCard(card);
+            player.Zones.Graveyard.AddCard(card);
+            card.SetZone(ZoneType.Graveyard);
+            landedZone = ZoneType.Graveyard;
+        }
+
+        // CR 702.35c — once a Madness card sits in exile, open the
+        // cast-for-madness-cost window by granting the controller a temporary
+        // cast-from-exile permission at the madness cost. The agent then proposes
+        // the cast via ExileCastAlternativeCost on the live priority loop, exactly
+        // the seam Ragavan / impulse-draw cards already use.
+        if (MadnessCatalog.HasMadness(card))
+        {
+            if (landedZone == ZoneType.Exile
+                && card is Card madnessCard
+                && MadnessCatalog.CostFor(card) is { } madnessCost)
+            {
+                // CR 702.35c — "you may cast it for its madness cost rather than
+                // putting it into your graveyard. If you don't, put it into your
+                // graveyard." The cast itself rides the runtime exile-cast grant
+                // (ExileCastAlternativeCost) the agent proposes on the priority
+                // loop — the same seam Ragavan / impulse-draw cards use. Stamp the
+                // grant and, with a live bus, schedule its revocation at end of
+                // turn (CR 514.2); when the window closes and the card is STILL
+                // an uncast object in exile, fall it into the graveyard.
+                madnessCard.GrantRuntimeExileCast(player, madnessCost, spendAsAnyColor: false);
+
+                void CloseMadnessWindow()
+                {
+                    madnessCard.ClearRuntimeExileCast();
+                    // CR 702.35c fallback — only when the card is still the exiled
+                    // object (not cast / already moved on by a later effect).
+                    if (madnessCard.Zone == ZoneType.Exile
+                        && player.Zones.Exile.ContainsCard(madnessCard))
+                    {
+                        Keywords.MadnessHelper.MoveExileToGraveyard(madnessCard, player);
+                    }
+                }
+
+                Keywords.ExilePlayPermission.ScheduleRevocation(
+                    player, Keywords.ExilePlayExpiry.EndOfTurn, bus, CloseMadnessWindow);
+            }
+        }
+
         bus?.Publish(new DiscardedEvent(player, card, wasCost));
+    }
+
+    /// <summary>
+    /// The <see cref="ReplacementBus"/> the discard funnel routes a would-discard
+    /// through — the player's bus-wired <see cref="ZoneService"/>'s bus when one
+    /// is registered for the game, else the player's own attached bus. Null when
+    /// neither is present (shape / dispatcher paths).
+    /// </summary>
+    private static ReplacementBus? ReplacementBusFor(Player player)
+        => ZoneServiceRegistry.Get(player)?.Replacements ?? player.Replacements;
+
+    /// <summary>Add <paramref name="card"/> to <paramref name="player"/>'s
+    /// <paramref name="zone"/> collection and stamp its zone (inline
+    /// replacement-bus path only — Graveyard / Exile destinations).</summary>
+    private static void AddToZone(Player player, ICard card, ZoneType zone)
+    {
+        switch (zone)
+        {
+            case ZoneType.Exile: player.Zones.Exile.AddCard(card); break;
+            case ZoneType.Graveyard: player.Zones.Graveyard.AddCard(card); break;
+            case ZoneType.Hand: player.Zones.Hand.AddCard(card); break;
+            case ZoneType.Library: player.Zones.Library.AddCard(card); break;
+            default: player.Zones.Graveyard.AddCard(card); zone = ZoneType.Graveyard; break;
+        }
+        card.SetZone(zone);
     }
 
     // ------------------------------------------------------------------

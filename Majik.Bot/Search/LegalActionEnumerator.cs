@@ -74,6 +74,32 @@ internal static class LegalActionEnumerator
                 if (ApproxCmc(card) <= manaAvailable)
                     result.Add(new PriorityAction.CastSpell(card, Array.Empty<object>()));
             }
+
+            // CR 118.9 — cast-from-exile runtime grants (madness / Ragavan /
+            // foretell / impulse). A card in our EXILE zone carrying a
+            // RuntimeExileCast grant that nominates US is a legal cast at the
+            // granted cost via ExileCastAlternativeCost. The live priority loop
+            // surfaces these for human / remote agents; without this loop the
+            // search bot is blind to them. Mirror the hand-cast gates: instant
+            // vs. sorcery speed and colour-blind affordability.
+            foreach (var card in self.Zones.Exile.GetCards())
+            {
+                if (card is not Card c) continue;
+                if (!ReferenceEquals(c.RuntimeExileCastAllowedCaster, self)) continue;
+                if (c.RuntimeExileCastCost is not { } exileCost) continue;
+                if (c is Land) continue;
+
+                var instantSpeed = IsInstantSpeed(c);
+                if (!instantSpeed && !sorceryWindow) continue;
+
+                if (exileCost.TotalValue > manaAvailable) continue;
+
+                result.Add(new PriorityAction.CastSpell(
+                    card,
+                    Array.Empty<object>(),
+                    AlternativeCost: new Majik.Core.Costs.ExileCastAlternativeCost(
+                        $"Cast {c.Name} from exile ({exileCost})", exileCost)));
+            }
         }
 
         // CR 602 — activated abilities of permanents the player controls.
@@ -91,6 +117,18 @@ internal static class LegalActionEnumerator
                 foreach (var ability in card.Abilities.OfType<IActivatedAbility>())
                 {
                     if (ability is IManaAbility) continue;
+                    // CR 602.5c — respect the "Activate only if <condition>" gate.
+                    // Prefer the context-aware overload (ctx is in scope) so a gate
+                    // that reads live game state — Hired Claw's "an opponent lost life
+                    // this turn" — is honoured here, matching the live driver. A
+                    // context-less gate still evaluates via the same overload's
+                    // fallback.
+                    var canActivate = ability is Majik.Core.Abilities.ActivatedAbility aa
+                        ? aa.CanActivateNow(ctx)
+                        : ability.CanActivateNow();
+                    if (!canActivate) continue;
+                    // Affordability is symmetric with casting: mana portion against
+                    // UntappedManaSources (floating + tappable), non-mana costs via CanPay.
                     if (CanAffordAbility(ability, self, manaAvailable))
                         result.Add(new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
                 }

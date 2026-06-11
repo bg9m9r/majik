@@ -55,7 +55,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MistbindCliqueFactory
 {
     public const string CardName = "Mistbind Clique";
-    public const string PrintedManaCost = "{3}{U}{U}";
+    public const string PrintedManaCost = "{3}{U}";
     public const int Power = 4;
     public const int Toughness = 4;
 

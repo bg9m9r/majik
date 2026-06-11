@@ -11,6 +11,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -117,7 +118,6 @@ public class SteelHellkiteFactoryTests
         var hellkite = SteelHellkiteFactory.Create(
             _alice,
             xValueProvider: () => 2,
-            allPlayersResolver: () => new[] { _alice, _bob },
             eventBus: bus);
         hellkite.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(hellkite);
@@ -136,7 +136,7 @@ public class SteelHellkiteFactoryTests
         // Activate destruction sweep for X = 2.
         var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
-        foreach (var e in sweep.Effects) e.Execute();
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         _bob.Zones.Graveyard.GetCards().Should().Contain(bobBear,
             "Bob took combat damage; his mv-2 nontoken permanent is destroyed.");
@@ -153,7 +153,6 @@ public class SteelHellkiteFactoryTests
         var hellkite = SteelHellkiteFactory.Create(
             _alice,
             xValueProvider: () => 1,
-            allPlayersResolver: () => new[] { _alice, _bob },
             eventBus: bus);
         hellkite.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(hellkite);
@@ -167,7 +166,7 @@ public class SteelHellkiteFactoryTests
 
         var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
-        foreach (var e in sweep.Effects) e.Execute();
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         _bob.Zones.Graveyard.GetCards().Should().Contain(bobOne,
             "Bob's mv-1 permanent destroyed (he took combat damage on his creature).");
@@ -183,7 +182,6 @@ public class SteelHellkiteFactoryTests
         var hellkite = SteelHellkiteFactory.Create(
             _alice,
             xValueProvider: () => 2,
-            allPlayersResolver: () => new[] { _alice, _bob },
             eventBus: bus);
         hellkite.SetZone(ZoneType.Battlefield);
 
@@ -192,7 +190,7 @@ public class SteelHellkiteFactoryTests
         // No combat damage published — victim set is empty.
         var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
-        foreach (var e in sweep.Effects) e.Execute();
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         _bob.Zones.Battlefield.GetCards().Should().Contain(bobBear,
             "no combat damage → no victims → no destruction.");
@@ -205,7 +203,6 @@ public class SteelHellkiteFactoryTests
         var hellkite = SteelHellkiteFactory.Create(
             _alice,
             xValueProvider: () => 2,
-            allPlayersResolver: () => new[] { _alice, _bob },
             eventBus: bus);
         hellkite.SetZone(ZoneType.Battlefield);
 
@@ -219,7 +216,7 @@ public class SteelHellkiteFactoryTests
 
         var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
-        foreach (var e in sweep.Effects) e.Execute();
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         _bob.Zones.Battlefield.GetCards().Should().Contain(bobBear,
             "the victim set was cleared at turn start — Bob no longer counts as having been dealt combat damage this turn.");
@@ -232,7 +229,6 @@ public class SteelHellkiteFactoryTests
         var hellkite = SteelHellkiteFactory.Create(
             _alice,
             xValueProvider: () => 0,
-            allPlayersResolver: () => new[] { _alice, _bob },
             eventBus: bus);
         hellkite.SetZone(ZoneType.Battlefield);
 
@@ -244,7 +240,7 @@ public class SteelHellkiteFactoryTests
 
         var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
-        foreach (var e in sweep.Effects) e.Execute();
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         _bob.Zones.Battlefield.GetCards().Should().Contain(bobToken,
             "tokens are excluded from Steel Hellkite's destruction sweep ('each nontoken permanent').");

@@ -53,7 +53,7 @@ namespace Majik.Core.CardData.Factories;
 public static class AngrathsMaraudersFactory
 {
     public const string CardName = "Angrath's Marauders";
-    public const string Cost = "{4}{R}{R}";
+    public const string Cost = "{5}{R}{R}";
     public const int Power = 4;
     public const int Toughness = 4;
 

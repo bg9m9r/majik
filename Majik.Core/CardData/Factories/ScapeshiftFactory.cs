@@ -147,7 +147,7 @@ public static class ScapeshiftFactory
                         if (!pick.HasType(CardType.Land)) continue;
                         if (!library.Contains(pick)) continue;
                         if (!seen.Add(pick)) continue;
-                        MoveLibraryToBattlefield(caster, pick);
+                        await MoveLibraryToBattlefieldAsync(caster, pick, ctx).ConfigureAwait(false);
                         placed++;
                     }
                     return;
@@ -173,7 +173,7 @@ public static class ScapeshiftFactory
                         ctx, caster, candidates, "land card").ConfigureAwait(false);
                     if (pick == null) break; // CR 701.19a — decline is legal.
 
-                    MoveLibraryToBattlefield(caster, pick);
+                    await MoveLibraryToBattlefieldAsync(caster, pick, ctx).ConfigureAwait(false);
                 }
                 // CR 701.20a — shuffle after the search resolves.
                 LibraryShuffle.ShuffleLibrary(caster, "scapeshift");
@@ -214,12 +214,20 @@ public static class ScapeshiftFactory
     /// service is registered (shape / dispatcher-test path).
     /// </para>
     /// </summary>
-    private static void MoveLibraryToBattlefield(Player caster, ICard pick)
+    private static async ValueTask MoveLibraryToBattlefieldAsync(
+        Player caster, ICard pick, ResolutionContext ctx)
     {
         var zones = ZoneServiceRegistry.Get(caster);
         if (zones != null)
         {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+            // Async move so the ResolutionContext (carrying the caster's
+            // agent) reaches a prompting ETB replacement — a tutored shock
+            // land must offer the "pay 2 life?" choice
+            // (ShockLandReplacement.ReplaceAsync) instead of auto-paying via
+            // the synchronous replacement path. Scapeshift puts lands in
+            // untapped, so the prompt's outcome is load-bearing.
+            await zones.MoveCardToAsync(pick, ZoneType.Battlefield, ctx, controller: caster)
+                .ConfigureAwait(false);
         }
         else
         {

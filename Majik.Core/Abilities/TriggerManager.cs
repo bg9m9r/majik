@@ -356,13 +356,23 @@ public class TriggerManager
         foreach (var group in byController)
         {
             var mine = group.ToList();
-            if (!agents.TryGetValue(group.Key, out var agent))
+            agents.TryGetValue(group.Key, out var agent);
+            if (agent == null)
             {
                 // No agent registered for this controller — fall back to timestamp.
                 mine = mine.OrderBy(t => t.Timestamp).ToList();
             }
-            else
+            else if (mine.Count > 1)
             {
+                // CR 603.3b — a player orders triggers ONLY when two or more of
+                // their triggered abilities are put on the stack at the same
+                // time. A SINGLE trigger has no ordering decision, so we must
+                // not prompt: a remote (human) agent would otherwise fire an
+                // OrderTriggersCommand prompt for one trigger that the portal
+                // can't meaningfully answer, wedging the player (the engine
+                // then rejects their PassPriority because it's still awaiting
+                // the order command). Live-play bug: a played surveil land
+                // ("Underground Mortuary") never reached its surveil prompt.
                 var ordered = await agent.OrderTriggersAsync(ctx, mine, ct);
                 mine = ordered.ToList();
             }

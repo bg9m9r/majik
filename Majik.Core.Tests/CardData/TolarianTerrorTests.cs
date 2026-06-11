@@ -45,7 +45,7 @@ public class TolarianTerrorTests
         var terror = TolarianTerrorFactory.Create(_alice);
 
         terror.Name.Should().Be("Tolarian Terror");
-        terror.ManaCost.Should().Be("{6}{U}{U}");
+        terror.ManaCost.Should().Be("{6}{U}");
         terror.HasType(CardType.Creature).Should().BeTrue();
         terror.HasSubtype(CardSubtype.Serpent).Should().BeTrue();
         terror.BasePower.Should().Be(5);
@@ -80,54 +80,54 @@ public class TolarianTerrorTests
     public void TolarianTerror_EmptyGraveyard_PaysFullCost()
     {
         // 0 instants / sorceries in graveyard → no reduction. Pays
-        // {6}{U}{U}: generic = 6, U pips = 2.
+        // {6}{U}: generic = 6, U pip = 1.
         var terror = TolarianTerrorFactory.Create(_alice);
 
         var effective = CostReduction.GetEffectiveCost(terror, _alice);
 
         effective.Generic.Should().Be(6);
-        effective.Blue.Should().Be(2);
+        effective.Blue.Should().Be(1);
     }
 
     [Fact]
     public void TolarianTerror_FourInstantsOrSorceriesInGraveyard_ReducesGenericBy4()
     {
         // 4 instants / sorceries in graveyard → reduction by 4 generic.
-        // Pays {2}{U}{U}: generic = 2, U pips = 2.
+        // Pays {2}{U}: generic = 2, U pip = 1.
         var terror = TolarianTerrorFactory.Create(_alice);
         SeedGraveyardWithSpells(_alice, instants: 2, sorceries: 2);
 
         var effective = CostReduction.GetEffectiveCost(terror, _alice);
 
         effective.Generic.Should().Be(2);
-        effective.Blue.Should().Be(2);
+        effective.Blue.Should().Be(1);
     }
 
     [Fact]
-    public void TolarianTerror_SixInstantsOrSorceriesInGraveyard_ReducesToUU()
+    public void TolarianTerror_SixInstantsOrSorceriesInGraveyard_ReducesToU()
     {
-        // 6 in graveyard → reduction = 6 generic. Pays {U}{U}.
+        // 6 in graveyard → reduction = 6 generic. Pays {U}.
         var terror = TolarianTerrorFactory.Create(_alice);
         SeedGraveyardWithSpells(_alice, instants: 3, sorceries: 3);
 
         var effective = CostReduction.GetEffectiveCost(terror, _alice);
 
         effective.Generic.Should().Be(0);
-        effective.Blue.Should().Be(2);
+        effective.Blue.Should().Be(1);
     }
 
     [Fact]
     public void TolarianTerror_TenInstantsOrSorceriesInGraveyard_FloorsAtColouredPips()
     {
         // 10 → reduction = 10 generic. Printed generic = 6; floors at 0.
-        // Coloured pips untouched (CR 117.7c) — still pays {U}{U}.
+        // Coloured pips untouched (CR 117.7c) — still pays {U}.
         var terror = TolarianTerrorFactory.Create(_alice);
         SeedGraveyardWithSpells(_alice, instants: 5, sorceries: 5);
 
         var effective = CostReduction.GetEffectiveCost(terror, _alice);
 
         effective.Generic.Should().Be(0);
-        effective.Blue.Should().Be(2);
+        effective.Blue.Should().Be(1);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class TolarianTerrorTests
 
         effective.Generic.Should().Be(6,
             "non-instant/sorcery cards don't trigger Tolarian Terror's reduction");
-        effective.Blue.Should().Be(2);
+        effective.Blue.Should().Be(1);
     }
 
     // -----------------------------------------------------------------------

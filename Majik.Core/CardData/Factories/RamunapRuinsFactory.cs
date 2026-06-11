@@ -89,19 +89,14 @@ public static class RamunapRuinsFactory
     /// opponent resolver) while the sacrifice still resolves. This is the
     /// overload <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
-    public static Land Create(Player owner) => Create(owner, opponentResolver: null);
-
     /// <summary>
-    /// Construct Ramunap Ruins with an optional live "each opponent" resolver
-    /// for the sacrifice ability's damage half.
+    /// Construct Ramunap Ruins. The sacrifice ability deals 2 damage to "each
+    /// opponent" read from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build (which dispatches this single-arg overload).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent"
-    /// (CR 800.4). Without a resolver the damage half no-ops; the sacrifice
-    /// still resolves.</param>
-    public static Land Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+    public static Land Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -141,25 +136,24 @@ public static class RamunapRuinsFactory
         // ----------------------------------------------------------------
         var sacEffect = new Effect(
             $"{CardName}: sacrifice a Desert + deal {SacDamage} damage to each opponent",
-            () =>
+            ctx =>
             {
                 // Sacrifice a Desert (this land qualifies) — battlefield →
                 // owner's graveyard. Performed before damage; mirrors the
                 // Barbarian Ring closure.
                 SacrificeSelf(land, owner);
 
-                // CR 800.4 — deal 2 damage to each opponent. Without a resolver
-                // the player aggregate exposes no opponents list at v1, so the
-                // damage half no-ops (same posture as Electrostatic Field).
-                var opponents = opponentResolver?.Invoke();
-                if (opponents is null) return;
-
+                // CR 800.4 — deal 2 damage to each opponent, read from the LIVE
+                // resolution context — NOT a captured resolver, which was null
+                // on the routed prod build and made the damage INERT in real
+                // games (resolver-null bug class; mirrors Stormbreath #2540 /
+                // Grist #2549).
                 var controller = land.Controller ?? owner;
-                foreach (var opp in opponents)
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, controller)) continue;
                     Fx.DealDamage(opp, SacDamage);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var sacAbility = new ActivatedAbility(

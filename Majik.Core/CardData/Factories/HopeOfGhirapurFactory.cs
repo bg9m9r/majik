@@ -104,7 +104,7 @@ namespace Majik.Core.CardData.Factories;
 public static class HopeOfGhirapurFactory
 {
     public const string CardName = "Hope of Ghirapur";
-    public const string PrintedManaCost = "{0}";
+    public const string PrintedManaCost = "{1}";
     public const int Power = 1;
     public const int Toughness = 1;
 
@@ -224,7 +224,9 @@ public static class HopeOfGhirapurFactory
         sacAbility = new ActivatedAbility(
             source: card,
             controller: owner,
-            costs: new ICost[] { AdditionalCost.Sacrifice(card) },
+            // CR 701.16a — pass the in-scope bus so paying the sac cost
+            // publishes PermanentSacrificedEvent for aristocrat payoffs.
+            costs: new ICost[] { AdditionalCost.Sacrifice(card, eventBus) },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]
             {

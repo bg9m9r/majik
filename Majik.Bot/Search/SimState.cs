@@ -38,18 +38,105 @@ public sealed class SimState
     /// <summary>The active player at the capture point.</summary>
     public Player ActivePlayer { get; }
 
+    /// <summary>
+    /// The opponent's full decklist (name strings) used to seed determinization
+    /// of hidden zones. <c>null</c> means perfect-info search (no resampling).
+    /// </summary>
+    public IReadOnlyList<string>? OpponentDecklist { get; }
+
+    /// <summary>
+    /// The deterministic world seed for hidden-zone resampling. <c>null</c> means
+    /// perfect-info search (no resampling). When set together with
+    /// <see cref="OpponentDecklist"/>, each sandbox clone is resampled before it
+    /// is searched / rolled out.
+    /// </summary>
+    public int? WorldSeed { get; }
+
+    /// <summary>
+    /// Per-world public observations (e.g. opponent cards already revealed on the
+    /// battlefield / in the graveyard) threaded to the resampler so the sampled
+    /// hidden zones are made consistent with what has been observed. <c>null</c>
+    /// means no observation augmentation (the perfect-info / unaugmented path).
+    /// </summary>
+    public IReadOnlyList<string>? ObservedPublic { get; }
+
     private SimState(
         IReadOnlyList<Player> livePlayers,
         Player activePlayer,
         int turnNumber,
         PhaseStateType phase,
-        Player searchedSeat)
+        Player searchedSeat,
+        IReadOnlyList<string>? opponentDecklist = null,
+        int? worldSeed = null,
+        IReadOnlyList<string>? observedPublic = null)
     {
         LivePlayers = livePlayers;
         ActivePlayer = activePlayer;
         TurnNumber = turnNumber;
         Phase = phase;
         SearchedSeat = searchedSeat;
+        OpponentDecklist = opponentDecklist;
+        WorldSeed = worldSeed;
+        ObservedPublic = observedPublic;
+    }
+
+    /// <summary>
+    /// Returns a copy of this state opted into determinization: the opponent's
+    /// decklist and a fixed world seed are attached so each sandbox clone is
+    /// resampled (hidden zones re-drawn) before it is searched. Every other field
+    /// is preserved unchanged.
+    /// </summary>
+    public SimState WithDeterminization(IReadOnlyList<string> opponentDecklist, int worldSeed) =>
+        WithDeterminization(opponentDecklist, observedPublic: null, worldSeed);
+
+    /// <summary>
+    /// As <see cref="WithDeterminization(IReadOnlyList{string}, int)"/> but also attaches
+    /// a per-world <see cref="ObservedPublic"/> list, threaded to the resampler so the
+    /// sampled hidden zones are made consistent with the observed public cards. Every
+    /// other field is preserved unchanged.
+    /// </summary>
+    public SimState WithDeterminization(
+        IReadOnlyList<string> opponentDecklist, IReadOnlyList<string>? observedPublic, int worldSeed)
+    {
+        ArgumentNullException.ThrowIfNull(opponentDecklist);
+        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat
+        return new SimState(
+            livePlayers: LivePlayers,
+            activePlayer: ActivePlayer,
+            turnNumber: TurnNumber,
+            phase: Phase,
+            searchedSeat: SearchedSeat,
+            opponentDecklist: opponentDecklist,
+            worldSeed: worldSeed,
+            observedPublic: observedPublic);
+    }
+
+    /// <summary>
+    /// Returns a copy of this state with a new <see cref="WorldSeed"/>, preserving
+    /// the existing <see cref="OpponentDecklist"/> (used by the K-world search loop
+    /// to spin the same root across many determinized worlds). Every other field is
+    /// preserved unchanged.
+    ///
+    /// <para>
+    /// Presupposes a decklist is already attached (intended use: re-seeding an
+    /// already-determinized root — i.e. one produced by <see cref="WithDeterminization"/>).
+    /// Calling this on a perfect-info root yields a seed-without-decklist state,
+    /// which resamples nothing (see <see cref="EngineSimulator"/>'s
+    /// resample-when-both-set guard); use <see cref="WithDeterminization"/> to opt in.
+    /// </para>
+    /// </summary>
+    public SimState WithWorldSeed(int worldSeed)
+    {
+        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, OpponentDecklist, ObservedPublic
+        return new SimState(
+            livePlayers: LivePlayers,
+            activePlayer: ActivePlayer,
+            turnNumber: TurnNumber,
+            phase: Phase,
+            searchedSeat: SearchedSeat,
+            opponentDecklist: OpponentDecklist,
+            worldSeed: worldSeed,
+            observedPublic: ObservedPublic);
     }
 
     /// <summary>

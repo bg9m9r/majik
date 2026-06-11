@@ -250,6 +250,63 @@ public class FactoryRoutingTests
     }
 
     // -----------------------------------------------------------------------
+    // Walking Ballista — enters with X +1/+1 counters (CR 614.1d / 202.3b).
+    // The prod routed build (NamedCardFactory.Create → WalkingBallistaFactory)
+    // then OverlayAdditiveBinders must register the variable-X ETB-counter
+    // replacement reading PendingCastX, so a cast Ballista enters with the
+    // chosen X counters instead of always 0/0.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void WalkingBallista_RoutedThroughFactory_EntersWithXCounters()
+    {
+        var deck = new List<ICard>
+        {
+            new Creature("Walking Ballista", "{X}{X}", 0, 0),
+        };
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, Array.Empty<ICard>(), cardRepo: Repo());
+        var ballista = (Creature)LibraryCardNamed(facade, facade.Alice, "Walking Ballista");
+
+        // Cast-time X = 3 (paid {3}{3}); SpellCastFlow stamps PendingCastX.
+        ((Card)ballista).SetPendingCastX(3);
+
+        // Run the ETB intent through the facade ReplacementBus (the same bus
+        // OverlayAdditiveBinders registered the variable-X counter replacement
+        // on), then place the counters as the permanent enters.
+        ballista.SetController(facade.Alice);
+
+        var intent = new Majik.Core.Effects.ZoneMoveIntent(
+            ballista, ZoneType.Hand, ZoneType.Battlefield, Controller: facade.Alice);
+        var replaced = facade.Replacements.Apply(intent);
+
+        replaced.Should().NotBeNull();
+        replaced!.PlusOneCountersOnEnter.Should().Be(3,
+            "Walking Ballista enters with X (=3) +1/+1 counters (CR 614.1d), not 0/0");
+    }
+
+    [Fact]
+    public void WalkingBallista_RoutedThroughFactory_ZeroX_EntersWithNoCounters()
+    {
+        var deck = new List<ICard>
+        {
+            new Creature("Walking Ballista", "{X}{X}", 0, 0),
+        };
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, Array.Empty<ICard>(), cardRepo: Repo());
+        var ballista = (Creature)LibraryCardNamed(facade, facade.Alice, "Walking Ballista");
+        // X = 0: no PendingCastX stamp.
+
+        var intent = new Majik.Core.Effects.ZoneMoveIntent(
+            ballista, ZoneType.Hand, ZoneType.Battlefield, Controller: facade.Alice);
+        var replaced = facade.Replacements.Apply(intent);
+
+        replaced.Should().NotBeNull();
+        replaced!.PlusOneCountersOnEnter.Should().Be(0,
+            "X = 0 → enters as a 0/0 (which the SBA layer then sends to the graveyard)");
+    }
+
+    // -----------------------------------------------------------------------
     // CR 712.3 — MDFC cast-either-face routing (deferral #3). The seed stores
     // "Sink into Stupor // Soporific Springs" under the composite name; the
     // production deck-build must route the FRONT face through its factory so

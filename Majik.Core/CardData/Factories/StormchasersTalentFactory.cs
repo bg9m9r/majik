@@ -94,7 +94,7 @@ namespace Majik.Core.CardData.Factories;
 public static class StormchasersTalentFactory
 {
     public const string CardName = "Stormchaser's Talent";
-    public const string PrintedManaCost = "{U}{R}";
+    public const string PrintedManaCost = "{U}";
     public const string Level2Cost = "{1}{U}{R}";
     public const string Level3Cost = "{3}{U}{R}";
 
@@ -106,7 +106,7 @@ public static class StormchasersTalentFactory
     /// invoking the effect directly. Suitable for dispatcher / shape tests.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, zoneService: null, triggers: null, eventBus: null, opponentResolver: null);
+        Create(owner, zoneService: null, triggers: null, eventBus: null);
 
     /// <summary>
     /// Construct Stormchaser's Talent with optional runtime services. When
@@ -117,14 +117,16 @@ public static class StormchasersTalentFactory
     /// all three triggered abilities (ETB + Level-2 + Level-3) are
     /// registered for bus-driven firing. When <paramref name="eventBus"/>
     /// is supplied, level-up resolutions publish
-    /// <see cref="ClassLevelUpEvent"/>.
+    /// <see cref="ClassLevelUpEvent"/>. The Level-2 "any target" damage reads
+    /// its target opponent from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build (v1 deterministic: first opponent).
     /// </summary>
     public static Enchantment Create(
         Player owner,
         ZoneService? zoneService,
         TriggerManager? triggers,
-        IEventBus? eventBus = null,
-        Func<Player>? opponentResolver = null)
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -208,21 +210,22 @@ public static class StormchasersTalentFactory
         // ----------------------------------------------------------------
         var level2Effect = new Effect(
             $"{CardName}: Level 2 — the Mercenary deals 1 damage to any target",
-            () =>
+            ctx =>
             {
                 var token = mercenaryHolder[0];
-                if (token == null) return;
-                if (token.Zone != ZoneType.Battlefield) return;
+                if (token == null) return ValueTask.CompletedTask;
+                if (token.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
-                // v1 any-target picker: opponent supplied by the caller's
-                // resolver (mirrors WishclawTalismanFactory's opponentChooser).
-                // Without a resolver wired in the dispatcher path, the
-                // trigger queues but its damage step is a no-op (the
-                // shape is still observable; live damage requires the
-                // (owner, zones, triggers, bus, opponentResolver) overload).
-                var opponent = opponentResolver?.Invoke();
-                if (opponent == null) return;
+                // v1 any-target picker: the first opponent, read from the LIVE
+                // resolution context — NOT a captured resolver, which was null
+                // on the routed prod build and made the damage step INERT in
+                // real games (resolver-null bug class; mirrors Stormbreath
+                // #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                var opponent = ContextOpponents.Of(ctx, controller).FirstOrDefault();
+                if (opponent == null) return ValueTask.CompletedTask;
                 opponent.LoseLife(1);
+                return ValueTask.CompletedTask;
             });
 
         var level2Trigger = new TriggeredAbility(

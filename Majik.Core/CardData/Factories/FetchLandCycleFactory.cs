@@ -177,12 +177,18 @@ public static class FetchLandCycleFactory
         // tutored land's CardMovedEvent fires (drives bounce-land ETB
         // bounce + Amulet of Vigor untap) and ETB-tapped replacements
         // (shock lands paying 2 life, bounce lands always tapped) run.
-        // Falls back to raw zone mutation for shape / dispatcher-test
-        // paths with no registered service.
+        // Use the ASYNC move so the ResolutionContext (carrying the
+        // controller's agent) reaches a prompting ETB replacement — a
+        // shock land's "you may pay 2 life" must consult the agent
+        // (ShockLandReplacement.ReplaceAsync) exactly like the direct
+        // play-land path (PriorityLoop), not auto-pay deterministically
+        // via the synchronous replacement path. Falls back to raw zone
+        // mutation for shape / dispatcher-test paths with no service.
         var zones = ZoneServiceRegistry.Get(player);
         if (zones != null)
         {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+            await zones.MoveCardToAsync(pick, ZoneType.Battlefield, ctx, controller: player)
+                .ConfigureAwait(false);
         }
         else
         {

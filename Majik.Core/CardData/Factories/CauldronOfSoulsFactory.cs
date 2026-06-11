@@ -76,7 +76,7 @@ namespace Majik.Core.CardData.Factories;
 public static class CauldronOfSoulsFactory
 {
     public const string CardName = "Cauldron of Souls";
-    public const string PrintedManaCost = "{4}";
+    public const string PrintedManaCost = "{5}";
 
     /// <summary>
     /// Keyword string registered on each chosen creature's

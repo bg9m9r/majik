@@ -8,6 +8,7 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -154,11 +155,13 @@ public class ThievesGuildEnforcerTests
             _alice,
             continuousEffects: null,
             triggers: null,
-            allPlayersResolver: () => new List<Player> { _alice, _bob, carol });
+            allPlayersResolver: null);
         c.SetZone(ZoneType.Battlefield);
 
         var trigger = GetMillTrigger(c);
-        foreach (var e in trigger.Effects) e.Execute();
+        // Resolve through a live GameContext so the mill reads its opponents
+        // off ctx.Game.AllPlayers / ContextOpponents (the production path).
+        ContextResolve.Resolve(trigger, _alice, _alice, _bob, carol);
 
         _bob.Zones.Graveyard.GetCards().Count().Should().Be(2);
         carol.Zones.Graveyard.GetCards().Count().Should().Be(2);

@@ -42,9 +42,9 @@ public class PheliaExuberantShepherdFactoryTests
         p.ManaCost.Should().Be("{1}{W}");
         p.HasType(CardType.Creature).Should().BeTrue();
         p.HasSubtype(CardSubtype.Dog).Should().BeTrue();
-        p.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
+        p.HasSubtype(CardSubtype.Wizard).Should().BeFalse();
         p.BasePower.Should().Be(2);
-        p.BaseToughness.Should().Be(1);
+        p.BaseToughness.Should().Be(2);
         p.Supertypes.Should().Contain(CardSupertype.Legendary);
         p.Owner.Should().BeSameAs(_alice);
 

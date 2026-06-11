@@ -15,7 +15,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Bedlam Reveler (Eldritch Moon, {6}{R}{R}).
 ///
-/// Creature — Horror 3/4. Oracle text:
+/// Creature — Devil Horror 3/4. Oracle text:
 ///   "Trample
 ///    Prowess (Whenever you cast a noncreature spell, this creature gets
 ///    +1/+1 until end of turn.)
@@ -26,7 +26,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 3/4 Creature — Horror at {6}{R}{R}; owner / controller wired.
+/// - 3/4 Creature — Devil Horror at {6}{R}{R}; owner / controller wired.
 /// - <b>Trample</b> (CR 702.19) wired as a <see cref="KeywordAbility"/>
 ///   marker; combat helpers (<c>CombatAbilities.HasTrample</c>) read it the
 ///   same way every other trample-bearing factory in this repo does (Amped
@@ -164,7 +164,7 @@ public static class BedlamRevelerFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Horror });
+            subtypes: new[] { CardSubtype.Devil, CardSubtype.Horror });
 
         card.SetOwner(owner);
         card.SetController(owner);

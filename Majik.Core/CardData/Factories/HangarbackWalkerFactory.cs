@@ -169,6 +169,12 @@ public static class HangarbackWalkerFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
+        // CR 614.1d — this factory wires its own "enters with X +1/+1
+        // counters" via the ETB trigger below; flag it so the generic
+        // EntersWithCountersBinder (run by the prod routed overlay) does NOT
+        // also register a variable-X replacement and double the counters.
+        card.MarkSelfManagesEntersWithCounters();
+
         // ----------------------------------------------------------------
         // ETB +1/+1 counters trigger — CR 603.6a / CR 122.1g.
         //   "Hangarback Walker enters with X +1/+1 counters on it."

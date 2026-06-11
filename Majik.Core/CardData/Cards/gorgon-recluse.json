@@ -1,0 +1,9 @@
+{
+  "name": "Gorgon Recluse",
+  "types": ["Creature"],
+  "subtypes": ["Gorgon"],
+  "manaCost": "{3}{B}{B}",
+  "power": 2,
+  "toughness": 4,
+  "abilities": []
+}

@@ -76,22 +76,27 @@ public static class PlaguecrafterFactory
     /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, playerResolver: null, triggers: null, agent: null, eventBus: null);
+        Create(owner, triggers: null, agent: null, eventBus: null);
 
     /// <summary>
-    /// Construct Plaguecrafter with optional runtime services.
+    /// Construct Plaguecrafter with optional runtime services. The ETB "each
+    /// player sacrifices … / discards" body reads every player from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551 / Priest of Forgotten Gods #2543). With no live
+    /// game context the body no-ops (shape-only paths). Each affected player's
+    /// "of their choice" pick reads THAT player's agent from
+    /// <see cref="AgentRegistry"/> (the optional <paramref name="agent"/>
+    /// overrides it for tests).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="playerResolver">Returns the live player list at
-    /// resolution time, ideally in APNAP order (CR 101.4). "Each player"
-    /// iterates whatever this yields — the controller included. Null → the
-    /// ETB body no-ops (shape path).</param>
     /// <param name="triggers">TriggerManager — when supplied the ETB trigger
     /// is registered so the enter-battlefield event lands it on the stack
     /// automatically.</param>
-    /// <param name="agent">Optional agent driving each affected player's
-    /// "of their choice" sacrifice pick and discard pick. Null falls back to
-    /// a deterministic first-eligible / first-card pick.</param>
+    /// <param name="agent">Optional agent override driving each affected
+    /// player's "of their choice" sacrifice / discard pick. Null reads each
+    /// affected player's live agent from <see cref="AgentRegistry"/>, then
+    /// falls back to a deterministic first-eligible / first-card pick.</param>
     /// <param name="eventBus">Optional event bus. When supplied, each forced
     /// sacrifice publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
     /// so "whenever a/an [player] sacrifices …" aristocrat payoffs (Mayhem
@@ -99,7 +104,6 @@ public static class PlaguecrafterFactory
     /// posture.</param>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? playerResolver,
         TriggerManager? triggers,
         IPlayerAgent? agent,
         IEventBus? eventBus = null)
@@ -120,7 +124,11 @@ public static class PlaguecrafterFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: each player sacrifices a creature or planeswalker of their choice; each who can't discards a card",
-            () => Resolve(playerResolver, agent, eventBus));
+            ctx =>
+            {
+                Resolve(ctx.Game?.AllPlayers, agent, eventBus);
+                return ValueTask.CompletedTask;
+            });
 
         var etbTrigger = new TriggeredAbility(
             source: card,
@@ -141,16 +149,20 @@ public static class PlaguecrafterFactory
     // they control none ("can't"), discard a card instead.
     // -----------------------------------------------------------------------
     private static void Resolve(
-        Func<IReadOnlyList<Player>>? playerResolver,
-        IPlayerAgent? agent,
+        IReadOnlyList<Player>? players,
+        IPlayerAgent? agentOverride,
         IEventBus? eventBus)
     {
-        var players = playerResolver?.Invoke();
-        if (players == null) return; // shape path — no players wired.
+        if (players == null) return; // shape path — no live game.
 
         foreach (var pl in players)
         {
             if (pl == null) continue;
+
+            // The affected player's own agent drives "of their choice": the
+            // explicit test override first, otherwise the live per-seat agent
+            // registered in AgentRegistry (mirrors Priest of Forgotten Gods).
+            var agent = agentOverride ?? AgentRegistry.Get(pl);
 
             // Eligible permanents = creatures OR planeswalkers this player
             // controls on the battlefield (CR 701.16 — "of their choice").

@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -151,13 +152,12 @@ public class VeteranExplorerTests
         var mountainB = SeedBasicInLibrary("Mountain", _bob);
         var mountainB2 = SeedBasicInLibrary("Mountain", _bob);
 
-        var card = VeteranExplorerFactory.Create(
-            _alice,
-            triggers: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var card = VeteranExplorerFactory.Create(_alice, triggers: null);
 
+        // Resolve through a live GameContext so the dies trigger reads
+        // ctx.Game.AllPlayers (the production path) — every player tutors.
         var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in trigger.Effects) e.Execute();
+        ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(new ICard[] { forestA, forestA2 });
         _bob.Zones.Battlefield.GetCards().Should().Contain(new ICard[] { mountainB, mountainB2 });

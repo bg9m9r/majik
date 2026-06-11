@@ -1,10 +1,12 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -141,15 +143,11 @@ public class ReanimateFactoryTests
         bob.Zones.Graveyard.AddCard(giant);
         giant.SetZone(ZoneType.Graveyard);
 
-        // Alice casts Reanimate; with the multi-player resolver she
-        // reaches across to Bob's graveyard (CR 700.6 "a graveyard").
-        foreach (var effect in ReanimateFactory.BuildResolveEffect(
-            alice,
-            zoneService: null,
-            allPlayersResolver: () => new[] { alice, bob }))
-        {
-            effect.Execute();
-        }
+        // Alice casts Reanimate; resolving through a live GameContext she
+        // reaches across to Bob's graveyard (CR 700.6 "a graveyard") — the
+        // effect reads ctx.Game.AllPlayers (the production path).
+        ContextResolve.ResolveEffects(
+            ReanimateFactory.BuildResolveEffect(alice), alice, alice, bob);
 
         giant.Zone.Should().Be(ZoneType.Battlefield);
         bob.Zones.Graveyard.GetCards().Should().NotContain(giant,

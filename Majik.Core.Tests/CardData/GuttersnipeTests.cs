@@ -113,14 +113,14 @@ public class GuttersnipeTests
         var triggers = new TriggerManager(stack, bus);
 
         var snipe = GuttersnipeFactory.Create(
-            _alice, () => new List<Player> { _alice, _bob }, bus, triggers);
+            _alice, bus, triggers);
         snipe.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "Lightning Bolt")));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(18);
         _alice.LifeTotal.Should().Be(20);
@@ -138,14 +138,14 @@ public class GuttersnipeTests
         var triggers = new TriggerManager(stack, bus);
 
         var snipe = GuttersnipeFactory.Create(
-            _alice, () => new List<Player> { _alice, _bob }, bus, triggers);
+            _alice, bus, triggers);
         snipe.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewSorcerySpell(_alice, "Lava Spike")));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(18);
         _alice.LifeTotal.Should().Be(20);
@@ -162,13 +162,12 @@ public class GuttersnipeTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var snipe = GuttersnipeFactory.Create(
-            _alice, () => new List<Player> { _alice, _bob, _carol }, bus, triggers);
+        var snipe = GuttersnipeFactory.Create(_alice, bus, triggers);
         snipe.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "Opt")));
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob, _carol);
 
         _bob.LifeTotal.Should().Be(18);
         _carol.LifeTotal.Should().Be(18);
@@ -187,7 +186,7 @@ public class GuttersnipeTests
         var triggers = new TriggerManager(stack, bus);
 
         var snipe = GuttersnipeFactory.Create(
-            _alice, () => new List<Player> { _alice, _bob }, bus, triggers);
+            _alice, bus, triggers);
         snipe.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewCreatureSpell(_alice, "Grizzly Bears")));
@@ -204,7 +203,7 @@ public class GuttersnipeTests
         var triggers = new TriggerManager(stack, bus);
 
         var snipe = GuttersnipeFactory.Create(
-            _alice, () => new List<Player> { _alice, _bob }, bus, triggers);
+            _alice, bus, triggers);
         snipe.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewArtifactSpell(_alice, "Mishra's Bauble")));
@@ -225,7 +224,7 @@ public class GuttersnipeTests
         var triggers = new TriggerManager(stack, bus);
 
         var snipe = GuttersnipeFactory.Create(
-            _alice, () => new List<Player> { _alice, _bob }, bus, triggers);
+            _alice, bus, triggers);
         snipe.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_bob, "Bob's Bolt")));

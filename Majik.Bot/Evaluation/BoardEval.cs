@@ -1,6 +1,8 @@
+using Majik.Bot.Search;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
 
 namespace Majik.Bot.Evaluation;
 
@@ -45,6 +47,9 @@ public static class BoardEval
         // value. A Teferi at 7 loyalty has already generated card advantage and
         // threatens to keep doing so each turn (see ArchetypeWeights.PlaneswalkerEngine).
         var planeswalkerEngine = SumPlaneswalkerLoyalty(self);
+        // Hidden-burn-reach penalty: dangerous sampled worlds eval dangerous.
+        // Subtracted (positive weight REDUCES the searched seat's score).
+        var hiddenReach = HiddenReachPenalty(self, opp);
 
         return
               weights.LifeDelta           * lifeDelta
@@ -57,8 +62,35 @@ public static class BoardEval
             + weights.KeyCardInPlay       * keyCard
             + weights.LethalProximity     * lethalProx
             + weights.CardAdvantage       * cardAdvDiff
-            + weights.PlaneswalkerEngine  * planeswalkerEngine;
+            + weights.PlaneswalkerEngine  * planeswalkerEngine
+            - weights.HiddenReach         * hiddenReach;
     }
+
+    /// <summary>
+    /// Penalty for being within burn reach of the opponent's (sandbox) hand. In determinized
+    /// worlds that hand is SAMPLED — the bot's own honest guess — so reading it leaks nothing;
+    /// in the perfect-info path it reads the real hand (that path already peeks wholesale —
+    /// explicit design decision: the term is active in ALL eval paths for consistency).
+    /// reach = Σ direct damage of opponent hand spells castable soon (mana value &lt;= opp lands + 2);
+    /// penalty = max(0, reach - (selfLife - margin)), margin 1.
+    /// </summary>
+    internal static double HiddenReachPenalty(Player self, Player opp)
+    {
+        var lands = CountLands(opp);
+        var reach = 0;
+        foreach (var card in opp.Zones.Hand.GetCards())
+        {
+            var dmg = DirectDamageRecognizer.DamageToPlayer(card);
+            if (dmg <= 0) continue;
+            if (ManaValueOf(card) <= lands + 2) reach += dmg;
+        }
+        const int Margin = 1;
+        return Math.Max(0, reach - (self.LifeTotal - Margin));
+    }
+
+    /// <summary>Mana value of a card via its parsed mana cost (no ICard.Cmc exists).</summary>
+    private static int ManaValueOf(ICard card)
+        => ManaCost.Parse(card.ManaCost ?? string.Empty).TotalValue;
 
     /// <summary>
     /// Non-linear bonus for driving the opponent's life total toward zero.

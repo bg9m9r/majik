@@ -39,7 +39,7 @@ namespace Majik.Core.CardData.Factories;
 public static class WrennsResolveFactory
 {
     public const string CardName = "Wrenn's Resolve";
-    public const string PrintedManaCost = "{R}";
+    public const string PrintedManaCost = "{1}{R}";
 
     /// <summary>
     /// Build a Wrenn's Resolve sorcery owned by <paramref name="owner"/>.

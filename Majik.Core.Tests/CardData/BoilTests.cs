@@ -38,7 +38,7 @@ public class BoilTests
         var b = BoilFactory.Create(_alice);
 
         b.Name.Should().Be("Boil");
-        b.ManaCost.Should().Be("{2}{R}");
+        b.ManaCost.Should().Be("{3}{R}");
         b.HasType(CardType.Instant).Should().BeTrue();
         b.Owner.Should().BeSameAs(_alice);
         b.Controller.Should().BeSameAs(_alice);
@@ -52,7 +52,7 @@ public class BoilTests
         card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Boil");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{R}");
+        card.ManaCost.Should().Be("{3}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
 

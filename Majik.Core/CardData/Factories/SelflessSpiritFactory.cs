@@ -86,7 +86,7 @@ public static class SelflessSpiritFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Spirit });
+            subtypes: new[] { CardSubtype.Spirit, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);

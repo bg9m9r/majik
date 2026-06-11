@@ -118,7 +118,7 @@ public static class NecropedeFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Insect });
+            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Insect });
 
         // CR 301.1 / 302.1 — Artifact Creature: additively flag the
         // Artifact type so HasType lookups see both types (mirrors

@@ -22,8 +22,9 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    turn."
 ///
 /// Covers:
-///   - Card identity (Instant + Tribal, {1}{B}, Shapeshifter subtype,
-///     owner/controller).
+///   - Card identity (Instant, {1}{B}, Shapeshifter subtype; printed
+///     "Kindred Instant — Shapeshifter" but the removed Kindred/Tribal type
+///     is NOT stamped, owner/controller).
 ///   - Changeling keyword marker (CR 702.73 / 312).
 ///   - NamedCardFactory dispatch.
 ///   - BuildDefinition: single 1..1 target-creature request, Removal intent.
@@ -45,7 +46,11 @@ public class NamelessInversionTests
         card.Name.Should().Be("Nameless Inversion");
         card.ManaCost.Should().Be("{1}{B}");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.HasType(CardType.Tribal).Should().BeTrue("Kindred is the Tribal card type, CR 312");
+        // CR 205.3 — Kindred/Tribal was removed by the 2024 errata; the seed
+        // type line is "Instant — Shapeshifter" and the engine no longer
+        // stamps the Tribal card type.
+        card.HasType(CardType.Tribal).Should().BeFalse(
+            "Nameless Inversion's modern type line carries no Kindred/Tribal type");
         card.HasSubtype(CardSubtype.Shapeshifter).Should().BeTrue();
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);

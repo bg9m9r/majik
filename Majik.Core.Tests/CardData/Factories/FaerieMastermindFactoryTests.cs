@@ -8,6 +8,7 @@ using Majik.Core.Combat;
 using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Rules;
 using Majik.Core.Zones;
 using Xunit;
@@ -227,15 +228,13 @@ public class FaerieMastermindFactoryTests
         var aliceTop = NewCardInLibrary(_alice, "AliceTop");
         var bobTop = NewCardInLibrary(_bob, "BobTop");
 
-        var players = new[] { _alice, _bob };
         var fm = FaerieMastermindFactory.Create(
-            _alice, eventBus: null, triggers: null, allPlayersResolver: () => players);
+            _alice, eventBus: null, triggers: null);
 
+        // Resolve through a live GameContext so the draw reads
+        // ctx.Game.AllPlayers (the production path) — every player.
         var activated = fm.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in activated.Effects)
-        {
-            effect.Execute();
-        }
+        ContextResolve.Resolve(activated, _alice, _alice, _bob);
 
         _alice.Zones.Hand.GetCards().Should().Equal(new[] { aliceTop });
         _bob.Zones.Hand.GetCards().Should().Equal(new[] { bobTop });

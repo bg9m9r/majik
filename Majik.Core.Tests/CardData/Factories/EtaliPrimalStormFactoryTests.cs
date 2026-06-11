@@ -45,7 +45,7 @@ public class EtaliPrimalStormFactoryTests
         var c = EtaliPrimalStormFactory.Create(_alice);
 
         c.Name.Should().Be("Etali, Primal Storm");
-        c.ManaCost.Should().Be("{4}{R}");
+        c.ManaCost.Should().Be("{4}{R}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         c.HasSubtype(CardSubtype.Elder).Should().BeTrue();
@@ -106,7 +106,7 @@ public class EtaliPrimalStormFactoryTests
 
         var result = EtaliPrimalStormFactory.ResolveAttack(
             controller: _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+            allPlayers: new[] { _alice, _bob });
 
         result.Exiled.Should().HaveCount(2,
             "one card exiled per player with a non-empty library.");
@@ -137,7 +137,7 @@ public class EtaliPrimalStormFactoryTests
 
         var result = EtaliPrimalStormFactory.ResolveAttack(
             controller: _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+            allPlayers: new[] { _alice, _bob });
 
         result.Exiled.Should().HaveCount(2);
         result.Eligible.Should().BeEmpty(
@@ -154,7 +154,7 @@ public class EtaliPrimalStormFactoryTests
 
         var result = EtaliPrimalStormFactory.ResolveAttack(
             controller: _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+            allPlayers: new[] { _alice, _bob });
 
         result.Exiled.Should().HaveCount(1,
             "only Alice's library produces an exile — Bob's is empty.");
@@ -173,7 +173,7 @@ public class EtaliPrimalStormFactoryTests
 
         var result = EtaliPrimalStormFactory.ResolveAttack(
             controller: _alice,
-            allPlayersResolver: () => new[] { _alice, _bob },
+            allPlayers: new[] { _alice, _bob },
             chooseSpells: pile => new[] { pile[0] });
 
         result.Eligible.Should().HaveCount(2);

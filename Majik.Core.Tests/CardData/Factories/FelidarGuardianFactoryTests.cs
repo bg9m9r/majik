@@ -41,7 +41,7 @@ public class FelidarGuardianFactoryTests
         var c = FelidarGuardianFactory.Create(_alice);
 
         c.Name.Should().Be("Felidar Guardian");
-        c.ManaCost.Should().Be("{2}{W}");
+        c.ManaCost.Should().Be("{3}{W}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
         c.HasSubtype(CardSubtype.Beast).Should().BeTrue();

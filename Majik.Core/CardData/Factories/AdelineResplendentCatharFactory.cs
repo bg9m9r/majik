@@ -125,7 +125,7 @@ public static class AdelineResplendentCatharFactory
     /// </summary>
     public static Creature Create(Player owner) =>
         Create(owner, effects: null, eventBus: null, creaturesYouControlSource: null,
-            opponentResolver: null, triggers: null, combat: null,
+            triggers: null, combat: null,
             planeswalkerChoiceForOpponent: null);
 
     /// <summary>
@@ -143,9 +143,6 @@ public static class AdelineResplendentCatharFactory
     /// <c>() =&gt; controller.Zones.Battlefield.GetCards()</c>. The CDA filters
     /// to <see cref="CardType.Creature"/>. Read fresh on every Compute. May be
     /// null (CDA not wired).</param>
-    /// <param name="opponentResolver">Closure returning the controller's
-    /// opponents at attack-trigger resolution; one token is created per
-    /// opponent. May be null — the attack trigger then creates no tokens.</param>
     /// <param name="triggers">TriggerManager the attack trigger is registered
     /// with so an <see cref="AttackersDeclaredEvent"/> by the controller lands
     /// it on the stack. May be null.</param>
@@ -157,11 +154,10 @@ public static class AdelineResplendentCatharFactory
         ContinuousEffectsService? effects,
         IEventBus? eventBus,
         Func<IEnumerable<ICard>>? creaturesYouControlSource,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         TriggerManager? triggers,
         CombatManager? combat)
         => Create(owner, effects, eventBus, creaturesYouControlSource,
-            opponentResolver, triggers, combat, planeswalkerChoiceForOpponent: null);
+            triggers, combat, planeswalkerChoiceForOpponent: null);
 
     /// <summary>
     /// Construct Adeline with optional runtime services, including the
@@ -180,7 +176,6 @@ public static class AdelineResplendentCatharFactory
         ContinuousEffectsService? effects,
         IEventBus? eventBus,
         Func<IEnumerable<ICard>>? creaturesYouControlSource,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         TriggerManager? triggers,
         CombatManager? combat,
         Func<Player, Planeswalker?>? planeswalkerChoiceForOpponent)
@@ -204,7 +199,7 @@ public static class AdelineResplendentCatharFactory
             lifecycle.Attach();
         }
 
-        AddAttackTrigger(card, owner, opponentResolver, triggers, combat, planeswalkerChoiceForOpponent);
+        AddAttackTrigger(card, owner, triggers, combat, planeswalkerChoiceForOpponent);
 
         return card;
     }
@@ -227,7 +222,6 @@ public static class AdelineResplendentCatharFactory
     private static void AddAttackTrigger(
         Creature card,
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         TriggerManager? triggers,
         CombatManager? combat,
         Func<Player, Planeswalker?>? planeswalkerChoiceForOpponent)
@@ -239,7 +233,11 @@ public static class AdelineResplendentCatharFactory
 
         var effect = new Effect(
             $"{CardName}: on attack, create a 1/1 white Human token tapped & attacking for each opponent",
-            () => ResolveAttackTrigger(card, owner, opponentResolver, combat, planeswalkerChoiceForOpponent));
+            ctx =>
+            {
+                ResolveAttackTrigger(card, owner, ctx, combat, planeswalkerChoiceForOpponent);
+                return ValueTask.CompletedTask;
+            });
 
         var trigger = new TriggeredAbility(
             source: card,
@@ -256,15 +254,16 @@ public static class AdelineResplendentCatharFactory
     private static void ResolveAttackTrigger(
         Creature card,
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
+        ResolutionContext ctx,
         CombatManager? combat,
         Func<Player, Planeswalker?>? planeswalkerChoiceForOpponent)
     {
-        if (opponentResolver == null) return;
         var controller = card.Controller ?? owner;
 
-        var opponents = opponentResolver();
-        if (opponents == null) return;
+        // "For each opponent" — read from the LIVE resolution context
+        // (ContextOpponents.Of filters to live non-controller players, CR
+        // 102.1). No captured resolver, so correct on the routed prod build.
+        var opponents = ContextOpponents.Of(ctx, controller).ToList();
 
         // CR 111.4 — 1/1 white Human creature token.
         var spec = new TokenFactory.TokenSpec(

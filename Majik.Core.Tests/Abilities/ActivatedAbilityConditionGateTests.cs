@@ -1,3 +1,4 @@
+using System.Linq;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
@@ -87,5 +88,75 @@ public class ActivatedAbilityConditionGateTests
         ab.CanActivateNow().Should().BeFalse();
         flag = true;
         ab.CanActivateNow().Should().BeTrue();
+    }
+
+    // ── Context-aware gate (Task 3.1) ──────────────────────────────────────
+
+    private static Majik.Core.Game.GameContext Ctx(Player self, params Player[] all) =>
+        new(
+            self: self,
+            allPlayers: all,
+            activePlayer: self,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+
+    [Fact]
+    public void CtxGate_Preferred_WhenContextSupplied()
+    {
+        // The context-aware gate reads the supplied game; here it returns true
+        // iff there are any opponents.
+        var bob = new Player("Bob", 20);
+        var ab = new ActivatedAbility(
+            source: new Land("L"),
+            controller: _alice,
+            canActivateCheck: () => false, // context-less would say false
+            canActivateCheckCtx: g => g.Opponents.Count > 0);
+
+        ab.CanActivateNow(Ctx(_alice, _alice, bob)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CtxGate_FallsBackToContextlessGate_WhenNoContext()
+    {
+        // No GameContext available → the context-aware gate is skipped and the
+        // context-less Func<bool> fallback decides.
+        var ab = new ActivatedAbility(
+            source: new Land("L"),
+            controller: _alice,
+            canActivateCheck: () => true,
+            canActivateCheckCtx: _ => false);
+
+        ab.CanActivateNow((Majik.Core.Game.GameContext?)null).Should().BeTrue();
+        ab.CanActivateNow().Should().BeTrue();
+    }
+
+    [Fact]
+    public void CtxGate_ReadsLiveState()
+    {
+        var bob = new Player("Bob", 20);
+        var ab = new ActivatedAbility(
+            source: new Land("L"),
+            controller: _alice,
+            canActivateCheckCtx: g => g.Opponents.Any(o => o.LifeLostThisTurn > 0));
+
+        ab.CanActivateNow(Ctx(_alice, _alice, bob)).Should().BeFalse();
+        bob.LoseLife(2);
+        ab.CanActivateNow(Ctx(_alice, _alice, bob)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CtxGate_MirroredOntoStackCopy_ByActivator()
+    {
+        var bob = new Player("Bob", 20);
+        bob.LoseLife(1);
+        var stack = new Majik.Core.Stack.Stack();
+        var activator = new AbilityActivator(stack);
+        var ab = new ActivatedAbility(
+            source: new Land("L"),
+            controller: _alice,
+            canActivateCheckCtx: g => g.Opponents.Any(o => o.LifeLostThisTurn > 0));
+
+        activator.CanActivate(ab, _alice, Ctx(_alice, _alice, bob)).Should().BeTrue();
     }
 }

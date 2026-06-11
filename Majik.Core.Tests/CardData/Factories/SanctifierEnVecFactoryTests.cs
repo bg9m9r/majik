@@ -85,7 +85,7 @@ public class SanctifierEnVecFactoryTests
         _bob.Zones.Graveyard.AddCard(greenCard);
         greenCard.SetZone(ZoneType.Graveyard);
 
-        SanctifierEnVecFactory.ResolveEtbExile(() => new[] { _alice, _bob }, zoneService: null);
+        SanctifierEnVecFactory.ResolveEtbExile(new[] { _alice, _bob }, zoneService: null);
 
         // Black + red gone; green stays.
         _alice.Zones.Exile.GetCards().Should().Contain(blackCard);
@@ -100,7 +100,7 @@ public class SanctifierEnVecFactoryTests
     [Fact]
     public void ResolveEtbExile_NoPlayers_NoOps()
     {
-        var act = () => SanctifierEnVecFactory.ResolveEtbExile(allPlayersResolver: null, zoneService: null);
+        var act = () => SanctifierEnVecFactory.ResolveEtbExile(players: null, zoneService: null);
         act.Should().NotThrow();
     }
 
@@ -112,7 +112,7 @@ public class SanctifierEnVecFactoryTests
     public void Static_RewritesBlackGraveyardMove_ToExile()
     {
         var bus = new ReplacementBus();
-        var c = SanctifierEnVecFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var c = SanctifierEnVecFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(c, _alice);
 
@@ -127,7 +127,7 @@ public class SanctifierEnVecFactoryTests
     public void Static_RewritesRedGraveyardMove_ToExile()
     {
         var bus = new ReplacementBus();
-        var c = SanctifierEnVecFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var c = SanctifierEnVecFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(c, _alice);
 
@@ -142,7 +142,7 @@ public class SanctifierEnVecFactoryTests
     public void Static_DoesNotAffect_NonBlackNonRedGraveyardMove()
     {
         var bus = new ReplacementBus();
-        var c = SanctifierEnVecFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var c = SanctifierEnVecFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(c, _alice);
 
@@ -158,7 +158,7 @@ public class SanctifierEnVecFactoryTests
     public void Static_DoesNotAffect_NonGraveyardMoves()
     {
         var bus = new ReplacementBus();
-        var c = SanctifierEnVecFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var c = SanctifierEnVecFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(c, _alice);
 
@@ -174,7 +174,7 @@ public class SanctifierEnVecFactoryTests
     public void Static_IsInert_WhileNotOnBattlefield()
     {
         var bus = new ReplacementBus();
-        var c = SanctifierEnVecFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var c = SanctifierEnVecFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         // Not placed on the battlefield.
 
@@ -190,7 +190,7 @@ public class SanctifierEnVecFactoryTests
     public void Static_IsNotEndOfTurnExpirable()
     {
         var bus = new ReplacementBus();
-        var c = SanctifierEnVecFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var c = SanctifierEnVecFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(c, _alice);
 

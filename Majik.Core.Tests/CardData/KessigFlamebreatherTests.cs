@@ -112,7 +112,6 @@ public class KessigFlamebreatherTests
 
         var card = KessigFlamebreatherFactory.Create(
             _alice,
-            opponentResolver: () => new List<Player> { _alice, _bob },
             eventBus: bus,
             triggers: triggers);
         card.SetZone(ZoneType.Battlefield);
@@ -121,7 +120,7 @@ public class KessigFlamebreatherTests
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         // CR 800.4 — each opponent (Bob) takes 1 damage; Alice (controller) does not.
         _bob.LifeTotal.Should().Be(19);
@@ -141,7 +140,6 @@ public class KessigFlamebreatherTests
 
         var card = KessigFlamebreatherFactory.Create(
             _alice,
-            opponentResolver: () => new List<Player> { _alice, _bob },
             eventBus: bus,
             triggers: triggers);
         card.SetZone(ZoneType.Battlefield);
@@ -150,7 +148,7 @@ public class KessigFlamebreatherTests
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
     }
@@ -168,7 +166,6 @@ public class KessigFlamebreatherTests
 
         var card = KessigFlamebreatherFactory.Create(
             _alice,
-            opponentResolver: () => new List<Player> { _alice, _bob },
             eventBus: bus,
             triggers: triggers);
         card.SetZone(ZoneType.Battlefield);
@@ -177,7 +174,7 @@ public class KessigFlamebreatherTests
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
     }
@@ -195,7 +192,6 @@ public class KessigFlamebreatherTests
 
         var card = KessigFlamebreatherFactory.Create(
             _alice,
-            opponentResolver: () => new List<Player> { _alice, _bob },
             eventBus: bus,
             triggers: triggers);
         card.SetZone(ZoneType.Battlefield);
@@ -219,7 +215,6 @@ public class KessigFlamebreatherTests
 
         var card = KessigFlamebreatherFactory.Create(
             _alice,
-            opponentResolver: () => new List<Player> { _alice, _bob },
             eventBus: bus,
             triggers: triggers);
         card.SetZone(ZoneType.Battlefield);

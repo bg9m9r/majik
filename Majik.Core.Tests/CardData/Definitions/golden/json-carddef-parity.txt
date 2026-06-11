@@ -1,3 +1,51 @@
+==== abandon-reason ====
+{
+  "name": "Abandon Reason",
+  "manaCost": "{1}{R}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== abbot-of-keral-keep ====
 {
   "name": "Abbot of Keral Keep",
@@ -1865,7 +1913,7 @@
 ==== auriok-champion ====
 {
   "name": "Auriok Champion",
-  "manaCost": "{W}",
+  "manaCost": "{W}{W}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -1911,6 +1959,54 @@
   "mdfc": null,
   "colors": [
     "White"
+  ]
+}
+==== avacyns-judgment ====
+{
+  "name": "Avacyn\u0027s Judgment",
+  "manaCost": "{1}{R}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
   ]
 }
 ==== avatar-of-the-resolute ====
@@ -2850,6 +2946,58 @@
     "Blue"
   ]
 }
+==== big-game-hunter ====
+{
+  "name": "Big Game Hunter",
+  "manaCost": "{1}{B}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Assassin",
+    "Human",
+    "Rebel"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== bile-blight ====
 {
   "name": "Bile Blight",
@@ -2952,6 +3100,54 @@
   "mdfc": null,
   "colors": [
     "Green"
+  ]
+}
+==== biting-rain ====
+{
+  "name": "Biting Rain",
+  "manaCost": "{2}{B}{B}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
   ]
 }
 ==== bituminous-blast ====
@@ -3299,6 +3495,56 @@
   "mdfc": null,
   "colors": []
 }
+==== blazing-rootwalla ====
+{
+  "name": "Blazing Rootwalla",
+  "manaCost": "{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Lizard"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== bleachbone-verge ====
 {
   "name": "Bleachbone Verge",
@@ -3545,6 +3791,109 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== bloodhall-priest ====
+{
+  "name": "Bloodhall Priest",
+  "manaCost": "{2}{B}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Cleric",
+    "Vampire"
+  ],
+  "power": 4,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Red"
+  ]
+}
+==== bloodmad-vampire ====
+{
+  "name": "Bloodmad Vampire",
+  "manaCost": "{2}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Berserker",
+    "Vampire"
+  ],
+  "power": 4,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
 }
 ==== bloodsoaked-champion ====
 {
@@ -4495,6 +4844,56 @@
   "mdfc": null,
   "colors": []
 }
+==== brain-gorgers ====
+{
+  "name": "Brain Gorgers",
+  "manaCost": "{3}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Zombie"
+  ],
+  "power": 4,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== branching-evolution ====
 {
   "name": "Branching Evolution",
@@ -4840,6 +5239,54 @@
   "mdfc": null,
   "colors": [
     "Green"
+  ]
+}
+==== broken-concentration ====
+{
+  "name": "Broken Concentration",
+  "manaCost": "{1}{U}{U}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
   ]
 }
 ==== brotherhoods-end ====
@@ -5828,6 +6275,54 @@
     "Red"
   ]
 }
+==== chilling-grasp ====
+{
+  "name": "Chilling Grasp",
+  "manaCost": "{2}{U}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== choked-estuary ====
 {
   "name": "Choked Estuary",
@@ -6275,7 +6770,7 @@
 ==== cloud-key ====
 {
   "name": "Cloud Key",
-  "manaCost": "{2}",
+  "manaCost": "{3}",
   "primaryType": "Artifact",
   "cardTypes": [
     "Artifact"
@@ -6808,7 +7303,7 @@
 ==== conclave-tribunal ====
 {
   "name": "Conclave Tribunal",
-  "manaCost": "{4}{W}",
+  "manaCost": "{3}{W}",
   "primaryType": "Enchantment",
   "cardTypes": [
     "Enchantment"
@@ -7911,6 +8406,54 @@
   "mdfc": null,
   "colors": [
     "White"
+  ]
+}
+==== dark-withering ====
+{
+  "name": "Dark Withering",
+  "manaCost": "{4}{B}{B}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
   ]
 }
 ==== darkbore-pathway ====
@@ -9048,6 +9591,54 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== distemper-of-the-blood ====
+{
+  "name": "Distemper of the Blood",
+  "manaCost": "{R}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
 }
 ==== distortion-strike ====
 {
@@ -11646,7 +12237,7 @@
 ==== feed-the-swarm ====
 {
   "name": "Feed the Swarm",
-  "manaCost": "{B}",
+  "manaCost": "{1}{B}",
   "primaryType": "Sorcery",
   "cardTypes": [
     "Sorcery"
@@ -11891,7 +12482,7 @@
 ==== fiery-cannonade ====
 {
   "name": "Fiery Cannonade",
-  "manaCost": "{1}{R}",
+  "manaCost": "{2}{R}",
   "primaryType": "Instant",
   "cardTypes": [
     "Instant"
@@ -12633,7 +13224,9 @@
     "Sorcery"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Arcane"
+  ],
   "power": null,
   "toughness": null,
   "loyalty": null,
@@ -13116,6 +13709,54 @@
   "colors": [
     "Blue",
     "Green"
+  ]
+}
+==== from-under-the-floorboards ====
+{
+  "name": "From Under the Floorboards",
+  "manaCost": "{3}{B}{B}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
   ]
 }
 ==== frontier-bivouac ====
@@ -14097,6 +14738,54 @@
     "Blue"
   ]
 }
+==== gibbering-descent ====
+{
+  "name": "Gibbering Descent",
+  "manaCost": "{4}{B}{B}",
+  "primaryType": "Enchantment",
+  "cardTypes": [
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== gifted-aetherborn ====
 {
   "name": "Gifted Aetherborn",
@@ -14710,7 +15399,7 @@
 ==== glissa-sunslayer ====
 {
   "name": "Glissa Sunslayer",
-  "manaCost": "{B}{G}",
+  "manaCost": "{1}{B}{G}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -15322,6 +16011,56 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== gorgon-recluse ====
+{
+  "name": "Gorgon Recluse",
+  "manaCost": "{3}{B}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Gorgon"
+  ],
+  "power": 2,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
 }
 ==== grasping-dunes ====
 {
@@ -17002,7 +17741,7 @@
     "Mercenary"
   ],
   "power": 1,
-  "toughness": 1,
+  "toughness": 2,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -19509,7 +20248,7 @@
     "Warrior"
   ],
   "power": 3,
-  "toughness": 1,
+  "toughness": 3,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -21163,7 +21902,7 @@
 ==== legion-warboss ====
 {
   "name": "Legion Warboss",
-  "manaCost": "{1}{R}",
+  "manaCost": "{2}{R}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -21174,7 +21913,7 @@
     "Soldier"
   ],
   "power": 2,
-  "toughness": 1,
+  "toughness": 2,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -24074,8 +24813,7 @@
   "manaCost": "{1}{B}",
   "primaryType": "Instant",
   "cardTypes": [
-    "Instant",
-    "Tribal"
+    "Instant"
   ],
   "supertypes": [],
   "subtypes": [
@@ -26118,7 +26856,7 @@
 ==== palladium-myr ====
 {
   "name": "Palladium Myr",
-  "manaCost": "{4}",
+  "manaCost": "{3}",
   "primaryType": "Creature",
   "cardTypes": [
     "Artifact",
@@ -30653,7 +31391,7 @@
     "Peasant"
   ],
   "power": 2,
-  "toughness": 1,
+  "toughness": 2,
   "loyalty": null,
   "abilities": {
     "keyword": {
@@ -33120,7 +33858,7 @@
 ==== shriekmaw ====
 {
   "name": "Shriekmaw",
-  "manaCost": "{5}{B}",
+  "manaCost": "{4}{B}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -37199,7 +37937,7 @@
 ==== sylvan-advocate ====
 {
   "name": "Sylvan Advocate",
-  "manaCost": "{2}{G}",
+  "manaCost": "{1}{G}",
   "primaryType": "Creature",
   "cardTypes": [
     "Creature"
@@ -37556,8 +38294,7 @@
   "manaCost": "{R}",
   "primaryType": "Instant",
   "cardTypes": [
-    "Instant",
-    "Tribal"
+    "Instant"
   ],
   "supertypes": [],
   "subtypes": [
@@ -43735,7 +44472,7 @@
     "Snake"
   ],
   "power": 2,
-  "toughness": 2,
+  "toughness": 3,
   "loyalty": null,
   "abilities": {
     "keyword": {

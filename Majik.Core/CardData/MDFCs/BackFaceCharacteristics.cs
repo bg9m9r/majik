@@ -69,9 +69,19 @@ public sealed class BackFaceCharacteristics
     public IReadOnlyList<ManaColor> Colors { get; }
 
     /// <summary>Planeswalker back's starting loyalty, when applicable. Null
-    /// for non-planeswalker backs. Carried but not yet honoured — see the
-    /// class remarks.</summary>
+    /// for non-planeswalker backs. On transform to the back face it seeds the
+    /// transient-loyalty surface (see the class remarks).</summary>
     public int? Loyalty { get; }
+
+    /// <summary>The back face's printed oracle text, when supplied. For a
+    /// planeswalker back this is parsed by
+    /// <see cref="Majik.Core.CardData.OracleLoyaltyAbilityBinder"/> on transform
+    /// to attach the back face's loyalty abilities ([+1]/[−2]/… — CR 606) to
+    /// the permanent through the Permanent-typed loyalty surface (4A), so a
+    /// creature-front DFC flipped to its planeswalker back can activate them
+    /// without re-classing. Null when the factory did not carry the back-face
+    /// text (no abilities attached; loyalty body + death still work).</summary>
+    public string? OracleText { get; }
 
     public BackFaceCharacteristics(
         string name,
@@ -83,7 +93,8 @@ public sealed class BackFaceCharacteristics
         IReadOnlyList<CardSupertype>? supertypes = null,
         IReadOnlyList<string>? keywords = null,
         IReadOnlyList<ManaColor>? colors = null,
-        int? loyalty = null)
+        int? loyalty = null,
+        string? oracleText = null)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException(nameof(name));
         Name = name;
@@ -96,6 +107,7 @@ public sealed class BackFaceCharacteristics
         Keywords = keywords ?? Array.Empty<string>();
         Colors = colors ?? Array.Empty<ManaColor>();
         Loyalty = loyalty;
+        OracleText = oracleText;
     }
 
     /// <summary>Convenience factory for a creature back face.</summary>

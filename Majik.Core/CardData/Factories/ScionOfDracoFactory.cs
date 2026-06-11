@@ -44,7 +44,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ScionOfDracoFactory
 {
     public const string CardName = "Scion of Draco";
-    public const string PrintedManaCost = "{10}";
+    public const string PrintedManaCost = "{12}";
     public const int Power = 4;
     public const int Toughness = 4;
 

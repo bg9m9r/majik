@@ -184,7 +184,14 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     {
         var hand = ctx.Self.Zones.Hand.GetCards();
         var graveyard = ctx.Self.Zones.Graveyard.GetCards();
-        var pool = hand.Concat(graveyard)
+        // CR 118.9 — cards in EXILE carrying a runtime exile-cast grant
+        // (Madness / Ragavan / foretell / impulse) are castable from exile via
+        // an ExileCastAlternativeCost. Pool only the exile cards whose grant
+        // nominates the bot, so the probe surfaces the alt-cost bid.
+        var exile = ctx.Self.Zones.Exile.GetCards()
+            .Where(c => c is Card concrete
+                && ReferenceEquals(concrete.RuntimeExileCastAllowedCaster, ctx.Self));
+        var pool = hand.Concat(graveyard).Concat(exile)
             .Where(c => !c.HasType(CardType.Land))
             .Where(IsCastableSpell)
             .Where(c => sorceryWindow || IsInstantSpeed(c))

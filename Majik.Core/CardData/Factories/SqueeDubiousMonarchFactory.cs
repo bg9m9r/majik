@@ -24,7 +24,7 @@ namespace Majik.Core.CardData.Factories;
 ///    Dubious Monarch from your graveyard to the battlefield."
 ///
 /// ## Implemented (v1)
-/// - 2/2 Legendary Creature — Goblin Warrior (the printed "Goblin Noble"
+/// - 2/2 Legendary Creature — Goblin Noble (the printed "Goblin Noble"
 ///   subtype line — "Noble" is not yet a value in
 ///   <see cref="CardSubtype"/>; v1 stamps Goblin only and flags the gap.
 ///   Most goblin-tribal / lord-style payoffs match on Goblin alone, so
@@ -135,10 +135,7 @@ public static class SqueeDubiousMonarchFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            // v1 gap — "Noble" subtype not yet in CardSubtype. Squee
-            // surfaces as Goblin Warrior so the Goblin-tribal anchors
-            // still match. See class xmldoc.
-            subtypes: new[] { CardSubtype.Goblin, CardSubtype.Warrior });
+            subtypes: new[] { CardSubtype.Goblin, CardSubtype.Noble });
 
         card.SetOwner(owner);
         card.SetController(owner);

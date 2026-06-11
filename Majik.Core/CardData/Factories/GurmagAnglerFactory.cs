@@ -29,7 +29,7 @@ namespace Majik.Core.CardData.Factories;
 public static class GurmagAnglerFactory
 {
     public static CardDef Define() => CardDef
-        .Creature("Gurmag Angler", "{7}{B}", power: 5, toughness: 5)
+        .Creature("Gurmag Angler", "{6}{B}", power: 5, toughness: 5)
         .WithSubtypes(CardSubtype.Zombie, CardSubtype.Fish)
         // CR 702.66 — Delve marker. The mechanic lives in DelveCost +
         // SpellCastFlow; the marker is here so introspection sees the
