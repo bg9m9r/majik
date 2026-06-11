@@ -84,7 +84,63 @@ public class ServerBotOptionsTests
         act.Should().NotThrow();
     }
 
+    // ── RolloutDepth (rollout-truncation knob) ─────────────────────────────────
+
+    [Fact]
+    public void DefaultOptions_RolloutDepth_IsFullTurnPlus_AndStaysNullUnderHeuristic()
+    {
+        new ServerBotOptions().RolloutDepth.Should().Be("FullTurnPlus",
+            "the code default is today's full playout — zero behaviour change");
+
+        var cfg = FactoryWith(null).BuildBotConfig("Burn", decisionSink: null);
+        cfg.RolloutDepth.Should().BeNull(
+            "the heuristic strategy never rolls out — only mcts threads the depth");
+    }
+
+    [Fact]
+    public void MctsOptions_BuildBotConfig_CarriesRolloutDepth()
+    {
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            RolloutDepth = "EndOfTurn",
+        });
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .RolloutDepth.Should().Be("EndOfTurn",
+                "the live flip of a probe-gate winner is config-only (Bot__RolloutDepth)");
+    }
+
+    [Fact]
+    public void MctsOptions_WithRolloutDepth_BotPlayerAgent_Constructs()
+    {
+        // Proves the wired depth string parses downstream (SearchStrategy
+        // fails fast at construction on an unknown RolloutDepth).
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            RolloutDepth = "LeafEval",
+        });
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        var seat = new Majik.Core.Players.Player("Bob", 20);
+        var act = () => new Majik.Bot.BotPlayerAgent(seat, cfg);
+
+        act.Should().NotThrow();
+    }
+
     // ── Fail fast on a bad knob ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("warpspeed")]
+    [InlineData("")]
+    public void UnknownRolloutDepth_Throws(string bad)
+    {
+        var act = () => FactoryWith(new ServerBotOptions { RolloutDepth = bad });
+
+        act.Should().Throw<ArgumentException>().WithMessage($"*'{bad}'*",
+            "a typo'd Bot__RolloutDepth must fail at registration and NAME the bad value");
+    }
 
     [Fact]
     public void UnknownStrategy_Throws()
@@ -177,6 +233,33 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
+    public void AddMajikEngine_BotSection_BindsRolloutDepth()
+    {
+        var factory = ResolveFactory(
+            ("Bot:Strategy", "mcts"),
+            ("Bot:RolloutDepth", "EndOfTurn"));
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .RolloutDepth.Should().Be("EndOfTurn",
+                "env Bot__RolloutDepth must reach the installed bot");
+    }
+
+    [Fact]
+    public void AddMajikEngine_UnknownRolloutDepth_FailsFastAtRegistration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Bot:RolloutDepth"] = "wat" })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var act = () => services.AddMajikEngine(configuration);
+
+        act.Should().Throw<ArgumentException>(
+            "a typo'd Bot__RolloutDepth env var must crash the boot, not the first vs-bot match");
+    }
+
+    [Fact]
     public void AddMajikEngine_ProdShape_MctsOnly_KeepsProfiledDefaults()
     {
         // The exact prod shape: render.yaml sets ONLY Bot__Strategy=mcts and
@@ -192,6 +275,9 @@ public class ServerBotOptionsTests
         cfg.SearchConcurrency.Should().Be(1,
             "the gate defaults ON (1 search at a time) when prod flips to mcts — " +
             "no extra env var needed");
+        cfg.RolloutDepth.Should().Be("FullTurnPlus",
+            "the rollout-depth default is today's full playout — the probe gate " +
+            "flips it later via Bot__RolloutDepth only");
     }
 
     [Fact]

@@ -6,13 +6,24 @@ namespace Majik.Bot.Search;
 /// <param name="MaxIterations">Maximum number of select-expand-rollout-backprop iterations.</param>
 /// <param name="MaxMillis">Wall-clock time budget in milliseconds (anytime cutoff).</param>
 /// <param name="DepthTurns">
-/// Rollout depth in turns beyond the current turn number.
-/// Keep small (0–3): deep rollouts wash out because the heuristic strategy
-/// recovers most positions to the same win value.
+/// Rollout depth in FULL turns beyond the current turn number — the playout cap
+/// is <c>maxTurns = TurnNumber + DepthTurns</c>, and the engine always plays the
+/// remainder of the current (resumed) turn first. Keep small (0–3): deep
+/// rollouts wash out because the heuristic strategy recovers most positions to
+/// the same win value. Only consulted under
+/// <see cref="Search.RolloutDepth.FullTurnPlus"/>; see <see cref="RolloutDepth"/>
+/// for how the other depths narrow it (<c>EndOfTurn</c> forces 0,
+/// <c>LeafEval</c> skips the playout entirely).
 /// </param>
 /// <param name="ExplorationC">UCB1 exploration constant (√2 ≈ 1.41 is the standard default).</param>
+/// <param name="RolloutDepth">
+/// How far the rollout plays out before evaluating (the #2596 rollout-cost
+/// lever). Default <see cref="Search.RolloutDepth.FullTurnPlus"/> = today's
+/// behaviour, byte-identical.
+/// </param>
 internal sealed record MctsConfig(
     int MaxIterations = 200,
     int MaxMillis = 2000,
     int DepthTurns = 2,
-    double ExplorationC = 1.41);
+    double ExplorationC = 1.41,
+    RolloutDepth RolloutDepth = RolloutDepth.FullTurnPlus);

@@ -71,7 +71,9 @@ public sealed class ServerGameFactory
     /// <c>SearchConcurrency</c> is set ONLY under <c>mcts</c> (default 1): live
     /// searches on the 1-vCPU box queue on the process-wide gate instead of
     /// splitting the core; the heuristic strategy never searches, so it stays
-    /// null (ungated) there.
+    /// null (ungated) there. <c>RolloutDepth</c> is likewise set ONLY under
+    /// <c>mcts</c> (default "FullTurnPlus" = today's playout): the heuristic
+    /// never rolls out, so it stays null there.
     /// Internal so tests can assert the exact installed config without digging
     /// the agent out of a facade.
     /// </summary>
@@ -85,6 +87,9 @@ public sealed class ServerGameFactory
             InferOpponentArchetype: _botOptions.InferOpponentArchetype,
             SearchConcurrency: _botOptions.Strategy == "mcts"
                 ? _botOptions.SearchConcurrency
+                : null,
+            RolloutDepth: _botOptions.Strategy == "mcts"
+                ? _botOptions.RolloutDepth
                 : null);
 
     /// <summary>

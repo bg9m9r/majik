@@ -91,14 +91,18 @@ public sealed class EngineSimulator : ISearchSimulator
     }
 
     /// <inheritdoc/>
-    public double Rollout(SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns)
+    public double Rollout(
+        SimState root,
+        IReadOnlyList<SimMove> pathFromRoot,
+        int depthTurns,
+        RolloutDepth rolloutDepth = RolloutDepth.FullTurnPlus)
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(pathFromRoot);
         if (depthTurns < 0)
             throw new ArgumentOutOfRangeException(nameof(depthTurns), "depthTurns must be >= 0.");
 
-        return RolloutCore(root, pathFromRoot, depthTurns);
+        return RolloutCore(root, pathFromRoot, depthTurns, rolloutDepth);
     }
 
     // ── Implementation ────────────────────────────────────────────────────────
@@ -141,9 +145,17 @@ public sealed class EngineSimulator : ISearchSimulator
     }
 
     private SimDecision AdvanceCore(SimState root, IReadOnlyList<SimMove> pathFromRoot)
-        => WithNullSyncContext(() => AdvanceCoreUnsafe(root, pathFromRoot));
+        => WithNullSyncContext(() => DriveToDecisionUnsafe(root, pathFromRoot).Decision);
 
-    private SimDecision AdvanceCoreUnsafe(SimState root, IReadOnlyList<SimMove> pathFromRoot)
+    /// <summary>
+    /// The shared Advance/LeafEval drive: replay the path in a fresh sandbox and
+    /// stop at the next substantive decision (or game over). Returns the decision
+    /// (terminal marker when the game ended first) TOGETHER with the sandbox so
+    /// <see cref="RolloutDepth.LeafEval"/> can evaluate the position at that
+    /// exact point.
+    /// </summary>
+    private (SimDecision Decision, SandboxGame Sandbox) DriveToDecisionUnsafe(
+        SimState root, IReadOnlyList<SimMove> pathFromRoot)
     {
         var cts = new CancellationTokenSource();
 
@@ -200,7 +212,7 @@ public sealed class EngineSimulator : ISearchSimulator
                 cts.Cancel();
                 var gameResult = run.GetAwaiter().GetResult();
                 var terminalValue = ComputeTerminalValue(gameResult, sandbox.State, root);
-                return SimDecision.Terminal(terminalValue);
+                return (SimDecision.Terminal(terminalValue), sandbox);
             }
 
             var decision = nextDecision.GetAwaiter().GetResult();
@@ -222,15 +234,29 @@ public sealed class EngineSimulator : ISearchSimulator
             // Non-Priority decision (or Priority with real choices) — this is
             // the MCTS node. Cancel the engine and return.
             cts.Cancel();
-            return decision;
+            return (decision, sandbox);
         }
     }
 
-    private double RolloutCore(SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns)
-        => WithNullSyncContext(() => RolloutCoreUnsafe(root, pathFromRoot, depthTurns));
+    private double RolloutCore(
+        SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns, RolloutDepth rolloutDepth)
+        => WithNullSyncContext(() => RolloutCoreUnsafe(root, pathFromRoot, depthTurns, rolloutDepth));
 
-    private double RolloutCoreUnsafe(SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns)
+    private double RolloutCoreUnsafe(
+        SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns, RolloutDepth rolloutDepth)
     {
+        // LeafEval: NO playout. Drive to the decision point the path leads to
+        // (the same drive Advance performs — pass-only priority windows drain,
+        // so the path's spells RESOLVE before evaluation) and score that
+        // position. The expensive both-seats heuristic playout is skipped.
+        if (rolloutDepth == RolloutDepth.LeafEval)
+            return LeafEvalUnsafe(root, pathFromRoot);
+
+        // EndOfTurn narrows the existing turn-cap machinery to the current-turn
+        // boundary (maxTurns = TurnNumber + 0: the resumed partial turn always
+        // plays out; zero full extra turns follow). FullTurnPlus = unchanged.
+        var effectiveDepthTurns = rolloutDepth == RolloutDepth.EndOfTurn ? 0 : depthTurns;
+
         SearchAgent? searchAgent = null;
         var rolloutStrategy = new HeuristicStrategy(new BotConfig(
             ArchetypeName: "Burn")); // Burn weights drive aggressive play in rollout
@@ -257,7 +283,7 @@ public sealed class EngineSimulator : ISearchSimulator
             root.Phase,
             clonedActive,
             root.TurnNumber,
-            maxTurns: root.TurnNumber + depthTurns,
+            maxTurns: root.TurnNumber + effectiveDepthTurns,
             ct: CancellationToken.None);
 
         // Synchronously wait — this is intentional (MCTS rollouts are
@@ -266,6 +292,32 @@ public sealed class EngineSimulator : ISearchSimulator
         var gameResult = run.GetAwaiter().GetResult();
 
         return ComputeTerminalValue(gameResult, sandbox.State, root);
+    }
+
+    /// <summary>
+    /// <see cref="RolloutDepth.LeafEval"/> rollout: drive to the decision point
+    /// (shared <see cref="DriveToDecisionUnsafe"/> machinery) and return
+    /// <see cref="BoardEval.Score"/> there — no playout. If the game ended
+    /// before a decision was reached, the terminal value is returned instead
+    /// (same scale as the playout's <see cref="ComputeTerminalValue"/>).
+    /// </summary>
+    private double LeafEvalUnsafe(SimState root, IReadOnlyList<SimMove> pathFromRoot)
+    {
+        var (decision, sandbox) = DriveToDecisionUnsafe(root, pathFromRoot);
+
+        if (decision.IsTerminal)
+            return decision.TerminalValue;
+
+        var clonedSeat = sandbox.State.Players
+            .FirstOrDefault(p => p.Id == root.SearchedSeatId);
+        if (clonedSeat == null)
+        {
+            // Searched seat left the game (should only happen if they lost).
+            return LossValue;
+        }
+
+        var ctx = BuildLeafContext(clonedSeat, sandbox.State.Players);
+        return BoardEval.Score(ctx, clonedSeat, _weights);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

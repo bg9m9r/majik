@@ -90,9 +90,11 @@ public sealed class HoldBackFlipTests
     /// the per-world values are pure line evaluations. Depth 2 → horizon
     /// turns 3..5 (Alice / Bob / Alice).
     /// </summary>
-    private static Mcts BuildMcts(ArchetypeWeights weights) =>
+    private static Mcts BuildMcts(
+        ArchetypeWeights weights, RolloutDepth rolloutDepth = RolloutDepth.FullTurnPlus) =>
         new(new EngineSimulator(weights),
-            new MctsConfig(MaxIterations: 32, MaxMillis: 600_000, DepthTurns: 2, ExplorationC: 1.41));
+            new MctsConfig(MaxIterations: 32, MaxMillis: 600_000, DepthTurns: 2, ExplorationC: 1.41,
+                RolloutDepth: rolloutDepth));
 
     private static SimState BuildHoldBackRaceRoot(int baseSeed)
     {
@@ -250,6 +252,107 @@ public sealed class HoldBackFlipTests
         defaults.Key.Should().NotBe(killSwitches.Key,
             "the decision must genuinely FLIP: the levers, fed by burn that sampled-card "
             + "fidelity made castable in-sim, change what the bot does at the root");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // (1b) THE FLIP, per RolloutDepth — pinned risk-signal survival table.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Pins whether the hold-back flip SURVIVES each <see cref="RolloutDepth"/>
+    /// (the #2596 rollout-truncation lever) — gate data for adopting a cheaper
+    /// depth live. Outcomes were MEASURED first, then pinned (per-world means in
+    /// parentheses are the observed values on this board, seeds 128..131):
+    ///
+    /// <list type="bullet">
+    ///   <item><b>FullTurnPlus — FLIPS</b> (hard regression assert, same as the
+    ///   default-depth test above): the playout reaches Bob's turn 4, the
+    ///   sampled Bolt world realizes a genuine terminal death on the all-out
+    ///   line (allOutMean −1000 in world 128 vs +1000 in the calm worlds),
+    ///   MinWorldMean trips the risk vote, defaults hold back.</item>
+    ///   <item><b>EndOfTurn — NO FLIP</b> (expected signal starvation): the
+    ///   playout stops at Alice's turn-3 boundary, BEFORE Bob untaps — the
+    ///   catastrophe (Killer 4 + Cracker 3 + Bolt 3 on Bob's turn 4) lies
+    ///   entirely beyond the horizon. No world ever realizes a death; every
+    ///   world evaluates to the same benign turn-cap evals (allOut 33.2 &gt;
+    ///   holdBack 26.5 — the race looks BETTER because 3 Squires connected),
+    ///   MinWorldMean starves, the risk vote has nothing to bite on, and both
+    ///   defaults and kill-switches race. NOTE: this board's crack-back is
+    ///   NEXT-turn; EndOfTurn still sees same-turn deaths (e.g. lethal already
+    ///   on the stack), it loses exactly the +1-turn losses pinned here.</item>
+    ///   <item><b>LeafEval — NO FLIP</b> (expected signal starvation): no
+    ///   playout at all — the sampled Bolt is never CAST, so no terminal loss
+    ///   can exist in any world. The materialized Bolt in world 128's hand only
+    ///   shades BOTH leaf evals equally via HiddenReach (allOut 29.2 /
+    ///   holdBack 22.5 vs 33.2 / 26.5 in calm worlds), preserving the race's
+    ///   lead; MinWorldMean stays benign (~29 ≫ −500) → defaults race too.</item>
+    /// </list>
+    ///
+    /// The pin is mechanism-level: per depth we assert the MinWorldMean signal
+    /// (present / starved) AND the end-to-end decision, so a future change that
+    /// silently revives or re-starves the risk signal at a truncated depth
+    /// fails loudly here.
+    /// </summary>
+    [Theory]
+    [InlineData(RolloutDepth.FullTurnPlus, true)]
+    [InlineData(RolloutDepth.EndOfTurn, false)]
+    [InlineData(RolloutDepth.LeafEval, false)]
+    public void RiskSignal_PerRolloutDepth_PinnedFlipOutcome(RolloutDepth depth, bool flipSurvives)
+    {
+        var wOn = ArchetypeWeights.Default;
+        var wOff = wOn with { HiddenReach = 0.0 };
+
+        // ── Mechanism pin: does ANY world realize the all-out death? ─────────
+        var mcts = BuildMcts(wOn, depth);
+        var root = BuildHoldBackRaceRoot(BaseSeed);
+        var tally = new Dictionary<string, DeterminizedSearch.KeyTally>();
+        for (var w = 0; w < 4; w++)
+            DeterminizedSearch.Accumulate(tally, mcts.SearchWithStats(root.WithWorldSeed(BaseSeed + w)).RootStats);
+
+        if (flipSurvives)
+        {
+            tally[AllOutKey].MinWorldMean.Should().BeLessThan(-500,
+                $"{depth}: the playout horizon must reach Bob's turn 4, where the sampled-Bolt "
+                + "world kills the over-committed race — the terminal-loss signal the risk vote feeds on");
+            tally[HoldBackKey].MinWorldMean.Should().BeGreaterThan(-500,
+                $"{depth}: the hold-back line survives every sampled world — the safe alternative "
+                + "the vote needs to demote the race");
+        }
+        else
+        {
+            tally[AllOutKey].MinWorldMean.Should().BeGreaterThan(-500,
+                $"{depth}: the catastrophe (Bob's turn-4 Killer + Cracker + sampled Bolt) lies "
+                + "beyond this truncated horizon — no world ever realizes the death, so the "
+                + "MinWorldMean risk signal STARVES (expected; this is the gate's per-depth cost)");
+        }
+
+        // ── End-to-end pin through DeterminizedSearch.Run ────────────────────
+        var defaults = DeterminizedSearch.Run(
+            BuildMcts(wOn, depth), BuildHoldBackRaceRoot(BaseSeed),
+            totalBudgetMs: 1600, perWorldBudgetMs: 400);
+        var killSwitches = DeterminizedSearch.Run(
+            BuildMcts(wOff, depth), BuildHoldBackRaceRoot(BaseSeed),
+            totalBudgetMs: 1600, perWorldBudgetMs: 400,
+            catastropheThreshold: double.NegativeInfinity);
+
+        killSwitches.Key.Should().Be(AllOutKey,
+            $"{depth}: with both levers disabled the legacy summed-robust-child vote always "
+            + "races — the race carries the highest summed mean at every depth on this board");
+
+        if (flipSurvives)
+        {
+            defaults.Key.Should().Be(HoldBackKey,
+                $"{depth}: the risk vote sees the sampled-world death and demotes the race — "
+                + "the flip must survive at the default depth (hard regression)");
+            defaults.Key.Should().NotBe(killSwitches.Key, "the decision must genuinely flip");
+        }
+        else
+        {
+            defaults.Key.Should().Be(AllOutKey,
+                $"{depth}: with the terminal-loss signal starved by the truncated horizon the "
+                + "risk vote finds no catastrophe to demote, so defaults race exactly like the "
+                + "kill-switches — the flip does NOT survive this depth (pinned gate data)");
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

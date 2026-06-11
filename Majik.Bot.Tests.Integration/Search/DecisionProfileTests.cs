@@ -381,6 +381,35 @@ public sealed class DecisionProfileTests
             }
         }
 
+        // ── 4a. Per-RolloutDepth decision cells (the #2596 truncation lever) ──
+        // Same board, same 150it/1500ms shape as the live default cell above,
+        // but with the rollout narrowed (EndOfTurn = current-turn boundary,
+        // LeafEval = no playout, BoardEval at the decision point). Quantifies
+        // the realized ms/iter multiple — LeafEval still pays clone +
+        // drive-to-decision per iteration, so expect well above the naive
+        // 6 ms → 13 µs eval-only ratio.
+        foreach (var depth in new[] { RolloutDepth.LeafEval, RolloutDepth.EndOfTurn })
+        {
+            var mcts = new Mcts(sim, new MctsConfig(
+                MaxIterations: 150, MaxMillis: 1500, DepthTurns: 1, ExplorationC: 1.41,
+                RolloutDepth: depth));
+            mcts.SearchWithStats(root); // warm rep (untimed)
+            for (int rep = 1; rep <= 3; rep++)
+            {
+                double wsBefore = WorkingSetMb();
+                long a0 = GC.GetTotalAllocatedBytes(precise: true);
+                long t0 = Stopwatch.GetTimestamp();
+                var result = mcts.SearchWithStats(root);
+                double wallMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+                long alloc = GC.GetTotalAllocatedBytes(precise: true) - a0;
+                int done = result.RootStats.Sum(s => s.Visits);
+                Log($"[PROF] decisionDepth cfg=150it/1500ms depth={depth} rep={rep} wall={wallMs:F0}ms " +
+                    $"iters={done} ms/iter={(done > 0 ? wallMs / done : double.NaN):F2} " +
+                    $"allocMB={alloc / (1024.0 * 1024.0):F0} best={result.Best.Key} " +
+                    $"ws={wsBefore:F0}->{WorkingSetMb():F0}MB");
+            }
+        }
+
         // ── 4b. Combat-phase decision at the live default (context) ───────────
         {
             var combatRoot = SimState.Capture(

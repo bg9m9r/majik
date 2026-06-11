@@ -31,6 +31,18 @@ internal interface ISearchSimulator
     /// negative value indicates a loss. <paramref name="depthTurns"/> bounds the
     /// total turns simulated beyond <see cref="SimState.TurnNumber"/>.
     /// </para>
+    ///
+    /// <para>
+    /// <paramref name="rolloutDepth"/> narrows the playout (see
+    /// <see cref="RolloutDepth"/>): <c>FullTurnPlus</c> (the default) honours
+    /// <paramref name="depthTurns"/> unchanged; <c>EndOfTurn</c> forces an
+    /// effective <c>depthTurns = 0</c>; <c>LeafEval</c> performs NO playout and
+    /// evaluates at the decision point the path leads to.
+    /// </para>
     /// </summary>
-    double Rollout(SimState root, IReadOnlyList<SimMove> pathFromRoot, int depthTurns);
+    double Rollout(
+        SimState root,
+        IReadOnlyList<SimMove> pathFromRoot,
+        int depthTurns,
+        RolloutDepth rolloutDepth = RolloutDepth.FullTurnPlus);
 }
