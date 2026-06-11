@@ -7,7 +7,9 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Rules;
 using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
@@ -251,5 +253,122 @@ public class NecrodominanceTests : IDisposable
             "empty library → nothing to exile");
         wiring.ActiveCasts.Should().BeEmpty(
             "no permission stamped when nothing was exiled");
+    }
+
+    // -----------------------------------------------------------------------
+    // End-step trigger: "you may pay any amount of life. If you do, draw
+    // that many cards." (CR 603.1)
+    // -----------------------------------------------------------------------
+
+    /// <summary>Helper: the End-step trigger built by the factory.</summary>
+    private static TriggeredAbility EndStepTrigger(Enchantment necro)
+        => necro.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<StepStartedEvent>);
+
+    private GameContext CtxFor(Player self) =>
+        new(self, new[] { _alice, _bob }, self, 1, StepStateType.End,
+            new Majik.Core.Stack.Stack());
+
+    private static void StackLibrary(Player p, int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            var c = new Card($"lib-{p.Name}-{i}", "");
+            c.SetOwner(p);
+            p.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+    }
+
+    [Fact]
+    public void Necrodominance_HasEndStepTrigger()
+    {
+        var necro = NecrodominanceFactory.Create(_alice);
+
+        var trigger = necro.Abilities.OfType<TriggeredAbility>().ToList();
+        trigger.Should().ContainSingle(
+            "the only triggered ability is the end-step pay-life-then-draw trigger");
+        trigger.Single().Condition.Should().BeOfType<EventTriggerCondition<StepStartedEvent>>();
+    }
+
+    [Fact]
+    public async Task EndStep_PayingN_Life_DrawsN_Cards()
+    {
+        StackLibrary(_alice, 5);
+        var wiring = NecrodominanceFactory.Create(_alice, eventBus: null);
+        _alice.Zones.Battlefield.AddCard(wiring.Card);
+        wiring.Card.SetZone(ZoneType.Battlefield);
+
+        var startLife = _alice.LifeTotal;
+        var agent = new ScriptedAgent();
+        agent.QueueX(3); // pay 3 life
+
+        await EndStepTrigger(wiring.Card).ResolveAsync(agent, CtxFor(_alice));
+
+        _alice.LifeTotal.Should().Be(startLife - 3, "paid 3 life");
+        _alice.Zones.Hand.GetCards().Should().HaveCount(3, "drew that many cards");
+        _alice.Zones.Library.GetCards().Should().HaveCount(2, "3 of 5 library cards drawn");
+    }
+
+    [Fact]
+    public async Task EndStep_PayingZero_DrawsNothing()
+    {
+        StackLibrary(_alice, 5);
+        var wiring = NecrodominanceFactory.Create(_alice, eventBus: null);
+        _alice.Zones.Battlefield.AddCard(wiring.Card);
+        wiring.Card.SetZone(ZoneType.Battlefield);
+
+        var startLife = _alice.LifeTotal;
+        var agent = new ScriptedAgent();
+        agent.QueueX(0); // decline
+
+        await EndStepTrigger(wiring.Card).ResolveAsync(agent, CtxFor(_alice));
+
+        _alice.LifeTotal.Should().Be(startLife, "no life paid");
+        _alice.Zones.Hand.GetCards().Should().BeEmpty("paying 0 draws nothing");
+        _alice.Zones.Library.GetCards().Should().HaveCount(5, "library untouched");
+    }
+
+    [Fact]
+    public async Task EndStep_AmountClampedToAvailableLife()
+    {
+        // CR 119.4 — a player can't pay more life than they have. Asking for
+        // 100 when at 20 pays 20 and draws 20 (or as many as the library
+        // holds). Stock the library generously so the draw is life-limited.
+        StackLibrary(_alice, 30);
+        var wiring = NecrodominanceFactory.Create(_alice, eventBus: null);
+        _alice.Zones.Battlefield.AddCard(wiring.Card);
+        wiring.Card.SetZone(ZoneType.Battlefield);
+
+        var startLife = _alice.LifeTotal; // 20
+        var agent = new ScriptedAgent();
+        agent.QueueX(100);
+
+        await EndStepTrigger(wiring.Card).ResolveAsync(agent, CtxFor(_alice));
+
+        _alice.LifeTotal.Should().Be(0, "clamped to the controller's life total");
+        _alice.Zones.Hand.GetCards().Should().HaveCount(startLife,
+            "drew exactly as many cards as life paid");
+    }
+
+    [Fact]
+    public async Task EndStep_OnlyFiresOnControllersOwnEndStep()
+    {
+        StackLibrary(_alice, 5);
+        var wiring = NecrodominanceFactory.Create(_alice, eventBus: null);
+        _alice.Zones.Battlefield.AddCard(wiring.Card);
+        wiring.Card.SetZone(ZoneType.Battlefield);
+
+        var trigger = EndStepTrigger(wiring.Card);
+
+        // Bob's end step should NOT match Alice's trigger condition.
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _bob))
+            .Should().BeFalse("Necrodominance triggers on its controller's end step only");
+        // Alice's upkeep should NOT match (wrong step).
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
+            .Should().BeFalse("the trigger is an end-step trigger");
+        // Alice's end step DOES match.
+        trigger.IsTriggered(new StepStartedEvent(StepStateType.End, _alice))
+            .Should().BeTrue();
     }
 }

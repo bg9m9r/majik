@@ -1,4 +1,5 @@
 using Majik.Bot.Diagnostics;
+using Majik.Bot.Evaluation;
 using Majik.Core.Diagnostics;
 
 namespace Majik.Bot;
@@ -18,7 +19,15 @@ namespace Majik.Bot;
 /// used for tie-breaks. Same seed + same engine state = same decision.</para>
 ///
 /// <para><c>Strategy</c> selects the <see cref="IBotStrategy"/> implementation:
-/// <c>"heuristic"</c> in v1; <c>"mcts"</c> reserved for v2.</para>
+/// <c>"heuristic"</c> uses the pure-heuristic strategy; <c>"mcts"</c> uses
+/// MCTS-backed combat search with heuristic fallback for all other prompts.</para>
+///
+/// <para><c>WeightsOverride</c> optional. When non-null, the bot uses this
+/// explicit <see cref="ArchetypeWeights"/> vector directly instead of calling
+/// <c>ArchetypeWeights.ForArchetype(ArchetypeName)</c>. Null preserves the
+/// default archetype-lookup behaviour so existing production code is unaffected.
+/// Primarily used by the self-play weight tuner to inject candidate weight
+/// vectors into individual bots without changing the archetype mapping.</para>
 ///
 /// <para><c>DecisionSink</c> optional. When non-null, EV-scored policies
 /// (PriorityPolicy, ActivatedAbilityPolicy via priority pump, CombatSearch)
@@ -33,6 +42,67 @@ namespace Majik.Bot;
 /// <see cref="Majik.Core.Events.UnimplementedCardEncounteredEvent"/> fires
 /// on the tracker's event bus. Defaults to no-op (the bot still
 /// deprioritises vanilla shells in EV scoring, just silently).</para>
+///
+/// <para><c>SimCombatBudgetMs</c> limits the opponent's <see cref="Combat.CombatPolicy"/>
+/// budget when this config is used for a sandbox opponent inside MCTS.
+/// The default (null) uses the production default (~800 ms). Set to a small
+/// value (e.g. 20) for sandbox-opponent agents so that an adversarial
+/// HeuristicStrategy blocking call at every MCTS node does not dominate
+/// search time. This field is only consulted by <see cref="Search.EngineSimulator"/>;
+/// it has no effect on the live (top-level) BotPlayerAgent.</para>
+///
+/// <para><c>MaxMctsIterations</c> overrides the default MCTS iteration cap
+/// (200) when <c>Strategy="mcts"</c>. Use a small value (e.g. 50) in integration
+/// tests to keep the test suite runtime reasonable. A null value uses the
+/// production default.</para>
+///
+/// <para><c>MaxMctsBudgetMs</c> overrides the wall-clock budget per MCTS call
+/// (default 1500 ms) when <c>Strategy="mcts"</c>. Use a small value (e.g. 200)
+/// in integration tests so that each priority decision finishes quickly. The
+/// search will still run up to <c>MaxMctsIterations</c> iterations but will
+/// cut off early if the budget is exhausted. A null value uses the production
+/// default.</para>
+///
+/// <para><c>PrioritySearchEnabled</c> controls whether the MCTS search is
+/// used for priority decisions when <c>Strategy="mcts"</c>. Default true
+/// (search is used). Set to false in tests to skip the priority MCTS and
+/// use the inner heuristic instead — useful when the priority MCTS sandbox
+/// games are slow (e.g., because the sandbox heuristic hits the priority-loop
+/// safety on unimplemented cards). The combat search (DeclareAttackers /
+/// DeclareBlockers) is unaffected by this flag.</para>
+///
+/// <para><c>OpponentArchetype</c> optional. When set to a known archetype name
+/// (a key in <see cref="Decks.BotDeckCatalog"/>), <see cref="Search.SearchStrategy"/>
+/// runs <em>determinized</em> MCTS: the search samples the opponent's hidden zones
+/// from that archetype's decklist across K worlds and votes by summed robust child
+/// (see <see cref="Search.DeterminizedSearch"/>). When null (the default), the bot
+/// uses today's perfect-info single-tree search — the opponent's hidden zones are
+/// left exactly as captured. Null is the production-safe default: an unknown
+/// opponent must NOT route through determinization, which would invent a wrong
+/// hidden world.</para>
+///
+/// <para><c>InferOpponentArchetype</c> optional (default false). When true AND
+/// <c>OpponentArchetype</c> is null, <see cref="Search.SearchStrategy"/> reads the
+/// opponent's PUBLIC cards from the live <see cref="Majik.Core.Game.GameContext"/>,
+/// infers a normalized belief over the curated archetypes
+/// (<see cref="OpponentModel.ArchetypeInferencer"/>), allocates the determinized
+/// worlds across that belief (<see cref="OpponentModel.WorldAllocator"/>), and runs
+/// belief-driven determinized search (<see cref="Search.DeterminizedSearch.RunBelief"/>).
+/// This is the "honest-vs-human" path: the opponent's deck is unknown, so it is
+/// inferred from their revealed public cards rather than assumed. Ignored when an
+/// explicit <c>OpponentArchetype</c> is set (the known-archetype path takes
+/// precedence). Default false preserves today's perfect-info behaviour for every
+/// existing caller.</para>
+///
+/// <para><c>RiskVoteThreshold</c> optional (default null). Catastrophe threshold
+/// for the risk-aware two-tier vote in <see cref="Search.DeterminizedSearch"/>:
+/// determinized lines whose worst per-world mean falls at or below this value are
+/// demoted below safe lines. Null resolves to
+/// <see cref="Search.DeterminizedSearch.DefaultCatastropheThreshold"/> (-500);
+/// <see cref="double.NegativeInfinity"/> is the kill switch — it disables the
+/// risk filter entirely (no line can score at or below it). Only consulted by
+/// <see cref="Search.SearchStrategy"/> on the determinized paths; the perfect-info
+/// search ignores it.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -40,4 +110,12 @@ public sealed record BotConfig(
     int RandomSeed = 0,
     string Strategy = "heuristic",
     IBotDecisionSink? DecisionSink = null,
-    VanillaShellTracker? VanillaShellTracker = null);
+    VanillaShellTracker? VanillaShellTracker = null,
+    int? SimCombatBudgetMs = null,
+    int? MaxMctsIterations = null,
+    int? MaxMctsBudgetMs = null,
+    bool PrioritySearchEnabled = true,
+    ArchetypeWeights? WeightsOverride = null,
+    string? OpponentArchetype = null,
+    bool InferOpponentArchetype = false,
+    double? RiskVoteThreshold = null);

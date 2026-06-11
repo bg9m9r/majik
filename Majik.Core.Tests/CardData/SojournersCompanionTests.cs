@@ -17,7 +17,7 @@ namespace Majik.Core.Tests.CardData;
 /// <summary>
 /// Unit tests for <see cref="SojournersCompanionFactory"/>.
 ///
-/// Card: Sojourner's Companion — Artifact Creature — Thopter Knight {6} 4/4
+/// Card: Sojourner's Companion — Artifact Creature — Salamander {6} 4/4
 /// (Modern Horizons 2).
 ///   "Affinity for artifacts (This spell costs {1} less to cast for each
 ///    artifact you control.)
@@ -25,8 +25,8 @@ namespace Majik.Core.Tests.CardData;
 ///    basic land card, put it onto the battlefield tapped, then shuffle."
 ///
 /// Covers:
-///   - Identity (name, dual types Artifact + Creature, subtypes Thopter +
-///     Knight, mana cost {6}, 4/4, owner/controller).
+///   - Identity (name, dual types Artifact + Creature, subtype Salamander,
+///     mana cost {6}, 4/4, owner/controller).
 ///   - NamedCardFactory dispatch returns a Creature with the Affinity
 ///     cost reducer + Affinity keyword marker.
 ///   - Affinity for artifacts (CR 702.40) — generic reduction; floor-at-
@@ -83,11 +83,13 @@ public class SojournersCompanionTests
         var c = SojournersCompanionFactory.Create(_alice);
 
         c.Name.Should().Be("Sojourner's Companion");
-        c.ManaCost.Should().Be("{6}");
+        c.ManaCost.Should().Be("{7}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasType(CardType.Artifact).Should().BeTrue("Sojourner's Companion is an Artifact Creature (CR 301.1 / 302.1)");
-        c.HasSubtype(CardSubtype.Thopter).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        // CR 205.3m — seed type line is "Artifact Creature — Salamander".
+        c.HasSubtype(CardSubtype.Salamander).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Thopter).Should().BeFalse();
+        c.HasSubtype(CardSubtype.Knight).Should().BeFalse();
         c.Power.Should().Be(4);
         c.Toughness.Should().Be(4);
         c.Owner.Should().BeSameAs(_alice);
@@ -102,8 +104,9 @@ public class SojournersCompanionTests
         c.Should().BeOfType<Creature>();
         c.Name.Should().Be("Sojourner's Companion");
         c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Thopter).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Salamander).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Thopter).Should().BeFalse();
+        c.HasSubtype(CardSubtype.Knight).Should().BeFalse();
         c.Abilities.OfType<CostReductionAbility>().Should().HaveCount(1,
             "the Affinity-for-artifacts cost reducer is attached");
         c.Abilities.OfType<KeywordAbility>()
@@ -118,19 +121,19 @@ public class SojournersCompanionTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void Affinity_NoArtifacts_FullSix()
+    public void Affinity_NoArtifacts_FullSeven()
     {
         var companion = SojournersCompanionFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(companion);
         companion.SetZone(ZoneType.Hand);
 
         var effective = CostReduction.GetEffectiveCost(companion, _alice);
-        effective.Generic.Should().Be(6);
-        effective.TotalValue.Should().Be(6);
+        effective.Generic.Should().Be(7);
+        effective.TotalValue.Should().Be(7);
     }
 
     [Fact]
-    public void Affinity_ThreeArtifacts_GenericThree()
+    public void Affinity_ThreeArtifacts_GenericFour()
     {
         var companion = SojournersCompanionFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(companion);
@@ -142,24 +145,24 @@ public class SojournersCompanionTests
         }
 
         var effective = CostReduction.GetEffectiveCost(companion, _alice);
-        effective.Generic.Should().Be(3, "{6} reduced by 3 → {3}");
+        effective.Generic.Should().Be(4, "{7} reduced by 3 → {4}");
     }
 
     [Fact]
-    public void Affinity_SixArtifacts_FreeCast()
+    public void Affinity_SevenArtifacts_FreeCast()
     {
-        // Headline dream: six artifacts → cast Sojourner's Companion free.
+        // Headline dream: seven artifacts → cast Sojourner's Companion free.
         var companion = SojournersCompanionFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(companion);
         companion.SetZone(ZoneType.Hand);
 
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 7; i++)
         {
             PutOnBattlefield(_alice, new Artifact($"Artifact {i}", "{0}"));
         }
 
         var effective = CostReduction.GetEffectiveCost(companion, _alice);
-        effective.Generic.Should().Be(0, "{6} reduced by 6 → {0} (free)");
+        effective.Generic.Should().Be(0, "{7} reduced by 7 → {0} (free)");
         effective.TotalValue.Should().Be(0);
     }
 

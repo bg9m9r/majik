@@ -441,6 +441,15 @@
               "object"
             ]
           },
+          "imprintedCards": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "instanceId": {
             "format": "uuid",
             "type": "string"
@@ -894,6 +903,9 @@
             "$ref": "#/components/schemas/GameCommandActivateAbilityCommand"
           },
           {
+            "$ref": "#/components/schemas/GameCommandActivateLoyaltyAbilityCommand"
+          },
+          {
             "$ref": "#/components/schemas/GameCommandOrderTriggersCommand"
           },
           {
@@ -924,6 +936,7 @@
         "discriminator": {
           "mapping": {
             "activateAbility": "#/components/schemas/GameCommandActivateAbilityCommand",
+            "activateLoyaltyAbility": "#/components/schemas/GameCommandActivateLoyaltyAbilityCommand",
             "activateManaAbility": "#/components/schemas/GameCommandActivateManaAbilityCommand",
             "attackers": "#/components/schemas/GameCommandDeclareAttackersCommand",
             "blockers": "#/components/schemas/GameCommandDeclareBlockersCommand",
@@ -975,6 +988,32 @@
         "required": [
           "permanentInstanceId",
           "abilityId"
+        ]
+      },
+      "GameCommandActivateLoyaltyAbilityCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "activateLoyaltyAbility"
+            ],
+            "type": "string"
+          },
+          "loyaltyAbilityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "permanentInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permanentInstanceId",
+          "loyaltyAbilityId"
         ]
       },
       "GameCommandActivateManaAbilityCommand": {

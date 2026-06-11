@@ -29,10 +29,11 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>etb_self</c> trigger →
 ///   <c>mill_then_pick_first_matching_to_hand</c> effect (amount 4, matching
 ///   Artifact / Creature / Land). CR 701.13 mill = top four cards of library
-///   to graveyard; the first matching milled card may then be moved to hand
-///   (v1 takes the first qualifying card in mill order — the "you may" opt-out
-///   awaits the agent prompt system, same queue as Malevolent Rumble /
-///   Ancient Stirrings).
+///   to graveyard; the controller is then PROMPTED (CR 116.1b "you may") to
+///   put one of the matching milled cards into hand, or decline — reusing the
+///   reveal-and-choose prompt (same queue as Malevolent Rumble / Ancient
+///   Stirrings). With no agent registered (bot self-play / agentless harness)
+///   it falls back to the deterministic first-matching-card auto-pick.
 /// - <b>Lifegain-on-graveyard-leave</b> (CR 603.2 — leaves-the-zone trigger):
 ///   <c>card_leaves_your_graveyard</c> trigger (cardTypes Artifact / Creature,
 ///   restricted to the controller's own graveyard) →

@@ -13,11 +13,12 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <summary>
 /// Unit tests for All Is Dust (Rise of the Eldrazi, {7}).
 ///
-/// Oracle (Tribal Sorcery — Eldrazi):
+/// Oracle (printed "Kindred Sorcery — Eldrazi"; modelled as Sorcery —
+/// Eldrazi after the 2024 Kindred/Tribal removal):
 ///   "Each player sacrifices all colored permanents they control."
 ///
 /// Coverage:
-///   * Identity (Tribal Sorcery, Eldrazi subtype, {7}, colourless).
+///   * Identity (Sorcery, Eldrazi subtype, {7}, colourless — NOT Tribal).
 ///   * NamedCardFactory dispatch.
 ///   * Sweep sacrifices coloured creatures, colourless creatures
 ///     (Eldrazi titans) survive.
@@ -41,16 +42,19 @@ public class AllIsDustFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void AllIsDust_IsTribalSorceryEldrazi_At7()
+    public void AllIsDust_IsSorceryEldrazi_At7()
     {
         var card = AllIsDustFactory.Create(_alice);
 
         card.Name.Should().Be("All Is Dust");
         card.ManaCost.Should().Be("{7}");
         card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.HasType(CardType.Tribal).Should().BeTrue(
-            "CR 308 — All Is Dust is a Tribal Sorcery; the Eldrazi " +
-            "subtype is grounded on the Tribal card type.");
+        // The Kindred (formerly "Tribal") card type was removed by the 2024
+        // type-line errata; the seed type line is "Sorcery — Eldrazi" with
+        // no Kindred/Tribal type, and the engine no longer stamps it.
+        card.HasType(CardType.Tribal).Should().BeFalse(
+            "CR 205.3 — Kindred/Tribal was removed; All Is Dust is a plain " +
+            "Sorcery with the Eldrazi subtype on the spell.");
         card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);

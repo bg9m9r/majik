@@ -144,7 +144,8 @@ public class ChromaticSphereTests
         _alice.ManaPool.Generic.Should().Be(0,
             "the {1} activation cost is deducted from the pool");
 
-        sphere.IsTapped.Should().BeTrue("activation taps the sphere");
+        sphere.IsTapped.Should().BeFalse(
+            "CR 400.7 — the sacrificed sphere is a new object in the graveyard and no longer tapped");
         sphere.Zone.Should().Be(ZoneType.Graveyard,
             "CR 701.16 — sacrifice moves the sphere from battlefield to owner's graveyard");
         _alice.Zones.Battlefield.GetCards().Should().NotContain(sphere);

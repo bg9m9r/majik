@@ -82,6 +82,40 @@ public class StateBasedActionsTests
     }
 
     [Fact]
+    public void CheckStateBasedActions_PlayerWith21CommanderDamage_SetsHasLost()
+    {
+        // CR 704.5j — the deferred commander-damage SBA: a player who has
+        // accumulated 21+ damage from a single commander loses on the sweep,
+        // NOT eagerly at the damage site.
+        var defender = new Player("Alice", 40);
+        var attacker = new Player("Bob", 40);
+        var commander = new Creature("Krenko", "3R", 5, 5) { Owner = attacker, Controller = attacker };
+        defender.AssignCommander(new Majik.Core.Formats.Commander.CommanderState(defender, commander));
+        defender.Commander!.TakeCommanderDamage(commander, 21);
+
+        defender.HasLost.Should().BeFalse("the loss is deferred to the SBA sweep, not flipped at the damage site");
+
+        _sba.CheckStateBasedActions(new List<Player> { defender, attacker }, new List<ICard>());
+
+        defender.HasLost.Should().BeTrue("CR 704.5j — 21+ commander damage from one source loses on the SBA sweep");
+        _eventBusMock.Verify(x => x.Publish(It.IsAny<PlayerLostEvent>()), Times.Once);
+    }
+
+    [Fact]
+    public void CheckStateBasedActions_PlayerWith20CommanderDamage_DoesNotLose()
+    {
+        var defender = new Player("Alice", 40);
+        var attacker = new Player("Bob", 40);
+        var commander = new Creature("Krenko", "3R", 5, 5) { Owner = attacker, Controller = attacker };
+        defender.AssignCommander(new Majik.Core.Formats.Commander.CommanderState(defender, commander));
+        defender.Commander!.TakeCommanderDamage(commander, 20);
+
+        _sba.CheckStateBasedActions(new List<Player> { defender, attacker }, new List<ICard>());
+
+        defender.HasLost.Should().BeFalse("20 commander damage is below the CR 704.5j threshold of 21");
+    }
+
+    [Fact]
     public void CheckStateBasedActions_DeadCreature_MovesToGraveyard()
     {
         // Arrange

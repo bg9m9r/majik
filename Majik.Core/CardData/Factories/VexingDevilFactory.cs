@@ -102,23 +102,23 @@ public static class VexingDevilFactory
     /// resolve body no-ops (no opponent resolver).
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null, zoneService: null, opponentResolver: null);
+        Create(owner, triggers: null, zoneService: null);
 
     /// <summary>
-    /// Construct Vexing Devil with full runtime wiring.
+    /// Construct Vexing Devil with full runtime wiring. The ETB "any opponent
+    /// may have it deal 4 damage to them" reads "each opponent" from the live
+    /// resolution context at resolution (<see cref="ContextOpponents"/>), so it
+    /// is correct on the production routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager for ETB registration. May be
     /// null — the trigger is attached structurally but not enrolled.</param>
     /// <param name="zoneService">Zone service the sacrifice routes through so
     /// LTB / zone-change events fire. May be null — raw-zone sacrifice path.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent".
-    /// Without a resolver the ETB body no-ops.</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ZoneService? zoneService,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ZoneService? zoneService)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -137,13 +137,13 @@ public static class VexingDevilFactory
             $"{CardName}: any opponent may take {EtbDamageAmount} damage; if one does, sacrifice this creature",
             async ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the ETB body INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
-
                     // "any opponent may have it deal 4 damage to them" — CR
                     // 601-style "may" choice made by the opponent. Downside
                     // for the chooser (lose 4 life), so the default heuristic

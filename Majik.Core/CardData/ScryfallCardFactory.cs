@@ -108,7 +108,8 @@ public sealed class ScryfallCardFactory
         // grant cleanup schedules. Without a TriggerManager the binder falls
         // back to synchronous chapter resolution.
         SagaBinder.Bind(card, entity, _effects, _zones, _triggers, _eventBus);
-        foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
+        foreach (var trig in OracleTriggeredAbilityBinder.Bind(
+            card, entity, owner, allPlayers: null, eventBus: _eventBus))
         {
             card.AddAbility(trig);
         }
@@ -153,61 +154,12 @@ public sealed class ScryfallCardFactory
         // template is registered for this name — when a template IS present,
         // we leave the flag false because the cast path will actually do
         // something on resolve.
-        if (IsLikelyVanillaShell(card, entity))
+        if (VanillaShellClassifier.IsLikelyVanillaShell(card, entity))
         {
             (card as Card)?.MarkAsVanillaShell();
         }
 
         return card;
-    }
-
-    /// <summary>
-    /// Inspect the built card + its source row and decide whether it's a
-    /// "vanilla shell" — see <see cref="ICard.IsVanillaShell"/>. The check
-    /// is split: permanents need an attached ability OR keyword-only text;
-    /// instants/sorceries need a compiled template (the runtime binder is
-    /// not consulted here — too expensive on every Create — but coverage
-    /// in practice is &gt;99% gated through the compiled table for the
-    /// SpellBound tier).
-    /// </summary>
-    private bool IsLikelyVanillaShell(ICard card, CardEntity entity)
-    {
-        var oracle = entity.OracleText ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(oracle))
-        {
-            // True vanilla creature / basic land — no printed rules text to
-            // enforce. The engine plays these correctly as plain bodies, so
-            // they are NOT vanilla shells from the bot's perspective.
-            return false;
-        }
-
-        var isInstantOrSorcery =
-            card.HasType(Majik.Core.Cards.Types.CardType.Instant)
-            || card.HasType(Majik.Core.Cards.Types.CardType.Sorcery);
-
-        if (isInstantOrSorcery)
-        {
-            // Compiled spell-template cache was removed when the SQLite
-            // backing store was deleted. The bot now relies on the
-            // resolver to clear the vanilla-shell flag when a live
-            // template walk binds (see ClearVanillaShellOnSpellBind on
-            // the production TurnDriver path). Default to NOT tagging
-            // instants/sorceries as vanilla shells — the live walk
-            // covers them at cast time.
-            return false;
-        }
-
-        // Permanent path: has at least one ability → engine covers it.
-        // The previous "keyword-only oracle text" fast path lived in
-        // CoverageClassifier and consumed the Scryfall `keywords` JSON
-        // array — that array is not carried by the embedded seed, so
-        // tagging on oracle-text emptiness alone would over-flag cards
-        // whose abilities are bound entirely from keywords. Be
-        // conservative and only flag when there are no abilities AND no
-        // oracle text at all (vanilla creatures / lands).
-        var hasAnyAbility = card.Abilities.Count > 0;
-        if (hasAnyAbility) return false;
-        return !string.IsNullOrWhiteSpace(entity.OracleText);
     }
 
     /// <summary>
@@ -223,6 +175,35 @@ public sealed class ScryfallCardFactory
     {
         var entity = _repo.GetByName(name);
         if (entity == null) return null;
+
+        // CR 608.3 / 608.2 — the spell-template registry binds an oracle text
+        // to a RESOLUTION effect, which is only meaningful for INSTANT /
+        // SORCERY spells: their printed text IS the spell's resolution. A
+        // permanent spell (artifact / creature / enchantment / planeswalker /
+        // land) "resolves" by entering the battlefield (CR 608.3b) — its
+        // activated / triggered / static abilities are bound at card-build
+        // time (KeywordBinder, OracleTriggeredAbilityBinder, the ETB
+        // replacement chain in Create), NOT by this cast-time spell binder.
+        //
+        // Binding the registry against a permanent's FULL oracle text is
+        // actively harmful: that text includes the permanent's activated /
+        // triggered ability clauses (e.g. Walking Ballista's "...deals 1
+        // damage to any target", Agatha's Soul Cauldron's "{T}: Exile target
+        // card from a graveyard"), which spuriously match instant/sorcery
+        // templates (DamageAnyTarget, ExileFromGraveyard, …). The synthesized
+        // SpellDefinition carries TargetRequests that SpellCastFlow then
+        // prompts for on CAST — a target/destination prompt that should never
+        // appear when casting a permanent. (The synthesized effects don't even
+        // run: StackResolver moves a permanent spell to the battlefield without
+        // executing the spell's effect list, so the only observable behaviour
+        // is the bogus prompt.) Skip the binder entirely for permanents and
+        // return null — TurnDriver falls back to a vanilla (no-target) spell
+        // for them, exactly as for an unmatched permanent.
+        var parsed = TypeLineParser.Parse(entity.TypeLine);
+        var isInstantOrSorcery =
+            parsed.Types.Contains(CardType.Instant)
+            || parsed.Types.Contains(CardType.Sorcery);
+        if (!isInstantOrSorcery) return null;
 
         // The offline compiled-template cache (DbCompiledSpellTemplateRepository)
         // was deleted along with the SQLite backing store. Every cast now

@@ -57,7 +57,7 @@ public class KeldonMaraudersFactoryTests
         km.HasSubtype(CardSubtype.Human).Should().BeTrue();
         km.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
         km.BasePower.Should().Be(3);
-        km.BaseToughness.Should().Be(1);
+        km.BaseToughness.Should().Be(3);
         km.Owner.Should().BeSameAs(_alice);
         km.Controller.Should().BeSameAs(_alice);
     }
@@ -72,7 +72,7 @@ public class KeldonMaraudersFactoryTests
         card.HasSubtype(CardSubtype.Human).Should().BeTrue();
         card.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
         ((Creature)card).BasePower.Should().Be(3);
-        ((Creature)card).BaseToughness.Should().Be(1);
+        ((Creature)card).BaseToughness.Should().Be(3);
     }
 
     // -----------------------------------------------------------------------

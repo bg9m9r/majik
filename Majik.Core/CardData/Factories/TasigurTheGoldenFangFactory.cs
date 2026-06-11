@@ -9,7 +9,7 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Tasigur, the Golden Fang (Khans of Tarkir, {4}{B/G}).
+/// Named-card factory for Tasigur, the Golden Fang (Khans of Tarkir, {5}{B}).
 ///
 /// Legendary Creature — Human Shaman 4/5. Oracle text:
 ///   "Delve (Each card you exile from your graveyard while casting this
@@ -18,9 +18,9 @@ namespace Majik.Core.CardData.Factories;
 ///    that card to your hand. Activate only as a sorcery."
 ///
 /// ## Implemented (v1)
-/// - Legendary 4/5 Creature with Human + Shaman subtypes, mana cost
-///   {4}{B/G} (hybrid pip parsed via <see cref="ValueObjects.ManaCost"/>'s
-///   HybridPip path — same idiom as Boros Reckoner's {R/W} cost).
+/// - Legendary 4/5 Creature with Human + Shaman subtypes, printed mana
+///   cost {5}{B}. (Delve reduces what you PAY at cast time per CR 702.66 —
+///   it does not change the printed cost / mana value, which stays MV 6.)
 /// - "Delve" marker keyword via <see cref="KeywordAbility"/> so downstream
 ///   code (UI, bot probes, action validator) can introspect the keyword.
 ///   The actual Delve mechanic (CR 702.66) lives in
@@ -93,7 +93,7 @@ public static class TasigurTheGoldenFangFactory
 
         var card = new Creature(
             name: CardName,
-            manaCost: "{4}{B/G}",
+            manaCost: "{5}{B}",
             power: 4,
             toughness: 5,
             supertypes: new[] { CardSupertype.Legendary },

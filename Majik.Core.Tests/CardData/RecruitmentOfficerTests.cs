@@ -44,7 +44,7 @@ public class RecruitmentOfficerTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
         c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        c.BasePower.Should().Be(1);
+        c.BasePower.Should().Be(2);
         c.BaseToughness.Should().Be(1);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

@@ -1,9 +1,12 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -258,6 +261,93 @@ public class OracleTriggeredAbilityBinderTests
     }
 
     [Fact]
+    public void Bind_BojukaBog_EtbExilesTargetPlayersGraveyard()
+    {
+        // CR 603.6a — Bojuka Bog is a LAND, so the only prod binding path is
+        // OracleTriggeredAbilityBinder. "When ~ enters, exile target player's
+        // graveyard." With an opponent present, the v1 deterministic target is
+        // the first opponent; every card in that graveyard is exiled.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var goyf = new Creature("Tarmogoyf", "1G", 0, 1) { Owner = _bob, Controller = _bob };
+        var drc = new Creature("Dragon's Rage Channeler", "R", 3, 3) { Owner = _bob, Controller = _bob };
+        goyf.SetZone(ZoneType.Graveyard);
+        drc.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(goyf);
+        _bob.Zones.Graveyard.AddCard(drc);
+
+        var allPlayers = new List<Player> { _alice, _bob };
+
+        var bog = new Majik.Core.Cards.Land("Bojuka Bog") { Owner = _alice, Controller = _alice };
+        bog.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bog);
+
+        var entity = new CardEntity
+        {
+            Name = "Bojuka Bog",
+            TypeLine = "Land",
+            OracleText = "Bojuka Bog enters tapped.\nWhen Bojuka Bog enters, exile target player's graveyard.\n{T}: Add {B}.",
+        };
+        var bound = OracleTriggeredAbilityBinder.Bind(bog, entity, _alice, allPlayers).ToList();
+        bound.Should().ContainSingle("the ETB exile-graveyard trigger must bind");
+        foreach (var ab in bound) bog.AddAbility(ab);
+        triggers.BindCard(bog);
+
+        zones.MoveCardTo(bog, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _bob.Zones.Graveyard.GetCards().Should().BeEmpty(
+            "every card in the target player's graveyard is exiled");
+        _bob.Zones.Exile.GetCards().Should().Contain(new[] { goyf, drc });
+        goyf.Zone.Should().Be(ZoneType.Exile);
+        drc.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    [Fact]
+    public void Bind_BojukaBog_Etb_FallsBackToController_WhenNoOpponents()
+    {
+        // Prod call site passes only the controller (no allPlayers). With no
+        // opponent available the v1 deterministic fallback exiles the
+        // controller's own graveyard — mirrors the Endurance fallback.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var ponder = new Creature("Snapcaster Mage", "1U", 2, 1) { Owner = _alice, Controller = _alice };
+        ponder.SetZone(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.AddCard(ponder);
+
+        var bog = new Majik.Core.Cards.Land("Bojuka Bog") { Owner = _alice, Controller = _alice };
+        bog.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bog);
+
+        var entity = new CardEntity
+        {
+            Name = "Bojuka Bog",
+            TypeLine = "Land",
+            OracleText = "Bojuka Bog enters tapped.\nWhen Bojuka Bog enters, exile target player's graveyard.\n{T}: Add {B}.",
+        };
+        // No allPlayers — exactly the prod GameFacade.BindCardAbilities call shape.
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(bog, entity, _alice))
+        {
+            bog.AddAbility(ab);
+        }
+        triggers.BindCard(bog);
+
+        zones.MoveCardTo(bog, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.Zones.Graveyard.GetCards().Should().BeEmpty(
+            "with no opponents, the controller's own graveyard is the fallback target");
+        _alice.Zones.Exile.GetCards().Should().Contain(ponder);
+        ponder.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    [Fact]
     public void GoblinGuide_Attack_RevealsTop_LandToDefenderHand()
     {
         var stack = new Majik.Core.Stack.Stack(_bus);
@@ -475,5 +565,906 @@ public class OracleTriggeredAbilityBinderTests
         // graveyard. Underground Mortuary surveils 1 → top card goes to GY.
         _alice.Zones.Graveyard.GetCards().Should().Contain(top,
             because: "no agent was registered; surveil falls back to all-to-graveyard");
+    }
+
+    // -----------------------------------------------------------------------
+    // Sanctum of Ugin — "Whenever you cast a colorless spell with mana value
+    // 7 or greater, you may sacrifice this land. If you do, search your library
+    // for a colorless creature card, reveal it, put it into your hand, then
+    // shuffle." (CR 603.1.)
+    //
+    // Sanctum of Ugin is a LAND, so production NEVER routes it through its
+    // named factory — it is built through GameFacade.BindCardAbilities (the
+    // binder chain). These tests build the trigger via OracleTriggeredAbilityBinder
+    // (the real prod path) to prove the cast-trigger binds in real games.
+    // -----------------------------------------------------------------------
+
+    private static CardEntity SanctumEntity() => new()
+    {
+        Name = "Sanctum of Ugin",
+        TypeLine = "Land",
+        OracleText = "{T}: Add {C}.\nWhenever you cast a colorless spell with " +
+                     "mana value 7 or greater, you may sacrifice this land. If " +
+                     "you do, search your library for a colorless creature card, " +
+                     "reveal it, put it into your hand, then shuffle.",
+    };
+
+    private static Majik.Core.Spells.Spell ColorlessSpell(Player controller, string manaCost)
+    {
+        var card = new Creature($"Eldrazi_{manaCost}", manaCost, 5, 5) { Owner = controller };
+        return new Majik.Core.Spells.Spell(card, controller);
+    }
+
+    private static Majik.Core.Spells.Spell ColoredSpell(Player controller, string manaCost)
+    {
+        var card = new Creature($"Colored_{manaCost}", manaCost, 5, 5) { Owner = controller };
+        return new Majik.Core.Spells.Spell(card, controller);
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColorlessMV7_BindsTriggerGatedToBattlefield()
+    {
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+
+        var trigger = OracleTriggeredAbilityBinder
+            .Bind(land, SanctumEntity(), _alice)
+            .OfType<TriggeredAbility>()
+            .Single();
+
+        trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColorlessMV7_Fires()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColorlessSpell(_alice, "7")));
+
+        triggers.PendingCount.Should().Be(1,
+            "colorless spell with MV 7 triggers Sanctum's bound ability");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColoredSpell_DoesNotFire()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColoredSpell(_alice, "6W")));
+
+        triggers.PendingCount.Should().Be(0, "colored spell does not trigger");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_ColorlessMV6_DoesNotFire()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColorlessSpell(_alice, "6")));
+
+        triggers.PendingCount.Should().Be(0, "colorless spell with MV < 7 does not trigger");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_OpponentCasts_DoesNotFire()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+            land.AddAbility(ab);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        triggers.BindCard(land);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            ColorlessSpell(_bob, "7")));
+
+        triggers.PendingCount.Should().Be(0,
+            "'whenever YOU cast' restricts the trigger to Sanctum's controller");
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_Resolve_YesSac_TutorsColorlessCreatureToHand()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueYesNo(true);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+                land.AddAbility(ab);
+            _alice.Zones.Battlefield.AddCard(land);
+            land.SetZone(ZoneType.Battlefield);
+            triggers.BindCard(land);
+
+            var titan = new Creature("Eldrazi Titan", "10", 10, 10) { Owner = _alice };
+            _alice.Zones.Library.AddCard(titan);
+            titan.SetZone(ZoneType.Library);
+
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+                ColorlessSpell(_alice, "7")));
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            land.Zone.Should().Be(ZoneType.Graveyard, "land was sacrificed on yes");
+            _alice.Zones.Hand.GetCards().Should().Contain(titan,
+                "tutor moved the colorless creature to hand");
+            _alice.Zones.Library.GetCards().Should().NotContain(titan);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Karoo / "bounce land" cycle (Ravnica city-of-guilds duals) — 10 lands:
+    // Azorius Chancery, Boros Garrison, Dimir Aqueduct, Golgari Rot Farm,
+    // Gruul Turf, Izzet Boilerworks, Orzhov Basilica, Rakdos Carnarium,
+    // Selesnya Sanctuary, Simic Growth Chamber.
+    //
+    // Oracle (Scryfall-confirmed):
+    //   "This land enters tapped.
+    //    When this land enters, return a land you control to its owner's hand.
+    //    {T}: Add {W}{U}." (colors vary per card)
+    //
+    // These are LANDS — production NEVER routes them through a named factory;
+    // the only prod binding path is OracleTriggeredAbilityBinder (the binder
+    // chain). The ETB bounce trigger must be synthesized here. The agent
+    // chooses which land they control to return (CR 603.3 / CR 701.20).
+    // -----------------------------------------------------------------------
+
+    private static CardEntity BounceLandEntity(string name = "Azorius Chancery") => new()
+    {
+        Name = name,
+        TypeLine = "Land",
+        OracleText = "This land enters tapped.\n" +
+                     "When this land enters, return a land you control to its owner's hand.\n" +
+                     "{T}: Add {W}{U}.",
+    };
+
+    [Fact]
+    public void Bind_BounceLand_Etb_BindsSingleTrigger()
+    {
+        var land = new Majik.Core.Cards.Land("Azorius Chancery")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+
+        var bound = OracleTriggeredAbilityBinder.Bind(land, BounceLandEntity(), _alice).ToList();
+
+        bound.Should().ContainSingle("the ETB return-a-land trigger must bind exactly once");
+    }
+
+    [Fact]
+    public void Bind_BounceLand_Etb_ReturnsChosenLandToHand()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Two lands already on Alice's battlefield — she should pick one to bounce.
+        var forest = new Majik.Core.Cards.Land("Forest") { Owner = _alice, Controller = _alice };
+        var island = new Majik.Core.Cards.Land("Island") { Owner = _alice, Controller = _alice };
+        forest.SetZone(ZoneType.Battlefield);
+        island.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+        _alice.Zones.Battlefield.AddCard(island);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(island); // controller chooses to return Island
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var chancery = new Majik.Core.Cards.Land("Azorius Chancery")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            chancery.SetZone(ZoneType.Hand);
+            _alice.Zones.Hand.AddCard(chancery);
+
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(chancery, BounceLandEntity(), _alice))
+                chancery.AddAbility(ab);
+            triggers.BindCard(chancery);
+
+            zones.MoveCardTo(chancery, ZoneType.Battlefield, controller: _alice);
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            _alice.Zones.Hand.GetCards().Should().Contain(island,
+                "the chosen land returns to its owner's hand (CR 701.20)");
+            _alice.Zones.Battlefield.GetCards().Should().NotContain(island);
+            _alice.Zones.Battlefield.GetCards().Should().Contain(forest,
+                "only the chosen land is returned");
+            island.Zone.Should().Be(ZoneType.Hand);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Bind_BounceLand_Etb_DefaultReturnsALand_WhenNoAgent()
+    {
+        // No agent registered — deterministic fallback bounces the first land
+        // the controller controls (the binder must still return SOMETHING,
+        // mirroring the surveil/scry pre-agent defaults). The bounce land
+        // itself is a legal choice but the fallback prefers a different land
+        // when one exists.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var forest = new Majik.Core.Cards.Land("Forest") { Owner = _alice, Controller = _alice };
+        forest.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+
+        var chancery = new Majik.Core.Cards.Land("Azorius Chancery")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        chancery.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(chancery);
+
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(chancery, BounceLandEntity(), _alice))
+            chancery.AddAbility(ab);
+        triggers.BindCard(chancery);
+
+        zones.MoveCardTo(chancery, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        var act = () => stack.Pop()!.Resolve();
+        act.Should().NotThrow();
+
+        // Exactly one land was returned to hand (a Karoo always bounces a land).
+        _alice.Zones.Hand.GetCards().OfType<Majik.Core.Cards.Land>().Should().HaveCount(1,
+            "the ETB trigger returns one land you control to its owner's hand");
+    }
+
+    // -----------------------------------------------------------------------
+    // Scry-Temple cycle (Theros block "scry lands") — Temple of Abandon,
+    // Deceit, Enlightenment, Epiphany, Malady, Malice, Mystery, Plenty,
+    // Silence, Triumph.
+    //
+    // Oracle (Scryfall-confirmed):
+    //   "This land enters tapped.
+    //    When this land enters, scry 1. (...)
+    //    {T}: Add {W} or {U}." (colors vary per card)
+    //
+    // LANDS — bound through the binder chain (OracleTriggeredAbilityBinder),
+    // not the named factory, in real play. ETB scry 1 (CR 701.20).
+    // (Temple of the Dragon Queen is NOT in this cycle — its oracle is a
+    // reveal-a-Dragon conditional-tapped + choose-a-color land with no scry.)
+    // -----------------------------------------------------------------------
+
+    private static CardEntity TempleEntity(string name = "Temple of Enlightenment") => new()
+    {
+        Name = name,
+        TypeLine = "Land",
+        OracleText = "This land enters tapped.\n" +
+                     "When this land enters, scry 1. (Look at the top card of your " +
+                     "library. You may put that card on the bottom.)\n" +
+                     "{T}: Add {W} or {U}.",
+    };
+
+    [Fact]
+    public void Bind_ScryTemple_Etb_BindsSingleTrigger()
+    {
+        var land = new Majik.Core.Cards.Land("Temple of Enlightenment")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+
+        var bound = OracleTriggeredAbilityBinder.Bind(land, TempleEntity(), _alice).ToList();
+
+        bound.Should().ContainSingle("the ETB scry-1 trigger must bind exactly once");
+    }
+
+    [Fact]
+    public void Bind_ScryTemple_Etb_Scries1_DefaultSendsTopToBottom()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Two distinguishable cards on top so scry-1's reorder is observable.
+        var top = new Creature("Top Card", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var second = new Creature("Second Card", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(top);    // index 0 = top
+        _alice.Zones.Library.AddCard(second);
+        top.SetZone(ZoneType.Library);
+        second.SetZone(ZoneType.Library);
+
+        var temple = new Majik.Core.Cards.Land("Temple of Enlightenment")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        temple.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(temple);
+
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(temple, TempleEntity(), _alice))
+            temple.AddAbility(ab);
+        triggers.BindCard(temple);
+
+        zones.MoveCardTo(temple, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        // Pre-agent default: peeked top card → bottom of library.
+        _alice.Zones.Library.GetCards().Last().Should().Be(top,
+            "no agent registered; scry-1 default sends the peeked card to the bottom");
+        _alice.Zones.Library.GetCards().First().Should().Be(second,
+            "the previously-second card becomes the new top");
+    }
+
+    [Fact]
+    public void Bind_ScryTemple_Etb_Scries1_AgentKeepsOnTop()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var top = new Creature("Top Card", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(top);
+        top.SetZone(ZoneType.Library);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        // Keep the single peeked card on top (no cards to bottom).
+        agent.QueueScryDecision(new ScryAction.ScryDecision(
+            ToBottom: Array.Empty<ICard>(),
+            TopOrder: new ICard[] { top }));
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var temple = new Majik.Core.Cards.Land("Temple of Mystery")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            temple.SetZone(ZoneType.Hand);
+            _alice.Zones.Hand.AddCard(temple);
+
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(
+                temple, TempleEntity("Temple of Mystery"), _alice))
+                temple.AddAbility(ab);
+            triggers.BindCard(temple);
+
+            zones.MoveCardTo(temple, ZoneType.Battlefield, controller: _alice);
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            _alice.Zones.Library.GetCards().First().Should().Be(top,
+                "agent chose to keep the card on top");
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void SanctumOfUgin_Binder_Resolve_NoSac_LandStaysNoTutor()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueYesNo(false);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Sanctum of Ugin")
+            {
+                Owner = _alice, Controller = _alice,
+            };
+            foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, SanctumEntity(), _alice))
+                land.AddAbility(ab);
+            _alice.Zones.Battlefield.AddCard(land);
+            land.SetZone(ZoneType.Battlefield);
+            triggers.BindCard(land);
+
+            var titan = new Creature("Eldrazi Titan", "10", 10, 10) { Owner = _alice };
+            _alice.Zones.Library.AddCard(titan);
+            titan.SetZone(ZoneType.Library);
+
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+                ColorlessSpell(_alice, "7")));
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            land.Zone.Should().Be(ZoneType.Battlefield, "declining leaves the land");
+            _alice.Zones.Hand.GetCards().Should().BeEmpty("declining skips the tutor");
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
+    // =======================================================================
+    // Utility-land ETB triggers — LANDS bound through the binder chain
+    // (OracleTriggeredAbilityBinder), never their named factory, in real play.
+    // Oracle text verified against EmbeddedCardRepository.GetByName(...).
+    // Each test drives the real stack/trigger flow.
+    // =======================================================================
+
+    private static CardEntity LandEntity(string name, string oracle, string typeLine = "Land") =>
+        new() { Name = name, TypeLine = typeLine, OracleText = oracle };
+
+    private void DriveEtb(
+        Majik.Core.Cards.Land land, CardEntity entity,
+        Majik.Core.Stack.Stack stack, TriggerManager triggers, ZoneService zones)
+    {
+        land.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(land);
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(
+                     land, entity, _alice, new[] { _alice, _bob }))
+            land.AddAbility(ab);
+        triggers.BindCard(land);
+
+        zones.MoveCardTo(land, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+    }
+
+    [Fact]
+    public void KhalniGarden_Etb_CreatesPlantToken()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var land = new Majik.Core.Cards.Land("Khalni Garden") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Khalni Garden",
+            "This land enters tapped.\n" +
+            "When this land enters, create a 0/1 green Plant creature token.\n" +
+            "{T}: Add {G}."), stack, triggers, zones);
+
+        var token = _alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .FirstOrDefault(c => c.Name == "Plant");
+        token.Should().NotBeNull("the ETB trigger mints a 0/1 green Plant token");
+        token!.Power.Should().Be(0);
+        token.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void PiranhaMarsh_Etb_TargetPlayerLosesLife()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var land = new Majik.Core.Cards.Land("Piranha Marsh") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Piranha Marsh",
+            "This land enters tapped.\n" +
+            "When this land enters, target player loses 1 life.\n" +
+            "{T}: Add {B}."), stack, triggers, zones);
+
+        _bob.LifeTotal.Should().Be(19, "the first opponent loses 1 life (CR 119.3)");
+        _alice.LifeTotal.Should().Be(20, "the controller is not the chosen target");
+    }
+
+    [Fact]
+    public void TeeteringPeaks_Etb_PumpsChosenCreature()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        bear.ActiveEffects = effects;
+        bear.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(bear);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Teetering Peaks") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Teetering Peaks",
+                "This land enters tapped.\n" +
+                "When this land enters, target creature gets +2/+0 until end of turn.\n" +
+                "{T}: Add {R}."), stack, triggers, zones);
+
+            bear.Power.Should().Be(4, "+2/+0 until end of turn (CR 613.1g)");
+            bear.Toughness.Should().Be(2);
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void SejiriSteppe_Etb_GrantsProtectionToControllerCreature()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        bear.ActiveEffects = effects;
+        bear.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(bear);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Sejiri Steppe") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Sejiri Steppe",
+                "This land enters tapped.\n" +
+                "When this land enters, target creature you control gains protection from the color of your choice until end of turn.\n" +
+                "{T}: Add {W}."), stack, triggers, zones);
+
+            bear.Abilities.OfType<ProtectionAbility>().Should().ContainSingle(
+                "the chosen creature gains protection from a colour (default white)");
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void SoaringSeacliff_Etb_GrantsFlying()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        bear.ActiveEffects = effects;
+        bear.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromBattlefield(bear);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Soaring Seacliff") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Soaring Seacliff",
+                "This land enters tapped.\n" +
+                "When this land enters, target creature gains flying until end of turn.\n" +
+                "{T}: Add {U}."), stack, triggers, zones);
+
+            bear.HasEffectiveKeyword("Flying")
+                .Should().BeTrue("the chosen creature gains flying until end of turn (CR 702.9)");
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void HalimarDepths_Etb_LooksAtTopThreeAndReorders()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var a = new Creature("A", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var b = new Creature("B", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var c = new Creature("C", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        foreach (var card in new[] { a, b, c }) { _alice.Zones.Library.AddCard(card); card.SetZone(ZoneType.Library); }
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        // Reorder the top three to C, B, A.
+        agent.QueueScryDecision(new ScryAction.ScryDecision(
+            ToBottom: Array.Empty<ICard>(),
+            TopOrder: new ICard[] { c, b, a }));
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        try
+        {
+            var land = new Majik.Core.Cards.Land("Halimar Depths") { Owner = _alice, Controller = _alice };
+            DriveEtb(land, LandEntity("Halimar Depths",
+                "This land enters tapped.\n" +
+                "When this land enters, look at the top three cards of your library, then put them back in any order.\n" +
+                "{T}: Add {U}."), stack, triggers, zones);
+
+            _alice.Zones.Library.GetCards().Take(3).Should().Equal(new ICard[] { c, b, a },
+                "the agent's reorder is applied; no card is bottomed (reorder-only)");
+            _alice.Zones.Library.GetCards().Should().HaveCount(3, "no card left the library");
+        }
+        finally { Majik.Core.Players.Agents.AgentRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void MortuaryMire_Etb_PutsCreatureCardFromGraveyardOnTop()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var grizzly = new Creature("Grizzly", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Graveyard.AddCard(grizzly);
+        grizzly.SetZone(ZoneType.Graveyard);
+        // A bystander library card so "on top" is observable.
+        var filler = new Creature("Filler", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(filler);
+        filler.SetZone(ZoneType.Library);
+
+        var land = new Majik.Core.Cards.Land("Mortuary Mire") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Mortuary Mire",
+            "This land enters tapped.\n" +
+            "When this land enters, you may put target creature card from your graveyard on top of your library.\n" +
+            "{T}: Add {B}."), stack, triggers, zones);
+
+        _alice.Zones.Library.GetCards().First().Should().Be(grizzly,
+            "the graveyard creature is put on top of the library (CR 701.20)");
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(grizzly);
+    }
+
+    [Fact]
+    public void SunscorchedDesert_Etb_DealsDamageToTargetPlayer()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Sunscorched Desert does NOT enter tapped — no "This land enters tapped." line.
+        var land = new Majik.Core.Cards.Land("Sunscorched Desert") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Sunscorched Desert",
+            "When this land enters, it deals 1 damage to target player or planeswalker.\n" +
+            "{T}: Add {C}.", "Land — Desert"), stack, triggers, zones);
+
+        _bob.LifeTotal.Should().Be(19, "the first opponent takes 1 damage (CR 119.1d)");
+    }
+
+    [Fact]
+    public void RuptureSpire_Etb_SacrificesWhenUnpaid()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // No mana in pool → cannot pay {1} → land is sacrificed.
+        var land = new Majik.Core.Cards.Land("Rupture Spire") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Rupture Spire",
+            "This land enters tapped.\n" +
+            "When this land enters, sacrifice it unless you pay {1}.\n" +
+            "{T}: Add one mana of any color."), stack, triggers, zones);
+
+        land.Zone.Should().Be(ZoneType.Graveyard, "unpaid {1} sacrifices the land (CR 701.17)");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(land);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(land);
+    }
+
+    [Fact]
+    public void RuptureSpire_Etb_StaysWhenPaid()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // {1} available in pool → pays → land stays.
+        _alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("G"));
+
+        var land = new Majik.Core.Cards.Land("Transguild Promenade") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Transguild Promenade",
+            "This land enters tapped.\n" +
+            "When this land enters, sacrifice it unless you pay {1}.\n" +
+            "{T}: Add one mana of any color."), stack, triggers, zones);
+
+        land.Zone.Should().Be(ZoneType.Battlefield, "paying {1} keeps the land");
+    }
+
+    [Fact]
+    public void CrumblingVestige_Etb_AddsOneManaOfAnyColor()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        var land = new Majik.Core.Cards.Land("Crumbling Vestige") { Owner = _alice, Controller = _alice };
+        DriveEtb(land, LandEntity("Crumbling Vestige",
+            "This land enters tapped.\n" +
+            "When this land enters, add one mana of any color.\n" +
+            "{T}: Add {C}."), stack, triggers, zones);
+
+        _alice.ManaPool.Total.Should().BeGreaterThan(0,
+            "the ETB trigger adds one mana of any color (default green) to the pool");
+    }
+}
+
+/// <summary>
+/// Tap-driven / mana-driven land triggers synthesized by
+/// <see cref="OracleTriggeredAbilityBinder"/> for the mana-pain land family
+/// (City of Brass becomes-tapped pain, Forbidden Orchard reflexive Spirit).
+/// These need the ambient <see cref="Majik.Core.Events.EventBusRegistry"/>
+/// (so <c>Permanent.Tap()</c> publishes <see cref="PermanentTappedEvent"/>)
+/// and a clean default bus per test, hence a dedicated IDisposable fixture.
+/// </summary>
+public class OracleTriggeredAbilityBinderLandTapTests : IDisposable
+{
+    private readonly EventBus _bus = new();
+    private readonly Majik.Core.Stack.Stack _stack;
+    private readonly TriggerManager _triggers;
+    private readonly ZoneService _zones;
+    private readonly Player _alice = new("Alice", 20);
+    private readonly Player _bob = new("Bob", 20);
+
+    public OracleTriggeredAbilityBinderLandTapTests()
+    {
+        _stack = new Majik.Core.Stack.Stack(_bus);
+        _triggers = new TriggerManager(_stack, _bus);
+        _zones = new ZoneService(_bus);
+        Majik.Core.Events.EventBusRegistry.Clear();
+        Majik.Core.Events.EventBusRegistry.SetDefault(_bus);
+    }
+
+    public void Dispose()
+    {
+        Majik.Core.Events.EventBusRegistry.Clear();
+        Majik.Core.Events.EventBusRegistry.SetDefault(null);
+    }
+
+    private Majik.Core.Cards.Land BindLand(string name, string oracle)
+    {
+        var land = new Majik.Core.Cards.Land(name) { Owner = _alice, Controller = _alice };
+        land.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(land);
+        var entity = new CardEntity { Name = name, TypeLine = "Land", OracleText = oracle };
+        // Bind mana abilities too so a real tap-for-mana ManaAbilityActivatedEvent
+        // can be raised against the land's own mana ability (Forbidden Orchard).
+        OracleManaBinder.Bind(land, entity, _alice);
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, entity, _alice,
+            new[] { _alice, _bob }))
+        {
+            land.AddAbility(ab);
+        }
+        _triggers.BindCard(land);
+        return land;
+    }
+
+    // --- City of Brass: "Whenever this land becomes tapped, it deals 1 damage
+    //     to you." (CR 603.2 becomes-tapped trigger via PermanentTappedEvent.) -
+
+    [Fact]
+    public void CityOfBrass_BecomesTapped_DealsOneDamageToController()
+    {
+        var land = BindLand("City of Brass",
+            "Whenever this land becomes tapped, it deals 1 damage to you.\n"
+            + "{T}: Add one mana of any color.");
+
+        land.Tap();
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Pop()!.Resolve();
+
+        _alice.LifeTotal.Should().Be(19,
+            because: "becoming tapped deals 1 damage to the controller");
+    }
+
+    [Fact]
+    public void CityOfBrass_BecomesTapped_FiresRegardlessOfTapper()
+    {
+        var land = BindLand("City of Brass",
+            "Whenever this land becomes tapped, it deals 1 damage to you.");
+
+        // Tapped by an opponent's effect ("tap target land") — CR 603.2 keys on
+        // the permanent becoming tapped, not who tapped it. Should still fire.
+        land.Tap(causedBy: _bob);
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Pop()!.Resolve();
+
+        _alice.LifeTotal.Should().Be(19);
+    }
+
+    [Fact]
+    public void CityOfBrass_Untapping_DoesNotDeal()
+    {
+        var land = BindLand("City of Brass",
+            "Whenever this land becomes tapped, it deals 1 damage to you.");
+
+        land.Tap();
+        land.Untap();
+        // Drain the tap trigger from the first tap.
+        _triggers.PutPendingTriggersOnStack(_alice);
+        while (_stack.Count > 0) _stack.Pop()!.Resolve();
+        var lifeAfterFirstTap = _alice.LifeTotal;
+
+        // Untap does NOT publish a tap event, so no further trigger pends.
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Count.Should().Be(0, because: "untapping is not a becomes-tapped event");
+        _alice.LifeTotal.Should().Be(lifeAfterFirstTap);
+    }
+
+    // --- Forbidden Orchard: "Whenever you tap this land for mana, target
+    //     opponent creates a 1/1 colorless Spirit creature token." -----------
+
+    [Fact]
+    public void ForbiddenOrchard_TapForMana_OpponentGetsSpirit()
+    {
+        var land = BindLand("Forbidden Orchard",
+            "{T}: Add one mana of any color.\n"
+            + "Whenever you tap this land for mana, target opponent creates a 1/1 "
+            + "colorless Spirit creature token.");
+
+        // Simulate the tap-for-mana signal (CR 605 — mana abilities publish
+        // ManaAbilityActivatedEvent, the only observable tap-for-mana hook).
+        var manaAbility = land.Abilities.OfType<IManaAbility>().First();
+        _bus.Publish(new ManaAbilityActivatedEvent(manaAbility, _alice, ManaCost.Parse("U")));
+        _triggers.PutPendingTriggersOnStack(_alice);
+        _stack.Pop()!.Resolve();
+
+        var spirits = _bob.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.Name == "Spirit")
+            .ToList();
+        spirits.Should().HaveCount(1, because: "the opponent creates one Spirit token");
+        var spirit = spirits[0];
+        spirit.Power.Should().Be(1);
+        spirit.Toughness.Should().Be(1);
+        spirit.IsToken.Should().BeTrue();
+        spirit.Controller.Should().Be(_bob, because: "the targeted opponent controls it");
+        Majik.Core.Cards.CardColors.GetColors(spirit).Should().BeEmpty(
+            because: "the Spirit is colorless");
+    }
+
+    [Fact]
+    public void ForbiddenOrchard_TapForMana_DoesNotFireForOtherLandsMana()
+    {
+        var land = BindLand("Forbidden Orchard",
+            "{T}: Add one mana of any color.\n"
+            + "Whenever you tap this land for mana, target opponent creates a 1/1 "
+            + "colorless Spirit creature token.");
+
+        // A DIFFERENT land's mana ability fires — must not trigger Orchard's
+        // Spirit (the condition gates on "this land" specifically).
+        var other = new Majik.Core.Cards.Land("Island") { Owner = _alice, Controller = _alice };
+        var otherMana = new Majik.Core.Abilities.ManaAbility(other, _alice, ManaCost.Parse("U"));
+        _bus.Publish(new ManaAbilityActivatedEvent(otherMana, _alice, ManaCost.Parse("U")));
+        _triggers.PutPendingTriggersOnStack(_alice);
+
+        _stack.Count.Should().Be(0, because: "the trigger is scoped to Forbidden Orchard's own mana");
+        _bob.Zones.Battlefield.GetCards().Should().BeEmpty();
     }
 }

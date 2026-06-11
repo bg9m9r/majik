@@ -145,14 +145,13 @@ public class KroxaTitanFactoryTests
 
         var kroxa = KroxaTitanFactory.Create(
             alice,
-            opponentResolver: () => new[] { bob },
             triggers: null,
             opponentAgent: null);
 
         var valueTrigger = SelectEntersOrAttacksTrigger(kroxa, isEtb: true);
 
         var bobLifeBefore = bob.LifeTotal;
-        foreach (var effect in valueTrigger.Effects) effect.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(valueTrigger, alice, alice, bob);
 
         bob.Zones.Hand.GetCards().Should().NotContain(spell,
             "CR 701.8 — each opponent discards a card");
@@ -175,13 +174,12 @@ public class KroxaTitanFactoryTests
 
         var kroxa = KroxaTitanFactory.Create(
             alice,
-            opponentResolver: () => new[] { bob },
             triggers: null,
             opponentAgent: null);
 
         var valueTrigger = SelectEntersOrAttacksTrigger(kroxa, isEtb: true);
 
-        foreach (var effect in valueTrigger.Effects) effect.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(valueTrigger, alice, alice, bob);
 
         bob.Zones.Graveyard.GetCards().Should().Contain(swamp,
             "CR 701.8 — Bob still discards his land");
@@ -198,13 +196,12 @@ public class KroxaTitanFactoryTests
 
         var kroxa = KroxaTitanFactory.Create(
             alice,
-            opponentResolver: () => new[] { bob },
             triggers: null,
             opponentAgent: null);
 
         var valueTrigger = SelectEntersOrAttacksTrigger(kroxa, isEtb: true);
 
-        foreach (var effect in valueTrigger.Effects) effect.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(valueTrigger, alice, alice, bob);
 
         bob.LifeTotal.Should().Be(17,
             "an opponent who didn't discard a nonland card this way loses 3 life (CR 119.3)");
@@ -223,7 +220,6 @@ public class KroxaTitanFactoryTests
 
         var kroxa = KroxaTitanFactory.Create(
             alice,
-            opponentResolver: () => new[] { bob },
             triggers: null,
             opponentAgent: null);
         alice.Zones.Battlefield.AddCard(kroxa);
@@ -242,7 +238,7 @@ public class KroxaTitanFactoryTests
         other.SetZone(ZoneType.Battlefield);
         attackTrigger.IsTriggered(new CreatureAttacksEvent(other, bob)).Should().BeFalse();
 
-        foreach (var effect in attackTrigger.Effects) effect.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(attackTrigger, alice, alice, bob);
 
         bob.Zones.Graveyard.GetCards().Should().Contain(swamp);
         bob.LifeTotal.Should().Be(17,

@@ -129,7 +129,6 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: () => new List<Player> { _bob },
             tapTargetResolver: null,
             effects: null,
             isControllersTurn: null,
@@ -139,7 +138,11 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var startingHand = _alice.Zones.Hand.GetCards().Count();
 
-        kaito.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == 0).Activate();
+        // Resolve the 0 ability through a live game context (resolver-null
+        // bug-class fix — the draw-for-each-opponent clause reads rc.Game).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(
+            kaito.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == 0),
+            _alice, _alice, _bob);
 
         kaito.Loyalty.Should().Be(4, "0: leaves loyalty unchanged");
         _alice.Zones.Hand.GetCards().Count().Should().Be(startingHand + 1,
@@ -155,7 +158,6 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: () => new List<Player> { _bob },
             tapTargetResolver: null,
             effects: null,
             isControllersTurn: null,
@@ -165,7 +167,9 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var startingHand = _alice.Zones.Hand.GetCards().Count();
 
-        kaito.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == 0).Activate();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(
+            kaito.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == 0),
+            _alice, _alice, _bob);
 
         _alice.Zones.Hand.GetCards().Count().Should().Be(startingHand,
             "no opponent lost life ⇒ no card drawn");
@@ -186,7 +190,6 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: null,
             tapTargetResolver: () => new Permanent[] { bear },
             effects: null,
             isControllersTurn: null,
@@ -207,7 +210,6 @@ public class KaitoBaneOfNightmaresFactoryTests
     {
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: null,
             tapTargetResolver: () => Array.Empty<Permanent>(),
             effects: null,
             isControllersTurn: null,
@@ -232,7 +234,6 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: null,
             tapTargetResolver: null,
             effects: effects,
             isControllersTurn: () => controllersTurn,
@@ -320,7 +321,6 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: null,
             tapTargetResolver: null,
             effects: effects,
             isControllersTurn: () => true,
@@ -351,10 +351,9 @@ public class KaitoBaneOfNightmaresFactoryTests
 
         var kaito = KaitoBaneOfNightmaresFactory.Create(
             _alice,
-            opponentsResolver: null,
             tapTargetResolver: null,
             effects: effects,
-            isControllersTurn: () => false, // opponent's turn ⇒ not animated
+            isControllersTurn: () => false, // opponent's turn ⇒ not animated,
             eventBus: null);
         _alice.Zones.Battlefield.AddCard(kaito);
         kaito.SetZone(ZoneType.Battlefield);

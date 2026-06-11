@@ -16,6 +16,15 @@ public class Instant : Card
     {
     }
 
+    /// <summary>Simulation copy constructor. Chains through
+    /// <see cref="Card(Card)"/> for all base runtime state.
+    /// <see cref="Instant"/> has no additional mutable runtime fields.
+    /// </summary>
+    protected Instant(Instant src) : base(src) { }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new Instant(this);
+
     /// <summary>
     /// Check if the instant can be cast.
     /// Instants can be cast at instant speed (any time you have priority).

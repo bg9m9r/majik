@@ -12,13 +12,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Atarka, World Render (Dragons of Tarkir, {5}{R}{R}).
 ///
-/// Legendary Creature — Elder Dragon 6/4. Oracle text:
+/// Legendary Creature — Dragon 6/4. Oracle text:
 ///   "Flying, trample.
 ///    Whenever a Dragon you control attacks, it gains double strike until
 ///    end of turn."
 ///
 /// ## Implemented (v1)
-/// - 6/4 Legendary Creature — Elder Dragon, mana cost {5}{R}{R}.
+/// - 6/4 Legendary Creature — Dragon, mana cost {5}{R}{R}.
 /// - <b>Flying</b> (CR 702.9) and <b>Trample</b> (CR 702.19) wired as
 ///   <see cref="KeywordAbility"/> markers — the combat helpers in
 ///   <see cref="Majik.Core.Combat.CombatAbilities"/> read these directly,
@@ -103,7 +103,7 @@ public static class AtarkaWorldRenderFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Elder, CardSubtype.Dragon });
+            subtypes: new[] { CardSubtype.Dragon });
 
         card.SetOwner(owner);
         card.SetController(owner);

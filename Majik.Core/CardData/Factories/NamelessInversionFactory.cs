@@ -22,15 +22,17 @@ namespace Majik.Core.CardData.Factories;
 /// ## Implemented (v1)
 ///
 /// - <b>Instant shape</b> at printed cost {1}{B}. The base shape
-///   (name / Instant + Tribal types / Shapeshifter subtype / {1}{B} cost) is
+///   (name / Instant type / Shapeshifter subtype / {1}{B} cost) is
 ///   materialised from the embedded JSON definition
 ///   (<c>nameless-inversion.json</c>) via
 ///   <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
 ///   <see cref="CardDefinitionFactory.Build"/> — same JSON-first posture as
-///   <see cref="TarfireFactory"/> (the other Kindred/Tribal instant in the
-///   pool). The JSON lists <c>Instant</c> first so the concrete
-///   <see cref="Instant"/> class is built, with <see cref="Majik.Core.Cards.Types.CardType.Tribal"/>
-///   added as the secondary type and the printed Shapeshifter subtype.
+///   <see cref="TarfireFactory"/> (the other former-Kindred instant in the
+///   pool). The printed type line is "Kindred Instant — Shapeshifter", but
+///   the Kindred (formerly "Tribal") card type was removed by the 2024
+///   type-line errata and the seed no longer carries it, so the JSON lists
+///   only <c>Instant</c> (Tribal product decision — see the semantic-parity
+///   -tail PR); the Shapeshifter subtype rides on the spell.
 /// - <b>Changeling (CR 702.73 / 312)</b> — modelled as a
 ///   <see cref="KeywordAbility"/> marker plus the printed Shapeshifter base
 ///   subtype carried on the JSON shape. This is the v1 Changeling posture used

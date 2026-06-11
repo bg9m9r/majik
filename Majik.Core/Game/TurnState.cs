@@ -1,6 +1,7 @@
 using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
+using System.Collections.Generic;
 
 namespace Majik.Core.Game;
 
@@ -17,6 +18,15 @@ public sealed class TurnState
 {
     /// <summary>Total number of creatures that died this turn (Rule 702.104b).</summary>
     public int CreaturesDiedThisTurn { get; private set; }
+
+    /// <summary>
+    /// Total number of attacking creatures declared this turn (CR 508.1).
+    /// Read by dynamic-X effects keyed on the attacker count — Raffine, Scheming
+    /// Seer connives X = number of attacking creatures. Incremented by the
+    /// attacker-declaration subscriber in <see cref="TurnDriver"/> (mirrors how
+    /// <see cref="CreaturesDiedThisTurn"/> is event-driven). Reset each turn.
+    /// </summary>
+    public int AttackersDeclaredThisTurn { get; private set; }
 
     /// <summary>Total number of permanents that left the battlefield this turn.</summary>
     public int PermanentsLeftBattlefieldThisTurn { get; private set; }
@@ -119,6 +129,17 @@ public sealed class TurnState
             _creaturesDiedByController[formerController.Id] =
                 _creaturesDiedByController.GetValueOrDefault(formerController.Id) + 1;
         }
+    }
+
+    /// <summary>
+    /// Called when attackers are declared (CR 508.1). Adds the number of
+    /// declared attacking creatures to the per-turn attacker tally. Read by
+    /// dynamic-X "number of attacking creatures" effects (Raffine, Scheming
+    /// Seer). Negative / zero counts are ignored.
+    /// </summary>
+    public void RecordAttackersDeclared(int count)
+    {
+        if (count > 0) AttackersDeclaredThisTurn += count;
     }
 
     /// <summary>
@@ -347,12 +368,96 @@ public sealed class TurnState
     }
 
     /// <summary>
+    /// Simulation-only: copy all per-turn tallies from <paramref name="src"/>
+    /// into this (empty) TurnState, remapping player Guid keys and card/permanent
+    /// references via the provided maps.
+    ///
+    /// <para>Player.Id is NOT preserved across <see cref="Majik.Core.Players.Player.CloneEmpty"/>;
+    /// the clone gets a fresh Guid. Therefore every dictionary key that was an
+    /// original player's Id must be translated to the clone's Id, using
+    /// <paramref name="playerMap"/> (original Player → clone Player).</para>
+    ///
+    /// <para>Reference sets that hold <see cref="Permanent"/> / <see cref="ICard"/>
+    /// are remapped through <paramref name="cardMap"/> (InstanceId → cloned ICard).</para>
+    /// </summary>
+    internal void CopyFrom(
+        TurnState src,
+        IReadOnlyDictionary<Guid, ICard> cardMap,
+        IReadOnlyDictionary<Player, Player> playerMap)
+    {
+        // Build a fast original-Id → clone-Id lookup.
+        var idRemap = new Dictionary<Guid, Guid>(playerMap.Count);
+        foreach (var (orig, clone) in playerMap)
+            idRemap[orig.Id] = clone.Id;
+
+        // ── Scalar globals ───────────────────────────────────────────────────
+        CreaturesDiedThisTurn = src.CreaturesDiedThisTurn;
+        AttackersDeclaredThisTurn = src.AttackersDeclaredThisTurn;
+        PermanentsLeftBattlefieldThisTurn = src.PermanentsLeftBattlefieldThisTurn;
+
+        // ── Guid-keyed integer dictionaries — remap keys ─────────────────────
+        CopyRemapIntDict(src._creaturesDiedByController,  _creaturesDiedByController,  idRemap);
+        CopyRemapIntDict(src._permanentsLeftByController, _permanentsLeftByController, idRemap);
+        CopyRemapIntDict(src._cardsDrawnByPlayer,         _cardsDrawnByPlayer,         idRemap);
+        CopyRemapIntDict(src._spellsCastByPlayer,         _spellsCastByPlayer,         idRemap);
+        CopyRemapIntDict(src._landsEnteredByController,   _landsEnteredByController,   idRemap);
+        CopyRemapIntDict(src._cyclesByPlayer,             _cyclesByPlayer,             idRemap);
+        CopyRemapIntDict(src._discardsByPlayer,           _discardsByPlayer,           idRemap);
+
+        // ── Spell colours (Guid → HashSet<ManaColor>) ────────────────────────
+        foreach (var (origId, colors) in src._spellColorsCastByPlayer)
+        {
+            var mappedId = idRemap.TryGetValue(origId, out var cId) ? cId : origId;
+            _spellColorsCastByPlayer[mappedId] = new HashSet<ManaColor>(colors);
+        }
+
+        // ── Permanents entered this turn — remap by InstanceId ───────────────
+        foreach (var perm in src._permanentsEnteredThisTurn)
+        {
+            if (cardMap.TryGetValue(perm.InstanceId, out var clonedCard)
+                && clonedCard is Permanent clonedPerm)
+            {
+                _permanentsEnteredThisTurn.Add(clonedPerm);
+            }
+            // If the permanent isn't in cardMap (e.g. token gone), skip.
+        }
+
+        // ── Permanents moved to graveyard (Guid → HashSet<ICard>) ────────────
+        foreach (var (origOwnerId, cards) in src._permanentsToGraveyardByController)
+        {
+            var mappedOwnerId = idRemap.TryGetValue(origOwnerId, out var cId) ? cId : origOwnerId;
+            var clonedSet = new HashSet<ICard>();
+            foreach (var card in cards)
+            {
+                if (card is Card c && cardMap.TryGetValue(c.InstanceId, out var clonedCard2))
+                    clonedSet.Add(clonedCard2);
+                // else skip (card not tracked in cardMap)
+            }
+            if (clonedSet.Count > 0)
+                _permanentsToGraveyardByController[mappedOwnerId] = clonedSet;
+        }
+    }
+
+    private static void CopyRemapIntDict(
+        Dictionary<Guid, int> src,
+        Dictionary<Guid, int> dst,
+        Dictionary<Guid, Guid> idRemap)
+    {
+        foreach (var (origId, count) in src)
+        {
+            var mappedId = idRemap.TryGetValue(origId, out var cId) ? cId : origId;
+            dst[mappedId] = count;
+        }
+    }
+
+    /// <summary>
     /// Reset all counters at the start of each turn (called by
     /// <see cref="TurnDriver"/> before the untap step).
     /// </summary>
     public void Reset()
     {
         CreaturesDiedThisTurn = 0;
+        AttackersDeclaredThisTurn = 0;
         PermanentsLeftBattlefieldThisTurn = 0;
         _creaturesDiedByController.Clear();
         _permanentsLeftByController.Clear();

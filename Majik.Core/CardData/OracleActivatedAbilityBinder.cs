@@ -1,0 +1,316 @@
+using System.Text.RegularExpressions;
+using Majik.Core.Abilities;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
+using Majik.Core.Zones;
+
+namespace Majik.Core.CardData;
+
+/// <summary>
+/// Card-identity-agnostic rebuilder that parses a creature's oracle text into
+/// fresh, RE-SOURCEABLE <see cref="ActivatedAbility"/>s built on a supplied
+/// <c>bearer</c> permanent. Sibling to
+/// <see cref="OracleManaBinder.ParseTapManaCosts"/>: where that binder rebuilds
+/// the MANA-ability slice ("{T}: Add …") against a new source, this binder
+/// rebuilds the common NON-mana activated-ability shapes that appear on real
+/// creature cards, re-homed so the cost taps/sacrifices the BEARER and the
+/// effect references the BEARER ("this creature" = the bearer).
+///
+/// <para>The canonical consumer is Agatha's Soul Cauldron's ability-grant
+/// static (CR 613.1f / 702.49): "creatures you control with +1/+1 counters on
+/// them have all activated abilities of all creature cards exiled with Agatha's
+/// Soul Cauldron." Engine abilities are CLOSURES over their source
+/// <see cref="Card"/> — you cannot copy an imprinted creature's
+/// <see cref="ActivatedAbility"/> onto a bearer because its cost/effect would
+/// reference the EXILED card. A granted ability must be a FRESH ability built
+/// against the bearer; the only sound way to do that for an arbitrary creature
+/// is to RECONSTRUCT it from oracle text. This binder reconstructs the shapes it
+/// can do correctly and skips everything else (see "Soundness boundary").</para>
+///
+/// <h3>Shapes rebuilt</h3>
+/// <list type="bullet">
+///   <item><b>Firebreathing / self-pump</b> —
+///     <c>"{cost}: This creature gets +X/+Y until end of turn."</c> Rebuilt as a
+///     no-target <see cref="ActivatedAbility"/> whose resolution registers a
+///     <see cref="PumpUntilEndOfTurnEffect"/>(+X, +Y) against the BEARER's own
+///     <see cref="Creature.ActiveEffects"/> (CR 613.1f Layer 7c; CR 514.2
+///     expiry) — exactly the primitive Fiery Hellhound uses.</item>
+///   <item><b>Pinger</b> —
+///     <c>"{cost}: This creature deals N damage to &lt;any target | target
+///     creature | target player&gt;."</c> Rebuilt with a 1..1
+///     <see cref="TargetRequest"/> and resolution through
+///     <see cref="Fx.DealDamageAny"/> (Player / Creature / Planeswalker funnel,
+///     CR 119.3 / 306.7) — exactly Endbringer's pinger.</item>
+///   <item><b>Sacrifice-self pinger</b> —
+///     <c>"Sacrifice this creature: It deals N damage to &lt;…&gt;."</c> Same as
+///     above but the cost is <see cref="AdditionalCost.Sacrifice"/>(bearer)
+///     instead of a mana/tap cost — exactly Mogg Fanatic.</item>
+/// </list>
+///
+/// <h3>Cost grammar</h3>
+/// A cost is a <c>", "</c>-separated list of mana symbols (<c>{2}</c>,
+/// <c>{R}</c>, …) and/or the tap symbol (<c>{T}</c>). The mana symbols are
+/// folded into a single <see cref="ManaCostCost"/>; a <c>{T}</c> becomes
+/// <see cref="AdditionalCost.Tap"/>(bearer). So <c>"{R}, {T}:"</c>,
+/// <c>"{T}:"</c>, and <c>"{2}:"</c> are all handled. The
+/// <c>"Sacrifice this creature:"</c> cost becomes
+/// <see cref="AdditionalCost.Sacrifice"/>(bearer).
+///
+/// <h3>Soundness boundary (what is deliberately SKIPPED, not broken)</h3>
+/// To never emit an ability that would behave incorrectly when re-homed, any
+/// clause whose cost or effect this binder cannot model EXACTLY is skipped:
+/// <list type="bullet">
+///   <item>Non-mana / non-tap / non-sacrifice cost tokens — energy
+///     (<c>{E}</c>), Phyrexian (<c>{R/P}</c>), snow (<c>{S}</c>), <c>{X}</c>,
+///     "Pay N life", "Discard a card", "Remove a counter", etc. — the cost
+///     can't be reconstructed soundly, so the whole clause is skipped.</item>
+///   <item>"Activate only …" riders (sorcery-speed, "only if", "only once each
+///     turn") — the gating predicate isn't reconstructable here.</item>
+///   <item>Restricted damage targets ("target creature defending player
+///     controls", "target attacking creature", "another target creature") —
+///     the candidate filter isn't reconstructed; only the open
+///     any-target / target-creature / target-player forms are rebuilt.</item>
+///   <item>Every shape not in the list above (tutors, mode-bearing abilities,
+///     token makers, anthem grants, "{T}: Draw", loyalty-style, bespoke
+///     one-offs). These are unbounded and not generally reconstructable from
+///     oracle text without per-card work — a correct partial beats a broken
+///     "all".</item>
+/// </list>
+/// </summary>
+public static class OracleActivatedAbilityBinder
+{
+    // A cost token is either {T} or a single mana pip we can model exactly:
+    // generic digits or one of W/U/B/R/G/C. Anything else ({X}, {E}, {S},
+    // Phyrexian {R/P}, etc.) is intentionally NOT matched so the clause is
+    // skipped as unsound. The cost is a ", "-separated list of these.
+    private const string CostToken = @"(?:\{T\}|\{(?:\d+|[WUBRGC])\})";
+    private const string CostList = CostToken + @"(?:\s*,\s*" + CostToken + @")*";
+
+    // "{cost}: This creature gets +X/+Y until end of turn."
+    private static readonly Regex SelfPumpRegex = new(
+        @"^(" + CostList + @")\s*:\s*This creature gets \+(\d+)/\+(\d+) until end of turn\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: This creature deals N damage to <target form>."
+    private static readonly Regex PingerRegex = new(
+        @"^(" + CostList + @")\s*:\s*This creature deals (\d+) damage to (any target|target creature|target player)\.$",
+        RegexOptions.IgnoreCase);
+
+    // "Sacrifice this creature: It deals N damage to <target form>."
+    private static readonly Regex SacPingerRegex = new(
+        @"^Sacrifice this creature:\s*It deals (\d+) damage to (any target|target creature|target player)\.$",
+        RegexOptions.IgnoreCase);
+
+    // A single tap symbol inside a cost list.
+    private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Parse <paramref name="oracleText"/> into fresh non-mana
+    /// <see cref="ActivatedAbility"/>s re-homed to <paramref name="bearer"/>.
+    /// Mana abilities are NOT produced here — those come from
+    /// <see cref="OracleManaBinder.ParseTapManaCosts"/>. Returns an empty list
+    /// when the text has no rebuildable non-mana activated clause (the common
+    /// case: a vanilla creature, or one whose only abilities are outside the
+    /// soundly-rebuildable set).
+    /// </summary>
+    /// <param name="oracleText">The imprinted creature card's oracle text.</param>
+    /// <param name="bearer">The permanent the rebuilt abilities are sourced on.
+    /// Must be a <see cref="Creature"/> for self-pump (pump is a creature-only
+    /// Layer-7c effect); damage abilities re-home onto any permanent.</param>
+    /// <param name="controller">The bearer's controller (the ability's
+    /// controller + the player who pays its costs).</param>
+    public static IReadOnlyList<ActivatedAbility> RebuildActivatedAbilities(
+        string? oracleText,
+        Permanent bearer,
+        Player controller)
+    {
+        ArgumentNullException.ThrowIfNull(bearer);
+        ArgumentNullException.ThrowIfNull(controller);
+
+        var result = new List<ActivatedAbility>();
+        if (string.IsNullOrWhiteSpace(oracleText)) return result;
+
+        foreach (var rawLine in oracleText.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0) continue;
+
+            var pump = SelfPumpRegex.Match(line);
+            if (pump.Success)
+            {
+                var ability = TryBuildSelfPump(pump, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var ping = PingerRegex.Match(line);
+            if (ping.Success)
+            {
+                var costs = TryBuildCostList(ping.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                var amount = int.Parse(ping.Groups[2].Value);
+                result.Add(BuildPinger(costs, amount, ping.Groups[3].Value, bearer, controller));
+                continue;
+            }
+
+            var sacPing = SacPingerRegex.Match(line);
+            if (sacPing.Success)
+            {
+                var amount = int.Parse(sacPing.Groups[1].Value);
+                var costs = new List<ICost> { AdditionalCost.Sacrifice(bearer) };
+                result.Add(BuildPinger(costs, amount, sacPing.Groups[2].Value, bearer, controller));
+                continue;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Build the firebreathing / self-pump ability. Pump is a creature-only
+    /// Layer-7c effect (CR 613.1f) registered against the bearer's
+    /// <see cref="Creature.ActiveEffects"/>, so a non-creature bearer can't
+    /// carry it soundly — returns null in that case (skip, don't emit broken).
+    /// </summary>
+    private static ActivatedAbility? TryBuildSelfPump(
+        Match pump, Permanent bearer, Player controller)
+    {
+        if (bearer is not Creature creatureBearer) return null;
+
+        var costs = TryBuildCostList(pump.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var p = int.Parse(pump.Groups[2].Value);
+        var t = int.Parse(pump.Groups[3].Value);
+
+        var pumpEffect = new Effect(
+            $"Granted: this creature gets +{p}/+{t} until end of turn",
+            () =>
+            {
+                // CR 613.1f Layer 7c — register against the BEARER's own
+                // effects service. null ActiveEffects (shape-only path) → the
+                // pump silently no-ops, same posture as Fiery Hellhound.
+                creatureBearer.ActiveEffects?.Register(
+                    new PumpUntilEndOfTurnEffect(creatureBearer, p, t));
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { pumpEffect });
+    }
+
+    /// <summary>
+    /// Build a pinger: "deals N damage to &lt;target form&gt;", re-homed so the
+    /// SOURCE is the bearer. Resolution funnels through
+    /// <see cref="Fx.DealDamageAny"/>; the cost (mana/tap/sacrifice) already
+    /// taps/sacrifices the bearer.
+    /// </summary>
+    private static ActivatedAbility BuildPinger(
+        List<ICost> costs,
+        int amount,
+        string targetForm,
+        Permanent bearer,
+        Player controller)
+    {
+        ActivatedAbility? ability = null;
+        var damageEffect = new Effect(
+            $"Granted: this creature deals {amount} damage to {targetForm}",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                var target = ability.ChosenTargets[0][0];
+                // CR 119 / 306.7 — Player / Creature / Planeswalker funnel.
+                // The bearer is the damage source (it dealt the damage).
+                Fx.DealDamageAny(target, amount, bearer as Creature);
+            });
+
+        var (description, intent) = targetForm.ToLowerInvariant() switch
+        {
+            "target creature" => ("target creature", BotIntent.Removal),
+            "target player" => ("target player", BotIntent.None),
+            _ => ("any target", BotIntent.Burn),
+        };
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { damageEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: description,
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: intent),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Parse a ", "-separated cost list of mana symbols + {T} into the engine's
+    /// cost objects, re-homed so any {T} taps the <paramref name="bearer"/>. The
+    /// mana symbols are folded into a single <see cref="ManaCostCost"/>; a {T}
+    /// becomes <see cref="AdditionalCost.Tap"/>(bearer). Returns null if any
+    /// token is not a sound, reconstructable mana pip or {T} (the caller then
+    /// skips the whole clause rather than emit a broken ability).
+    /// </summary>
+    private static List<ICost>? TryBuildCostList(
+        string costList, Permanent bearer, Player controller)
+    {
+        var costs = new List<ICost>();
+        var manaSymbols = new System.Text.StringBuilder();
+        var tapped = false;
+
+        foreach (var rawToken in costList.Split(','))
+        {
+            var token = rawToken.Trim();
+            if (token.Length == 0) continue;
+
+            if (TapTokenRegex.IsMatch(token))
+            {
+                // CR 602.2 — only one tap symbol is meaningful; a duplicate {T}
+                // would be an unmodellable cost, so reject it.
+                if (tapped) return null;
+                tapped = true;
+                continue;
+            }
+
+            // A mana pip we can model exactly: {N} generic or one of W/U/B/R/G/C.
+            if (Regex.IsMatch(token, @"^\{(?:\d+|[WUBRGC])\}$", RegexOptions.IgnoreCase))
+            {
+                manaSymbols.Append(token);
+                continue;
+            }
+
+            // Any other token is not soundly reconstructable — skip the clause.
+            return null;
+        }
+
+        if (manaSymbols.Length > 0)
+        {
+            costs.Add(new ManaCostCost(manaSymbols.ToString()));
+        }
+
+        if (tapped)
+        {
+            costs.Add(AdditionalCost.Tap(bearer));
+        }
+
+        // A pinger / pump must have SOME cost; an empty cost list would mean we
+        // parsed a malformed line. (All real shapes have at least a {T} or mana.)
+        return costs.Count > 0 ? costs : null;
+    }
+}

@@ -257,6 +257,16 @@ public sealed class CreepingTarPitBecomesPTEffect : ContinuousEffect
     // creature row (CR 613.1c), this set-base lands correctly and the 3/2
     // surfaces through combat math. (A previous no-op override here swallowed
     // the P/T against the upgraded row — removed.)
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="CreepingTarPitBecomesPTEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: NewPower, NewToughness; target → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new CreepingTarPitBecomesPTEffect(clonedSource, NewPower, NewToughness);
 }
 
 /// <summary>

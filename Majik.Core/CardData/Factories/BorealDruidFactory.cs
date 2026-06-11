@@ -9,11 +9,11 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Boreal Druid (Coldsnap, {G}).
 ///
-/// Creature — Elf Druid 1/1. Oracle text:
+/// Snow Creature — Elf Druid 1/1. Oracle text:
 ///   "{T}: Add {C}."
 ///
 /// ## Implemented (v1)
-/// - 1/1 Creature — Elf Druid, mana cost {G}, owner / controller wired.
+/// - 1/1 Snow Creature — Elf Druid, mana cost {G}, owner / controller wired.
 /// - <b>Single mana ability (CR 605.1)</b>: {T}: Add {C}. Implemented as a
 ///   <see cref="ManaAbility"/> with a <c>canActivateCheck = !IsTapped</c>
 ///   gate — mirrors the single colourless mana ability on
@@ -49,6 +49,7 @@ public static class BorealDruidFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
+            supertypes: new[] { CardSupertype.Snow },
             subtypes: new[] { CardSubtype.Elf, CardSubtype.Druid });
 
         card.SetOwner(owner);

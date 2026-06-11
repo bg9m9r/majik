@@ -43,7 +43,8 @@ public class RecklessBushwhackerFactoryTests
         c.ManaCost.Should().Be("{2}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Berserker).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Ally).Should().BeTrue();
         c.Power.Should().Be(2);
         c.Toughness.Should().Be(1);
         c.Owner.Should().Be(_alice);

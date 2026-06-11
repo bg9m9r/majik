@@ -106,16 +106,15 @@ public static class KroxaTitanFactory
     /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, triggers: null, opponentAgent: null);
+        Create(owner, triggers: null, opponentAgent: null);
 
     /// <summary>
-    /// Construct Kroxa with optional runtime services.
+    /// Construct Kroxa with optional runtime services. "Each opponent" is read
+    /// from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so the discard/drain is correct on the
+    /// production routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="opponentResolver">Returns the live opponent list at
-    /// resolution time. "Each opponent" iterates whatever this yields,
-    /// excluding the controller (CR 800.4). Null → the discard/drain body
-    /// no-ops (shape path).</param>
     /// <param name="triggers">TriggerManager — when supplied both the sac
     /// trigger and the enters-or-attacks triggers are registered so the
     /// appropriate domain events land them on the stack automatically.</param>
@@ -124,7 +123,6 @@ public static class KroxaTitanFactory
     /// back to a deterministic first-card pick.</param>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         TriggerManager? triggers,
         IPlayerAgent? opponentAgent)
     {
@@ -170,7 +168,11 @@ public static class KroxaTitanFactory
         IEffect BuildDiscardDrainEffect(string label) =>
             new Effect(
                 $"{CardName}: {label} — each opponent discards a card, then each opponent who didn't discard a nonland card this way loses {LifeLoss} life",
-                () => ResolveDiscardDrain(owner, card, opponentResolver, opponentAgent));
+                ctx =>
+                {
+                    ResolveDiscardDrain(owner, card, ctx, opponentAgent);
+                    return ValueTask.CompletedTask;
+                });
 
         // ETB trigger — CR 603.1.
         var etbTrigger = new TriggeredAbility(
@@ -210,18 +212,16 @@ public static class KroxaTitanFactory
     private static void ResolveDiscardDrain(
         Player owner,
         Creature card,
-        Func<IReadOnlyList<Player>>? opponentResolver,
+        ResolutionContext ctx,
         IPlayerAgent? opponentAgent)
     {
         var controller = card.Controller ?? owner;
 
-        var opponents = opponentResolver?.Invoke();
-        if (opponents == null) return; // shape path — no opponents wired.
-
-        // Snapshot, excluding the controller (CR 800.4 — "each opponent").
-        var targets = opponents
-            .Where(p => p != null && !ReferenceEquals(p, controller))
-            .ToList();
+        // "Each opponent" is read from the LIVE resolution context — NOT a
+        // captured resolver, which was null on the routed prod build and made
+        // the discard/drain INERT in real games (resolver-null bug class;
+        // mirrors Stormbreath #2540 / Grist #2549).
+        var targets = ContextOpponents.Of(ctx, controller).ToList();
         if (targets.Count == 0) return;
 
         // Pass 1 — each opponent discards a card (CR 701.8). Record whether

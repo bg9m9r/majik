@@ -14,8 +14,8 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for Pashalik Mons (Mercadian Masques, {3}{R}{R}, Legendary
-/// Creature — Goblin Warrior 3/3).
+/// Tests for Pashalik Mons (Modern Horizons 3, {2}{R}, Legendary
+/// Creature — Goblin Warrior 2/2).
 ///
 /// Oracle text (Scryfall, verified):
 ///   "Whenever Pashalik Mons or another Goblin you control dies, Pashalik
@@ -24,7 +24,7 @@ namespace Majik.Core.Tests.CardData;
 ///    tokens."
 ///
 /// Covers:
-/// - Card identity (Legendary supertype + Goblin + Warrior subtypes, 3/3,
+/// - Card identity (Legendary supertype + Goblin + Warrior subtypes, 2/2,
 ///   mana cost).
 /// - NamedCardFactory dispatch.
 /// - Dies-trigger shape (any-target, exactly 1) and predicate:
@@ -61,7 +61,7 @@ public class PashalikMonsTests
         var c = PashalikMonsFactory.Create(_alice);
 
         c.Name.Should().Be("Pashalik Mons");
-        c.ManaCost.Should().Be("{3}{R}{R}");
+        c.ManaCost.Should().Be("{2}{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue("Pashalik Mons is legendary");
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();

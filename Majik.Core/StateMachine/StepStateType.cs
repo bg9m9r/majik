@@ -31,4 +31,26 @@ public static class PhaseStateTypeExtensions
     /// </summary>
     public static bool IsMain(this StepStateType p)
         => p is StepStateType.PreCombatMain or StepStateType.PostCombatMain;
+
+    /// <summary>
+    /// Maps a fine-grained <see cref="StepStateType"/> (step-level) to its
+    /// coarse <see cref="PhaseStateType"/> (phase-level). Used when building
+    /// a <c>SimState</c> from a live <c>GameContext.CurrentPhase</c>.
+    /// </summary>
+    public static PhaseStateType ToPhaseStateType(this StepStateType step) => step switch
+    {
+        StepStateType.Untap
+            or StepStateType.Upkeep
+            or StepStateType.Draw       => PhaseStateType.TurnBeginning,
+        StepStateType.PreCombatMain     => PhaseStateType.PreCombatMain,
+        StepStateType.BeginningOfCombat
+            or StepStateType.DeclareAttackers
+            or StepStateType.DeclareBlockers
+            or StepStateType.CombatDamage
+            or StepStateType.EndOfCombat => PhaseStateType.Combat,
+        StepStateType.PostCombatMain    => PhaseStateType.PostCombatMain,
+        StepStateType.End
+            or StepStateType.Cleanup    => PhaseStateType.TurnEnding,
+        _                               => PhaseStateType.PreCombatMain,
+    };
 }

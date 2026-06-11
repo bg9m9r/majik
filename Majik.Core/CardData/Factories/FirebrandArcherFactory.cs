@@ -73,26 +73,25 @@ public static class FirebrandArcherFactory
     /// overload <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null, opponentResolver: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Firebrand Archer with optional event bus, trigger manager,
-    /// and opponent resolver. When <paramref name="triggers"/> is supplied the
-    /// burn trigger is registered so the bus surfaces it as pending on a
-    /// matching <see cref="SpellCastEvent"/>.
+    /// Construct Firebrand Archer with an optional event bus + trigger manager.
+    /// When <paramref name="triggers"/> is supplied the burn trigger is
+    /// registered so the bus surfaces it as pending on a matching
+    /// <see cref="SpellCastEvent"/>. "Each opponent" is read from the live
+    /// resolution context at resolution (<see cref="ContextOpponents"/>), so the
+    /// burn is correct on the production routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">Not used directly by this factory; reserved for
     /// future lifecycle subscribers (e.g. LTB unregister).</param>
     /// <param name="triggers">TriggerManager for the burn trigger. May be
     /// null — the trigger is still attached to the card shape.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent" for
-    /// the burn half. Without a resolver the damage half no-ops.</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -115,21 +114,19 @@ public static class FirebrandArcherFactory
 
         var burnEffect = new Effect(
             $"{CardName}: deal {DamageAmount} damage to each opponent (whenever you cast a noncreature spell)",
-            () =>
+            ctx =>
             {
-                // CR 119 — damage to each opponent is life loss. The Player
-                // aggregate exposes no opponents list at v1, so the caller
-                // threads them through via opponentResolver (same pattern as
-                // Voldaren Epicure / Creeping Chill). Without a resolver the
-                // burn half no-ops.
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // CR 119 — damage to each opponent is life loss. "Each opponent"
+                // is read from the LIVE resolution context — NOT a captured
+                // resolver, which was null on the routed prod build and made the
+                // burn INERT in real games (resolver-null bug class; mirrors
+                // Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamageAny(opp, DamageAmount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var burnTrigger = new TriggeredAbility(

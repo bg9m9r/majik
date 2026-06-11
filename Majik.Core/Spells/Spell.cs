@@ -22,7 +22,7 @@ public class Spell : ISpell
     private readonly List<ICost> _costs = new();
     private readonly List<IEffect> _effects = new();
 
-    public Guid Id { get; }
+    public Guid Id { get; internal set; }
     public Player Controller { get; }
     public DateTime Timestamp { get; }
     public ICard Card { get; }

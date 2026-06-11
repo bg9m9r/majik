@@ -53,7 +53,7 @@ namespace Majik.Core.CardData.Factories;
 public static class HeliodsPilgrimFactory
 {
     public const string CardName = "Heliod's Pilgrim";
-    public const string PrintedManaCost = "{1}{W}";
+    public const string PrintedManaCost = "{2}{W}";
     public const int Power = 1;
     public const int Toughness = 2;
 

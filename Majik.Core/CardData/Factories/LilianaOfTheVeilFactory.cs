@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -129,24 +130,49 @@ public static class LilianaOfTheVeilFactory
         }));
 
         // -- -2: Target player sacrifices a creature. ----------------------
-        // v1 auto-pick: target the first opponent in the player list with a
-        // creature; sacrifice the first creature on their battlefield.
-        liliana.AddAbility(new LoyaltyAbility(liliana, -2, () =>
-        {
-            var players = allPlayersResolver?.Invoke();
-            if (players == null) return;
-            foreach (var p in players)
+        // CR 606 (loyalty) + CR 115 (target player) + CR 701.17 (sacrifice).
+        // The target player is chosen by the activating player's agent via a
+        // TargetRequest; the effect reads the chosen player off the
+        // ResolutionContext (slot 0), falling back to "first opponent with a
+        // creature" on the legacy direct-activation path. That player then
+        // sacrifices the first creature on their battlefield (v1 deterministic
+        // pick — the sacrificing player chooses which creature; modelled as
+        // first-creature here, matching the +1 discard simplification).
+        var sacrificePlayerRequest = new TargetRequest(
+            Description: "Target player sacrifices a creature",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Removal,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .Cast<object>()
+                .ToList());
+
+        liliana.AddAbility(new LoyaltyAbility(
+            liliana,
+            -2,
+            new[]
             {
-                if (ReferenceEquals(p, owner)) continue;
-                var victim = p.Zones.Battlefield.GetCards()
-                    .OfType<Creature>().FirstOrDefault();
-                if (victim == null) continue;
-                p.Zones.Battlefield.RemoveCard(victim);
-                p.Zones.Graveyard.AddCard(victim);
-                victim.SetZone(ZoneType.Graveyard);
-                return; // CR 700.6 — "target player" is one player
-            }
-        }));
+                Fx.Inline("Target player sacrifices a creature", rc =>
+                {
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Player
+                        : null)
+                        ?? allPlayersResolver?.Invoke()?
+                            .FirstOrDefault(p => !ReferenceEquals(p, owner)
+                                && p.Zones.Battlefield.GetCards().OfType<Creature>().Any());
+                    if (target == null) return default;
+
+                    var victim = target.Zones.Battlefield.GetCards()
+                        .OfType<Creature>().FirstOrDefault();
+                    if (victim == null) return default;
+                    target.Zones.Battlefield.RemoveCard(victim);
+                    target.Zones.Graveyard.AddCard(victim);
+                    victim.SetZone(ZoneType.Graveyard);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { sacrificePlayerRequest }));
 
         // -- -6 ultimate: pile split. v1 deferred — loyalty change applies
         //    with an empty body so the cost is still paid.

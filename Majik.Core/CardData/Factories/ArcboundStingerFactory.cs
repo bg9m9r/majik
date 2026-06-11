@@ -23,8 +23,8 @@ public static class ArcboundStingerFactory
 {
     public const string CardName = "Arcbound Stinger";
     public const string PrintedManaCost = "{2}";
-    public const int Power = 1;
-    public const int Toughness = 1;
+    public const int Power = 0;
+    public const int Toughness = 0;
     public const int ModularValue = 1;
 
     /// <summary>

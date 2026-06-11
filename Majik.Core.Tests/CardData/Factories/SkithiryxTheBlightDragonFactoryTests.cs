@@ -45,6 +45,7 @@ public class SkithiryxTheBlightDragonFactoryTests
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue(
             "Skithiryx is Legendary");
+        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
         c.HasSubtype(CardSubtype.Skeleton).Should().BeTrue();
         c.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
         c.BasePower.Should().Be(4);

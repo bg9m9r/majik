@@ -28,6 +28,17 @@ public static class EntersAsCopyBinder
         @"\benters?\s+(?:the\s+battlefield\s+)?as\s+a\s+copy\s+of\s+(?<pool>[^.]*?\bbattlefield\b|[^.]*?\bgraveyard\b|[^.]*?\byou\s+control\b)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Vesuva (Time Spiral) — "You may have this land enter tapped as a copy of
+    // any land on the battlefield." The generalized land-copy shape: the copy
+    // source is restricted to LANDS, the copy enters TAPPED, and Legendary is
+    // stripped (CR 706.2 — a copy is never legendary if the original is). Lands
+    // are never routed through their [CardName] factory, so this binder is the
+    // only prod binding path. Ports VesuvaFactory's generalized
+    // EntersAsCopyReplacement(Options(Land, StripLegendary, EntersTapped)).
+    private static readonly Regex LandEntersTappedAsCopyOfLand = new(
+        @"\benter\s+tapped\s+as\s+a\s+copy\s+of\s+any\s+land\s+on\s+the\s+battlefield",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public static bool Bind(
         ICard card,
         CardEntity entity,
@@ -41,6 +52,24 @@ public static class EntersAsCopyBinder
 
         var text = entity.OracleText ?? string.Empty;
         if (string.IsNullOrWhiteSpace(text)) return false;
+
+        // Vesuva-style land-copy: restrict the source to lands, enter tapped,
+        // strip Legendary. Checked before the generic clause because the generic
+        // regex would otherwise classify the pool as AnyBattlefield (copying any
+        // permanent) with no land filter / tapped / strip-legendary riders.
+        if (card is Land && LandEntersTappedAsCopyOfLand.IsMatch(text))
+        {
+            replacements.Register(new EntersAsCopyReplacement(
+                card,
+                EntersAsCopyReplacement.CopyPool.AnyBattlefield,
+                effects,
+                new EntersAsCopyReplacement.Options(
+                    Filter: EntersAsCopyReplacement.SourceFilter.Land,
+                    StripLegendary: true,
+                    EntersTapped: true)));
+            if (card is Permanent vesuva) vesuva.ActiveEffects = effects;
+            return true;
+        }
 
         var m = EntersAsCopyAnyone.Match(text);
         if (!m.Success) return false;

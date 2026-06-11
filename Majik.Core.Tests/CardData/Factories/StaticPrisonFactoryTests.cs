@@ -52,7 +52,7 @@ public class StaticPrisonFactoryTests
         var prison = StaticPrisonFactory.Create(_alice);
 
         prison.Name.Should().Be("Static Prison");
-        prison.ManaCost.Should().Be("{2}{W}");
+        prison.ManaCost.Should().Be("{W}");
         prison.HasType(CardType.Enchantment).Should().BeTrue();
         prison.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
         prison.Owner.Should().BeSameAs(_alice);

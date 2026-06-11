@@ -30,9 +30,13 @@ public class AbilityActivator
     }
 
     /// <summary>
-    /// Check if an ability can be activated.
+    /// Check if an ability can be activated. <paramref name="game"/> — when
+    /// supplied — lets a context-aware "Activate only if" gate read live game
+    /// state (CR 602.5c) that a context-less predicate can't reach (Hired Claw's
+    /// "an opponent lost life this turn"). Null falls back to the context-less
+    /// gate.
     /// </summary>
-    public bool CanActivate(IActivatedAbility ability, Player player)
+    public bool CanActivate(IActivatedAbility ability, Player player, Majik.Core.Game.GameContext? game = null)
     {
         if (ability == null || player == null)
         {
@@ -42,7 +46,11 @@ public class AbilityActivator
         // CR 602.5c / 605.1a — "Activate only if <condition>" gate. Reject
         // when the ability carries a condition predicate that is currently
         // unsatisfied (Metalcraft, Delirium, "you control a Forest", …).
-        if (!ability.CanActivateNow())
+        // Prefer the context-aware gate when a live GameContext is available.
+        var canActivate = ability is ActivatedAbility aaGate
+            ? aaGate.CanActivateNow(game)
+            : ability.CanActivateNow();
+        if (!canActivate)
         {
             return false;
         }
@@ -54,8 +62,10 @@ public class AbilityActivator
 
     /// <summary>
     /// Activate an ability with targets and costs (full activation process per Rule 602.2a-d).
+    /// <paramref name="game"/> threads the live <see cref="Majik.Core.Game.GameContext"/>
+    /// into the context-aware activation gate (CR 602.5c).
     /// </summary>
-    public void ActivateAbility(IActivatedAbility ability, Player player, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null)
+    public void ActivateAbility(IActivatedAbility ability, Player player, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, Majik.Core.Game.GameContext? game = null)
     {
         if (ability == null)
         {
@@ -68,7 +78,7 @@ public class AbilityActivator
         }
 
         // Step 602.2a: Announce ability and move to stack
-        if (!CanActivate(ability, player))
+        if (!CanActivate(ability, player, game))
         {
             throw new InvalidPlayerActionException("Cannot activate ability");
         }
@@ -99,7 +109,8 @@ public class AbilityActivator
             effects: sourceAbility?.Effects,
             targetRequests: sourceAbility?.TargetRequests,
             sorcerySpeed: ability.IsSorcerySpeed,
-            canActivateCheck: sourceAbility?.CanActivateCheck);
+            canActivateCheck: sourceAbility?.CanActivateCheck,
+            canActivateCheckCtx: sourceAbility?.CanActivateCheckCtx);
         if (sourceAbility != null && sourceAbility.ChosenTargets.Count > 0)
         {
             activatedAbility.SetChosenTargets(sourceAbility.ChosenTargets);

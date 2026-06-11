@@ -42,8 +42,8 @@ public class PlagueEngineerTests
 
         c.Name.Should().Be("Plague Engineer");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue("Human is part of the printed creature type");
-        c.HasSubtype(CardSubtype.Rogue).Should().BeTrue("Rogue is part of the printed creature type");
+        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue("Phyrexian is the only enum-backed printed subtype (Carrier has no enum value)");
+        c.HasSubtype(CardSubtype.Human).Should().BeFalse();
         c.BasePower.Should().Be(2);
         c.BaseToughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
@@ -57,8 +57,7 @@ public class PlagueEngineerTests
 
         c.Should().BeOfType<Creature>("Plague Engineer is a Creature");
         c.Name.Should().Be("Plague Engineer");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
     }
 
     [Fact]

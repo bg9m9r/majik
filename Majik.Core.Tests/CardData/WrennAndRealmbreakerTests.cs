@@ -37,7 +37,7 @@ public class WrennAndRealmbreakerTests
         var wrenn = WrennAndRealmbreakerFactory.Create(_alice);
 
         wrenn.Name.Should().Be("Wrenn and Realmbreaker");
-        wrenn.ManaCost.Should().Be("{3}{G}");
+        wrenn.ManaCost.Should().Be("{1}{G}{G}");
         wrenn.HasType(CardType.Planeswalker).Should().BeTrue();
         wrenn.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         wrenn.HasSubtype(CardSubtype.Wrenn).Should().BeTrue();

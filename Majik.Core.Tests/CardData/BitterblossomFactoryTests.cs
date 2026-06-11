@@ -16,10 +16,13 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for Bitterblossom (Morningtide, {1}{B}, Tribal Enchantment — Faerie).
+/// Tests for Bitterblossom (Morningtide, {1}{B}, printed "Kindred
+/// Enchantment — Faerie"; modelled as Enchantment — Faerie after the 2024
+/// Kindred/Tribal removal).
 ///
 /// Coverage:
-/// - Identity (name / types / mana cost / Faerie subtype + Tribal type).
+/// - Identity (name / Enchantment type / mana cost / Faerie subtype; NOT
+///   the removed Kindred/Tribal type).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - Upkeep trigger shape — single TriggeredAbility filtered to controller's
 ///   own Upkeep step.
@@ -44,8 +47,11 @@ public class BitterblossomFactoryTests
         c.Name.Should().Be("Bitterblossom");
         c.ManaCost.Should().Be("{1}{B}");
         c.HasType(CardType.Enchantment).Should().BeTrue();
-        c.HasType(CardType.Tribal).Should().BeTrue(
-            "Bitterblossom is printed as 'Tribal Enchantment — Faerie' (Morningtide)");
+        // CR 205.3 — Kindred/Tribal was removed; the seed type line is
+        // "Enchantment — Faerie" and the engine no longer stamps Tribal.
+        // Faerie-matters effects key off the Faerie SUBTYPE, not a card type.
+        c.HasType(CardType.Tribal).Should().BeFalse(
+            "Bitterblossom's modern type line is 'Enchantment — Faerie'");
         c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
@@ -61,7 +67,7 @@ public class BitterblossomFactoryTests
 
         c.Should().BeOfType<Enchantment>();
         c.Name.Should().Be("Bitterblossom");
-        c.HasType(CardType.Tribal).Should().BeTrue();
+        c.HasType(CardType.Tribal).Should().BeFalse();
         c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
     }
 

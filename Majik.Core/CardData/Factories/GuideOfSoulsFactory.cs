@@ -12,7 +12,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Guide of Souls (Modern Horizons 3,
-/// Creature — Spirit Cleric {W} 1/2). Anchor of the Modern Boros
+/// Creature — Human Cleric {W} 1/2). Anchor of the Modern Boros
 /// Energy / Boros Convoke "small creatures + energy" axis.
 ///
 /// Oracle text:
@@ -22,7 +22,7 @@ namespace Majik.Core.CardData.Factories;
 ///    end of turn."
 ///
 /// ## Implemented (v1)
-/// - 1/2 Creature — Spirit Cleric, mana cost {W}, owner / controller
+/// - 1/2 Creature — Human Cleric, mana cost {W}, owner / controller
 ///   wired.
 /// - <b>Energy ETB trigger</b> (CR 603.6a + CR 106.13): a triggered
 ///   ability over <see cref="CardMovedEvent"/> Anywhere → Battlefield
@@ -123,7 +123,7 @@ public static class GuideOfSoulsFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Spirit, CardSubtype.Cleric });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);

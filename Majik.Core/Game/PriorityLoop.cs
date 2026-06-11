@@ -4,7 +4,6 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
-using Majik.Core.Rules;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -30,9 +29,16 @@ public sealed class PriorityLoop
     private readonly IReadOnlyDictionary<Player, IPlayerAgent> _agents;
     private readonly Func<int> _turnNumberAccessor;
     private readonly Func<StepStateType?> _phaseAccessor;
+    // Live per-turn tally accessor. Threaded into every GameContext this loop
+    // builds so resolution-time effects (dynamic-X connive) and context-aware
+    // activation gates can read per-turn counts off rc.Game.TurnState. Null in
+    // legacy harnesses that don't own a TurnState (the GameContext then carries
+    // a null TurnState — consumers null-guard).
+    private readonly Func<TurnState?>? _turnStateAccessor;
     private readonly LandDropTracker _landDropTracker;
-    private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task>? _castDispatcher;
+    private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
+    private readonly Func<Player, PriorityAction.ActivateLoyaltyAbility, GameContext, Task>? _loyaltyDispatcher;
     private readonly Action<Player, PriorityAction.ActivateManaAbility>? _manaAbilityDispatcher;
     // Slice 5a — server-side auto-pass plumbing. All three are optional;
     // when null the loop falls back to its pre-Slice-5a behaviour
@@ -45,14 +51,29 @@ public sealed class PriorityLoop
     // PriorityKinds.Build), passed in as a predicate to keep PriorityLoop
     // unaware of the wire command types.
     private readonly Func<GameContext, bool>? _isPassOnlyDeadWindow;
+    // CR 603.3 — agent-aware drain of pending triggered abilities. When
+    // supplied, PriorityLoop owns the drain (calling this delegate, which
+    // routes to TriggerManager.PutPendingTriggersOnStackAsync so the
+    // controller's agent is prompted for any targeted trigger's targets)
+    // and suppresses PriorityManager's built-in SYNC drain (which would
+    // otherwise auto-pick first-eligible). The delegate is invoked at the
+    // same logical points the sync drain fired — every time a player is
+    // about to receive priority and could act on a freshly-fired trigger.
+    // Null in legacy / unit harnesses (TurnDriver wires it in production):
+    // the loop then leaves PriorityManager's sync drain in charge, exactly
+    // preserving pre-change behaviour for those callers.
+    private readonly Func<Player, GameContext, CancellationToken, Task>? _asyncTriggerDrain;
+    // CR 704.1 / 704.3 / 704.4 — check state-based actions whenever a player
+    // WOULD receive priority and after each stack object resolves, looping
+    // until none apply (704.3). Supplied by TurnDriver (which owns the
+    // StateBasedActions service + the player list). Null in legacy / unit
+    // harnesses that construct PriorityLoop without an SBA service — those
+    // keep the pre-change behaviour (SBAs checked only at turn boundaries),
+    // exactly preserving prior callers. CR 704.4 / 117.5 ordering: this runs
+    // BEFORE the trigger drain (_asyncTriggerDrain) so SBAs fire, then any
+    // pending triggers go on the stack, then the player gets priority.
+    private readonly Action? _checkStateBasedActions;
     private readonly Func<DateTime> _clock;
-    // CR 704.4 — the SBA coordinator the loop runs before granting priority.
-    // Optional: when null (legacy ctor sites / focused unit tests that don't
-    // care about loss / death checks) the loop falls back to its pre-704.4
-    // behaviour and offers priority without an SBA sweep. Wired by TurnDriver
-    // (the live full-game path) so the SAME coordinator GameDriver uses at turn
-    // boundaries also runs before every priority grant.
-    private readonly StateBasedActions? _stateBasedActions;
     // Stack-mutation event subscriptions held so the loop can detach on
     // its way out. TurnDriver constructs a fresh PriorityLoop per round
     // and the bus outlives every one of them — without unsubscribe,
@@ -78,18 +99,31 @@ public sealed class PriorityLoop
         Func<int> turnNumberAccessor,
         Func<StepStateType?> phaseAccessor,
         LandDropTracker landDropTracker,
-        Func<Player, PriorityAction.CastSpell, GameContext, Task>? castDispatcher = null,
+        Func<Player, PriorityAction.CastSpell, GameContext, Task<bool>>? castDispatcher = null,
         Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null,
+        Func<Player, PriorityAction.ActivateLoyaltyAbility, GameContext, Task>? loyaltyDispatcher = null,
         Action<Player, PriorityAction.ActivateManaAbility>? manaAbilityDispatcher = null,
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         IEventBus? eventBus = null,
         Func<DateTime>? clock = null,
-        StateBasedActions? stateBasedActions = null)
+        Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
+        Func<TurnState?>? turnStateAccessor = null,
+        Action? checkStateBasedActions = null)
     {
-        _stateBasedActions = stateBasedActions;
         _castDispatcher = castDispatcher;
+        _asyncTriggerDrain = asyncTriggerDrain;
+        _checkStateBasedActions = checkStateBasedActions;
+        // CR 603.3 — when an agent-aware async drain is supplied, this loop
+        // owns the drain; suppress PriorityManager's built-in sync drain so
+        // pending targeted triggers are NOT auto-picked first-eligible before
+        // we get a chance to prompt the controller's agent for targets.
+        if (asyncTriggerDrain != null)
+        {
+            priority.SuppressInternalTriggerDrain = true;
+        }
         _activateDispatcher = activateDispatcher;
+        _loyaltyDispatcher = loyaltyDispatcher;
         _manaAbilityDispatcher = manaAbilityDispatcher;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _priority = priority ?? throw new ArgumentNullException(nameof(priority));
@@ -99,6 +133,7 @@ public sealed class PriorityLoop
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _turnNumberAccessor = turnNumberAccessor;
         _phaseAccessor = phaseAccessor;
+        _turnStateAccessor = turnStateAccessor;
         // CR 305.2 — the per-turn one-land cap is engine-level and unconditional.
         // PriorityLoop must always own a tracker so PlayLand consumption is gated
         // uniformly for every actor (bot or human). Callers that don't otherwise
@@ -159,30 +194,45 @@ public sealed class PriorityLoop
             var actionCount = 0;
             while (!_priority.AllPlayersPassed && !ct.IsCancellationRequested)
             {
-                // CR 704.4 — before the appropriate player gets priority, the
-                // game checks state-based actions, performs all that apply, and
-                // repeats until none remain. CheckStateBasedActions is itself a
-                // fixed-point loop (CR 704.4), so one call settles the state.
-                // Running it here closes the gap where a lethal spell resolved,
-                // a player hit 0 life, but they were offered priority anyway and
-                // could attempt to act (and drive mana into a lost player's pool).
-                if (RunStateBasedActionsBeforePriority())
-                {
-                    // The game ended (only one or zero players un-lost). Stop the
-                    // priority loop cleanly; GameDriver's turn-loop survivor-count
-                    // check declares the winner. We do NOT invent a new game-end
-                    // mechanism here — we simply yield control back up the stack.
-                    return;
-                }
-
                 var current = _priority.CurrentPlayer
                     ?? throw new InvalidOperationException("No current priority holder");
 
-                // CR 704.4 / CR 800.4a — a player who lost to the SBA sweep above
-                // must not be offered priority. Skip them by passing on their
-                // behalf so priority rotation reaches the next live player. (The
-                // game-continues case: e.g. a 3-player game where one opponent
-                // died but two remain.)
+                // CR 704.1 / 704.3 / 704.4 — check state-based actions BEFORE a
+                // player receives priority (and BEFORE the trigger drain below,
+                // per the 704.4 / 117.5 ordering: SBAs first, then put pending
+                // triggers on the stack, then grant priority). The SBA service
+                // loops internally until no action applies (704.3), so a 0/0
+                // creature (Walking Ballista X=0) or a creature reduced to 0
+                // toughness by a noncombat effect is in the graveyard before
+                // this window's holder can act. No-op when not wired (legacy
+                // unit harnesses).
+                _checkStateBasedActions?.Invoke();
+
+                // CR 603.3 — drain any pending triggered abilities onto the
+                // stack on the agent-aware async path BEFORE the current
+                // holder decides, so a targeted trigger (e.g. Leyline of
+                // Lightning's "deal 1 to any target", a Restless land's
+                // attack trigger, an emblem) prompts its controller's agent
+                // for targets instead of auto-picking first-eligible. This
+                // is the same logical point PriorityManager's suppressed sync
+                // drain fired at (a player about to receive priority); the
+                // async drain groups by controller and preserves APNAP order
+                // (CR 603.3b). A no-op when nothing is pending. Built once per
+                // window off the active player's context (the async drain
+                // re-resolves each trigger's controller + candidates itself).
+                if (_asyncTriggerDrain != null)
+                {
+                    var drainCtx = MakeContext(activePlayer, activePlayer);
+                    await _asyncTriggerDrain(activePlayer, drainCtx, ct).ConfigureAwait(false);
+                }
+
+                // CR 800.4a — a player who has lost the game can no longer take
+                // any actions. Skip their priority window with a forced pass so the
+                // loop doesn't offer (and execute) a cast/ability for a player
+                // whose _hasLost flag is already set. Without this guard, a bot
+                // that runs MCTS search on behalf of a lost player can return a
+                // CastSpell action → DispatchCast pays mana →
+                // Player.AddManaToPool throws "Cannot add mana after losing".
                 if (current.HasLost)
                 {
                     _priority.PassPriority();
@@ -270,54 +320,16 @@ public sealed class PriorityLoop
                 ResolveAgentForController,
                 MakeContext(activePlayer, activePlayer),
                 ct).ConfigureAwait(false);
+
+            // CR 704.1 — check state-based actions immediately after the object
+            // resolves, before priority is offered again (the loop restarts a
+            // fresh round above, which also checks at its top — but checking
+            // here keeps the death tightly coupled to the resolution that
+            // caused it, and matches the 704.3 "repeat until none apply" point
+            // right after a game event). The SBA service loops internally.
+            _checkStateBasedActions?.Invoke();
+
             // Loop back: start a fresh priority round with active player.
-        }
-    }
-
-    /// <summary>
-    /// CR 704.4 — run state-based actions until stable, then report whether the
-    /// game has ended (one or zero players remain un-lost). Returns <c>true</c>
-    /// when the priority loop should stop and hand control back to the turn loop
-    /// so the normal game-over path declares the winner; <c>false</c> when the
-    /// game continues (no SBA wired, or it ran and 2+ players remain alive).
-    ///
-    /// <para><see cref="StateBasedActions.CheckStateBasedActions"/> is itself a
-    /// fixed-point loop (it repeats its check set until a pass changes nothing),
-    /// so a single call settles the state per CR 704.4. We add an outer safety
-    /// bound anyway: the live-player count is monotonically non-increasing across
-    /// sweeps, so this terminates quickly, but a future infinite-SBA regression
-    /// must be loud (throw), not a silent hang.</para>
-    /// </summary>
-    private bool RunStateBasedActionsBeforePriority()
-    {
-        if (_stateBasedActions == null) return false;
-
-        const int kSbaSweepLimit = 100;
-        var sweeps = 0;
-        while (true)
-        {
-            if (++sweeps > kSbaSweepLimit)
-            {
-                throw new InvalidOperationException(
-                    $"State-based actions did not stabilise after {kSbaSweepLimit} sweeps " +
-                    "before priority (CR 704.4) — suspected infinite-SBA regression.");
-            }
-
-            var aliveBefore = _players.Count(p => !p.HasLost);
-            // CR 704.4 — gather every player's battlefield as the card universe
-            // the checks operate over (mirrors GameDriver's turn-boundary call).
-            _stateBasedActions.CheckStateBasedActions(
-                _players,
-                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList());
-            var aliveAfter = _players.Count(p => !p.HasLost);
-
-            // CR 104.2 — one (or zero) players left un-lost ends the game.
-            if (aliveAfter <= 1) return true;
-
-            // CheckStateBasedActions is internally fixed-point; once a sweep
-            // leaves the live-player count unchanged the state is stable enough
-            // for priority. (A further sweep would be a no-op.)
-            if (aliveAfter == aliveBefore) return false;
         }
     }
 
@@ -367,13 +379,22 @@ public sealed class PriorityLoop
                 if (_castDispatcher == null)
                     throw new InvalidOperationException(
                         "PriorityLoop received CastSpell but no castDispatcher was supplied.");
-                await _castDispatcher(actor, cast, ctx).ConfigureAwait(false);
-                break;
+                // Fix 2 — castDispatcher now returns bool: true = cast committed,
+                // false = silently failed (mana payment rejected, card rotated back
+                // to hand). Propagate false so ApplyActionAsync returns false and
+                // the caller forces PassPriority() instead of spinning the cap.
+                return await _castDispatcher(actor, cast, ctx).ConfigureAwait(false);
             case PriorityAction.ActivateAbility activate:
                 if (_activateDispatcher == null)
                     throw new InvalidOperationException(
                         "PriorityLoop received ActivateAbility but no activateDispatcher was supplied.");
                 await _activateDispatcher(actor, activate, ctx).ConfigureAwait(false);
+                break;
+            case PriorityAction.ActivateLoyaltyAbility loyalty:
+                if (_loyaltyDispatcher == null)
+                    throw new InvalidOperationException(
+                        "PriorityLoop received ActivateLoyaltyAbility but no loyaltyDispatcher was supplied.");
+                await _loyaltyDispatcher(actor, loyalty, ctx).ConfigureAwait(false);
                 break;
             case PriorityAction.ActivateManaAbility mana:
                 if (_manaAbilityDispatcher == null)
@@ -400,32 +421,41 @@ public sealed class PriorityLoop
     /// Slice 5a — server-side auto-pass gate. Returns <c>true</c> (with
     /// <see cref="PriorityAction.Pass"/>) when ALL of the following hold:
     /// <list type="number">
-    ///   <item>A priority-kinds builder is wired AND it returns exactly
-    ///         <c>[PassPriorityCommand]</c> for this priority moment
-    ///         (the engine has narrowed to a "dead" window — no lands,
-    ///         no castable spells, no activatable abilities). Belt and
-    ///         braces with the agent's own narrowing: the kinds builder
-    ///         is the single source of truth so the engine and the
-    ///         portal can't disagree about which windows are dead.</item>
     ///   <item>A prefs provider is wired AND it returns a non-null
     ///         <see cref="IAutoPassPrefsView"/> for the current priority
     ///         holder (bot seats return null → never auto-pass; bots
     ///         drive themselves through ChoosePriorityActionAsync).</item>
     ///   <item><see cref="IAutoPassPrefsView.FullControl"/> is false —
     ///         the human is NOT holding the Full Control modifier.</item>
+    ///   <item>There is a REASON to auto-pass — either:
+    ///         <list type="bullet">
+    ///           <item><b>own-top</b>: the current player controls the top
+    ///                 object of the stack (their own spell / ability /
+    ///                 trigger). CR 117's default is to not respond to your
+    ///                 own object. Fires even on a non-dead window, so an
+    ///                 untapped land's mana ability no longer forces the
+    ///                 caster to manually pass their own spell.</item>
+    ///           <item><b>dead window</b>: the priority-kinds builder
+    ///                 returns exactly <c>[PassPriorityCommand]</c> (no
+    ///                 lands / castable spells / activatable abilities).
+    ///                 Single source of truth with the portal's pass-only
+    ///                 detection.</item>
+    ///         </list></item>
     ///   <item>No phase stop is configured for the active side at the
     ///         current wire phase label. Semantics match the portal's
     ///         <c>shouldAutoPass</c>: <c>"mine"</c> means stop on the
     ///         viewer's own turn; <c>"theirs"</c> on the opponent's.</item>
     ///   <item>We're past the stack-display window
     ///         (<see cref="AutoPassConstants.StackMutationDisplayMs"/>)
-    ///         after the most recent stack mutation. Gives the user a
-    ///         beat to register a freshly-landed trigger or spell
-    ///         before it resolves silently.</item>
+    ///         after the most recent stack mutation — EXCEPT on the own-top
+    ///         path, which is exempt (the player put the object there
+    ///         themselves; the opponent still gets their own display
+    ///         window). Gives the user a beat to register a freshly-landed
+    ///         trigger or spell they did not initiate before it resolves
+    ///         silently.</item>
     /// </list>
-    /// All five must be true for the agent to be skipped. A miss on any
-    /// falls through to the normal <see cref="IPlayerAgent.ChoosePriorityActionAsync"/>
-    /// path.
+    /// A miss on any falls through to the normal
+    /// <see cref="IPlayerAgent.ChoosePriorityActionAsync"/> path.
     ///
     /// <para>Concurrency: the prefs read is a snapshot. A user toggling
     /// FullControl while a window is being evaluated may see at most one
@@ -436,13 +466,7 @@ public sealed class PriorityLoop
     {
         autoAction = PriorityAction.Pass;
 
-        if (_isPassOnlyDeadWindow == null) return false;
         if (_autoPassPrefsProvider == null) return false;
-
-        // Gate 1 — engine-narrowed dead window. The predicate is supplied
-        // by Majik.Core.Api (PriorityKinds) so PriorityLoop stays unaware
-        // of the wire command types.
-        if (!_isPassOnlyDeadWindow(ctx)) return false;
 
         // Gate 2 — prefs available for this seat (bot seats return null).
         var prefs = _autoPassPrefsProvider(current);
@@ -450,6 +474,24 @@ public sealed class PriorityLoop
 
         // Gate 3 — Full Control suppresses every auto-pass.
         if (prefs.FullControl) return false;
+
+        // Gate 1 — there must be a reason to auto-pass. Two qualify:
+        //   (a) own-top: the current player controls the top object of the
+        //       stack — their own spell / activated ability / trigger. CR
+        //       117's default is to NOT respond to your own object; only
+        //       Full Control (Gate 3, above) surfaces it. This fires even
+        //       when the window is not "dead": an untapped land keeps a
+        //       mana ability legal, which would otherwise defeat the
+        //       dead-window gate after every cast and force the caster to
+        //       manually pass their own spell.
+        //   (b) dead window: the engine narrowed the kinds to PassPriority
+        //       only (no lands / castable spells / activatable abilities).
+        //       Predicate supplied by Majik.Core.Api (PriorityKinds) so
+        //       PriorityLoop stays unaware of the wire command types.
+        var ownsTopOfStack = ctx.Stack.Top is { } top
+            && ReferenceEquals(top.Controller, current);
+        var deadWindow = _isPassOnlyDeadWindow != null && _isPassOnlyDeadWindow(ctx);
+        if (!ownsTopOfStack && !deadWindow) return false;
 
         // Gate 4 — phase stop on the active side at the current phase.
         // PhaseStops keys are wire phase labels (StepStateType.ToString()
@@ -472,11 +514,20 @@ public sealed class PriorityLoop
 
         // Gate 5 — stack-display window. AutoPassConstants.StackMutationDisplayMs
         // after the last stack mutation, suppress to give the user a beat
-        // to register the change before it resolves silently.
-        var elapsed = _clock() - _lastStackMutatedAt;
-        if (elapsed < TimeSpan.FromMilliseconds(AutoPassConstants.StackMutationDisplayMs))
+        // to register the change before it resolves silently. EXEMPT the
+        // own-top path: the player put that object on the stack themselves,
+        // so there is nothing new for them to register — and the opponent
+        // still gets their own full display window when priority reaches
+        // them. Without this exemption the freshly-cast object would always
+        // sit inside the window and re-prompt the caster (the very friction
+        // this path removes).
+        if (!ownsTopOfStack)
         {
-            return false;
+            var elapsed = _clock() - _lastStackMutatedAt;
+            if (elapsed < TimeSpan.FromMilliseconds(AutoPassConstants.StackMutationDisplayMs))
+            {
+                return false;
+            }
         }
 
         return true;
@@ -492,7 +543,9 @@ public sealed class PriorityLoop
         // only reject (the old over-include flooded logs / spun the round).
         var landPlayAvailable = phase is { } ph
             && _landDropTracker.CanPlayLand(self, activePlayer, ph, _stack.IsEmpty, out _);
-        return new(self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable);
+        return new(
+            self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable,
+            turnState: _turnStateAccessor?.Invoke());
     }
 
     // PLAN 01 — resolve the agent for a stack object's controller when
@@ -511,6 +564,7 @@ public sealed class PriorityLoop
     {
         PriorityAction.CastSpell cs => cs.HoldPriority,
         PriorityAction.ActivateAbility a => a.HoldPriority,
+        PriorityAction.ActivateLoyaltyAbility la => la.HoldPriority,
         PriorityAction.PlayLand pl => pl.HoldPriority,
         // CR 605.3a — activating a mana ability does not cause the player
         // to pass priority. Implicit hold so the same player gets the next

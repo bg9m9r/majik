@@ -40,20 +40,22 @@ namespace Majik.Core.CardData.Factories;
 ///   Confluence's "Pay 1 life", CR 119.4): pain can drop you to 0 or below
 ///   and you then lose to SBAs.
 ///
-/// ## Deferred (v1 gap)
-/// - <b>True "becomes tapped" trigger (Rule 603.2).</b> The printed card is
-///   a triggered ability that fires whenever the land becomes tapped for
-///   ANY reason (e.g. an opponent's "tap target land"), not only when
-///   activating its own mana ability. The engine has no faithful
-///   becomes-tapped event trigger: there is no tapped-event on the bus, and
-///   <see cref="StateChangeTriggerCondition"/> is evaluated only after an
-///   SBA pass — which a mana-ability tap (CR 605.3, never on the stack)
-///   does not run. Since the only way City of Brass taps itself is its own
-///   mana ability, folding the damage into that activation reproduces the
-///   common case exactly. Taps caused by other effects do NOT deal the
-///   damage under this model — the same simplification the merged
-///   <see cref="PainLandCycleFactory"/> takes for its pain rider. See the
-///   v1-deferrals backlog.
+/// ## Prod note — true "becomes tapped" trigger lives in the binder
+/// - This named factory is TEST-ONLY (lands are never routed through their
+///   <c>[CardName]</c> factory — they build through the binder chain). The
+///   PROD path now binds a faithful CR 603.2 "Whenever this land becomes
+///   tapped, it deals 1 damage to you" trigger in
+///   <see cref="Majik.Core.CardData.OracleTriggeredAbilityBinder"/>, firing on
+///   the <see cref="Majik.Core.Domain.DomainEvents.PermanentTappedEvent"/>
+///   (CR 701.21, published by <see cref="Permanent.Tap(Player?)"/> at EVERY
+///   tap site) regardless of the tapper — so an opponent's "tap target land"
+///   correctly pings the controller. The factory keeps the older
+///   fold-pain-into-the-mana-ability model only for shape / dispatcher tests
+///   (it taps itself only via its own mana ability, so the common case
+///   coincides). When this factory's any-colour modes are activated in a test
+///   alongside the binder-bound trigger they would double-count damage — so
+///   tests use ONE path, not both (the prod path is the binder; the factory is
+///   not run in prod).
 /// </summary>
 [CardName("City of Brass")]
 public static class CityOfBrassFactory

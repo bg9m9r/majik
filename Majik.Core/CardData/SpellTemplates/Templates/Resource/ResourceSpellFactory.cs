@@ -79,14 +79,8 @@ internal static class ResourceSpellFactory
     }
 
     private static void DiscardCards(Player player, int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            var top = player.Zones.Hand.GetCards().FirstOrDefault();
-            if (top == null) return;
-            player.Zones.Hand.RemoveCard(top);
-            player.Zones.Graveyard.AddCard(top);
-            top.SetZone(Majik.Core.Zones.ZoneType.Graveyard);
-        }
-    }
+        // CR 701.8 — route through Fx.Discard (effect discard, wasCost: false)
+        // so a DiscardedEvent fires per card and "Whenever you discard …"
+        // triggers see it (Mind Rot et al.).
+        => Majik.Core.Primitives.Fx.Discard(player, n);
 }

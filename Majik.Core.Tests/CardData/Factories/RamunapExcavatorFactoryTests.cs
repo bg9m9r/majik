@@ -56,7 +56,7 @@ public class RamunapExcavatorFactoryTests
         excavator.Name.Should().Be("Ramunap Excavator");
         excavator.ManaCost.Should().Be("{1}{G}{G}");
         excavator.HasType(CardType.Creature).Should().BeTrue();
-        excavator.HasSubtype(CardSubtype.Naga).Should().BeTrue();
+        excavator.HasSubtype(CardSubtype.Snake).Should().BeTrue();
         excavator.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
         excavator.Power.Should().Be(2);
         excavator.Toughness.Should().Be(3);

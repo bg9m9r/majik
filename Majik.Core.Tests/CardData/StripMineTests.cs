@@ -128,7 +128,9 @@ public class StripMineTests
         _alice.Zones.Battlefield.GetCards().Should().NotContain(stripMine);
         stripMine.Zone.Should().Be(ZoneType.Graveyard);
 
-        stripMine.IsTapped.Should().BeTrue();
+        // CR 400.7 / 614 — Strip Mine sacrificed itself; in the graveyard it
+        // is a new object and is no longer tapped from the cost-tap.
+        stripMine.IsTapped.Should().BeFalse();
     }
 
     [Fact]

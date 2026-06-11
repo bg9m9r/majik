@@ -63,8 +63,8 @@ public class CensorFactoryTests
         censor.Name.Should().Be("Censor");
         censor.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(censor).Should().Contain(ManaColor.Blue);
-        censor.ManaCost.Should().Be("{U}");
-        censor.ManaCostValue.TotalValue.Should().Be(1);
+        censor.ManaCost.Should().Be("{1}{U}");
+        censor.ManaCostValue.TotalValue.Should().Be(2);
         censor.Owner.Should().BeSameAs(_alice);
         censor.Controller.Should().BeSameAs(_alice);
     }

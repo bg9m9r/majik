@@ -177,6 +177,13 @@ public sealed class ContinuousEffectsService
         _generation++;
     }
 
+    /// <summary>
+    /// Sim-only: the list of currently-registered effects.  Exposed so the
+    /// <see cref="Majik.Core.Simulation.GameStateCloner"/> can walk the live effects
+    /// and re-register sim-cloneable ones on a fresh service for the sandbox.
+    /// </summary>
+    internal IReadOnlyList<ContinuousEffect> RegisteredEffects => _effects;
+
     public void Register(ContinuousEffect effect)
     {
         if (effect == null) throw new ArgumentNullException(nameof(effect));
@@ -411,9 +418,18 @@ public sealed class ContinuousEffectsService
         // from — matching Compute's own cache-store discipline (mid-pass grant
         // side-effects may have bumped _generation; keying on genAtEntry keeps
         // this entry invalidated exactly when the layered entry is).
-        var chars = (CreatureCharacteristics)Compute((Permanent)creature);
-        _ptCache[creature] = (genAtEntry, chars.Power, chars.Toughness);
-        return (chars.Power, chars.Toughness);
+        // CR 711 — a Creature C# instance can compute as a NON-creature when
+        // flipped to a non-creature DFC back (a planeswalker back), in which
+        // case the result is a plain PermanentCharacteristics carrying no P/T.
+        // Treat that as 0/0 (it is not currently a creature; the
+        // creature-death SBA gates on effective creature-ness, so the 0
+        // toughness never wrongly kills it).
+        var computed = Compute((Permanent)creature);
+        var (power, toughness) = computed is CreatureCharacteristics cc
+            ? (cc.Power, cc.Toughness)
+            : (0, 0);
+        _ptCache[creature] = (genAtEntry, power, toughness);
+        return (power, toughness);
     }
 
     /// <summary>

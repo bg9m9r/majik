@@ -21,12 +21,9 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Subtypes
 ///
-/// Harbinger of the Seas's printed creature type is "Merfolk Wizard."
-/// The Majik <see cref="CardSubtype"/> enum does not yet include
-/// <c>Merfolk</c>; per project policy (don't invent subtypes), only
-/// <see cref="CardSubtype.Wizard"/> is assigned. If/when Merfolk is added
-/// to <see cref="CardSubtype"/>, this factory should be updated to
-/// include it.
+/// Harbinger of the Seas's printed creature type is "Merfolk Wizard" — both
+/// <see cref="CardSubtype.Merfolk"/> and <see cref="CardSubtype.Wizard"/> are
+/// assigned (CR 205.3m), matching the seed type line.
 ///
 /// Callers wiring real gameplay should use
 /// <see cref="Create(Player, ContinuousEffectsService, IEventBus?)"/> so
@@ -36,7 +33,7 @@ namespace Majik.Core.CardData.Factories;
 public static class HarbingerOfTheSeasFactory
 {
     public const string CardName = "Harbinger of the Seas";
-    public const string Cost = "{1}{U}";
+    public const string Cost = "{1}{U}{U}";
 
     private static readonly IReadOnlySet<CardSubtype> IslandOnly =
         new HashSet<CardSubtype> { CardSubtype.Island };
@@ -68,9 +65,8 @@ public static class HarbingerOfTheSeasFactory
             Cost,
             power: 2,
             toughness: 2,
-            // Printed creature type "Merfolk Wizard" — Merfolk not yet
-            // enumerated in CardSubtype, so we assign Wizard only.
-            subtypes: new[] { CardSubtype.Wizard });
+            // Printed creature type "Merfolk Wizard" (CR 205.3m).
+            subtypes: new[] { CardSubtype.Merfolk, CardSubtype.Wizard });
         card.SetOwner(owner);
         card.SetController(owner);
 

@@ -40,25 +40,47 @@ namespace Majik.Core.CardData.Factories;
 ///     3. You add {B}{B} (CR 106.1) — <see cref="Player.AddManaToPool"/>.
 ///     4. You draw a card (CR 120.1).
 ///
-/// ## Why a named factory
-/// Shape is the sac-engine Cleric pattern already in the engine: this mirrors
-/// <see cref="YawgmothFactory"/> (sacrifice-another-creature cost, an
-/// each-other-player rider, "you draw a card", plus an
-/// <c>opponentsResolver</c> injected at factory time) extended with a second
-/// sacrifice cost, a per-player "sacrifice a creature of their choice" body
-/// (from <see cref="DiabolicEdictFactory"/>), and an add-mana rider. No new
-/// engine mechanic is introduced — every building block (tap cost, sacrifice-
-/// another-creature cost, life loss, agent-driven sacrifice, add-mana, draw)
-/// pre-exists.
+/// ## Reads opponents from the live resolution context (the fix)
+/// The "any number of target players" rider reads the affected players from the
+/// LIVE game at RESOLUTION via <see cref="ResolutionContext.Game"/>
+/// (<c>ctx.Game.AllPlayers</c>, filtered to non-controller, not-lost players) —
+/// the same context-driven idiom as <see cref="AmaliaBenavidesAguirreFactory"/>
+/// / <see cref="StormbreathDragonFactory"/>. Previously it captured a
+/// <c>Func&lt;IReadOnlyList&lt;Player&gt;&gt; opponentsResolver</c> at factory
+/// time; the production routed build
+/// (<c>GameFacade.BuildDeckCard → NamedCardFactory.Create(name, owner, effects)</c>)
+/// dispatched the single-arg shape build, which left that resolver null, so the
+/// each-opponent half (life loss + sacrifice) was INERT in real games while the
+/// factory-direct tests passed (they injected the resolver). Reading the live
+/// context means the rider is correct on BOTH the shape build and the routed
+/// prod build, with no captured resolver.
+///
+/// The affected player's "of their choice" sacrifice pick reads THAT player's
+/// agent from <see cref="AgentRegistry"/> at resolution (the live engine
+/// registers a per-seat agent there — see <c>GameFacade</c>), with an optional
+/// <paramref name="sacrificeAgent"/> override for tests. Deterministic
+/// first-creature fallback when neither is available or the pick is illegal.
+///
+/// ## Wiring overloads
+/// - <see cref="Create(Player)"/> — canonical build. Wires the activated
+///   ability whose rider reads opponents from the live resolution context.
+/// - <see cref="Create(Player, Effects.ContinuousEffectsService?)"/> — the
+///   effects-aware overload the source generator recognises and the production
+///   <c>GameFacade</c> routed build dispatches to (via
+///   <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+///   The Priest registers no continuous effect, so it forwards straight to the
+///   canonical overload — its sole purpose is to make the generator emit the
+///   effects-aware dispatch arm so the routed prod build wires the ability with
+///   the context-reading rider (mirrors the Stormbreath Dragon /
+///   Festival Crasher / Kiln Fiend fix).
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>"Any number of target players" targeting</b>: the engine's
 ///   targeting / target-count prompt for players is not wired for this card
-///   shape (same gap as Yawgmoth's "each other player"). v1 affects every
-///   other player supplied by <paramref name="opponentsResolver"/>. For the
-///   common two-player game this is identical to choosing "the one opponent";
-///   the optional multi-player downside of being forced to hit every opponent
-///   is the same deferral posture as Yawgmoth.
+///   shape. v1 affects every opponent. For the common two-player game this is
+///   identical to choosing "the one opponent"; the optional multi-player
+///   downside of being forced to hit every opponent is the same deferral
+///   posture as Yawgmoth's historical each-other-player iteration.
 /// - <b>Sacrifice-cost target prompt</b>: <see cref="SacrificeAnotherCreatureCost.Target"/>
 ///   must be set by the agent before payment; v1 falls back to the first
 ///   eligible creature on the battlefield (deterministic).
@@ -73,38 +95,45 @@ public static class PriestOfForgottenGodsFactory
     public const string PrintedManaCost = "{1}{B}";
 
     /// <summary>
-    /// Construct Priest of Forgotten Gods with no opponent resolver (test /
-    /// vanilla path). The per-player lose-life / sacrifice rider is a no-op in
-    /// this mode; the controller's add-mana + draw still execute.
+    /// Canonical build. The per-player lose-life / sacrifice rider reads the
+    /// affected players from the live resolution context at resolution time.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentsResolver: null, sacrificeAgent: null);
+        Create(owner, sacrificeAgent: null, eventBus: null);
 
     /// <summary>
-    /// Construct Priest of Forgotten Gods with a runtime opponent resolver so
-    /// the activated ability can iterate the affected players.
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+    /// The Priest registers no continuous effect, so this forwards straight to
+    /// the canonical <see cref="Create(Player)"/> — its sole purpose is to make
+    /// the generator emit the effects-aware dispatch arm so the routed prod
+    /// build wires the ability (without it the routed build fell through to
+    /// single-arg dispatch with a null opponents resolver → the each-opponent
+    /// rider was inert; same fix as Stormbreath Dragon / Festival Crasher).
+    /// The <paramref name="effects"/> service is intentionally unused; the rider
+    /// reads opponents from the live resolution context, not a registered
+    /// continuous effect.
     /// </summary>
-    public static Creature Create(Player owner, Func<IReadOnlyList<Player>>? opponentsResolver) =>
-        Create(owner, opponentsResolver, sacrificeAgent: null);
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner, sacrificeAgent: null, eventBus: null);
 
     /// <summary>
     /// Construct Priest of Forgotten Gods.
     /// </summary>
     /// <param name="owner">Owner and initial controller of the card.</param>
-    /// <param name="opponentsResolver">Called at ability resolution time to
-    /// obtain the full player list (including the controller). Pass the game's
-    /// player collection here. When null the per-player rider is skipped.</param>
     /// <param name="sacrificeAgent">Optional agent used to drive each affected
-    /// player's "sacrifice a creature of their choice" pick. When null the pick
-    /// falls back deterministically to the first creature in battlefield
-    /// order (mirrors <see cref="DiabolicEdictFactory"/>).</param>
+    /// player's "sacrifice a creature of their choice" pick. When null the live
+    /// per-player agent is read from <see cref="AgentRegistry"/> at resolution;
+    /// when neither is available (or the pick is illegal) the pick falls back
+    /// deterministically to the first creature in battlefield order (mirrors
+    /// <see cref="DiabolicEdictFactory"/>).</param>
     /// <param name="eventBus">Optional event bus. When supplied, each affected
     /// player's forced "sacrifice a creature of their choice" publishes a
     /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
     /// payoffs fire on the Priest activation path.</param>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentsResolver,
         IPlayerAgent? sacrificeAgent,
         IEventBus? eventBus = null)
     {
@@ -149,19 +178,29 @@ public static class PriestOfForgottenGodsFactory
             {
                 // Effect 1+2: each affected player loses 2 life (CR 119.3),
                 // then sacrifices a creature of their choice (CR 701.16).
+                //
+                // The affected players are read from the LIVE game at
+                // RESOLUTION (ctx.Game.AllPlayers) — no captured opponents
+                // resolver — so this is correct on BOTH the shape build and the
+                // production routed build. With no game context (shape-only
+                // Resolve) there are no opponents to hit, so the rider is a safe
+                // no-op (mirrors Amalia / Stormbreath).
                 new Effect(
                     $"{CardName}: each affected player loses 2 life and sacrifices a creature",
-                    () =>
+                    ctx =>
                     {
-                        var players = opponentsResolver?.Invoke();
-                        if (players == null) return;
+                        var controller = card.Controller ?? owner;
+
+                        var players = ctx.Game?.AllPlayers;
+                        if (players == null) return ValueTask.CompletedTask;
 
                         foreach (var p in players)
                         {
                             // "Any number of target players" — v1 affects every
-                            // other player (see class xmldoc deferral). The
-                            // controller is never a legal pick here.
-                            if (ReferenceEquals(p, owner)) continue;
+                            // opponent (see class xmldoc deferral). CR 102.1 —
+                            // the controller is never a legal pick here.
+                            if (ReferenceEquals(p, controller)) continue;
+                            if (p.HasLost) continue;
 
                             // CR 119.3 — life loss happens regardless of whether
                             // the player controls a creature to sacrifice.
@@ -174,10 +213,15 @@ public static class PriestOfForgottenGodsFactory
                                 .ToList();
                             if (creatures.Count == 0) continue;
 
+                            // The affected player's own agent makes the choice:
+                            // the explicit test override first, otherwise the
+                            // live per-seat agent registered in AgentRegistry.
+                            var agent = sacrificeAgent ?? AgentRegistry.Get(p);
+
                             ICard pick;
-                            if (sacrificeAgent != null)
+                            if (agent != null)
                             {
-                                var chosen = sacrificeAgent
+                                var chosen = agent
                                     .ChooseFromBattlefieldAsync(p, creatures, BotIntent.Removal)
                                     .GetAwaiter().GetResult();
 
@@ -201,6 +245,8 @@ public static class PriestOfForgottenGodsFactory
                             if (eventBus != null) Fx.Sacrifice(pick, p, eventBus);
                             else Fx.Sacrifice(pick);
                         }
+
+                        return ValueTask.CompletedTask;
                     }),
 
                 // Effect 3: you add {B}{B} (CR 106.1).

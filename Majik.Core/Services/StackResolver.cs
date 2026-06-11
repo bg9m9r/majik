@@ -100,9 +100,24 @@ public class StackResolver
                 }
             }
 
-            // Resolve the object (Rule 608.1) on the async path.
+            // Resolve the object (Rule 608.1) on the async path. Mark this
+            // object's controller as the "currently resolving" controller for
+            // the duration so a counter effect run during resolution (a
+            // counterspell's own resolution) attributes the counter to its
+            // controller — "a spell or ability you control counters a spell"
+            // (Baral, Chief of Compliance). Restored afterward so nested /
+            // sequential resolutions don't leak the attribution.
             var agent = agentLookup?.Invoke(top.Controller);
-            await top.ResolveAsync(agent, game, ct).ConfigureAwait(false);
+            var previousResolutionController = stack.CurrentResolutionController;
+            stack.CurrentResolutionController = top.Controller;
+            try
+            {
+                await top.ResolveAsync(agent, game, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                stack.CurrentResolutionController = previousResolutionController;
+            }
 
             // Handle spell resolution (Rule 608.2)
             if (top is ISpell spell)

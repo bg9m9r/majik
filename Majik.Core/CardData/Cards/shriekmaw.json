@@ -2,7 +2,7 @@
   "name": "Shriekmaw",
   "types": ["Creature"],
   "subtypes": ["Elemental"],
-  "manaCost": "{5}{B}",
+  "manaCost": "{4}{B}",
   "power": 3,
   "toughness": 2,
   "abilities": []

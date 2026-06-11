@@ -3,9 +3,11 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Abilities;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -72,7 +74,7 @@ public class RestInPeaceTests
         _bob.Zones.Graveyard.AddCard(c2);
         c2.SetZone(ZoneType.Graveyard);
 
-        RestInPeaceFactory.ResolveEtbExile(() => new[] { _alice, _bob }, zoneService: null);
+        RestInPeaceFactory.ResolveEtbExile(new[] { _alice, _bob }, zoneService: null);
 
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
         _bob.Zones.Graveyard.GetCards().Should().BeEmpty();
@@ -83,9 +85,34 @@ public class RestInPeaceTests
     }
 
     [Fact]
+    public void EtbTrigger_ResolvedThroughLiveContext_ExilesAllGraveyards()
+    {
+        // PROD PATH: build via the routed single-arg overload and resolve the
+        // ETB trigger through a live GameContext — the sweep must read
+        // ctx.Game.AllPlayers (both graveyards), not a captured resolver.
+        var c1 = new Card("Alice's Spell", "{1}");
+        _alice.Zones.Graveyard.AddCard(c1);
+        c1.SetZone(ZoneType.Graveyard);
+
+        var c2 = new Card("Bob's Spell", "{2}");
+        _bob.Zones.Graveyard.AddCard(c2);
+        c2.SetZone(ZoneType.Graveyard);
+
+        var rip = RestInPeaceFactory.Create(_alice);
+        var etb = rip.Abilities.OfType<TriggeredAbility>().Single();
+
+        ContextResolve.Resolve(etb, _alice, _alice, _bob);
+
+        _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
+        _bob.Zones.Graveyard.GetCards().Should().BeEmpty();
+        _alice.Zones.Exile.GetCards().Should().Contain(c1);
+        _bob.Zones.Exile.GetCards().Should().Contain(c2);
+    }
+
+    [Fact]
     public void ResolveEtbExile_NoPlayers_NoOps()
     {
-        var act = () => RestInPeaceFactory.ResolveEtbExile(allPlayersResolver: null, zoneService: null);
+        var act = () => RestInPeaceFactory.ResolveEtbExile(players: null, zoneService: null);
         act.Should().NotThrow();
     }
 
@@ -97,7 +124,7 @@ public class RestInPeaceTests
     public void Static_RewritesGraveyardMove_ToExile()
     {
         var bus = new ReplacementBus();
-        var rip = RestInPeaceFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var rip = RestInPeaceFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(rip, _alice);
 
@@ -115,7 +142,7 @@ public class RestInPeaceTests
     public void Static_RewritesOpponentGraveyardMove_ToExile()
     {
         var bus = new ReplacementBus();
-        var rip = RestInPeaceFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var rip = RestInPeaceFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(rip, _alice);
 
@@ -131,7 +158,7 @@ public class RestInPeaceTests
     public void Static_DoesNotAffectNonGraveyardMoves()
     {
         var bus = new ReplacementBus();
-        var rip = RestInPeaceFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var rip = RestInPeaceFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(rip, _alice);
 
@@ -147,7 +174,7 @@ public class RestInPeaceTests
     public void Static_IsInert_WhileNotOnBattlefield()
     {
         var bus = new ReplacementBus();
-        var rip = RestInPeaceFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var rip = RestInPeaceFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         // Leave Rest in Peace in its default zone — NOT placed on the battlefield.
 
@@ -163,7 +190,7 @@ public class RestInPeaceTests
     public void Static_IsNotEndOfTurnExpirable()
     {
         var bus = new ReplacementBus();
-        var rip = RestInPeaceFactory.Create(_alice, allPlayersResolver: null, replacements: bus,
+        var rip = RestInPeaceFactory.Create(_alice, replacements: bus,
             zoneService: null, triggers: null);
         PlaceOnBattlefield(rip, _alice);
 

@@ -145,7 +145,16 @@ public sealed class CardDefActivatedAbility : CardDefAbility
             costs: costs,
             effects: effects,
             targetRequests: requests,
-            sorcerySpeed: SorcerySpeed);
+            sorcerySpeed: SorcerySpeed,
+            // STAGE 2/3 (re-sourceable abilities) — every CardDef verb reads its
+            // source/subject off the live ResolutionContext: self-source verbs
+            // (pump / connive / explore) were migrated to ResolutionContext.Source;
+            // the rest are scoped to the controller or to ChosenTargets. So the
+            // whole data-driven activated ability is sound to re-home via
+            // ActivatedAbility.RebindTo — Agatha's Soul Cauldron grants the REAL
+            // ability of an imprinted creature this way rather than re-parsing
+            // its oracle text.
+            rebindSafe: true);
     }
 }
 

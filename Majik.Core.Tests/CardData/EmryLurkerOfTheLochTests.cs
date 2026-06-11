@@ -58,7 +58,7 @@ public class EmryLurkerOfTheLochTests
         var c = EmryLurkerOfTheLochFactory.Create(_alice);
 
         c.Name.Should().Be("Emry, Lurker of the Loch");
-        c.ManaCost.Should().Be("{4}{U}");
+        c.ManaCost.Should().Be("{2}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue("Emry is Legendary");
         c.HasSubtype(CardSubtype.Merfolk).Should().BeTrue("Merfolk is a printed subtype");
@@ -111,20 +111,21 @@ public class EmryLurkerOfTheLochTests
 
         var effective = CostReduction.GetEffectiveCost(emry, _alice);
 
-        effective.Generic.Should().Be(4, "no artifacts controlled — no Affinity discount");
+        effective.Generic.Should().Be(2, "no artifacts controlled — no Affinity discount");
         effective.Blue.Should().Be(1, "coloured pip untouched");
-        effective.TotalValue.Should().Be(5);
+        effective.TotalValue.Should().Be(3);
     }
 
     [Fact]
-    public void Affinity_ThreeArtifactsControlled_GenericReducedByThree()
+    public void Affinity_TwoArtifactsControlled_GenericReducedToZero()
     {
         var emry = EmryLurkerOfTheLochFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(emry);
         emry.SetZone(ZoneType.Hand);
 
-        // Three artifacts on Alice's battlefield.
-        for (var i = 0; i < 3; i++)
+        // Two artifacts on Alice's battlefield — exactly enough to zero the
+        // {2} generic of Emry's printed {2}{U}.
+        for (var i = 0; i < 2; i++)
         {
             var bauble = new Artifact($"Artifact {i}", "{0}");
             bauble.SetOwner(_alice);
@@ -133,15 +134,15 @@ public class EmryLurkerOfTheLochTests
 
         var effective = CostReduction.GetEffectiveCost(emry, _alice);
 
-        effective.Generic.Should().Be(1, "{4} generic reduced by 3 → {1}");
+        effective.Generic.Should().Be(0, "{2} generic reduced by 2 → {0}");
         effective.Blue.Should().Be(1, "coloured pip untouched (CR 117.7c)");
-        effective.TotalValue.Should().Be(2);
+        effective.TotalValue.Should().Be(1);
     }
 
     [Fact]
     public void Affinity_FiveArtifactsControlled_FloorAtZero_ColouredPipUntouched()
     {
-        // Five artifacts → {4} generic floors at 0; {U} pip remains.
+        // Five artifacts → {2} generic floors at 0; {U} pip remains.
         var emry = EmryLurkerOfTheLochFactory.Create(_alice);
         _alice.Zones.Hand.AddCard(emry);
         emry.SetZone(ZoneType.Hand);
@@ -155,7 +156,7 @@ public class EmryLurkerOfTheLochTests
 
         var effective = CostReduction.GetEffectiveCost(emry, _alice);
 
-        effective.Generic.Should().Be(0, "{4} reduced by 5 → floor at 0 (CR 117.7c)");
+        effective.Generic.Should().Be(0, "{2} reduced by 5 → floor at 0 (CR 117.7c)");
         effective.Blue.Should().Be(1, "coloured pip never reduced");
         effective.TotalValue.Should().Be(1);
     }

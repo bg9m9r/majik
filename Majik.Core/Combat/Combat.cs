@@ -21,9 +21,12 @@ public class Combat
     public Player? DefendingPlayer { get; }
 
     /// <summary>
-    /// The planeswalker being attacked (if attacking planeswalker).
+    /// The planeswalker being attacked (if attacking planeswalker). Typed
+    /// <see cref="Cards.Permanent"/> so a creature-front DFC flipped to its
+    /// planeswalker back (CR 711, <see cref="Cards.Permanent.IsEffectivePlaneswalker"/>)
+    /// is a legal combat defender too.
     /// </summary>
-    public Cards.Planeswalker? TargetPlaneswalker { get; }
+    public Cards.Permanent? TargetPlaneswalker { get; }
 
     /// <summary>
     /// All attacking creatures.
@@ -91,7 +94,7 @@ public class Combat
     /// </summary>
     public DateTime Timestamp { get; }
 
-    public Combat(Player attackingPlayer, Player? defendingPlayer = null, Cards.Planeswalker? targetPlaneswalker = null)
+    public Combat(Player attackingPlayer, Player? defendingPlayer = null, Cards.Permanent? targetPlaneswalker = null)
     {
         if (attackingPlayer == null)
         {

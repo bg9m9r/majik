@@ -66,7 +66,8 @@ public class HorrorOfTheBrokenLandsFactoryTests
     public void HorrorOfTheBrokenLands_TriggerSubscribesToCardCycledEvent()
     {
         var card = HorrorOfTheBrokenLandsFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         trigger.Condition.Should().BeOfType<EventTriggerCondition<CardCycledEvent>>();
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield,
@@ -82,7 +83,8 @@ public class HorrorOfTheBrokenLandsFactoryTests
     public void HorrorOfTheBrokenLands_TriggerCondition_DoesNotFire_OnSelfCycle()
     {
         var card = HorrorOfTheBrokenLandsFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var selfEvent = new CardCycledEvent(card, _alice);
         trigger.Condition.Matches(selfEvent, trigger).Should().BeFalse(
@@ -93,7 +95,8 @@ public class HorrorOfTheBrokenLandsFactoryTests
     public void HorrorOfTheBrokenLands_TriggerCondition_DoesNotFire_OnOpponentCycle()
     {
         var card = HorrorOfTheBrokenLandsFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var otherCard = new Card("Some Cycler", "");
         var opponentEvent = new CardCycledEvent(otherCard, _bob);
@@ -105,7 +108,8 @@ public class HorrorOfTheBrokenLandsFactoryTests
     public void HorrorOfTheBrokenLands_TriggerCondition_Fires_OnControllerCyclingAnother()
     {
         var card = HorrorOfTheBrokenLandsFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var otherCard = new Card("Some Cycler", "");
         var aliceCyclesOther = new CardCycledEvent(otherCard, _alice);
@@ -125,7 +129,8 @@ public class HorrorOfTheBrokenLandsFactoryTests
         card.Power.Should().Be(4, "base power before the pump");
         card.Toughness.Should().Be(4, "base toughness before the pump");
 
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
         foreach (var effect in trigger.Effects) effect.Execute();
 
         card.Power.Should().Be(6, "+2 from the cycle/discard pump");
@@ -175,5 +180,50 @@ public class HorrorOfTheBrokenLandsFactoryTests
         _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycling drew a card");
         captured.Should().NotBeNull();
         captured!.Card.Should().BeSameAs(horror);
+    }
+
+    // -----------------------------------------------------------------------
+    // Discard leg — CR 603.1 over DiscardedEvent (CR 701.8)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void HorrorOfTheBrokenLands_HasSecondTrigger_SubscribingToDiscardedEvent()
+    {
+        var card = HorrorOfTheBrokenLandsFactory.Create(_alice);
+        var discardTrigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        discardTrigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+        discardTrigger.TargetRequests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void HorrorOfTheBrokenLands_DiscardCondition_Fires_OnControllerDiscardingAnother()
+    {
+        var card = HorrorOfTheBrokenLandsFactory.Create(_alice);
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        var other = new Card("Some Card", "");
+        trigger.Condition.Matches(new DiscardedEvent(_alice, other, wasCost: false), trigger)
+            .Should().BeTrue("Alice discarding another card pumps Horror");
+        trigger.Condition.Matches(new DiscardedEvent(_bob, other, wasCost: false), trigger)
+            .Should().BeFalse("opponent discard does NOT trigger — 'you discard' gate");
+        trigger.Condition.Matches(new DiscardedEvent(_alice, card, wasCost: false), trigger)
+            .Should().BeFalse("discarding Horror itself does NOT trigger — 'another card' gate");
+    }
+
+    [Fact]
+    public void HorrorOfTheBrokenLands_DiscardResolve_Pumps_Plus2Plus1()
+    {
+        var effects = new ContinuousEffectsService();
+        var card = HorrorOfTheBrokenLandsFactory.Create(_alice, effects: effects, triggers: null);
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        card.Power.Should().Be(6);
+        card.Toughness.Should().Be(5);
     }
 }

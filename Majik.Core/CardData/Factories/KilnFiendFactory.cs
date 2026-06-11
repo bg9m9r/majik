@@ -66,6 +66,24 @@ public static class KilnFiendFactory
         Create(owner, effects: null, triggers: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (via <see cref="NamedCardFactory.Create(string,
+    /// Player, Majik.Core.Effects.ContinuousEffectsService?)"/>). The source
+    /// generator only recognises a two-parameter <c>Create(Player,
+    /// ContinuousEffectsService)</c> as the effects-aware overload, so this
+    /// shape is required for the cast-pump trigger to be wired in live matches
+    /// — without it the routed build fell through to the shape-only
+    /// <see cref="Create(Player)"/> and the trigger was inert. No
+    /// <see cref="TriggerManager"/> is needed here: the live manager auto-binds
+    /// any card carrying an <see cref="ITriggeredAbility"/> on its first zone
+    /// crossing (battlefield entry). Forwards to the canonical overload with a
+    /// null trigger manager. Mirrors the lord/anthem factories' effects-aware
+    /// posture.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects, triggers: null);
+
+    /// <summary>
     /// Construct Kiln Fiend with optional effects service + trigger manager.
     /// When <paramref name="effects"/> is supplied the cast-trigger pump is
     /// built; when <paramref name="triggers"/> is supplied that trigger is
@@ -153,4 +171,18 @@ public sealed class KilnFiendPumpEffect : ContinuousEffect
         chars.Power += KilnFiendFactory.PumpAmount;
         // +3/+0 — toughness unchanged.
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="KilnFiendPumpEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// The effect expires at end of turn; it is only registered mid-turn when the
+    /// cast trigger resolves, so cloning it is correct for in-turn snapshots.
+    /// preserves: nothing scalar (amount comes from static PumpAmount); target → clonedSource (as Creature).
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => clonedSource is Creature clonedCreature
+            ? new KilnFiendPumpEffect(clonedCreature)
+            : null;
 }

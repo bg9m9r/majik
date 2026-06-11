@@ -42,7 +42,7 @@ public class SpikeFeederTests
         var c = SpikeFeederFactory.Create(_alice);
 
         c.Name.Should().Be("Spike Feeder");
-        c.ManaCost.Should().Be("{1}{G}");
+        c.ManaCost.Should().Be("{1}{G}{G}");
         c.Power.Should().Be(0);
         c.Toughness.Should().Be(0);
         c.HasType(CardType.Creature).Should().BeTrue();
@@ -80,16 +80,29 @@ public class SpikeFeederTests
     // ------------------------------------------------------------------
 
     [Fact]
-    public void ActivatedAbility_Has_ManaCost_And_RemoveCounterCost()
+    public void ActivatedAbilities_HaveCorrectCostShapes()
     {
         var feeder = SpikeFeederFactory.Create(_alice);
 
-        var ability = feeder.Abilities.OfType<ActivatedAbility>().Single();
+        var activated = feeder.Abilities.OfType<ActivatedAbility>().ToList();
+        activated.Should().HaveCount(2,
+            "Spike Feeder has two activated abilities: the {2} targeted pump and the free lifegain");
 
-        ability.Costs.OfType<ManaCostCost>().Should().ContainSingle(
-            "{2} is the printed mana cost half of the activation");
-        ability.Costs.OfType<RemovePlusOnePlusOneCounterCost>().Should().ContainSingle(
-            "the activation requires removing one +1/+1 counter from Spike Feeder");
+        // The targeted pump: "{2}, Remove a +1/+1 counter: Put a +1/+1 counter
+        // on target creature." It is the one carrying a TargetRequest.
+        var pump = activated.Single(a => a.TargetRequests.Count > 0);
+        pump.Costs.OfType<ManaCostCost>().Should().ContainSingle(
+            "{2} is the printed mana cost of the pump ability");
+        pump.Costs.OfType<RemovePlusOnePlusOneCounterCost>().Should().ContainSingle(
+            "the pump activation removes one +1/+1 counter");
+
+        // The lifegain: "Remove a +1/+1 counter: You gain 2 life." — NO mana
+        // cost (free), which is what makes the Heliod combo loop.
+        var gain = activated.Single(a => a.TargetRequests.Count == 0);
+        gain.Costs.OfType<ManaCostCost>().Should().BeEmpty(
+            "the lifegain ability has no mana cost in the printed text");
+        gain.Costs.OfType<RemovePlusOnePlusOneCounterCost>().Should().ContainSingle(
+            "the lifegain activation removes one +1/+1 counter");
     }
 
     // ------------------------------------------------------------------
@@ -105,7 +118,9 @@ public class SpikeFeederTests
         alice.Zones.Battlefield.AddCard(feeder);
         feeder.SetZone(ZoneType.Battlefield);
 
-        var ability = feeder.Abilities.OfType<ActivatedAbility>().Single();
+        // The free lifegain ability (no TargetRequest).
+        var ability = feeder.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.TargetRequests.Count == 0);
         var counterCost = ability.Costs.OfType<RemovePlusOnePlusOneCounterCost>().Single();
 
         var lifeBefore = alice.LifeTotal;
@@ -130,10 +145,51 @@ public class SpikeFeederTests
         var feeder = SpikeFeederFactory.Create(_alice);
         // No MarkEntersWithCounters — fresh card has zero counters.
 
-        var counterCost = feeder.Abilities.OfType<ActivatedAbility>().Single()
+        var counterCost = feeder.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.TargetRequests.Count == 0)
             .Costs.OfType<RemovePlusOnePlusOneCounterCost>().Single();
 
         counterCost.CanPay(_alice).Should().BeFalse(
             "no +1/+1 counters means the cost cannot be paid (CR 117.6)");
+    }
+
+    // ------------------------------------------------------------------
+    // Pump ability — "{2}, Remove a +1/+1 counter: Put a +1/+1 counter on
+    // target creature." This is the missing-effect that the Layer-B audit
+    // surfaced (only the lifegain half was previously bound).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void PumpAbility_PutsCounterOnChosenTargetCreature()
+    {
+        var alice = new Player("Alice", 20);
+        var feeder = SpikeFeederFactory.Create(alice);
+        SpikeFeederFactory.MarkEntersWithCounters(feeder);
+        alice.Zones.Battlefield.AddCard(feeder);
+        feeder.SetZone(ZoneType.Battlefield);
+
+        // A separate creature to receive the counter.
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.SetOwner(alice);
+        bear.SetController(alice);
+        alice.Zones.Battlefield.AddCard(bear);
+        bear.SetZone(ZoneType.Battlefield);
+
+        var pump = feeder.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.TargetRequests.Count > 0);
+
+        // Pay the remove-counter cost half (mana handled by the framework).
+        var counterCost = pump.Costs.OfType<RemovePlusOnePlusOneCounterCost>().Single();
+        counterCost.CanPay(alice).Should().BeTrue();
+        counterCost.Pay(alice);
+
+        // Choose the bear as the target, then resolve.
+        pump.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bear } });
+        foreach (var effect in pump.Effects) effect.Execute();
+
+        bear.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the pump puts one +1/+1 counter on the chosen target creature");
+        feeder.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "one of Spike Feeder's two counters was removed to pay the cost");
     }
 }

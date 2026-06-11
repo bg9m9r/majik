@@ -12,7 +12,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Drift of Phantasms (Future Sight, {3}{U}).
 ///
-/// Creature — Illusion 1/5. Oracle text:
+/// Creature — Spirit 0/5. Oracle text:
 ///   "Defender.
 ///    Transmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your
 ///    library for a card with the same mana value as this card, reveal
@@ -31,7 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// tutor is shape-correct and works against the printed-MV match.
 ///
 /// ## Implemented (v1)
-/// - <b>Creature — Illusion {3}{U} 1/5</b>.
+/// - <b>Creature — Spirit {3}{U} 0/5</b>.
 /// - <b>Defender</b> (CR 702.3) wired via the <see cref="KeywordAbility"/>
 ///   marker so <see cref="Majik.Core.Combat.CombatAbilities.HasDefender"/>
 ///   surfaces the can't-attack restriction.
@@ -80,8 +80,8 @@ namespace Majik.Core.CardData.Factories;
 public static class DriftOfPhantasmsFactory
 {
     public const string CardName = "Drift of Phantasms";
-    public const string PrintedManaCost = "{3}{U}";
-    public const int Power = 1;
+    public const string PrintedManaCost = "{2}{U}";
+    public const int Power = 0;
     public const int Toughness = 5;
     public const string TransmuteCost = "{1}{U}{U}";
 
@@ -101,7 +101,7 @@ public static class DriftOfPhantasmsFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Illusion });
+            subtypes: new[] { CardSubtype.Spirit });
 
         card.SetOwner(owner);
         card.SetController(owner);

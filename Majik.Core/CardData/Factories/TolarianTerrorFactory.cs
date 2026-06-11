@@ -64,7 +64,7 @@ namespace Majik.Core.CardData.Factories;
 public static class TolarianTerrorFactory
 {
     public const string CardName = "Tolarian Terror";
-    public const string PrintedManaCost = "{6}{U}{U}";
+    public const string PrintedManaCost = "{6}{U}";
     public const int Power = 5;
     public const int Toughness = 5;
 

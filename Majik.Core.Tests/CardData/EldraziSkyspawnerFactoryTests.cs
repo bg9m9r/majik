@@ -47,7 +47,7 @@ public class EldraziSkyspawnerFactoryTests
         card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
         card.HasSubtype(CardSubtype.Drone).Should().BeTrue();
         card.BasePower.Should().Be(2);
-        card.BaseToughness.Should().Be(2);
+        card.BaseToughness.Should().Be(1);
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }

@@ -38,7 +38,7 @@ public class SanguineBondFactoryTests
         var c = SanguineBondFactory.Create(_alice);
 
         c.Name.Should().Be("Sanguine Bond");
-        c.ManaCost.Should().Be("{4}{B}{B}");
+        c.ManaCost.Should().Be("{3}{B}{B}");
         c.HasType(CardType.Enchantment).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

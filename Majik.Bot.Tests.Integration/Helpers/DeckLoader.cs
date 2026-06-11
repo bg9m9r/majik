@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 
@@ -15,6 +16,49 @@ internal static class DeckLoader
     {
         var names = Majik.Bot.Decks.BotDeckCatalog.Get(archetype);
         return names.Select(MaterializeFallback).Cast<ICard>().ToList();
+    }
+
+    /// <summary>
+    /// Materialize an archetype's deck list into REAL typed shells resolved
+    /// from the embedded card seed — correct types / mana / P-T / loyalty /
+    /// color indicator, no abilities. This mirrors the server's
+    /// <c>RealDeckLoader</c> shell path: abilities are NOT bound here; they
+    /// are bound when the shells run through <see cref="Majik.Core.Api.GameFacade.Create"/>
+    /// with a <c>cardRepo</c> (the same binder/factory chain production uses).
+    ///
+    /// <para>Throws if a deck-list name is absent from the seed — that is a
+    /// real regression (every bot-deck name is vetted by <c>BotDeckValidator</c>
+    /// at startup), not something to paper over with a vanilla fallback.</para>
+    /// </summary>
+    public static IReadOnlyList<ICard> LoadReal(string archetype, ICardRepository repo)
+    {
+        var names = Majik.Bot.Decks.BotDeckCatalog.Get(archetype);
+        return names.Select(n => MaterializeReal(n, repo)).ToList();
+    }
+
+    /// <summary>
+    /// Same as <see cref="LoadReal"/> but for the archetype's SIDEBOARD
+    /// (wishboard) list — materializes <c>BotDeckCatalog.GetSideboard</c>
+    /// names into real typed shells via the identical materialization path,
+    /// so the audit can run them through <c>GameFacade.PopulateSideboard</c>.
+    /// </summary>
+    public static IReadOnlyList<ICard> LoadRealSideboard(string archetype, ICardRepository repo)
+    {
+        var names = Majik.Bot.Decks.BotDeckCatalog.GetSideboard(archetype);
+        return names.Select(n => MaterializeReal(n, repo)).ToList();
+    }
+
+    // Delegates to the shared DeckCardShellBuilder so the audit/test shell is
+    // the same shape the server's RealDeckLoader produces — including all
+    // printed card types (CR 205.1b: an artifact land is an Artifact) and the
+    // printed color indicator (CR 202.2c). GameFacade rebinds abilities after.
+    private static ICard MaterializeReal(string name, ICardRepository repo)
+    {
+        var entity = repo.GetByName(name)
+            ?? throw new InvalidOperationException(
+                $"bot-deck card not in embedded seed: '{name}'");
+
+        return DeckCardShellBuilder.Build(entity);
     }
 
     private static Card MaterializeFallback(string name)

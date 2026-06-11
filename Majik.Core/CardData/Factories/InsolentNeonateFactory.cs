@@ -10,14 +10,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Insolent Neonate (Shadows over Innistrad, {R}).
 ///
-/// Creature — Vampire Wizard 1/1. Oracle text:
+/// Creature — Vampire 1/1. Oracle text:
 ///   "Menace (This creature can't be blocked except by two or more
 ///    creatures.)
 ///    Discard a card, Sacrifice this creature: Draw a card."
 ///
 /// ## Implemented (v1)
 ///
-/// - 1/1 Vampire Wizard with mana cost {R}, owner / controller stamped.
+/// - 1/1 Vampire with mana cost {R}, owner / controller stamped.
 /// - <see cref="KeywordAbility"/> marker for Menace (CR 702.110), consumed
 ///   by <see cref="Majik.Core.Combat.CombatAbilities.HasMenace"/> (same
 ///   posture as Grief / Hive of the Eye Tyrant / Lord of Atlantis).
@@ -82,7 +82,7 @@ public static class InsolentNeonateFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Wizard });
+            subtypes: new[] { CardSubtype.Vampire });
 
         card.SetOwner(owner);
         card.SetController(owner);

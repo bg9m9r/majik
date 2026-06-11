@@ -54,7 +54,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MastermindsAcquisitionFactory
 {
     public const string CardName = "Mastermind's Acquisition";
-    public const string PrintedManaCost = "{3}{B}{B}";
+    public const string PrintedManaCost = "{2}{B}{B}";
 
     /// <summary>Mode 0 — library tutor.</summary>
     public const int ModeLibrary = 0;

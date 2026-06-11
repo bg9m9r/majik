@@ -78,12 +78,16 @@ public static class ReanimateFactory
     /// battlefield move routes through <see cref="ZoneService.MoveCard"/>
     /// so ETB triggers / replacements fire on the reanimated creature
     /// (CR 603.6a).</param>
-    /// <param name="allPlayersResolver">Optional. When supplied every
-    /// player's graveyard is scanned; otherwise only the caster's.</param>
+    /// <remarks>
+    /// "From a graveyard" scans every player's graveyard read from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551). With no live game context only the caster's
+    /// graveyard is scanned (shape-only paths).
+    /// </remarks>
     public static IReadOnlyList<IEffect> BuildResolveEffect(
         Player caster,
-        ZoneService? zoneService = null,
-        Func<IReadOnlyList<Player>>? allPlayersResolver = null)
+        ZoneService? zoneService = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
 
@@ -91,7 +95,11 @@ public static class ReanimateFactory
         {
             Fx.Inline(
                 $"{CardName}: reanimate target creature card from a graveyard; caster loses life = its mana value",
-                () => Resolve(caster, zoneService, allPlayersResolver)),
+                ctx =>
+                {
+                    Resolve(caster, zoneService, ctx.Game?.AllPlayers);
+                    return ValueTask.CompletedTask;
+                }),
         };
     }
 
@@ -105,9 +113,9 @@ public static class ReanimateFactory
     private static void Resolve(
         Player caster,
         ZoneService? zoneService,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        IReadOnlyList<Player>? allPlayers)
     {
-        var candidatePlayers = allPlayersResolver?.Invoke()
+        var candidatePlayers = allPlayers
             ?? (IReadOnlyList<Player>)new[] { caster };
 
         foreach (var p in candidatePlayers)

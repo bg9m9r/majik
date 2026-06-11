@@ -226,13 +226,31 @@ public class TriggeredAbility : ITriggeredAbility
 
         _resolutionState = ResolutionState.Resolving();
 
-        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct)
+        // STAGE 1 — expose the trigger's own source (when it is a battlefield
+        // permanent) so effects can read "their source" generically off the
+        // context (CR 113.7) rather than capturing a specific permanent.
+        var rc = ResolutionContext.For(
+                Controller, agent, game, _chosenTargets, ct, source: Source as Permanent)
             with
             { TriggeringPlayer = TriggeringPlayer };
 
-        foreach (var effect in _effects)
+        // Attribute any counter performed during this ability's resolution to
+        // its controller — "a spell or ability you control counters a spell"
+        // (Baral, Chief of Compliance). Mystic Snake / Voidslime counter their
+        // target as part of resolving here. Restored afterward.
+        var stack = game?.Stack;
+        var previousResolutionController = stack?.CurrentResolutionController;
+        if (stack is not null) stack.CurrentResolutionController = Controller;
+        try
         {
-            await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            foreach (var effect in _effects)
+            {
+                await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (stack is not null) stack.CurrentResolutionController = previousResolutionController;
         }
 
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);

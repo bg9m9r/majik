@@ -91,9 +91,9 @@ public sealed class DiscardXCardsAdditionalCost : IAdditionalCost
         foreach (var pick in picks)
         {
             if (!caster.Zones.Hand.ContainsCard(pick)) continue;
-            caster.Zones.Hand.RemoveCard(pick);
-            caster.Zones.Graveyard.AddCard(pick);
-            // Zone.AddCard sets card.Zone — no manual SetZone needed.
+            // CR 701.8 — route through the central discard chokepoint so a
+            // DiscardedEvent fires per card (wasCost: true).
+            Majik.Core.Primitives.Fx.DiscardCard(caster, pick, wasCost: true);
             discarded.Add(pick);
         }
 

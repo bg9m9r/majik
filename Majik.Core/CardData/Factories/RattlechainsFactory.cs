@@ -10,9 +10,9 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Rattlechains (Shadows over Innistrad, {1}{W}).
+/// Named-card factory for Rattlechains (Shadows over Innistrad, {1}{U}).
 ///
-/// Creature — Spirit 2/2. Oracle text:
+/// Creature — Spirit 2/1. Oracle text:
 ///   "Flash
 ///    Flying
 ///    When this creature enters, target Spirit you control gains hexproof
@@ -20,7 +20,7 @@ namespace Majik.Core.CardData.Factories;
 ///    You may cast Spirit spells as though they had flash."
 ///
 /// ## Implemented (v1)
-/// - 2/2 Creature — Spirit, mana cost {1}{W}, owner / controller wired.
+/// - 2/1 Creature — Spirit, mana cost {1}{U}, owner / controller wired.
 /// - <b>Flash</b> + <b>Flying</b> keyword markers (CR 702.8 / 702.9) via
 ///   <see cref="KeywordAbility"/>.
 /// - <b>ETB hexproof rider</b> (CR 603.6a): a <see cref="TriggeredAbility"/>
@@ -64,9 +64,9 @@ namespace Majik.Core.CardData.Factories;
 public static class RattlechainsFactory
 {
     public const string CardName = "Rattlechains";
-    public const string PrintedManaCost = "{1}{W}";
+    public const string PrintedManaCost = "{1}{U}";
     public const int Power = 2;
-    public const int Toughness = 2;
+    public const int Toughness = 1;
 
     /// <summary>
     /// Construct Rattlechains with no live event bus, trigger manager, or

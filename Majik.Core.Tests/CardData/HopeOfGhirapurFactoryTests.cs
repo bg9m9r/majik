@@ -60,7 +60,7 @@ public class HopeOfGhirapurFactoryTests : IDisposable
         var h = HopeOfGhirapurFactory.Create(_alice);
 
         h.Name.Should().Be("Hope of Ghirapur");
-        h.ManaCost.Should().Be("{0}");
+        h.ManaCost.Should().Be("{1}");
         h.Power.Should().Be(1);
         h.Toughness.Should().Be(1);
         h.HasType(CardType.Artifact).Should().BeTrue();

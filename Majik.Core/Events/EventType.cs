@@ -128,4 +128,15 @@ public enum EventType
     // bus-aware <c>Fx.Sacrifice</c> overload at the moment the permanent
     // leaves the battlefield.
     PermanentSacrificed,
+
+    // CR 701.8 — a player DISCARDED a card (moved a card from their hand to
+    // their graveyard as a discard — a discard cost, a discard effect, or the
+    // cleanup-step max-hand-size trim, CR 514.1). Distinct from a raw
+    // CardMovedEvent Hand→Graveyard: carries the discarding player and whether
+    // the discard was paid as a cost, so "whenever you discard a card …"
+    // payoff triggers (Flameblade Adept, Horror of the Broken Lands, Curator
+    // of Mysteries; madness later builds on it) fire without the CardMovedEvent
+    // over/under-fire footprint. Published by the central chokepoint
+    // <c>Fx.DiscardCard</c> after the zone move completes.
+    Discarded,
 }

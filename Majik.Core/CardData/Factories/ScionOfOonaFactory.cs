@@ -53,7 +53,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ScionOfOonaFactory
 {
     public const string CardName = "Scion of Oona";
-    public const string PrintedManaCost = "{1}{U}";
+    public const string PrintedManaCost = "{2}{U}";
     public const int Power = 1;
     public const int Toughness = 1;
 

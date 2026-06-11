@@ -208,4 +208,80 @@ public class HeuristicBotAgentAltCostTests
 
         probe.CandidatesFor(ungrantedBolt, _alice, ctx).Should().BeEmpty();
     }
+
+    // ── Task 2.1 — RuntimeExileCastAltCostProbe (madness / Ragavan / impulse) ──
+
+    /// <summary>
+    /// Madness path (CR 702.35 / CR 118.9): a discarded madness card sits in
+    /// EXILE carrying a runtime exile-cast grant (set by the madness
+    /// replacement). <see cref="RuntimeExileCastAltCostProbe"/> must surface
+    /// an <see cref="ExileCastAlternativeCost"/> built from the stamped cost,
+    /// and the heuristic bot — wired with that probe — must propose a
+    /// CastSpell for the exile card at the granted cost. Fiery Temper is the
+    /// canonical case: printed {1}{R}{R}, madness {B}{R}.
+    /// </summary>
+    [Fact]
+    public async Task ElectsExileCast_WhenMadnessGrantInExile_AndManaAvailable()
+    {
+        var temper = new Instant("Fiery Temper", "1RR");
+        temper.ChangeOwner(_alice);
+        _alice.Zones.Exile.AddCard(temper);
+
+        // The madness replacement normally stamps this; grant directly so the
+        // probe is the only thing under test. Madness cost {B}{R}.
+        temper.GrantRuntimeExileCast(_alice, ManaCost.Parse("{B}{R}"));
+
+        // {R} + {B} sources so the bid is affordable.
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+        _alice.Zones.Battlefield.AddCard(swamp);
+
+        var bot = new HeuristicBotAgent(new RuntimeExileCastAltCostProbe());
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+
+        var action = await bot.ChoosePriorityActionAsync(ctx);
+
+        var cast = action.Should().BeOfType<PriorityAction.CastSpell>().Subject;
+        cast.Card.Should().BeSameAs(temper);
+        cast.AlternativeCost.Should().BeOfType<ExileCastAlternativeCost>();
+        cast.AlternativeCost!.AlternativeManaCost.Should().Be(ManaCost.Parse("{B}{R}"));
+    }
+
+    /// <summary>
+    /// Probe-level: yields a single <see cref="ExileCastAlternativeCost"/> for
+    /// a grant nominating the caster, and nothing for a copy without a grant
+    /// or a grant nominating a different player. Keys on the card instance's
+    /// flag + nominated caster, not the name.
+    /// </summary>
+    [Fact]
+    public void RuntimeExileCastProbe_KeysOnInstanceAndCaster()
+    {
+        var probe = new RuntimeExileCastAltCostProbe();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+
+        var granted = new Instant("Fiery Temper", "1RR");
+        granted.ChangeOwner(_alice);
+        _alice.Zones.Exile.AddCard(granted);
+        granted.GrantRuntimeExileCast(_alice, ManaCost.Parse("{B}{R}"));
+
+        probe.CandidatesFor(granted, _alice, ctx).Should().ContainSingle().Which
+            .Should().BeOfType<ExileCastAlternativeCost>()
+            .Which.AlternativeManaCost.Should().Be(ManaCost.Parse("{B}{R}"));
+
+        // No grant — nothing.
+        var ungranted = new Instant("Fiery Temper", "1RR");
+        ungranted.ChangeOwner(_alice);
+        _alice.Zones.Exile.AddCard(ungranted);
+        probe.CandidatesFor(ungranted, _alice, ctx).Should().BeEmpty();
+
+        // Grant nominates the OTHER player — nothing for self.
+        var grantedToBob = new Instant("Ragavan Loot", "R");
+        grantedToBob.ChangeOwner(_alice);
+        _alice.Zones.Exile.AddCard(grantedToBob);
+        grantedToBob.GrantRuntimeExileCast(_bob, ManaCost.Parse("{R}"));
+        probe.CandidatesFor(grantedToBob, _alice, ctx).Should().BeEmpty();
+    }
 }

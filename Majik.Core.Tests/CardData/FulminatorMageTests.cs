@@ -41,7 +41,7 @@ public class FulminatorMageTests
         var mage = FulminatorMageFactory.Create(_alice);
 
         mage.Name.Should().Be("Fulminator Mage");
-        mage.ManaCost.Should().Be("{B/R}{B/R}");
+        mage.ManaCost.Should().Be("{1}{B/R}{B/R}");
         mage.Power.Should().Be(2);
         mage.Toughness.Should().Be(2);
         mage.HasType(CardType.Creature).Should().BeTrue();

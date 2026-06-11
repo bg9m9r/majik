@@ -51,7 +51,16 @@ public sealed record CardSnapshotDto(
     // and the enriched CardMovedEvent / CounterAddedEvent payloads agree.
     // Empty for cards with no counters (and for non-permanents). Defaults
     // to an empty map so pre-seq constructions stay valid.
-    IReadOnlyDictionary<string, int>? Counters = null);
+    IReadOnlyDictionary<string, int>? Counters = null,
+    // CR 702.49 — cards exiled "with" this permanent (imprinted on it), as
+    // nested shallow snapshots so a client can render them UNDER the permanent
+    // (showing where any granted abilities come from, e.g. Agatha's Soul
+    // Cauldron). Populated from Permanent.ImprintedCards in
+    // StateSnapshotter.SnapshotCard. Non-empty only for battlefield permanents
+    // that currently imprint cards; defaults to an empty list everywhere else
+    // (and for non-permanents). NOT recursive — an imprinted card's own
+    // ImprintedCards is left empty.
+    IReadOnlyList<CardSnapshotDto>? ImprintedCards = null);
 
 public sealed record AbilityDto(string Kind, string Description, Guid? Id = null);
 

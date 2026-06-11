@@ -157,6 +157,7 @@ public sealed class TurnDriver
         _eventBus?.Subscribe<CardDrawnEvent>(OnCardDrawn);
         _eventBus?.Subscribe<Majik.Core.Domain.DomainEvents.SpellCastEvent>(OnSpellCast);
         _eventBus?.Subscribe<CardCycledEvent>(OnCardCycled);
+        _eventBus?.Subscribe<Majik.Core.Domain.DomainEvents.AttackersDeclaredEvent>(OnAttackersDeclared);
     }
 
     // -----------------------------------------------------------------
@@ -243,6 +244,15 @@ public sealed class TurnDriver
         TurnState.RecordCardCycled(e.Player);
     }
 
+    private void OnAttackersDeclared(Majik.Core.Domain.DomainEvents.AttackersDeclaredEvent e)
+    {
+        // CR 508.1 — tally the declared attacking creatures for the turn. Read
+        // by dynamic-X "number of attacking creatures" effects (Raffine,
+        // Scheming Seer's connive X). Mirrors how CreaturesDiedThisTurn is fed
+        // off CardMovedEvent — event-driven, not polled.
+        TurnState.RecordAttackersDeclared(e.Combat.Attackers.Count);
+    }
+
     private void OnSpellCast(Majik.Core.Domain.DomainEvents.SpellCastEvent e)
     {
         // CR 105 — record the colours of every spell cast this turn so
@@ -253,6 +263,31 @@ public sealed class TurnDriver
             TurnState.RecordSpellCast(caster, Majik.Core.Cards.CardColors.GetColors(card));
         }
     }
+
+    // -----------------------------------------------------------------
+    // Resume-point enum — coarse phases a sim can resume at.
+    // Used by RunTurnFromPhaseAsync to decide which helpers to call.
+    // -----------------------------------------------------------------
+
+    private enum ResumePoint { PreCombatMain, Combat, PostCombatMain, Ending }
+
+    /// <summary>
+    /// Maps a <see cref="PhaseStateType"/> to the coarse <see cref="ResumePoint"/>
+    /// at which <see cref="RunTurnFromPhaseAsync"/> should re-enter.
+    /// Beginning-phase inputs (<see cref="PhaseStateType.TurnBeginning"/>) map to
+    /// <see cref="ResumePoint.PreCombatMain"/> because the beginning phase is
+    /// always skipped on resume (untap/upkeep/draw and turn-tracker resets are
+    /// the caller's responsibility in a cloned mid-game position).
+    /// </summary>
+    private static ResumePoint NormalizeResumePhase(PhaseStateType phase) => phase switch
+    {
+        PhaseStateType.TurnBeginning  => ResumePoint.PreCombatMain,
+        PhaseStateType.PreCombatMain  => ResumePoint.PreCombatMain,
+        PhaseStateType.Combat         => ResumePoint.Combat,
+        PhaseStateType.PostCombatMain => ResumePoint.PostCombatMain,
+        PhaseStateType.TurnEnding     => ResumePoint.Ending,
+        _                             => ResumePoint.PreCombatMain,
+    };
 
     public async Task RunTurnAsync(Player activePlayer, int turnNumber, CancellationToken ct = default)
     {
@@ -304,6 +339,45 @@ public sealed class TurnDriver
         // even though the previous turn ended in TurnEnding.
         _currentTurnState = null;
 
+        var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
+
+        await RunBeginningPhaseAsync(activePlayer, turnNumber, ct);
+        await RunPreCombatMainAsync(activePlayer, ct);
+        await RunCombatPhaseAsync(activePlayer, defender, ct);
+        await RunPostCombatMainAsync(activePlayer, ct);
+        await RunEndingPhaseAsync(activePlayer, ct);
+    }
+
+    /// <summary>
+    /// Sim-only: resume this turn at <paramref name="resumePhase"/>, skipping the
+    /// beginning-phase init and any earlier phases, then run to end of turn exactly
+    /// as RunTurnAsync would. Used by the bot search simulator to re-enter a cloned
+    /// mid-game position. NOTE: does not run untap/upkeep/draw or reset turn trackers.
+    /// </summary>
+    internal async Task RunTurnFromPhaseAsync(Player activePlayer, int turnNumber, PhaseStateType resumePhase, CancellationToken ct = default)
+    {
+        _currentTurnNumber = turnNumber;
+        _activePlayerForStepEvents = activePlayer;
+        var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
+
+        var resume = NormalizeResumePhase(resumePhase);
+        if (resume <= ResumePoint.PreCombatMain) await RunPreCombatMainAsync(activePlayer, ct);
+        if (resume <= ResumePoint.Combat)        await RunCombatPhaseAsync(activePlayer, defender, ct);
+        if (resume <= ResumePoint.PostCombatMain) await RunPostCombatMainAsync(activePlayer, ct);
+        await RunEndingPhaseAsync(activePlayer, ct);
+    }
+
+    // -----------------------------------------------------------------
+    // Phase-block helpers — ONE source of truth per phase block.
+    // Called by both RunTurnAsync and RunTurnFromPhaseAsync.
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Beginning phase (CR 501-504): Untap → Upkeep → Draw.
+    /// Preserves: day/night transition, untap step restrictions, draw skip.
+    /// </summary>
+    private async Task RunBeginningPhaseAsync(Player activePlayer, int turnNumber, CancellationToken ct)
+    {
         // Beginning phase (CR 501-504: Untap, Upkeep, Draw).
         SetTurnState(PhaseStateType.TurnBeginning);
         SetPhase(StepStateType.Untap);
@@ -333,20 +407,34 @@ public sealed class TurnDriver
             DrawCard(activePlayer);
         }
         await PriorityRound(activePlayer, ct);
+    }
 
+    /// <summary>
+    /// Pre-combat main phase (CR 505).
+    /// Preserves: Saga lore-counter tick, SetTurnState, SetPhase, PriorityRound.
+    /// </summary>
+    private async Task RunPreCombatMainAsync(Player activePlayer, CancellationToken ct)
+    {
         // Main 1 (CR 505 — precombat main phase).
         SetTurnState(PhaseStateType.PreCombatMain);
         SetPhase(StepStateType.PreCombatMain);
         // CR 714.2 — Saga lore-counter tick fires at the precombat main.
         AdvanceSagas(activePlayer);
         await PriorityRound(activePlayer, ct);
+    }
 
+    /// <summary>
+    /// Full combat phase (CR 506-511): BeginningOfCombat priority → DeclareAttackers →
+    /// additional-combats drain loop → EndOfCombat.
+    /// Preserves: additional combat queue drain, per-combat EndOfCombat step.
+    /// </summary>
+    private async Task RunCombatPhaseAsync(Player activePlayer, Player defender, CancellationToken ct)
+    {
         // Combat (CR 506-511).
         SetTurnState(PhaseStateType.Combat);
         SetPhase(StepStateType.BeginningOfCombat);
         await PriorityRound(activePlayer, ct);
 
-        var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
         SetPhase(StepStateType.DeclareAttackers);
         await RunCombat(activePlayer, defender, ct);
 
@@ -387,12 +475,25 @@ public sealed class TurnDriver
         // combat" durations (e.g. Firebending mana) can expire before the
         // postcombat main begins.
         SetPhase(StepStateType.EndOfCombat);
+    }
 
+    /// <summary>
+    /// Post-combat main phase (CR 505).
+    /// </summary>
+    private async Task RunPostCombatMainAsync(Player activePlayer, CancellationToken ct)
+    {
         // Main 2 (CR 505 — postcombat main phase).
         SetTurnState(PhaseStateType.PostCombatMain);
         SetPhase(StepStateType.PostCombatMain);
         await PriorityRound(activePlayer, ct);
+    }
 
+    /// <summary>
+    /// Ending phase (CR 512-514): End step → Cleanup.
+    /// Also records _previousTurnActivePlayer and clears active control grant.
+    /// </summary>
+    private async Task RunEndingPhaseAsync(Player activePlayer, CancellationToken ct)
+    {
         // End phase (CR 512-514: End step, Cleanup).
         SetTurnState(PhaseStateType.TurnEnding);
         SetPhase(StepStateType.End);
@@ -589,7 +690,7 @@ public sealed class TurnDriver
         // resolver falls back to printed mana abilities.
         var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects);
 
-        async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
+        async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
             static void RotateHand(ICard card, string reason)
             {
@@ -638,7 +739,7 @@ public sealed class TurnDriver
                             phase: _currentPhase,
                             stackEmpty: _stack.IsEmpty,
                             effects: _continuousEffects);
-                        return;
+                        return true; // committed: land played
                     }
 
                     // CR 712.3 — back spell face: swap the cast object to a
@@ -688,7 +789,7 @@ public sealed class TurnDriver
             if (resolved == null && !isPermanent)
             {
                 RotateHand(castCard, "no SpellDef for instant/sorcery");
-                return;
+                return false; // not committed: no definition, card stays in hand
             }
             def = resolved
                 ?? Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
@@ -735,7 +836,13 @@ public sealed class TurnDriver
                 // in hand. No SpellCastEvent, no priority change.
                 if (payment.IsCancelled)
                 {
-                    return;
+                    // CR 601.2 / CR 727 — player explicitly cancelled the cast at
+                    // the cost-payment prompt. Nothing has been paid; spell stays
+                    // in hand. Return true so PriorityLoop keeps the current player
+                    // rather than force-passing (a deliberate cancel is not a
+                    // silent failure — the player chose this outcome and may choose
+                    // a different action next).
+                    return true;
                 }
 
                 // Portal "Auto-pay": the mana-cost prompt's Auto-pay button
@@ -766,32 +873,51 @@ public sealed class TurnDriver
                 && grantCard.RuntimeExileCastSpendAsAnyColor
                 && ReferenceEquals(grantCard.RuntimeExileCastAllowedCaster, actor);
 
-            // CR 106.4 — pass the cast card as the "spent on" context so
-            // slot-level mana provenance (Arena of Glory's exert haste rider,
-            // deferral #1) can react to "if THAT mana is spent on THIS spell".
-            if (!manaResolver.Pay(
-                    actor, cost, payment,
-                    spentOn: castCard, spendAsAnyColor,
-                    out _, out var colorCounts))
+            // CR 601.2c / 601.2h / CR 732.1 — the mana payment is executed
+            // INSIDE the cast flow, at the 601.2h step, i.e. AFTER target
+            // collection (601.2c). If the cast becomes illegal before then
+            // (insufficient targets, sorcery-speed gate, unpayable additional
+            // costs), CastAsync throws BEFORE this callback runs — nothing is
+            // tapped, nothing leaves the pool, so there is nothing to rewind.
+            // Pre-fix the payment was made up front and the failure path only
+            // rotated the hand: the live bot repeatedly tapped its lands for
+            // casts that then failed at targeting, wasting the mana.
+            //
+            // The callback pays the PRE-PROMPTED cost (the agent chose
+            // `payment`'s sources for exactly this cost at the selection
+            // prompt above), keeping the prompt/payment pairing intact.
+            // The flow-computed total cost (CR 601.2f) is deliberately unused
+            // here: the agent was prompted against `cost`, so `cost` is paid.
+            bool PayCastMana(Majik.Core.ValueObjects.ManaCost totalCostFromFlow)
             {
-                RotateHand(castCard, "Pay failed");
-                return;
-            }
+                // CR 106.4 — pass the cast card as the "spent on" context so
+                // slot-level mana provenance (Arena of Glory's exert haste
+                // rider, deferral #1) can react to "if THAT mana is spent on
+                // THIS spell".
+                if (!manaResolver.Pay(
+                        actor, cost, payment,
+                        spentOn: castCard, spendAsAnyColor,
+                        out _, out var colorCounts))
+                {
+                    return false; // CastAsync turns this into an illegal cast.
+                }
 
-            // CR 702.44b — stamp the per-color spent ledger on this cast so
-            // ETB effects can read it off the resolving permanent (parallels
-            // PendingCastX). SetPendingCastColorCounts also derives the
-            // distinct-color set (PendingCastColors) for Sunburst, while the
-            // count ledger preserves multiplicity so "{R}{R} was spent"
-            // intervening-ifs (Vibrance / Wistfulness) can distinguish
-            // {R}{R} from {R}{G}. The resolver computed the per-color counts
-            // by diffing the pool across the spend (colored pips + colored
-            // mana used to satisfy generic). Empty ledger = no colored mana
-            // spent → Sunburst yields zero counters. Consumed + cleared by
-            // the ETB effect.
-            if (castCard is Majik.Core.Cards.Card concreteForColors)
-            {
-                concreteForColors.SetPendingCastColorCounts(colorCounts);
+                // CR 702.44b — stamp the per-color spent ledger on this cast
+                // so ETB effects can read it off the resolving permanent
+                // (parallels PendingCastX). SetPendingCastColorCounts also
+                // derives the distinct-color set (PendingCastColors) for
+                // Sunburst, while the count ledger preserves multiplicity so
+                // "{R}{R} was spent" intervening-ifs (Vibrance / Wistfulness)
+                // can distinguish {R}{R} from {R}{G}. The resolver computed
+                // the per-color counts by diffing the pool across the spend
+                // (colored pips + colored mana used to satisfy generic).
+                // Empty ledger = no colored mana spent → Sunburst yields zero
+                // counters. Consumed + cleared by the ETB effect.
+                if (castCard is Majik.Core.Cards.Card concreteForColors)
+                {
+                    concreteForColors.SetPendingCastColorCounts(colorCounts);
+                }
+                return true;
             }
 
             try
@@ -802,12 +928,15 @@ public sealed class TurnDriver
                     actor, castCard, def, _agents[actor], ctx, ct,
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
-                    preChosenMana: payment);
+                    preChosenMana: payment,
+                    payManaCost: PayCastMana);
             }
             catch (InvalidOperationException ex)
             {
                 RotateHand(castCard, $"CastAsync threw: {ex.Message}");
+                return false; // not committed: CastAsync threw
             }
+            return true; // committed: spell put on the stack
         }
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
@@ -852,7 +981,7 @@ public sealed class TurnDriver
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _eventBus);
             try
             {
-                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs);
+                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs, ctx);
             }
             catch (InvalidOperationException)
             {
@@ -860,6 +989,82 @@ public sealed class TurnDriver
                 // priority pump move on. Bot's per-turn memo prevents
                 // re-proposing this same ability.
             }
+        }
+
+        async Task DispatchLoyalty(Player actor, PriorityAction.ActivateLoyaltyAbility activate, GameContext ctx)
+        {
+            // CR 606.3 — activate a planeswalker loyalty ability. Loyalty
+            // abilities are sorcery-speed (active player + main phase + empty
+            // stack) and once-per-turn; re-verify here so a stale / out-of-
+            // window proposal is swallowed rather than mutating state.
+            var loyalty = activate.Ability;
+            if (!loyalty.CanActivate()) return;
+            var inSorceryWindow = ReferenceEquals(ctx.ActivePlayer, actor)
+                && ctx.CurrentPhase is { } phase && phase.IsMain()
+                && ctx.Stack.Count == 0
+                && ReferenceEquals(loyalty.Source.Controller, actor);
+            if (!inSorceryWindow) return;
+
+            // CR 602.2b — collect targets from the loyalty ability's
+            // TargetRequests via the activating player's agent (same loop the
+            // ActivatedAbility dispatcher uses). The chosen objects are stored
+            // on the stack object so its effects read them at resolution.
+            var chosenTargets = new List<IReadOnlyList<object>>();
+            var targetWrappers = new List<Majik.Core.Targeting.ITarget>();
+            foreach (var req in loyalty.TargetRequests)
+            {
+                var live = req.ResolveCandidates(ctx);
+                var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                    ? req
+                    : req.WithCandidates(live);
+                var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                chosenTargets.Add(chosen);
+                foreach (var obj in chosen)
+                {
+                    Majik.Core.Targeting.ITarget? wrapper = obj switch
+                    {
+                        Majik.Core.Cards.Permanent perm => Majik.Core.Targeting.Target.Permanent(perm),
+                        Majik.Core.Cards.ICard card => Majik.Core.Targeting.Target.Card(card),
+                        Player p => Majik.Core.Targeting.Target.Player(p),
+                        Majik.Core.Spells.ISpell spell => Majik.Core.Targeting.Target.Spell(spell),
+                        Majik.Core.Abilities.IActivatedAbility ab => Majik.Core.Targeting.Target.Ability(ab),
+                        _ => null,
+                    };
+                    if (wrapper != null) targetWrappers.Add(wrapper);
+                }
+            }
+
+            // CR 606.3/606.5 — pay the loyalty cost as the ability is put on
+            // the stack (add/remove loyalty + mark once-per-turn).
+            try
+            {
+                loyalty.PayLoyaltyCost();
+            }
+            catch (InvalidOperationException)
+            {
+                return; // raced out of the activation window — no state change.
+            }
+
+            // Build the ActivatedAbility stack object from the loyalty
+            // template: source = the planeswalker, controller = the actor,
+            // costs empty (loyalty cost pre-paid), effects = the loyalty
+            // effects, targetRequests for provenance. It resolves later off
+            // the stack so the effect is targetable + responding is allowed.
+            var stackObject = new Majik.Core.Abilities.ActivatedAbility(
+                source: loyalty.Source,
+                controller: actor,
+                targets: targetWrappers.Count > 0 ? targetWrappers : null,
+                costs: null,
+                effects: loyalty.Effects,
+                targetRequests: loyalty.TargetRequests.Count > 0 ? loyalty.TargetRequests : null,
+                sorcerySpeed: true);
+            if (chosenTargets.Count > 0)
+            {
+                stackObject.SetChosenTargets(chosenTargets);
+            }
+
+            _stack.Push(stackObject);
+            _eventBus?.Publish(new Majik.Core.Domain.DomainEvents.AbilityActivatedEvent(stackObject));
         }
 
         var manaActivator = new Majik.Core.Services.ManaAbilityActivator(_eventBus);
@@ -901,6 +1106,7 @@ public sealed class TurnDriver
             landDropTracker: _landDropTracker,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
+            loyaltyDispatcher: DispatchLoyalty,
             manaAbilityDispatcher: DispatchManaAbility,
             // Slice 5a — forward server-side auto-pass plumbing into
             // every priority round. All four are null in the legacy
@@ -910,11 +1116,40 @@ public sealed class TurnDriver
             isPassOnlyDeadWindow: _isPassOnlyDeadWindow,
             eventBus: _eventBus,
             clock: _clock,
-            // CR 704.4 — the SAME SBA coordinator GameDriver runs at turn
-            // boundaries, so the loop checks state-based actions (loss / death /
-            // etc.) before granting priority and ends the game cleanly when a
-            // lethal spell drops a player to 0 mid-round.
-            stateBasedActions: _sba);
+            // CR 603.3 — agent-aware trigger drain. The driver owns the
+            // TriggerManager + the seat agents, so it supplies the async
+            // drain the PriorityLoop calls each time a player is about to
+            // receive priority. Routing through PutPendingTriggersOnStackAsync
+            // (not the sync PutPendingTriggersOnStack PriorityManager used)
+            // means any pending TARGETED triggered ability prompts its
+            // controller's agent for targets (CR 603.3) before it goes on the
+            // stack — emblems, Leyline-of-Lightning-style "deal 1 to any
+            // target", Restless-land attack triggers, Valakut, utility-land
+            // ETB triggers — instead of silently auto-picking first-eligible.
+            // Non-targeted triggers behave exactly as before; APNAP order
+            // (CR 603.3b) is preserved by the async drain's controller
+            // grouping. Supplying this delegate also flips
+            // PriorityManager.SuppressInternalTriggerDrain so the drain
+            // happens once, here, not target-lessly inside PriorityManager.
+            asyncTriggerDrain: (activePlayerForDrain, drainCtx, drainCt) =>
+                _triggerManager.PutPendingTriggersOnStackAsync(
+                    activePlayerForDrain, _agents, drainCtx, drainCt),
+            // Thread the driver-owned live TurnState into every GameContext the
+            // loop builds, so rc.Game.TurnState is non-null at resolution in real
+            // games — dynamic-X connive reads per-turn counts off it, and
+            // context-aware activation gates see live state.
+            turnStateAccessor: () => TurnState,
+            // CR 704.1 / 704.3 / 704.4 — check state-based actions in the live
+            // priority flow (before a player receives priority AND after each
+            // stack object resolves), looping until none apply. The driver owns
+            // the StateBasedActions service + the player list, so it supplies
+            // the check the loop invokes. Without this, a 0/0 creature (Walking
+            // Ballista cast with X=0) or a creature reduced to 0 toughness by a
+            // noncombat effect lingered on the battlefield until the next turn
+            // boundary instead of dying immediately.
+            checkStateBasedActions: () => _sba.CheckStateBasedActions(
+                _players,
+                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
 
         try
         {

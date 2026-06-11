@@ -239,4 +239,16 @@ public sealed class SliverLegionAnthemEffect : ContinuousEffect
         chars.Power += others;
         chars.Toughness += others;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="SliverLegionAnthemEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// The allPlayers resolver is rebound to <paramref name="clonedPlayers"/> so
+    /// the Sliver count walks the CLONED players' battlefields, not the live game.
+    /// preserves: _allPlayersResolver → clonedPlayers; source → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Player>>? clonedPlayers)
+        => new SliverLegionAnthemEffect(clonedSource, clonedPlayers);
 }

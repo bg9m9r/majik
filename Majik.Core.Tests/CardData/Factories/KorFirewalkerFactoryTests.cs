@@ -63,7 +63,7 @@ public class KorFirewalkerFactoryTests
         var c = KorFirewalkerFactory.Create(_alice);
 
         c.Name.Should().Be("Kor Firewalker");
-        c.ManaCost.Should().Be("{W}");
+        c.ManaCost.Should().Be("{W}{W}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Kor).Should().BeTrue();
         c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();

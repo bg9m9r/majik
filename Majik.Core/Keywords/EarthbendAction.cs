@@ -10,20 +10,20 @@ using Majik.Core.Zones;
 namespace Majik.Core.Keywords;
 
 /// <summary>
-/// CR 701.59 — Earthbend N (Bloomburrow).
+/// Earthbend N (Avatar: The Last Airbender).
 ///
-/// Full rules text:
-///   1. Target land you control becomes a 0/0 Elemental creature with haste
-///      that's still a land (CR 701.59a).
-///   2. Put N +1/+1 counters on it (CR 701.59b) — so Earthbend N → an N/N.
+/// Full rules text (keyword reminder):
+///   1. Target land you control becomes a 0/0 creature with haste that's
+///      still a land (no creature subtype).
+///   2. Put N +1/+1 counters on it — so Earthbend N → an N/N.
 ///   3. When that land dies or is exiled, return it to the battlefield
-///      tapped under its owner's control (CR 701.59c).
+///      tapped under its owner's control.
 ///
 /// The animate-land half (step 1) is a proper CR 613 continuous effect via
 /// <see cref="AnimateLandEffect"/> when a <see cref="ContinuousEffectsService"/>
-/// is supplied: Layer 4 adds <see cref="CardType.Creature"/> +
-/// <see cref="CardSubtype.Elemental"/> (the printed Land type stays — "still a
-/// land"), Layer 7b sets base P/T 0/0, Layer 6 grants Haste. The service's
+/// is supplied: Layer 4 adds <see cref="CardType.Creature"/> (the printed Land
+/// type stays — "still a land"; no creature subtype is granted),
+/// Layer 7b sets base P/T 0/0, Layer 6 grants Haste. The service's
 /// creature-row upgrade (a Layer-4 Creature grant on a non-creature permanent)
 /// makes the 0/0 base + the +1/+1 counters surface as an N/N through
 /// <see cref="ContinuousEffectsService.Compute(Permanent)"/> and therefore
@@ -88,9 +88,12 @@ public static class EarthbendAction
             // characteristics (it may not have been wired — lands skip the
             // creature ActiveEffects hookup in the prod binder).
             land.ActiveEffects ??= ces;
+            // CR — Earthbend grants the Creature type only, with NO creature
+            // subtype ("becomes a 0/0 creature with haste that's still a
+            // land"). subtype: null adds Creature but no Elemental/etc.
             AnimateLandEffect.Register(
                 ces, land,
-                subtype: CardSubtype.Elemental,
+                subtype: null,
                 basePower: 0,
                 baseToughness: 0,
                 grantsHaste: true,
@@ -103,12 +106,23 @@ public static class EarthbendAction
 
         // Step 3 — delayed triggered ability: "When [land] dies or is exiled,
         // return it to the battlefield tapped under its owner's control."
-        // (CR 701.59c / CR 603.6a). activeZones includes Graveyard and Exile
-        // so the trigger stays registered after the zone change.
+        // This is a ONE-SHOT delayed trigger (CR 603.7a): it fires exactly
+        // once, the next time THIS animated land dies or is exiled, then is
+        // gone. A returned land is a fresh permanent — plain (the animate
+        // effect self-prunes when the land leaves the battlefield), with no
+        // standing return trigger. Modelled as a DelayedTriggeredAbility so
+        // the TriggerManager auto-unregisters it after it fires.
         var owner = land.Owner ?? controller;
 
+        DelayedTriggeredAbility? returnTrigger = null;
         var returnEffect = new Effect("Earthbend — return to battlefield tapped", () =>
         {
+            // Detach the one-shot from the land's ability list so a later
+            // zone change of the (now plain) returned land can't re-register
+            // and re-fire it via SyncCardRegistration. TriggerManager already
+            // dropped it from its own set when it fired (CR 603.7a).
+            if (returnTrigger != null) land.RemoveAbility(returnTrigger);
+
             if (land.Zone == ZoneType.Graveyard)
             {
                 owner.Zones.Graveyard.RemoveCard(land);
@@ -126,18 +140,17 @@ public static class EarthbendAction
             land.SetZone(ZoneType.Battlefield);
             land.SetController(owner);
             land.MarkEnteredBattlefield();
-            land.Tap(); // CR 701.59c — returns tapped.
+            land.Tap(); // returns tapped.
         });
 
-        var returnTrigger = new TriggeredAbility(
+        returnTrigger = new DelayedTriggeredAbility(
             land,
             owner,
             condition: new EventTriggerCondition<CardMovedEvent>((e, _) =>
                 ReferenceEquals(e.Card, land)
                 && e.FromZone == ZoneType.Battlefield
                 && (e.ToZone == ZoneType.Graveyard || e.ToZone == ZoneType.Exile)),
-            effects: new IEffect[] { returnEffect },
-            activeZones: new[] { ZoneType.Battlefield, ZoneType.Graveyard, ZoneType.Exile });
+            effects: new IEffect[] { returnEffect });
 
         land.AddAbility(returnTrigger);
     }

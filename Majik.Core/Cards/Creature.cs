@@ -84,6 +84,25 @@ public class Creature : Permanent
         BaseToughness = toughness;
         _damage = 0;
     }
+
+    /// <summary>
+    /// Simulation copy constructor. Chains to <see cref="Permanent(Permanent)"/>
+    /// for base state, then copies Creature-level runtime state.
+    /// </summary>
+    protected Creature(Creature src) : base(src)
+    {
+        _basePower = src._basePower;
+        _baseToughness = src._baseToughness;
+        _damage = src._damage;
+        MarkedForDestructionByDeathtouch = src.MarkedForDestructionByDeathtouch;
+        IsCommander = src.IsCommander;
+        EvokeWasPaid = src.EvokeWasPaid;
+        BlitzWasPaid = src.BlitzWasPaid;
+        CanAttackAsThoughItDidntHaveDefenderThisTurn = src.CanAttackAsThoughItDidntHaveDefenderThisTurn;
+    }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new Creature(this);
     // ActiveEffects moved up to Permanent (CR 613) so non-creature
     // permanents can also consult the layer system (e.g. Layer-5
     // colour-changing on artifacts / enchantments). P/T and keyword

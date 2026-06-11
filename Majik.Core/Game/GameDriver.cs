@@ -374,11 +374,36 @@ public sealed class GameDriver
     /// (CR 500.7 extra-turn queue takes precedence over round-robin) →
     /// RunTurnAsync. Stops when only one (or zero) players remain alive or
     /// the turn cap is hit.</summary>
-    private async Task<GameResult> RunTurnLoopAsync(
+    private Task<GameResult> RunTurnLoopAsync(
         int startingIndex, Player startingPlayer, int maxTurns, CancellationToken ct)
+        => RunTurnsFromAsync(
+            startingActiveIndex: startingIndex,
+            startingTurnNumber: 0,
+            maxTurns: maxTurns,
+            startingPlayer: startingPlayer,
+            ct: ct);
+
+    /// <summary>
+    /// Shared turn-loop body. Runs FULL turns (via
+    /// <see cref="TurnDriver.RunTurnAsync"/>) starting at
+    /// <paramref name="startingTurnNumber"/> + 1, advancing the active-seat
+    /// index from <paramref name="startingActiveIndex"/>, up to
+    /// <paramref name="maxTurns"/> total turns played in this call.
+    ///
+    /// <para>Both <see cref="RunTurnLoopAsync"/> (which seeds it with
+    /// startingTurnNumber=0) and <see cref="ResumeGameAsync"/> (which seeds it
+    /// with the already-resumed turn number so subsequent FULL turns follow)
+    /// delegate here — one loop, no forking.</para>
+    /// </summary>
+    private async Task<GameResult> RunTurnsFromAsync(
+        int startingActiveIndex,
+        int startingTurnNumber,
+        int maxTurns,
+        Player startingPlayer,
+        CancellationToken ct)
     {
-        var turnNumber = 0;
-        var activeIndex = startingIndex;
+        var turnNumber = startingTurnNumber;
+        var activeIndex = startingActiveIndex;
         while (turnNumber < maxTurns)
         {
             _sba.CheckStateBasedActions(
@@ -410,6 +435,78 @@ public sealed class GameDriver
         var stillAlive = _players.Where(p => !p.HasLost).ToList();
         return new GameResult(
             turnNumber, stillAlive.Count == 1 ? stillAlive[0] : null, startingPlayer);
+    }
+
+    /// <summary>
+    /// Resume the engine at a cloned mid-game position WITHOUT shuffling
+    /// libraries or running mulligans — preserving the cloned board state.
+    ///
+    /// <para>Installs the same ambient scopes as <see cref="RunGameAsync"/>
+    /// (logical clock, deterministic-id source, per-game registry store) so all
+    /// subsystem closures resolve the correct per-sandbox instances. Then:</para>
+    /// <list type="number">
+    ///   <item>Runs the partial (resumed) turn via
+    ///     <see cref="TurnDriver.RunTurnFromPhaseAsync"/> — skipping untap,
+    ///     upkeep, draw, and turn-tracker resets — from
+    ///     <paramref name="resumePhase"/> to end of turn.</item>
+    ///   <item>Continues FULL turns from <paramref name="turnNumber"/> + 1 up
+    ///     to <paramref name="maxTurns"/> via the shared
+    ///     <see cref="RunTurnsFromAsync"/> loop, alternating from
+    ///     <paramref name="activePlayer"/>'s opponent.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="resumePhase">The phase at which to re-enter the current turn.</param>
+    /// <param name="activePlayer">The active player for the current (partial) turn.</param>
+    /// <param name="turnNumber">The turn number of the current (partial) turn.</param>
+    /// <param name="maxTurns">Total turn cap (same semantics as
+    ///   <see cref="RunGameAsync"/>). Must be &gt; <paramref name="turnNumber"/>
+    ///   for any subsequent turns to run.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<GameResult> ResumeGameAsync(
+        PhaseStateType resumePhase,
+        Player activePlayer,
+        int turnNumber,
+        int maxTurns,
+        CancellationToken ct = default)
+    {
+        // Install the same ambient scopes RunGameAsync installs so every
+        // trigger / effect / id / registry call inside this sandbox run
+        // resolves against THIS game's instances, not a stale ambient.
+        using var clockScope = LogicalClockScope.Push(_logicalClock);
+
+        var effectiveIdSource = DeterministicIdScope.Current ?? _idSource;
+        using var idScope = DeterministicIdScope.Push(effectiveIdSource);
+
+        using var registryScope = GameRegistryScope.PushForGame();
+        RegisterAmbientRegistries();
+
+        // Check terminal condition before doing any work.
+        if (TryFinalizeOnSurvivorCount(turnNumber, activePlayer) is { } early)
+            return early;
+
+        // Resume the partial turn at the requested phase (no untap/upkeep/draw).
+        await _turnDriver.RunTurnFromPhaseAsync(activePlayer, turnNumber, resumePhase, ct);
+
+        // After the resumed partial turn, check terminal again.
+        if (TryFinalizeOnSurvivorCount(turnNumber, activePlayer) is { } afterPartial)
+            return afterPartial;
+
+        // Find the index of the active player so the next turn advances to their opponent.
+        var activeIndex = 0;
+        for (var i = 0; i < _players.Count; i++)
+        {
+            if (ReferenceEquals(_players[i], activePlayer)) { activeIndex = i; break; }
+        }
+        // Advance to the next seat (the opponent's seat).
+        var nextActiveIndex = (activeIndex + 1) % _players.Count;
+
+        // Run full turns from turnNumber+1 up to maxTurns via the shared loop.
+        return await RunTurnsFromAsync(
+            startingActiveIndex: nextActiveIndex,
+            startingTurnNumber: turnNumber,
+            maxTurns: maxTurns,
+            startingPlayer: activePlayer,
+            ct: ct);
     }
 
     /// <summary>If exactly one (or zero) players remain alive, build the

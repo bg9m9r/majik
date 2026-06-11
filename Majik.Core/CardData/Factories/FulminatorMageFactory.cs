@@ -70,7 +70,7 @@ public static class FulminatorMageFactory
 
         var card = new Creature(
             name: CardName,
-            manaCost: "{B/R}{B/R}",
+            manaCost: "{1}{B/R}{B/R}",
             power: 2,
             toughness: 2,
             subtypes: new[] { CardSubtype.Elemental, CardSubtype.Shaman });

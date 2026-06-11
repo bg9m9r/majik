@@ -5,6 +5,8 @@ using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Rules;
 using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
@@ -14,14 +16,25 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Necrodominance (Modern Horizons 3 — black
-/// enchantment, Necropotence variant). Oracle text:
+/// enchantment, Necropotence variant).
 ///
-///   Enchantment — {B}{B}{B}
-///   "If you would draw a card except for the first card you draw in each
-///    of your draw steps, skip that draw.
-///    Skip your draw step.
-///    Pay 1 life: Exile the top card of your library face down. Look at
-///    it any time. You may cast that card from exile until end of turn."
+/// Printed oracle text (per the embedded seed):
+///
+///   Legendary Enchantment — {B}{B}{B}
+///   "Skip your draw step.
+///    At the beginning of your end step, you may pay any amount of life.
+///    If you do, draw that many cards.
+///    Your maximum hand size is five.
+///    If a card or token would be put into your graveyard from anywhere,
+///    exile it instead."
+///
+/// NOTE: the structural skip-additional-draw marker + the "Pay 1 life:
+/// exile top + cast-from-exile" activated ability modelled below were
+/// authored against an earlier (preview) wording of this card and do not
+/// correspond to the printed oracle text above; they are retained as-is
+/// (out of scope for the end-step trigger work) but are NOT part of the
+/// real card. The live, printed clause this factory now implements is the
+/// end-step pay-life-then-draw trigger.
 ///
 /// ## Implemented (v1)
 /// - Card identity: Enchantment, {B}{B}{B}, owner/controller.
@@ -49,6 +62,18 @@ namespace Majik.Core.CardData.Factories;
 ///   next Cleanup step (CR 514.2 — "until end of turn" expires when
 ///   the next Cleanup begins). Each activation records the exiled card
 ///   on the wiring so callers (and tests) can locate it for casting.
+/// - <b>Triggered ability — "At the beginning of your end step, you may
+///   pay any amount of life. If you do, draw that many cards."</b>: a
+///   <see cref="TriggeredAbility"/> gated on the controller's End step
+///   (<see cref="Triggers.OnStepBegin"/>). On resolution the controller's
+///   agent supplies the amount X via its variable-amount prompt
+///   (<see cref="IPlayerAgent.ChooseXAsync"/>), clamped to
+///   [0, LifeTotal] (CR 119.4); the controller then loses that much life
+///   (CR 119.1c) and draws that many cards via <see cref="Fx.DrawCards"/>
+///   (CR 120). The trigger lives on <c>card.Abilities</c>, so the live
+///   engine auto-registers it on ETB (<c>TriggerManager</c> scans
+///   battlefield permanents for <see cref="ITriggeredAbility"/>) — no
+///   explicit TriggerManager wiring is needed by callers.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>Face-down exile</b>: the engine has no per-card face-down flag
@@ -108,7 +133,10 @@ public static class NecrodominanceFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Enchantment(CardName, "{B}{B}{B}");
+        var card = new Enchantment(
+            CardName,
+            "{B}{B}{B}",
+            supertypes: new[] { CardSupertype.Legendary });
         card.SetOwner(owner);
         card.SetController(owner);
 
@@ -229,6 +257,65 @@ public static class NecrodominanceFactory
             });
 
         card.AddAbility(activated);
+
+        // -----------------------------------------------------------------
+        // Triggered — "At the beginning of your end step, you may pay any
+        //              amount of life. If you do, draw that many cards."
+        //
+        // CR 603.1 — a "you may" end-step trigger. On resolution the
+        // controller's agent chooses how much life to pay (the variable
+        // amount X). Paying 0 (or declining) draws nothing; paying N pays
+        // (loses) N life and draws N cards.
+        //
+        // The amount is sourced from the agent's variable-amount prompt
+        // (IPlayerAgent.ChooseXAsync) — the same primitive SpellCastFlow
+        // uses for {X} costs — then clamped to [0, controller.LifeTotal]
+        // (CR 119.4 — a player can't pay more life than they have; this
+        // seed has no "you don't lose the game for 0 or less life" clause,
+        // so paying down to 0 is the floor). Each drawn card is routed
+        // through Fx.DrawCards so the controller's ReplacementBus sees a
+        // DrawCardIntent (CR 614) — relevant if a future draw-replacement
+        // is attached; this seed's graveyard→exile replacement does not
+        // intercept draws, so the cards land in hand normally.
+        //
+        // The effect reads the live agent + game off the ResolutionContext
+        // (CR 608) — populated on the routed trigger-resolution path
+        // (TriggeredAbility.ResolveAsync). With no agent (shape path /
+        // legacy sync Execute) it falls back to the AgentRegistry, then to
+        // "pay nothing" so a context-free fire is a safe no-op.
+        // -----------------------------------------------------------------
+        var endStepEffect = new Effect(
+            "Necrodominance: you may pay any amount of life, then draw that many cards",
+            async (ResolutionContext ctx) =>
+            {
+                if (card.Zone != ZoneType.Battlefield) return;
+                var controller = card.Controller;
+                if (controller == null) return;
+
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
+                if (agent == null) return; // No decider → pay nothing (CR 119.1 — optional).
+
+                var requested = await agent
+                    .ChooseXAsync(ctx.Game!, card, ctx.Ct)
+                    .ConfigureAwait(false);
+
+                // CR 119.4 — clamp to the life the controller can actually
+                // pay; a negative request (mis-behaving agent) pays nothing.
+                var amount = Math.Clamp(requested, 0, controller.LifeTotal);
+                if (amount <= 0) return;
+
+                controller.LoseLife(amount);            // CR 119.1c — paying life is losing it.
+                Fx.DrawCards(controller, amount);       // CR 120 — draw that many.
+            });
+
+        var endStepTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: Triggers.OnStepBegin(owner, StepStateType.End),
+            effects: new IEffect[] { endStepEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(endStepTrigger);
 
         var cleanup = new NecrodominanceCleanup(skipToken);
         return new NecrodominanceWiring(card, activeCasts, cleanup);

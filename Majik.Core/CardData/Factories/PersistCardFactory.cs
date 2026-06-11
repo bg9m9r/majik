@@ -62,7 +62,7 @@ namespace Majik.Core.CardData.Factories;
 public static class PersistCardFactory
 {
     public const string CardName = "Persist";
-    public const string PrintedManaCost = "{2}{B}";
+    public const string PrintedManaCost = "{1}{B}";
     public const int ManaValueCeiling = 3;
 
     /// <summary>Granted keyword. CR 702.10 — Haste.</summary>

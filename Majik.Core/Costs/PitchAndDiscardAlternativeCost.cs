@@ -105,9 +105,10 @@ public sealed class PitchAndDiscardAlternativeCost : IAlternativeCost
         }
         if (DiscardedCard.Zone == ZoneType.Hand)
         {
-            caster.Zones.Hand.RemoveCard(DiscardedCard);
-            caster.Zones.Graveyard.AddCard(DiscardedCard);
-            // Zone.AddCard sets card.Zone — no manual SetZone needed.
+            // CR 701.8 — route the discard half through the central discard
+            // chokepoint so a DiscardedEvent fires (wasCost: true). The pitch
+            // half (above) goes to exile and is NOT a discard.
+            Majik.Core.Primitives.Fx.DiscardCard(caster, DiscardedCard, wasCost: true);
         }
     }
 }

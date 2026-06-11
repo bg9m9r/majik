@@ -15,7 +15,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Unit tests for <see cref="StreetWraithFactory"/> (Future Sight).
 ///
 /// Covers:
-/// - Identity ({3}{B}{B} Creature — Zombie 3/4).
+/// - Identity ({3}{B}{B} Creature — Wraith 3/4; no enum'd subtype).
 /// - Swampwalk keyword marker.
 /// - Cycling activated ability: cost shape (<see cref="PayLifeCost"/>(2) +
 ///   <see cref="DiscardSelfCost"/>), hand-zone gate, life-floor gate,
@@ -32,7 +32,7 @@ public class StreetWraithFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void StreetWraith_Identity_ZombieThreeFour()
+    public void StreetWraith_Identity_WraithThreeFour()
     {
         var wraith = StreetWraithFactory.Create(_alice);
 
@@ -41,7 +41,10 @@ public class StreetWraithFactoryTests
         wraith.BasePower.Should().Be(3);
         wraith.BaseToughness.Should().Be(4);
         wraith.HasType(CardType.Creature).Should().BeTrue();
-        wraith.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
+        // CR 205.3m — printed "Creature — Wraith"; the engine has no Wraith
+        // CardSubtype, so no subtype is carried and it is NOT a Zombie.
+        wraith.HasSubtype(CardSubtype.Zombie).Should().BeFalse();
+        wraith.Subtypes.Should().BeEmpty();
         wraith.Owner.Should().BeSameAs(_alice);
         wraith.Controller.Should().BeSameAs(_alice);
     }

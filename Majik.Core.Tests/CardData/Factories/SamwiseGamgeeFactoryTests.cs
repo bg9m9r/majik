@@ -59,7 +59,7 @@ public class SamwiseGamgeeFactoryTests
         c.Subtypes.Should().Contain(CardSubtype.Halfling);
         c.Subtypes.Should().Contain(CardSubtype.Peasant);
         c.BasePower.Should().Be(2);
-        c.BaseToughness.Should().Be(1);
+        c.BaseToughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
 

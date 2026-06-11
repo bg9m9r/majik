@@ -84,6 +84,51 @@ public class FestivalCrasherFactoryTests
             "single-arg dispatcher path is shape-only — no cast trigger");
     }
 
+    /// <summary>
+    /// PROD-PATH regression guard. The production GameFacade routed build calls
+    /// <see cref="NamedCardFactory.Create(string, Player, ContinuousEffectsService?)"/>
+    /// (the effects-aware dispatch), NOT the 3-arg factory overload directly. If
+    /// that dispatch does not route to Festival Crasher's effects-aware overload
+    /// the card is built shape-only and the +2/+0 cast trigger is inert in real
+    /// play. This builds the card exactly as prod does and drives a full cast →
+    /// auto-bind → pump cycle through the live TriggerManager / event bus.
+    /// </summary>
+    [Fact]
+    public void EffectsAwareDispatch_WiresAndFiresCastTrigger_OnProdPath()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var effects = new ContinuousEffectsService();
+
+        // Prod dispatch: GameFacade.BuildDeckCard → NamedCardFactory.Create(name, owner, effects).
+        var built = NamedCardFactory.Create("Festival Crasher", _alice, effects);
+        built.Should().BeOfType<Creature>();
+        var fc = (Creature)built;
+        fc.ActiveEffects = effects;
+
+        // The trigger must be attached to the card so the live TriggerManager
+        // auto-binds it on the first zone crossing (battlefield entry).
+        fc.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the prod effects-aware dispatch must route through the "
+            + "Create(Player, ContinuousEffectsService) overload — not shape-only");
+
+        // Move onto the battlefield via an event the manager sees, so it
+        // auto-binds the trigger (mirrors live play — nobody passes a
+        // TriggerManager to the prod factory dispatch).
+        fc.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(fc, ZoneType.Library, ZoneType.Battlefield));
+
+        bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "Lightning Bolt")));
+        triggers.PendingCount.Should().Be(1, "the auto-bound cast trigger fires in live play");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        fc.Power.Should().Be(3, "+2/+0 pumps base 1/3 to 3/3 until end of turn on the prod path");
+        fc.Toughness.Should().Be(3);
+    }
+
     // -----------------------------------------------------------------------
     // Instant cast by controller → +2/+0 until end of turn (1/3 → 3/3)
     // -----------------------------------------------------------------------

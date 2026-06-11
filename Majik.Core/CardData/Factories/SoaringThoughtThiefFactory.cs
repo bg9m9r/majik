@@ -13,7 +13,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Soaring Thought-Thief (Zendikar Rising,
-/// {1}{U}). Creature — Faerie Rogue 1/2.
+/// {1}{U}). Creature — Human Rogue 1/3.
 ///
 /// Oracle text:
 ///   "Flying
@@ -22,7 +22,7 @@ namespace Majik.Core.CardData.Factories;
 ///    Other Rogues you control have flying."
 ///
 /// ## Implemented (v1)
-/// - 1/2 Creature — Faerie Rogue, mana cost {1}{U}, owner/controller wired.
+/// - 1/3 Creature — Human Rogue, mana cost {1}{U}, owner/controller wired.
 /// - <b>Flying</b> keyword marker (CR 702.9) via <see cref="KeywordAbility"/>.
 /// - <b>Attack-with-Rogues trigger (CR 603.1 / CR 508.1f)</b> wired via
 ///   <see cref="EventTriggerCondition{TEvent}"/> against
@@ -69,7 +69,7 @@ public static class SoaringThoughtThiefFactory
     public const string CardName = "Soaring Thought-Thief";
     public const string PrintedManaCost = "{1}{U}";
     public const int Power = 1;
-    public const int Toughness = 2;
+    public const int Toughness = 3;
 
     /// <summary>Number of cards milled by the attack trigger.</summary>
     public const int MillCount = 2;
@@ -86,11 +86,14 @@ public static class SoaringThoughtThiefFactory
         => Create(
             owner,
             continuousEffects: null,
-            triggers: null,
-            allPlayersResolver: null);
+            triggers: null);
 
     /// <summary>
-    /// Construct a fully-wired Soaring Thought-Thief.
+    /// Construct a fully-wired Soaring Thought-Thief. The attack-trigger mill
+    /// body reads the player list from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution to pick the target opponent —
+    /// no captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="continuousEffects">Layers service to register the
@@ -99,14 +102,10 @@ public static class SoaringThoughtThiefFactory
     /// <param name="triggers">TriggerManager to register the attack-with-
     /// Rogues trigger against. May be null — the trigger is still attached
     /// to the card shape.</param>
-    /// <param name="allPlayersResolver">Closure returning the full player
-    /// list. Called at trigger resolution to pick the target opponent for
-    /// the mill body. May be null — mill body is a no-op.</param>
     public static Creature Create(
         Player owner,
         ContinuousEffectsService? continuousEffects,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -115,7 +114,7 @@ public static class SoaringThoughtThiefFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Faerie, CardSubtype.Rogue });
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Rogue });
 
         card.SetOwner(owner);
         card.SetController(owner);
@@ -151,7 +150,11 @@ public static class SoaringThoughtThiefFactory
         TriggeredAbility? attackTrigger = null;
         var attackEffect = new Effect(
             $"{CardName}: target opponent mills 2",
-            () => ResolveAttackMill(attackTrigger, card, owner, allPlayersResolver));
+            ctx =>
+            {
+                ResolveAttackMill(attackTrigger, card, owner, ctx.Game?.AllPlayers);
+                return ValueTask.CompletedTask;
+            });
 
         attackTrigger = new TriggeredAbility(
             source: card,
@@ -194,10 +197,8 @@ public static class SoaringThoughtThiefFactory
         TriggeredAbility? attackTrigger,
         Creature card,
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        IReadOnlyList<Player>? players)
     {
-        if (allPlayersResolver == null) return;
-        var players = allPlayersResolver();
         if (players == null) return;
 
         var controller = card.Controller ?? owner;

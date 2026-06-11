@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -130,7 +131,6 @@ public class RangerCaptainOfEosTests : IDisposable
     {
         var rc = RangerCaptainOfEosFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: null,
             triggers: null);
 
@@ -138,7 +138,7 @@ public class RangerCaptainOfEosTests : IDisposable
         rc.SetZone(ZoneType.Battlefield);
 
         var ability = rc.Abilities.OfType<ActivatedAbility>().First();
-        foreach (var effect in ability.Effects) effect.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         CastingRestrictions.CannotCastNoncreatureSpell(_bob).Should().BeTrue();
         // Controller (Alice) is not opponent-side — not restricted.
@@ -146,6 +146,31 @@ public class RangerCaptainOfEosTests : IDisposable
         // Sacrifice moved Ranger-Captain to the graveyard.
         _alice.Zones.Graveyard.GetCards().Should().Contain(rc);
         _alice.Zones.Battlefield.GetCards().Should().NotContain(rc);
+    }
+
+    [Fact]
+    public void SacCost_WhenBusWired_PublishesPermanentSacrificedEvent()
+    {
+        // Task 3.5 (class-(a) sac-bus subset): a sac-cost factory that has an
+        // IEventBus in scope at the AdditionalCost.Sacrifice call site now
+        // threads it, so paying the cost publishes PermanentSacrificedEvent
+        // (CR 701.16a) — the seam aristocrat "whenever an opponent sacrifices…"
+        // payoffs read.
+        var bus = new EventBus();
+        var captured = new List<Majik.Core.Events.PermanentSacrificedEvent>();
+        bus.Subscribe<Majik.Core.Events.PermanentSacrificedEvent>(captured.Add);
+
+        var rc = RangerCaptainOfEosFactory.Create(_alice, eventBus: bus, triggers: null);
+        _alice.Zones.Battlefield.AddCard(rc);
+        rc.SetZone(ZoneType.Battlefield);
+
+        var sacCost = rc.Abilities.OfType<ActivatedAbility>().First()
+            .Costs.OfType<Majik.Core.Costs.AdditionalCost>().Single();
+        sacCost.Pay(_alice);
+
+        captured.Should().ContainSingle()
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(rc);
     }
 
     [Fact]
@@ -179,7 +204,6 @@ public class RangerCaptainOfEosTests : IDisposable
         var bus = new EventBus();
         var rc = RangerCaptainOfEosFactory.Create(
             _alice,
-            opponentResolver: () => new[] { _bob },
             eventBus: bus,
             triggers: null);
 
@@ -187,7 +211,7 @@ public class RangerCaptainOfEosTests : IDisposable
         rc.SetZone(ZoneType.Battlefield);
 
         var ability = rc.Abilities.OfType<ActivatedAbility>().First();
-        foreach (var effect in ability.Effects) effect.Execute();
+        ContextResolve.Resolve(ability, _alice, _alice, _bob);
         CastingRestrictions.CannotCastNoncreatureSpell(_bob).Should().BeTrue();
 
         // Publish a TurnEndedEvent — handler clears the restriction.

@@ -90,7 +90,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SaiMasterThopteristFactory
 {
     public const string CardName = "Sai, Master Thopterist";
-    public const string PrintedManaCost = "{1}{U}";
+    public const string PrintedManaCost = "{2}{U}";
     public const int Power = 1;
     public const int Toughness = 4;
     public const string ActivationCost = "{2}";

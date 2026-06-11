@@ -16,8 +16,11 @@
       "list": []
     },
     "mana": {
-      "count": 0,
-      "list": []
+      "count": 2,
+      "list": [
+        "mana:R",
+        "mana:U"
+      ]
     },
     "activated": {
       "count": 0,

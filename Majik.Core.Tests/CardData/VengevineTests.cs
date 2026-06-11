@@ -43,7 +43,7 @@ public class VengevineTests
         card.Name.Should().Be("Vengevine");
         card.ManaCost.Should().Be("{2}{G}{G}");
         card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plant).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Plant).Should().BeFalse();
         card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
         card.BasePower.Should().Be(4);
         card.BaseToughness.Should().Be(3);
@@ -68,7 +68,7 @@ public class VengevineTests
 
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Vengevine");
-        card.HasSubtype(CardSubtype.Plant).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Plant).Should().BeFalse();
         card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
     }
 

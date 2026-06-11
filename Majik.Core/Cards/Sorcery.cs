@@ -16,6 +16,15 @@ public class Sorcery : Card
     {
     }
 
+    /// <summary>Simulation copy constructor. Chains through
+    /// <see cref="Card(Card)"/> for all base runtime state.
+    /// <see cref="Sorcery"/> has no additional mutable runtime fields.
+    /// </summary>
+    protected Sorcery(Sorcery src) : base(src) { }
+
+    /// <inheritdoc cref="Card.CloneForSim"/>
+    internal override Card CloneForSim() => new Sorcery(this);
+
     /// <summary>
     /// Check if the sorcery can be cast.
     /// Sorceries can only be cast during main phase with empty stack (Rule 307.1).

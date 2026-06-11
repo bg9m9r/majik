@@ -12,7 +12,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Priest of Fell Rites (Modern Horizons 2, {W}{B}).
 ///
-/// Creature — Human Cleric 2/1. Oracle text:
+/// Creature — Human Warlock 2/2. Oracle text:
 ///   "When Priest of Fell Rites enters, you may return target creature card
 ///    with mana value 3 or less from your graveyard to the battlefield.
 ///    {2}{W}{B}, Exile Priest of Fell Rites from your graveyard: Return
@@ -20,7 +20,7 @@ namespace Majik.Core.CardData.Factories;
 ///    only as a sorcery."
 ///
 /// ## Implemented (v1)
-/// - 2/1 Human Cleric with mana cost {W}{B}.
+/// - 2/2 Human Warlock with mana cost {W}{B}.
 /// - <b>ETB triggered ability (CR 603.1)</b>: When Priest of Fell Rites
 ///   enters, the controller may return target creature card with mana
 ///   value 3 or less from their graveyard to the battlefield. v1 picks
@@ -95,8 +95,8 @@ public static class PriestOfFellRitesFactory
             name: "Priest of Fell Rites",
             manaCost: "{W}{B}",
             power: 2,
-            toughness: 1,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Cleric });
+            toughness: 2,
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Warlock });
 
         card.SetOwner(owner);
         card.SetController(owner);

@@ -45,7 +45,7 @@ public class NahirisWrathTests
         var card = NahirisWrathFactory.Create(_alice);
 
         card.Name.Should().Be("Nahiri's Wrath");
-        card.ManaCost.Should().Be("{4}{R}{R}");
+        card.ManaCost.Should().Be("{2}{R}");
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);

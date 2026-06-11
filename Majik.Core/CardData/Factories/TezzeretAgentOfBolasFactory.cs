@@ -335,4 +335,14 @@ public sealed class TezzeretSetBasePTEffect : ContinuousEffect
         chars.Power = NewPower;
         chars.Toughness = NewToughness;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="TezzeretSetBasePTEffect"/> bound to
+    /// <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: NewPower, NewToughness; target → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new TezzeretSetBasePTEffect(clonedSource, NewPower, NewToughness);
 }

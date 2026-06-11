@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
+using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Xunit;
@@ -43,5 +44,31 @@ public class ResolutionContextTests
         ResolutionContext.Legacy.Agent.Should().BeNull();
         ResolutionContext.Legacy.Game.Should().BeNull();
         ResolutionContext.Legacy.ChosenTargets.Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // STAGE 1 (re-sourceable abilities) — ResolutionContext.Source.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void For_DefaultSource_IsNull()
+    {
+        var controller = new Player("P", 20);
+
+        var rc = ResolutionContext.For(controller, agent: null, game: null, chosenTargets: null);
+
+        rc.Source.Should().BeNull();
+    }
+
+    [Fact]
+    public void For_CarriesSource()
+    {
+        var controller = new Player("P", 20);
+        var source = new Creature("Grizzly Bears", "1G", 2, 2);
+
+        var rc = ResolutionContext.For(
+            controller, agent: null, game: null, chosenTargets: null, source: source);
+
+        rc.Source.Should().BeSameAs(source);
     }
 }

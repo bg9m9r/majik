@@ -59,9 +59,10 @@ public sealed class DiscardACreatureCardAdditionalCost : IAdditionalCost
             .FirstOrDefault(c => c.HasType(CardType.Creature));
         if (pick == null) return false;
 
-        caster.Zones.Hand.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        // CR 701.8 — route through the central discard chokepoint so a
+        // DiscardedEvent fires (wasCost: true) and "Whenever you discard a
+        // card …" triggers see it.
+        Majik.Core.Primitives.Fx.DiscardCard(caster, pick, wasCost: true);
         Discarded = pick;
         return true;
     }

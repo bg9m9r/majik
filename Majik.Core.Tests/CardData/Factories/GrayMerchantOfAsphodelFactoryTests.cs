@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -45,13 +46,31 @@ public class GrayMerchantOfAsphodelFactoryTests
     /// Place a Gray Merchant on Alice's battlefield (so its own {B}{B} counts
     /// toward her devotion to black, as it does when the trigger resolves).
     /// </summary>
-    private Creature PlaceMerchant(Func<IReadOnlyList<Player>>? opponentResolver)
+    private Creature PlaceMerchant()
     {
-        var merchant = GrayMerchantOfAsphodelFactory.Create(
-            _alice, triggers: null, opponentResolver: opponentResolver);
+        var merchant = GrayMerchantOfAsphodelFactory.Create(_alice);
         merchant.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(merchant);
         return merchant;
+    }
+
+    /// <summary>
+    /// Resolve the ETB trigger through the async path with a live
+    /// <see cref="GameContext"/>, so "each opponent" reads off the live game
+    /// exactly as it does in a real match (the resolver-null bug class fix).
+    /// </summary>
+    private static void ResolveEtb(Creature merchant, Player controller, params Player[] players)
+    {
+        var game = new GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new EventBus()));
+
+        var trigger = merchant.Abilities.OfType<TriggeredAbility>().Single();
+        trigger.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 
     private void AddBlackPermanent(string name, string manaCost)
@@ -126,24 +145,44 @@ public class GrayMerchantOfAsphodelFactoryTests
     {
         // Just Gray Merchant on the battlefield: devotion to black = its own
         // {B}{B} = 2 (CR 700.5 — the source counts itself once resolving).
-        var merchant = PlaceMerchant(() => new[] { _bob });
+        var merchant = PlaceMerchant();
 
-        foreach (var e in EtbOf(merchant).Effects) e.Execute();
+        ResolveEtb(merchant, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(18, "X = devotion to black = 2 (Gray Merchant's own {B}{B})");
         _alice.LifeTotal.Should().Be(22, "Alice gains life equal to the 2 life lost this way");
     }
 
+    /// <summary>
+    /// PROD-PATH guard (resolver-null bug class). Gray Merchant's ETB drain is a
+    /// Modern staple — the routed <see cref="NamedCardFactory.Create(string, Player)"/>
+    /// build must drain each opponent read off the live <see cref="GameContext"/>,
+    /// not no-op on a captured-null resolver.
+    /// </summary>
+    [Fact]
+    public void Etb_DrainsEachOpponent_OnProdBuild()
+    {
+        var merchant = (Creature)NamedCardFactory.Create("Gray Merchant of Asphodel", _alice);
+        merchant.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(merchant);
+
+        ResolveEtb(merchant, _alice, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(18,
+            "the prod-built ETB devotion drain reads opponents from the live context (not inert)");
+        _alice.LifeTotal.Should().Be(22, "Alice gains the 2 life lost this way");
+    }
+
     [Fact]
     public void Etb_CountsOtherBlackPermanents_TowardDevotion()
     {
-        var merchant = PlaceMerchant(() => new[] { _bob });
+        var merchant = PlaceMerchant();
         AddBlackPermanent("Diregraf Ghoul", "{B}");        // +1 black
         AddBlackPermanent("Phyrexian Obliterator", "{B}{B}{B}{B}"); // +4 black
         AddBlackPermanent("Grizzly Bears Stand-in", "{1}{G}");      // +0 black
 
         // Devotion to black = 2 (merchant) + 1 + 4 = 7.
-        foreach (var e in EtbOf(merchant).Effects) e.Execute();
+        ResolveEtb(merchant, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(13, "X = devotion to black = 7");
         _alice.LifeTotal.Should().Be(27, "Alice gains the 7 life lost this way");
@@ -152,10 +191,10 @@ public class GrayMerchantOfAsphodelFactoryTests
     [Fact]
     public void Etb_MultipleOpponents_EachLosesX_GainsTotal()
     {
-        var merchant = PlaceMerchant(() => new[] { _bob, _carol });
+        var merchant = PlaceMerchant();
         AddBlackPermanent("Diregraf Ghoul", "{B}"); // devotion = 2 + 1 = 3
 
-        foreach (var e in EtbOf(merchant).Effects) e.Execute();
+        ResolveEtb(merchant, _alice, _alice, _bob, _carol);
 
         _bob.LifeTotal.Should().Be(17, "each opponent loses X = 3");
         _carol.LifeTotal.Should().Be(17, "each opponent loses X = 3");
@@ -168,30 +207,30 @@ public class GrayMerchantOfAsphodelFactoryTests
     {
         // Gray Merchant NOT on the battlefield and no black permanents → the
         // controller's devotion to black is 0, so X = 0 and nothing happens.
-        var merchant = GrayMerchantOfAsphodelFactory.Create(
-            _alice, triggers: null, opponentResolver: () => new[] { _bob });
+        var merchant = GrayMerchantOfAsphodelFactory.Create(_alice);
 
-        foreach (var e in EtbOf(merchant).Effects) e.Execute();
+        ResolveEtb(merchant, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(20, "devotion to black = 0 ⇒ each opponent loses 0");
         _alice.LifeTotal.Should().Be(20, "no life lost this way ⇒ no lifegain");
     }
 
     [Fact]
-    public void Etb_NoResolver_NoOps()
+    public void Etb_NoLiveGame_NoOps()
     {
-        var merchant = PlaceMerchant(opponentResolver: null);
+        var merchant = PlaceMerchant();
 
+        // No live game context → no opponents → drain no-ops.
         foreach (var e in EtbOf(merchant).Effects) e.Execute();
 
-        _bob.LifeTotal.Should().Be(20, "no opponent resolver ⇒ drain no-ops");
+        _bob.LifeTotal.Should().Be(20, "no live game ⇒ drain no-ops");
         _alice.LifeTotal.Should().Be(20, "no life lost this way ⇒ no lifegain");
     }
 
     [Fact]
     public void Etb_DevotionHelper_CountsBlackPips()
     {
-        PlaceMerchant(opponentResolver: null);
+        PlaceMerchant();
         AddBlackPermanent("Diregraf Ghoul", "{B}");
 
         NykthosShrineToNyxFactory

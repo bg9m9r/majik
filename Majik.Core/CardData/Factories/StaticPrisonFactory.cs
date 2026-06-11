@@ -110,7 +110,7 @@ namespace Majik.Core.CardData.Factories;
 public static class StaticPrisonFactory
 {
     public const string CardName = "Static Prison";
-    public const string PrintedManaCost = "{2}{W}";
+    public const string PrintedManaCost = "{W}";
 
     /// <summary>
     /// Construct Static Prison with no live bus / trigger-manager wiring.

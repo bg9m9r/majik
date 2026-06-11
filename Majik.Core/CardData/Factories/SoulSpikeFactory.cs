@@ -41,7 +41,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SoulSpikeFactory
 {
     public const string CardName = "Soul Spike";
-    public const string PrintedManaCost = "{3}{B}{B}";
+    public const string PrintedManaCost = "{5}{B}{B}";
 
     public const int DamageAmount = 4;
     public const int LifeGainAmount = 4;

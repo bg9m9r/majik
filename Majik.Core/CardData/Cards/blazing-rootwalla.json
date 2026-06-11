@@ -1,0 +1,9 @@
+{
+  "name": "Blazing Rootwalla",
+  "types": ["Creature"],
+  "subtypes": ["Lizard"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}

@@ -76,22 +76,14 @@ public static class OblivionStoneFactory
     public const string Cost = "{3}";
 
     /// <summary>
-    /// Construct Oblivion Stone with no live runtime wiring. Both
-    /// activated abilities are attached for shape observability; the
-    /// sweep / counter scans see only the controller's battlefield.
+    /// Construct Oblivion Stone. Both activated abilities scan every player's
+    /// battlefield read from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution — no captured player
+    /// resolver, so they are correct on the production routed build (mirrors
+    /// #2551). With no live game context the scans fall back to the
+    /// controller's battlefield (shape-only paths).
     /// </summary>
-    public static Artifact Create(Player owner) =>
-        Create(owner, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Oblivion Stone. When
-    /// <paramref name="allPlayersResolver"/> is supplied, both abilities
-    /// scan every player's battlefield; otherwise only the controller's
-    /// battlefield is scanned.
-    /// </summary>
-    public static Artifact Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Artifact Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -107,11 +99,13 @@ public static class OblivionStoneFactory
         // ----------------------------------------------------------------
         var markEffect = new Effect(
             $"{CardName}: put a fate counter on each nonland permanent",
-            () =>
+            ctx =>
             {
-                if (stone.Zone != ZoneType.Battlefield) return;
+                if (stone.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each nonland permanent" — across every player's battlefield,
+                // read from the LIVE game at resolution (ctx.Game.AllPlayers).
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -127,6 +121,8 @@ public static class OblivionStoneFactory
                         perm.Counters.Add(CounterType.Fate, 1);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         stone.AddAbility(new ActivatedAbility(
@@ -155,7 +151,7 @@ public static class OblivionStoneFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: destroy each nonland permanent without a fate counter; remove all fate counters",
-            () =>
+            ctx =>
             {
                 // Self-sac stub — perform the zone move so visible state
                 // matches CR 701.16 BEFORE the sweep scans the battlefield.
@@ -166,7 +162,9 @@ public static class OblivionStoneFactory
                     stone.SetZone(ZoneType.Graveyard);
                 }
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each nonland permanent" — across every player's battlefield,
+                // read from the LIVE game at resolution (ctx.Game.AllPlayers).
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 // Destroy pass — collect victims first, then mutate.
@@ -202,6 +200,8 @@ public static class OblivionStoneFactory
                         }
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         stone.AddAbility(new ActivatedAbility(

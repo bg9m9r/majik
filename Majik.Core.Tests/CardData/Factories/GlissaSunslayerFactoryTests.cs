@@ -62,7 +62,7 @@ public class GlissaSunslayerFactoryTests : IDisposable
         c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
         c.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
         c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.ManaCost.Should().Be("{B}{G}");
+        c.ManaCost.Should().Be("{1}{B}{G}");
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }

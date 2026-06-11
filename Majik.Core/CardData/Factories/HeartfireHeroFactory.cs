@@ -88,23 +88,13 @@ public static class HeartfireHeroFactory
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null, effects: null, opponentResolver: null);
+        Create(owner, eventBus: null, triggers: null, effects: null);
 
     /// <summary>
-    /// Construct Heartfire Hero with the trigger-driving services wired but no
-    /// opponent resolver — the Valiant counter side is live; the dies-damage
-    /// side is a no-op (no opponents supplied). Convenience overload for
-    /// Valiant-focused tests.
-    /// </summary>
-    public static Creature Create(
-        Player owner,
-        IEventBus? eventBus,
-        TriggerManager? triggers,
-        ContinuousEffectsService? effects) =>
-        Create(owner, eventBus, triggers, effects, opponentResolver: null);
-
-    /// <summary>
-    /// Construct Heartfire Hero with optional runtime services.
+    /// Construct Heartfire Hero with optional runtime services. The dies trigger
+    /// reads "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">When supplied, a <see cref="TurnStartedEvent"/>
@@ -116,14 +106,11 @@ public static class HeartfireHeroFactory
     /// <see cref="Creature.Power"/> / toughness via the layer compute
     /// (CR 122 / 613). When null, the counter is still added but
     /// <see cref="Creature.GetPower"/> falls back to base P/T.</param>
-    /// <param name="opponentResolver">Supplies the opponents the dies trigger
-    /// damages (CR 603.6d). May be null — the damage side no-ops.</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
         TriggerManager? triggers,
-        ContinuousEffectsService? effects,
-        Func<IEnumerable<Player>?>? opponentResolver)
+        ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -144,7 +131,7 @@ public static class HeartfireHeroFactory
         triggers?.RegisterTriggeredAbility(valiant);
 
         // CR 603.6d — dies trigger.
-        var dies = BuildDies(card, owner, opponentResolver);
+        var dies = BuildDies(card, owner);
         card.AddAbility(dies);
         triggers?.RegisterTriggeredAbility(dies);
 
@@ -214,7 +201,7 @@ public static class HeartfireHeroFactory
     /// equal to its power to each opponent." (CR 603.6d / 700.4 / 603.10).
     /// </summary>
     private static TriggeredAbility BuildDies(
-        Creature card, Player owner, Func<IEnumerable<Player>?>? opponentResolver)
+        Creature card, Player owner)
     {
         var condition = new EventTriggerCondition<CardMovedEvent>((e, _) =>
         {
@@ -226,23 +213,25 @@ public static class HeartfireHeroFactory
 
         var damageEffect = new Effect(
             $"{CardName} dies: deal damage equal to its power to each opponent",
-            () =>
+            ctx =>
             {
                 // CR 603.10 — "its power" is last-known information: the
                 // Creature instance retains its counters + ActiveEffects
                 // reference after leaving the battlefield, so Power here is
                 // the power the hero had immediately before it died.
                 var power = card.Power;
-                if (power <= 0) return;
+                if (power <= 0) return ValueTask.CompletedTask;
 
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the damage INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamage(opp, power); // CR 119 — Player → LoseLife
                 }
+                return ValueTask.CompletedTask;
             });
 
         // CR 603.6d — a self-naming dies trigger must remain active in the

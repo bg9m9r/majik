@@ -95,9 +95,9 @@ public sealed class EscalateDiscardAdditionalCost : IAdditionalCost
             pick = eligible[0];
         }
 
-        caster.Zones.Hand.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        // CR 701.8 — route through the central discard chokepoint so a
+        // DiscardedEvent fires (wasCost: true).
+        Majik.Core.Primitives.Fx.DiscardCard(caster, pick, wasCost: true);
         Discarded = pick;
         return true;
     }

@@ -13,11 +13,11 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for Munitions Expert (Mercadian Masques, {R}, Creature — Goblin
-/// Warrior 1/1).
+/// Tests for Munitions Expert (Modern Horizons 3, {B}{R}, Creature —
+/// Goblin 1/1).
 ///
 /// Covers:
-/// - Identity (Goblin + Warrior, {R}, 1/1, owner/controller).
+/// - Identity (Goblin, {B}{R}, 1/1, owner/controller).
 /// - NamedCardFactory dispatch.
 /// - ETB trigger shape: declares one 1..1 any-target request.
 /// - ETB resolution: deals X damage = Goblins controller controls
@@ -52,10 +52,11 @@ public class MunitionsExpertTests
         var me = MunitionsExpertFactory.Create(_alice);
 
         me.Name.Should().Be("Munitions Expert");
-        me.ManaCost.Should().Be("{R}");
+        me.ManaCost.Should().Be("{B}{R}");
         me.HasType(CardType.Creature).Should().BeTrue();
         me.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        me.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        // CR 205.3m — seed type line is "Creature — Goblin"; NOT a Warrior.
+        me.HasSubtype(CardSubtype.Warrior).Should().BeFalse();
         me.BasePower.Should().Be(MunitionsExpertFactory.Power);
         me.BaseToughness.Should().Be(MunitionsExpertFactory.Toughness);
         me.Owner.Should().BeSameAs(_alice);
@@ -70,7 +71,7 @@ public class MunitionsExpertTests
         c.Should().BeOfType<Creature>();
         c.Name.Should().Be("Munitions Expert");
         c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeFalse();
     }
 
     // -----------------------------------------------------------------------

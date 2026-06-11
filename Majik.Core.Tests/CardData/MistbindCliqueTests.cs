@@ -39,7 +39,7 @@ public class MistbindCliqueTests
         var c = MistbindCliqueFactory.Create(_alice);
 
         c.Name.Should().Be("Mistbind Clique");
-        c.ManaCost.Should().Be("{3}{U}{U}");
+        c.ManaCost.Should().Be("{3}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
         c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();

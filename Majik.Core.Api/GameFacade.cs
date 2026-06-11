@@ -212,6 +212,21 @@ public sealed class GameFacade : IDisposable
     public Player Bob => _bob;
 
     /// <summary>
+    /// Test-only: the live spell stack for this facade. Exposed as internal so
+    /// simulation tests (SandboxParityTests) can pass it to
+    /// <see cref="Majik.Core.Simulation.SandboxGame.From"/> when building a
+    /// mid-game sandbox from a live facade state.
+    /// </summary>
+    internal Majik.Core.Stack.Stack LiveStack => _stack;
+
+    /// <summary>
+    /// Test-only: the live per-turn state tally. Exposed as internal so
+    /// simulation tests (SandboxParityTests) can pass it to
+    /// <see cref="Majik.Core.Simulation.SandboxGame.From"/>.
+    /// </summary>
+    internal Majik.Core.Game.TurnState? LiveTurnState => null; // TurnDriver owns TurnState; facade tracks only PhaseStateType. Pass null — acceptable for sandbox seeding.
+
+    /// <summary>
     /// True when the seat with this id is driven by a HUMAN agent — i.e. its
     /// effective agent is still the wire-facing <see cref="RemoteAgent"/> (a
     /// seat whose prompts come over the wire and are answered by
@@ -344,7 +359,7 @@ public sealed class GameFacade : IDisposable
         var castFlow = new SpellCastFlow(_stack, _zones, _bus);
         var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects);
 
-        async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
+        async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
             var isPermanent = cast.Card.HasType(Majik.Core.Cards.Types.CardType.Creature)
                 || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
@@ -354,7 +369,7 @@ public sealed class GameFacade : IDisposable
             {
                 // No spell-def resolver in this facade — skip non-permanent
                 // casts rather than waste the card.
-                return;
+                return false; // not committed: non-permanent with no resolver
             }
 
             var agent = agents[actor];
@@ -386,7 +401,12 @@ public sealed class GameFacade : IDisposable
                 // Cancelled sentinel. Spell stays in hand, nothing fires.
                 if (payment.IsCancelled)
                 {
-                    return;
+                    // CR 601.2 / CR 727 — player explicitly cancelled. The cast
+                    // is abandoned but priority is NOT forced-passed (the human
+                    // made a deliberate choice; they remain the priority holder so
+                    // they can choose again). Return true so PriorityLoop keeps
+                    // the current player rather than calling PassPriority().
+                    return true;
                 }
 
                 // Portal "Auto-pay" — empty (non-cancelled) source list means
@@ -400,25 +420,28 @@ public sealed class GameFacade : IDisposable
                     payment = autoPayment;
                 }
             }
-            if (!manaResolver.Pay(actor, cost, payment))
-            {
-                return;
-            }
-
             try
             {
                 var def = Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<IEffect>());
+                // CR 601.2c / 601.2h / CR 732.1 — the mana payment runs INSIDE
+                // the cast flow, after target collection, via the payManaCost
+                // callback (mirrors TurnDriver.DispatchCast). A cast that
+                // becomes illegal earlier in the flow throws before any mana
+                // is paid or any source is tapped — nothing to rewind.
                 await castFlow.CastAsync(
                     actor, cast.Card, def, agent, ctx, CancellationToken.None,
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
-                    preChosenMana: payment);
+                    preChosenMana: payment,
+                    payManaCost: _ => manaResolver.Pay(actor, cost, payment));
             }
             catch (InvalidOperationException)
             {
                 // Swallow — same posture as TurnDriver. Failure leaves the
                 // card in hand; bot/agent memo prevents re-proposing.
+                return false; // not committed: CastAsync threw
             }
+            return true; // committed: spell put on the stack
         }
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
@@ -456,6 +479,81 @@ public sealed class GameFacade : IDisposable
             }
         }
 
+        async Task DispatchLoyalty(Player actor, PriorityAction.ActivateLoyaltyAbility activate, GameContext ctx)
+        {
+            // CR 606.3 — activate a planeswalker loyalty ability. Mirrors
+            // TurnDriver.DispatchLoyalty (Majik.Core/Game/TurnDriver.cs) so the
+            // legacy single-round StartAsync path accepts
+            // ActivateLoyaltyAbilityCommand instead of throwing
+            // "PriorityLoop received ActivateLoyaltyAbility but no loyaltyDispatcher".
+            // Loyalty abilities are sorcery-speed (active player + main phase +
+            // empty stack) and once-per-turn; re-verify here so a stale / out-
+            // of-window proposal is swallowed rather than mutating state.
+            var loyalty = activate.Ability;
+            if (!loyalty.CanActivate()) return;
+            var inSorceryWindow = ReferenceEquals(ctx.ActivePlayer, actor)
+                && ctx.CurrentPhase is { } phase && phase.IsMain()
+                && ctx.Stack.Count == 0
+                && ReferenceEquals(loyalty.Source.Controller, actor);
+            if (!inSorceryWindow) return;
+
+            // CR 602.2b — collect targets from the loyalty ability's
+            // TargetRequests via the activating player's agent.
+            var chosenTargets = new List<IReadOnlyList<object>>();
+            var targetWrappers = new List<Majik.Core.Targeting.ITarget>();
+            foreach (var req in loyalty.TargetRequests)
+            {
+                var live = req.ResolveCandidates(ctx);
+                var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                    ? req
+                    : req.WithCandidates(live);
+                var chosen = await agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                chosenTargets.Add(chosen);
+                foreach (var obj in chosen)
+                {
+                    Majik.Core.Targeting.ITarget? wrapper = obj switch
+                    {
+                        Majik.Core.Cards.Permanent perm => Majik.Core.Targeting.Target.Permanent(perm),
+                        Majik.Core.Cards.ICard card => Majik.Core.Targeting.Target.Card(card),
+                        Player p => Majik.Core.Targeting.Target.Player(p),
+                        Majik.Core.Spells.ISpell spell => Majik.Core.Targeting.Target.Spell(spell),
+                        Majik.Core.Abilities.IActivatedAbility ab => Majik.Core.Targeting.Target.Ability(ab),
+                        _ => null,
+                    };
+                    if (wrapper != null) targetWrappers.Add(wrapper);
+                }
+            }
+
+            // CR 606.3/606.5 — pay the loyalty cost as the ability is put on the
+            // stack (add/remove loyalty + mark once-per-turn).
+            try
+            {
+                loyalty.PayLoyaltyCost();
+            }
+            catch (InvalidOperationException)
+            {
+                return; // raced out of the activation window — no state change.
+            }
+
+            // Build the ActivatedAbility stack object from the loyalty template
+            // (loyalty cost pre-paid; effects resolve later off the stack).
+            var stackObject = new Majik.Core.Abilities.ActivatedAbility(
+                source: loyalty.Source,
+                controller: actor,
+                targets: targetWrappers.Count > 0 ? targetWrappers : null,
+                costs: null,
+                effects: loyalty.Effects,
+                targetRequests: loyalty.TargetRequests.Count > 0 ? loyalty.TargetRequests : null,
+                sorcerySpeed: true);
+            if (chosenTargets.Count > 0)
+            {
+                stackObject.SetChosenTargets(chosenTargets);
+            }
+
+            _stack.Push(stackObject);
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.AbilityActivatedEvent(stackObject));
+        }
+
         var manaActivator = new ManaAbilityActivator(_bus);
         void DispatchManaAbility(Player actor, PriorityAction.ActivateManaAbility ma)
         {
@@ -491,7 +589,14 @@ public sealed class GameFacade : IDisposable
             landDropTracker: LandDrops,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
-            manaAbilityDispatcher: DispatchManaAbility);
+            loyaltyDispatcher: DispatchLoyalty,
+            manaAbilityDispatcher: DispatchManaAbility,
+            // CR 704.1 — check SBAs before priority + after each resolution on
+            // the legacy single-round StartAsync path too, so a 0/0 dies
+            // immediately rather than lingering. Mirrors the TurnDriver wiring.
+            checkStateBasedActions: () => _sba.CheckStateBasedActions(
+                new[] { _alice, _bob },
+                new[] { _alice, _bob }.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
     }
 
     /// <summary>
@@ -803,6 +908,26 @@ public sealed class GameFacade : IDisposable
         shell.SetOwner(owner);
         BindCardAbilities(shell, owner, cardRepo, replacements, effects,
             triggers, zones, eventBus);
+
+        // Stamp IsVanillaShell ONLY on the non-routed binder-chain path. A card
+        // built through its [CardName] factory (the routed return above) is
+        // implemented by definition — its behaviour may live in off-card
+        // effects (continuous / replacement / CDA registered on a live service,
+        // not as card.Abilities), which the classifier cannot see, so stamping
+        // there false-flags cards like Blood Moon / Wild Nacatl / Pithing
+        // Needle. Only lands + factory-less cards reach here, where the card is
+        // fully bound and the classification is authoritative. Uses the same
+        // shared classifier as ScryfallCardFactory.Create.
+        if (cardRepo != null)
+        {
+            var entity = cardRepo.GetByName(shell.Name);
+            if (entity != null
+                && Majik.Core.CardData.VanillaShellClassifier.IsLikelyVanillaShell(shell, entity))
+            {
+                (shell as Majik.Core.Cards.Card)?.MarkAsVanillaShell();
+            }
+        }
+
         return shell;
     }
 
@@ -821,6 +946,30 @@ public sealed class GameFacade : IDisposable
         ReplacementBus replacements,
         ContinuousEffectsService effects)
     {
+        // CR 205.1b — preserve EVERY printed card type. A [CardName] factory
+        // builds a single concrete subclass (Creature / Land / …) that only
+        // registers its OWN primary type, so a dual-type card built through
+        // the factory route loses its secondary type unless the factory
+        // remembered to AddCardType it (most do not — Esper Sentinel's
+        // Artifact was silently dropped). Additively flag any parsed type the
+        // built card is missing, so every artifact-creature / artifact-land /
+        // enchantment-land is correctly typed in prod regardless of whether
+        // its factory bothered. AddCardType is idempotent — a type the factory
+        // already added is a no-op. Composite (DFC / split / adventure) rows
+        // build as their FRONT face, so parse only the front half; adding the
+        // back face's types here would mistype the front (e.g. a spell-front
+        // // land-back MDFC must not become a Land).
+        if (card is Card typedCard)
+        {
+            var typeLine = entity.TypeLine ?? "";
+            var splitIdx = typeLine.IndexOf(" // ", StringComparison.Ordinal);
+            var frontTypeLine = splitIdx >= 0 ? typeLine[..splitIdx] : typeLine;
+            foreach (var t in Majik.Core.CardData.TypeLineParser.Parse(frontTypeLine).Types)
+            {
+                typedCard.AddCardType(t);
+            }
+        }
+
         // Snapshot the keyword + mana abilities the factory already attached
         // so the binders' additions can be deduped.
         var existingKeywords = card.Abilities.OfType<KeywordAbility>()
@@ -917,7 +1066,8 @@ public sealed class GameFacade : IDisposable
                 // abilities route through the stack (responder priority window)
                 // and the Fable rummage prompts the controller's agent.
                 SagaBinder.Bind(card, entity, effects, zones, triggers, eventBus);
-                foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, controller))
+                foreach (var trig in OracleTriggeredAbilityBinder.Bind(
+                    card, entity, controller, allPlayers: null, eventBus: eventBus))
                 {
                     card.AddAbility(trig);
                 }
@@ -939,7 +1089,31 @@ public sealed class GameFacade : IDisposable
                 EntersWithCountersBinder.Bind(card, entity, replacements);
                 EntersAsCopyBinder.Bind(card, entity, replacements, effects);
                 OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
+                // Generic utility-land activated abilities (scry / draw / +1/+1
+                // counter / token / damage / gain-life / return-from-graveyard /
+                // destroy-target-land). Lands are NEVER routed through their
+                // [CardName] factory, so these abilities were DEAD in prod —
+                // this binder is the ONLY path that makes them fire in a real
+                // match (v1-deferrals #12). Runs AFTER the fetch/Horizon binder
+                // (those patterns are claimed first) and BEFORE ManlandBinder.
+                LandActivatedAbilityBinder.Bind(card, entity, controller, effects, triggers);
+                // Manland (creature-land) animate + Restless attack triggers.
+                // Lands are NEVER routed through their [CardName] factory (the
+                // factory instance-swap is gated on !shell.HasType(Land)), so
+                // the per-card manland factories are dead in production — this
+                // binder is the ONLY path that gives a real-match manland its
+                // animate ability + attack trigger. Reuses the shared
+                // AnimateLandEffect / keyword primitives the factories use.
+                ManlandBinder.Bind(card, entity, controller, effects, triggers);
                 OracleLoyaltyAbilityBinder.Bind(card, entity, controller);
+                // CR 305.7 — additive land-retype static ("Each land is a
+                // [basic] in addition to its other land types"): Urborg, Tomb
+                // of Yawgmoth / Yavimaya, Cradle of Growth. Lands are never
+                // routed through their [CardName] factory (FactoryRouting), so
+                // the factory's effects-aware overload that wires this static
+                // is never reached in prod — this binder wires it against the
+                // live per-game CES + event bus instead.
+                AdditiveLandSubtypeBinder.Bind(card, entity, effects, eventBus);
                 return;
             }
         }

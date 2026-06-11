@@ -58,7 +58,7 @@ public class HidetsugusSecondRiteTests
         var rite = HidetsugusSecondRiteFactory.Create(_alice);
 
         rite.Name.Should().Be("Hidetsugu's Second Rite");
-        rite.ManaCost.Should().Be("{2}{R}");
+        rite.ManaCost.Should().Be("{3}{R}");
         rite.HasType(CardType.Instant).Should().BeTrue();
         rite.Owner.Should().BeSameAs(_alice);
         rite.Controller.Should().BeSameAs(_alice);
@@ -72,7 +72,7 @@ public class HidetsugusSecondRiteTests
         card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Hidetsugu's Second Rite");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{R}");
+        card.ManaCost.Should().Be("{3}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
 

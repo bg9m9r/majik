@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -87,12 +88,11 @@ public class PlaguecrafterFactoryTests
 
         var pc = PlaguecrafterFactory.Create(
             alice,
-            playerResolver: () => new[] { alice },
             triggers: null,
             agent: null);
 
         var etb = SelectEtbTrigger(pc);
-        foreach (var effect in etb.Effects) effect.Execute();
+        ContextResolve.Resolve(etb, alice, alice);
 
         alice.Zones.Battlefield.GetCards().Should().NotContain(bear,
             "CR 701.16 — the controller sacrifices a creature of their choice");
@@ -120,12 +120,11 @@ public class PlaguecrafterFactoryTests
 
         var pc = PlaguecrafterFactory.Create(
             alice,
-            playerResolver: () => new[] { alice },
             triggers: null,
             agent: null);
 
         var etb = SelectEtbTrigger(pc);
-        foreach (var effect in etb.Effects) effect.Execute();
+        ContextResolve.Resolve(etb, alice, alice);
 
         alice.Zones.Battlefield.GetCards().Should().NotContain(pw,
             "a creature OR planeswalker may be sacrificed (CR 701.16)");
@@ -152,12 +151,11 @@ public class PlaguecrafterFactoryTests
 
         var pc = PlaguecrafterFactory.Create(
             alice,
-            playerResolver: () => new[] { alice },
             triggers: null,
             agent: null);
 
         var etb = SelectEtbTrigger(pc);
-        foreach (var effect in etb.Effects) effect.Execute();
+        ContextResolve.Resolve(etb, alice, alice);
 
         alice.Zones.Battlefield.GetCards().Should().Contain(land,
             "a land is neither a creature nor a planeswalker — nothing sacrificed");
@@ -174,12 +172,11 @@ public class PlaguecrafterFactoryTests
 
         var pc = PlaguecrafterFactory.Create(
             alice,
-            playerResolver: () => new[] { alice },
             triggers: null,
             agent: null);
 
         var etb = SelectEtbTrigger(pc);
-        Action act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
+        Action act = () => ContextResolve.Resolve(etb, alice, alice);
 
         act.Should().NotThrow();
         alice.Zones.Hand.GetCards().Should().BeEmpty();
@@ -207,12 +204,11 @@ public class PlaguecrafterFactoryTests
 
         var pc = PlaguecrafterFactory.Create(
             alice,
-            playerResolver: () => new[] { alice, bob },
             triggers: null,
             agent: null);
 
         var etb = SelectEtbTrigger(pc);
-        foreach (var effect in etb.Effects) effect.Execute();
+        ContextResolve.Resolve(etb, alice, alice, bob);
 
         alice.Zones.Graveyard.GetCards().Should().Contain(aliceBear,
             "the controller is a 'player' too and sacrifices");
@@ -253,13 +249,14 @@ public class PlaguecrafterFactoryTests
 
         var pc = PlaguecrafterFactory.Create(
             alice,
-            playerResolver: () => new[] { alice, bob },
             triggers: null,
             agent: null,
             eventBus: bus);
 
         var etb = SelectEtbTrigger(pc);
-        foreach (var effect in etb.Effects) effect.Execute();
+        // Resolve through a live GameContext so the ETB reads ctx.Game.AllPlayers
+        // (the production path) — each player sacrifices / discards.
+        ContextResolve.Resolve(etb, alice, alice, bob);
 
         // Two players each sacrificed a creature → two events, each crediting
         // the controlling player (CR 701.16a).

@@ -53,9 +53,192 @@ public static class ActivatedAbilityPolicy
         Player self,
         ArchetypeWeights weights)
     {
+        // CR 602 + CR 701.23 — land-fetch shape special case. The generic
+        // cost/effect split below mis-scores a fetchland crack: CostDelta
+        // charges a FULL -ManaSources for sacrificing the land source, but
+        // the fetched land replaces it on the battlefield — the sacrifice is
+        // mana-NEUTRAL, and the crack adds deck thinning + colour fixing on
+        // top. Left to the generic math the delta is always negative
+        // (-ManaSources - LifeDelta + tiny effect bump), so the bot played
+        // fetches and then never cracked them — effectively one fewer land
+        // every game. Score the shape directly instead.
+        if (IsLandFetch(ability, out var fetchText))
+        {
+            return LandFetchDelta(ability, self, fetchText, weights);
+        }
+
         var costDelta = CostDelta(ability, self, weights);
         var effectDelta = EffectDelta(ability, ctx, self, weights);
         return costDelta + effectDelta;
+    }
+
+    // ----- Land-fetch shape (fetchlands / Evolving Wilds / Prismatic Vista) -----
+
+    /// <summary>The five basic land types (CR 205.3i) — used to read the
+    /// fetch predicate back out of the effect description so the
+    /// has-a-target gate can scan the library for a matching land.</summary>
+    private static readonly (string Token, CardSubtype Subtype)[] BasicLandTypes =
+    {
+        ("plains",   CardSubtype.Plains),
+        ("island",   CardSubtype.Island),
+        ("swamp",    CardSubtype.Swamp),
+        ("mountain", CardSubtype.Mountain),
+        ("forest",   CardSubtype.Forest),
+    };
+
+    /// <summary>
+    /// Shape detection: a <see cref="Land"/> source whose activation cost
+    /// includes a sacrifice and whose effect searches the library and puts
+    /// the result onto the battlefield ("{T}, Pay 1 life, Sacrifice: Search
+    /// your library for a … land card, put it onto the battlefield"). Matched
+    /// on effect-description text (the same sniffing vocabulary EffectDelta
+    /// uses), not card names, so the whole fetch cycle plus Evolving Wilds /
+    /// Prismatic Vista shapes all qualify.
+    /// </summary>
+    private static bool IsLandFetch(IActivatedAbility ability, out string effectText)
+    {
+        effectText = string.Empty;
+        if (ability.Source is not Land) return false;
+        if (ability is not ActivatedAbility concrete) return false;
+        if (!ability.Costs.OfType<AdditionalCost>()
+                .Any(c => c.CostType == AdditionalCostType.Sacrifice))
+        {
+            return false;
+        }
+
+        var text = string.Join(" | ",
+            concrete.Effects.Select(e => (e.Description ?? string.Empty).ToLowerInvariant()));
+        if (!Mentions(text, "search")) return false;
+        if (!Mentions(text, "librar")) return false;
+        if (!Mentions(text, "battlefield")) return false;
+
+        effectText = text;
+        return true;
+    }
+
+    /// <summary>
+    /// Score a land-fetch activation. Cracking is almost always correct —
+    /// mana-neutral (fetched land replaces the sacrificed source), thins the
+    /// deck, and fixes colours — so it gets a modest strictly-positive delta
+    /// whenever a fetchable land exists in our library (searching our own
+    /// library is legal knowledge — CR 701.23). Two hold-backs:
+    /// no target in library (pure loss: life + a land for nothing) and
+    /// critically low life when the cost includes a life payment.
+    /// </summary>
+    private static double LandFetchDelta(
+        IActivatedAbility ability, Player self, string effectText, ArchetypeWeights weights)
+    {
+        // Read the fetch predicate back out of the description: which basic
+        // land types does it search for? No named type (e.g. "a basic land")
+        // → any land in library counts as a target.
+        var wantedTypes = BasicLandTypes
+            .Where(t => effectText.Contains(t.Token, StringComparison.OrdinalIgnoreCase))
+            .Select(t => t.Subtype)
+            .ToList();
+
+        var libraryLands = self.Zones.Library.GetCards()
+            .Where(c => c.HasType(CardType.Land))
+            .ToList();
+        var hasTarget = wantedTypes.Count > 0
+            ? libraryLands.Any(l => wantedTypes.Any(l.HasSubtype))
+            : libraryLands.Count > 0;
+
+        if (!hasTarget)
+        {
+            // Cracking with no target = pay the costs for nothing. Strongly
+            // negative so Pass always wins.
+            return -(weights.ManaSources + weights.LifeDelta);
+        }
+
+        // Pay-life caution: hold the fetch when the life payment would eat
+        // into the last couple of points (e.g. at 2 life vs a pay-1 fetch).
+        var lifeCost = ability.Costs.OfType<AdditionalCost>()
+            .Where(c => c.CostType == AdditionalCostType.PayLife)
+            .Sum(c => ExtractInt(c.Description, fallback: 1));
+        if (lifeCost > 0 && self.LifeTotal <= lifeCost + 2)
+        {
+            return -weights.LifeDelta * lifeCost;
+        }
+
+        // Mana-neutral free value: thinning + fixing. Modest positive —
+        // reliably beats Pass without outbidding real spells (a fresh land
+        // drop still scores higher at ManaSources * 1).
+        return weights.ManaSources * 0.5 + weights.Tempo * 0.25;
+    }
+
+    /// <summary>
+    /// CR 606 — projected BoardEval delta for activating a planeswalker
+    /// loyalty ability. Loyalty abilities are their own shape
+    /// (<see cref="LoyaltyAbility"/>), pre-pay their cost as loyalty change,
+    /// and resolve their effects off the stack. The heuristic: a loyalty
+    /// ability is broadly favourable (it protects the walker by adding
+    /// loyalty, or spends loyalty for an effect), so we give a baseline
+    /// keep-the-walker-active bump plus the same effect-intent sniff used for
+    /// activated abilities. Plus / ultimate abilities additionally credit the
+    /// loyalty they bank (a more loaded walker is worth more); minus abilities
+    /// that remove a threat lean on the effect sniff (destroy / damage), and
+    /// the loyalty spent is a mild cost. Always at least slightly positive so
+    /// the bot uses its planeswalkers rather than letting them idle.
+    /// </summary>
+    public static double ProjectLoyaltyDelta(
+        LoyaltyAbility ability,
+        GameContext ctx,
+        Player self,
+        ArchetypeWeights weights)
+    {
+        // Effect-intent sniff over the loyalty ability's own effect
+        // descriptions + the source name (same vocabulary as EffectDelta).
+        var description = string.Join(" | ",
+            ability.Effects.Select(e => (e.Description ?? string.Empty).ToLowerInvariant()));
+        var sourceName = (ability.Source.Name ?? string.Empty).ToLowerInvariant();
+        var combined = description + " | " + sourceName;
+
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
+        var oppHasBigThreat = opp != null
+            && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any(c => c.Power >= 3);
+
+        double delta;
+
+        if (ability.LoyaltyChange >= 0)
+        {
+            // Plus / zero ability: banks loyalty (protects the walker) and
+            // generally develops our board. Credit the loyalty gained as a
+            // small key-card-stability bump, plus any effect payoff.
+            delta = weights.KeyCardInPlay * 0.25 * Math.Max(1, ability.LoyaltyChange + 1);
+        }
+        else
+        {
+            // Minus ability: spends loyalty for a (usually stronger) effect.
+            // Mild cost for the loyalty burned; the effect sniff supplies the
+            // upside (removal against a threat scores high).
+            delta = -weights.KeyCardInPlay * 0.1 * -ability.LoyaltyChange;
+        }
+
+        // Effect payoff — removal is the high-value case the spec calls out.
+        if (Mentions(combined, "destroy", "exile target", "return target", "sacrifice"))
+        {
+            delta += oppHasBigThreat
+                ? weights.OpponentThreats * -2 + weights.Tempo
+                : weights.OpponentThreats * -1 + weights.Tempo * 0.5;
+        }
+        else if (Mentions(combined, "deals", "damage", "loses") && Mentions(combined, "life"))
+        {
+            delta += weights.LifeDelta * 1.0 + weights.Tempo * 0.25;
+        }
+        else if (Mentions(combined, "draw"))
+        {
+            delta += weights.HandSize * ExtractInt(combined, fallback: 1);
+        }
+        else if (Mentions(combined, "create", "token"))
+        {
+            delta += weights.BoardPower + weights.BoardToughness;
+        }
+        else
+        {
+            delta += weights.Tempo * 0.3;
+        }
+
+        return delta;
     }
 
     // ----- Cost side -----
@@ -227,7 +410,9 @@ public static class ActivatedAbilityPolicy
             return weights.BoardPower * amount + weights.BoardToughness * amount;
         }
 
-        if (Mentions(combined, "search your library"))
+        // Both wordings: oracle text says "search your library"; the engine's
+        // generated effect descriptions say "search library for …".
+        if (Mentions(combined, "search your library", "search library"))
         {
             return weights.ManaSources * 0.5 + weights.HandSize * 0.5;
         }

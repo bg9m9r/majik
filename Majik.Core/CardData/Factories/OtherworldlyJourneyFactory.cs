@@ -92,7 +92,12 @@ public static class OtherworldlyJourneyFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Instant(CardName, PrintedManaCost);
+        // CR 205.3 — seed type line is "Instant — Arcane"; the Arcane
+        // spell subtype (CR 205.3k) rides on the spell and must be carried.
+        var card = new Instant(
+            CardName,
+            PrintedManaCost,
+            subtypes: new[] { CardSubtype.Arcane });
         card.SetOwner(owner);
         card.SetController(owner);
         return card;

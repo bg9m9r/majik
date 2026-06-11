@@ -187,7 +187,9 @@ public static class BomatCourierFactory
             {
                 new ManaCostCost(ActivationManaCost),
                 new DiscardYourHandCost(owner, zones),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — pass the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { returnEffect });
 

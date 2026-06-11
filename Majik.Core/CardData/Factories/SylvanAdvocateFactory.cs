@@ -238,4 +238,15 @@ public sealed class SylvanAdvocateAnthemEffect : ContinuousEffect
         chars.Power += SylvanAdvocateFactory.Pump;
         chars.Toughness += SylvanAdvocateFactory.Pump;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="SylvanAdvocateAnthemEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// IsActive reads CountControlledLands from clonedSource.Controller live (remapped).
+    /// preserves: nothing scalar; source → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new SylvanAdvocateAnthemEffect(clonedSource);
 }

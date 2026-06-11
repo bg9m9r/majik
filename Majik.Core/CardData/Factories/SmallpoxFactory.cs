@@ -105,14 +105,21 @@ public static class SmallpoxFactory
     /// <paramref name="playerResolver"/> and, for each player in order,
     /// applies the four sub-effects (CR 608.2).
     /// </summary>
-    /// <param name="playerResolver">Returns the live player list at resolution
-    /// time, ideally in APNAP order (CR 101.4). Null → the resolve body
-    /// no-ops (shape path).</param>
+    /// <remarks>
+    /// The four-step each-player body reads every player from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551 / Priest of Forgotten Gods #2543). With no live
+    /// game context the body no-ops (shape-only paths). Each affected player's
+    /// "of their choice" picks read THAT player's agent from
+    /// <see cref="AgentRegistry"/> at resolution (the optional
+    /// <paramref name="agentSelector"/> overrides it for tests).
+    /// </remarks>
     /// <param name="agentSelector">Optional per-player agent selector driving
-    /// the "of their choice" discard / creature / land picks. Null falls back
-    /// to deterministic first-eligible picks.</param>
+    /// the "of their choice" discard / creature / land picks. Null reads each
+    /// affected player's live agent from <see cref="AgentRegistry"/>, then
+    /// falls back to deterministic first-eligible picks.</param>
     public static SpellDefinition BuildSpellDefinition(
-        Func<IReadOnlyList<Player>>? playerResolver,
         Func<Player, IPlayerAgent?>? agentSelector = null)
     {
         return new SpellDefinition(
@@ -123,7 +130,11 @@ public static class SmallpoxFactory
             {
                 Fx.Inline(
                     $"{CardName}: each player loses 1 life, discards a card, sacrifices a creature, then sacrifices a land",
-                    () => Resolve(playerResolver, agentSelector)),
+                    ctx =>
+                    {
+                        Resolve(ctx.Game?.AllPlayers, agentSelector);
+                        return ValueTask.CompletedTask;
+                    }),
             });
     }
 
@@ -132,16 +143,18 @@ public static class SmallpoxFactory
     //   loseLife → discard → sacrifice a creature → then sacrifice a land.
     // -----------------------------------------------------------------------
     private static void Resolve(
-        Func<IReadOnlyList<Player>>? playerResolver,
+        IReadOnlyList<Player>? players,
         Func<Player, IPlayerAgent?>? agentSelector)
     {
-        var players = playerResolver?.Invoke();
-        if (players == null) return; // shape path — no players wired.
+        if (players == null) return; // shape path — no live game.
 
         foreach (var pl in players)
         {
             if (pl == null) continue;
-            var agent = agentSelector?.Invoke(pl);
+            // The affected player's own agent drives "of their choice": the
+            // explicit test override first, otherwise the live per-seat agent
+            // registered in AgentRegistry (mirrors Priest of Forgotten Gods).
+            var agent = agentSelector?.Invoke(pl) ?? AgentRegistry.Get(pl);
 
             // 1. CR 119 — loses 1 life (life loss, not damage).
             Fx.LoseLife(pl, LifeLoss);

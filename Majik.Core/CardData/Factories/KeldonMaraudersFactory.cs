@@ -14,7 +14,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Keldon Marauders (Time Spiral + Modern Horizons
-/// reprint, {1}{R}). Creature — Human Warrior 3/1. Oracle text (verified
+/// reprint, {1}{R}). Creature — Human Warrior 3/3. Oracle text (verified
 /// against the printed card):
 ///   "Vanishing 2 (This creature enters with two time counters on it. At
 ///    the beginning of your upkeep, remove a time counter from it. When the
@@ -23,7 +23,7 @@ namespace Majik.Core.CardData.Factories;
 ///    damage to target player or planeswalker."
 ///
 /// The card's base shape (name, Creature, Human / Warrior subtypes, {1}{R},
-/// 3/1) is materialised from the embedded JSON definition
+/// 3/3) is materialised from the embedded JSON definition
 /// (<c>keldon-marauders.json</c>) via
 /// <see cref="CardDefinitionLoader.FromEmbeddedResource(string)"/> +
 /// <see cref="CardDefinitionFactory.Build"/>. The Vanishing time-counter
@@ -34,7 +34,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 ///
-/// - 3/1 Human Warrior at printed cost {1}{R}, owner / controller wired.
+/// - 3/3 Human Warrior at printed cost {1}{R}, owner / controller wired.
 /// - <b>Vanishing 2 (CR 702.63)</b>:
 ///   <list type="bullet">
 ///     <item><b>Enters with two time counters (CR 702.63b / CR 122.1)</b>:
@@ -102,7 +102,7 @@ public static class KeldonMaraudersFactory
     public const string CardName = "Keldon Marauders";
     public const string Slug = "keldon-marauders";
     public const int Power = 3;
-    public const int Toughness = 1;
+    public const int Toughness = 3;
 
     /// <summary>CR 702.63a — Vanishing N: enters with N time counters.</summary>
     public const int VanishingCount = 2;

@@ -79,15 +79,16 @@ public static class RestInPeaceFactory
     /// replacement wiring). Suitable for shape / dispatcher tests.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, allPlayersResolver: null, replacements: null, zoneService: null, triggers: null);
+        Create(owner, replacements: null, zoneService: null, triggers: null);
 
     /// <summary>
-    /// Constructs a Rest in Peace.
+    /// Constructs a Rest in Peace. The ETB "exile all graveyards" half reads
+    /// every player from the LIVE resolution context (<c>ctx.Game.AllPlayers</c>)
+    /// at resolution — no captured player resolver, so it is correct on the
+    /// production routed build (mirrors #2551). With no live game context the
+    /// ETB exile half no-ops (shape-only paths).
     /// </summary>
     /// <param name="owner">Card owner / controller.</param>
-    /// <param name="allPlayersResolver">Returns the full player list
-    /// at ETB resolution. v1 walks every player's graveyard. Null →
-    /// the ETB exile half no-ops.</param>
     /// <param name="replacements">Bus on which the static
     /// graveyard→exile replacement is registered. Null → static half
     /// is skipped.</param>
@@ -99,7 +100,6 @@ public static class RestInPeaceFactory
     /// battlefield arrival.</param>
     public static Enchantment Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         ReplacementBus? replacements,
         ZoneService? zoneService,
         TriggerManager? triggers)
@@ -133,7 +133,11 @@ public static class RestInPeaceFactory
 
         var etbEffect = new Effect(
             $"{CardName} — exile all graveyards (CR 701.21)",
-            () => ResolveEtbExile(allPlayersResolver, zoneService));
+            ctx =>
+            {
+                ResolveEtbExile(ctx.Game?.AllPlayers, zoneService);
+                return ValueTask.CompletedTask;
+            });
 
         var etb = new TriggeredAbility(
             source: card,
@@ -151,13 +155,13 @@ public static class RestInPeaceFactory
     /// <summary>
     /// Resolve helper: exile every card sitting in every supplied
     /// player's graveyard. Exposed so tests can invoke directly without
-    /// driving the full TriggerManager loop.
+    /// driving the full TriggerManager loop. <paramref name="players"/> is the
+    /// live player list read off the resolution context at resolution time.
     /// </summary>
     public static void ResolveEtbExile(
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        IReadOnlyList<Player>? players,
         ZoneService? zoneService)
     {
-        var players = allPlayersResolver?.Invoke();
         if (players == null) return;
 
         foreach (var player in players)

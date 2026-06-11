@@ -40,14 +40,14 @@ public class MastermindsAcquisitionTests : IDisposable
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Create_HasSorceryShape_AtCost3BB()
+    public void Create_HasSorceryShape_AtCost2BB()
     {
         var card = MastermindsAcquisitionFactory.Create(_alice);
 
         card.Name.Should().Be("Mastermind's Acquisition");
-        card.ManaCost.Should().Be("{3}{B}{B}");
+        card.ManaCost.Should().Be("{2}{B}{B}");
         card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCostValue.TotalValue.Should().Be(5);
+        card.ManaCostValue.TotalValue.Should().Be(4);
         Majik.Core.Cards.CardColors.GetColors(card).Should().Contain(ManaColor.Black);
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);

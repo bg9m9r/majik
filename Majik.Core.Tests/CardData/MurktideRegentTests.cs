@@ -57,7 +57,7 @@ public class MurktideRegentTests
         var murk = MurktideRegentFactory.Create(_alice);
 
         murk.Name.Should().Be("Murktide Regent");
-        murk.ManaCost.Should().Be("{3}{U}{U}");
+        murk.ManaCost.Should().Be("{5}{U}{U}");
         murk.HasType(CardType.Creature).Should().BeTrue();
         murk.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
         murk.BasePower.Should().Be(3);

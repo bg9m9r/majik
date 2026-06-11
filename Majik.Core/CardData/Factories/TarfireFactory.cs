@@ -25,10 +25,12 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="ShockFactory"/> exactly.
 ///
 /// The only thing distinguishing Tarfire from Shock is its type line:
-/// it is a "Kindred Instant — Goblin". CR 312 — <b>Kindred</b> is the
-/// 2023 rename of the legacy "Tribal" card type, modelled here by
-/// <see cref="CardType.Tribal"/>. The Goblin creature subtype rides on a
-/// non-creature card so Goblin-tribal "matters" effects (e.g. Goblin
+/// its printed line is "Kindred Instant — Goblin". CR 312 — <b>Kindred</b>
+/// (formerly "Tribal") is a card type that was removed from the game by the
+/// 2024 type-line errata; the seed type line no longer carries it, so the
+/// engine models Tarfire as a plain Instant (Tribal product decision — see
+/// the semantic-parity-tail PR). The Goblin creature SUBTYPE still rides on
+/// the non-creature card so Goblin-"matters" effects (e.g. Goblin
 /// Chieftain's cost bonus, name/subtype tutors) can see it. These are
 /// pure card-shape concerns expressed in the embedded JSON
 /// (<c>tarfire.json</c>); they don't affect resolution.
@@ -39,10 +41,9 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="BuildSpellDefinition"/> because a
 /// <see cref="SpellDefinition"/> needs a target resolver supplied by the
 /// caller's <see cref="GameContext"/> (not expressible in the data-only
-/// JSON schema). The JSON lists <c>Instant</c> first so
+/// JSON schema). The JSON lists only <c>Instant</c> so
 /// <see cref="CardDefinitionFactory"/> builds the concrete
-/// <see cref="Instant"/> class and adds <see cref="CardType.Tribal"/> as
-/// a secondary type.
+/// <see cref="Instant"/> class with the Goblin subtype.
 /// </summary>
 [CardName("Tarfire")]
 public static class TarfireFactory

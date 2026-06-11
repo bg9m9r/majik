@@ -10,7 +10,7 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Earthshaker Khenra (Hour of Devastation,
-/// Creature — Minotaur Warrior {1}{R}).
+/// Creature — Jackal Warrior {1}{R}).
 ///
 /// Oracle text:
 ///   "Haste.
@@ -19,9 +19,9 @@ namespace Majik.Core.CardData.Factories;
 ///    Eternalize {5}{R}{R}"
 ///
 /// ## Implemented (v1)
-/// - 2/1 Creature — Minotaur Warrior, mana cost {1}{R}, owner/controller
+/// - 2/1 Creature — Jackal Warrior, mana cost {1}{R}, owner/controller
 ///   wired. (User brief said "Jackal Warrior" but the printed oracle is
-///   "Minotaur Warrior"; <see cref="CardSubtype"/> has Minotaur and the
+///   "Jackal Warrior"; <see cref="CardSubtype"/> has Jackal and the
 ///   comp rules are canonical — CLAUDE.md "Rules authority".)
 /// - <b>Haste</b> (CR 702.10) wired as a <see cref="KeywordAbility"/>
 ///   marker on the card; <c>CombatAbilities.HasHaste</c> reads it. Same
@@ -47,7 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>Eternalize {5}{R}{R}</b> (CR 702.117 — exile from graveyard,
-///   return as a 4/4 black Zombie Minotaur Warrior token copy with no
+///   return as a 4/4 black Zombie Jackal Warrior token copy with no
 ///   mana cost): not implemented. Eternalize parallels Unearth — needs
 ///   an alternative-cost / cast-from-graveyard-as-token pipeline
 ///   (sibling of the cast-from-exile / Priest-of-Fell-Rites unearth
@@ -97,7 +97,7 @@ public static class EarthshakerKhenraFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Minotaur, CardSubtype.Warrior });
+            subtypes: new[] { CardSubtype.Jackal, CardSubtype.Warrior });
 
         card.SetOwner(owner);
         card.SetController(owner);

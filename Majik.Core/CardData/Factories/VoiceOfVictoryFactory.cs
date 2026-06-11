@@ -16,14 +16,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Voice of Victory (Tarkir: Dragonstorm, {1}{W}).
 ///
-/// Creature — Human Bard, 2/2. Oracle text:
+/// Creature — Human Bard, 1/3. Oracle text:
 ///   "Mobilize 2 (Whenever this creature attacks, create two tapped and
 ///    attacking 1/1 red Warrior creature tokens. Sacrifice them at the
 ///    beginning of the next end step.)
 ///    Your opponents can't cast spells during your turn."
 ///
 /// ## Implemented (v1)
-/// - 2/2 white Human Bard at {1}{W}, owner / controller wired (CR 105 —
+/// - 1/3 white Human Bard at {1}{W}, owner / controller wired (CR 105 —
 ///   white from the {W} pip).
 /// - <b>Static "Your opponents can't cast spells during your turn"
 ///   (CR 601.3)</b> — the same total-cast-block shape as Grand Abolisher
@@ -82,8 +82,8 @@ public static class VoiceOfVictoryFactory
 {
     public const string CardName = "Voice of Victory";
     public const string PrintedManaCost = "{1}{W}";
-    public const int Power = 2;
-    public const int Toughness = 2;
+    public const int Power = 1;
+    public const int Toughness = 3;
 
     /// <summary>Mobilize 2 — two 1/1 red Warrior tokens per attack.</summary>
     public const int MobilizeCount = 2;

@@ -49,7 +49,7 @@ public class HedronCrabFactoryTests
         CardColors.GetColors(crab).Should().Contain(ManaColor.Blue);
         crab.Power.Should().Be(0);
         crab.Toughness.Should().Be(2);
-        crab.Subtypes.Should().Contain(CardSubtype.Homarid);
+        crab.Subtypes.Should().Contain(CardSubtype.Crab);
         crab.Owner.Should().BeSameAs(_alice);
         crab.Controller.Should().BeSameAs(_alice);
     }

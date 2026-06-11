@@ -41,7 +41,7 @@ public class WrennsResolveTests
         var c = WrennsResolveFactory.Create(_alice);
 
         c.Name.Should().Be("Wrenn's Resolve");
-        c.ManaCost.Should().Be("{R}");
+        c.ManaCost.Should().Be("{1}{R}");
         c.HasType(CardType.Sorcery).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
@@ -55,7 +55,7 @@ public class WrennsResolveTests
         card.Should().BeOfType<Sorcery>();
         card.Name.Should().Be("Wrenn's Resolve");
         card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{R}");
+        card.ManaCost.Should().Be("{1}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
 

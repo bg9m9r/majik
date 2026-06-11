@@ -12,10 +12,10 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for World Breaker (Battle for Zendikar, {5}{G}).
+/// Tests for World Breaker (Battle for Zendikar, {6}{G}).
 ///
 /// Covers:
-///   - Card identity (5/5 Creature — Eldrazi at {5}{G}).
+///   - Card identity (5/7 Creature — Eldrazi at {6}{G}).
 ///   - Ability list (Reach keyword + ETB trigger + attack trigger +
 ///     graveyard activation).
 ///   - ETB resolution: exiles a chosen nonbasic land target; rejects a
@@ -32,14 +32,14 @@ public class WorldBreakerFactoryTests
     private readonly Player _bob = new("Bob", 20);
 
     [Fact]
-    public void WorldBreaker_IsEldrazi_5_5_AtCost5G()
+    public void WorldBreaker_IsEldrazi_5_7_AtCost6G()
     {
         var wb = WorldBreakerFactory.Create(_alice);
 
         wb.Name.Should().Be("World Breaker");
-        wb.ManaCost.Should().Be("{5}{G}");
+        wb.ManaCost.Should().Be("{6}{G}");
         wb.Power.Should().Be(5);
-        wb.Toughness.Should().Be(5);
+        wb.Toughness.Should().Be(7);
         wb.HasType(CardType.Creature).Should().BeTrue();
         wb.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
         wb.Owner.Should().BeSameAs(_alice);
@@ -215,7 +215,7 @@ public class WorldBreakerFactoryTests
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
         ((Creature)card).Power.Should().Be(5);
-        ((Creature)card).Toughness.Should().Be(5);
+        ((Creature)card).Toughness.Should().Be(7);
         card.Owner.Should().Be(_alice);
         card.Abilities.OfType<KeywordAbility>().Should().Contain(k => k.Keyword == "Reach");
         card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);

@@ -37,9 +37,9 @@ public class BadgermoleCubTests
 
         b.Name.Should().Be("Badgermole Cub");
         b.HasType(CardType.Creature).Should().BeTrue();
-        b.HasSubtype(CardSubtype.Bear).Should().BeTrue("Badgermole Cub is a Bear");
-        b.BasePower.Should().Be(1);
-        b.BaseToughness.Should().Be(1);
+        b.Subtypes.Should().BeEmpty("printed type \"Badger Mole\" has no CardSubtype enum value");
+        b.BasePower.Should().Be(2);
+        b.BaseToughness.Should().Be(2);
         b.Owner.Should().BeSameAs(_alice);
         b.Controller.Should().BeSameAs(_alice);
     }
@@ -109,8 +109,9 @@ public class BadgermoleCubTests
         var chars = svc.Compute(forest);
         chars.Should().BeOfType<CreatureCharacteristics>();
         chars.Types.Should().Contain(CardType.Creature);
-        chars.Types.Should().Contain(CardType.Land, "still a land (CR 701.59a)");
-        chars.Subtypes.Should().Contain(CardSubtype.Elemental);
+        chars.Types.Should().Contain(CardType.Land, "still a land");
+        chars.Subtypes.Should().NotContain(CardSubtype.Elemental,
+            "Earthbend grants no creature subtype — 'becomes a 0/0 creature'");
         chars.Keywords.Should().Contain("Haste");
 
         var cc = (CreatureCharacteristics)chars;

@@ -186,15 +186,16 @@ public class SpymastersVaultTests
     [Fact]
     public void Connive_NoCreaturesDied_IsNoOp()
     {
-        var turnState = new TurnState();
-        var land = (Land)SpymastersVaultFactory.Create(_alice, turnState);
+        // PROD PATH — single-arg dispatch (no captured TurnState) + resolve
+        // through a live GameContext whose TurnState records 0 deaths.
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
         land.SetController(_alice);
         var target = PlaceCreature(_alice);
         AddCardToLibrary(_alice);
 
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
         ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
-        ability.Effects.Single().Execute();
+        ResolveWithDeaths(ability, deaths: 0);
 
         // X = 0 → no draw, no counter.
         _alice.Zones.Hand.GetCards().Should().BeEmpty("X = 0 connives nothing");
@@ -204,10 +205,7 @@ public class SpymastersVaultTests
     [Fact]
     public void Connive_OneCreatureDied_DrawsThenDiscards_NonlandAddsCounter()
     {
-        var turnState = new TurnState();
-        turnState.RecordCreatureDied(_alice); // 1 creature died this turn.
-
-        var land = (Land)SpymastersVaultFactory.Create(_alice, turnState);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
         land.SetController(_alice);
         var target = PlaceCreature(_alice);
         // Library top is a NONLAND so the connive discard is a nonland →
@@ -216,14 +214,53 @@ public class SpymastersVaultTests
 
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
         ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
-        ability.Effects.Single().Execute();
+        ResolveWithDeaths(ability, deaths: 1);
 
         // Connive 1: drew the nonland, then discarded it (last in hand) →
         // a nonland was discarded → +1/+1 counter on the target.
         target.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
-            "X = 1 connive discarded a nonland → +1/+1 counter");
+            "X = 1 connive discarded a nonland → +1/+1 counter (read off rc.Game.TurnState)");
         _alice.Zones.Graveyard.GetCards().Should().HaveCount(1,
             "the connive draw was discarded");
+    }
+
+    [Fact]
+    public void Connive_ThreeCreaturesDied_ConnivesX3_DynamicFromLiveTurnState()
+    {
+        // The dynamic-X path: X = creatures died this turn read off the LIVE
+        // resolution context, not a captured TurnState. 3 deaths → connive X=3.
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
+        land.SetController(_alice);
+        var target = PlaceCreature(_alice);
+        for (var i = 0; i < 3; i++) AddCardToLibrary(_alice, land: false);
+
+        var ability = land.Abilities.OfType<ActivatedAbility>().Single();
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+        ResolveWithDeaths(ability, deaths: 3);
+
+        // Connive 3 drew 3 nonlands, then discarded all 3 → 3 +1/+1 counters.
+        target.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
+            "X = 3 (creatures died this turn, read live) connives 3 nonlands → 3 counters");
+        _alice.Zones.Graveyard.GetCards().Should().HaveCount(3);
+    }
+
+    /// <summary>Resolve <paramref name="ability"/>'s effect through a live
+    /// GameContext whose TurnState records <paramref name="deaths"/> creature
+    /// deaths this turn — exercising the dynamic-X read off rc.Game.TurnState.</summary>
+    private void ResolveWithDeaths(ActivatedAbility ability, int deaths)
+    {
+        var ts = new TurnState();
+        for (var i = 0; i < deaths; i++) ts.RecordCreatureDied(_alice);
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice },
+            activePlayer: _alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(),
+            landPlayAvailable: true,
+            turnState: ts);
+        ability.ResolveAsync(agent: null, game: ctx).AsTask().GetAwaiter().GetResult();
     }
 
     private static GameContext BuildContext(params Player[] players)
