@@ -220,8 +220,9 @@ public sealed class SandboxCastabilityTests
     /// rollout returned a small BoardEval leaf score instead.
     /// </summary>
     [Fact(Timeout = 60_000)]
-    public void EngineSimulator_ScriptedBoltRollout_IsLethal_AgainstThreeLifeOpponent()
+    public async Task EngineSimulator_ScriptedBoltRollout_IsLethal_AgainstThreeLifeOpponent()
     {
+        await Task.Yield(); // xUnit requires async for Timeout-marked facts
         var (alice, bob, _) = BuildBoltBoard(bobLife: 3); // one bolt is exactly lethal
 
         var root = SimState.Capture(
