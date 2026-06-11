@@ -64,20 +64,29 @@ public class Card : ICard
     /// </summary>
     public ValueObjects.ManaCost ManaCostValue { get; }
 
+    // Cached AsReadOnly wrappers — ReadOnlyCollection is a LIVE view over the
+    // backing list (later mutations remain visible through it), but each
+    // AsReadOnly() call allocates a fresh wrapper. These properties are read
+    // on per-iteration bot-search paths (ability scans, type checks), so the
+    // wrapper is created once per card and reused. Behaviour is identical.
+    private System.Collections.ObjectModel.ReadOnlyCollection<CardType>? _cardTypesView;
+    private System.Collections.ObjectModel.ReadOnlyCollection<CardSupertype>? _supertypesView;
+    private System.Collections.ObjectModel.ReadOnlyCollection<CardSubtype>? _subtypesView;
+
     /// <summary>
     /// The card types (cards can have multiple types).
     /// </summary>
-    public IReadOnlyList<CardType> CardTypes => _cardTypes.AsReadOnly();
+    public IReadOnlyList<CardType> CardTypes => _cardTypesView ??= _cardTypes.AsReadOnly();
 
     /// <summary>
     /// The card supertypes.
     /// </summary>
-    public IReadOnlyList<CardSupertype> Supertypes => _supertypes.AsReadOnly();
+    public IReadOnlyList<CardSupertype> Supertypes => _supertypesView ??= _supertypes.AsReadOnly();
 
     /// <summary>
     /// The card subtypes.
     /// </summary>
-    public IReadOnlyList<CardSubtype> Subtypes => _subtypes.AsReadOnly();
+    public IReadOnlyList<CardSubtype> Subtypes => _subtypesView ??= _subtypes.AsReadOnly();
     
     public Player? Owner { get; internal set; }
 
@@ -1671,10 +1680,14 @@ public class Card : ICard
         }
     }
 
+    // Cached live AsReadOnly wrapper — see CardTypes for rationale. Add/Remove
+    // mutate the BACKING list, so the cached view always reflects them.
+    private System.Collections.ObjectModel.ReadOnlyCollection<IAbility>? _abilitiesView;
+
     /// <summary>
     /// Abilities attached to this card (activated, triggered, static, mana).
     /// </summary>
-    public IReadOnlyList<IAbility> Abilities => _abilities.AsReadOnly();
+    public IReadOnlyList<IAbility> Abilities => _abilitiesView ??= _abilities.AsReadOnly();
 
     /// <summary>
     /// Attach an ability to this card. Used during card construction or by effects

@@ -51,6 +51,9 @@ public class Zone : IZone
         return _cards.ToList();
     }
 
+    /// <inheritdoc cref="IZone.CardsView"/>
+    public IReadOnlyList<ICard> CardsView => _cards;
+
     public void Clear()
     {
         _cards.Clear();

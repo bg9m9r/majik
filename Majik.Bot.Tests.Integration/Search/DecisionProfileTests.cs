@@ -419,7 +419,7 @@ public sealed class DecisionProfileTests
         //              number the reuse strength probes raise their cap to).
         foreach (var reuse in new[] { false, true })
         {
-            foreach (var (cell, iters) in new[] { ("live", 150), ("capacity", 2000) })
+            foreach (var (cell, iters) in new[] { ("live", 150), ("live800", 800), ("capacity", 2000) })
             {
                 var mcts = new Mcts(sim, new MctsConfig(
                     MaxIterations: iters, MaxMillis: 1500, DepthTurns: 1, ExplorationC: 1.41,

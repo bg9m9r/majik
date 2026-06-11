@@ -253,6 +253,24 @@ public static class OracleTextNormalizer
     public static string NormalizeForCard(string text, string? cardName)
     {
         if (string.IsNullOrEmpty(text)) return Normalize(text);
+
+        // Memoized: normalization is a pure function of (text, name) and sits
+        // on the cast hot path — SpellBindContext.Text recomputes it for every
+        // template the registry walks, on every cast, including every MCTS
+        // sandbox cast (measured: a large slice of per-iteration string churn).
+        var key = new TextNameKey(text, cardName);
+        if (ForCardCache.TryGetValue(key, out var hit)) return hit;
+
+        var result = NormalizeForCardUncached(text, cardName);
+        if (ForCardCache.Count < NormalizeCacheCapacity)
+        {
+            ForCardCache.TryAdd(key, result);
+        }
+        return result;
+    }
+
+    private static string NormalizeForCardUncached(string text, string? cardName)
+    {
         if (string.IsNullOrWhiteSpace(cardName)) return Normalize(text);
         // Single-character names are skipped — real MTG card names are
         // never one character long, and test fixtures commonly use "X" as
@@ -263,6 +281,20 @@ public static class OracleTextNormalizer
         var s = ReplaceCardName(text, cardName);
         return Normalize(s);
     }
+
+    // ── Normalization memo (bot-search measured hot path) ───────────────────
+    // Pure (text, cardName) → normalized text. The distinct key set is bounded
+    // by the card pool; the soft cap removes any unbounded-growth concern
+    // (insertion simply stops on a full cache — correctness is unaffected).
+    private readonly record struct TextNameKey(string Text, string? Name);
+
+    private const int NormalizeCacheCapacity = 8192;
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<TextNameKey, string>
+        ForCardCache = new();
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<TextNameKey, string>
+        FoldedCache = new();
 
     /// <summary>
     /// PR-B: an additionally-folded view of the oracle body. Runs the same
@@ -296,9 +328,19 @@ public static class OracleTextNormalizer
     /// </summary>
     public static string NormalizeFolded(string text, string? cardName)
     {
+        if (string.IsNullOrEmpty(text)) return NormalizeForCard(text, cardName);
+
+        // Memoized for the same reason as NormalizeForCard (pure, hot path).
+        var key = new TextNameKey(text, cardName);
+        if (FoldedCache.TryGetValue(key, out var hit)) return hit;
+
         var s = NormalizeForCard(text, cardName);
-        if (string.IsNullOrEmpty(s)) return s;
-        return FoldTokens(s);
+        var result = string.IsNullOrEmpty(s) ? s : FoldTokens(s);
+        if (FoldedCache.Count < NormalizeCacheCapacity)
+        {
+            FoldedCache.TryAdd(key, result);
+        }
+        return result;
     }
 
     /// <summary>

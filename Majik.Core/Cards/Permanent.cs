@@ -464,10 +464,23 @@ public class Permanent : Card
         // ManaAbility.CloneForSim returns null for non-simple-shape abilities
         // (dynamic generators, additional-cost payers, etc.); those keep the
         // original ref — a known limitation tracked for future work.
-        var manaAbilitiesToRelink = Abilities
-            .OfType<Majik.Core.Abilities.ManaAbility>()
-            .Where(ma => ReferenceEquals(ma.Source, src))
-            .ToList();
+        // Manual scan (no LINQ): this runs for every cloned permanent on every
+        // MCTS-iteration clone — the OfType/Where/ToList chain allocated a
+        // closure + enumerators + a list per permanent per clone. The list is
+        // only materialized when an ability actually needs relinking (we
+        // mutate the ability list inside the loop below, so the scan must
+        // complete before any Remove/Add anyway).
+        List<Majik.Core.Abilities.ManaAbility>? manaAbilitiesToRelink = null;
+        var abilities = Abilities;
+        for (var i = 0; i < abilities.Count; i++)
+        {
+            if (abilities[i] is Majik.Core.Abilities.ManaAbility ma && ReferenceEquals(ma.Source, src))
+            {
+                (manaAbilitiesToRelink ??= new List<Majik.Core.Abilities.ManaAbility>()).Add(ma);
+            }
+        }
+        if (manaAbilitiesToRelink is null) return;
+
         foreach (var old in manaAbilitiesToRelink)
         {
             var ctrl = old.Controller != null && players.TryGetValue(old.Controller, out var cp)

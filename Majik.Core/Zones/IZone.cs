@@ -45,6 +45,17 @@ public interface IZone
     IEnumerable<ICard> GetCards();
 
     /// <summary>
+    /// NO-COPY read-only view of this zone's cards, in zone order.
+    /// <see cref="GetCards"/> returns a defensive copy per call — correct for
+    /// general consumers, but measurably wasteful on per-iteration bot-search
+    /// paths (the sandbox cloner walks every zone of every player on every
+    /// MCTS iteration). Callers of this view MUST NOT add/remove zone cards
+    /// while enumerating it. Default implementation falls back to the copying
+    /// path so existing implementers stay correct without changes.
+    /// </summary>
+    IReadOnlyList<ICard> CardsView => GetCards().ToList();
+
+    /// <summary>
     /// Clear all cards from this zone.
     /// </summary>
     void Clear();
