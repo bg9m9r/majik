@@ -1010,9 +1010,13 @@ public sealed class DealDamageEachOpponentEffectDef : EffectDefinition
 
 /// <summary>
 /// "Mill N cards. You may put a card with one of the given types from
-/// among the milled cards into your hand." Auto-picks the first
-/// qualifying milled card in v1 (the "may" opt-out awaits agent
-/// prompting). Matches the Dredger's Insight ETB effect.
+/// among the milled cards into your hand." (CR 116.1b — the pick is a
+/// genuine player choice.) Mills <see cref="Amount"/>, then prompts the
+/// controller's agent (via the reveal-and-choose prompt) to put one of
+/// the matching milled cards into hand, or decline. With no agent
+/// (bot self-play / agentless harness) it falls back to the deterministic
+/// default of auto-picking the first matching milled card. Matches the
+/// Dredger's Insight ETB effect.
 ///
 /// <see cref="MatchingTypes"/> are parsed as
 /// <see cref="Majik.Core.Cards.Types.CardType"/>; OR-matched.

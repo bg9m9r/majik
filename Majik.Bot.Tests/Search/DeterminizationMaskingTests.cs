@@ -49,8 +49,21 @@ public class DeterminizationMaskingTests
     private static ICard Build(string name, Player owner) => Factory.Create(name, owner);
 
     /// <summary>
-    /// Small budgets so the determinized K-world search runs fast in the suite.
-    /// Fixed RandomSeed so both games sample identical opponent worlds.
+    /// Small iteration cap so the determinized K-world search runs fast in the
+    /// suite. Fixed RandomSeed so both games sample identical opponent worlds.
+    ///
+    /// <para>
+    /// The wall-clock budget is set deliberately high (60 s) so the
+    /// DETERMINISTIC <see cref="BotConfig.MaxMctsIterations"/> cap always
+    /// governs the search depth — never the timer. A low wall-clock budget
+    /// (the previous 800 ms) made the result machine-timing-dependent: on a
+    /// slower host (CI) the search was cut off mid-iteration at a different
+    /// count than on a fast host, so the masking invariant (decision identical
+    /// across the two real opponent hands) flipped non-deterministically. Any
+    /// change to per-iteration cost — e.g. growing the implemented-card pool —
+    /// could expose that timing flake. Capping on iterations alone removes the
+    /// timing coupling entirely.
+    /// </para>
     /// </summary>
     private static BotConfig Config(string? opponentArchetype) =>
         new BotConfig(
@@ -58,7 +71,7 @@ public class DeterminizationMaskingTests
             Strategy: "mcts",
             RandomSeed: 7,
             MaxMctsIterations: 80,
-            MaxMctsBudgetMs: 800,
+            MaxMctsBudgetMs: 60_000,
             OpponentArchetype: opponentArchetype);
 
     // Two clearly-different, clone-clean opponent real hands (avoid Brainstorm —

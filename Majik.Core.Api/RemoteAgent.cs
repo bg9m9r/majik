@@ -71,6 +71,18 @@ public sealed class RemoteAgent : IPlayerAgent
     // resolution; replaced on each new ChooseAsync prompt.
     private IReadOnlyList<object>? _pendingChoiceCandidates;
     private ChoiceKind? _pendingChoiceKind;
+    // CR 115.4 / 608.2b — engine-resolved legal candidate pool for the most
+    // recent ChooseTargetsAsync prompt. The TargetRequest handed to us by the
+    // shared targeting pipeline (TargetCollection.CollectAsync) already has its
+    // CandidateGatherer / "you control" / type restriction resolved into
+    // LegalCandidates; we stash that pool so Resolve can DROP any picked
+    // instance id the client smuggled in that is not in the offered set (the
+    // CR 608.2b illegality recheck at the agent boundary). Before this, the
+    // remote (human) target prompt shipped NO candidate list and accepted any
+    // instance id the portal sent — so illegal targets (an opponent's land /
+    // any creature for "target land you control", etc.) resolved unchecked.
+    // Cleared on prompt resolution; replaced on each new target prompt.
+    private IReadOnlyList<object>? _pendingTargetCandidates;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -144,6 +156,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var bottomCount = _pendingBottomCount;
         var choiceCandidates = _pendingChoiceCandidates;
         var choiceKind = _pendingChoiceKind;
+        var targetCandidates = _pendingTargetCandidates;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
@@ -154,8 +167,9 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingBottomCount = null;
         _pendingChoiceCandidates = null;
         _pendingChoiceKind = null;
+        _pendingTargetCandidates = null;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates);
     }
 
     private void Resolve(
@@ -168,7 +182,8 @@ public sealed class RemoteAgent : IPlayerAgent
         bool revealedOptional,
         int? bottomCount,
         IReadOnlyList<object>? choiceCandidates,
-        ChoiceKind? choiceKind)
+        ChoiceKind? choiceKind,
+        IReadOnlyList<object>? targetCandidates)
     {
         switch (command)
         {
@@ -202,9 +217,46 @@ public sealed class RemoteAgent : IPlayerAgent
                     m.Keep ? MulliganDecision.Keep : MulliganDecision.Mulligan);
                 break;
             case ChooseTargetsCommand t:
-                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(
-                    t.TargetInstanceIds.Select(id => (object)ResolveCard(id)).ToList());
+            {
+                // CR 115.4 / 608.2b — validate every picked instance id against
+                // the engine-offered legal candidate pool (resolved upstream by
+                // TargetCollection from the TargetRequest's CandidateGatherer /
+                // "you control" / type restriction). A pick not in the offered
+                // set is ILLEGAL and is dropped (logged), rather than resolved
+                // blindly — this is the agent-boundary recheck that stops the
+                // portal from smuggling an opponent's land / any creature into a
+                // "target land you control" slot. When the engine attached no
+                // candidate pool (targetCandidates == null — e.g. a request with
+                // only a Description string and no machine-readable restriction),
+                // fall back to the prior behaviour and resolve the ids as-is so
+                // we don't over-filter requests whose legality we can't express.
+                IReadOnlyList<object> resolved;
+                if (targetCandidates == null)
+                {
+                    resolved = t.TargetInstanceIds
+                        .Select(id => (object)ResolveCard(id)).ToList();
+                }
+                else
+                {
+                    var picked = new List<object>(t.TargetInstanceIds.Count);
+                    foreach (var id in t.TargetInstanceIds)
+                    {
+                        var match = targetCandidates
+                            .FirstOrDefault(c => CandidateMatchesId(c, id));
+                        if (match == null)
+                        {
+                            Console.Error.WriteLine(
+                                $"WARN: ChooseTargetsCommand selected instance {id} " +
+                                "is not in the offered legal-target set (CR 608.2b) — dropping.");
+                            continue;
+                        }
+                        picked.Add(match);
+                    }
+                    resolved = picked;
+                }
+                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(resolved);
                 break;
+            }
             case ChooseXCommand x:
                 ((TaskCompletionSource<int>)tcs).SetResult(x.X);
                 break;
@@ -292,6 +344,40 @@ public sealed class RemoteAgent : IPlayerAgent
                 // as part of activation, not the priority command).
                 ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
                     new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
+                break;
+            }
+            case ActivateLoyaltyAbilityCommand lac:
+            {
+                // CR 606 — translate the wire command into the engine's
+                // PriorityAction.ActivateLoyaltyAbility. Validate locally only
+                // the bits that gate command-routing (source exists, is a
+                // permanent the caller controls, carries the named loyalty
+                // ability). Sorcery-speed timing, once-per-turn, and loyalty-
+                // cost payability are engine concerns and are re-verified by
+                // TurnDriver.DispatchLoyalty when the activation runs.
+                var source = ResolveCard(lac.PermanentInstanceId);
+                if (source is not Permanent permanent)
+                {
+                    throw new InvalidOperationException(
+                        $"ActivateLoyaltyAbilityCommand source {lac.PermanentInstanceId} is not a Permanent ({source.GetType().Name}).");
+                }
+                if (permanent.Controller != null && !ReferenceEquals(permanent.Controller, _player))
+                {
+                    throw new InvalidOperationException(
+                        $"Player {_player.Id} does not control permanent {permanent.Name}.");
+                }
+                var loyaltyAbility = permanent.Abilities
+                    .OfType<LoyaltyAbility>()
+                    .FirstOrDefault(a => a.Id == lac.LoyaltyAbilityId);
+                if (loyaltyAbility == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Permanent {permanent.Name} has no loyalty ability with id {lac.LoyaltyAbilityId}.");
+                }
+                // Targets are not pre-resolved here — DispatchLoyalty re-prompts
+                // via ChooseTargetsAsync (CR 602.2b; mirrors ActivateAbilityCommand).
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                    new PriorityAction.ActivateLoyaltyAbility(loyaltyAbility, Array.Empty<object>()));
                 break;
             }
             case OrderTriggersCommand ot:
@@ -678,8 +764,64 @@ public sealed class RemoteAgent : IPlayerAgent
         }
     }
 
+    /// <summary>
+    /// CR 115 / 601.2c / 603.3 — target prompt. The <paramref name="request"/>
+    /// arrives from the shared targeting pipeline
+    /// (<c>TargetCollection.CollectAsync</c>) with its
+    /// <see cref="TargetRequest.CandidateGatherer"/> already resolved into
+    /// <see cref="TargetRequest.LegalCandidates"/> (the "you control" / type
+    /// restriction). We stash that legal pool (CR 608.2b recheck in
+    /// <see cref="Resolve"/>) and ship the card candidates onto the prompt
+    /// payload so the portal renders ONLY legal targets — fixing the
+    /// long-standing bug where the remote target prompt shipped no candidate
+    /// list and accepted any instance id the client sent (illegal targets like
+    /// an opponent's land / any creature were selectable for "target land you
+    /// control"). When the request carries no machine-readable candidate pool
+    /// (only a Description string), the stash is empty and the recheck falls
+    /// back to resolving picks as-is — we don't over-filter requests whose
+    /// legality we can't express.
+    /// </summary>
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
-        => Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+
+        // The pipeline resolves the CandidateGatherer before calling us, but
+        // re-resolve defensively (ctx may differ) and union — ResolveCandidates
+        // returns LegalCandidates unchanged when there's no gatherer.
+        var candidates = request.ResolveCandidates(ctx);
+        _pendingTargetCandidates = candidates;
+
+        // Only ship a candidate payload when the request actually carries a
+        // machine-readable pool (gatherer or static LegalCandidates). An empty
+        // pool → null payload, so the portal's existing "no candidates → free
+        // selection" behaviour is preserved for unrestricted requests and the
+        // Resolve recheck no-ops for them.
+        if (candidates.Count > 0)
+        {
+            var cardSnapshots = candidates
+                .OfType<ICard>()
+                .Select(StateSnapshotter.SnapshotCard)
+                .ToList();
+            _pendingPayload = new PromptPayload(
+                Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
+                Label: request.Description);
+        }
+
+        try
+        {
+            return Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
+        }
+        catch
+        {
+            _pendingTargetCandidates = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     /// <summary>
     /// PLAN 01 (Slice C) — unified declarative choice sink. Resolves any lazy

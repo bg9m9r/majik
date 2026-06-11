@@ -539,6 +539,25 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 614.1d — set by a <c>[CardName]</c> factory that ALREADY wires its
+    /// own "enters with X +1/+1 counters" handling (e.g. an ETB trigger that
+    /// reads <see cref="PendingCastX"/> — Hangarback Walker, Endless One,
+    /// Stonecoil Serpent, The Goose Mother). The generic
+    /// <see cref="Majik.Core.CardData.EntersWithCountersBinder"/> consults this
+    /// flag and SKIPS registering its own variable-X replacement so the card's
+    /// counters aren't placed twice (once by the factory's mechanism, once by
+    /// the binder). Cards whose factory does NOT self-manage X-counters
+    /// (Walking Ballista — pure JSON activated abilities) leave this false, so
+    /// the binder's replacement is their single counter source.
+    /// </summary>
+    public bool SelfManagesEntersWithCounters { get; private set; }
+
+    /// <summary>Mark that this card's factory self-manages "enters with X
+    /// +1/+1 counters", so the generic binder must not double it.</summary>
+    public void MarkSelfManagesEntersWithCounters() =>
+        SelfManagesEntersWithCounters = true;
+
+    /// <summary>
     /// CR 608.3 override — when an instant/sorcery's resolution instructs the
     /// spell to return ITSELF to its owner's hand (Recross the Paths — "If you
     /// win [the clash], return Recross the Paths to its owner's hand") instead
@@ -1599,6 +1618,7 @@ public class Card : ICard
         PendingDelveExiledCount = src.PendingDelveExiledCount;
         Intensity = src.Intensity;
         PendingCastX = src.PendingCastX;
+        SelfManagesEntersWithCounters = src.SelfManagesEntersWithCounters;
         ReturnToHandOnResolution = src.ReturnToHandOnResolution;
         PendingCastColors = src.PendingCastColors;
         PendingCastColorCounts = src.PendingCastColorCounts;

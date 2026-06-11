@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
+using Majik.Core.Counters;
 using Majik.Core.Effects;
 
 namespace Majik.Core.CardData;
@@ -14,17 +15,27 @@ namespace Majik.Core.CardData;
 ///   * "enters with a +1/+1 counter on it"
 ///   * "enters with two +1/+1 counters on it"
 ///   * "enters the battlefield with three +1/+1 counters on it"
+///   * "enters with X +1/+1 counters on it" (Walking Ballista, Endless One,
+///     Hangarback Walker, …) — registers a DYNAMIC replacement that reads the
+///     X chosen at cast time off <see cref="Card.PendingCastX"/> (CR 202.3b /
+///     614.1d), so the permanent enters WITH the counters (no transient 0/0
+///     window the SBA layer would immediately kill).
 ///
-/// Variable-X counter loads (Walking Ballista, "with X +1/+1 counters") are
-/// intentionally NOT matched — those need <c>ChosenSpellParams.X</c>
-/// threaded through <see cref="ZoneMoveIntent"/>, deferred to a follow-up.
 /// Conditional "with N counters" clauses ("for each Y, enters with a +1/+1
-/// counter") also stay unbound — they need a context-aware predicate.
+/// counter") stay unbound — they need a context-aware predicate.
 /// </summary>
 public static class EntersWithCountersBinder
 {
     private static readonly Regex Pattern = new(
         @"\benters\s+(?:the\s+battlefield\s+)?with\s+(?<n>a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+\+1/\+1\s+counters?\s+on\s+it\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // CR 202.3b — variable "X +1/+1 counters" form. Separate from the fixed
+    // Pattern so the X count is sourced dynamically from PendingCastX rather
+    // than parsed to a literal. The "for each" guard in Bind excludes
+    // conditional clauses that still need a context predicate.
+    private static readonly Regex VariableXPattern = new(
+        @"\benters\s+(?:the\s+battlefield\s+)?with\s+X\s+\+1/\+1\s+counters?\s+on\s+it\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static bool Bind(ICard card, CardEntity entity, ReplacementBus replacements)
@@ -37,13 +48,36 @@ public static class EntersWithCountersBinder
         if (string.IsNullOrWhiteSpace(text)) return false;
 
         var m = Pattern.Match(text);
-        if (!m.Success) return false;
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            if (n <= 0) return false;
 
-        var n = WordToInt(m.Groups["n"].Value);
-        if (n <= 0) return false;
+            replacements.Register(new EntersWithCountersReplacement(card, n));
+            return true;
+        }
 
-        replacements.Register(new EntersWithCountersReplacement(card, n));
-        return true;
+        // CR 202.3b — "enters with X +1/+1 counters on it". Skip the
+        // conditional "for each …" shape (needs a context predicate, still
+        // out of scope). Register a dynamic replacement that reads the chosen
+        // X off PendingCastX at entry; non-cast entries (blink / copy / token)
+        // have no stamp → X = 0 → no counters.
+        var vx = VariableXPattern.Match(text);
+        if (vx.Success
+            && text.IndexOf("for each", StringComparison.OrdinalIgnoreCase) < 0
+            // CR 614.1d — skip when the card's factory ALREADY wires its own
+            // X-counter mechanism (Hangarback / Endless One / Stonecoil /
+            // Goose Mother); registering here would double the counters.
+            && (card as Card)?.SelfManagesEntersWithCounters != true)
+        {
+            replacements.Register(new EntersWithCountersReplacement(
+                card,
+                CounterType.PlusOnePlusOne,
+                () => (card as Card)?.PendingCastX ?? 0));
+            return true;
+        }
+
+        return false;
     }
 
     private static int WordToInt(string s) =>

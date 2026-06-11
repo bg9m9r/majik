@@ -1731,15 +1731,59 @@ public static class CardDefRuntime
     private static IEffect BuildMillThenPickEffect(
         MillThenPickFirstMatchingToHandEffectDef def, ICard card, Player controller)
     {
+        // CR 116.1b — "mill N. You MAY put a matching card from among the
+        // milled cards into your hand." The pick is a genuine player choice,
+        // not an auto-pick: mill, then PROMPT the controller's agent to choose
+        // zero-or-one of the milled matching cards. Reuses the existing
+        // reveal-and-choose prompt (IPlayerAgent.ChooseFromRevealedAsync /
+        // ChooseFromRevealedCommand) so the portal renders it with no contract
+        // change — the milled cards are the "revealed" pile, the matching
+        // subset is "eligible", optional: true models the "may" opt-out.
+        //
+        // No agent (bot self-play / agentless harness): fall back to the
+        // deterministic legacy default — auto-pick the first matching milled
+        // card — so existing no-agent callers stay behaviour-preserving.
         var amount = def.Amount;
         var types = def.MatchingTypes.Select(ParseType).ToArray();
         return new Effect(
-            $"{card.Name}: mill {amount}, pick first matching",
-            () =>
+            $"{card.Name}: mill {amount}, may put one matching milled card into hand",
+            async ctx =>
             {
                 var milled = Fx.Mill(controller, amount);
-                if (types.Length == 0) return;
-                var pick = milled.FirstOrDefault(c => types.Any(t => c.HasType(t)));
+                if (types.Length == 0 || milled.Count == 0) return;
+
+                var eligible = milled
+                    .Where(c => types.Any(t => c.HasType(t)))
+                    .ToList();
+
+                ICard? pick;
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
+                if (agent != null)
+                {
+                    // Genuinely prompt — even with empty eligible so the player
+                    // sees the milled pile (mirrors RevealAndChoose's UX).
+                    pick = await agent.ChooseFromRevealedAsync(
+                        ctx: ctx.Game,
+                        revealed: milled,
+                        eligible: eligible,
+                        optional: true,
+                        label: $"{card.Name}: put a card into your hand",
+                        ct: ctx.Ct).ConfigureAwait(false);
+
+                    // Defensive: coerce any out-of-set pick (custom agents) to
+                    // a decline so we never pull a non-milled / non-matching
+                    // card into hand.
+                    if (pick != null && !eligible.Contains(pick))
+                    {
+                        pick = null;
+                    }
+                }
+                else
+                {
+                    // No agent — deterministic fallback (first matching).
+                    pick = eligible.Count > 0 ? eligible[0] : null;
+                }
+
                 if (pick != null)
                 {
                     controller.Zones.Graveyard.RemoveCard(pick);

@@ -63,6 +63,16 @@ public sealed class PriorityLoop
     // the loop then leaves PriorityManager's sync drain in charge, exactly
     // preserving pre-change behaviour for those callers.
     private readonly Func<Player, GameContext, CancellationToken, Task>? _asyncTriggerDrain;
+    // CR 704.1 / 704.3 / 704.4 — check state-based actions whenever a player
+    // WOULD receive priority and after each stack object resolves, looping
+    // until none apply (704.3). Supplied by TurnDriver (which owns the
+    // StateBasedActions service + the player list). Null in legacy / unit
+    // harnesses that construct PriorityLoop without an SBA service — those
+    // keep the pre-change behaviour (SBAs checked only at turn boundaries),
+    // exactly preserving prior callers. CR 704.4 / 117.5 ordering: this runs
+    // BEFORE the trigger drain (_asyncTriggerDrain) so SBAs fire, then any
+    // pending triggers go on the stack, then the player gets priority.
+    private readonly Action? _checkStateBasedActions;
     private readonly Func<DateTime> _clock;
     // Stack-mutation event subscriptions held so the loop can detach on
     // its way out. TurnDriver constructs a fresh PriorityLoop per round
@@ -98,10 +108,12 @@ public sealed class PriorityLoop
         IEventBus? eventBus = null,
         Func<DateTime>? clock = null,
         Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
-        Func<TurnState?>? turnStateAccessor = null)
+        Func<TurnState?>? turnStateAccessor = null,
+        Action? checkStateBasedActions = null)
     {
         _castDispatcher = castDispatcher;
         _asyncTriggerDrain = asyncTriggerDrain;
+        _checkStateBasedActions = checkStateBasedActions;
         // CR 603.3 — when an agent-aware async drain is supplied, this loop
         // owns the drain; suppress PriorityManager's built-in sync drain so
         // pending targeted triggers are NOT auto-picked first-eligible before
@@ -184,6 +196,17 @@ public sealed class PriorityLoop
             {
                 var current = _priority.CurrentPlayer
                     ?? throw new InvalidOperationException("No current priority holder");
+
+                // CR 704.1 / 704.3 / 704.4 — check state-based actions BEFORE a
+                // player receives priority (and BEFORE the trigger drain below,
+                // per the 704.4 / 117.5 ordering: SBAs first, then put pending
+                // triggers on the stack, then grant priority). The SBA service
+                // loops internally until no action applies (704.3), so a 0/0
+                // creature (Walking Ballista X=0) or a creature reduced to 0
+                // toughness by a noncombat effect is in the graveyard before
+                // this window's holder can act. No-op when not wired (legacy
+                // unit harnesses).
+                _checkStateBasedActions?.Invoke();
 
                 // CR 603.3 — drain any pending triggered abilities onto the
                 // stack on the agent-aware async path BEFORE the current
@@ -297,6 +320,15 @@ public sealed class PriorityLoop
                 ResolveAgentForController,
                 MakeContext(activePlayer, activePlayer),
                 ct).ConfigureAwait(false);
+
+            // CR 704.1 — check state-based actions immediately after the object
+            // resolves, before priority is offered again (the loop restarts a
+            // fresh round above, which also checks at its top — but checking
+            // here keeps the death tightly coupled to the resolution that
+            // caused it, and matches the 704.3 "repeat until none apply" point
+            // right after a game event). The SBA service loops internally.
+            _checkStateBasedActions?.Invoke();
+
             // Loop back: start a fresh priority round with active player.
         }
     }

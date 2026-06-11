@@ -125,7 +125,10 @@ public class SearchStrategyDeterminizationTests
             Strategy: "mcts",
             RandomSeed: 7,
             MaxMctsIterations: 80,
-            MaxMctsBudgetMs: 800,
+            // 60 s budget so the deterministic iteration cap (80) governs the
+            // search depth, never the wall clock (low budgets flake on slow CI
+            // hosts).
+            MaxMctsBudgetMs: 60_000,
             OpponentArchetype: opponentArchetype);
 
     // ── Wiring discriminator ────────────────────────────────────────────────────

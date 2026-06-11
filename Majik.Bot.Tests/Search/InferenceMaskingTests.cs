@@ -67,7 +67,11 @@ public class InferenceMaskingTests
             Strategy: "mcts",
             RandomSeed: 7,
             MaxMctsIterations: 80,
-            MaxMctsBudgetMs: 800,
+            // 60 s budget so the deterministic iteration cap (80) governs the
+            // search depth, never the wall clock — a low budget made the
+            // masking invariant machine-timing-dependent and flaky on slow
+            // (CI) hosts.
+            MaxMctsBudgetMs: 60_000,
             OpponentArchetype: null,
             InferOpponentArchetype: true);
 
@@ -219,7 +223,7 @@ public class InferenceMaskingTests
         var g1 = BuildPublicIdenticalGame(realOppHand: new[] { "Lightning Bolt", "Lightning Bolt", "Goblin Guide" });
         var g2 = BuildPublicIdenticalGame(realOppHand: new[] { "Island", "Island", "Island" });
         var cfg = new BotConfig("Burn", Strategy: "mcts", RandomSeed: 7,
-            MaxMctsIterations: 80, MaxMctsBudgetMs: 800, InferOpponentArchetype: true);
+            MaxMctsIterations: 80, MaxMctsBudgetMs: 60_000, InferOpponentArchetype: true);
 
         var a1 = new SearchStrategy(cfg).PickAttackers(g1.ctx, g1.self, g1.eligible);
         var a2 = new SearchStrategy(cfg).PickAttackers(g2.ctx, g2.self, g2.eligible);
@@ -234,7 +238,7 @@ public class InferenceMaskingTests
         var (ctx1, self1) = BuildPriorityGame(new[] { "Lightning Bolt", "Lightning Bolt", "Goblin Guide" });
         var (ctx2, self2) = BuildPriorityGame(new[] { "Island", "Island", "Island" });
         var cfg = new BotConfig("Burn", Strategy: "mcts", RandomSeed: 7,
-            MaxMctsIterations: 80, MaxMctsBudgetMs: 800, InferOpponentArchetype: true);
+            MaxMctsIterations: 80, MaxMctsBudgetMs: 60_000, InferOpponentArchetype: true);
 
         var p1 = new SearchStrategy(cfg).PickPriorityAction(ctx1, self1);
         var p2 = new SearchStrategy(cfg).PickPriorityAction(ctx2, self2);

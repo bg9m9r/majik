@@ -117,6 +117,10 @@ public static class StonecoilSerpentFactory
         var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);
         var card = (Creature)CardDefinitionFactory.Build(definition, owner, replacements);
 
+        // CR 614.1d — self-manages its X +1/+1 counters via the ETB trigger
+        // below; flag so the generic binder doesn't double them.
+        card.MarkSelfManagesEntersWithCounters();
+
         // Evergreen combat keywords. KeywordAbility markers so
         // CombatAbilities.Has{Reach,Trample} surface the combat behaviour.
         // Casing matches the CombatAbilities lookups.

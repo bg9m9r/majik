@@ -158,6 +158,11 @@ public static class TheGooseMotherFactory
 
         card.SetController(owner);
 
+        // CR 614.1d — self-manages its X +1/+1 counters via the ETB trigger
+        // below (and the Food ETB shares the same cast-time X); flag so the
+        // generic binder doesn't register a second variable-X replacement.
+        card.MarkSelfManagesEntersWithCounters();
+
         // CR 702.9 — Flying. KeywordAbility marker only; consumed by
         // CombatAbilities.HasFlying so block-legality observes it.
         card.AddAbility(new KeywordAbility(FlyingKeyword, card, owner));

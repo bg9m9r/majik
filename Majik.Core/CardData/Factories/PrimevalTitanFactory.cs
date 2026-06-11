@@ -166,7 +166,7 @@ public static class PrimevalTitanFactory
                 if (!pick.HasType(CardType.Land)) continue;
                 if (!library.Contains(pick)) continue;
                 if (!seen.Add(pick)) continue;
-                MoveToBattlefieldTapped(caster, pick);
+                await MoveToBattlefieldTappedAsync(caster, pick, ctx).ConfigureAwait(false);
                 placed++;
             }
             // CR 701.20a — shuffle after the search resolves.
@@ -191,7 +191,7 @@ public static class PrimevalTitanFactory
                 : candidates[0];
             if (pick == null) break; // CR 701.19a — decline is legal.
 
-            MoveToBattlefieldTapped(caster, pick);
+            await MoveToBattlefieldTappedAsync(caster, pick, ctx).ConfigureAwait(false);
         }
         // CR 701.20a — shuffle after the search resolves.
         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "primeval-titan");
@@ -215,12 +215,22 @@ public static class PrimevalTitanFactory
     /// condition at event-publish time.
     /// </para>
     /// </summary>
-    private static void MoveToBattlefieldTapped(Player caster, ICard pick)
+    private static async ValueTask MoveToBattlefieldTappedAsync(
+        Player caster, ICard pick, ResolutionContext ctx)
     {
         var zones = ZoneServiceRegistry.Get(caster);
         if (zones != null)
         {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+            // Async move so the ResolutionContext (carrying the caster's
+            // agent) reaches a prompting ETB replacement — a tutored shock
+            // land must offer the controller the "pay 2 life?" choice
+            // (ShockLandReplacement.ReplaceAsync) rather than auto-paying
+            // via the synchronous replacement path. Primeval Titan's printed
+            // rider still taps the land afterward, so a sensible agent
+            // declines the payment; the sync path forced a pointless 2-life
+            // auto-pay.
+            await zones.MoveCardToAsync(pick, ZoneType.Battlefield, ctx, controller: caster)
+                .ConfigureAwait(false);
             if (pick is Permanent perm && !perm.IsTapped)
             {
                 perm.Tap();

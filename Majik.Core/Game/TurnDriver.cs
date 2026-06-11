@@ -873,32 +873,51 @@ public sealed class TurnDriver
                 && grantCard.RuntimeExileCastSpendAsAnyColor
                 && ReferenceEquals(grantCard.RuntimeExileCastAllowedCaster, actor);
 
-            // CR 106.4 — pass the cast card as the "spent on" context so
-            // slot-level mana provenance (Arena of Glory's exert haste rider,
-            // deferral #1) can react to "if THAT mana is spent on THIS spell".
-            if (!manaResolver.Pay(
-                    actor, cost, payment,
-                    spentOn: castCard, spendAsAnyColor,
-                    out _, out var colorCounts))
+            // CR 601.2c / 601.2h / CR 732.1 — the mana payment is executed
+            // INSIDE the cast flow, at the 601.2h step, i.e. AFTER target
+            // collection (601.2c). If the cast becomes illegal before then
+            // (insufficient targets, sorcery-speed gate, unpayable additional
+            // costs), CastAsync throws BEFORE this callback runs — nothing is
+            // tapped, nothing leaves the pool, so there is nothing to rewind.
+            // Pre-fix the payment was made up front and the failure path only
+            // rotated the hand: the live bot repeatedly tapped its lands for
+            // casts that then failed at targeting, wasting the mana.
+            //
+            // The callback pays the PRE-PROMPTED cost (the agent chose
+            // `payment`'s sources for exactly this cost at the selection
+            // prompt above), keeping the prompt/payment pairing intact.
+            // The flow-computed total cost (CR 601.2f) is deliberately unused
+            // here: the agent was prompted against `cost`, so `cost` is paid.
+            bool PayCastMana(Majik.Core.ValueObjects.ManaCost totalCostFromFlow)
             {
-                RotateHand(castCard, "Pay failed");
-                return false; // not committed: mana payment failed
-            }
+                // CR 106.4 — pass the cast card as the "spent on" context so
+                // slot-level mana provenance (Arena of Glory's exert haste
+                // rider, deferral #1) can react to "if THAT mana is spent on
+                // THIS spell".
+                if (!manaResolver.Pay(
+                        actor, cost, payment,
+                        spentOn: castCard, spendAsAnyColor,
+                        out _, out var colorCounts))
+                {
+                    return false; // CastAsync turns this into an illegal cast.
+                }
 
-            // CR 702.44b — stamp the per-color spent ledger on this cast so
-            // ETB effects can read it off the resolving permanent (parallels
-            // PendingCastX). SetPendingCastColorCounts also derives the
-            // distinct-color set (PendingCastColors) for Sunburst, while the
-            // count ledger preserves multiplicity so "{R}{R} was spent"
-            // intervening-ifs (Vibrance / Wistfulness) can distinguish
-            // {R}{R} from {R}{G}. The resolver computed the per-color counts
-            // by diffing the pool across the spend (colored pips + colored
-            // mana used to satisfy generic). Empty ledger = no colored mana
-            // spent → Sunburst yields zero counters. Consumed + cleared by
-            // the ETB effect.
-            if (castCard is Majik.Core.Cards.Card concreteForColors)
-            {
-                concreteForColors.SetPendingCastColorCounts(colorCounts);
+                // CR 702.44b — stamp the per-color spent ledger on this cast
+                // so ETB effects can read it off the resolving permanent
+                // (parallels PendingCastX). SetPendingCastColorCounts also
+                // derives the distinct-color set (PendingCastColors) for
+                // Sunburst, while the count ledger preserves multiplicity so
+                // "{R}{R} was spent" intervening-ifs (Vibrance / Wistfulness)
+                // can distinguish {R}{R} from {R}{G}. The resolver computed
+                // the per-color counts by diffing the pool across the spend
+                // (colored pips + colored mana used to satisfy generic).
+                // Empty ledger = no colored mana spent → Sunburst yields zero
+                // counters. Consumed + cleared by the ETB effect.
+                if (castCard is Majik.Core.Cards.Card concreteForColors)
+                {
+                    concreteForColors.SetPendingCastColorCounts(colorCounts);
+                }
+                return true;
             }
 
             try
@@ -909,7 +928,8 @@ public sealed class TurnDriver
                     actor, castCard, def, _agents[actor], ctx, ct,
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
-                    preChosenMana: payment);
+                    preChosenMana: payment,
+                    payManaCost: PayCastMana);
             }
             catch (InvalidOperationException ex)
             {
@@ -1118,7 +1138,18 @@ public sealed class TurnDriver
             // loop builds, so rc.Game.TurnState is non-null at resolution in real
             // games — dynamic-X connive reads per-turn counts off it, and
             // context-aware activation gates see live state.
-            turnStateAccessor: () => TurnState);
+            turnStateAccessor: () => TurnState,
+            // CR 704.1 / 704.3 / 704.4 — check state-based actions in the live
+            // priority flow (before a player receives priority AND after each
+            // stack object resolves), looping until none apply. The driver owns
+            // the StateBasedActions service + the player list, so it supplies
+            // the check the loop invokes. Without this, a 0/0 creature (Walking
+            // Ballista cast with X=0) or a creature reduced to 0 toughness by a
+            // noncombat effect lingered on the battlefield until the next turn
+            // boundary instead of dying immediately.
+            checkStateBasedActions: () => _sba.CheckStateBasedActions(
+                _players,
+                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
 
         try
         {

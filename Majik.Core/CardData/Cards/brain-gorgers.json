@@ -1,0 +1,9 @@
+{
+  "name": "Brain Gorgers",
+  "types": ["Creature"],
+  "subtypes": ["Zombie"],
+  "manaCost": "{3}{B}",
+  "power": 4,
+  "toughness": 2,
+  "abilities": []
+}
