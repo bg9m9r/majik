@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Bot.Search;
 using Majik.Bot.Tests.Integration.Helpers;
 using Majik.Core.Api;
 using Majik.Core.CardData;
@@ -99,6 +100,18 @@ internal static class ProbeHarness
     /// </summary>
     internal const int MctsBudgetMs = 6000;
 
+    /// <summary>
+    /// Wall-clock budget per MCTS search call (ms) for the ROLLOUT-DEPTH MATRIX
+    /// cells (<c>RolloutDepthMatrixProbes.cs</c>) — the LIVE production budget.
+    /// Unlike <see cref="MctsBudgetMs"/> these cells are deliberately
+    /// wall-clock-BOUND at 1500 ms: the matrix's question is whether a cheaper
+    /// <see cref="Majik.Bot.Search.RolloutDepth"/> converts the SAME live budget
+    /// into more useful iterations (the iteration cap per cell sets how many it
+    /// may spend; whether the budget lets it finish them is part of the
+    /// measurement).
+    /// </summary>
+    internal const int MatrixBudgetMs = 1500;
+
     /// <summary>Maximum turns per game — prevents hangs on drawn-out games.</summary>
     internal const int MaxTurns = 30;
 
@@ -122,6 +135,15 @@ internal static class ProbeHarness
 
     /// <summary>Mirror archetype for the determinization family (both seats).</summary>
     internal const string MirrorArchetype = "Prowess";
+
+    /// <summary>Base seed for the MIRROR rollout-depth MATRIX cells
+    /// (<c>RolloutDepthMatrixProbes.cs</c>) — each cell uses its own +1000
+    /// block, all distinct from the existing families' blocks.</summary>
+    internal const int MatrixMirrorBaseSeed = 20000;
+
+    /// <summary>Base seed for the ASYMMETRIC rollout-depth MATRIX cells —
+    /// each cell uses its own +1000 block.</summary>
+    internal const int MatrixAsymmetricBaseSeed = 30000;
 
     /// <summary>Which seat's strategy won a single game (or a draw / crash).</summary>
     internal enum SeatAWinner { SeatA, SeatB, Draw, Inconclusive }
@@ -218,6 +240,49 @@ internal static class ProbeHarness
     internal static BotConfig MirrorHeuristic(int seed) => new BotConfig(
         MirrorArchetype, Strategy: "heuristic", RandomSeed: seed);
 
+    // ── BotConfig factories — ROLLOUT-DEPTH MATRIX cells ────────────────────────
+    // Matrix variants of MirrorDeterminized / Inference: same honest search, but
+    // wall-clock-BOUND at the live budget (MatrixBudgetMs = 1500 ms) with a
+    // per-cell iteration cap + truncated RolloutDepth. The matrix's question:
+    // does a cheaper rollout convert the SAME live budget into more useful
+    // iterations? (See RolloutDepthMatrixProbes.cs for the cell grid.)
+
+    /// <summary>
+    /// Matrix-cell variant of <see cref="MirrorDeterminized"/> (honest,
+    /// resamples from the known mirror decklist; no peek) at the given
+    /// <paramref name="depth"/> + <paramref name="iterations"/>, wall-clock-bound
+    /// at <see cref="MatrixBudgetMs"/>. <c>preserves: MirrorArchetype, Strategy,
+    /// PrioritySearchEnabled, OpponentArchetype</c> from the live factory.
+    /// </summary>
+    internal static Func<int, BotConfig> MirrorDeterminizedAt(RolloutDepth depth, int iterations) =>
+        seed => new BotConfig(
+            MirrorArchetype, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: iterations,
+            MaxMctsBudgetMs: MatrixBudgetMs,
+            PrioritySearchEnabled: true,
+            OpponentArchetype: MirrorArchetype,
+            RolloutDepth: depth.ToString());
+
+    /// <summary>
+    /// Matrix-cell variant of <see cref="Inference"/> (honest — no peek, no
+    /// assumed deck; infers the opponent's archetype from public cards) at the
+    /// given <paramref name="depth"/> + <paramref name="iterations"/>,
+    /// wall-clock-bound at <see cref="MatrixBudgetMs"/>. <c>preserves:
+    /// AsymmetricBotDeck, Strategy, PrioritySearchEnabled, OpponentArchetype,
+    /// InferOpponentArchetype</c> from the live factory.
+    /// </summary>
+    internal static Func<int, BotConfig> InferenceAt(RolloutDepth depth, int iterations) =>
+        seed => new BotConfig(
+            AsymmetricBotDeck, Strategy: "mcts",
+            RandomSeed: seed,
+            MaxMctsIterations: iterations,
+            MaxMctsBudgetMs: MatrixBudgetMs,
+            PrioritySearchEnabled: true,
+            OpponentArchetype: null,
+            InferOpponentArchetype: true,
+            RolloutDepth: depth.ToString());
+
     // ── Head-to-head runner ─────────────────────────────────────────────────────
 
     /// <summary>
@@ -291,21 +356,25 @@ internal static class ProbeHarness
     /// <summary>
     /// Emits the single grep-able per-probe summary line for the controller
     /// (tagged <c>[INFER]</c> or <c>[DET]</c> by family) to both the xUnit sink
-    /// and <see cref="ProbeProgress"/>.
+    /// and <see cref="ProbeProgress"/>. The rollout-depth MATRIX cells pass
+    /// their per-cell <paramref name="iterations"/> / <paramref name="budgetMs"/>
+    /// (defaults = the iteration-bound family consts).
     /// </summary>
     internal static void LogSummary(
         ITestOutputHelper output,
         string tag,
         string label,
         string decks,
-        (int AWins, int Decided, int Draws, int Inconclusive) r)
+        (int AWins, int Decided, int Draws, int Inconclusive) r,
+        int iterations = MctsIterations,
+        int budgetMs = MctsBudgetMs)
     {
         double rate = WinRate(r);
         var line =
             $"{tag} head={label} {decks} N={Games}  " +
             $"{label}={rate:P0} ({r.AWins}/{r.Decided})  " +
             $"draws={r.Draws} inconclusive={r.Inconclusive}  " +
-            $"iter={MctsIterations} budgetMs={MctsBudgetMs} maxTurns={MaxTurns} prioritySearch=true";
+            $"iter={iterations} budgetMs={budgetMs} maxTurns={MaxTurns} prioritySearch=true";
         output.WriteLine(line);
         ProbeProgress.Log(line);
     }
