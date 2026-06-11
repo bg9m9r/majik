@@ -69,6 +69,19 @@ public sealed class ServerBotOptions
     public bool InferOpponentArchetype { get; set; } = true;
 
     /// <summary>
+    /// Process-wide cap on concurrent LIVE searches (env
+    /// <c>Bot__SearchConcurrency</c>; only read when <see cref="Strategy"/> is
+    /// <c>mcts</c>). Default 1: on the 1-vCPU prod box two overlapping ~1.5 s
+    /// CPU-bound searches would split the core and each complete fewer
+    /// iterations (weaker decisions + API latency) — gated searches QUEUE
+    /// instead, so every search runs at full strength and a queued bot just
+    /// thinks slightly longer (invisible vs humans). The wait is bounded
+    /// (~10 s); on timeout that pick degrades to the heuristic decision. Must
+    /// be &gt;= 1. Raise only on multi-core deployments.
+    /// </summary>
+    public int SearchConcurrency { get; set; } = 1;
+
+    /// <summary>
     /// Fail fast on a bad knob (called at registration so a typo'd env var
     /// crashes the boot, not the first vs-bot match creation).
     /// </summary>
@@ -90,6 +103,12 @@ public sealed class ServerBotOptions
         {
             throw new ArgumentException(
                 $"Bot__MaxMctsBudgetMs must be positive (got {MaxMctsBudgetMs}).");
+        }
+
+        if (SearchConcurrency < 1)
+        {
+            throw new ArgumentException(
+                $"Bot__SearchConcurrency must be >= 1 (got {SearchConcurrency}).");
         }
     }
 }

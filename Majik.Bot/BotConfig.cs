@@ -103,6 +103,19 @@ namespace Majik.Bot;
 /// risk filter entirely (no line can score at or below it). Only consulted by
 /// <see cref="Search.SearchStrategy"/> on the determinized paths; the perfect-info
 /// search ignores it.</para>
+///
+/// <para><c>SearchConcurrency</c> optional (default null = ungated, today's
+/// behaviour). When non-null and <c>Strategy="mcts"</c>, every top-level LIVE
+/// search (<see cref="Search.SearchStrategy"/>'s PickAttackers /
+/// PickPriorityAction) must hold a permit on the PROCESS-WIDE
+/// <see cref="Search.SearchConcurrencyGate"/> — overlapping searches from
+/// concurrent bot matches QUEUE instead of splitting the CPU, so each runs at
+/// full strength (the 1-vCPU prod motivation; see ServerBotOptions). The wait
+/// is bounded (<see cref="Search.SearchGate.DefaultTimeout"/>); on timeout the
+/// pick falls back to the heuristic decision. The gate is shared process-wide
+/// with first-configured-permits-wins semantics. Null keeps unit tests, the
+/// PARALLEL strength probes, and sim-internal searches completely ungated.
+/// Heuristic-strategy decisions are never gated (they are microseconds).</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
@@ -118,4 +131,5 @@ public sealed record BotConfig(
     ArchetypeWeights? WeightsOverride = null,
     string? OpponentArchetype = null,
     bool InferOpponentArchetype = false,
-    double? RiskVoteThreshold = null);
+    double? RiskVoteThreshold = null,
+    int? SearchConcurrency = null);

@@ -162,9 +162,30 @@ internal sealed class SearchStrategy : IBotStrategy
         };
     }
 
+    /// <summary>
+    /// Concurrency gate for the TOP-LEVEL live searches (null = ungated, the
+    /// default). Resolved from <see cref="BotConfig.SearchConcurrency"/> to the
+    /// process-wide <see cref="SearchConcurrencyGate"/> so overlapping searches
+    /// from concurrent matches queue instead of splitting the CPU. Held only
+    /// around <see cref="SearchRoot"/> at the decision entries — never inside
+    /// <see cref="EngineSimulator"/> rollouts (nested within a held permit).
+    /// </summary>
+    private readonly SearchGate? _gate;
+
     public SearchStrategy(BotConfig config)
+        : this(config, ResolveGate(config))
+    {
+    }
+
+    /// <summary>
+    /// Test seam: inject an ISOLATED gate so gate tests cannot interfere with
+    /// the process-wide shared gate (or each other). Production always goes
+    /// through the public constructor → <see cref="ResolveGate"/>.
+    /// </summary>
+    internal SearchStrategy(BotConfig config, SearchGate? gate)
     {
         ArgumentNullException.ThrowIfNull(config);
+        _gate = gate;
         _heuristic = new HeuristicStrategy(config);
         // WeightsOverride: use explicit vector when provided; fall back to the
         // archetype lookup so default behavior is completely unchanged.
@@ -209,6 +230,19 @@ internal sealed class SearchStrategy : IBotStrategy
         // risk filter) so SearchRoot threads a plain double per decision.
         _riskThreshold = ResolveRiskThreshold(config.RiskVoteThreshold);
     }
+
+    /// <summary>
+    /// Resolve <see cref="BotConfig.SearchConcurrency"/> to the effective gate:
+    /// null (the default) → no gate, today's ungated behaviour — unit tests,
+    /// the PARALLEL strength probes, and sim-internal agents must never
+    /// serialize; non-null → the process-wide shared gate (first-configured
+    /// permit count wins; see <see cref="SearchConcurrencyGate.Shared"/>).
+    /// </summary>
+    private static SearchGate? ResolveGate(BotConfig? config) =>
+        config?.SearchConcurrency is { } permits ? SearchConcurrencyGate.Shared(permits) : null;
+
+    /// <summary>The resolved gate (test instrumentation — null means ungated).</summary>
+    internal SearchGate? Gate => _gate;
 
     /// <summary>
     /// Resolve <see cref="BotConfig.RiskVoteThreshold"/> to the effective
@@ -313,6 +347,12 @@ internal sealed class SearchStrategy : IBotStrategy
             phase: PhaseStateType.Combat,
             searchedSeat: self);
 
+        // Concurrency gate (live bots only — null gate is the ungated default).
+        // Starvation guard: a bounded wait that times out degrades THIS pick to
+        // the heuristic decision instead of stalling the match indefinitely.
+        if (_gate is { } gate && !gate.TryEnter())
+            return _heuristic.PickAttackers(ctx, self, eligible);
+
         SimMove chosen;
         try
         {
@@ -322,6 +362,12 @@ internal sealed class SearchStrategy : IBotStrategy
         {
             // Any search failure (e.g. terminal root) → fall back to heuristic.
             return _heuristic.PickAttackers(ctx, self, eligible);
+        }
+        finally
+        {
+            // Only reached after a successful TryEnter (the timeout path
+            // returned above), so the release is always balanced.
+            _gate?.Exit();
         }
 
         // MCTS may return a Priority action (not a CombatPlan) when priority search
@@ -476,6 +522,11 @@ internal sealed class SearchStrategy : IBotStrategy
             return _heuristic.PickPriorityAction(ctx, self);
         }
 
+        // Concurrency gate (live bots only — null gate is the ungated default).
+        // Starvation guard: bounded wait → heuristic fallback, never a stall.
+        if (_gate is { } gate && !gate.TryEnter())
+            return _heuristic.PickPriorityAction(ctx, self);
+
         SimMove chosen;
         try
         {
@@ -485,6 +536,12 @@ internal sealed class SearchStrategy : IBotStrategy
         {
             // Any search failure → fall back to heuristic for correctness.
             return _heuristic.PickPriorityAction(ctx, self);
+        }
+        finally
+        {
+            // Only reached after a successful TryEnter (the timeout path
+            // returned above), so the release is always balanced.
+            _gate?.Exit();
         }
 
         // Step 4 — map the chosen SimMove back to a LIVE PriorityAction by InstanceId.

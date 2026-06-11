@@ -42,6 +42,8 @@ public class ServerBotOptionsTests
         cfg.Strategy.Should().Be("heuristic",
             "the code default must keep dev / tests / rehydration replay on the deterministic heuristic");
         cfg.DecisionSink.Should().BeNull();
+        cfg.SearchConcurrency.Should().BeNull(
+            "heuristic decisions are microseconds — only mcts searches are gated");
     }
 
     // ── The flip: mcts at the profiled live parameters ────────────────────────
@@ -63,6 +65,9 @@ public class ServerBotOptionsTests
             "vs a human the bot must INFER the opponent's archetype from public cards");
         cfg.OpponentArchetype.Should().BeNull(
             "a human opponent's deck is never known — and setting it would also disable inference");
+        cfg.SearchConcurrency.Should().Be(1,
+            "live searches on the 1-vCPU prod box must QUEUE (full strength each) " +
+            "instead of splitting the core");
     }
 
     [Fact]
@@ -103,6 +108,20 @@ public class ServerBotOptionsTests
         });
 
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void NonPositiveSearchConcurrency_Throws(int searchConcurrency)
+    {
+        var act = () => FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            SearchConcurrency = searchConcurrency,
+        });
+
+        act.Should().Throw<ArgumentException>().WithMessage("*SearchConcurrency*");
     }
 
     // ── DI binding: env vars reach the installed bot ──────────────────────────
@@ -146,6 +165,18 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
+    public void AddMajikEngine_BotSection_BindsSearchConcurrency()
+    {
+        var factory = ResolveFactory(
+            ("Bot:Strategy", "mcts"),
+            ("Bot:SearchConcurrency", "2"));
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .SearchConcurrency.Should().Be(2,
+                "env Bot__SearchConcurrency must reach the installed bot");
+    }
+
+    [Fact]
     public void AddMajikEngine_ProdShape_MctsOnly_KeepsProfiledDefaults()
     {
         // The exact prod shape: render.yaml sets ONLY Bot__Strategy=mcts and
@@ -158,6 +189,9 @@ public class ServerBotOptionsTests
         cfg.MaxMctsIterations.Should().Be(150);
         cfg.MaxMctsBudgetMs.Should().Be(1500);
         cfg.InferOpponentArchetype.Should().BeTrue();
+        cfg.SearchConcurrency.Should().Be(1,
+            "the gate defaults ON (1 search at a time) when prod flips to mcts — " +
+            "no extra env var needed");
     }
 
     [Fact]

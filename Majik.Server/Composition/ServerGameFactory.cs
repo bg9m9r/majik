@@ -68,6 +68,10 @@ public sealed class ServerGameFactory
     /// the heuristic default. <c>OpponentArchetype</c> is deliberately never
     /// set — a human opponent's deck is unknown, and the honest search path is
     /// inference (<see cref="ServerBotOptions.InferOpponentArchetype"/>).
+    /// <c>SearchConcurrency</c> is set ONLY under <c>mcts</c> (default 1): live
+    /// searches on the 1-vCPU box queue on the process-wide gate instead of
+    /// splitting the core; the heuristic strategy never searches, so it stays
+    /// null (ungated) there.
     /// Internal so tests can assert the exact installed config without digging
     /// the agent out of a facade.
     /// </summary>
@@ -78,7 +82,10 @@ public sealed class ServerGameFactory
             DecisionSink: decisionSink,
             MaxMctsIterations: _botOptions.MaxMctsIterations,
             MaxMctsBudgetMs: _botOptions.MaxMctsBudgetMs,
-            InferOpponentArchetype: _botOptions.InferOpponentArchetype);
+            InferOpponentArchetype: _botOptions.InferOpponentArchetype,
+            SearchConcurrency: _botOptions.Strategy == "mcts"
+                ? _botOptions.SearchConcurrency
+                : null);
 
     /// <summary>
     /// vs-Bot match: install the Bob-seat <see cref="Majik.Bot.BotPlayerAgent"/>
