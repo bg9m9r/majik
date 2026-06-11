@@ -117,6 +117,9 @@ internal static class DamageSpellFactory
             return new IEffect[] { new Effect($"deal {n} to player", () =>
             {
                 if (target is not Player player) return;
+                // CR 800.4a / 104.3a — a player who has already left the game
+                // can't be dealt damage; LoseLife would throw on a lost player.
+                if (player.HasLost) return;
                 var amount = Filter(replacements, (object?)caster ?? target, player, n);
                 if (amount <= 0) return;
                 player.LoseLife(amount);
@@ -178,6 +181,8 @@ internal static class DamageSpellFactory
             foreach (var pl in allPlayers)
             {
                 if (ReferenceEquals(pl, caster)) continue;
+                // CR 800.4a — a player who has left the game can't lose life.
+                if (pl.HasLost) continue;
                 pl.LoseLife(n);
             }
         }) });
@@ -317,7 +322,9 @@ internal static class DamageSpellFactory
         EffectFactory: p => new IEffect[] { new Effect($"each player takes {n}", () =>
         {
             var all = p.AllPlayers;
-            if (all == null) { caster.LoseLife(n); return; }
-            foreach (var pl in all) pl.LoseLife(n);
+            // CR 800.4a / 104.3a — skip players who have already left the game;
+            // LoseLife throws on a lost player.
+            if (all == null) { if (!caster.HasLost) caster.LoseLife(n); return; }
+            foreach (var pl in all) if (!pl.HasLost) pl.LoseLife(n);
         }) });
 }

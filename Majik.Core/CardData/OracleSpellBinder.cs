@@ -332,6 +332,14 @@ public static class OracleSpellBinder
         switch (target)
         {
             case Player p:
+                // CR 800.4a / 104.3a — a player who has already left the game
+                // (lost) is no longer in the game; damage to them is a no-op.
+                // Without this, a Burn mirror where two burn spells are on the
+                // stack and the first is lethal lets the second resolve and call
+                // LoseLife on the already-lost player, which throws "Cannot lose
+                // life after losing the game". CombatFlow guards the combat-damage
+                // path the same way; this is the spell-damage equivalent.
+                if (p.HasLost) break;
                 // CR 120.3 — record damage (Bloodthirst etc.) before applying.
                 p.RecordDamageDealt(n);
                 // CR 702.90c — an infect source deals damage to a player as

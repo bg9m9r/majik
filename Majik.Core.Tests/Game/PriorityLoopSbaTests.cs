@@ -76,12 +76,12 @@ public class PriorityLoopSbaTests
         for (var i = 0; i < 10; i++) aliceAgent.QueuePriority(PriorityAction.Pass);
 
         var castDispatched = false;
-        Func<Player, PriorityAction.CastSpell, GameContext, System.Threading.Tasks.Task> castDispatcher =
+        Func<Player, PriorityAction.CastSpell, GameContext, System.Threading.Tasks.Task<bool>> castDispatcher =
             (actor, cast, ctx) =>
             {
                 castDispatched = true;
                 actor.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("R"));
-                return System.Threading.Tasks.Task.CompletedTask;
+                return System.Threading.Tasks.Task.FromResult(true);
             };
 
         var loop = new PriorityLoop(
@@ -91,7 +91,15 @@ public class PriorityLoopSbaTests
             () => 1, () => StepStateType.PreCombatMain,
             new LandDropTracker(),
             castDispatcher: castDispatcher,
-            stateBasedActions: sba);
+            // CR 704.4 — wire the SBA check the same way TurnDriver does in the
+            // live engine (main's PriorityLoop takes an Action delegate, not the
+            // StateBasedActions service directly): sweep loss/death before each
+            // priority grant.
+            checkStateBasedActions: () => sba.CheckStateBasedActions(
+                new[] { alice, bob },
+                System.Linq.Enumerable.ToList(
+                    System.Linq.Enumerable.SelectMany(
+                        new[] { alice, bob }, p => p.Zones.Battlefield.GetCards()))));
 
         // Should NOT throw — the lost player is never offered priority.
         await loop.RunUntilRoundEndsAsync(bob);
@@ -136,7 +144,12 @@ public class PriorityLoopSbaTests
             { [alice] = aliceAgent, [bob] = bobAgent, [carol] = carolAgent },
             () => 1, () => StepStateType.PreCombatMain,
             new LandDropTracker(),
-            stateBasedActions: sba);
+            // CR 704.4 — same Action-delegate wiring as TurnDriver / main.
+            checkStateBasedActions: () => sba.CheckStateBasedActions(
+                players,
+                System.Linq.Enumerable.ToList(
+                    System.Linq.Enumerable.SelectMany(
+                        players, p => p.Zones.Battlefield.GetCards()))));
 
         await loop.RunUntilRoundEndsAsync(alice);
 
