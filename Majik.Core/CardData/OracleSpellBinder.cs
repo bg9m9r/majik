@@ -493,15 +493,29 @@ public static class OracleSpellBinder
         }
 
         var keep = new List<IStackObject>();
+        var removed = false;
         while (!stack.IsEmpty)
         {
             var top = stack.Pop()!;
             if (!ReferenceEquals(top, spell)) keep.Add(top);
+            else removed = true;
         }
         for (var i = keep.Count - 1; i >= 0; i--)
         {
             stack.Push(keep[i]);
         }
+
+        // CR 701.5 — the object was actually removed from the stack by this
+        // counter. When it's a SPELL (not an activated/triggered ability),
+        // announce the counter so "whenever a spell or ability you control
+        // counters a spell" triggers (Baral, Chief of Compliance) can fire.
+        // The countering controller is attributed via the stack's
+        // CurrentResolutionController (set by the resolution entry points).
+        if (removed && spell is Majik.Core.Spells.ISpell counteredSpell)
+        {
+            stack.PublishSpellCountered(counteredSpell);
+        }
+
         return true;
     }
 }

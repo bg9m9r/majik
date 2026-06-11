@@ -12,12 +12,12 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Vito, Thorn of the Dusk Rose (Core Set 2021,
 /// {1}{B}{B}).
 ///
-/// Legendary Creature — Vampire Knight 1/3. Oracle text:
+/// Legendary Creature — Vampire Cleric 1/3. Oracle text:
 ///   "Lifelink
 ///    Whenever you gain life, each opponent loses that much life."
 ///
 /// ## Implemented (v1)
-/// - 1/3 Legendary Creature — Vampire Knight, mana cost {1}{B}{B}, owner /
+/// - 1/3 Legendary Creature — Vampire Cleric, mana cost {1}{B}{B}, owner /
 ///   controller wired.
 /// - <b>Lifelink (CR 702.15)</b>: <see cref="KeywordAbility"/> marker so
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasLifelink"/> reads it
@@ -71,27 +71,29 @@ public static class VitoThornOfTheDuskRoseFactory
     }
 
     /// <summary>
-    /// Construct Vito with no live runtime services. The lifegain trigger
-    /// is attached for shape inspection (not registered with a
-    /// <see cref="TriggerManager"/>) and the drain clause is a no-op
-    /// without an opponent resolver / event bus. Suitable for shape /
-    /// dispatcher tests.
+    /// Construct Vito with no live runtime services. The lifegain trigger is
+    /// attached for shape inspection (not registered with a
+    /// <see cref="TriggerManager"/>); its drain clause reads "each opponent"
+    /// from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>). On the production routed build (which
+    /// dispatches this single-arg overload and auto-binds the trigger via
+    /// <see cref="TriggerManager.BindCard"/>) the drain is correct provided the
+    /// amount slot is stamped — which the live engine does by wiring an event
+    /// bus when Vito enters.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
     /// Construct Vito, Thorn of the Dusk Rose. When
-    /// <paramref name="opponentResolver"/> is supplied, the lifegain trigger
-    /// drains "that much" life from every opponent it returns. When
     /// <paramref name="eventBus"/> is supplied, Vito subscribes to
     /// <see cref="LifeChangedEvent"/> so the amount slot is stamped before
     /// the trigger resolves. When <paramref name="triggers"/> is supplied
-    /// the trigger is registered for bus-driven firing.
+    /// the trigger is registered for bus-driven firing. "Each opponent" is
+    /// always read from the live resolution context at resolution.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -103,7 +105,7 @@ public static class VitoThornOfTheDuskRoseFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Knight });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);
@@ -138,27 +140,28 @@ public static class VitoThornOfTheDuskRoseFactory
         // Lifegain trigger — CR 603.6a / 119.3 / 603.7.
         //   "Whenever you gain life, each opponent loses that much life."
         // Filter: LifeChangedEvent.Player == controller AND NewLife > Prev.
-        // Resolution: drain slot.Amount from each opponent returned by the
-        // resolver. The slot is reset to 0 after drain so a stale value
-        // can't replay on a later trigger fired by a different (non-life-
-        // gain) path.
+        // Resolution: drain slot.Amount from each opponent read off the LIVE
+        // resolution context (ctx.Game.AllPlayers, filtered to non-controller /
+        // not-lost) — NOT a captured resolver, which was null on the routed
+        // prod build and made the drain INERT in real games (mirrors
+        // Stormbreath #2540 / Yawgmoth + Priest #2543 / Grist #2549). The slot
+        // is reset to 0 after drain so a stale value can't replay on a later
+        // trigger fired by a different (non-life-gain) path.
         // ----------------------------------------------------------------
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses that much life",
-            () =>
+            ctx =>
             {
                 var amount = slot.Amount;
                 slot.Amount = 0;
-                if (amount <= 0) return;
+                if (amount <= 0) return ValueTask.CompletedTask;
 
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opp == null) continue;
-                    if (ReferenceEquals(opp, owner)) continue;
                     opp.LoseLife(amount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var lifegainTrigger = new TriggeredAbility(

@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -94,12 +95,7 @@ public class BastionOfRemembranceTests
     [Fact]
     public void BastionOfRemembrance_OwnCreatureDies_DrainsAndGains()
     {
-        var bastion = BastionOfRemembranceFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null,
-            zoneService: null);
+        var bastion = BastionOfRemembranceFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(bastion);
         bastion.SetZone(ZoneType.Battlefield);
@@ -114,7 +110,7 @@ public class BastionOfRemembranceTests
         var trigger = bastion.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(diesEvent));
 
-        foreach (var e in trigger.Effects) e.Execute();
+        ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19, "each opponent loses 1 life");
         _alice.LifeTotal.Should().Be(21, "controller gains 1 life");
@@ -123,12 +119,7 @@ public class BastionOfRemembranceTests
     [Fact]
     public void BastionOfRemembrance_OpponentCreatureDies_DoesNotFire()
     {
-        var bastion = BastionOfRemembranceFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            eventBus: null,
-            triggers: null,
-            zoneService: null);
+        var bastion = BastionOfRemembranceFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(bastion);
         bastion.SetZone(ZoneType.Battlefield);

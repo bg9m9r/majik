@@ -1,5 +1,12 @@
 # Effects-primitive audit
 
+> **Status note (historical):** this is the original design write-up. The facade
+> shipped as `Fx` in namespace **`Majik.Core.Primitives`** (`Majik.Core/Primitives/Fx.cs`),
+> *not* `Majik.Core.Effects.Primitives` / an `Effects.*` surface as proposed below.
+> Call sites use `using Majik.Core.Primitives;` + `Fx.DealDamage(...)` / `Fx.GainLife(...)`
+> / `Fx.Inline(...)`. Read the `Effects.Primitives.*` / `Effects.*` names below as the
+> proposal; the verb inventory and rationale still hold.
+
 Snapshot of effect "verbs" used inside `Majik.Core/CardData/Factories/*.cs` resolve bodies, taken at branch `feat/effects-primitives`.
 
 288 factory files were scanned with `grep` over each verb form. Counts below are raw occurrences and the number of distinct factory files that touch the verb at least once. Tally is descriptive — duplicates (e.g. a factory that calls `OracleSpellBinder.DealDamage` and `DealDamageWithPlaneswalker`) are counted once per match per file.

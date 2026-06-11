@@ -81,9 +81,9 @@ public sealed class DiscardACardOrPayManaAdditionalCost : IAdditionalCost
         var discardPick = caster.Zones.Hand.GetCards().FirstOrDefault();
         if (discardPick != null)
         {
-            caster.Zones.Hand.RemoveCard(discardPick);
-            caster.Zones.Graveyard.AddCard(discardPick);
-            discardPick.SetZone(ZoneType.Graveyard);
+            // CR 701.8 — route through the central discard chokepoint so a
+            // DiscardedEvent fires (wasCost: true).
+            Majik.Core.Primitives.Fx.DiscardCard(caster, discardPick, wasCost: true);
             Discarded = discardPick;
             return true;
         }

@@ -83,7 +83,7 @@ public static class SpellskiteFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Horror });
+            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Horror });
 
         // CR 301.1 / 302.1 — Artifact Creature: additively flag the
         // Artifact type so HasType-based lookups + colour identity see

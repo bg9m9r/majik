@@ -108,7 +108,8 @@ public sealed class ScryfallCardFactory
         // grant cleanup schedules. Without a TriggerManager the binder falls
         // back to synchronous chapter resolution.
         SagaBinder.Bind(card, entity, _effects, _zones, _triggers, _eventBus);
-        foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
+        foreach (var trig in OracleTriggeredAbilityBinder.Bind(
+            card, entity, owner, allPlayers: null, eventBus: _eventBus))
         {
             card.AddAbility(trig);
         }
@@ -174,6 +175,35 @@ public sealed class ScryfallCardFactory
     {
         var entity = _repo.GetByName(name);
         if (entity == null) return null;
+
+        // CR 608.3 / 608.2 — the spell-template registry binds an oracle text
+        // to a RESOLUTION effect, which is only meaningful for INSTANT /
+        // SORCERY spells: their printed text IS the spell's resolution. A
+        // permanent spell (artifact / creature / enchantment / planeswalker /
+        // land) "resolves" by entering the battlefield (CR 608.3b) — its
+        // activated / triggered / static abilities are bound at card-build
+        // time (KeywordBinder, OracleTriggeredAbilityBinder, the ETB
+        // replacement chain in Create), NOT by this cast-time spell binder.
+        //
+        // Binding the registry against a permanent's FULL oracle text is
+        // actively harmful: that text includes the permanent's activated /
+        // triggered ability clauses (e.g. Walking Ballista's "...deals 1
+        // damage to any target", Agatha's Soul Cauldron's "{T}: Exile target
+        // card from a graveyard"), which spuriously match instant/sorcery
+        // templates (DamageAnyTarget, ExileFromGraveyard, …). The synthesized
+        // SpellDefinition carries TargetRequests that SpellCastFlow then
+        // prompts for on CAST — a target/destination prompt that should never
+        // appear when casting a permanent. (The synthesized effects don't even
+        // run: StackResolver moves a permanent spell to the battlefield without
+        // executing the spell's effect list, so the only observable behaviour
+        // is the bogus prompt.) Skip the binder entirely for permanents and
+        // return null — TurnDriver falls back to a vanilla (no-target) spell
+        // for them, exactly as for an unmatched permanent.
+        var parsed = TypeLineParser.Parse(entity.TypeLine);
+        var isInstantOrSorcery =
+            parsed.Types.Contains(CardType.Instant)
+            || parsed.Types.Contains(CardType.Sorcery);
+        if (!isInstantOrSorcery) return null;
 
         // The offline compiled-template cache (DbCompiledSpellTemplateRepository)
         // was deleted along with the SQLite backing store. Every cast now

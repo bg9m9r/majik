@@ -1,6 +1,6 @@
 {
   "name": "Tarfire",
-  "types": ["Instant", "Tribal"],
+  "types": ["Instant"],
   "subtypes": ["Goblin"],
   "manaCost": "{R}"
 }

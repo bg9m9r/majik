@@ -1,6 +1,6 @@
 {
   "name": "Nameless Inversion",
-  "types": ["Instant", "Tribal"],
+  "types": ["Instant"],
   "subtypes": ["Shapeshifter"],
   "manaCost": "{1}{B}"
 }

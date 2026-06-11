@@ -60,7 +60,7 @@ public class ClassLevelingTests
     }
 
     private (Enchantment Card, ClassState State, Majik.Core.Stack.Stack Stack, TriggerManager Triggers)
-        WireStormchasersTalent(Func<Player>? opponentResolver = null)
+        WireStormchasersTalent()
     {
         var stack = new Majik.Core.Stack.Stack(_bus);
         var triggers = new TriggerManager(stack, _bus);
@@ -70,8 +70,7 @@ public class ClassLevelingTests
             _alice,
             zoneService: zones,
             triggers: triggers,
-            eventBus: _bus,
-            opponentResolver: opponentResolver ?? (() => _bob));
+            eventBus: _bus);
 
         card.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(card);
@@ -214,10 +213,18 @@ public class ClassLevelingTests
             "the level-2 noncreature-spell trigger must queue");
 
         triggers.PutPendingTriggersOnStack(_alice);
-        while (stack.Pop() is { } obj) obj.Resolve();
+        // Resolve through a live game so the level-2 "any target" damage reads
+        // the first opponent off the resolution context (resolver-null fix).
+        while (stack.Pop() is { } obj)
+        {
+            if (obj is TriggeredAbility ta)
+                Majik.Core.Tests.Helpers.ContextResolve.Resolve(ta, _alice, _alice, _bob);
+            else
+                obj.Resolve();
+        }
 
         _bob.LifeTotal.Should().Be(lifeBefore - 1,
-            "the Mercenary deals 1 damage to the opponent (v1 deterministic any-target resolver)");
+            "the Mercenary deals 1 damage to the opponent (v1 deterministic first-opponent from context)");
     }
 
     [Fact]

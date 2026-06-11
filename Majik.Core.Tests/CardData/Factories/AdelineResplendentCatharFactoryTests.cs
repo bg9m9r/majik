@@ -12,6 +12,7 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -120,7 +121,7 @@ public class AdelineResplendentCatharFactoryTests
 
         var card = AdelineResplendentCatharFactory.Create(
             _alice, effects, bus, mine,
-            opponentResolver: null, triggers: null, combat: null);
+            triggers: null, combat: null);
         card.ActiveEffects = effects;
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);
@@ -173,7 +174,6 @@ public class AdelineResplendentCatharFactoryTests
 
         var card = AdelineResplendentCatharFactory.Create(
             _alice, effects, bus, mine,
-            opponentResolver: () => new[] { _bob },
             triggers: triggers,
             combat: combat);
         card.ActiveEffects = effects;
@@ -191,7 +191,7 @@ public class AdelineResplendentCatharFactoryTests
         triggers.PendingCount.Should().Be(1, "'Whenever you attack' fires when you attack");
 
         var attack = card.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in attack.Effects) e.Execute();
+        ContextResolve.Resolve(attack, _alice, _alice, _bob);
 
         var humans = _alice.Zones.Battlefield.GetCards()
             .OfType<Creature>()
@@ -232,7 +232,6 @@ public class AdelineResplendentCatharFactoryTests
 
         var card = AdelineResplendentCatharFactory.Create(
             _alice, effects, bus, mine,
-            opponentResolver: () => new[] { _bob },
             triggers: triggers,
             combat: combat,
             planeswalkerChoiceForOpponent: _ => jace);
@@ -250,7 +249,7 @@ public class AdelineResplendentCatharFactoryTests
         });
 
         var attack = card.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in attack.Effects) e.Execute();
+        ContextResolve.Resolve(attack, _alice, _alice, _bob);
 
         var token = _alice.Zones.Battlefield.GetCards()
             .OfType<Creature>()
@@ -281,7 +280,6 @@ public class AdelineResplendentCatharFactoryTests
 
         var card = AdelineResplendentCatharFactory.Create(
             _alice, effects, bus, mine,
-            opponentResolver: () => new[] { _bob },
             triggers: triggers,
             combat: combat);
         _alice.Zones.Battlefield.AddCard(card);

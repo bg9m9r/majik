@@ -200,7 +200,8 @@ public static class SenseisDiviningTopFactory
         // (CR 608.2b — illegal/missing source makes the move-self do
         // nothing). The cost-tap was paid at activation; we do not
         // un-tap here — when Top arrives in its new zone it loses the
-        // tapped-state per CR 614 (zone change = new object).
+        // tapped-state per CR 614 (zone change = new object). The reset is
+        // applied centrally by Card.Zone's setter on every battlefield exit.
         if (top.Zone != ZoneType.Battlefield) return;
 
         var holder = top.Controller ?? owner;

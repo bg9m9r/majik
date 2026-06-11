@@ -38,7 +38,7 @@ public class CauldronOfSoulsTests
         var c = CauldronOfSoulsFactory.Create(_alice);
 
         c.Name.Should().Be("Cauldron of Souls");
-        c.ManaCost.Should().Be("{4}");
+        c.ManaCost.Should().Be("{5}");
         c.HasType(CardType.Artifact).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

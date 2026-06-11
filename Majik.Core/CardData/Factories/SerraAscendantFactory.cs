@@ -202,6 +202,19 @@ public static class SerraAscendantFactory
             chars.Power += BonusPower;
             chars.Toughness += BonusToughness;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="LifeThresholdPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The life-threshold check reads clonedSource.Controller live (correctly remapped).
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new LifeThresholdPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

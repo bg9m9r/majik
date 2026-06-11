@@ -175,14 +175,14 @@ public static class WildNacatlFactory
     public sealed class LandSubtypeSelfPumpStaticEffect : ContinuousEffect
     {
         private readonly Creature _source;
-        private readonly ContinuousEffectsService _effects;
+        private readonly ContinuousEffectsService? _effects;
 
         public LandSubtypeSelfPumpStaticEffect(
             Creature source,
-            ContinuousEffectsService effects)
+            ContinuousEffectsService? effects)
         {
             _source = source ?? throw new ArgumentNullException(nameof(source));
-            _effects = effects ?? throw new ArgumentNullException(nameof(effects));
+            _effects = effects;
         }
 
         /// <summary>CR 613.1g — the permanent generating this effect.</summary>
@@ -221,6 +221,22 @@ public static class WildNacatlFactory
                 chars.Toughness += ClauseBonus;
             }
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="LandSubtypeSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The ContinuousEffectsService is passed as null (printed-subtypes mode) because
+        /// the fresh sandbox CES is still being populated when CloneForSim runs, and passing
+        /// it would risk recursion during Compute — same posture as
+        /// <see cref="TerritorialKavuFactory.DomainPumpStaticEffect.Apply"/>.
+        /// preserves: nothing scalar (effects → null); source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new LandSubtypeSelfPumpStaticEffect(clonedCreature, effects: null)
+                : null;
     }
 
     // -----------------------------------------------------------------------

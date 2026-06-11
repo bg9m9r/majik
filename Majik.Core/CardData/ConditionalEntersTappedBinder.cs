@@ -27,6 +27,25 @@ public static class ConditionalEntersTappedBinder
         @"enters\s+(?:the\s+battlefield\s+)?tapped\s+unless\s+you\s+control\s+(?<count>one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+or\s+(?<direction>more|fewer)\s+other\s+lands",
         RegexOptions.IgnoreCase);
 
+    // "enters tapped unless you control <count> or more other <Subtype>s." —
+    // the ELD "cottage" cycle (Witch's Cottage: "…three or more other Swamps";
+    // Mystic Sanctuary: Islands; …). Subtype-count variant the generic
+    // OtherLandsClause does NOT claim. Captures the count word and the basic
+    // land subtype so the predicate counts that subtype on the battlefield.
+    private static readonly Regex OtherSubtypeLandsClause = new(
+        @"enters\s+(?:the\s+battlefield\s+)?tapped\s+unless\s+you\s+control\s+(?<count>one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+or\s+more\s+other\s+(?<subtype>Plains|Islands|Swamps|Mountains|Forests)",
+        RegexOptions.IgnoreCase);
+
+    private static readonly Dictionary<string, CardSubtype> SubtypeByPlural =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Plains"]    = CardSubtype.Plains,
+            ["Islands"]   = CardSubtype.Island,
+            ["Swamps"]    = CardSubtype.Swamp,
+            ["Mountains"] = CardSubtype.Mountain,
+            ["Forests"]   = CardSubtype.Forest,
+        };
+
     public static bool Bind(ICard card, CardEntity entity, ReplacementBus replacements)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -34,6 +53,23 @@ public static class ConditionalEntersTappedBinder
         if (replacements == null) throw new ArgumentNullException(nameof(replacements));
 
         var text = entity.OracleText ?? string.Empty;
+
+        // Subtype-count variant first (Witch's Cottage / the ELD cottage cycle):
+        // "enters tapped unless you control N or more other <Subtype>s." CR 109.2
+        // — "other" excludes the card itself; CR 305.6 — count permanents
+        // carrying that basic land subtype (basic OR nonbasic).
+        var subtypeMatch = OtherSubtypeLandsClause.Match(text);
+        if (subtypeMatch.Success
+            && SubtypeByPlural.TryGetValue(subtypeMatch.Groups["subtype"].Value, out var subtype))
+        {
+            var subtypeThreshold = WordToInt(subtypeMatch.Groups["count"].Value);
+            replacements.Register(new ConditionalEntersTappedReplacement(
+                card,
+                entersUntappedIf: (controller, self) =>
+                    CountOtherSubtype(controller, self, subtype) >= subtypeThreshold));
+            return true;
+        }
+
         var m = OtherLandsClause.Match(text);
         if (!m.Success) return false;
 
@@ -60,6 +96,10 @@ public static class ConditionalEntersTappedBinder
     private static int CountOtherLands(Player controller, ICard self) =>
         controller.Zones.Battlefield.GetCards()
             .Count(c => !ReferenceEquals(c, self) && c.HasType(CardType.Land));
+
+    private static int CountOtherSubtype(Player controller, ICard self, CardSubtype subtype) =>
+        controller.Zones.Battlefield.GetCards()
+            .Count(c => !ReferenceEquals(c, self) && c.HasSubtype(subtype));
 
     private static int WordToInt(string s) =>
         s.ToLowerInvariant() switch

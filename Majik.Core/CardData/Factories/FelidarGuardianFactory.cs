@@ -69,7 +69,7 @@ namespace Majik.Core.CardData.Factories;
 public static class FelidarGuardianFactory
 {
     public const string CardName = "Felidar Guardian";
-    public const string PrintedManaCost = "{2}{W}";
+    public const string PrintedManaCost = "{3}{W}";
     public const int Power = 1;
     public const int Toughness = 4;
 

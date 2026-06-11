@@ -107,6 +107,10 @@ public static class EndlessOneFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
+        // CR 614.1d — self-manages its X +1/+1 counters via the ETB trigger
+        // below; flag so the generic binder doesn't double them.
+        card.MarkSelfManagesEntersWithCounters();
+
         // ----------------------------------------------------------------
         // ETB +1/+1 counters trigger — CR 603.6a / CR 122.1g.
         //   "Endless One enters with X +1/+1 counters on it."

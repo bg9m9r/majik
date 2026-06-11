@@ -111,20 +111,21 @@ public static class DominatorDroneFactory
     /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, opponentResolver: null);
+        => Create(owner, triggers: null);
 
     /// <summary>
-    /// Construct a fully-wired Dominator Drone.
+    /// Construct a fully-wired Dominator Drone. The ETB drain reads "each
+    /// opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build (which dispatches the single-arg overload and auto-binds
+    /// the triggers via <see cref="TriggerManager.BindCard"/>).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager for registration. May be null —
     /// the triggers attach structurally but aren't enrolled.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent" for
-    /// the ETB drain. Without a resolver the drain no-ops.</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -209,19 +210,20 @@ public static class DominatorDroneFactory
                 && CardColors.GetColors(c).Count == 0);            // colorless (CR 105.2c)
         }
 
+        // "Each opponent" is read from the LIVE resolution context — NOT a
+        // captured resolver, which was null on the routed prod build and made
+        // the drain INERT in real games (resolver-null bug class; mirrors
+        // Stormbreath #2540 / Grist #2549).
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses {LifeLossPerOpponent} life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opp == null) continue;
-                    if (ReferenceEquals(opp, owner)) continue;
                     opp.LoseLife(LifeLossPerOpponent);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var etbTrigger = new TriggeredAbility(

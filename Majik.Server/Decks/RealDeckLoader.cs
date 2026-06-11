@@ -74,71 +74,19 @@ public sealed class RealDeckLoader : IDeckLoader
     }
 
     /// <summary>Instantiates a typed <see cref="ICard"/> shell from a
-    /// <see cref="CardEntity"/> without setting an owner. Mirrors the
-    /// type-dispatch in <see cref="ScryfallCardFactory"/> but omits ability
-    /// binding which requires a live <see cref="Majik.Core.Players.Player"/>.
-    /// Also stamps the Scryfall <c>colors</c> array as a
-    /// <see cref="Card.ColorIndicator"/> (CR 202.2c) so color-matters
-    /// tutors (Green Sun's Zenith, Summoner's Pact) match cards like Dryad
-    /// Arbor whose color comes from the printed indicator rather than from
-    /// mana-cost pips.</summary>
+    /// <see cref="CardEntity"/> without setting an owner. Delegates to the
+    /// shared <see cref="DeckCardShellBuilder"/> so the prod loader and the
+    /// bot/audit test materializers stay in sync. The builder preserves ALL
+    /// printed card types (CR 205.1b — so an artifact land is actually an
+    /// Artifact, an enchantment land an Enchantment, etc.) and stamps the
+    /// Scryfall <c>colors</c> array as a <see cref="Card.ColorIndicator"/>
+    /// (CR 202.2c) so color-matters tutors (Green Sun's Zenith, Summoner's
+    /// Pact) match cards like Dryad Arbor whose color comes from the printed
+    /// indicator rather than from mana-cost pips. Ability binding happens
+    /// later in the GameFacade binder/factory chain (which needs a live
+    /// <see cref="Majik.Core.Players.Player"/>).</summary>
     private static ICard CreateCard(CardEntity entity)
-    {
-        var parsed = TypeLineParser.Parse(entity.TypeLine);
-        var manaCost = entity.ManaCost ?? "";
-
-        ICard card = PickPrimaryType(parsed.Types) switch
-        {
-            CardType.Creature => new Creature(
-                entity.Name, manaCost,
-                ParseStat(entity.Power), ParseStat(entity.Toughness),
-                parsed.Supertypes, parsed.Subtypes),
-            CardType.Land => new Land(entity.Name, parsed.Supertypes, parsed.Subtypes),
-            CardType.Instant => new Instant(entity.Name, manaCost),
-            CardType.Sorcery => new Sorcery(entity.Name, manaCost),
-            CardType.Enchantment => new Enchantment(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Artifact => new Artifact(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Planeswalker => new Planeswalker(
-                entity.Name, manaCost,
-                startingLoyalty: entity.Loyalty ?? 0,
-                parsed.Supertypes, parsed.Subtypes),
-            _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
-        };
-
-        // CR 202.2c — stamp the printed color indicator (parsed from the
-        // seed's `colors` JSON) so CardColors.GetColors yields the right
-        // answer for Dryad Arbor and any other indicator-only card. Plain
-        // mana-cost colors are duplicate-safe; the indicator is unioned
-        // with the mana-cost pip scan, not substituted for it.
-        if (card is Card concrete)
-        {
-            var colors = CardColors.ParseScryfallColors(entity.Colors);
-            if (colors.Count > 0)
-            {
-                concrete.SetColorIndicator(colors);
-            }
-        }
-
-        return card;
-    }
-
-    private static CardType? PickPrimaryType(IEnumerable<CardType> types)
-    {
-        var priority = new[]
-        {
-            CardType.Creature, CardType.Land, CardType.Instant, CardType.Sorcery,
-            CardType.Enchantment, CardType.Artifact, CardType.Planeswalker,
-        };
-        foreach (var p in priority)
-            if (types.Contains(p)) return p;
-        return null;
-    }
-
-    private static int ParseStat(string? s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return 0;
-        return int.TryParse(s, out var v) ? v : 0;
-    }
+        => DeckCardShellBuilder.Build(entity);
 }
 
 public sealed class DeckLoadException : Exception

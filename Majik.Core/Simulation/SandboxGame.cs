@@ -8,6 +8,7 @@ using Majik.Core.Players.Agents;
 using Majik.Core.Random;
 using Majik.Core.Rules;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Simulation;
@@ -151,4 +152,21 @@ public sealed class SandboxGame
 
         return new SandboxGame(bus, driver, cloned);
     }
+
+    /// <summary>
+    /// Resume this sandbox from a cloned mid-game position at
+    /// <paramref name="resumePhase"/> without reshuffling libraries or running
+    /// mulligans. Delegates to
+    /// <see cref="GameDriver.ResumeGameAsync"/>.
+    ///
+    /// <para><paramref name="activePlayer"/> must be one of the CLONED players
+    /// (e.g. obtained via <c>State.PlayerFor(original)</c>).</para>
+    /// </summary>
+    public Task<GameDriver.GameResult> ResumeAsync(
+        PhaseStateType resumePhase,
+        Player activePlayer,
+        int turnNumber,
+        int maxTurns,
+        CancellationToken ct = default)
+        => Driver.ResumeGameAsync(resumePhase, activePlayer, turnNumber, maxTurns, ct);
 }

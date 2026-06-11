@@ -117,10 +117,15 @@ public static class KnightOfTheEbonLegionFactory
     /// </summary>
     public static Creature Create(Player owner)
         => Create(owner, eventBus: null, triggers: null, effects: null,
-                  replacements: null, playerResolver: null);
+                  replacements: null);
 
     /// <summary>
-    /// Construct Knight of the Ebon Legion with optional runtime services.
+    /// Construct Knight of the Ebon Legion with optional runtime services. The
+    /// end-step "if a player lost 4 or more life this turn" intervening-if reads
+    /// every player from the LIVE resolution context (<c>ctx.Game.AllPlayers</c>)
+    /// at resolution — no captured player resolver, so it is correct on the
+    /// production routed build (mirrors #2551); with no live game context the
+    /// intervening-if is false.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="eventBus">Routed through <see cref="CountersService.Add"/>
@@ -136,17 +141,12 @@ public static class KnightOfTheEbonLegionFactory
     /// <param name="replacements">Optional <see cref="ReplacementBus"/> routed
     /// through <see cref="CountersService.Add"/> for the +1/+1 placement
     /// (Hardened Scales / Doubling Season — CR 614).</param>
-    /// <param name="playerResolver">Live enumerator of the player list, used to
-    /// evaluate the "a player lost 4 or more life this turn" intervening-if
-    /// (CR 603.4) against every player's <see cref="Player.LifeLostThisTurn"/>.
-    /// Without a resolver the intervening-if is false.</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
         TriggerManager? triggers,
         ContinuousEffectsService? effects,
-        ReplacementBus? replacements,
-        Func<IReadOnlyList<Player>>? playerResolver)
+        ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -201,10 +201,11 @@ public static class KnightOfTheEbonLegionFactory
         var counterEffect = new Effect(
             $"{CardName}: put a +1/+1 counter on this creature " +
             "if a player lost 4 or more life this turn",
-            () =>
+            ctx =>
             {
-                if (card.Zone != ZoneType.Battlefield) return;
-                if (!AnyPlayerLostFourOrMoreLifeThisTurn(playerResolver)) return;
+                if (card.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                if (!AnyPlayerLostFourOrMoreLifeThisTurn(ctx.Game?.AllPlayers))
+                    return ValueTask.CompletedTask;
 
                 CountersService.Add(
                     card,
@@ -212,6 +213,8 @@ public static class KnightOfTheEbonLegionFactory
                     CounterAmount,
                     replacements,
                     eventBus);
+
+                return ValueTask.CompletedTask;
             });
 
         var endStepTrigger = new TriggeredAbility(
@@ -230,14 +233,13 @@ public static class KnightOfTheEbonLegionFactory
     /// <summary>
     /// CR 603.4 — true iff at least one player (any player — "a player"
     /// includes the controller) has lost ≥ 4 life this turn
-    /// (<see cref="Player.LifeLostThisTurn"/>). Players are read live through
-    /// <paramref name="playerResolver"/>; without a resolver this is false
-    /// (the intervening-if fails and the trigger resolves to a no-op).
+    /// (<see cref="Player.LifeLostThisTurn"/>). <paramref name="players"/> is the
+    /// live player list read off the resolution context; without a live game
+    /// this is false (the intervening-if fails and the trigger no-ops).
     /// </summary>
     private static bool AnyPlayerLostFourOrMoreLifeThisTurn(
-        Func<IReadOnlyList<Player>>? playerResolver)
+        IReadOnlyList<Player>? players)
     {
-        var players = playerResolver?.Invoke();
         if (players == null) return false;
 
         foreach (var p in players)

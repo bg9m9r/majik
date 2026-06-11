@@ -55,4 +55,12 @@ public sealed class BotTestScenario
         card.ChangeOwner(p);
         p.Zones.Hand.AddCard(card);
     }
+
+    public Planeswalker AddPlaneswalkerToBattlefield(Player p, string name, int loyalty)
+    {
+        var pw = new Planeswalker(name, manaCost: string.Empty, startingLoyalty: loyalty);
+        pw.ChangeOwner(p);
+        p.Zones.Battlefield.AddCard(pw);
+        return pw;
+    }
 }

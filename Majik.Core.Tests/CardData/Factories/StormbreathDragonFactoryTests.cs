@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Rules;
 using Majik.Core.ValueObjects;
@@ -18,10 +19,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Unit tests for <see cref="StormbreathDragonFactory"/> (Theros, {3}{R}{R}).
 ///
 /// Creature — Dragon 4/4. Oracle text:
-///   "Flying. Haste. Protection from white.
-///    Monstrosity 3.
-///    When Stormbreath Dragon becomes monstrous, if you have seven or
-///    more cards in hand, it deals 3 damage to each opponent."
+///   "Flying, haste, protection from white
+///    {5}{R}{R}: Monstrosity 3.
+///    When this creature becomes monstrous, it deals damage to each
+///    opponent equal to the number of cards in that player's hand."
 ///
 /// Covers:
 ///   - Identity / shape / NamedCardFactory dispatch.
@@ -29,8 +30,9 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Protection from white via Rules.Protection.HasProtectionFromColor.
 ///   - Monstrosity activation places three +1/+1 counters + flips the
 ///     monstrous flag; second activation no-ops.
-///   - Becomes-monstrous trigger fires 3-damage-each-opponent IFF hand
-///     size ≥ 7.
+///   - Becomes-monstrous trigger deals each opponent damage equal to
+///     THAT opponent's own hand size (per-opponent variable; no
+///     hand-size threshold).
 /// </summary>
 [Trait("Color", "R")]
 public class StormbreathDragonFactoryTests
@@ -100,7 +102,7 @@ public class StormbreathDragonFactoryTests
         monstrosity.IsMonstrous.Should().BeFalse("starts not-monstrous");
         dragon.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
 
-        foreach (var e in monstrosity.Effects) e.Execute();
+        ResolveMonstrosity(dragon);
 
         monstrosity.IsMonstrous.Should().BeTrue();
         dragon.Counters.Count(CounterType.PlusOnePlusOne)
@@ -113,8 +115,8 @@ public class StormbreathDragonFactoryTests
         var dragon = StormbreathDragonFactory.Create(_alice);
         var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
 
-        foreach (var e in monstrosity.Effects) e.Execute();
-        foreach (var e in monstrosity.Effects) e.Execute(); // second pop
+        ResolveMonstrosity(dragon);
+        ResolveMonstrosity(dragon); // second pop
 
         dragon.Counters.Count(CounterType.PlusOnePlusOne)
             .Should().Be(StormbreathDragonFactory.MonstrosityCounters,
@@ -137,68 +139,179 @@ public class StormbreathDragonFactoryTests
     // Becomes-monstrous trigger
     // -------------------------------------------------------------------------
 
-    [Fact]
-    public void BecomesMonstrous_HandSizeSeven_DealsThreeToEachOpponent()
+    private static void FillHand(Player p, int count)
     {
-        var dragon = StormbreathDragonFactory.Create(_alice, opponentsResolver: () => new[] { _bob });
-
-        // Fill Alice's hand to 7 cards (vanilla shells).
-        for (var i = 0; i < 7; i++)
+        for (var i = 0; i < count; i++)
         {
             var c = new Card($"Filler{i}", "");
-            c.SetOwner(_alice);
-            _alice.Zones.Hand.AddCard(c);
+            c.SetOwner(p);
+            p.Zones.Hand.AddCard(c);
         }
+    }
 
-        var bobLifeBefore = _bob.LifeTotal;
+    /// <summary>
+    /// Drive the Monstrosity 3 activated ability's resolution through the
+    /// real async path with a live <see cref="GameContext"/> built from the
+    /// supplied players, so the becomes-monstrous trigger reads opponents +
+    /// hand sizes off <c>ctx.Game.AllPlayers</c> exactly as it does in a live
+    /// match. Mirrors the engine's <c>ActivatedAbility.ResolveAsync</c> wiring.
+    /// </summary>
+    private static void ResolveMonstrosity(Creature dragon, params Player[] players)
+    {
+        var controller = dragon.Controller!;
+        GameContext? game = players.Length == 0
+            ? null
+            : new GameContext(
+                self: controller,
+                allPlayers: players,
+                activePlayer: controller,
+                turnNumber: 1,
+                currentPhase: null,
+                stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+        var ctx = ResolutionContext.For(controller, agent: null, game, chosenTargets: null);
 
         var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
-        foreach (var e in monstrosity.Effects) e.Execute();
-
-        _bob.LifeTotal.Should().Be(bobLifeBefore - StormbreathDragonFactory.BecomesMonstrousDamage);
+        foreach (var e in monstrosity.Effects)
+        {
+            e.ExecuteAsync(ctx).AsTask().GetAwaiter().GetResult();
+        }
     }
 
     [Fact]
-    public void BecomesMonstrous_HandSizeUnderSeven_DoesNotDeal()
+    public void BecomesMonstrous_IsARealTriggeredAbility_InCardAbilities()
     {
-        var dragon = StormbreathDragonFactory.Create(_alice, opponentsResolver: () => new[] { _bob });
-
-        // Only 6 cards in hand — intervening-if fails (CR 603.6c).
-        for (var i = 0; i < 6; i++)
-        {
-            var c = new Card($"Filler{i}", "");
-            c.SetOwner(_alice);
-            _alice.Zones.Hand.AddCard(c);
-        }
-
-        var bobLifeBefore = _bob.LifeTotal;
-
-        var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
-        foreach (var e in monstrosity.Effects) e.Execute();
-
-        _bob.LifeTotal.Should().Be(bobLifeBefore,
-            "intervening-if fails at 6 cards — no damage even though monstrous flips");
+        // The pool-wide audit reads card.Abilities.OfType<ITriggeredAbility>();
+        // the becomes-monstrous trigger must be a real bound ability.
+        var dragon = StormbreathDragonFactory.Create(_alice);
+        dragon.Abilities.OfType<ITriggeredAbility>().Should().ContainSingle(
+            "the becomes-monstrous trigger is a real TriggeredAbility in card.Abilities");
     }
 
     [Fact]
-    public void BecomesMonstrous_NoOpponentsResolver_NoOp()
+    public void BecomesMonstrous_DealsEachOpponentDamageEqualToTheirOwnHandSize()
     {
-        // Single-arg overload — no opponents resolver, no damage even
-        // when the hand threshold is met (defensive — shape-only tests).
+        var carol = new Player("Carol", 20);
         var dragon = StormbreathDragonFactory.Create(_alice);
 
-        for (var i = 0; i < 7; i++)
-        {
-            var c = new Card($"Filler{i}", "");
-            c.SetOwner(_alice);
-            _alice.Zones.Hand.AddCard(c);
-        }
+        // Bob holds 4 cards, Carol holds 2 — each opponent takes damage
+        // equal to THAT player's hand size (per-opponent variable).
+        FillHand(_bob, 4);
+        FillHand(carol, 2);
+
+        var bobLifeBefore = _bob.LifeTotal;
+        var carolLifeBefore = carol.LifeTotal;
+
+        ResolveMonstrosity(dragon, _alice, _bob, carol);
+
+        _bob.LifeTotal.Should().Be(bobLifeBefore - 4, "Bob held 4 cards");
+        carol.LifeTotal.Should().Be(carolLifeBefore - 2, "Carol held 2 cards");
+    }
+
+    [Fact]
+    public void BecomesMonstrous_OpponentWithEmptyHand_TakesNoDamage()
+    {
+        var dragon = StormbreathDragonFactory.Create(_alice);
+
+        // Bob's hand is empty — zero cards means zero damage (CR 701.31
+        // damage = the number of cards in that player's hand). No
+        // hand-size threshold gate exists in the current oracle.
+        var bobLifeBefore = _bob.LifeTotal;
+
+        ResolveMonstrosity(dragon, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(bobLifeBefore, "Bob had no cards in hand");
+    }
+
+    [Fact]
+    public void BecomesMonstrous_ControllerHandSize_DoesNotMatter()
+    {
+        // The damage keys off each OPPONENT's hand, never the controller's.
+        // Stuff Alice's (controller) hand; Bob's empty — Bob still takes 0.
+        var dragon = StormbreathDragonFactory.Create(_alice);
+
+        FillHand(_alice, 7);
 
         var bobLifeBefore = _bob.LifeTotal;
 
-        var monstrosity = dragon.Abilities.OfType<StormbreathDragonAbility>().Single();
-        foreach (var e in monstrosity.Effects) e.Execute();
+        ResolveMonstrosity(dragon, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(bobLifeBefore,
+            "controller hand size is irrelevant under the current oracle");
+    }
+
+    [Fact]
+    public void BecomesMonstrous_OnlyFiresOnce_SecondActivationNoOp()
+    {
+        // CR 701.31 — monstrosity does nothing if the creature is already
+        // monstrous, so the becomes-monstrous trigger does not re-fire.
+        var dragon = StormbreathDragonFactory.Create(_alice);
+
+        FillHand(_bob, 3);
+
+        ResolveMonstrosity(dragon, _alice, _bob); // becomes monstrous → 3 damage
+
+        var bobLifeAfterFirst = _bob.LifeTotal;
+        bobLifeAfterFirst.Should().Be(20 - 3);
+
+        ResolveMonstrosity(dragon, _alice, _bob); // already monstrous → no-op
+
+        _bob.LifeTotal.Should().Be(bobLifeAfterFirst,
+            "already monstrous — monstrosity (and its trigger) does nothing");
+    }
+
+    [Fact]
+    public void BecomesMonstrous_NoGameContext_NoOp()
+    {
+        // Shape-only resolution with no live game context — the damage
+        // effect finds no opponents to read and is a safe no-op.
+        var dragon = StormbreathDragonFactory.Create(_alice);
+
+        FillHand(_bob, 5);
+
+        var bobLifeBefore = _bob.LifeTotal;
+
+        ResolveMonstrosity(dragon); // no players ⇒ ctx.Game is null
 
         _bob.LifeTotal.Should().Be(bobLifeBefore);
+    }
+
+    // -------------------------------------------------------------------------
+    // PROD-PATH: GameFacade routed build wires the trigger
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// PROD-PATH regression guard (same class as the Festival Crasher / Kiln
+    /// Fiend fix). The production <c>GameFacade</c> routed build dispatches
+    /// <see cref="NamedCardFactory.Create(string, Player, Majik.Core.Effects.ContinuousEffectsService?)"/>
+    /// (the effects-aware overload), NOT the single-arg factory overload. If
+    /// the generator does not see a <c>Create(Player, ContinuousEffectsService)</c>
+    /// overload the routed build falls through to shape-only dispatch and the
+    /// becomes-monstrous trigger is absent in live play (the bug the pool-wide
+    /// audit flags as MissingTrigger). This builds the card exactly as prod
+    /// does and asserts the trigger is bound + deals opponent damage.
+    /// </summary>
+    [Fact]
+    public void EffectsAwareDispatch_WiresBecomesMonstrousTrigger_OnProdPath()
+    {
+        var effects = new Majik.Core.Effects.ContinuousEffectsService();
+
+        // Prod dispatch: GameFacade.BuildDeckCard → NamedCardFactory.Create(name, owner, effects).
+        var built = NamedCardFactory.Create("Stormbreath Dragon", _alice, effects);
+        built.Should().BeOfType<Creature>();
+        var dragon = (Creature)built;
+
+        dragon.Abilities.OfType<ITriggeredAbility>().Should().ContainSingle(
+            "the prod effects-aware dispatch must route through the "
+            + "Create(Player, ContinuousEffectsService) overload — not shape-only");
+
+        FillHand(_bob, 4);
+        var bobLifeBefore = _bob.LifeTotal;
+
+        ResolveMonstrosity(dragon, _alice, _bob);
+
+        dragon.Abilities.OfType<StormbreathDragonAbility>().Single().IsMonstrous
+            .Should().BeTrue("monstrosity resolved on the prod-built card");
+        _bob.LifeTotal.Should().Be(bobLifeBefore - 4,
+            "the prod-built trigger deals each opponent damage = their hand size");
     }
 }

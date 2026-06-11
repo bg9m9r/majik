@@ -22,6 +22,31 @@ public class PriorityManager
     private PriorityState _state;
 
     /// <summary>
+    /// When <see langword="true"/>, this manager's own SYNCHRONOUS
+    /// trigger-drain (<see cref="DrainPendingTriggers"/>) is suppressed
+    /// because an async, agent-aware driver (<see cref="PriorityLoop"/>) is
+    /// draining the pending triggers via
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/> instead.
+    /// <para>
+    /// The sync drain (<see cref="TriggerManager.PutPendingTriggersOnStack"/>)
+    /// does NOT collect targets, so on the live game path it auto-picks
+    /// first-eligible for every targeted trigger (CR 603.3 says targets are
+    /// chosen as the ability is put on the stack). <see cref="PriorityLoop"/>
+    /// flips this flag so the drain happens exactly once — on the async path,
+    /// where the controller's agent is prompted for targets — at the same
+    /// logical moment the sync drain fired (a player is about to receive
+    /// priority; APNAP order CR 603.3b is preserved by the async drain's own
+    /// controller grouping).
+    /// </para>
+    /// <para>
+    /// Defaults to <see langword="false"/> so unit harnesses that drive
+    /// <see cref="PriorityManager"/> directly (no PriorityLoop) keep the
+    /// built-in drain — behaviour-preserving for those callers.
+    /// </para>
+    /// </summary>
+    public bool SuppressInternalTriggerDrain { get; set; }
+
+    /// <summary>
     /// The player who currently has priority.
     /// </summary>
     public Player? CurrentPlayer => _state.CurrentPlayer;
@@ -126,6 +151,16 @@ public class PriorityManager
 
     private void DrainPendingTriggers()
     {
+        // CR 603.3 — when an async, agent-aware driver (PriorityLoop) owns the
+        // drain, it puts pending triggers on the stack via the async path
+        // (collecting the controller's targets first). Suppress the sync drain
+        // here so triggers aren't drained twice — and, more importantly, aren't
+        // drained target-lessly (first-eligible auto-pick) on the live path.
+        if (SuppressInternalTriggerDrain)
+        {
+            return;
+        }
+
         if (_triggerManager == null || _activePlayer == null)
         {
             return;

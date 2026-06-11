@@ -156,22 +156,17 @@ public class RamunapRuinsFactoryTests
     [Fact]
     public void RamunapRuins_SacAbility_DealsTwoDamageToEachOpponent_AndSacrificesSelf()
     {
-        var land = RamunapRuinsFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(land);
-        land.SetZone(ZoneType.Battlefield);
-
         var bob = new Player("Bob", 20);
         var carol = new Player("Carol", 20);
 
-        // Re-create with opponent resolver wired so the damage half resolves.
-        var land2 = RamunapRuinsFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { bob, carol });
+        var land2 = RamunapRuinsFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(land2);
         land2.SetZone(ZoneType.Battlefield);
 
         var sac = land2.Abilities.OfType<ActivatedAbility>().Single();
-        sac.Resolve();
+        // Resolve through a live game so the damage half reads "each opponent"
+        // off the resolution context (resolver-null bug-class fix).
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(sac, _alice, _alice, bob, carol);
 
         bob.LifeTotal.Should().Be(18, "each opponent takes 2 damage (CR 800.4)");
         carol.LifeTotal.Should().Be(18, "each opponent takes 2 damage (CR 800.4)");

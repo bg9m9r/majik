@@ -74,6 +74,49 @@ public class AdditionalCost : ICost
         return new AdditionalCost(AdditionalCostType.PayLife, $"Pay {amount} life", amount);
     }
 
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — return a NEW <see cref="AdditionalCost"/>
+    /// identical to this one EXCEPT that, for <see cref="AdditionalCostType.Tap"/>
+    /// / <see cref="AdditionalCostType.Sacrifice"/> costs whose captured permanent
+    /// (<see cref="_costParameter"/>) is reference-equal to <paramref name="oldSource"/>,
+    /// the captured permanent is swapped to <paramref name="newSource"/>.
+    ///
+    /// <para>
+    /// This re-homes the self-referential <c>{T}</c> / sacrifice cost of an
+    /// activated ability when the ability is re-sourced onto a new permanent
+    /// (CR 707.2 copy machinery / Agatha's Soul Cauldron granted abilities), so
+    /// the rebound ability taps / sacrifices the NEW source rather than the
+    /// permanent the original cost captured. Mana / pay-life costs do not
+    /// reference a source permanent, and costs whose captured permanent does not
+    /// match <paramref name="oldSource"/> are returned unchanged (this instance).
+    /// The description is rebuilt to name the new permanent; the event bus
+    /// (sacrifice-cost aristocrat publishing) is preserved.
+    /// </para>
+    /// </summary>
+    public AdditionalCost RebindSource(object oldSource, object newSource)
+    {
+        // Only the source-capturing cost types reference a permanent; mana /
+        // pay-life carry an int or nothing, so there is nothing to rebind.
+        if (_costType is not (AdditionalCostType.Tap or AdditionalCostType.Sacrifice))
+        {
+            return this;
+        }
+
+        // Swap only when this cost's captured permanent IS the old source
+        // (reference equality — CR 707.2 re-home of the ability's own {T}/sac).
+        if (!ReferenceEquals(_costParameter, oldSource)
+            || newSource is not Cards.Permanent newPermanent)
+        {
+            return this;
+        }
+
+        var description = _costType == AdditionalCostType.Tap
+            ? $"Tap {newPermanent.Name}"
+            : $"Sacrifice {newPermanent.Name}";
+
+        return new AdditionalCost(_costType, description, newPermanent, _eventBus);
+    }
+
     public bool CanPay(Player player)
     {
         if (player == null)

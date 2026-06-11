@@ -1,4 +1,6 @@
+using System.Linq;
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
@@ -6,6 +8,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -71,7 +74,7 @@ public class SmallpoxFactoryTests
     [Fact]
     public void Smallpox_Resolve_HasNoTargets()
     {
-        var def = SmallpoxFactory.BuildSpellDefinition(() => new[] { _alice });
+        var def = SmallpoxFactory.BuildSpellDefinition();
         def.TargetRequests.Should().BeEmpty(
             "Smallpox affects each player — no chosen targets (CR 115.1a)");
         def.HasVariableX.Should().BeFalse();
@@ -190,10 +193,13 @@ public class SmallpoxFactoryTests
 
     private static void ResolveSmallpox(Player caster, Func<IReadOnlyList<Player>> players)
     {
-        var def = SmallpoxFactory.BuildSpellDefinition(players);
+        var def = SmallpoxFactory.BuildSpellDefinition();
         var chosen = new ChosenSpellParams(
             null, null, Array.Empty<IReadOnlyList<object>>(), ManaPayment.Empty);
         var effects = def.EffectFactory(chosen);
-        foreach (var effect in effects) effect.Execute();
+
+        // Resolve through a live GameContext so the each-player body reads
+        // ctx.Game.AllPlayers (the production path).
+        ContextResolve.ResolveEffects(effects, caster, players().ToArray());
     }
 }

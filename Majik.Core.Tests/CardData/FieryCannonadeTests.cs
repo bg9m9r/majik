@@ -44,7 +44,7 @@ public class FieryCannonadeTests
         var c = FieryCannonadeFactory.Create(_alice);
 
         c.Name.Should().Be("Fiery Cannonade");
-        c.ManaCost.Should().Be("{1}{R}");
+        c.ManaCost.Should().Be("{2}{R}");
         c.HasType(CardType.Instant).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
@@ -58,7 +58,7 @@ public class FieryCannonadeTests
         card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Fiery Cannonade");
         card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}");
+        card.ManaCost.Should().Be("{2}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
 

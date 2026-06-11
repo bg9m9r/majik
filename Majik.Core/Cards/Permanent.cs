@@ -453,6 +453,36 @@ public class Permanent : Card
                 _attachments.Add((Permanent)clonedAttached);
             }
         }
+
+        // Re-link ManaAbility.Source: the copy-ctor shares ability refs by
+        // reference (_abilities.AddRange). Any ManaAbility whose Source is the
+        // original live permanent would tap the LIVE permanent when activated in
+        // the sandbox, corrupting live game state across MCTS iterations (the
+        // live land becomes tapped after each sandbox run, so subsequent
+        // iterations can no longer pay the mana cost). Replace such abilities
+        // with new instances bound to THIS clone so sandbox taps stay local.
+        // ManaAbility.CloneForSim returns null for non-simple-shape abilities
+        // (dynamic generators, additional-cost payers, etc.); those keep the
+        // original ref — a known limitation tracked for future work.
+        var manaAbilitiesToRelink = Abilities
+            .OfType<Majik.Core.Abilities.ManaAbility>()
+            .Where(ma => ReferenceEquals(ma.Source, src))
+            .ToList();
+        foreach (var old in manaAbilitiesToRelink)
+        {
+            var ctrl = old.Controller != null && players.TryGetValue(old.Controller, out var cp)
+                ? cp
+                : old.Controller;
+            if (ctrl == null) continue; // no controller to bind — keep original
+            var replacement = old.CloneForSim(this, ctrl);
+            if (replacement != null)
+            {
+                RemoveAbility(old);
+                AddAbility(replacement);
+            }
+            // else: keep original (complex ability shape; live-source tap is a
+            // known limitation until those shapes are sim-clonable too).
+        }
     }
 
     /// <summary>
@@ -503,6 +533,20 @@ public class Permanent : Card
         // publishing is a no-op (direct-construction unit tests).
         Majik.Core.Events.EventBusRegistry.Get(Controller ?? causedBy)
             ?.Publish(new Majik.Core.Domain.DomainEvents.PermanentTappedEvent(this, causedBy));
+    }
+
+    /// <summary>
+    /// CR 400.7 / 613.7 / 614 — a permanent that changes zones becomes a NEW
+    /// object and loses all status it had on the battlefield, including its
+    /// tapped/untapped state. Called by the zone-move pipeline when a
+    /// permanent leaves the battlefield. Clears the tapped flag directly
+    /// (without going through <see cref="Untap"/>, which throws when the
+    /// permanent is already untapped) so it is safe to call blindly on every
+    /// battlefield exit regardless of the prior tap state.
+    /// </summary>
+    internal void ResetOnLeaveBattlefield()
+    {
+        _isTapped = false;
     }
 
     /// <summary>
@@ -585,6 +629,23 @@ public class Permanent : Card
     public bool IsEffectivePlaneswalker() => GetEffectiveLoyalty().HasValue;
 
     /// <summary>
+    /// CR 613.1c / 711 — true when this permanent's EFFECTIVE (layer-computed)
+    /// card types include <see cref="Types.CardType.Creature"/>. Distinct from
+    /// the C# instance type: a <see cref="Creature"/> instance flipped to a
+    /// non-creature DFC back (a planeswalker back) is NOT effectively a
+    /// creature, and a <see cref="Land"/> animated by a Layer-4 grant IS. When
+    /// <see cref="ActiveEffects"/> is null this falls back to the printed
+    /// types. Consulted by the creature-death SBA (CR 704.5f) so a flipped
+    /// creature-front DFC is governed by the planeswalker-death SBA instead.
+    /// </summary>
+    public bool IsEffectivelyCreature()
+    {
+        if (ActiveEffects == null)
+            return CardTypes.Contains(Types.CardType.Creature);
+        return ActiveEffects.Compute(this).Types.Contains(Types.CardType.Creature);
+    }
+
+    /// <summary>
     /// CR 704.5j — true when this permanent has a loyalty body that has dropped
     /// to 0 (so the planeswalker-death SBA destroys it). False when it carries
     /// no loyalty body.
@@ -604,6 +665,23 @@ public class Permanent : Card
             throw new ArgumentException("Loyalty removal cannot be negative", nameof(amount));
         if (_transientLoyalty is not { } current) return false;
         _transientLoyalty = Math.Max(0, current - amount);
+        return true;
+    }
+
+    /// <summary>
+    /// CR 606.3/306.5b — add <paramref name="amount"/> loyalty to a transient
+    /// loyalty body (a "+N" loyalty-ability cost on a creature-front DFC
+    /// flipped to its planeswalker back). No-op when this permanent has no
+    /// transient body. A real <see cref="Planeswalker"/> overrides this to add
+    /// to its own authoritative field. Returns <c>true</c> if a transient body
+    /// absorbed the addition.
+    /// </summary>
+    public virtual bool AddTransientLoyalty(int amount)
+    {
+        if (amount < 0)
+            throw new ArgumentException("Loyalty addition cannot be negative", nameof(amount));
+        if (_transientLoyalty is not { } current) return false;
+        _transientLoyalty = current + amount;
         return true;
     }
 

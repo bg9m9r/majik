@@ -125,39 +125,22 @@ public static class HazoretTheFerventFactory
     /// to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, continuousEffects: null, opponentsResolver: null);
+        => Create(owner, continuousEffects: null);
 
     /// <summary>
-    /// Construct Hazoret with a continuous-effects service for the
-    /// can't-attack-or-block restriction but no opponents resolver (the
-    /// burn still no-ops). Convenience overload for restriction tests.
-    /// </summary>
-    public static Creature Create(Player owner, ContinuousEffectsService? continuousEffects)
-        => Create(owner, continuousEffects, opponentsResolver: null);
-
-    /// <summary>
-    /// Construct Hazoret with an opponents resolver for the burn but no
-    /// continuous-effects service (restriction skipped). Convenience
-    /// overload for activated-ability tests.
-    /// </summary>
-    public static Creature Create(Player owner, Func<IReadOnlyList<Player>>? opponentsResolver)
-        => Create(owner, continuousEffects: null, opponentsResolver);
-
-    /// <summary>
-    /// Construct a fully-wired Hazoret the Fervent.
+    /// Construct a fully-wired Hazoret the Fervent. The activated burn reads
+    /// "each opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="continuousEffects">Game-level continuous-effects
     /// service. When supplied, the two predicate-mode combat restrictions
     /// (CannotAttack + CannotBlock) are registered, gated on Hazoret being
     /// on the battlefield. Pass null to skip the restriction.</param>
-    /// <param name="opponentsResolver">Live opponents list used by the
-    /// activated burn at resolve time. Pass null — the burn then finds no
-    /// opponents (defensive no-op).</param>
     public static Creature Create(
         Player owner,
-        ContinuousEffectsService? continuousEffects,
-        Func<IReadOnlyList<Player>>? opponentsResolver)
+        ContinuousEffectsService? continuousEffects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -224,18 +207,18 @@ public static class HazoretTheFerventFactory
         // ----------------------------------------------------------------
         var burn = new Effect(
             $"{CardName}: deal {ActivatedDamage} damage to each opponent",
-            () =>
+            ctx =>
             {
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the burn INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
                 var controller = card.Controller ?? owner;
-                var opponents = opponentsResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, controller)) continue; // defensive
-                    if (opp.HasLost) continue;
                     Fx.DealDamageAny(opp, ActivatedDamage);
                 }
+                return ValueTask.CompletedTask;
             });
 
         card.AddAbility(new ActivatedAbility(

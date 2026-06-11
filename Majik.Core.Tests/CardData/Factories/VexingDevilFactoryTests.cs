@@ -72,17 +72,13 @@ public class VexingDevilFactoryTests
 
         try
         {
-            var card = VexingDevilFactory.Create(
-                _alice,
-                triggers,
-                zones,
-                opponentResolver: () => new[] { _bob });
+            var card = VexingDevilFactory.Create(_alice, triggers, zones);
 
             _alice.Zones.Battlefield.AddCard(card);
             card.SetZone(ZoneType.Battlefield);
 
             var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
-            foreach (var e in trigger.Effects) e.Execute();
+            Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
             // Bob took 4 damage (CR 119.3 — damage to a player is life loss).
             _bob.LifeTotal.Should().Be(16,
@@ -114,17 +110,13 @@ public class VexingDevilFactoryTests
 
         try
         {
-            var card = VexingDevilFactory.Create(
-                _alice,
-                triggers,
-                zones,
-                opponentResolver: () => new[] { _bob });
+            var card = VexingDevilFactory.Create(_alice, triggers, zones);
 
             _alice.Zones.Battlefield.AddCard(card);
             card.SetZone(ZoneType.Battlefield);
 
             var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
-            foreach (var e in trigger.Effects) e.Execute();
+            Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
             // No damage; the controller keeps a 4/3 for {R}.
             _bob.LifeTotal.Should().Be(20, "the opponent declined the damage");
@@ -145,30 +137,22 @@ public class VexingDevilFactoryTests
         var triggers = new TriggerManager(new Majik.Core.Stack.Stack(), bus);
 
         // No agent registered for Bob → default decline.
-        var card = VexingDevilFactory.Create(
-            _alice,
-            triggers,
-            zones,
-            opponentResolver: () => new[] { _bob });
+        var card = VexingDevilFactory.Create(_alice, triggers, zones);
 
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);
 
         var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in trigger.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(20);
         card.Zone.Should().Be(ZoneType.Battlefield);
     }
 
     [Fact]
-    public void EtbEffect_WithoutOpponentResolver_NoOp()
+    public void EtbEffect_WithoutLiveGame_NoOp()
     {
-        var card = VexingDevilFactory.Create(
-            _alice,
-            triggers: null,
-            zoneService: null,
-            opponentResolver: null);
+        var card = VexingDevilFactory.Create(_alice);
 
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);

@@ -265,4 +265,159 @@ public class StateSnapshotterTests
 
         dto.Seq.Should().Be(42);
     }
+
+    // -----------------------------------------------------------------------
+    // CR 702.49 — ImprintedCards on the snapshot. A permanent that imprints
+    // cards (e.g. Agatha's Soul Cauldron) carries those exiled-with cards as
+    // nested shallow snapshots so a client can render them UNDER it. A permanent
+    // with no imprints carries an empty list.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Snapshot_PermanentWithImprints_CarriesImprintedCards()
+    {
+        var alice = new Player("Alice", 20);
+
+        // A creature card sitting in exile, imprinted on the Cauldron.
+        var imprinted = new Creature("Imprinted Dork", "G", 1, 1) { Owner = alice };
+        alice.Zones.Exile.AddCard(imprinted);
+        imprinted.SetZone(ZoneType.Exile);
+
+        // The Cauldron on Alice's battlefield, with the imprint link recorded.
+        var cauldron = Majik.Core.CardData.Factories.AgathasSoulCauldronFactory.Create(alice);
+        cauldron.AddImprinted(imprinted);
+        imprinted.SetExiledWith(cauldron.InstanceId);
+        alice.Zones.Battlefield.AddCard(cauldron);
+        cauldron.SetZone(ZoneType.Battlefield);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cauldronDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == cauldron.InstanceId);
+
+        cauldronDto.ImprintedCards.Should().NotBeNull()
+            .And.ContainSingle("the Cauldron carries its one imprinted card");
+        var nested = cauldronDto.ImprintedCards!.Single();
+        nested.InstanceId.Should().Be(imprinted.InstanceId);
+        nested.Name.Should().Be("Imprinted Dork");
+        // Shallow: an imprinted card's own ImprintedCards is empty (no recursion).
+        nested.ImprintedCards.Should().NotBeNull().And.BeEmpty();
+    }
+
+    [Fact]
+    public void Snapshot_NonImprintingPermanent_HasEmptyImprintedCards()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var bearDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == bear.InstanceId);
+
+        bearDto.ImprintedCards.Should().NotBeNull().And.BeEmpty(
+            "a permanent that imprints nothing carries an empty ImprintedCards list");
+    }
+
+    [Fact]
+    public void Snapshot_Planeswalker_CountersMapContainsLoyalty()
+    {
+        // CR 306.5b — loyalty lives in Planeswalker.Loyalty, NOT in the generic
+        // Counters collection. The portal renders a "Loyalty" pip from the
+        // CardSnapshotDto Counters map, so the snapshot must project effective
+        // loyalty into that map under the "Loyalty" key.
+        var alice = new Player("Alice", 20);
+        var grist = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", 3) { Owner = alice };
+        alice.Zones.Library.AddCard(grist);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(grist, ZoneType.Battlefield, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var gristDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == grist.InstanceId);
+
+        gristDto.Counters.Should().NotBeNull();
+        gristDto.Counters!.Should().ContainKey("Loyalty")
+            .WhoseValue.Should().Be(3);
+    }
+
+    [Fact]
+    public void Snapshot_Planeswalker_CountersLoyaltyTracksCurrentValue()
+    {
+        // After a +1 activation the projected loyalty must reflect the live value.
+        var alice = new Player("Alice", 20);
+        var grist = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", 3) { Owner = alice };
+        alice.Zones.Library.AddCard(grist);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(grist, ZoneType.Battlefield, controller: alice);
+        grist.AddLoyalty(1); // now 4
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var gristDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == grist.InstanceId);
+
+        gristDto.Counters!["Loyalty"].Should().Be(4);
+    }
+
+    [Fact]
+    public void Snapshot_NonPlaneswalker_CountersHasNoLoyaltyKey()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var bearDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == bear.InstanceId);
+
+        bearDto.Counters.Should().NotContainKey("Loyalty");
+    }
+
+    [Fact]
+    public void Snapshot_Planeswalker_LoyaltyAbilitiesListedWithKindAndCost()
+    {
+        // CR 606 — loyalty abilities are surfaced on the abilities list with a
+        // distinct "Loyalty" kind, the signed cost as Description, and a stable
+        // Id so the portal can render "+1 / −2 / −5" and echo the Id back in
+        // ActivateLoyaltyAbilityCommand.
+        var alice = new Player("Alice", 20);
+        var grist = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", 3) { Owner = alice };
+        grist.AddAbility(new LoyaltyAbility(grist, +1, () => { }));
+        grist.AddAbility(new LoyaltyAbility(grist, -2, () => { }));
+        grist.AddAbility(new LoyaltyAbility(grist, -5, () => { }));
+        alice.Zones.Library.AddCard(grist);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(grist, ZoneType.Battlefield, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var gristDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == grist.InstanceId);
+
+        var loyaltyAbilities = gristDto.Abilities.Where(a => a.Kind == "Loyalty").ToList();
+        loyaltyAbilities.Should().HaveCount(3);
+        loyaltyAbilities.Select(a => a.Description).Should().BeEquivalentTo("+1", "-2", "-5");
+        loyaltyAbilities.Should().OnlyContain(a => a.Id != null && a.Id != Guid.Empty);
+        loyaltyAbilities.Select(a => a.Id).Should().OnlyHaveUniqueItems();
+    }
 }

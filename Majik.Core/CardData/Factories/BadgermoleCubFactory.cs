@@ -15,22 +15,23 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Badgermole Cub (Bloomburrow).
 ///
-/// Creature — Bear {G} 1/1. Oracle text:
+/// Creature — Badger Mole {G} 2/2. Oracle text:
 ///   "When this creature enters, earthbend 1. (Target land you control becomes
 ///    a 0/0 creature with haste that's still a land. Put a +1/+1 counter on it.
 ///    When it dies or is exiled, return it to the battlefield tapped.)
 ///    Whenever you tap a creature for mana, add an additional {G}."
 ///
 /// ## Implemented
-/// - Correct name, type (Creature), subtype (Bear), mana cost ({G}),
-///   power/toughness (1/1).
+/// - Correct name, type (Creature), no enum-backed subtype (printed
+///   "Badger Mole" has no CardSubtype value), mana cost ({G}),
+///   power/toughness (2/2).
 /// - <b>Earthbend 1 ETB</b> (CR 701.59 / 603.6a): an ETB
 ///   <see cref="TriggeredAbility"/> with a unified
 ///   <see cref="TargetRequest"/> for "target land you control". On
 ///   resolution it routes the chosen land through
 ///   <see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>
 ///   — the land gets a +1/+1 counter and is animated into a 0/0
-///   creature with haste that's still a land (so a 1/1 with the counter,
+///   creature with haste that's still a land (so a 0/0 base +1/+1 = 1/1,
 ///   surfacing through the layer system's creature-row upgrade). The live
 ///   <see cref="ContinuousEffectsService"/> is read from this card's
 ///   <see cref="Permanent.ActiveEffects"/> at resolution (the prod build path
@@ -55,8 +56,7 @@ public static class BadgermoleCubFactory
     public const string CardName = "Badgermole Cub";
 
     public static CardDef Define() => CardDef
-        .Creature(CardName, "{G}", power: 1, toughness: 1)
-        .WithSubtype(CardSubtype.Bear);
+        .Creature(CardName, "{1}{G}", power: 2, toughness: 2);
 
     /// <summary>
     /// Build Badgermole Cub with its Earthbend-1 ETB trigger attached. Used by

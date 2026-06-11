@@ -52,23 +52,15 @@ public static class RelicOfProgenitusFactory
     public const string CardName = "Relic of Progenitus";
 
     /// <summary>
-    /// Construct Relic of Progenitus. The all-graveyards sweep of the second
-    /// activated ability is scoped to the controller only (no allPlayersResolver).
-    /// Suitable for shape / dispatcher tests.
+    /// Construct Relic of Progenitus. The second activated ability's "exile
+    /// all cards from all graveyards" sweep reads every player from the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
+    /// captured player resolver, so it is correct on the production routed
+    /// build (mirrors #2551). With no live game context the sweep falls back to
+    /// the controller's graveyard (shape-only paths). This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
-    public static Artifact Create(Player owner) =>
-        Create(owner, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Relic of Progenitus with optional cross-player graveyard
-    /// access. When <paramref name="allPlayersResolver"/> is supplied, the
-    /// second activated ability's "exile all cards from all graveyards"
-    /// sweeps every player's graveyard in resolver order. Without it, only
-    /// the controller's graveyard is swept.
-    /// </summary>
-    public static Artifact Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Artifact Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -143,7 +135,7 @@ public static class RelicOfProgenitusFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             "Relic of Progenitus: exile all graveyards, draw a card",
-            () =>
+            ctx =>
             {
                 // Self-exile: move Relic from Battlefield → Exile.
                 // Guard against double-execution (idempotent if already
@@ -155,8 +147,11 @@ public static class RelicOfProgenitusFactory
                     relic.SetZone(ZoneType.Exile);
                 }
 
-                // Exile all cards from all reachable graveyards.
-                var players = allPlayersResolver?.Invoke()
+                // Exile all cards from ALL graveyards — read every player from
+                // the LIVE game at resolution (ctx.Game.AllPlayers). No
+                // captured resolver, so the sweep is correct on the routed prod
+                // build. Shape-only resolves fall back to the controller.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
@@ -175,11 +170,12 @@ public static class RelicOfProgenitusFactory
                 if (top == null)
                 {
                     owner.MarkTriedToDrawFromEmptyLibrary();
-                    return;
+                    return ValueTask.CompletedTask;
                 }
                 owner.Zones.Library.RemoveCard(top);
                 owner.Zones.Hand.AddCard(top);
                 top.SetZone(ZoneType.Hand);
+                return ValueTask.CompletedTask;
             });
 
         var sweepAbility = new ActivatedAbility(

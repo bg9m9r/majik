@@ -54,7 +54,7 @@ namespace Majik.Core.CardData.Factories;
 public static class CensorFactory
 {
     public const string CardName = "Censor";
-    public const string PrintedManaCost = "{U}";
+    public const string PrintedManaCost = "{1}{U}";
     public const string CyclingCost = "{1}";
 
     /// <summary>Pay-or-counter rider (CR 118.4 — "unless its controller pays {1}").</summary>

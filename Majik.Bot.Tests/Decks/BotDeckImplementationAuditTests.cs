@@ -65,6 +65,31 @@ public class BotDeckImplementationAuditTests
             "Reality Smasher",
         };
 
+    /// <summary>Stub-heuristic false positives: <see cref="ICard.IsVanillaShell"/>
+    /// is true (the binder chain attached no <c>card.Abilities</c>) but the
+    /// card's printed behaviour DOES run — it lives in an OFF-CARD effect the
+    /// classifier cannot see (a continuous/replacement effect on a live per-game
+    /// service, not a <c>card.Ability</c>). Verified working via the GameFacade
+    /// prod path in <c>Majik.Core.Api.Tests.OffCardEffectLandBinderTests</c>.
+    /// Each entry names WHY. Real gaps go in
+    /// <see cref="KnownPartialImplementations"/>, NOT here. (None of these are
+    /// in the bot decks today, so the gate is unaffected — the allowlist is
+    /// kept in lock-step with the pool-wide audit's copy so the shared
+    /// detection logic stays consistent.)</summary>
+    private static readonly HashSet<string> StubHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // CR 305.7 — additive land-retype static, bound by
+            // AdditiveLandSubtypeBinder as an off-card continuous effect on the
+            // game's ContinuousEffectsService (not a card.Ability).
+            "Urborg, Tomb of Yawgmoth",
+            "Yavimaya, Cradle of Growth",
+            // CR 706.2 — "enter tapped as a copy of any land", bound by
+            // EntersAsCopyBinder as an off-card replacement effect on the
+            // game's ReplacementBus (not a card.Ability).
+            "Vesuva",
+        };
+
     /// <summary>Detection result for one distinct card name.</summary>
     private enum RawSignal { None, Stub, MissingTrigger }
 
@@ -150,7 +175,15 @@ public class BotDeckImplementationAuditTests
         // their behaviour lives in off-card continuous / replacement / CDA
         // effects the classifier can't see — so they are never stamped and no
         // allowlist is needed here.
-        if (card.IsVanillaShell)
+        //
+        // LANDS are the exception: they are never routed through a [CardName]
+        // factory (the instance-swap is gated on !HasType(Land)), so a land
+        // whose ONLY behaviour is an off-card continuous/replacement effect
+        // (Urborg additive static, Vesuva enters-as-copy replacement) reaches
+        // the binder-chain path with zero card.Abilities and IS stamped a
+        // vanilla shell — a false positive. The StubHeuristicAllowlist clears
+        // these provably-working off-card-effect lands.
+        if (card.IsVanillaShell && !StubHeuristicAllowlist.Contains(name))
             return RawSignal.Stub;
 
         var entity = Repo.GetByName(name);
@@ -267,51 +300,6 @@ public class BotDeckImplementationAuditTests
             ?? throw new InvalidOperationException(
                 $"bot-deck card not in embedded seed: '{name}'");
 
-        var parsed = TypeLineParser.Parse(entity.TypeLine);
-        var manaCost = entity.ManaCost ?? "";
-
-        ICard card = PickPrimaryType(parsed.Types) switch
-        {
-            CardType.Creature => new Creature(
-                entity.Name, manaCost,
-                ParseStat(entity.Power), ParseStat(entity.Toughness),
-                parsed.Supertypes, parsed.Subtypes),
-            CardType.Land => new Land(entity.Name, parsed.Supertypes, parsed.Subtypes),
-            CardType.Instant => new Instant(entity.Name, manaCost),
-            CardType.Sorcery => new Sorcery(entity.Name, manaCost),
-            CardType.Enchantment => new Enchantment(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Artifact => new Artifact(entity.Name, manaCost, parsed.Supertypes, parsed.Subtypes),
-            CardType.Planeswalker => new Planeswalker(
-                entity.Name, manaCost,
-                startingLoyalty: entity.Loyalty ?? 0,
-                parsed.Supertypes, parsed.Subtypes),
-            _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
-        };
-
-        // CR 202.2c — stamp the printed color indicator (Dryad Arbor et al.)
-        // so the shell mirrors the server loader before GameFacade rebinds.
-        if (card is Card concrete)
-        {
-            var colors = CardColors.ParseScryfallColors(entity.Colors);
-            if (colors.Count > 0) concrete.SetColorIndicator(colors);
-        }
-
-        return card;
+        return DeckCardShellBuilder.Build(entity);
     }
-
-    private static CardType? PickPrimaryType(IReadOnlyList<CardType> types)
-    {
-        foreach (var p in new[]
-        {
-            CardType.Creature, CardType.Land, CardType.Instant, CardType.Sorcery,
-            CardType.Enchantment, CardType.Artifact, CardType.Planeswalker,
-        })
-        {
-            if (types.Contains(p)) return p;
-        }
-        return null;
-    }
-
-    private static int ParseStat(string? s)
-        => int.TryParse(s, out var v) ? v : 0;
 }

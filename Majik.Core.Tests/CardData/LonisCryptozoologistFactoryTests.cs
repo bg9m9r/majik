@@ -52,7 +52,7 @@ public class LonisCryptozoologistFactoryTests
         l.HasSubtype(CardSubtype.Snake).Should().BeTrue();
         l.HasSubtype(CardSubtype.Elf).Should().BeTrue();
         l.HasSubtype(CardSubtype.Scout).Should().BeTrue();
-        l.BasePower.Should().Be(2);
+        l.BasePower.Should().Be(1);
         l.BaseToughness.Should().Be(2);
         l.Owner.Should().BeSameAs(_alice);
         l.Controller.Should().BeSameAs(_alice);

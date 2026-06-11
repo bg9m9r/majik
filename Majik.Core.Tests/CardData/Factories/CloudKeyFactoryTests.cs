@@ -98,7 +98,7 @@ public class CloudKeyFactoryTests
         var c = CloudKeyFactory.Create(_alice);
 
         c.Name.Should().Be("Cloud Key");
-        c.ManaCost.Should().Be("{2}");
+        c.ManaCost.Should().Be("{3}");
         c.HasType(CardType.Artifact).Should().BeTrue("Cloud Key is an Artifact");
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

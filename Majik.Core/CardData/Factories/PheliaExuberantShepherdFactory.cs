@@ -15,14 +15,14 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Phelia, Exuberant Shepherd (Modern Horizons 3,
 /// {1}{W}).
 ///
-/// Legendary Creature — Dog Wizard 2/1. Oracle text:
+/// Legendary Creature — Dog 2/2. Oracle text:
 ///   "Lifelink.
 ///    Whenever Phelia, Exuberant Shepherd attacks, exile another target
 ///    nonland permanent. At the beginning of the next end step, return
 ///    that card to the battlefield under its owner's control."
 ///
 /// ## Implemented (v1)
-/// - 2/1 Legendary Creature — Dog Wizard, mana cost {1}{W}.
+/// - 2/2 Legendary Creature — Dog, mana cost {1}{W}.
 /// - <b>Lifelink</b> (CR 702.15) — wired as a <see cref="KeywordAbility"/>;
 ///   damage-time life gain is enforced by the combat damage step
 ///   (CR 510.1c).
@@ -92,7 +92,7 @@ public static class PheliaExuberantShepherdFactory
     public const string CardName = "Phelia, Exuberant Shepherd";
     public const string PrintedManaCost = "{1}{W}";
     public const int Power = 2;
-    public const int Toughness = 1;
+    public const int Toughness = 2;
 
     /// <summary>
     /// Construct Phelia with no live TriggerManager wiring. The attack
@@ -121,7 +121,7 @@ public static class PheliaExuberantShepherdFactory
             power: Power,
             toughness: Toughness,
             supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Dog, CardSubtype.Wizard });
+            subtypes: new[] { CardSubtype.Dog });
 
         card.SetOwner(owner);
         card.SetController(owner);

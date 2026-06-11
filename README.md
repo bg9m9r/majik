@@ -20,7 +20,7 @@ Solution: `Majik.sln`.
 | `Majik.Server` | ASP.NET Core host — REST (`/cards`, `/decks`, `/me`, `/matches`), SignalR `/hubs/match`, OpenAPI at `/openapi/v1.json`. |
 | `Majik.Bot` | Game-playing bot (EV search, decision policies). |
 | `Majik.Console` | Diagnostic CLI. Two commands: `play-triggers` (triggered-ability playground) and `export-modern-cards` (regenerates the embedded card seed). Not a gameplay UI. |
-| `Majik.*.Tests` | xUnit + FluentAssertions + Moq. ~5,975 tests across `Majik.Core.Tests`, `Majik.Core.Api.Tests`, `Majik.Server.Tests`, `Majik.Bot.Tests`. (`Majik.Bot.Tests.Integration` exists but is mostly skipped — bot-vs-bot smoke.) |
+| `Majik.*.Tests` | xUnit + FluentAssertions + Moq. 20,000+ tests across `Majik.Core.Tests`, `Majik.Core.Api.Tests`, `Majik.Server.Tests`, `Majik.Bot.Tests`. (`Majik.Bot.Tests.Integration` exists but is mostly skipped — bot-vs-bot smoke.) |
 
 ## Common commands
 
@@ -89,11 +89,11 @@ git commit -m "chore(cards): refresh modern-cards seed (Scryfall YYYY-MM-DD)"
 
 ## Architecture (where things live)
 
-- **Aggregate root:** `Majik.Core.Domain.Aggregates.Game` — owns players, state machines, stack, the managers (`TurnManager`, `PhaseManager`, `PriorityManager`, `StackResolver`, `CombatManager`), `StateBasedActions`, and the `EventBus`. New gameplay surfaces go through `Game`.
-- **State machines** (`Majik.Core/StateMachine/` + `Majik.Core/Game/`): `GameStateMachine` (Initializing / Mulligan / Playing / GameOver), `TurnStateMachine`, `PhaseStateMachine`. Pluggable phases support extra-turn / extra-phase / extra-step insertion (Rule 500.7–9).
+- **Engine entry point:** `Majik.Core.Api.GameFacade` → `GameDriver` → `TurnDriver` — composes players, the state machine, stack, `PriorityManager`, `StackResolver`, `CombatManager`, `ContinuousEffectsService`, `StateBasedActions`, and the `EventBus`. New gameplay surfaces are coordinated through `GameFacade`/`TurnDriver`. (There is no `Game` aggregate root — an earlier `Domain.Aggregates.Game` + `PhaseManager` design was vestigial and removed.)
+- **State machine + turn flow** (`Majik.Core/StateMachine/` + `Majik.Core/Game/`): `GameStateMachine` (Initializing / Mulligan / Playing / GameOver) is the only live state machine. Phase/step flow is driven directly by `TurnDriver`, which emits a typed `PhaseStateChangedEvent` per phase and `StepStartedEvent` per step. Pluggable phases support extra-turn / extra-phase / extra-step insertion (Rule 500.7–9).
 - **Stack, priority, SBAs:** `Majik.Core/Stack/Stack.cs`, `PriorityManager` + `StackResolver` in `Majik.Core/Services/`, `Majik.Core/Rules/StateBasedActions.cs` (Rule 704), `ActionValidator.cs` + `RulesEngine.cs`.
-- **Abilities + effects** (`Majik.Core/Abilities/`, `Majik.Core/Effects/`): `ActivatedAbility`, `TriggeredAbility`, `StaticAbility`, `ReplacementEffect`, `ManaAbility`. `EffectLibrary` + `EffectFactory` produce `IEffect`s. Composed by `SpellCaster`, `AbilityActivator`, `ManaAbilityActivator`.
-- **Events:** `IEventBus` / `EventBus` in `Majik.Core/Events/`. Public `GameEvent` subclasses (`CardDrawnEvent`, `PhaseChangedEvent`, …). Domain-internal events under `Majik.Core/Domain/DomainEvents/`.
+- **Abilities + effects** (`Majik.Core/Abilities/`, `Majik.Core/Effects/`): `ActivatedAbility`, `TriggeredAbility`, `StaticAbility`, `ReplacementEffect`, `ManaAbility`. Each `IEffect` is its own class; one-shot effects are also built inline via `Fx.Inline` (the `Fx` facade lives in `Majik.Core/Primitives/`). Composed by `SpellCaster`, `AbilityActivator`, `ManaAbilityActivator`.
+- **Events:** `IEventBus` / `EventBus` in `Majik.Core/Events/`. Public `GameEvent` subclasses (`CardDrawnEvent`, `GameStateChangedEvent`, `PhaseStateChangedEvent`, `StepStartedEvent`, `TurnStartedEvent`, …). Domain-internal events under `Majik.Core/Domain/DomainEvents/`.
 - **Cards + zones:** `Card` -> `Permanent` -> `Creature` / `Artifact` / `Enchantment` / `Land` / `Planeswalker`; plus `Instant` / `Sorcery`. Zones managed by `ZoneManager` + `ZoneService` so all movement fires events.
 - **Card data layer:** `Majik.Core/CardData/EmbeddedCardRepository.cs` (the only `ICardRepository`), `Factories/` (named factories), `SpellTemplates/` (oracle-text binders), `Parsing/` (`KeywordRegistry`, `KeywordParser`).
 

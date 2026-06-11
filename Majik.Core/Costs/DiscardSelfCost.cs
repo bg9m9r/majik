@@ -55,8 +55,9 @@ public sealed class DiscardSelfCost : ICost
             throw new InvalidPlayerActionException(
                 $"Cannot pay {Description}: card is not in {caster.Name}'s hand.");
 
-        caster.Zones.Hand.RemoveCard(_self);
-        caster.Zones.Graveyard.AddCard(_self);
-        // Zone.AddCard internally calls card.SetZone — no manual SetZone needed.
+        // CR 701.8 — route through the central discard chokepoint so a
+        // DiscardedEvent fires (wasCost: true) and "Whenever you discard a
+        // card …" triggers see it.
+        Majik.Core.Primitives.Fx.DiscardCard(caster, _self, wasCost: true);
     }
 }

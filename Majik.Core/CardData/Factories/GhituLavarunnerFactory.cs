@@ -208,6 +208,20 @@ public static class GhituLavarunnerFactory
             if (!ThresholdMet(_source)) return;
             chars.Power += BonusPower;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="GhituPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// ThresholdMet reads the source's controller's graveyard live — correctly
+        /// scoped on the cloned source (controller remapped by RelinkReferences).
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new GhituPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

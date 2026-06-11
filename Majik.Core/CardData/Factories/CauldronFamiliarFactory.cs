@@ -100,21 +100,19 @@ public static class CauldronFamiliarFactory
     /// Suitable for shape / dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, zoneService: null, triggers: null);
+        Create(owner, zoneService: null, triggers: null);
 
     /// <summary>
     /// Construct Cauldron Familiar with optional runtime services.
-    /// <paramref name="opponentResolver"/> supplies the player list the ETB
-    /// trigger drains 1 life from (typically every <c>Game.Players</c> entry
-    /// that isn't the controller). <paramref name="triggers"/> registers the
-    /// ETB trigger so the bus drives it automatically.
-    /// <paramref name="zoneService"/> routes the graveyard-return zone move
-    /// (and the ETB trigger registration) so <see cref="CardMovedEvent"/>
-    /// publishes.
+    /// <paramref name="triggers"/> registers the ETB trigger so the bus
+    /// drives it automatically. <paramref name="zoneService"/> routes the
+    /// graveyard-return zone move (and the ETB trigger registration) so
+    /// <see cref="CardMovedEvent"/> publishes. "Each opponent" is read from
+    /// the live resolution context at resolution (<see cref="ContextOpponents"/>),
+    /// so the drain is correct on the production routed build.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         ZoneService? zoneService,
         TriggerManager? triggers)
     {
@@ -136,22 +134,22 @@ public static class CauldronFamiliarFactory
         // ----------------------------------------------------------------
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses 1 life + controller gains 1 life",
-            () =>
+            ctx =>
             {
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the drain INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
                 var controller = card.Controller ?? owner;
-                var opponents = opponentResolver?.Invoke();
-                if (opponents != null)
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    foreach (var opp in opponents)
-                    {
-                        if (ReferenceEquals(opp, controller)) continue;
-                        // CR 119.3 — life loss is a discrete event.
-                        opp.LoseLife(DrainAmount);
-                    }
+                    // CR 119.3 — life loss is a discrete event.
+                    opp.LoseLife(DrainAmount);
                 }
                 // CR 119.3 — lifegain is a separate discrete event and fires
                 // unconditionally per the printed "and you gain 1 life".
                 controller.GainLife(GainAmount);
+                return ValueTask.CompletedTask;
             });
 
         var etbTrigger = new TriggeredAbility(

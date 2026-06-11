@@ -62,7 +62,7 @@ namespace Majik.Core.CardData.Factories;
 public static class AtraxaGrandUnifierFactory
 {
     public const string CardName = "Atraxa, Grand Unifier";
-    public const string Cost = "{3}{W}{U}{B}{R}{G}";
+    public const string Cost = "{3}{G}{W}{U}{B}";
 
     /// <summary>
     /// Construct Atraxa, Grand Unifier owned and controlled by

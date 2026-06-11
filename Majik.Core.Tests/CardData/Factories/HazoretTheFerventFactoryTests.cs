@@ -208,12 +208,12 @@ public class HazoretTheFerventFactoryTests
     [Fact]
     public void ActivatedAbility_DealsTwoToEachOpponent()
     {
-        var hazoret = HazoretTheFerventFactory.Create(_alice, opponentsResolver: () => new[] { _bob });
+        var hazoret = HazoretTheFerventFactory.Create(_alice);
 
         var bobLifeBefore = _bob.LifeTotal;
 
         var ability = hazoret.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(bobLifeBefore - HazoretTheFerventFactory.ActivatedDamage);
     }

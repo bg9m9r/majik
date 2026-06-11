@@ -131,10 +131,10 @@ public class ThermoAlchemistFactoryTests
     public void TapBurn_DealsOneDamageToEachOpponent()
     {
         var card = ThermoAlchemistFactory.Create(
-            _alice, triggers: null, opponentResolver: () => new[] { _bob });
+            _alice, triggers: null);
 
         var burn = card.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in burn.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(burn, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19,
             "{T} deals 1 damage to each opponent (CR 119 — damage is life loss)");
@@ -145,7 +145,7 @@ public class ThermoAlchemistFactoryTests
     public void TapBurn_WithoutResolver_NoOps()
     {
         var card = ThermoAlchemistFactory.Create(
-            _alice, triggers: null, opponentResolver: null);
+            _alice, triggers: null);
 
         var burn = card.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var e in burn.Effects) e.Execute();
@@ -175,7 +175,7 @@ public class ThermoAlchemistFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var card = ThermoAlchemistFactory.Create(_alice, triggers, () => AllPlayers);
+        var card = ThermoAlchemistFactory.Create(_alice, triggers);
         card.SetZone(ZoneType.Battlefield);
         card.Tap();
         card.IsTapped.Should().BeTrue("tapped to pay the {T} burn cost");
@@ -197,7 +197,7 @@ public class ThermoAlchemistFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var card = ThermoAlchemistFactory.Create(_alice, triggers, () => AllPlayers);
+        var card = ThermoAlchemistFactory.Create(_alice, triggers);
         card.SetZone(ZoneType.Battlefield);
         card.Tap();
 
@@ -218,7 +218,7 @@ public class ThermoAlchemistFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var card = ThermoAlchemistFactory.Create(_alice, triggers, () => AllPlayers);
+        var card = ThermoAlchemistFactory.Create(_alice, triggers);
         card.SetZone(ZoneType.Battlefield);
         card.Tap();
 
@@ -235,7 +235,7 @@ public class ThermoAlchemistFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var card = ThermoAlchemistFactory.Create(_alice, triggers, () => AllPlayers);
+        var card = ThermoAlchemistFactory.Create(_alice, triggers);
         card.SetZone(ZoneType.Battlefield);
         card.Tap();
 
@@ -252,7 +252,7 @@ public class ThermoAlchemistFactoryTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var card = ThermoAlchemistFactory.Create(_alice, triggers, () => AllPlayers);
+        var card = ThermoAlchemistFactory.Create(_alice, triggers);
         card.SetZone(ZoneType.Battlefield);
         card.Tap();
 

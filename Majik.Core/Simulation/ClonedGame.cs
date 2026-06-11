@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Game;
 using Majik.Core.Players;
 
@@ -26,6 +27,18 @@ public sealed class ClonedGame
     /// Cloned per-turn tally, or null if no live TurnState was provided.
     /// </summary>
     public TurnState? TurnState { get; init; }
+
+    /// <summary>
+    /// Fresh <see cref="ContinuousEffectsService"/> built for this sandbox,
+    /// containing re-registered sim-cloneable effects (e.g.
+    /// <see cref="LordStaticEffect"/>) that were active on the live battlefield.
+    /// Null when the original board had no live CES (no permanent had
+    /// <see cref="Majik.Core.Cards.Permanent.ActiveEffects"/> wired).
+    /// All cloned battlefield permanents have their
+    /// <see cref="Majik.Core.Cards.Permanent.ActiveEffects"/> pointed at this
+    /// service so anthems / lords apply correctly in the search sandbox.
+    /// </summary>
+    public ContinuousEffectsService? Effects { get; init; }
 
     public Player PlayerFor(Player original) => PlayerMap[original];
 }

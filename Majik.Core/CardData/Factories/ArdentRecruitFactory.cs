@@ -205,6 +205,19 @@ public static class ArdentRecruitFactory
             chars.Power += MetalcraftBonus;
             chars.Toughness += MetalcraftBonus;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="MetalcraftSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The controller is read live from clonedSource.Controller (correctly remapped).
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new MetalcraftSelfPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------

@@ -57,7 +57,7 @@ public class AnointedPeacekeeperTests
         peacekeeper.ManaCost.Should().Be("{1}{W}{W}");
         peacekeeper.ManaCostValue.Generic.Should().Be(1);
         peacekeeper.ManaCostValue.White.Should().Be(2);
-        peacekeeper.Power.Should().Be(2);
+        peacekeeper.Power.Should().Be(3);
         peacekeeper.Toughness.Should().Be(3);
         peacekeeper.Owner.Should().BeSameAs(_alice);
         peacekeeper.Controller.Should().BeSameAs(_alice);

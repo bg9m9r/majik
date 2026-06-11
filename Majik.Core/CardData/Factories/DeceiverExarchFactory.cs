@@ -88,7 +88,7 @@ public static class DeceiverExarchFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Cleric });
+            subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);

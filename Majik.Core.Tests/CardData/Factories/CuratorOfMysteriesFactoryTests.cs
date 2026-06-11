@@ -69,7 +69,8 @@ public class CuratorOfMysteriesFactoryTests
     public void CuratorOfMysteries_TriggerSubscribesToCardCycledEvent()
     {
         var card = CuratorOfMysteriesFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         trigger.Condition.Should().BeOfType<EventTriggerCondition<CardCycledEvent>>();
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield,
@@ -85,7 +86,8 @@ public class CuratorOfMysteriesFactoryTests
     public void CuratorOfMysteries_TriggerCondition_DoesNotFire_OnSelfCycle()
     {
         var card = CuratorOfMysteriesFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var selfEvent = new CardCycledEvent(card, _alice);
         trigger.Condition.Matches(selfEvent, trigger).Should().BeFalse(
@@ -96,7 +98,8 @@ public class CuratorOfMysteriesFactoryTests
     public void CuratorOfMysteries_TriggerCondition_DoesNotFire_OnOpponentCycle()
     {
         var card = CuratorOfMysteriesFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var otherCard = new Card("Some Cycler", "");
         var opponentEvent = new CardCycledEvent(otherCard, _bob);
@@ -108,7 +111,8 @@ public class CuratorOfMysteriesFactoryTests
     public void CuratorOfMysteries_TriggerCondition_Fires_OnControllerCyclingAnother()
     {
         var card = CuratorOfMysteriesFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var otherCard = new Card("Some Cycler", "");
         var aliceCyclesOther = new CardCycledEvent(otherCard, _alice);
@@ -133,7 +137,8 @@ public class CuratorOfMysteriesFactoryTests
         }
 
         var card = CuratorOfMysteriesFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         foreach (var effect in trigger.Effects) effect.Execute();
 
@@ -183,5 +188,58 @@ public class CuratorOfMysteriesFactoryTests
         curator.Zone.Should().Be(ZoneType.Graveyard);
         captured.Should().NotBeNull();
         captured!.Card.Should().BeSameAs(curator);
+    }
+
+    // -----------------------------------------------------------------------
+    // Discard leg — CR 603.1 over DiscardedEvent (CR 701.8)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void CuratorOfMysteries_HasSecondTrigger_SubscribingToDiscardedEvent()
+    {
+        var card = CuratorOfMysteriesFactory.Create(_alice);
+        var discardTrigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        discardTrigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+        discardTrigger.TargetRequests.Should().BeEmpty("scry 1 has no targets");
+    }
+
+    [Fact]
+    public void CuratorOfMysteries_DiscardCondition_GatesToControllerAndAnother()
+    {
+        var card = CuratorOfMysteriesFactory.Create(_alice);
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        var other = new Card("Some Card", "");
+        trigger.Condition.Matches(new DiscardedEvent(_alice, other, wasCost: false), trigger)
+            .Should().BeTrue();
+        trigger.Condition.Matches(new DiscardedEvent(_bob, other, wasCost: false), trigger)
+            .Should().BeFalse("'you discard' gate");
+        trigger.Condition.Matches(new DiscardedEvent(_alice, card, wasCost: false), trigger)
+            .Should().BeFalse("'another card' gate");
+    }
+
+    [Fact]
+    public void CuratorOfMysteries_DiscardResolve_ScrysOne_TopToBottomByDefault()
+    {
+        var topCard = new Card("Top", "");
+        var second = new Card("Second", "");
+        foreach (var c in new[] { topCard, second })
+        {
+            c.SetOwner(_alice);
+            _alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        var card = CuratorOfMysteriesFactory.Create(_alice);
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        _alice.Zones.Library.GetCards().First().Should().BeSameAs(second);
+        _alice.Zones.Library.GetCards().Last().Should().BeSameAs(topCard);
     }
 }

@@ -46,7 +46,7 @@ namespace Majik.Core.CardData.Factories;
 public static class ExquisiteBloodFactory
 {
     public const string CardName = "Exquisite Blood";
-    public const string PrintedManaCost = "{4}{B}{B}";
+    public const string PrintedManaCost = "{4}{B}";
 
     /// <summary>
     /// Construct Exquisite Blood. The life-loss trigger is attached to the

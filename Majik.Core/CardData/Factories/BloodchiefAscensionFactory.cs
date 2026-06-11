@@ -75,7 +75,7 @@ namespace Majik.Core.CardData.Factories;
 public static class BloodchiefAscensionFactory
 {
     public const string CardName = "Bloodchief Ascension";
-    public const string PrintedManaCost = "{1}{B}";
+    public const string PrintedManaCost = "{B}";
 
     /// <summary>Quest-counter threshold (CR 121 — printed "three or more").</summary>
     public const int QuestThreshold = 3;

@@ -190,4 +190,14 @@ public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
     // creature row (CR 613.1c) when the paired Layer-4 Creature grant applies,
     // so this set-base lands and the manland's body surfaces through combat
     // math. (A previous no-op override swallowed the P/T — removed.)
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="ManlandCycleBecomesPTEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: NewPower, NewToughness, ExpiresAtEndOfTurn; target → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new ManlandCycleBecomesPTEffect(clonedSource, NewPower, NewToughness);
 }

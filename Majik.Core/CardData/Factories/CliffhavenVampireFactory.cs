@@ -12,12 +12,12 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Cliffhaven Vampire (Battle for Zendikar,
 /// {1}{W}{B}).
 ///
-/// Creature — Vampire Cleric 2/3. Oracle text:
+/// Creature — Vampire Warrior Ally 2/4. Oracle text:
 ///   "Flying
 ///    Whenever you gain life, each opponent loses 1 life."
 ///
 /// ## Implemented (v1)
-/// - 2/3 Creature — Vampire Cleric, mana cost {1}{W}{B}, owner / controller
+/// - 2/4 Creature — Vampire Warrior Ally, mana cost {1}{W}{B}, owner / controller
 ///   wired.
 /// - <b>Flying (CR 702.9)</b>: <see cref="KeywordAbility"/> marker so
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasFlying"/> reads it for
@@ -53,9 +53,9 @@ namespace Majik.Core.CardData.Factories;
 public static class CliffhavenVampireFactory
 {
     public const string CardName = "Cliffhaven Vampire";
-    public const string PrintedManaCost = "{1}{W}{B}";
+    public const string PrintedManaCost = "{2}{W}{B}";
     public const int Power = 2;
-    public const int Toughness = 3;
+    public const int Toughness = 4;
     public const int LifeLossPerOpponent = 1;
 
     /// <summary>
@@ -66,18 +66,18 @@ public static class CliffhavenVampireFactory
     /// tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, opponentResolver: null, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Cliffhaven Vampire. When <paramref name="opponentResolver"/>
-    /// is supplied, the lifegain trigger drains 1 life from every player
-    /// it returns (filtered to non-controller). When <paramref name="triggers"/>
-    /// is supplied, the trigger is registered so a controller-scoped
+    /// Construct Cliffhaven Vampire. When <paramref name="triggers"/> is
+    /// supplied, the trigger is registered so a controller-scoped
     /// <see cref="LifeChangedEvent"/> places it on the stack automatically.
+    /// "Each opponent" is read from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so the drain is correct on the
+    /// production routed build.
     /// </summary>
     public static Creature Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? opponentResolver,
         IEventBus? eventBus,
         TriggerManager? triggers)
     {
@@ -88,7 +88,7 @@ public static class CliffhavenVampireFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Cleric });
+            subtypes: new[] { CardSubtype.Vampire, CardSubtype.Warrior, CardSubtype.Ally });
 
         card.SetOwner(owner);
         card.SetController(owner);
@@ -110,16 +110,18 @@ public static class CliffhavenVampireFactory
         // ----------------------------------------------------------------
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses {LifeLossPerOpponent} life",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the drain INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opp == null) continue;
-                    if (ReferenceEquals(opp, owner)) continue;
                     opp.LoseLife(LifeLossPerOpponent);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var lifegainTrigger = new TriggeredAbility(

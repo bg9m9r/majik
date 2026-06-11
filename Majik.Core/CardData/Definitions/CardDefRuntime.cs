@@ -1406,13 +1406,18 @@ public static class CardDefRuntime
 
     private static IEffect BuildConniveSelfEffect(ConniveSelfEffectDef def, ICard card)
     {
+        // STAGE 3 (re-sourceable abilities) — "this creature connives" resolves
+        // its subject off ResolutionContext.Source (CR 113.7) so the SAME effect
+        // connives the BEARER when re-homed by Agatha's grant. Falls back to the
+        // captured card on the normal / legacy-null-context paths.
         var amount = def.Amount;
         return new Effect(
             $"{card.Name}: connive x{amount}",
-            () =>
+            ctx =>
             {
-                if (card is not Creature creature) return;
-                Fx.Connive(creature, amount);
+                var creature = (ctx.Source as Creature) ?? (card as Creature);
+                if (creature != null) Fx.Connive(creature, amount);
+                return ValueTask.CompletedTask;
             });
     }
 
@@ -1430,9 +1435,11 @@ public static class CardDefRuntime
         // body connive_self runs — the agent-driven discard sink + CountersService
         // counter placement — so the targeted verb is pure schema wiring.
         var amount = def.Amount;
+        var amountSource = def.AmountSource;
         var filter = def.TargetFilter;
+        var label = amountSource is null ? amount.ToString() : $"X ({amountSource})";
         return new Effect(
-            $"{card.Name}: target {filter} connives {amount}",
+            $"{card.Name}: target {filter} connives {label}",
             ctx =>
             {
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
@@ -1440,10 +1447,36 @@ public static class CardDefRuntime
                     && target.Zone == ZoneType.Battlefield
                     && TargetFilters.Matches(filter, target))
                 {
-                    Fx.Connive(target, amount);
+                    // CR 700.6 — dynamic-X connive reads the live per-turn count
+                    // off the resolving GameContext.TurnState (Task 3.1 exposed
+                    // it) instead of the fixed def.Amount. A null source ⇒ the
+                    // fixed amount; an unknown / unavailable count ⇒ 0 (Fx.Connive
+                    // no-ops on amount <= 0).
+                    var x = ResolveConniveAmount(amountSource, amount, ctx);
+                    Fx.Connive(target, x);
                 }
                 return ValueTask.CompletedTask;
             });
+    }
+
+    /// <summary>
+    /// Resolve a connive count. When <paramref name="amountSource"/> is null the
+    /// fixed <paramref name="fixedAmount"/> wins. Otherwise read the live per-turn
+    /// tally off <c>ctx.Game.TurnState</c> (CR 700.6). Unknown source name or no
+    /// live TurnState ⇒ 0 (a clean no-op).
+    /// </summary>
+    private static int ResolveConniveAmount(
+        string? amountSource, int fixedAmount, ResolutionContext ctx)
+    {
+        if (amountSource is null) return fixedAmount;
+        var ts = ctx.Game?.TurnState;
+        if (ts is null) return 0;
+        return amountSource switch
+        {
+            "creatures_died_this_turn" => ts.CreaturesDiedThisTurn,
+            "attackers_this_turn" => ts.AttackersDeclaredThisTurn,
+            _ => 0,
+        };
     }
 
     private static IEffect BuildAmassSelfEffect(AmassSelfEffectDef def, ICard card, Player controller)
@@ -1698,15 +1731,59 @@ public static class CardDefRuntime
     private static IEffect BuildMillThenPickEffect(
         MillThenPickFirstMatchingToHandEffectDef def, ICard card, Player controller)
     {
+        // CR 116.1b — "mill N. You MAY put a matching card from among the
+        // milled cards into your hand." The pick is a genuine player choice,
+        // not an auto-pick: mill, then PROMPT the controller's agent to choose
+        // zero-or-one of the milled matching cards. Reuses the existing
+        // reveal-and-choose prompt (IPlayerAgent.ChooseFromRevealedAsync /
+        // ChooseFromRevealedCommand) so the portal renders it with no contract
+        // change — the milled cards are the "revealed" pile, the matching
+        // subset is "eligible", optional: true models the "may" opt-out.
+        //
+        // No agent (bot self-play / agentless harness): fall back to the
+        // deterministic legacy default — auto-pick the first matching milled
+        // card — so existing no-agent callers stay behaviour-preserving.
         var amount = def.Amount;
         var types = def.MatchingTypes.Select(ParseType).ToArray();
         return new Effect(
-            $"{card.Name}: mill {amount}, pick first matching",
-            () =>
+            $"{card.Name}: mill {amount}, may put one matching milled card into hand",
+            async ctx =>
             {
                 var milled = Fx.Mill(controller, amount);
-                if (types.Length == 0) return;
-                var pick = milled.FirstOrDefault(c => types.Any(t => c.HasType(t)));
+                if (types.Length == 0 || milled.Count == 0) return;
+
+                var eligible = milled
+                    .Where(c => types.Any(t => c.HasType(t)))
+                    .ToList();
+
+                ICard? pick;
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
+                if (agent != null)
+                {
+                    // Genuinely prompt — even with empty eligible so the player
+                    // sees the milled pile (mirrors RevealAndChoose's UX).
+                    pick = await agent.ChooseFromRevealedAsync(
+                        ctx: ctx.Game,
+                        revealed: milled,
+                        eligible: eligible,
+                        optional: true,
+                        label: $"{card.Name}: put a card into your hand",
+                        ct: ctx.Ct).ConfigureAwait(false);
+
+                    // Defensive: coerce any out-of-set pick (custom agents) to
+                    // a decline so we never pull a non-milled / non-matching
+                    // card into hand.
+                    if (pick != null && !eligible.Contains(pick))
+                    {
+                        pick = null;
+                    }
+                }
+                else
+                {
+                    // No agent — deterministic fallback (first matching).
+                    pick = eligible.Count > 0 ? eligible[0] : null;
+                }
+
                 if (pick != null)
                 {
                     controller.Zones.Graveyard.RemoveCard(pick);
@@ -1841,16 +1918,21 @@ public static class CardDefRuntime
         // ability was put on the stack carries, CR 701.40a). This is the
         // declarative form of the shared ExploreEtb body (PR #2237) — the SAME
         // ExploreAction primitive Seekers' Squire / Merfolk Branchwalker run.
+        // STAGE 3 (re-sourceable abilities) — the exploring permanent is read
+        // off ResolutionContext.Source (CR 113.7), so a re-homed activated
+        // explore (Agatha's grant) explores the BEARER. Falls back to the
+        // captured card on the normal / legacy-null-context paths.
         var count = Math.Max(1, def.Count);
         return new Effect(
             count == 1 ? $"{card.Name}: explores" : $"{card.Name}: explores {count}x",
             async ctx =>
             {
-                var explorerController = (card as Permanent)?.Controller ?? controller;
+                var explorer = (ctx.Source as ICard) ?? card;
+                var explorerController = (explorer as Permanent)?.Controller ?? controller;
                 for (var i = 0; i < count; i++)
                 {
                     await Majik.Core.Keywords.ExploreAction.ExploreAsync(
-                        creature: card,
+                        creature: explorer,
                         controller: explorerController,
                         agent: ctx.Agent ?? AgentRegistry.Get(explorerController),
                         game: ctx.Game,
@@ -1947,19 +2029,28 @@ public static class CardDefRuntime
         // at the cleanup step and stacks additively per activation (CR 611.2c).
         // Source not a battlefield creature / ActiveEffects null (pure-shape
         // test path) → silent no-op, mirroring BuildPumpTargetEffect.
+        //
+        // STAGE 3 (re-sourceable abilities) — "this creature" resolves off the
+        // live ResolutionContext.Source (CR 113.7) rather than the captured
+        // authoring card, so the SAME effect object pumps the BEARER when this
+        // ability is re-homed by Agatha's Soul Cauldron's RebindTo grant. On the
+        // normal battlefield path Source IS the card, so behaviour is unchanged;
+        // the legacy null-context path (Effect.Execute) falls back to the card.
         var p = def.Power;
         var t = def.Toughness;
         return new Effect(
             $"{card.Name}: gets {(p < 0 ? "" : "+")}{p}/{(t < 0 ? "" : "+")}{t} until EOT",
-            () =>
+            ctx =>
             {
-                if (card is Creature creature
-                    && creature.Zone == ZoneType.Battlefield
-                    && creature.ActiveEffects != null)
+                var subject = (ctx.Source as Creature) ?? (card as Creature);
+                if (subject != null
+                    && subject.Zone == ZoneType.Battlefield
+                    && subject.ActiveEffects != null)
                 {
-                    creature.ActiveEffects.Register(
-                        new PumpUntilEndOfTurnEffect(creature, p, t));
+                    subject.ActiveEffects.Register(
+                        new PumpUntilEndOfTurnEffect(subject, p, t));
                 }
+                return ValueTask.CompletedTask;
             });
     }
 

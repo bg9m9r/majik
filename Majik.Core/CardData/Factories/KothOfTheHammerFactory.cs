@@ -4,6 +4,8 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Factories;
@@ -122,46 +124,67 @@ public static class KothOfTheHammerFactory
         // -- +1: Untap target Mountain. It becomes a 4/4 red Elemental creature
         //    until end of turn. It's still a land. ----------------------------
         // CR 606 (loyalty) + CR 701.20 (untap) + CR 613.1c (animate, "still a
-        // land") + CR 613.1e (colour). v1 picks the first battlefield Mountain
-        // from the resolver (no agent target prompt yet — see class xmldoc).
-        koth.AddAbility(new LoyaltyAbility(koth, Plus1Loyalty, () =>
-        {
-            var candidates = targetMountainResolver?.Invoke();
-            if (candidates == null) return;
+        // land") + CR 613.1e (colour). The Mountain is a real target chosen by
+        // the activating player's agent: a TargetRequest is declared so the
+        // dispatch path prompts for it and the effect reads the chosen Mountain
+        // off the ResolutionContext (slot 0) — falling back to the resolver on
+        // the legacy direct-activation path.
+        var mountainRequest = new TargetRequest(
+            Description: "Untap target Mountain",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.None,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Land>()
+                .Where(l => l.HasSubtype(CardSubtype.Mountain))
+                .Cast<object>()
+                .ToList());
 
-            foreach (var mountain in candidates)
+        koth.AddAbility(new LoyaltyAbility(
+            koth,
+            Plus1Loyalty,
+            new[]
             {
-                if (mountain == null) continue;
-                if (mountain.Zone != Majik.Core.Zones.ZoneType.Battlefield) continue;
-
-                // Untap target Mountain (CR 701.20a — no-op if already untapped).
-                if (mountain.IsTapped) mountain.Untap();
-
-                // Animate to a 4/4 red Elemental until EOT (CR 613). Printed
-                // Land type stays ("It's still a land").
-                if (continuousEffects != null)
+                Fx.Inline("Untap target Mountain; it becomes a 4/4 red Elemental creature until end of turn (it's still a land)", rc =>
                 {
-                    // Layer 4 — add Creature type + Elemental subtype.
-                    continuousEffects.Register(new ManlandCycleAnimateEffect(
-                        mountain,
-                        keywords: Array.Empty<string>(),
-                        subtypes: new[] { CardSubtype.Elemental },
-                        extraTypes: null));
+                    var mountain = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Land
+                        : null)
+                        ?? targetMountainResolver?.Invoke()?.FirstOrDefault();
+                    if (mountain == null) return default;
+                    if (mountain.Zone != Majik.Core.Zones.ZoneType.Battlefield) return default;
 
-                    // Layer 5 — set colour to red (CR 613.1e).
-                    continuousEffects.Register(new SetColorsEffect(
-                        mountain,
-                        scope: p => ReferenceEquals(p, mountain),
-                        colors: new[] { ManaColor.Red }));
+                    // Untap target Mountain (CR 701.20a — no-op if already untapped).
+                    if (mountain.IsTapped) mountain.Untap();
 
-                    // Layer 7b — set base P/T to 4/4 (CR 613.7b).
-                    continuousEffects.Register(new ManlandCycleBecomesPTEffect(
-                        mountain, AnimatedPower, AnimatedToughness));
-                }
+                    // Animate to a 4/4 red Elemental until EOT (CR 613). Printed
+                    // Land type stays ("It's still a land").
+                    if (continuousEffects != null)
+                    {
+                        // Layer 4 — add Creature type + Elemental subtype.
+                        continuousEffects.Register(new ManlandCycleAnimateEffect(
+                            mountain,
+                            keywords: Array.Empty<string>(),
+                            subtypes: new[] { CardSubtype.Elemental },
+                            extraTypes: null));
 
-                return; // "target Mountain" — a single permanent.
-            }
-        }));
+                        // Layer 5 — set colour to red (CR 613.1e).
+                        continuousEffects.Register(new SetColorsEffect(
+                            mountain,
+                            scope: p => ReferenceEquals(p, mountain),
+                            colors: new[] { ManaColor.Red }));
+
+                        // Layer 7b — set base P/T to 4/4 (CR 613.7b).
+                        continuousEffects.Register(new ManlandCycleBecomesPTEffect(
+                            mountain, AnimatedPower, AnimatedToughness));
+                    }
+
+                    return default;
+                }),
+            },
+            targetRequests: new[] { mountainRequest }));
 
         // -- −2: Add {R} for each Mountain you control. -------------------------
         // CR 606 (loyalty) + CR 106.4 (mana into the controller's pool) +

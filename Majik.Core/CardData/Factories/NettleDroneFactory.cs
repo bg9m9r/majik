@@ -97,20 +97,20 @@ public static class NettleDroneFactory
     /// dispatches to.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, opponentResolver: null);
+        => Create(owner, triggers: null);
 
     /// <summary>
-    /// Construct a fully-wired Nettle Drone.
+    /// Construct a fully-wired Nettle Drone. The tap-burn ability reads "each
+    /// opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Trigger manager for registration. May be null
     /// — the untap trigger attaches structurally but isn't enrolled.</param>
-    /// <param name="opponentResolver">Live enumerator of "each opponent" for
-    /// the tap-burn ability. Without a resolver the burn half no-ops.</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -136,16 +136,18 @@ public static class NettleDroneFactory
         // ----------------------------------------------------------------
         var burnEffect = new Effect(
             $"{CardName}: deal {TapBurnAmount} damage to each opponent",
-            () =>
+            ctx =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
-
-                foreach (var opp in opponents)
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the burn INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
+                var controller = card.Controller ?? owner;
+                foreach (var opp in ContextOpponents.Of(ctx, controller))
                 {
-                    if (ReferenceEquals(opp, owner)) continue;
                     Fx.DealDamageAny(opp, TapBurnAmount);
                 }
+                return ValueTask.CompletedTask;
             });
 
         var burnAbility = new ActivatedAbility(

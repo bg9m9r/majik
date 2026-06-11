@@ -70,6 +70,35 @@ public class TriggerManagerAgentOrderingTests
         _stack.Pop().Should().BeSameAs(aliceTrig);
     }
 
+    [Fact]
+    public async Task DrainAsync_SingleTrigger_DoesNotPromptAgentForOrder()
+    {
+        // CR 603.3b — a player orders triggers ONLY when two or more of their
+        // triggered abilities are put on the stack at the same time. A SINGLE
+        // trigger must skip OrderTriggersAsync entirely. Regression for the
+        // live-play wedge: a played surveil land's lone ETB trigger fired an
+        // OrderTriggersCommand prompt for one trigger that the portal couldn't
+        // answer, so the surveil never resolved and the player's PassPriority
+        // was rejected. The ScriptedAgent THROWS if OrderTriggersAsync is
+        // called without a queued order, so this asserts it is never invoked.
+        var solo = MakeTrigger(_alice);
+        Fire(solo);
+
+        var agent = new ScriptedAgent(); // no queued trigger order on purpose
+        var agents = new Dictionary<Player, IPlayerAgent>
+        {
+            [_alice] = agent,
+            [_bob] = new DeterministicBotAgent(),
+        };
+
+        var act = async () =>
+            await _triggers.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        await act.Should().NotThrowAsync(
+            "a single trigger must not prompt the agent to order it (CR 603.3b)");
+        _stack.Pop().Should().BeSameAs(solo, "the lone trigger goes straight on the stack");
+    }
+
     private TriggeredAbility MakeTrigger(Player controller)
     {
         var src = new Creature($"S-{Guid.NewGuid()}", "1G", 2, 2)

@@ -12,9 +12,9 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for World Breaker (Battle for Zendikar, {5}{G}).
+/// Named-card factory for World Breaker (Battle for Zendikar, {6}{G}).
 ///
-/// Creature — Eldrazi 5/5. Oracle text (Scryfall, verified):
+/// Creature — Eldrazi 5/7. Oracle text (Scryfall, verified):
 ///   "Reach
 ///    When this creature enters, exile target nonbasic land.
 ///    Whenever this creature attacks, exile target permanent that's one
@@ -23,7 +23,7 @@ namespace Majik.Core.CardData.Factories;
 ///        owner's hand."
 ///
 /// ## Implemented (v1)
-/// - 5/5 Creature — Eldrazi at {5}{G}.
+/// - 5/7 Creature — Eldrazi at {6}{G}.
 /// - <b>Reach (CR 702.17)</b>: <see cref="KeywordAbility"/> marker —
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasReach"/> reads via
 ///   the same shape Endurance / Kraul Harpooner / Wrenn and Six use.
@@ -70,10 +70,10 @@ namespace Majik.Core.CardData.Factories;
 public static class WorldBreakerFactory
 {
     public const string CardName = "World Breaker";
-    public const string PrintedManaCost = "{5}{G}";
+    public const string PrintedManaCost = "{6}{G}";
     public const string GraveyardReturnManaCost = "{G}";
     public const int Power = 5;
-    public const int Toughness = 5;
+    public const int Toughness = 7;
 
     /// <summary>
     /// Construct World Breaker with no live wiring. ETB + attack triggers

@@ -40,7 +40,7 @@ public class WorshipTests
         var c = WorshipFactory.Create(_alice);
 
         c.Name.Should().Be("Worship");
-        c.ManaCost.Should().Be("{2}{W}");
+        c.ManaCost.Should().Be("{3}{W}");
         c.HasType(CardType.Enchantment).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
@@ -54,7 +54,7 @@ public class WorshipTests
         card.Should().BeOfType<Enchantment>();
         card.Name.Should().Be("Worship");
         card.HasType(CardType.Enchantment).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{W}");
+        card.ManaCost.Should().Be("{3}{W}");
     }
 
     // -------- Replacement: caps lethal damage to controller --------------

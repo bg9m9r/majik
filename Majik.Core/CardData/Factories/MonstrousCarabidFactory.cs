@@ -11,12 +11,12 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Monstrous Carabid (Onslaught, {4}{B}).
 ///
-/// Creature — Insect 4/1. Oracle text (Scryfall):
+/// Creature — Insect 4/4. Oracle text (Scryfall):
 ///   "Cycling {2} ({2}, Discard this card: Draw a card.)"
 ///
 /// ## Implemented (v1)
 ///
-/// - <b>Creature — Insect {4}{B} 4/1</b>. Plain-vanilla Onslaught
+/// - <b>Creature — Insect {4}{B} 4/4</b>. Plain-vanilla Onslaught
 ///   "cycler with stats", printed almost exclusively to be discarded
 ///   for a card and reanimated by Living End / Hypnox / Mind's Desire
 ///   style payoffs. Same shape role as Twisted Abomination + Krosan
@@ -51,7 +51,7 @@ public static class MonstrousCarabidFactory
     public const string CardName = "Monstrous Carabid";
     public const string PrintedManaCost = "{4}{B}";
     public const int Power = 4;
-    public const int Toughness = 1;
+    public const int Toughness = 4;
     public const string CyclingCost = "{2}";
 
     /// <summary>

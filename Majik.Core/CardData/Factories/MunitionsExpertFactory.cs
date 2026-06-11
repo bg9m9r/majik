@@ -12,12 +12,12 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Munitions Expert (Mercadian Masques, {R}).
 ///
-/// Creature — Goblin Warrior 1/1. Oracle text:
+/// Creature — Goblin 1/1. Oracle text:
 ///   "When Munitions Expert enters, you may have it deal X damage to any
 ///    target, where X is the number of Goblins you control."
 ///
 /// ## Implemented (v1)
-/// - 1/1 Creature — Goblin Warrior, mana cost {R}, owner/controller wired.
+/// - 1/1 Creature — Goblin, mana cost {B}{R}, owner/controller wired.
 /// - <b>ETB triggered ability (CR 603.6a)</b>: declares one 1..1 "any
 ///   target" <see cref="TargetRequest"/> — same shape as Murderous Redcap /
 ///   Pyrite Spellbomb. On resolution the effect:
@@ -68,7 +68,7 @@ namespace Majik.Core.CardData.Factories;
 public static class MunitionsExpertFactory
 {
     public const string CardName = "Munitions Expert";
-    public const string PrintedManaCost = "{R}";
+    public const string PrintedManaCost = "{B}{R}";
     public const int Power = 1;
     public const int Toughness = 1;
 
@@ -88,7 +88,7 @@ public static class MunitionsExpertFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Goblin, CardSubtype.Warrior });
+            subtypes: new[] { CardSubtype.Goblin });
 
         card.SetOwner(owner);
         card.SetController(owner);

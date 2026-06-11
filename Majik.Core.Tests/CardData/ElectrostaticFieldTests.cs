@@ -123,7 +123,7 @@ public class ElectrostaticFieldTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ef = ElectrostaticFieldFactory.Create(_alice, triggers, () => AllPlayers);
+        var ef = ElectrostaticFieldFactory.Create(_alice, triggers);
         ef.SetZone(ZoneType.Battlefield);
 
         _bob.LifeTotal.Should().Be(20);
@@ -132,7 +132,7 @@ public class ElectrostaticFieldTests
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
         _alice.LifeTotal.Should().Be(20);
@@ -149,14 +149,14 @@ public class ElectrostaticFieldTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ef = ElectrostaticFieldFactory.Create(_alice, triggers, () => AllPlayers);
+        var ef = ElectrostaticFieldFactory.Create(_alice, triggers);
         ef.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewSorcerySpell(_alice, "Lava Spike")));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
     }
@@ -172,7 +172,7 @@ public class ElectrostaticFieldTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ef = ElectrostaticFieldFactory.Create(_alice, triggers, () => AllPlayers);
+        var ef = ElectrostaticFieldFactory.Create(_alice, triggers);
         ef.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewArtifactSpell(_alice, "Mishra's Bauble")));
@@ -192,7 +192,7 @@ public class ElectrostaticFieldTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ef = ElectrostaticFieldFactory.Create(_alice, triggers, () => AllPlayers);
+        var ef = ElectrostaticFieldFactory.Create(_alice, triggers);
         ef.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewCreatureSpell(_alice, "Grizzly Bears")));
@@ -212,7 +212,7 @@ public class ElectrostaticFieldTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
-        var ef = ElectrostaticFieldFactory.Create(_alice, triggers, () => AllPlayers);
+        var ef = ElectrostaticFieldFactory.Create(_alice, triggers);
         ef.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_bob, "Bob's Bolt")));

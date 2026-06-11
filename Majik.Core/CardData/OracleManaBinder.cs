@@ -46,6 +46,113 @@ public static class OracleManaBinder
         @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+color",
         RegexOptions.IgnoreCase);
 
+    // {T}, Pay 1 life: Add {U} or {R}.  — Modern Horizons "Horizon Canopy"
+    // painless-dual cycle (Fiery Islet, Sunbaked Canyon, Silent Clearing,
+    // Nurturing Peatland, Waterlogged Grove, Horizon Canopy). The cost prefix
+    // is "{T}, Pay 1 life:" rather than a bare "{T}:", so the standard
+    // tap-for-mana regexes never match it. Each colour is bound as a separate
+    // pay-life ManaAbility (life-floor gate, CR 119.4) via HorizonLandBinder.
+    private static readonly Regex PayLifeDualManaRegex = new(
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*:\s*Add\s+(\{[WUBRGC]\})\s*or\s+(\{[WUBRGC]\})",
+        RegexOptions.IgnoreCase);
+
+    // {T}, Pay 1 life: Add one mana of any color.  — Mana Confluence
+    // (Journey into Nyx). The any-colour sibling of the Horizon Canopy
+    // pay-life dual above: the cost prefix is "{T}, Pay 1 life:" (NOT a bare
+    // {T}), so neither TapForAnyColorRegex nor the dual pay-life regex match
+    // it. Binds five pay-life ManaAbility options (one per WUBRG). The
+    // life-floor gate is the precise CR 119.4 reading — payable at exactly
+    // 1 life (drops to 0), NOT the stricter "> 1" HorizonLandBinder gate.
+    private static readonly Regex PayLifeAnyColorRegex = new(
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*:\s*Add\s+one\s+mana\s+of\s+any\s+color",
+        RegexOptions.IgnoreCase);
+
+    // {T}, Remove a mining counter from this land: Add one mana of any color.
+    // If there are no mining counters on this land, sacrifice it.
+    //   — Gemstone Mine (Weatherlight + reprints). The cost prefix is
+    // "{T}, Remove a mining counter from this land:" (NOT a bare {T}), so the
+    // bare TapForAnyColorRegex never matches this line — there is no risk of a
+    // free any-colour ability slipping in. Binds five counter-cost ManaAbility
+    // options (one per WUBRG); each removes a mining counter as part of the
+    // activation cost (CR 119.4 — the cost must be payable) and, when the last
+    // counter is gone, sacrifices the land (CR 701.16). The "enters with three
+    // mining counters" rider is wired as an ETB trigger (see BindGemstoneMine)
+    // because EntersWithCountersReplacement only models +1/+1 counters today.
+    private static readonly Regex GemstoneMineCounterManaRegex = new(
+        @"\{T\}\s*,\s*Remove\s+a\s+mining\s+counter\s+from\s+this\s+land\s*:\s*"
+        + @"Add\s+one\s+mana\s+of\s+any\s+color",
+        RegexOptions.IgnoreCase);
+
+    // "This land enters with three mining counters on it." — Gemstone Mine's
+    // ETB rider. Parameterised on the count word so a future variant reads
+    // cleanly; today only "three" ships.
+    private static readonly Regex EntersWithMiningCountersRegex = new(
+        @"enters\s+with\s+(?<n>a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)"
+        + @"\s+mining\s+counters?\s+on\s+it",
+        RegexOptions.IgnoreCase);
+
+    // "{T}: Add one mana of any type that a land you control could produce."
+    //   — Reflecting Pool (Tempest). The set of producible mana types is NOT
+    // fixed — it is recomputed at every legality check from the lands the
+    // controller currently controls. Modelled as six fixed-type ManaAbility
+    // instances (WUBRG + {C}), each gated so it is legal ONLY while some OTHER
+    // land the controller controls could produce that type (CR 605.1a). Lands
+    // are never routed through their [CardName] factory, so this binder is the
+    // ONLY prod binding path — it ports the (test-only) ReflectingPoolFactory
+    // logic verbatim. A "type" is one of W/U/B/R/G plus colorless (CR 107.4c).
+    private static readonly Regex ReflectingPoolManaRegex = new(
+        @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+type\s+that\s+a\s+land\s+you\s+control\s+could\s+produce",
+        RegexOptions.IgnoreCase);
+
+    // "{T}, Pay 2 life: Add {C}." — Boseiju, Who Shelters All (Champions of
+    // Kamigawa). A {C}-producing mana ability with an additional "lose 2 life"
+    // activation cost (CR 605.1a / 119.4). The "spent on an instant/sorcery →
+    // can't be countered" rider is DEFERRED (needs per-slot mana provenance +
+    // a cast-time uncounterable flag — same deferral as Cavern of Souls). The
+    // pay-life cost prefix is "{T}, Pay 2 life:" (NOT a bare {T}), so the bare
+    // tap-for-mana regexes never match it. Ports BoseijuWhoSheltersAllFactory.
+    private static readonly Regex PayTwoLifeColorlessManaRegex = new(
+        @"\{T\}\s*,\s*Pay\s+2\s+life\s*:\s*Add\s+\{C\}",
+        RegexOptions.IgnoreCase);
+
+    // "{T}: Add one mana of the chosen color." — Sunken Citadel /
+    // Temple of the Dragon Queen "as it enters, choose a color" cycle. There
+    // is no agent colour-choice surface in the binder layer yet (deferred
+    // engine-wide — same posture as Sejiri Steppe / Crumbling Vestige), so the
+    // faithful-but-pragmatic modelling is five fixed-type ManaAbility instances
+    // (one per WUBRG), exactly like the any-colour lands (Glimmervoid / Mox
+    // Opal) — the bot taps for whichever colour it needs. This is strictly
+    // MORE permissive than the printed single-chosen-colour card; the precise
+    // choose-a-color restriction unlocks when the agent colour-choice surface
+    // lands. Ports the colour-bearing half of SunkenCitadelFactory /
+    // TempleOfTheDragonQueenFactory.
+    private static readonly Regex ChosenColorOneManaRegex = new(
+        @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+the\s+chosen\s+color",
+        RegexOptions.IgnoreCase);
+
+    // "{T}: Add two mana of the chosen color. Spend this mana only to activate
+    // abilities of land sources." — Sunken Citadel's restricted double-mana
+    // ability (CR 605.1a / 106.4). Five fixed-type double-pip ManaAbility
+    // instances (one per WUBRG), each stamped with a land-ability-only
+    // SpendRestriction. Payment-gate enforcement of the restriction is DEFERRED
+    // (ManaPool stores bucketed colour counts, no per-slot tags yet — same
+    // deferral as Eldrazi Temple); the rider is observational metadata today.
+    private static readonly Regex ChosenColorTwoManaLandAbilityRegex = new(
+        @"\{T\}\s*:\s*Add\s+two\s+mana\s+of\s+the\s+chosen\s+color\.\s*Spend\s+this\s+mana\s+only\s+to\s+activate\s+abilities\s+of\s+land\s+sources",
+        RegexOptions.IgnoreCase);
+
+    // CR 106.4 — Sunken Citadel's "Spend this mana only to activate abilities
+    // of land sources." The SpendRestriction predicate is spell-side only
+    // (Func<ISpell,bool>); this mana can never pay a spell pip, so it denies
+    // every spell. Shared instance keeps the rider structurally stable
+    // (SpendRestriction equality is by-reference).
+    private static readonly Majik.Core.Mana.SpendRestriction SunkenCitadelLandAbilitiesOnly =
+        new("land source ability", _ => false);
+
+    // The five colours plus colorless — the complete set of mana "types" a
+    // Reflecting Pool can ever reflect (CR 107.4c / 106.1b).
+    private static readonly string[] ReflectingPoolManaTypes = { "W", "U", "B", "R", "G", "C" };
+
     /// <summary>
     /// Attaches the correct <see cref="ManaAbility"/> to a basic land that
     /// already has its controller set. Idempotent — if the card is not a
@@ -68,6 +175,63 @@ public static class OracleManaBinder
         TryBindFromOracle(card, entity, controller);
     }
 
+    /// <summary>
+    /// Parse the "{T}: Add …" mana-ability clauses out of <paramref name="oracleText"/>
+    /// and return one <see cref="ManaCost"/> per <see cref="ManaAbility"/> that
+    /// <see cref="Bind"/> would attach — WITHOUT mutating any card. The same
+    /// regexes drive both methods, so a card's printed mana abilities and this
+    /// list stay in lock-step.
+    ///
+    /// <para>This is the card-identity-agnostic core that makes a "{T}: Add {C}"
+    /// mana ability RE-HOMABLE to an arbitrary source: a caller can take the
+    /// returned costs and build fresh <see cref="ManaAbility"/> instances homed
+    /// to any permanent (CR 605.1a). The canonical consumer is Agatha's Soul
+    /// Cauldron's ability-grant static — it grants each imprinted creature card's
+    /// mana abilities to the bearer by re-running this parse against the imprinted
+    /// card's oracle text and constructing mana abilities sourced on the bearer.
+    /// Only the {T}-cost mana clauses are returned; non-mana activated abilities
+    /// (e.g. "{2}: this gets +1/+1") are not produced by this binder at all.</para>
+    /// </summary>
+    /// <returns>One <see cref="ManaCost"/> per mana ability the oracle text
+    /// implies (an any-colour clause expands to five single-colour costs; a modal
+    /// "Add {R} or {W}" to one per option). Empty when the text has no
+    /// {T}-cost mana clause.</returns>
+    public static IReadOnlyList<ManaCost> ParseTapManaCosts(string? oracleText)
+    {
+        var result = new List<ManaCost>();
+        if (string.IsNullOrWhiteSpace(oracleText)) return result;
+
+        // Any-colour mana sources (Mox Opal, City of Brass, command tower).
+        if (TapForAnyColorRegex.IsMatch(oracleText))
+        {
+            foreach (var color in new[] { "W", "U", "B", "R", "G" })
+                result.Add(ManaCost.Parse(color));
+            return result;
+        }
+
+        // Dual / triple colour modal — one ManaCost per option.
+        foreach (Match m in TapForModalManaRegex.Matches(oracleText))
+        {
+            for (var i = 1; i <= 3; i++)
+            {
+                if (!m.Groups[i].Success) continue;
+                var raw = m.Groups[i].Value.Replace("{", "").Replace("}", "");
+                result.Add(ManaCost.Parse(raw));
+            }
+            return result; // matched a modal — don't double-add via the non-modal regex
+        }
+
+        foreach (Match m in TapForManaRegex.Matches(oracleText))
+        {
+            var symbols = m.Groups[1].Value;
+            var stripped = symbols.Replace("{", "").Replace("}", "").Replace(" ", "");
+            if (string.IsNullOrEmpty(stripped)) continue;
+            result.Add(ManaCost.Parse(stripped));
+        }
+
+        return result;
+    }
+
     private static bool TryBindBasicLand(ICard card, Player controller)
     {
         if (!card.HasSupertype(CardSupertype.Basic)) return false;
@@ -88,37 +252,297 @@ public static class OracleManaBinder
         var text = entity.OracleText;
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        // Any-colour mana sources (Mox Opal, City of Brass, command tower).
-        if (TapForAnyColorRegex.IsMatch(text))
+        // Horizon Canopy painless-dual cycle: "{T}, Pay 1 life: Add {A} or {B}."
+        // Checked before the bare-{T} regexes because the pay-life prefix is a
+        // distinct (richer) activation cost — NOT a bare {T} mana ability, so it
+        // is intentionally out of scope for ParseTapManaCosts (which only knows
+        // the source-agnostic {T}-cost mana clauses). Each colour binds as its
+        // own pay-life ManaAbility (CR 119.4 life-floor gate). Only Land cards
+        // carry this shape, so it's a no-op on non-lands.
+        if (card is Land payLifeLand)
+        {
+            // Reflecting Pool — six dynamic-output mana abilities (WUBRG + {C}),
+            // each gated on some OTHER land the controller controls being able
+            // to produce that type (recomputed every legality check). Ports the
+            // test-only ReflectingPoolFactory into the prod binder path.
+            if (ReflectingPoolManaRegex.IsMatch(text))
+            {
+                BindReflectingPool(payLifeLand, controller);
+                return;
+            }
+
+            // Boseiju, Who Shelters All — "{T}, Pay 2 life: Add {C}." A {C}
+            // mana ability with a lose-2-life additional cost (CR 605.1a /
+            // 119.4). The uncounterable rider is deferred (provenance infra).
+            if (PayTwoLifeColorlessManaRegex.IsMatch(text))
+            {
+                payLifeLand.AddAbility(new ManaAbility(
+                    source: payLifeLand,
+                    controller: controller,
+                    manaGenerated: ManaCost.Parse("C"),
+                    canActivateCheck: () =>
+                    {
+                        if (payLifeLand.IsTapped) return false;
+                        var c = payLifeLand.Controller ?? controller;
+                        return c.LifeTotal > 2;
+                    },
+                    additionalCostPayer: p => p.LoseLife(2)));
+                return;
+            }
+
+            // Sunken Citadel / Temple of the Dragon Queen — "{T}: Add one mana
+            // of the chosen color" (+ Sunken Citadel's restricted double-mana
+            // ability). No agent colour-choice surface in the binder yet, so
+            // five WUBRG instances are bound (bot taps for the colour it needs)
+            // — the precise single-chosen-colour gate is deferred. The
+            // double-mana clause additionally stamps a land-ability-only
+            // SpendRestriction (payment-gate enforcement deferred).
+            if (ChosenColorOneManaRegex.IsMatch(text))
+            {
+                BindChosenColorLand(payLifeLand, text, controller);
+                return;
+            }
+
+            var payLife = PayLifeDualManaRegex.Match(text);
+            if (payLife.Success)
+            {
+                var colorA = payLife.Groups[1].Value.Replace("{", "").Replace("}", "");
+                var colorB = payLife.Groups[2].Value.Replace("{", "").Replace("}", "");
+                HorizonLandBinder.AttachPayLifeMana(payLifeLand, controller, colorA);
+                HorizonLandBinder.AttachPayLifeMana(payLifeLand, controller, colorB);
+                return;
+            }
+
+            // Mana Confluence: "{T}, Pay 1 life: Add one mana of any color."
+            // Five pay-life ManaAbility options (one per WUBRG). The life-floor
+            // gate is the precise CR 119.4 reading (>= 1 — payable at exactly
+            // 1 life), distinct from HorizonLandBinder's stricter > 1 gate, so
+            // it is built inline here rather than reusing AttachPayLifeMana.
+            if (PayLifeAnyColorRegex.IsMatch(text))
+            {
+                foreach (var color in new[] { "W", "U", "B", "R", "G" })
+                {
+                    var mana = ManaCost.Parse(color);
+                    payLifeLand.AddAbility(new ManaAbility(
+                        source: payLifeLand,
+                        controller: controller,
+                        manaGenerated: mana,
+                        canActivateCheck: () =>
+                        {
+                            if (payLifeLand.IsTapped) return false;
+                            var c = payLifeLand.Controller ?? controller;
+                            return c.LifeTotal >= 1;
+                        },
+                        additionalCostPayer: c => c.LoseLife(1)));
+                }
+                return;
+            }
+
+            // Gemstone Mine: "{T}, Remove a mining counter from this land: Add
+            // one mana of any color. If there are no mining counters on this
+            // land, sacrifice it." Five counter-cost ManaAbility options + the
+            // "enters with three mining counters" ETB trigger.
+            if (GemstoneMineCounterManaRegex.IsMatch(text))
+            {
+                BindGemstoneMine(payLifeLand, text, controller);
+                return;
+            }
+        }
+
+        // Single source of truth for the bare-{T} mana clauses: ParseTapManaCosts
+        // applies the same regexes and produces one ManaCost per ManaAbility.
+        // Bind each homed to this card. (Bot's source-picker scans abilities and
+        // picks the first that produces the needed colour.)
+        foreach (var cost in ParseTapManaCosts(text))
+        {
+            card.AddAbility(new ManaAbility(card, controller, cost));
+        }
+    }
+
+    /// <summary>
+    /// Wire Gemstone Mine's counter-cost any-colour mana abilities plus its
+    /// "enters with three mining counters" ETB trigger.
+    ///
+    /// <para>Mana: five <see cref="ManaAbility"/> options (one per WUBRG). Each
+    /// is gated on the land being untapped, on the battlefield, and carrying at
+    /// least one <see cref="Majik.Core.Counters.CounterType.Mining"/> counter
+    /// (the remove-a-mining-counter cost must be payable — CR 119.4). The
+    /// additional-cost payer removes one mining counter and, when none remain,
+    /// sacrifices the land to its owner's graveyard (CR 701.16) — both happen
+    /// atomically in the mana ability's activation (CR 605.1, no stack). This
+    /// mirrors <c>GemstoneMineFactory</c>'s shape exactly (the factory is
+    /// test-only; lands bind through this binder in prod).</para>
+    ///
+    /// <para>ETB: a self-<see cref="TriggeredAbility"/> over
+    /// <see cref="Triggers.OnEnterBattlefieldSelf"/> that adds N mining
+    /// counters. A true CR 614.1d "enters with N counters" replacement only
+    /// models +1/+1 counters today, so non-+1/+1 counter loads use the
+    /// trigger-shape (same posture as Blast Zone / Aether Hub).</para>
+    /// </summary>
+    private static void BindGemstoneMine(Land land, string text, Player controller)
+    {
+        // ETB: "This land enters with three mining counters on it."
+        var etbMatch = EntersWithMiningCountersRegex.Match(text);
+        if (etbMatch.Success)
+        {
+            var n = WordToInt(etbMatch.Groups["n"].Value);
+            if (n > 0)
+            {
+                var etbEffect = new Effect(
+                    $"{land.Name}: enters with {n} mining counters",
+                    () =>
+                    {
+                        if (land.Zone != Majik.Core.Zones.ZoneType.Battlefield) return;
+                        land.Counters.Add(Majik.Core.Counters.CounterType.Mining, n);
+                    });
+
+                land.AddAbility(new TriggeredAbility(
+                    source: land,
+                    controller: controller,
+                    condition: Triggers.OnEnterBattlefieldSelf(land),
+                    effects: new IEffect[] { etbEffect },
+                    activeZones: new[] { Majik.Core.Zones.ZoneType.Battlefield }));
+            }
+        }
+
+        // {T}, Remove a mining counter from this land: Add one mana of any
+        // color. If there are no mining counters on this land, sacrifice it.
+        foreach (var color in new[] { "W", "U", "B", "R", "G" })
+        {
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerated: ManaCost.Parse(color),
+                canActivateCheck: () =>
+                    !land.IsTapped
+                    && land.Zone == Majik.Core.Zones.ZoneType.Battlefield
+                    && land.Counters.Count(Majik.Core.Counters.CounterType.Mining) >= 1,
+                additionalCostPayer: _ => RemoveMiningCounterAndMaybeSacrifice(land, controller)));
+        }
+    }
+
+    /// <summary>
+    /// Pay Gemstone Mine's "Remove a mining counter from this land" activation
+    /// cost, then enforce "If there are no mining counters on this land,
+    /// sacrifice it" (CR 701.16). Uses the inline self-sacrifice move
+    /// (controller's battlefield → owner's graveyard) — the same posture every
+    /// other binder/factory self-sacrifice takes, since the generic sacrifice
+    /// path is a no-op stub.
+    /// </summary>
+    private static void RemoveMiningCounterAndMaybeSacrifice(Land land, Player controller)
+    {
+        land.Counters.Remove(Majik.Core.Counters.CounterType.Mining, 1);
+
+        if (land.Counters.Count(Majik.Core.Counters.CounterType.Mining) > 0) return;
+        if (land.Zone != Majik.Core.Zones.ZoneType.Battlefield) return;
+
+        var holder = land.Controller ?? controller;
+        var graveyardOwner = land.Owner ?? controller;
+        holder.Zones.Battlefield.RemoveCard(land);
+        graveyardOwner.Zones.Graveyard.AddCard(land);
+        land.SetZone(Majik.Core.Zones.ZoneType.Graveyard);
+    }
+
+    /// <summary>
+    /// Wire Reflecting Pool's six dynamic-output mana abilities (CR 605.1a).
+    /// One per W/U/B/R/G/{C}, each legal ONLY while some OTHER land the
+    /// controller currently controls could produce that type — recomputed at
+    /// every legality check, so it tracks control changes / lands entering and
+    /// leaving. Ports <c>ReflectingPoolFactory.Create</c> into the prod binder
+    /// path (lands are never routed through their [CardName] factory).
+    /// </summary>
+    private static void BindReflectingPool(Land land, Player controller)
+    {
+        foreach (var type in ReflectingPoolManaTypes)
+        {
+            var thisType = type; // capture per iteration
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerated: ManaCost.Parse(thisType),
+                canActivateCheck: () => !land.IsTapped
+                                        && land.Zone == Majik.Core.Zones.ZoneType.Battlefield
+                                        && ControllerCanProduce(land, thisType)));
+        }
+    }
+
+    /// <summary>
+    /// True when some land the <paramref name="pool"/>'s current controller
+    /// controls — other than <paramref name="pool"/> itself (and any other
+    /// Reflecting Pool, to break the circular self-reference) — has a mana
+    /// ability that produces <paramref name="typeSymbol"/> (one of W/U/B/R/G/C).
+    /// This is the "any type that a land you control could produce" gate
+    /// (CR 605.1a). Mirrors <c>ReflectingPoolFactory.ControllerCanProduce</c>.
+    /// </summary>
+    private static bool ControllerCanProduce(Land pool, string typeSymbol)
+    {
+        var target = ManaCost.Parse(typeSymbol).ToString();
+        var c = pool.Controller;
+        if (c == null) return false;
+
+        foreach (var card in c.Zones.Battlefield.GetCards())
+        {
+            if (ReferenceEquals(card, pool)
+                || card is not Land otherLand
+                || !otherLand.HasType(CardType.Land)
+                || otherLand.Name == ReflectingPoolName)
+            {
+                continue;
+            }
+
+            var produces = otherLand.Abilities
+                .OfType<ManaAbility>()
+                .Any(ma => ma.ManaGenerated.ToString() == target);
+            if (produces) return true;
+        }
+        return false;
+    }
+
+    private const string ReflectingPoolName = "Reflecting Pool";
+
+    /// <summary>
+    /// Wire the "{T}: Add one mana of the chosen color" cycle (Sunken Citadel /
+    /// Temple of the Dragon Queen). Five fixed-type single-pip ManaAbility
+    /// instances (one per WUBRG) — the bot taps for whichever colour it needs,
+    /// since the binder layer has no agent colour-choice surface yet (the
+    /// precise single-chosen-colour gate is deferred). When the oracle also
+    /// carries Sunken Citadel's "{T}: Add two mana of the chosen color. Spend
+    /// this mana only to activate abilities of land sources." clause, five
+    /// double-pip ManaAbility instances are added too, each stamped with a
+    /// land-ability-only <see cref="Majik.Core.Mana.SpendRestriction"/>
+    /// (payment-gate enforcement deferred — same posture as Eldrazi Temple).
+    /// </summary>
+    private static void BindChosenColorLand(Land land, string text, Player controller)
+    {
+        foreach (var color in new[] { "W", "U", "B", "R", "G" })
+        {
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerated: ManaCost.Parse(color),
+                canActivateCheck: () => !land.IsTapped));
+        }
+
+        if (ChosenColorTwoManaLandAbilityRegex.IsMatch(text))
         {
             foreach (var color in new[] { "W", "U", "B", "R", "G" })
             {
-                card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(color)));
+                land.AddAbility(new ManaAbility(
+                    source: land,
+                    controller: controller,
+                    manaGenerated: ManaCost.Parse(color + color),
+                    canActivateCheck: () => !land.IsTapped,
+                    spendRestriction: SunkenCitadelLandAbilitiesOnly));
             }
-            return;
-        }
-
-        // Dual / triple colour modal — bind each option as a separate
-        // ManaAbility. Bot's source-picker scans abilities and picks the
-        // first that produces the needed colour.
-        foreach (Match m in TapForModalManaRegex.Matches(text))
-        {
-            for (var i = 1; i <= 3; i++)
-            {
-                if (!m.Groups[i].Success) continue;
-                var raw = m.Groups[i].Value.Replace("{", "").Replace("}", "");
-                card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(raw)));
-            }
-            return; // matched a modal — don't double-add via the non-modal regex
-        }
-
-        foreach (Match m in TapForManaRegex.Matches(text))
-        {
-            var symbols = m.Groups[1].Value;
-            var stripped = symbols.Replace("{", "").Replace("}", "").Replace(" ", "");
-            if (string.IsNullOrEmpty(stripped)) continue;
-
-            card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(stripped)));
         }
     }
+
+    private static int WordToInt(string s) =>
+        s.ToLowerInvariant() switch
+        {
+            "a" or "an" or "one" => 1,
+            "two" => 2, "three" => 3, "four" => 4, "five" => 5,
+            "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
+            _ => int.TryParse(s, out var v) ? v : 0,
+        };
 }

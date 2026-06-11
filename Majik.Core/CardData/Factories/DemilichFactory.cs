@@ -24,7 +24,7 @@ namespace Majik.Core.CardData.Factories;
 ///    graveyard."
 ///
 /// ## Implemented (v1)
-/// - Creature — Zombie Wizard 4/3 at {3}{U}{U}{U}; owner / controller wired.
+/// - Creature — Skeleton Wizard 4/3 at {3}{U}{U}{U}; owner / controller wired.
 /// - <b>Flying (CR 702.9)</b>: <see cref="KeywordAbility"/> marker; combat
 ///   code reads it the same way Murktide Regent's Flying is wired.
 /// - <b>Self cost reduction (CR 117.7)</b>: <see cref="CostReductionAbility"/>
@@ -85,7 +85,7 @@ namespace Majik.Core.CardData.Factories;
 public static class DemilichFactory
 {
     public const string CardName = "Demilich";
-    public const string PrintedManaCost = "{3}{U}{U}{U}";
+    public const string PrintedManaCost = "{U}{U}{U}{U}";
     public const int Power = 4;
     public const int Toughness = 3;
     public const int OnCastExileCount = 2;
@@ -122,7 +122,7 @@ public static class DemilichFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Zombie, CardSubtype.Wizard });
+            subtypes: new[] { CardSubtype.Skeleton, CardSubtype.Wizard });
 
         card.SetOwner(owner);
         card.SetController(owner);

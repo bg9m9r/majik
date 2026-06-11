@@ -63,16 +63,16 @@ public static class KozileksCommandFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
+        // CR 205.3 — the printed type line is "Kindred Instant — Eldrazi",
+        // but the Kindred (formerly "Tribal") card type was removed by the
+        // 2024 type-line errata; the seed type line is just "Instant" with
+        // the Eldrazi subtype on the spell, and the engine no longer stamps
+        // CardType.Tribal (Tribal product decision — see the semantic-parity
+        // -tail PR). The Eldrazi subtype rides on the Instant ctor below.
         var card = new Instant(
             name: CardName,
             manaCost: PrintedManaCost,
             subtypes: new[] { CardSubtype.Eldrazi });
-
-        // CR 308 — Kindred (legacy "Tribal") card type, layered onto the
-        // Instant so the Eldrazi subtype is grammatically grounded (CR 308.2).
-        // Idempotent — AddCardType skips duplicates. Same pattern as
-        // AllIsDustFactory.
-        card.AddCardType(CardType.Tribal);
 
         card.SetOwner(owner);
         card.SetController(owner);

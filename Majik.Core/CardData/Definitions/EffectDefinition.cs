@@ -1010,9 +1010,13 @@ public sealed class DealDamageEachOpponentEffectDef : EffectDefinition
 
 /// <summary>
 /// "Mill N cards. You may put a card with one of the given types from
-/// among the milled cards into your hand." Auto-picks the first
-/// qualifying milled card in v1 (the "may" opt-out awaits agent
-/// prompting). Matches the Dredger's Insight ETB effect.
+/// among the milled cards into your hand." (CR 116.1b — the pick is a
+/// genuine player choice.) Mills <see cref="Amount"/>, then prompts the
+/// controller's agent (via the reveal-and-choose prompt) to put one of
+/// the matching milled cards into hand, or decline. With no agent
+/// (bot self-play / agentless harness) it falls back to the deterministic
+/// default of auto-picking the first matching milled card. Matches the
+/// Dredger's Insight ETB effect.
 ///
 /// <see cref="MatchingTypes"/> are parsed as
 /// <see cref="Majik.Core.Cards.Types.CardType"/>; OR-matched.
@@ -1079,8 +1083,23 @@ public sealed class ConniveSelfEffectDef : EffectDefinition
 /// </summary>
 public sealed class ConniveTargetEffectDef : EffectDefinition
 {
-    /// <summary>Number of connives (default 1; the "connive N" form).</summary>
+    /// <summary>Number of connives (default 1; the "connive N" form). Ignored
+    /// when <see cref="AmountSource"/> is set (the live count wins).</summary>
     public int Amount { get; set; } = 1;
+
+    /// <summary>
+    /// Optional DYNAMIC-X source. When set, the connive amount is read live from
+    /// the resolving <see cref="GameContext.TurnState"/> instead of the fixed
+    /// <see cref="Amount"/> (CR 700.6 per-turn tally). Recognised values:
+    /// <list type="bullet">
+    ///   <item><c>creatures_died_this_turn</c> — Spymaster's Vault (X = creatures
+    ///     that died this turn, CR 702.104b).</item>
+    ///   <item><c>attackers_this_turn</c> — Raffine, Scheming Seer (X = number of
+    ///     attacking creatures declared this turn).</item>
+    /// </list>
+    /// Null ⇒ fixed <see cref="Amount"/>.
+    /// </summary>
+    public string? AmountSource { get; set; }
 
     /// <summary>Target filter (default <c>"creature_you_control"</c>).</summary>
     public string TargetFilter { get; set; } = "creature_you_control";

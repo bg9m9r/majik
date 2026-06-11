@@ -1,0 +1,290 @@
+using FluentAssertions;
+using Majik.Core.Abilities;
+using Majik.Core.Api;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Factories;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Zones;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Majik.Bot.Tests.Decks;
+
+/// <summary>
+/// Pool-wide faithful coverage REPORT for every IMPLEMENTED card name (the
+/// <see cref="ImplementedCardNames.All"/> registry — every card with a
+/// <c>[CardName]</c> factory / generated JSON arm / inline fallback). It is the
+/// sibling of <see cref="BotDeckImplementationAuditTests"/>, which audits only
+/// the 24 bot decks and is the CI GATE. THIS class is a NON-FAILING report: it
+/// surfaces the true coverage backlog across the whole implemented pool, which
+/// legitimately contains gaps, so gating on it would be perpetually red.
+///
+/// <para>It reuses the exact same detection the bot-deck gate uses — build each
+/// card through the real <see cref="GameFacade"/> binder/factory chain, then
+/// read the engine-stamped <see cref="ICard.IsVanillaShell"/> + inspect bound
+/// <see cref="ITriggeredAbility"/>s — but builds efficiently: every card name is
+/// materialized into ONE facade's library (a synthetic mega-deck) so the
+/// expensive facade construction is amortized over thousands of cards instead
+/// of per-card.</para>
+///
+/// <para>Classification per card:
+/// OK / Stub (<see cref="ICard.IsVanillaShell"/>) / MissingTrigger (permanent,
+/// oracle leads with When/Whenever/At, no <see cref="ITriggeredAbility"/> bound,
+/// not in the trigger-heuristic allowlist) / Partial (recorded in
+/// <see cref="KnownPartialImplementations"/>). The Stub + MissingTrigger lists
+/// are the backlog.</para>
+/// </summary>
+public class PoolWideImplementationAuditTests
+{
+    private readonly ITestOutputHelper _out;
+    public PoolWideImplementationAuditTests(ITestOutputHelper output) => _out = output;
+
+    // Built once for the whole class — the seed is ~22k rows.
+    private static readonly EmbeddedCardRepository Repo = new();
+
+    /// <summary>Class-B heuristic false positives shared with the bot-deck
+    /// audit: oracle leads with When/Whenever/At but the "trigger" is actually
+    /// a keyword / replacement / Ward phrasing, not an
+    /// <see cref="ITriggeredAbility"/>. Real gaps go in
+    /// <see cref="KnownPartialImplementations"/>, NOT here.</summary>
+    private static readonly HashSet<string> TriggerHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // WARD templated wording (CR 702.21) — see BotDeckImplementationAuditTests.
+            "Reality Smasher",
+        };
+
+    /// <summary>
+    /// Stub-heuristic false positives: <see cref="ICard.IsVanillaShell"/> is
+    /// true (the binder chain attached no <c>card.Abilities</c>) but the card's
+    /// printed behaviour DOES run — it lives in an OFF-CARD effect the
+    /// classifier cannot see (a continuous/replacement effect registered on a
+    /// live per-game service, not a <c>card.Ability</c>). Verified working via
+    /// the GameFacade prod path in
+    /// <c>Majik.Core.Api.Tests.OffCardEffectLandBinderTests</c>. Each entry
+    /// names WHY. Only provably-working cards belong here — do NOT use this to
+    /// silence a genuine gap (those go in <see cref="KnownPartialImplementations"/>).
+    /// </summary>
+    private static readonly HashSet<string> StubHeuristicAllowlist =
+        new(StringComparer.Ordinal)
+        {
+            // CR 305.7 — additive land-retype static ("Each land is a [basic]
+            // in addition to its other land types"). Bound by
+            // AdditiveLandSubtypeBinder as a GrantLandSubtypeStaticEffect on the
+            // game's ContinuousEffectsService — an off-card continuous effect,
+            // not a card.Ability — so the land has zero card.Abilities yet the
+            // static is live.
+            "Urborg, Tomb of Yawgmoth",
+            "Yavimaya, Cradle of Growth",
+
+            // CR 706.2 — "enter tapped as a copy of any land on the
+            // battlefield." Bound by EntersAsCopyBinder as an
+            // EntersAsCopyReplacement on the game's ReplacementBus (an off-card
+            // replacement effect, not a card.Ability). Vesuva's printed
+            // characteristics all come from the copied land, so it carries no
+            // card.Abilities of its own until it copies one on ETB.
+            "Vesuva",
+        };
+
+    private enum Status { Ok, Stub, Partial, MissingTrigger, Skipped }
+
+    /// <summary>
+    /// Build every implemented card name into ONE facade's library through the
+    /// real <see cref="GameFacade.Create"/> binder/factory chain (the exact
+    /// production path), then return the fully-bound live <see cref="ICard"/>
+    /// per name. Names with no row in the embedded Modern seed (inline
+    /// test-only vanilla creatures, or any non-Modern factory) are absent from
+    /// the result — <see cref="Classify"/> reports them as Skipped, never OK.
+    /// </summary>
+    private static IReadOnlyDictionary<string, ICard> BuildAllLiveCards()
+    {
+        var shells = new List<ICard>(ImplementedCardNames.All.Count);
+        foreach (var name in ImplementedCardNames.All.OrderBy(n => n, StringComparer.Ordinal))
+        {
+            // Not in the embedded Modern seed — inline test-only vanillas
+            // (Grizzly Bears / Runeclaw Bear / Hill Giant) or a non-Modern
+            // factory. Cannot be faithfully materialized; left out of the
+            // library and surfaced as Skipped (no silent truncation).
+            var entity = Repo.GetByName(name);
+            if (entity != null) shells.Add(MaterializeReal(entity));
+        }
+
+        // One facade, one giant library: amortizes facade construction over the
+        // whole pool. GameFacade.Create enforces no deck-size limit, so a
+        // multi-thousand-card library is fine for a static (no-game-start) audit.
+        var facade = GameFacade.Create(
+            aliceName: "pool-audit-A",
+            bobName: "pool-audit-B",
+            aliceDeck: shells,
+            bobDeck: Array.Empty<ICard>(),
+            cardRepo: Repo);
+
+        var byName = new Dictionary<string, ICard>(StringComparer.Ordinal);
+        foreach (var card in facade.Alice.Zones.GetZone(ZoneType.Library).GetCards())
+        {
+            if (!byName.ContainsKey(card.Name)) byName[card.Name] = card;
+        }
+
+        return byName;
+    }
+
+    private static readonly IReadOnlyDictionary<string, ICard> LiveCards = BuildAllLiveCards();
+
+    private static bool OracleImpliesTrigger(string? oracle)
+    {
+        if (string.IsNullOrWhiteSpace(oracle)) return false;
+        foreach (var raw in oracle.Split('\n'))
+        {
+            var line = raw.TrimStart();
+            if (line.StartsWith("When ", StringComparison.Ordinal)
+                || line.StartsWith("Whenever ", StringComparison.Ordinal)
+                || line.StartsWith("At ", StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsPermanent(ICard c)
+        => c.HasType(CardType.Creature) || c.HasType(CardType.Artifact)
+        || c.HasType(CardType.Enchantment) || c.HasType(CardType.Planeswalker)
+        || c.HasType(CardType.Land);
+
+    /// <summary>Report status: registry overlay over the live-built detection.</summary>
+    private static Status Classify(string name)
+    {
+        if (KnownPartialImplementations.TryGet(name, out var gap))
+            return gap.Severity == CardGapSeverity.Stub ? Status.Stub : Status.Partial;
+
+        if (!LiveCards.TryGetValue(name, out var card))
+            return Status.Skipped; // no row in the Modern seed — reported separately
+
+        // GameFacade.BuildDeckCard stamps IsVanillaShell only on the non-routed
+        // binder-chain path; routed (factory-backed) cards are implemented by
+        // definition. Same semantics as the bot-deck gate.
+        if (card.IsVanillaShell && !StubHeuristicAllowlist.Contains(name))
+            return Status.Stub;
+
+        var entity = Repo.GetByName(name);
+        if (entity != null
+            && IsPermanent(card)
+            && OracleImpliesTrigger(entity.OracleText)
+            && !card.Abilities.OfType<ITriggeredAbility>().Any()
+            && !TriggerHeuristicAllowlist.Contains(name))
+            return Status.MissingTrigger;
+
+        return Status.Ok;
+    }
+
+    [Fact]
+    public void PrintPoolWideHealth()
+    {
+        var names = ImplementedCardNames.All
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
+
+        var byStatus = new Dictionary<Status, List<string>>
+        {
+            [Status.Ok] = new(),
+            [Status.Stub] = new(),
+            [Status.Partial] = new(),
+            [Status.MissingTrigger] = new(),
+            [Status.Skipped] = new(),
+        };
+
+        foreach (var name in names)
+            byStatus[Classify(name)].Add(name);
+
+        _out.WriteLine("===== POOL-WIDE IMPLEMENTATION HEALTH (non-failing report) =====");
+        _out.WriteLine($"Total implemented card names : {names.Count}");
+        _out.WriteLine($"  OK             : {byStatus[Status.Ok].Count}");
+        _out.WriteLine($"  Stub           : {byStatus[Status.Stub].Count}");
+        _out.WriteLine($"  MissingTrigger : {byStatus[Status.MissingTrigger].Count}");
+        _out.WriteLine($"  Partial        : {byStatus[Status.Partial].Count}");
+        _out.WriteLine($"  Skipped        : {byStatus[Status.Skipped].Count} "
+            + "(no row in the Modern seed — non-Modern factory / inline test "
+            + "vanilla; not classifiable, NOT silently truncated)");
+        // Sanity: every skipped-by-classifier name is one we couldn't materialize.
+        if (byStatus[Status.Skipped].Count > 0)
+        {
+            foreach (var n in byStatus[Status.Skipped].OrderBy(x => x, StringComparer.Ordinal))
+                _out.WriteLine($"    (skipped) {n}");
+        }
+
+        _out.WriteLine("");
+        _out.WriteLine($"----- BACKLOG: Stub ({byStatus[Status.Stub].Count}) -----");
+        foreach (var n in byStatus[Status.Stub])
+        {
+            var reason = KnownPartialImplementations.TryGet(n, out var gap)
+                ? gap.Reason : "(detected vanilla shell — does nothing in real play)";
+            _out.WriteLine($"  [Stub] {n} — {reason}");
+        }
+
+        _out.WriteLine("");
+        _out.WriteLine($"----- BACKLOG: MissingTrigger ({byStatus[Status.MissingTrigger].Count}) -----");
+        foreach (var n in byStatus[Status.MissingTrigger])
+            _out.WriteLine($"  [MissingTrigger] {n} — oracle implies a trigger but none is bound");
+    }
+
+    /// <summary>
+    /// Regression gate for the land-binding + off-card-effect-allowlist work:
+    /// the named cards must NOT appear in the Stub / MissingTrigger backlog.
+    /// <list type="bullet">
+    ///   <item>The bound lands (Reflecting Pool / Boseiju / Sunken Citadel /
+    ///   Temple of the Dragon Queen / Glimmervoid / Abraded Bluffs / Witch's
+    ///   Cottage) now carry real card.Abilities through the prod binder chain.</item>
+    ///   <item>The off-card-effect lands (Urborg / Yavimaya / Vesuva) are
+    ///   cleared by the StubHeuristicAllowlist — their behaviour is provably
+    ///   live but lives off-card.</item>
+    ///   <item>Overgrowth / Fertile Ground now wire their tap-for-mana trigger
+    ///   into card.Abilities on the prod dispatch path (a real bug fix, not an
+    ///   allowlist).</item>
+    /// </list>
+    /// Unlike <see cref="PrintPoolWideHealth"/> this one FAILS on regression.
+    /// </summary>
+    [Fact]
+    public void BoundAndAllowlistedCards_AreNotInBacklog()
+    {
+        string[] mustBeOk =
+        {
+            // Stub → now bound (mana abilities).
+            "Reflecting Pool", "Boseiju, Who Shelters All", "Sunken Citadel",
+            "Temple of the Dragon Queen",
+            // MissingTrigger → now bound (triggered abilities).
+            "Glimmervoid", "Abraded Bluffs", "Witch's Cottage",
+            // Stub → cleared by the off-card-effect allowlist.
+            "Urborg, Tomb of Yawgmoth", "Yavimaya, Cradle of Growth", "Vesuva",
+            // MissingTrigger → real prod fix (trigger now in card.Abilities).
+            "Overgrowth", "Fertile Ground",
+            // MissingTrigger → targeted Restless attack triggers bound with
+            // real TargetRequests (agent-chosen targets via the prod binder
+            // chain); Fortress is the non-targeted defender drain.
+            "Restless Bivouac", "Restless Cottage", "Restless Fortress",
+            "Restless Reef", "Restless Ridgeline", "Restless Vinestalk",
+            // MissingTrigger → Valakut "Mountain enters → deal 3 to any target"
+            // and Frostwalk Bastion's combat-damage tap/skip-untap rider, both
+            // bound in OracleTriggeredAbilityBinder (lands' only prod path).
+            "Valakut, the Molten Pinnacle", "Frostwalk Bastion",
+        };
+
+        var stillFlagged = mustBeOk
+            .Select(n => (Name: n, Status: Classify(n)))
+            .Where(x => x.Status is Status.Stub or Status.MissingTrigger)
+            .Select(x => $"{x.Name}: {x.Status}")
+            .ToList();
+
+        stillFlagged.Should().BeEmpty(
+            "these cards were fixed (bound) or allowlisted (provable off-card "
+            + "effect) and must no longer appear in the audit backlog");
+    }
+
+    // ---------------------------------------------------------------------
+    // Local typed-shell materialization — same logic as
+    // BotDeckImplementationAuditTests.MaterializeReal (DeckLoader.LoadReal
+    // lives in the Integration project, not referenced here). Takes a resolved
+    // CardEntity so the caller controls seed-miss handling.
+    // ---------------------------------------------------------------------
+
+    private static ICard MaterializeReal(CardEntity entity)
+        => DeckCardShellBuilder.Build(entity);
+}

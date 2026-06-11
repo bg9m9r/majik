@@ -20,11 +20,11 @@ namespace Majik.Core.Tests.CardData;
 /// - NamedCardFactory dispatch returns a Creature shell with Artifact
 ///   card type stamped on (mirrors Wurmcoil Engine).
 /// - Domain cost reduction (CR 702.16 / CR 117.7):
-///     * No basics → full {10}.
-///     * 3 distinct basic types → {4} (10 - 3×2).
-///     * All 5 distinct basic types → {0} (10 - 5×2).
+///     * No basics → full {12}.
+///     * 3 distinct basic types → {6} (12 - 3×2).
+///     * All 5 distinct basic types → {2} (12 - 5×2).
 ///     * Wastes doesn't contribute (CR 305.6 — basic land without a basic
-///       land type) and reduction floors at 0.
+///       land type).
 /// </summary>
 public class ScionOfDracoTests
 {
@@ -85,18 +85,18 @@ public class ScionOfDracoTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void ScionOfDraco_NoBasicTypes_CostsFullTen()
+    public void ScionOfDraco_NoBasicTypes_CostsFullTwelve()
     {
         var c = ScionOfDracoFactory.Create(_alice);
 
         var effective = CostReduction.GetEffectiveCost(c, _alice);
 
-        effective.Generic.Should().Be(10,
-            "with zero basic land types in play, Domain reduces by 0 — full {10}");
+        effective.Generic.Should().Be(12,
+            "with zero basic land types in play, Domain reduces by 0 — full {12}");
     }
 
     [Fact]
-    public void ScionOfDraco_ThreeBasicTypes_CostsFour()
+    public void ScionOfDraco_ThreeBasicTypes_CostsSix()
     {
         var c = ScionOfDracoFactory.Create(_alice);
 
@@ -106,11 +106,11 @@ public class ScionOfDracoTests
 
         var effective = CostReduction.GetEffectiveCost(c, _alice);
 
-        effective.Generic.Should().Be(4, "10 - 3 × 2 = 4 (CR 702.16 — Domain)");
+        effective.Generic.Should().Be(6, "12 - 3 × 2 = 6 (CR 702.16 — Domain)");
     }
 
     [Fact]
-    public void ScionOfDraco_AllFiveBasicTypes_CostsZero()
+    public void ScionOfDraco_AllFiveBasicTypes_CostsTwo()
     {
         var c = ScionOfDracoFactory.Create(_alice);
 
@@ -122,7 +122,7 @@ public class ScionOfDracoTests
 
         var effective = CostReduction.GetEffectiveCost(c, _alice);
 
-        effective.Generic.Should().Be(0, "10 - 5 × 2 = 0 — Domain at full count");
+        effective.Generic.Should().Be(2, "12 - 5 × 2 = 2 — Domain at full count");
     }
 
     [Fact]
@@ -146,25 +146,20 @@ public class ScionOfDracoTests
 
         var effective = CostReduction.GetEffectiveCost(c, _alice);
 
-        effective.Generic.Should().Be(6,
+        effective.Generic.Should().Be(8,
             "only 2 distinct basic types (Mountain + Forest) contribute; " +
-            "duplicates collapse and Wastes is excluded → 10 - 2 × 2 = 6");
+            "duplicates collapse and Wastes is excluded → 12 - 2 × 2 = 8");
     }
 
     [Fact]
-    public void ScionOfDraco_DomainFloorsAtZero()
+    public void ScionOfDraco_DomainCapsAtFiveDistinctTypes()
     {
-        // Synthetic scenario — give the controller more "domain mass" than
-        // the printed cost so the reduction would otherwise drive cost
-        // negative. The five basic types max out Domain at 5 × {2} = 10,
-        // exactly matching the printed cost; this test confirms the
-        // floor-at-zero clamp lands cleanly at 0 (and exercises the clamp
-        // path explicitly via the BasicLandTypes count).
+        // The five basic types max out Domain at 5 × {2} = 10; extra
+        // duplicate basics on top must NOT push the reduction past the cap.
         var c = ScionOfDracoFactory.Create(_alice);
 
-        // All five basics, but add an additional Plains + Island just to
-        // confirm the cap and floor cohabit — distinct-type count maxes at
-        // 5 regardless of how many lands sit on top.
+        // All five basics, plus duplicate Plains + Island — distinct-type
+        // count maxes at 5 regardless of how many lands sit on top.
         AddBasic(_alice, CardSubtype.Plains, "Plains");
         AddBasic(_alice, CardSubtype.Plains, "Plains");
         AddBasic(_alice, CardSubtype.Island, "Island");
@@ -175,7 +170,7 @@ public class ScionOfDracoTests
 
         var effective = CostReduction.GetEffectiveCost(c, _alice);
 
-        effective.Generic.Should().Be(0,
-            "Domain caps at 5 distinct basic types → 10 - 10 = 0; floor-at-zero clamp holds");
+        effective.Generic.Should().Be(2,
+            "Domain caps at 5 distinct basic types → 12 - 10 = 2; duplicates don't over-reduce");
     }
 }

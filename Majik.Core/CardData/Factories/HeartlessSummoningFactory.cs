@@ -190,4 +190,20 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
         chars.Power += _power;
         chars.Toughness += _toughness;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="ControllerCreatureAnthemEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// All filtering reads clonedSource.Controller live (correctly remapped).
+    /// preserves: _power, _toughness, _includeSelf, _requiredColor; source → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new ControllerCreatureAnthemEffect(
+            source:        clonedSource,
+            power:         _power,
+            toughness:     _toughness,
+            includeSelf:   _includeSelf,
+            requiredColor: _requiredColor);
 }

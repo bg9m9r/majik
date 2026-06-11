@@ -39,7 +39,7 @@ public class JadelightRangerFactoryTests : IDisposable
         c.HasSubtype(CardSubtype.Merfolk).Should().BeTrue();
         c.HasSubtype(CardSubtype.Scout).Should().BeTrue();
         c.HasSubtype(CardSubtype.Ranger).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{G}");
+        c.ManaCost.Should().Be("{1}{G}{G}");
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1, "the ETB double-explore trigger");
     }
 

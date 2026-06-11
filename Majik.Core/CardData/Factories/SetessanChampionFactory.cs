@@ -11,9 +11,9 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Setessan Champion (Theros Beyond Death — {1}{G}{G}).
 ///
-/// Creature — Human Warrior 2/2. Oracle text:
-///   "Constellation — Whenever Setessan Champion or another enchantment
-///    enters under your control, you may pay 1 life. If you do, draw a card."
+/// Creature — Human Warrior 1/3. Oracle text (current printing):
+///   "Constellation — Whenever an enchantment you control enters, put a
+///    +1/+1 counter on this creature and draw a card."
 ///
 /// ## Implementation
 ///
@@ -26,25 +26,16 @@ namespace Majik.Core.CardData.Factories;
 /// control.
 ///
 /// Shape mirrors <see cref="SythisHarvestsHandFactory"/> (single
-/// <see cref="TriggeredAbility"/> over <see cref="CardMovedEvent"/>), with
-/// two predicate differences:
+/// <see cref="TriggeredAbility"/> over <see cref="CardMovedEvent"/>):
 ///   * Self-ETB qualifies — predicate is
 ///     <c>ReferenceEquals(e.Card, card) || e.Card.HasType(CardType.Enchantment)</c>.
-///   * Resolution prompts the controller via
-///     <see cref="IPlayerAgent.ChooseYesNoAsync"/> with
-///     <see cref="BotIntent.CardAdvantage"/>. Default-accept posture
-///     matches the legacy "auto-accept may-clauses" behaviour for upside
-///     prompts (the deferred draw outweighs 1 life for any non-precarious
-///     life total).
-///
-/// Effect on accept: lose 1 life (CR 119.3) then draw a card (top of
-/// controller's library → hand, matching the inline DrawOne pattern used
-/// by <see cref="UpTheBeanstalkFactory"/> / <see cref="SythisHarvestsHandFactory"/>).
+///   * Resolution is UNCONDITIONAL: put a +1/+1 counter on Setessan Champion
+///     (CR 122) AND draw a card. The current printing has NO "you may pay 1
+///     life" clause — a previous version of this factory modeled a fictional
+///     life-payment may-clause that is not in the card's oracle; this is the
+///     missing-effect fix (the +1/+1 counter half was never bound).
 ///
 /// ## Notes
-/// - "If you do" gates the draw on actually paying the life — CR 117.11.
-///   When the agent declines or the controller cannot pay (life ≤ 0
-///   defensive guard), no life is lost and no card is drawn.
 /// - Self-ETB triggers fire because Setessan Champion is a creature whose
 ///   battlefield-entry constitutes "[Setessan Champion] enters under your
 ///   control"; constellation cares about the enchantment-typed entrant,
@@ -60,9 +51,8 @@ public static class SetessanChampionFactory
 {
     public const string CardName = "Setessan Champion";
     public const string PrintedManaCost = "{1}{G}{G}";
-    public const int Power = 2;
-    public const int Toughness = 2;
-    public const int LifeCost = 1;
+    public const int Power = 1;
+    public const int Toughness = 3;
 
     /// <summary>
     /// Construct Setessan Champion with no live trigger-manager / agent
@@ -82,12 +72,13 @@ public static class SetessanChampionFactory
     /// <param name="triggers">Trigger manager. When supplied, the
     /// constellation trigger is registered so the bus surfaces it as
     /// pending.</param>
-    /// <param name="agent">Agent for the "may pay 1 life" prompt
-    /// (<see cref="BotIntent.CardAdvantage"/>). Null → auto-accept (legacy
-    /// posture matching pre-prompt may-clause factories).</param>
+    /// <param name="agent">Retained for signature stability; the current
+    /// printing's constellation effect is unconditional (no agent prompt), so
+    /// this is unused.</param>
     public static Creature Create(Player owner, TriggerManager? triggers, IPlayerAgent? agent)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        _ = agent; // unconditional effect — no prompt needed.
 
         var card = new Creature(
             name: CardName,
@@ -114,30 +105,18 @@ public static class SetessanChampionFactory
         });
 
         var constellationEffect = new Effect(
-            $"{CardName} — may pay 1 life to draw a card on enchantment ETB",
-            async ctx =>
+            $"{CardName} — put a +1/+1 counter on itself and draw a card on enchantment ETB",
+            () =>
             {
-                // "You may pay 1 life" — consult agent when wired; else
-                // auto-accept (matches legacy may-clause posture for
-                // upside-tagged optional actions).
-                bool yes = true;
-                if (agent != null)
-                {
-                    yes = (await agent.ChooseYesNoAsync(
-                        $"Pay 1 life to draw a card from {CardName}?",
-                        BotIntent.CardAdvantage).ConfigureAwait(false));
-                }
-                if (!yes) return;
+                // CR 122 — "put a +1/+1 counter on this creature." Routed
+                // through Fx.PlaceCounter so the counter lands on Setessan
+                // Champion itself.
+                Majik.Core.Primitives.Fx.PlaceCounter(
+                    card, Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
 
-                // CR 119.3 — life loss to pay an optional cost. Guard
-                // against life total dropping below 0 from a defensive
-                // posture; the engine's SBA loop is responsible for
-                // ending the game when life ≤ 0 (CR 704.5a).
-                owner.LoseLife(LifeCost);
-
-                // CR 117.11 — "If you do" succeeds when the optional cost
-                // was paid. Draw a card (top → hand). Mirrors the inline
-                // DrawOne in SythisHarvestsHandFactory / UpTheBeanstalkFactory.
+                // "and draw a card." Unconditional (the current printing has
+                // no "you may pay 1 life" clause). Draw the top of the
+                // controller's library — the inline DrawOne pattern.
                 var top = owner.Zones.Library.GetCards().FirstOrDefault();
                 if (top == null) return;
                 owner.Zones.Library.RemoveCard(top);

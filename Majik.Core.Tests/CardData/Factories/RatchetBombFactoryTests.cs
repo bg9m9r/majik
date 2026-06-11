@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -111,9 +112,7 @@ public class RatchetBombFactoryTests
     {
         // Seed Ratchet Bomb with 2 charge counters then sweep — mv-2 targets
         // across both battlefields die; lands + non-matching mv survive.
-        var bomb = RatchetBombFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var bomb = RatchetBombFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(bomb);
         bomb.SetZone(ZoneType.Battlefield);
         bomb.Counters.Add(CounterType.Charge, 2);
@@ -151,7 +150,9 @@ public class RatchetBombFactoryTests
         bobBig.SetZone(ZoneType.Battlefield);
 
         var sweep = SweepAbility(bomb);
-        foreach (var e in sweep.Effects) e.Execute();
+        // Resolve through a live GameContext so the sweep reads
+        // ctx.Game.AllPlayers (the production path) — both battlefields.
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
         aliceBear.Zone.Should().Be(ZoneType.Graveyard, "mv-2 creature destroyed");
         _alice.Zones.Graveyard.GetCards().Should().Contain(aliceBear);

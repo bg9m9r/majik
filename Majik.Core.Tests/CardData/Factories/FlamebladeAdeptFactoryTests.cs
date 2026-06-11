@@ -90,7 +90,8 @@ public class FlamebladeAdeptFactoryTests
     public void FlamebladeAdept_TriggerSubscribesToCardCycledEvent()
     {
         var card = FlamebladeAdeptFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         trigger.Condition.Should().BeOfType<EventTriggerCondition<CardCycledEvent>>();
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield,
@@ -106,7 +107,8 @@ public class FlamebladeAdeptFactoryTests
     public void FlamebladeAdept_TriggerCondition_DoesNotFire_OnOpponentCycle()
     {
         var card = FlamebladeAdeptFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var otherCard = new Card("Some Cycler", "");
         var opponentEvent = new CardCycledEvent(otherCard, _bob);
@@ -118,7 +120,8 @@ public class FlamebladeAdeptFactoryTests
     public void FlamebladeAdept_TriggerCondition_Fires_OnControllerCycling()
     {
         var card = FlamebladeAdeptFactory.Create(_alice);
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
 
         var otherCard = new Card("Some Cycler", "");
         var aliceCycles = new CardCycledEvent(otherCard, _alice);
@@ -138,10 +141,54 @@ public class FlamebladeAdeptFactoryTests
         card.Power.Should().Be(1, "base power before the pump");
         card.Toughness.Should().Be(2, "base toughness before the pump");
 
-        var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardCycledEvent>);
         foreach (var effect in trigger.Effects) effect.Execute();
 
         card.Power.Should().Be(2, "+1 from the cycle/discard pump");
         card.Toughness.Should().Be(2, "+0 toughness from the cycle/discard pump");
+    }
+
+    // -----------------------------------------------------------------------
+    // Discard leg — CR 603.1 over DiscardedEvent (CR 701.8)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void FlamebladeAdept_HasSecondTrigger_SubscribingToDiscardedEvent()
+    {
+        var card = FlamebladeAdeptFactory.Create(_alice);
+        var discardTrigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        discardTrigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+        discardTrigger.TargetRequests.Should().BeEmpty("the self-pump has no targets");
+    }
+
+    [Fact]
+    public void FlamebladeAdept_DiscardCondition_Fires_OnYourDiscard_NotOpponents()
+    {
+        var card = FlamebladeAdeptFactory.Create(_alice);
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        var some = new Card("Some Card", "");
+        trigger.Condition.Matches(new DiscardedEvent(_alice, some, wasCost: false), trigger)
+            .Should().BeTrue("Alice discarding a card pumps her Flameblade Adept");
+        trigger.Condition.Matches(new DiscardedEvent(_bob, some, wasCost: true), trigger)
+            .Should().BeFalse("Bob discarding does NOT trigger — 'you discard' gate");
+    }
+
+    [Fact]
+    public void FlamebladeAdept_DiscardResolve_Pumps_Plus1Plus0()
+    {
+        var effects = new ContinuousEffectsService();
+        var card = FlamebladeAdeptFactory.Create(_alice, effects: effects, triggers: null);
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<DiscardedEvent>);
+
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        card.Power.Should().Be(2);
+        card.Toughness.Should().Be(2);
     }
 }

@@ -23,6 +23,7 @@ public class SbaStrategyTests
 
         sba.Checks.Select(c => c.Name).Should().Equal(
             "PlayerLife",
+            "CommanderDamage",
             "CounterCancellation",
             "TokensCeaseToExist",
             "AttachmentLegality",

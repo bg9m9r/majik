@@ -39,7 +39,7 @@ public class HarbingerOfTheSeasTests
 
         harbinger.Name.Should().Be("Harbinger of the Seas");
         harbinger.HasType(CardType.Creature).Should().BeTrue();
-        harbinger.ManaCost.Should().Be("{1}{U}");
+        harbinger.ManaCost.Should().Be("{1}{U}{U}");
         harbinger.BasePower.Should().Be(2);
         harbinger.BaseToughness.Should().Be(2);
         harbinger.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
@@ -52,7 +52,7 @@ public class HarbingerOfTheSeasTests
 
         harbinger.Should().BeOfType<Creature>();
         harbinger.Name.Should().Be("Harbinger of the Seas");
-        harbinger.ManaCost.Should().Be("{1}{U}");
+        harbinger.ManaCost.Should().Be("{1}{U}{U}");
     }
 
     /// <summary>

@@ -180,7 +180,7 @@ public class KlothysGodOfDestinyFactoryTests
     public void Trigger_NonlandTarget_GainsLifeAndDamagesEachOpponent()
     {
         var klothys = KlothysGodOfDestinyFactory.Create(
-            _alice, opponentsResolver: () => new[] { _bob });
+            _alice);
         var trigger = klothys.Abilities.OfType<TriggeredAbility>().Single();
 
         // A nonland (creature) card in Bob's graveyard.
@@ -193,7 +193,7 @@ public class KlothysGodOfDestinyFactoryTests
 
         var aliceLifeBefore = _alice.LifeTotal;
         var bobLifeBefore = _bob.LifeTotal;
-        foreach (var e in trigger.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         creature.Zone.Should().Be(ZoneType.Exile);
         _alice.LifeTotal.Should().Be(aliceLifeBefore + KlothysGodOfDestinyFactory.LifeGain);

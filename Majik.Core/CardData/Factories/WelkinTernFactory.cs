@@ -32,7 +32,7 @@ namespace Majik.Core.CardData.Factories;
 public static class WelkinTernFactory
 {
     public const string CardName = "Welkin Tern";
-    public const string PrintedManaCost = "{U}";
+    public const string PrintedManaCost = "{1}{U}";
     public const int Power = 2;
     public const int Toughness = 1;
 

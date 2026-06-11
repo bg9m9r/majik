@@ -6,6 +6,8 @@ using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -62,7 +64,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SpikeFeederFactory
 {
     public const string CardName = "Spike Feeder";
-    public const string PrintedManaCost = "{1}{G}";
+    public const string PrintedManaCost = "{1}{G}{G}";
     public const int Power = 0;
     public const int Toughness = 0;
     public const int EntersWithCounters = 2;
@@ -117,22 +119,30 @@ public static class SpikeFeederFactory
         }
 
         // ----------------------------------------------------------------
-        // Activated ability — CR 602.1.
-        //   "{2}, Remove a +1/+1 counter from Spike Feeder: You gain 2 life."
+        // Activated ability #1 (CR 602.1) — the targeted pump.
+        //   "{2}, Remove a +1/+1 counter from Spike Feeder:
+        //    Put a +1/+1 counter on target creature."
         // Cost = ManaCostCost("{2}") + RemovePlusOnePlusOneCounterCost(1).
-        // Effect = controller gains 2 life via Player.GainLife (which
-        // publishes LifeChangedEvent so Heliod's lifegain trigger and the
-        // rest of the payoff family fire — CR 119.3 / 603.6a).
+        // Single 1..1 "target creature" TargetRequest; the resolution reads
+        // the chosen creature off ChosenTargets and routes the counter
+        // through CountersService.Add so Hardened Scales / Doubling Season
+        // bumps apply (CR 122 / CR 613).
         // ----------------------------------------------------------------
-        var activatedEffect = new Effect(
-            $"{CardName}: gain {LifeGained} life",
+        ActivatedAbility? pumpAbility = null;
+        var pumpEffect = new Effect(
+            $"{CardName}: put a +1/+1 counter on target creature",
             () =>
             {
-                var controller = card.Controller ?? owner;
-                controller.GainLife(LifeGained);
+                if (pumpAbility is null) return;
+                if (pumpAbility.ChosenTargets.Count == 0) return;
+                if (pumpAbility.ChosenTargets[0].Count == 0) return;
+                if (pumpAbility.ChosenTargets[0][0] is not Creature target) return;
+                // CR 608.2b — resolution recheck: target still on battlefield.
+                if (target.Zone != ZoneType.Battlefield) return;
+                CountersService.Add(target, CounterType.PlusOnePlusOne, 1, replacements, eventBus: null);
             });
 
-        var activatedAbility = new ActivatedAbility(
+        pumpAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -140,11 +150,61 @@ public static class SpikeFeederFactory
                 new ManaCostCost(ActivationManaCost),
                 new RemovePlusOnePlusOneCounterCost(card, 1),
             },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { pumpEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    CandidateGatherer: ctx => GatherCreatures(ctx),
+                    Intent: BotIntent.Buff),
+            });
 
-        card.AddAbility(activatedAbility);
+        card.AddAbility(pumpAbility);
+
+        // ----------------------------------------------------------------
+        // Activated ability #2 (CR 602.1 / CR 119.1) — the lifegain.
+        //   "Remove a +1/+1 counter from Spike Feeder: You gain 2 life."
+        // NOTE: this ability has NO mana cost (the printed text puts the
+        // {2} on the pump ability, not here) — the free lifegain is what
+        // makes the Heliod, Sun-Crowned infinite-life combo work (gain 2 →
+        // Heliod replaces the spent counter → loop). The effect calls
+        // Player.GainLife, which publishes LifeChangedEvent (CR 119.3 /
+        // 603.6a) so the lifegain-payoff family fires.
+        // ----------------------------------------------------------------
+        var gainEffect = new Effect(
+            $"{CardName}: gain {LifeGained} life",
+            () =>
+            {
+                var controller = card.Controller ?? owner;
+                controller.GainLife(LifeGained);
+            });
+
+        var gainAbility = new ActivatedAbility(
+            source: card,
+            controller: owner,
+            costs: new ICost[]
+            {
+                new RemovePlusOnePlusOneCounterCost(card, 1),
+            },
+            effects: new IEffect[] { gainEffect });
+
+        card.AddAbility(gainAbility);
 
         return card;
+    }
+
+    /// <summary>CR 115.1 — "target creature" candidate pool: every creature
+    /// on the battlefield across all players in the live game.</summary>
+    private static IReadOnlyList<object> GatherCreatures(Majik.Core.Game.GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
+                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
+        return result;
     }
 
     /// <summary>

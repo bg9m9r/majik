@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
@@ -97,13 +98,107 @@ public static class GameStateCloner
             clonedTurnState.CopyFrom(liveTurnState, cardMap, playerMap);
         }
 
+        // Pass 5: re-register sim-cloneable continuous effects on the clone.
+        // Anthems / lords (LordStaticEffect) must re-apply on the cloned battlefield
+        // so P/T reads in the search sandbox are correct (CR 613).
+        //
+        // Algorithm:
+        //   a) Find the live ContinuousEffectsService by scanning the original
+        //      players' battlefields for any permanent with ActiveEffects != null.
+        //      All battlefield permanents share one CES in production, so the
+        //      first hit gives us the shared instance.
+        //   b) If none found (no live CES), skip — every cloned permanent stays
+        //      with ActiveEffects == null and returns base P/T, which is correct
+        //      for boards that never had a CES wired.
+        //   c) Build a fresh ContinuousEffectsService for the sandbox.
+        //   d) For each live effect whose Source is a battlefield permanent that
+        //      was cloned (InstanceId is in cardMap) AND IsActive() (gates out
+        //      inactive manland / transient effects), call effect.CloneForSim(...)
+        //      and register the non-null result on the fresh CES.
+        //      Effects whose CloneForSim returns null (bespoke long-tail not yet
+        //      ported) are silently skipped — eval loses those effects temporarily.
+        //   e) Assign the fresh CES to EVERY cloned battlefield permanent so
+        //      non-source permanents also consult it for incoming buffs.
+        //      Register() already wires the source permanent's ActiveEffects;
+        //      the explicit assignment below covers the rest.
+        var clonedPlayers = players.Select(p => playerMap[p]).ToList();
+        ContinuousEffectsService? freshCes = null;
+
+        ContinuousEffectsService? FindLiveCes()
+        {
+            foreach (var p in players)
+            {
+                foreach (var card in p.Zones.GetZone(ZoneType.Battlefield).GetCards())
+                {
+                    if (card is Permanent perm && perm.ActiveEffects != null)
+                        return perm.ActiveEffects;
+                }
+            }
+            return null;
+        }
+
+        var liveCes = FindLiveCes();
+        if (liveCes != null)
+        {
+            freshCes = new ContinuousEffectsService();
+
+            // clonedPlayersProvider lazy lambda — available to CloneForSim overrides
+            // that need a whole-roster resolver (e.g. future allPlayers-variant lords).
+            IReadOnlyList<Player> ClonedPlayersProvider() => clonedPlayers;
+
+            foreach (var liveEffect in liveCes.RegisteredEffects)
+            {
+                // Gate 1: effect must have a sim-anchor permanent that was cloned
+                // (i.e. existed on the original battlefield).
+                // SimAnchorPermanent is the cloner's routing key — it is the
+                // permanent the cloned effect should be bound to. For source-carries-
+                // effect cases (lords/anthems) this equals Source. For target-capturing
+                // effects (BecomesPTEffect, PumpUntilEndOfTurnEffect, etc.) Source is null
+                // or a non-battlefield permanent, so those classes override SimAnchorPermanent
+                // to return _target instead — without touching Source (which carries live
+                // CR 613.6 ability-suppression semantics). See ContinuousEffect.SimAnchorPermanent.
+                if (liveEffect.SimAnchorPermanent is not Permanent liveSrc) continue;
+                if (!cardMap.TryGetValue(liveSrc.InstanceId, out var clonedCard)) continue;
+                if (clonedCard is not Permanent clonedSrc) continue;
+
+                // Gate 2: effect must currently be active (source on battlefield,
+                // duration not expired).  This screens out manland effects that
+                // registered while animated but since de-animated, transient "until
+                // end of turn" effects, etc.
+                if (!liveEffect.IsActive()) continue;
+
+                // Delegate reconstruction to the effect itself.  Returns null for
+                // bespoke effect classes not yet ported (acceptable — they return the
+                // base-class default null and are silently skipped).
+                var cloned2 = liveEffect.CloneForSim(clonedSrc, ClonedPlayersProvider);
+                if (cloned2 != null)
+                    freshCes.Register(cloned2);
+            }
+
+            // Assign the fresh CES to every cloned battlefield permanent (including
+            // non-source permanents that receive incoming buffs from the lord).
+            // Register() already wired ActiveEffects on each source permanent
+            // (via the "if null" branch in Register); the loop below covers the
+            // remaining permanents that are targets-only (no registered effect of
+            // their own).
+            foreach (var cp in clonedPlayers)
+            {
+                foreach (var card in cp.Zones.GetZone(ZoneType.Battlefield).GetCards())
+                {
+                    if (card is Permanent cperm)
+                        cperm.ActiveEffects = freshCes;
+                }
+            }
+        }
+
         return new ClonedGame
         {
-            Players = players.Select(p => playerMap[p]).ToList(),
+            Players = clonedPlayers,
             PlayerMap = playerMap,
             CardMap = cardMap,
             Stack = clonedStack,
             TurnState = clonedTurnState,
+            Effects = freshCes,
         };
     }
 }

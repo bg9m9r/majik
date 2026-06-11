@@ -72,6 +72,68 @@ public class UtopiaSprawlTests
         sprawl.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
 
+    /// <summary>
+    /// Single-arg dispatch — the routed production entry point — attaches the
+    /// triggered mana ability (defaulting to Green) so the routed build, which
+    /// runs no triggered-ability binder, still produces a card whose bonus is
+    /// present. Mirrors the shape posture of every other routed-trigger factory.
+    /// </summary>
+    [Fact]
+    public void UtopiaSprawl_SingleArgDispatch_AttachesManaTrigger()
+    {
+        var sprawl = UtopiaSprawlFactory.Create(_alice);
+
+        sprawl.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
+    }
+
+    /// <summary>
+    /// PRODUCTION wiring: the routed instance-swap build dispatches the
+    /// single-arg <see cref="UtopiaSprawlFactory.Create(Player)"/> overload and
+    /// runs no triggered-ability binder, so the factory itself must register
+    /// the trigger with the live per-game <see cref="TriggerManager"/> — looked
+    /// up from the ambient <see cref="TriggerManagerRegistry"/> (installed at
+    /// game start). This test drives exactly that path: set the ambient manager,
+    /// build through <see cref="NamedCardFactory.Create(string, Player)"/> (the
+    /// routed dispatcher), attach to a Forest, tap it, and assert the default
+    /// Green bonus actually surfaces and resolves end-to-end. Without the
+    /// ambient registration the trigger would be inert in a real match.
+    /// </summary>
+    [Fact]
+    public void RoutedBuild_RegistersTriggerWithAmbientManager_AndFires()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var activator = new ManaAbilityActivator(bus);
+
+        // Install the ambient per-game manager (GameDriver.RunGameAsync does
+        // this in prod). PushScope isolates it from any concurrent test.
+        using var scope = TriggerManagerRegistry.PushScope();
+        TriggerManagerRegistry.Set(triggers);
+
+        var forest = (Land)NamedCardFactory.Create("Forest", _alice);
+        forest.SetController(_alice);
+        forest.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+
+        // Routed production entry point — single-arg dispatch.
+        var sprawl = (Enchantment)NamedCardFactory.Create("Utopia Sprawl", _alice);
+        sprawl.AttachTo(forest);
+        sprawl.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(sprawl);
+
+        var manaAbility = forest.Abilities.OfType<IManaAbility>().Single();
+        activator.ActivateManaAbility(manaAbility, _alice);
+
+        triggers.PendingCount.Should().Be(1, "the factory registered the trigger with the ambient manager");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.ManaPool.Green.Should().Be(2,
+            "the Forest's own {G} plus Utopia Sprawl's default-Green bonus");
+    }
+
     // -----------------------------------------------------------------------
     // Mana-doubling trigger
     // -----------------------------------------------------------------------

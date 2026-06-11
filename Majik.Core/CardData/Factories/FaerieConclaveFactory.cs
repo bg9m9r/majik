@@ -244,4 +244,14 @@ public sealed class FaerieConclaveBecomesPTEffect : ContinuousEffect
     // creature row. ContinuousEffectsService.Compute upgrades an animated
     // Land to a creature row (CR 613.1c) on a Layer-4 Creature grant, so this
     // set-base lands and the animated body surfaces through combat math.
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="FaerieConclaveBecomesPTEffect"/>
+    /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+    /// preserves: NewPower, NewToughness; target → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new FaerieConclaveBecomesPTEffect(clonedSource, NewPower, NewToughness);
 }

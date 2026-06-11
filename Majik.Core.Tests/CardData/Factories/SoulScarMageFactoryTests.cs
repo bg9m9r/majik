@@ -56,7 +56,7 @@ public class SoulScarMageFactoryTests
         c.ManaCost.Should().Be("{R}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Monk).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         c.Power.Should().Be(1);
         c.Toughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);

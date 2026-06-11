@@ -34,12 +34,12 @@ public class QuirionBeastcallerFactoryTests
         var c = QuirionBeastcallerFactory.Create(_alice);
 
         c.Name.Should().Be("Quirion Beastcaller");
-        c.ManaCost.Should().Be("{G}");
+        c.ManaCost.Should().Be("{1}{G}");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Druid).Should().BeTrue();
-        c.Power.Should().Be(1);
-        c.Toughness.Should().Be(1);
+        c.HasSubtype(CardSubtype.Dryad).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
+        c.Power.Should().Be(2);
+        c.Toughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }

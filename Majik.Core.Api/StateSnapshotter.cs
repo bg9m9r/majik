@@ -101,9 +101,27 @@ public static class StateSnapshotter
     /// outside this assembly must use the zone-level <see cref="Snapshot"/>
     /// entry point.
     /// </summary>
-    internal static CardSnapshotDto SnapshotCard(ICard card)
+    internal static CardSnapshotDto SnapshotCard(ICard card) =>
+        SnapshotCard(card, includeImprints: true);
+
+    /// <param name="includeImprints">When true, populate
+    /// <see cref="CardSnapshotDto.ImprintedCards"/> from
+    /// <see cref="Permanent.ImprintedCards"/> (CR 702.49) — the cards exiled
+    /// "with" this permanent, so a client renders them UNDER it. False on the
+    /// nested pass so the snapshot stays SHALLOW (an imprinted card never
+    /// carries its own imprints).</param>
+    private static CardSnapshotDto SnapshotCard(ICard card, bool includeImprints)
     {
         var f = BuildPermanentFields(card);
+
+        IReadOnlyList<CardSnapshotDto> imprinted = System.Array.Empty<CardSnapshotDto>();
+        if (includeImprints && card is Permanent perm && perm.ImprintedCards.Count > 0)
+        {
+            imprinted = perm.ImprintedCards
+                .Select(c => SnapshotCard(c, includeImprints: false))
+                .ToList();
+        }
+
         return new CardSnapshotDto(
             InstanceId: card.InstanceId,
             Name: card.Name,
@@ -115,7 +133,8 @@ public static class StateSnapshotter
             SummoningSickness: f.SummoningSickness,
             Abilities: f.Abilities,
             ProducedManaColors: f.ProducedManaColors,
-            Counters: f.Counters);
+            Counters: f.Counters,
+            ImprintedCards: imprinted);
     }
 
     /// <summary>
@@ -169,12 +188,26 @@ public static class StateSnapshotter
     private static IReadOnlyDictionary<string, int> SnapshotCounters(Permanent perm)
     {
         var all = perm.Counters.All;
-        if (all.Count == 0) return EmptyCounters;
-        var map = new Dictionary<string, int>(all.Count);
+
+        // CR 306.5b — a planeswalker's loyalty lives in a dedicated field
+        // (Planeswalker.Loyalty / Permanent.GetEffectiveLoyalty), NOT in the
+        // generic Counters collection. The portal renders a "Loyalty" pip from
+        // this counters map, so project the effective loyalty into it under the
+        // "Loyalty" key. Positive loyalty only (a 0-loyalty walker is about to
+        // die to the SBA; a negative value is impossible). This is purely a
+        // client surface — the authoritative loyalty stays on the field.
+        var effectiveLoyalty = perm.IsEffectivePlaneswalker()
+            ? perm.GetEffectiveLoyalty()
+            : null;
+
+        if (all.Count == 0 && effectiveLoyalty is not > 0) return EmptyCounters;
+
+        var map = new Dictionary<string, int>(all.Count + 1);
         foreach (var kv in all)
         {
             if (kv.Value > 0) map[kv.Key.Name] = kv.Value;
         }
+        if (effectiveLoyalty is int loyalty && loyalty > 0) map["Loyalty"] = loyalty;
         return map;
     }
 
@@ -228,6 +261,12 @@ public static class StateSnapshotter
     private static AbilityDto SnapshotAbility(IAbility ability) => ability switch
     {
         IActivatedAbility a => new AbilityDto("Activated", a.GetType().Name, a.Id),
+        // CR 606 — loyalty abilities are their own shape (not IActivatedAbility).
+        // Surface them with a distinct "Loyalty" kind, the signed cost as the
+        // Description ("+1" / "-2" / "-5"), and the ability's stable Id so the
+        // portal can list each one, render the loyalty-cost sign/amount, gate on
+        // affordability, and echo the Id back in ActivateLoyaltyAbilityCommand.
+        LoyaltyAbility la => new AbilityDto("Loyalty", la.Description, la.Id),
         ITriggeredAbility => new AbilityDto("Triggered", "triggered ability"),
         IStaticAbility => new AbilityDto("Static", "static ability"),
         _ => new AbilityDto(ability.GetType().Name, ability.ToString() ?? ""),

@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -80,10 +81,10 @@ public class SoaringThoughtThiefTests
         c.Name.Should().Be("Soaring Thought-Thief");
         c.ManaCost.Should().Be("{1}{U}");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
+        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
         c.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
         c.BasePower.Should().Be(1);
-        c.BaseToughness.Should().Be(2);
+        c.BaseToughness.Should().Be(3);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
@@ -95,7 +96,7 @@ public class SoaringThoughtThiefTests
 
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Soaring Thought-Thief");
-        card.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
         card.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
     }
 
@@ -119,8 +120,7 @@ public class SoaringThoughtThiefTests
         var thief = SoaringThoughtThiefFactory.Create(
             _alice,
             continuousEffects: svc,
-            triggers: null,
-            allPlayersResolver: null);
+            triggers: null);
         thief.SetZone(ZoneType.Battlefield);
         thief.ActiveEffects = svc;
         _alice.Zones.Battlefield.AddCard(thief);
@@ -141,8 +141,7 @@ public class SoaringThoughtThiefTests
         var thief = SoaringThoughtThiefFactory.Create(
             _alice,
             continuousEffects: svc,
-            triggers: null,
-            allPlayersResolver: null);
+            triggers: null);
         thief.SetZone(ZoneType.Battlefield);
         thief.ActiveEffects = svc;
         _alice.Zones.Battlefield.AddCard(thief);
@@ -162,8 +161,7 @@ public class SoaringThoughtThiefTests
         var thief = SoaringThoughtThiefFactory.Create(
             _alice,
             continuousEffects: svc,
-            triggers: null,
-            allPlayersResolver: null);
+            triggers: null);
         thief.SetZone(ZoneType.Battlefield);
         thief.ActiveEffects = svc;
         _alice.Zones.Battlefield.AddCard(thief);
@@ -231,12 +229,13 @@ public class SoaringThoughtThiefTests
         var thief = SoaringThoughtThiefFactory.Create(
             _alice,
             continuousEffects: null,
-            triggers: null,
-            allPlayersResolver: () => new List<Player> { _alice, _bob });
+            triggers: null);
         thief.SetZone(ZoneType.Battlefield);
 
         var trigger = GetAttackTrigger(thief);
-        foreach (var e in trigger.Effects) e.Execute();
+        // Resolve through a live GameContext so the mill picks its target
+        // opponent off ctx.Game.AllPlayers (the production path).
+        ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.Zones.Graveyard.GetCards().Count().Should().Be(2,
             "CR 701.13b — target opponent mills two cards.");
@@ -246,7 +245,7 @@ public class SoaringThoughtThiefTests
     }
 
     [Fact]
-    public void SoaringThoughtThief_TriggerBody_NoOp_WithoutResolver()
+    public void SoaringThoughtThief_TriggerBody_NoOp_WithoutLiveGameContext()
     {
         StockLibrary(_bob, 5);
 
@@ -257,6 +256,6 @@ public class SoaringThoughtThiefTests
         foreach (var e in trigger.Effects) e.Execute();
 
         _bob.Zones.Graveyard.GetCards().Count().Should().Be(0,
-            "no players resolver → mill body short-circuits cleanly.");
+            "no live game context → mill body short-circuits cleanly.");
     }
 }

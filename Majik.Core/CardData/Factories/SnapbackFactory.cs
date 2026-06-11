@@ -50,7 +50,7 @@ namespace Majik.Core.CardData.Factories;
 public static class SnapbackFactory
 {
     public const string CardName = "Snapback";
-    public const string PrintedManaCost = "{2}{U}";
+    public const string PrintedManaCost = "{1}{U}";
 
     public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 

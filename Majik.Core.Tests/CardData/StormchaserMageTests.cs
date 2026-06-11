@@ -58,7 +58,7 @@ public class StormchaserMageTests
         sm.HasSubtype(CardSubtype.Human).Should().BeTrue();
         sm.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         sm.BasePower.Should().Be(1);
-        sm.BaseToughness.Should().Be(2);
+        sm.BaseToughness.Should().Be(3);
         sm.Owner.Should().BeSameAs(_alice);
         sm.Controller.Should().BeSameAs(_alice);
     }
@@ -131,7 +131,7 @@ public class StormchaserMageTests
         // Apply layer-7c continuous effects and read computed P/T.
         var chars = effects.Compute(sm);
         chars.Power.Should().Be(2, "1 base + 1 prowess pump");
-        chars.Toughness.Should().Be(3, "2 base + 1 prowess pump");
+        chars.Toughness.Should().Be(4, "3 base + 1 prowess pump");
     }
 
     [Fact]

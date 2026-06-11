@@ -189,7 +189,7 @@ public class HeartfireHeroFactoryTests
         var effects = new ContinuousEffectsService();
 
         var card = HeartfireHeroFactory.Create(
-            _alice, bus, triggers, effects, opponentResolver: () => new[] { _bob, _carol });
+            _alice, bus, triggers, effects);
         card.ActiveEffects = effects;
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);
@@ -208,7 +208,7 @@ public class HeartfireHeroFactoryTests
 
         var dies = card.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.Effects.Any(e => e.Description.Contains("dies")));
-        foreach (var e in dies.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(dies, _alice, _alice, _bob, _carol);
 
         _bob.LifeTotal.Should().Be(17, "each opponent takes 3 damage (LKI power including counters)");
         _carol.LifeTotal.Should().Be(17);

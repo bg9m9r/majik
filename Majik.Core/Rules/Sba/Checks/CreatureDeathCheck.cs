@@ -35,6 +35,12 @@ public sealed class CreatureDeathCheck : IStateBasedActionCheck
     private static bool TryDestroyCreature(Creature creature, SbaContext ctx)
     {
         if (creature.Zone != ZoneType.Battlefield) return false;
+        // CR 704.5f / 711 — this SBA applies only to permanents that are
+        // CURRENTLY creatures. A Creature C# instance flipped to a non-creature
+        // DFC back (a planeswalker back) is not effectively a creature: it has
+        // no toughness, so the lethal/0-toughness rule must not touch it (its
+        // death is governed by the planeswalker-death SBA via IsLoyaltyDead).
+        if (!creature.IsEffectivelyCreature()) return false;
         if (CombatAbilities.HasIndestructible(creature)) return false;
         // CR 702.12 / 613.1f — externally-granted indestructible (Darksteel
         // Forge on an Artifact Creature) also resists the destroy SBA.

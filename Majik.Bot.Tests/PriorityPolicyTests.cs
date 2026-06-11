@@ -75,9 +75,12 @@ public class PriorityPolicyTests
         var s = new BotTestScenario();
         var land = new Land("Mountain");
         s.AddCardToHand(s.Self, land);
+        // landPlayAvailable=false: opponent's turn — LandDropTracker would return false.
+        // LegalActionEnumerator now uses ctx.LandPlayAvailable (not its own sorceryWindow).
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
+            stack: s.Stack, landPlayAvailable: false);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
         pol.Pick(oppCtx, s.Self).Should().BeOfType<PriorityAction.PassAction>();
     }
@@ -97,6 +100,34 @@ public class PriorityPolicyTests
 
         action.Should().BeOfType<PriorityAction.CastSpell>();
         ((PriorityAction.CastSpell)action).Card.Should().Be(crt);
+    }
+
+    /// <summary>
+    /// Task 2.3 end-to-end — the production scoring policy (which scores
+    /// <see cref="Majik.Bot.Search.LegalActionEnumerator"/> output) proposes a
+    /// cast-from-exile runtime grant (CR 118.9 madness / Ragavan / impulse).
+    /// Fiery Temper sits in exile with a {B}{R} grant nominating the bot; two
+    /// lands make it affordable. The policy must elect the exile cast with a
+    /// non-null <see cref="Majik.Core.Costs.ExileCastAlternativeCost"/>.
+    /// </summary>
+    [Fact]
+    public void CastsExileGrant_WhenMadnessCardInExile_AndAffordable()
+    {
+        var s = new BotTestScenario();
+        s.AddLandToBattlefield(s.Self, "Mountain");
+        s.AddLandToBattlefield(s.Self, "Swamp");
+
+        var temper = new Instant("Fiery Temper", "1RR");
+        temper.ChangeOwner(s.Self);
+        s.Self.Zones.Exile.AddCard(temper);
+        temper.GrantRuntimeExileCast(s.Self, Majik.Core.ValueObjects.ManaCost.Parse("{B}{R}"));
+
+        var pol = new PriorityPolicy(ArchetypeWeights.Burn);
+        var action = pol.Pick(s.Context, s.Self);
+
+        var cast = action.Should().BeOfType<PriorityAction.CastSpell>().Subject;
+        cast.Card.Should().BeSameAs(temper);
+        cast.AlternativeCost.Should().BeOfType<Majik.Core.Costs.ExileCastAlternativeCost>();
     }
 
     [Fact]
@@ -141,9 +172,11 @@ public class PriorityPolicyTests
         s.AddCardToHand(s.Self, bolt);
 
         // Opponent's turn, in their main, stack empty — instant cast still legal.
+        // landPlayAvailable=false: opponent's turn.
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
+            stack: s.Stack, landPlayAvailable: false);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
 
         // Opponent's turn → policy should *not* cast our instant proactively.
@@ -162,9 +195,11 @@ public class PriorityPolicyTests
         var sorc = new Sorcery("Banefire", manaCost: "{X}{R}");
         s.AddCardToHand(s.Self, sorc);
 
+        // landPlayAvailable=false: opponent's turn.
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
+            stack: s.Stack, landPlayAvailable: false);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
 
         pol.Pick(oppCtx, s.Self).Should().BeOfType<PriorityAction.PassAction>();

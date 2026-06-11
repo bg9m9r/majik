@@ -53,7 +53,7 @@ public class BoromirWardenOfTheTowerFactoryTests
         boromir.Name.Should().Be("Boromir, Warden of the Tower");
         boromir.ManaCost.Should().Be("{2}{W}");
         boromir.ManaCostValue.TotalValue.Should().Be(3);
-        boromir.BasePower.Should().Be(2);
+        boromir.BasePower.Should().Be(3);
         boromir.BaseToughness.Should().Be(3);
         boromir.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
         boromir.HasSubtype(CardSubtype.Human).Should().BeTrue();

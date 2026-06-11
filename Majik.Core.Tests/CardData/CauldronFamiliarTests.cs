@@ -68,11 +68,7 @@ public class CauldronFamiliarTests
     [Fact]
     public void CauldronFamiliar_Etb_DrainsEachOpponentAndGains()
     {
-        var familiar = CauldronFamiliarFactory.Create(
-            _alice,
-            opponentResolver: () => new[] { _bob },
-            zoneService: null,
-            triggers: null);
+        var familiar = CauldronFamiliarFactory.Create(_alice);
 
         // CR 603.6a — the ETB CardMovedEvent fires after the card lands on
         // the battlefield, so the trigger's source is already in its active
@@ -85,7 +81,7 @@ public class CauldronFamiliarTests
         var trigger = familiar.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.IsTriggered(etbEvent));
 
-        foreach (var e in trigger.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19, "each opponent loses 1 life on ETB");
         _alice.LifeTotal.Should().Be(21, "controller gains 1 life on ETB");

@@ -36,7 +36,7 @@ public class ExquisiteBloodFactoryTests
         var c = ExquisiteBloodFactory.Create(_alice);
 
         c.Name.Should().Be("Exquisite Blood");
-        c.ManaCost.Should().Be("{4}{B}{B}");
+        c.ManaCost.Should().Be("{4}{B}");
         c.HasType(CardType.Enchantment).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);

@@ -34,8 +34,23 @@ public static class KnownPartialImplementations
         {
             ["Agatha's Soul Cauldron"] = new CardGap(
                 CardGapSeverity.Partial,
-                "Ability-grant static deferred (closure re-home blocker, v1-deferrals #5); "
-                + "real targeting + Legendary supertype done (#2497)."),
+                "Ability-grant static broadly implemented: an imprinted creature's MANA abilities "
+                + "('{T}: Add …') AND its non-mana activated abilities are re-homed to each "
+                + "+1/+1-countered creature you control, sourced on the bearer (the cost "
+                + "taps/sacrifices the bearer; 'this creature' = bearer). PRIMARY mechanism is now "
+                + "ActivatedAbility.RebindTo of the creature's REAL abilities (CR 707.2) — it covers "
+                + "WHATEVER abilities the card actually has, not just oracle-parseable shapes, gated "
+                + "on ActivatedAbility.RebindSafe (true for ALL data-driven CardDef abilities, whose "
+                + "self-source verbs pump/connive/explore read ResolutionContext.Source, with the "
+                + "rest scoped to controller/chosen targets). FALLBACK oracle-rebuild "
+                + "(OracleActivatedAbilityBinder) runs only when RebindTo yields nothing, "
+                + "reconstructing firebreathing / pinger / sacrifice-self-pinger from oracle text. "
+                + "Residual (NOT emitted broken): bespoke [CardName]-factory activated abilities "
+                + "whose effect closures still capture the original card (not yet RebindSafe) AND "
+                + "whose oracle text is outside the fallback's firebreathing/pinger/sac set. As such "
+                + "factories migrate their effects to ResolutionContext.Source + mark RebindSafe, the "
+                + "RebindTo path picks them up automatically. Targeting + Legendary supertype + "
+                + "mana-colour-substitution done (#2497)."),
 
             // --- Re-derived from the faithful BotDeckImplementationAuditTests
             // run (cards built via the real GameFacade.Create + PopulateSideboard
@@ -45,46 +60,28 @@ public static class KnownPartialImplementations
             // binder runs on the faithful path — so only the ones the binder's
             // regex still misses remain Stubs.
 
-            // Fetchlands whose first fetched basic begins with a VOWEL ("an
-            // Island ...") — OracleLandActivatedAbilityBinder's FetchLand regex
-            // requires literal " a <Basic> " (consonant article), so it fails to
-            // match "an Island", leaving these as do-nothing lands. The 8
-            // consonant-article fetchlands (Arid Mesa, Bloodstained Mire,
-            // Flooded Strand, Marsh Flats, Misty Rainforest, Verdant Catacombs,
-            // Windswept Heath, Wooded Foothills) ARE bound and are no longer
-            // gaps — they were removed from this registry.
-            ["Polluted Delta"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: OracleLandActivatedAbilityBinder's regex requires a consonant-article 'a <Basic>' and so misses 'an Island or Swamp' — fetch ability not bound, vanilla land in play."),
-            ["Scalding Tarn"] = new CardGap(CardGapSeverity.Stub,
-                "Fetchland: OracleLandActivatedAbilityBinder's regex requires a consonant-article 'a <Basic>' and so misses 'an Island or Mountain' — fetch ability not bound, vanilla land in play."),
-            ["Prismatic Vista"] = new CardGap(CardGapSeverity.Stub,
-                "Basic-fetch land: oracle says 'a basic land card', not two named basics, so OracleLandActivatedAbilityBinder (which keys off named basics) doesn't bind it; lands aren't routed through PrismaticVistaFactory either — vanilla land in play."),
+            // NOTE: all 10 fetchlands are NOW bound by OracleLandActivatedAbilityBinder
+            // on the faithful path. The "an <vowel-basic>" fetchlands (Polluted
+            // Delta, Scalding Tarn) used to be missed because the FetchLand regex
+            // required a consonant article "a <Basic>"; the regex now accepts
+            // "an?" so both are bound. Prismatic Vista's "a basic land card" form
+            // is bound via the BasicLandFetch branch. All three were removed from
+            // this registry.
 
-            // Horizon Canopy cycle (pain-mana + sac-to-draw). The binder chain
-            // binds neither the pain mana ability nor the sac-to-draw activated
-            // ability, so they currently produce a do-nothing land.
-            ["Fiery Islet"] = new CardGap(CardGapSeverity.Stub,
-                "Horizon land: pain-mana + '{1},{T},Sacrifice: draw' not bound by the binder chain (no factory) — vanilla land in play."),
-            ["Sunbaked Canyon"] = new CardGap(CardGapSeverity.Stub,
-                "Horizon land: pain-mana + '{1},{T},Sacrifice: draw' not bound by the binder chain (no factory) — vanilla land in play."),
+            // Horizon Canopy cycle (pain-mana + sac-to-draw) is now bound on the
+            // prod binder path: OracleManaBinder recognises "{T}, Pay 1 life: Add
+            // {A} or {B}" and OracleLandActivatedAbilityBinder recognises "{1},
+            // {T}, Sacrifice this land: Draw a card" — both route through
+            // HorizonLandBinder. Fiery Islet + Sunbaked Canyon removed.
 
-            // Lands with a working mana ability but a missing triggered ability.
-            // Lands are never routed through named factories, so their bespoke
-            // factory triggers (if any) don't run in play; the binder chain
-            // doesn't bind these triggers either.
-            ["Bojuka Bog"] = new CardGap(CardGapSeverity.Partial,
-                "Mana ability + enters-tapped work; the 'When this land enters, exile target player's graveyard' triggered ability is not bound (lands aren't routed)."),
-            ["Sanctum of Ugin"] = new CardGap(CardGapSeverity.Partial,
-                "Colorless mana ability works; the 'Whenever you cast a colorless spell with mana value 7+' sacrifice-to-tutor triggered ability is not bound (lands aren't routed)."),
-
-            // Non-land factory-backed cards (routed in production) whose factory
-            // builds part of the card but not the implied triggered ability.
-            ["Leyline Binding"] = new CardGap(CardGapSeverity.Partial,
-                "Domain cost reduction (Flash + cheaper-per-basic-type) works via the factory; the 'When this enchantment enters, exile target nonland permanent...' O-Ring ETB triggered ability is not bound."),
-            ["Utopia Sprawl"] = new CardGap(CardGapSeverity.Partial,
-                "Aura attaches (Enchant Forest); the 'Whenever enchanted Forest is tapped for mana, add an additional mana of the chosen color' triggered ability isn't wired on the routed build because the 'As this Aura enters, choose a color' prompt is deferred engine-wide."),
-            ["Grist, the Hunger Tide"] = new CardGap(CardGapSeverity.Partial,
-                "Loyalty abilities dropped on routed planeswalker build; CDA deferred."),
+            // Grist, the Hunger Tide is now FULLY implemented and was removed
+            // from this registry: loyalty abilities are playable end-to-end
+            // through the priority loop (sorcery-speed activation, stack
+            // resolution), and the −2's destroy is a real agent-prompted target
+            // (the last documented residual). The +1 (Insect token + mill loop +
+            // loyalty counters), −2 (sacrifice + prompted destroy), −5 (each
+            // opponent loses life per creature card in graveyard), and the
+            // zone-conditional 1/1-Insect CDA (CR 604.3) are all complete.
         };
 
     /// <summary>True when <paramref name="name"/> has a recorded gap.</summary>

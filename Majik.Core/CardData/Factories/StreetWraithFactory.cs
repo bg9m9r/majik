@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Street Wraith (Future Sight, {3}{B}{B}).
 ///
-/// Creature — Zombie 3/4. Oracle text:
+/// Creature — Wraith 3/4. Oracle text:
 ///   "Swampwalk (This creature can't be blocked as long as defending
 ///    player controls a Swamp.)
 ///    Cycling—Pay 2 life. (Pay 2 life, Discard this card: Draw a card.)"
@@ -23,7 +23,10 @@ namespace Majik.Core.CardData.Factories;
 /// reaches the battlefield via Reanimator-style cheats.
 ///
 /// ## Implemented (v1)
-/// - <b>Creature — Zombie</b> 3/4 {3}{B}{B} with owner / controller wiring.
+/// - <b>Creature — Wraith</b> 3/4 {3}{B}{B} with owner / controller wiring.
+///   The engine's <see cref="CardSubtype"/> enum has no Wraith value, so
+///   the built card carries no subtype (matching the seed type line, which
+///   <see cref="TypeLineParser"/> drops to empty — it is NOT a Zombie).
 /// - <b>Swampwalk</b> as a <see cref="KeywordAbility"/> marker (CR 702.13
 ///   landwalk variant; <see cref="Majik.Core.Combat.CombatAbilities"/>
 ///   consumers gate the "can't be blocked" predicate on whether the
@@ -83,7 +86,11 @@ public static class StreetWraithFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
-            subtypes: new[] { CardSubtype.Zombie });
+            // CR 205.3m — printed creature type is "Wraith". The engine's
+            // CardSubtype enum has no Wraith value, so (matching the seed
+            // type line, which TypeLineParser drops to an empty subtype set)
+            // no subtype is assigned — NOT Zombie, which Street Wraith is not.
+            subtypes: System.Array.Empty<CardSubtype>());
 
         card.SetOwner(owner);
         card.SetController(owner);

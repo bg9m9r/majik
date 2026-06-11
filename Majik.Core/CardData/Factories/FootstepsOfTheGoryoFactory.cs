@@ -43,10 +43,11 @@ namespace Majik.Core.CardData.Factories;
 /// (<c>footsteps-of-the-goryo.json</c>) via
 /// <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
 /// <see cref="CardDefinitionFactory.Build"/> — same posture as
-/// <see cref="UnburialRitesFactory"/>. The printed Arcane subtype is omitted
-/// from the runtime card: CR 205.3 — Arcane is a spell subtype the engine's
-/// <see cref="CardSubtype"/> enum carries, but Footsteps has no Splice
-/// interaction, so it is left off the JSON (same posture as Unburial Rites).
+/// <see cref="UnburialRitesFactory"/>. CR 205.3 — the printed Arcane spell
+/// subtype is carried on the runtime card (<c>"subtypes": ["Arcane"]</c> in
+/// the JSON) so it matches the seed type line "Sorcery — Arcane"; Footsteps
+/// has no Splice interaction wired yet, but the subtype rides on the spell
+/// regardless (Splice-onto-Arcane targets would key off it).
 ///
 /// ## Implemented (v1)
 /// - Sorcery shape at printed cost {2}{B}, owner / controller wired from JSON.

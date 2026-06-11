@@ -68,11 +68,20 @@ public static class FertileGroundFactory
         CardDefinitionLoader.FromEmbeddedResource("fertile-ground");
 
     /// <summary>
-    /// Construct Fertile Ground with correct card identity only (no live
-    /// mana-trigger wiring). Suitable for factory-shape / dispatcher tests.
+    /// Construct Fertile Ground with its triggered mana ability attached to
+    /// <see cref="Card.Abilities"/>. This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to in production — the live
+    /// <see cref="TriggerManager"/> auto-registers the trigger when the Aura
+    /// crosses onto the battlefield (CR 603.3), so passing a TriggerManager is
+    /// only needed for eager (pre-ETB) registration in unit tests. Without this
+    /// the prod dispatch built a do-nothing Aura: the bonus mana never fired
+    /// because the trigger lived only on the three-arg overload (which prod
+    /// never called) — the audit's MissingTrigger flag was a real bug, not a
+    /// false positive. The "any color" bonus defaults to Green (Lotus Cobra
+    /// deferral — no agent colour surface in the binder layer yet).
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        (Enchantment)CardDefinitionFactory.Build(Definition, owner);
+        Create(owner, triggers: null, colorPicker: null);
 
     /// <summary>
     /// Construct a fully-wired Fertile Ground. The triggered mana ability is
@@ -90,7 +99,9 @@ public static class FertileGroundFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = Create(owner);
+        // Build identity directly (NOT via Create(owner), which now delegates
+        // here — that would recurse).
+        var card = (Enchantment)CardDefinitionFactory.Build(Definition, owner);
 
         // "Whenever enchanted land is tapped for mana, its controller adds
         // an additional one mana of any color." (CR 605.1b / 603.2.)

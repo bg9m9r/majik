@@ -32,11 +32,63 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleLandActivatedAbilityBinder
 {
-    // Matches: "{T}, Pay 1 life, Sacrifice <anything>: Search your library for a
+    // Matches: "{T}, Pay 1 life, Sacrifice <anything>: Search your library for a[n]
     //           <Plains|Island|Swamp|Mountain|Forest> or <Plains|Island|Swamp|Mountain|Forest> card"
+    //
+    // The article is "a" for consonant-leading basics (a Forest, a Swamp) and
+    // "an" for vowel-leading basics (an Island) — Polluted Delta / Scalding Tarn
+    // read "an Island or ...". `an?` accepts both; missing it left those two
+    // fetchlands as do-nothing lands in real games.
     private static readonly Regex FetchLand = new(
-        @"\{T\}\s*,\s*Pay\s+1\s+life\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+a\s+" +
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+an?\s+" +
         @"(?<a>Plains|Island|Swamp|Mountain|Forest)\s+or\s+(?<b>Plains|Island|Swamp|Mountain|Forest)\s+card",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Matches Prismatic Vista's single-target form:
+    //   "{T}, Pay 1 life, Sacrifice <anything>: Search your library for a basic
+    //    land card, put it onto the battlefield, then shuffle."
+    // Fetches ANY basic land (CR 205.4a — Basic supertype + Land card type)
+    // rather than two specific basic-land subtypes.
+    private static readonly Regex BasicLandFetch = new(
+        @"\{T\}\s*,\s*Pay\s+1\s+life\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+a\s+" +
+        @"basic\s+land\s+card",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Matches the sac-fetch-onto-battlefield-TAPPED cycle:
+    //   "{T}, Sacrifice this land: Search your library for a basic land card,
+    //    put it onto the battlefield tapped, then shuffle."
+    // (Evolving Wilds, Terramorphic Expanse) and Fabled Passage, which adds the
+    //   "Then if you control four or more lands, untap that land." rider.
+    //
+    // Distinct from BasicLandFetch (Prismatic Vista) in two ways: NO "Pay 1
+    // life" in the cost, and the fetched basic enters TAPPED. The Fabled
+    // Passage conditional-untap rider is detected separately via
+    // FabledPassageUntapRider below — its presence flips the effect to the
+    // four-or-more-lands variant.
+    private static readonly Regex BasicLandFetchTapped = new(
+        @"\{T\}\s*,\s*Sacrifice\s+[^:]+:\s*Search\s+your\s+library\s+for\s+a\s+" +
+        @"basic\s+land\s+card\s*,\s*put\s+it\s+onto\s+the\s+battlefield\s+tapped",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Fabled Passage's printed rider, appended after the tapped-fetch line:
+    //   "Then if you control four or more lands, untap that land."
+    private static readonly Regex FabledPassageUntapRider = new(
+        @"if\s+you\s+control\s+four\s+or\s+more\s+lands\s*,\s*untap\s+that\s+land",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Fabled Passage's printed untap rider: untap the fetched land when the
+    // controller controls at least this many lands.
+    private const int FabledPassageUntapLandThreshold = 4;
+
+    // Matches the Modern Horizons "Horizon Canopy" cycle's sac-to-draw line:
+    //   "{1}, {T}, Sacrifice this land: Draw a card."
+    // (Fiery Islet, Sunbaked Canyon, Horizon Canopy, Silent Clearing,
+    // Nurturing Peatland, Waterlogged Grove). The pain-mana line on these
+    // lands is bound separately by OracleManaBinder. The ability binds via
+    // HorizonLandBinder.AttachSacDraw — costs {1} + {T} + Sacrifice, effect
+    // draws the top card of the controller's library.
+    private static readonly Regex HorizonSacDraw = new(
+        @"\{1\}\s*,\s*\{T\}\s*,\s*Sacrifice\s+[^:]+:\s*Draw\s+a\s+card",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Map from oracle name → CardSubtype enum value.
@@ -68,6 +120,37 @@ public static class OracleLandActivatedAbilityBinder
 
         var text = entity.OracleText;
         if (string.IsNullOrWhiteSpace(text)) return false;
+
+        // Horizon Canopy cycle sac-to-draw: "{1}, {T}, Sacrifice this land:
+        // Draw a card." Distinct wording from any fetch-land form, so order
+        // among these branches is for clarity, not correctness.
+        if (HorizonSacDraw.IsMatch(text))
+        {
+            HorizonLandBinder.AttachSacDraw(land, controller);
+            return true;
+        }
+
+        // Sac-fetch-onto-battlefield-TAPPED cycle: "{T}, Sacrifice this land:
+        // Search your library for a basic land card, put it onto the
+        // battlefield tapped, then shuffle." (Evolving Wilds, Terramorphic
+        // Expanse) + Fabled Passage's conditional-untap rider. NO "Pay 1 life"
+        // in the cost and the basic enters TAPPED — both distinguish this from
+        // the Prismatic Vista form below, so ordering is for clarity.
+        if (BasicLandFetchTapped.IsMatch(text))
+        {
+            var untapsWhenFourLands = FabledPassageUntapRider.IsMatch(text);
+            BindBasicLandFetchTapped(land, controller, untapsWhenFourLands);
+            return true;
+        }
+
+        // Prismatic Vista form first: "a basic land card" (single any-basic
+        // target). The two-basic FetchLand regex never matches this wording, so
+        // ordering is for clarity, not correctness.
+        if (BasicLandFetch.IsMatch(text))
+        {
+            BindBasicLandFetch(land, controller);
+            return true;
+        }
 
         var m = FetchLand.Match(text);
         if (!m.Success) return false;
@@ -103,6 +186,190 @@ public static class OracleLandActivatedAbilityBinder
 
         fetchLand.AddAbility(ability);
         return true;
+    }
+
+    /// <summary>
+    /// Attaches the Prismatic Vista–style fetch ability: same Tap + Pay 1 life +
+    /// Sacrifice cost as the colour-pair cycle, but the effect searches for ANY
+    /// basic land (CR 205.4a) rather than two named basic-land subtypes.
+    /// </summary>
+    private static void BindBasicLandFetch(Land land, Player controller)
+    {
+        var fetchLand = land;
+        var ctrl = controller;
+
+        var ability = new ActivatedAbility(
+            source: fetchLand,
+            controller: ctrl,
+            costs: new ICost[]
+            {
+                AdditionalCost.Tap(fetchLand),
+                AdditionalCost.PayLife(1),
+                AdditionalCost.Sacrifice(fetchLand),
+            },
+            effects: new IEffect[]
+            {
+                new Effect(
+                    "search library for a basic land and put onto battlefield",
+                    ctx => BasicLandFetchEffectAsync(ctrl, ctx)),
+            });
+
+        fetchLand.AddAbility(ability);
+    }
+
+    private static async ValueTask BasicLandFetchEffectAsync(Player controller, ResolutionContext ctx)
+    {
+        // CR 205.4a — basic lands are those with the Basic supertype. Mirrors
+        // PrismaticVistaFactory.TutorBasicLandToBattlefieldAsync so the live
+        // binder path matches the (test-only) factory path exactly.
+        var candidates = controller.Zones.Library
+            .GetCards()
+            .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
+            .ToList();
+
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, controller, candidates, "basic land card").ConfigureAwait(false);
+
+        if (pick != null)
+        {
+            var zones = ZoneServiceRegistry.Get(controller);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+            }
+            else
+            {
+                controller.Zones.Library.RemoveCard(pick);
+                controller.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(controller);
+            }
+        }
+
+        // CR 701.20a — shuffle whether or not a card was found.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "fetch-land");
+    }
+
+    /// <summary>
+    /// Attaches the sac-fetch-onto-battlefield-TAPPED ability shared by
+    /// Evolving Wilds / Terramorphic Expanse (and Fabled Passage with its
+    /// conditional-untap rider). Cost is <c>{T}</c> + Sacrifice only — NO "Pay
+    /// 1 life" (unlike the fetchland / Prismatic Vista cycle). The effect
+    /// searches for ANY basic land (CR 205.4a), puts it onto the battlefield
+    /// TAPPED (printed rider; CR 305 / 614), then shuffles. When
+    /// <paramref name="untapsWhenFourLands"/> is set (Fabled Passage), the
+    /// fetched land is untapped afterwards iff the controller now controls four
+    /// or more lands (the just-fetched land counts; the sacrificed source does
+    /// not). Mirrors <c>TerramorphicExpanseFactory</c> / <c>FabledPassageFactory</c>
+    /// so the live binder path matches the (test-only) factory path exactly.
+    /// </summary>
+    private static void BindBasicLandFetchTapped(Land land, Player controller, bool untapsWhenFourLands)
+    {
+        var fetchLand = land;
+        var ctrl = controller;
+
+        ActivatedAbility? fetchAbility = null;
+        var fetchEffect = new Effect(
+            untapsWhenFourLands
+                ? "sac self + tutor basic land -> battlefield tapped, shuffle, untap if 4+ lands"
+                : "sac self + tutor basic land -> battlefield tapped, shuffle",
+            async ctx =>
+            {
+                // Self-sacrifice inlined in the resolve closure because
+                // AdditionalCost.Sacrifice.Pay() is a no-op stub (same posture
+                // as the factories). Must happen before the search so the
+                // source is no longer on the battlefield and so it does not
+                // inflate the four-or-more-lands count for Fabled Passage.
+                SacrificeToOwnersGraveyard(fetchLand);
+
+                await BasicLandFetchTappedEffectAsync(ctrl, untapsWhenFourLands, ctx)
+                    .ConfigureAwait(false);
+            });
+
+        fetchAbility = new ActivatedAbility(
+            source: fetchLand,
+            controller: ctrl,
+            costs: new ICost[]
+            {
+                AdditionalCost.Tap(fetchLand),
+                AdditionalCost.Sacrifice(fetchLand),
+            },
+            effects: new IEffect[] { fetchEffect });
+
+        fetchLand.AddAbility(fetchAbility);
+    }
+
+    private static void SacrificeToOwnersGraveyard(Land self)
+    {
+        // CR 701.16 — sacrifice moves the permanent to its owner's graveyard.
+        var ownerOfSelf = self.Owner;
+        if (ownerOfSelf == null) return;
+        if (self.Zone != ZoneType.Battlefield) return;
+
+        var holder = self.Controller ?? ownerOfSelf;
+        holder.Zones.Battlefield.RemoveCard(self);
+        ownerOfSelf.Zones.Graveyard.AddCard(self);
+        self.SetZone(ZoneType.Graveyard);
+    }
+
+    private static async ValueTask BasicLandFetchTappedEffectAsync(
+        Player controller, bool untapsWhenFourLands, ResolutionContext ctx)
+    {
+        // CR 205.4a — basic lands are those with the Basic supertype.
+        var candidates = controller.Zones.Library
+            .GetCards()
+            .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
+            .ToList();
+
+        // CR 701.19a — prompt the agent even on zero candidates so a human
+        // searcher sees the failed search rather than a silent no-op.
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, controller, candidates, "basic land card").ConfigureAwait(false);
+
+        if (pick != null)
+        {
+            // Route Library -> Battlefield through ZoneService so ETB-tapped
+            // replacements (snow basics) + CardMovedEvent subscribers (Amulet
+            // of Vigor untap, bounce-land ETB triggers) fire; then apply the
+            // printed "tapped" rider (CR 305 / 614).
+            var zones = ZoneServiceRegistry.Get(controller);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+                if (pick is Permanent permTapped && !permTapped.IsTapped)
+                {
+                    permTapped.Tap();
+                }
+            }
+            else
+            {
+                controller.Zones.Library.RemoveCard(pick);
+                controller.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(controller);
+                if (pick is Permanent perm)
+                {
+                    perm.Tap();
+                }
+            }
+
+            // Fabled Passage rider: "Then if you control four or more lands,
+            // untap that land." The just-fetched land is already on the
+            // battlefield and counts; the sacrificed source no longer counts.
+            if (untapsWhenFourLands)
+            {
+                var landCount = controller.Zones.Battlefield.GetCards()
+                    .Count(c => c.HasType(CardType.Land));
+                if (landCount >= FabledPassageUntapLandThreshold
+                    && pick is Permanent permUntap && permUntap.IsTapped)
+                {
+                    permUntap.Untap();
+                }
+            }
+        }
+
+        // CR 701.20a — shuffle whether or not a card was found.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "fetch-land");
     }
 
     private static async ValueTask FetchEffectAsync(Player controller, CardSubtype subtypeA, CardSubtype subtypeB, ResolutionContext ctx)

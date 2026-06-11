@@ -16,8 +16,8 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Legion Warboss (Guilds of Ravnica, {1}{R}).
-/// Creature — Goblin Soldier, 2/1.
+/// Named-card factory for Legion Warboss (Guilds of Ravnica, {2}{R}).
+/// Creature — Goblin Soldier, 2/2.
 ///
 /// Oracle text (verified against Gatherer / Scryfall 2026-05-29):
 ///   "Mentor (Whenever this creature attacks, put a +1/+1 counter on target
@@ -27,7 +27,7 @@ namespace Majik.Core.CardData.Factories;
 ///    this combat if able."
 ///
 /// ## Implemented (v1)
-/// - 2/1 Creature — Goblin Soldier, mana cost {1}{R}, owner/controller wired.
+/// - 2/2 Creature — Goblin Soldier, mana cost {2}{R}, owner/controller wired.
 ///   Base shape materialised from the embedded JSON definition
 ///   (<c>legion-warboss.json</c>) via
 ///   <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
@@ -138,7 +138,7 @@ public static class LegionWarbossFactory
         System.ArgumentNullException.ThrowIfNull(owner);
 
         // Base shape from the embedded JSON definition (name, Creature type,
-        // Goblin + Soldier subtypes, {1}{R}, 2/1). The Mentor trigger and the
+        // Goblin + Soldier subtypes, {2}{R}, 2/2). The Mentor trigger and the
         // begin-combat token trigger are layered on below — neither is
         // expressible in the current JSON AbilityDefinition schema.
         var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);

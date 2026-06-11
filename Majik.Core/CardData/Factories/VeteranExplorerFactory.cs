@@ -82,24 +82,26 @@ public static class VeteranExplorerFactory
     /// broader player list available).
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null, allPlayersResolver: null);
+        => Create(owner, triggers: null);
 
     /// <summary>
     /// Construct Veteran Explorer with its dies trigger attached and
     /// optionally registered against the supplied
-    /// <paramref name="triggers"/> manager.
+    /// <paramref name="triggers"/> manager. The dies trigger's "each player
+    /// may search …" walk reads every player from the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution — no captured player
+    /// resolver, so it is correct on the production routed build (mirrors
+    /// #2551); with no live game context it reduces to the dying card's owner.
+    /// Each affected player's search uses THAT player's agent from
+    /// <see cref="AgentRegistry"/>.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">When supplied, the dies trigger registers
     /// so a qualifying <see cref="Majik.Core.Events.CardMovedEvent"/>
     /// automatically queues the ability on the stack.</param>
-    /// <param name="allPlayersResolver">When supplied, the dies trigger
-    /// walks the resolver's player list on resolution so each player
-    /// gets their basic-land tutor. Null → owner-only (shape tests).</param>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -125,19 +127,21 @@ public static class VeteranExplorerFactory
         // ----------------------------------------------------------------
         var diesEffect = new Effect(
             $"{CardName}: each player may tutor up to two basic lands to battlefield, then shuffle",
-            () =>
+            ctx =>
             {
-                // Walk the configured "each player" resolver (CR 101.4
-                // APNAP). When unset (shape-test path) reduce to the
-                // dying card's owner only — deterministic single-player
-                // observation that mirrors the AssassinsTrophy shape.
-                var players = allPlayersResolver?.Invoke() ?? new[] { owner };
+                // "Each player" — read every player from the LIVE game at
+                // resolution (ctx.Game.AllPlayers, CR 101.4 APNAP). No captured
+                // resolver, so correct on the routed prod build. With no live
+                // game reduce to the dying card's owner only (shape-test path).
+                var players = ctx.Game?.AllPlayers ?? new[] { owner };
                 foreach (var player in players)
                 {
                     if (player == null) continue;
                     TutorUpToTwoBasicsToBattlefield(player);
                     Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "veteran-explorer");
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var diesTrigger = new TriggeredAbility(

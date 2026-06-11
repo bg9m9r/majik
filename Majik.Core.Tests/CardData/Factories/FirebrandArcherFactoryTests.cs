@@ -102,14 +102,14 @@ public class FirebrandArcherFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var fa = FirebrandArcherFactory.Create(
-            _alice, bus, triggers, opponentResolver: () => new[] { _bob });
+            _alice, bus, triggers);
         fa.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "Lightning Bolt")));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         // CR 119.3 — damage to a player is life loss.
         _bob.LifeTotal.Should().Be(19);
@@ -127,14 +127,14 @@ public class FirebrandArcherFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var fa = FirebrandArcherFactory.Create(
-            _alice, bus, triggers, opponentResolver: () => new[] { _bob });
+            _alice, bus, triggers);
         fa.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewSorcerySpell(_alice, "Lava Spike")));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
     }
@@ -151,14 +151,14 @@ public class FirebrandArcherFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var fa = FirebrandArcherFactory.Create(
-            _alice, bus, triggers, opponentResolver: () => new[] { _bob });
+            _alice, bus, triggers);
         fa.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewArtifactSpell(_alice, "Mishra's Bauble")));
         triggers.PendingCount.Should().Be(1);
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        Majik.Core.Tests.Helpers.ContextResolve.ResolveStackTop(stack, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19);
     }
@@ -175,7 +175,7 @@ public class FirebrandArcherFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var fa = FirebrandArcherFactory.Create(
-            _alice, bus, triggers, opponentResolver: () => new[] { _bob });
+            _alice, bus, triggers);
         fa.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewCreatureSpell(_alice, "Grizzly Bears")));
@@ -196,7 +196,7 @@ public class FirebrandArcherFactoryTests
         var triggers = new TriggerManager(stack, bus);
 
         var fa = FirebrandArcherFactory.Create(
-            _alice, bus, triggers, opponentResolver: () => new[] { _bob });
+            _alice, bus, triggers);
         fa.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_bob, "Bob's Bolt")));
@@ -210,19 +210,21 @@ public class FirebrandArcherFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void CastingNoncreatureSpell_WithoutResolver_TriggersButNoDamage()
+    public void CastingNoncreatureSpell_WithoutLiveGame_TriggersButNoDamage()
     {
         var bus = new EventBus();
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
 
         var fa = FirebrandArcherFactory.Create(
-            _alice, bus, triggers, opponentResolver: null);
+            _alice, bus, triggers);
         fa.SetZone(ZoneType.Battlefield);
 
         bus.Publish(new SpellCastEvent(NewInstantSpell(_alice, "Lightning Bolt")));
         triggers.PendingCount.Should().Be(1);
 
+        // Resolve with no live game (Game=null) → the burn reads no opponents
+        // and no-ops, but the trigger still fired.
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 

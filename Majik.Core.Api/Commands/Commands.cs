@@ -20,6 +20,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(CancelCastCommand), "cancelCast")]
 [JsonDerivedType(typeof(ActivateManaAbilityCommand), "activateManaAbility")]
 [JsonDerivedType(typeof(ActivateAbilityCommand), "activateAbility")]
+[JsonDerivedType(typeof(ActivateLoyaltyAbilityCommand), "activateLoyaltyAbility")]
 [JsonDerivedType(typeof(OrderTriggersCommand), "order-triggers")]
 [JsonDerivedType(typeof(DeclareAttackersCommand), "attackers")]
 [JsonDerivedType(typeof(DeclareBlockersCommand), "blockers")]
@@ -88,6 +89,30 @@ public sealed record ActivateManaAbilityCommand(Guid PermanentInstanceId, string
 /// dispatch path.
 /// </summary>
 public sealed record ActivateAbilityCommand(Guid PermanentInstanceId, Guid AbilityId) : GameCommand;
+
+/// <summary>
+/// CR 606 — activate a planeswalker loyalty ability. The
+/// <see cref="PermanentInstanceId"/> identifies the planeswalker (or
+/// effective planeswalker — a flipped creature-front DFC carrying a transient
+/// loyalty body); <see cref="LoyaltyAbilityId"/> is the
+/// <see cref="Majik.Core.Abilities.LoyaltyAbility.Id"/> of the specific
+/// loyalty ability the player chose (a planeswalker has several: +1 / −2 / −5).
+/// <para>
+/// Loyalty abilities are NOT <see cref="Majik.Core.Abilities.IActivatedAbility"/>
+/// (CR 606.3 — the loyalty cost is paid as the ability is put on the stack,
+/// not as a normal activation cost), so this is a distinct wire command from
+/// <see cref="ActivateAbilityCommand"/>. The engine enforces sorcery-speed
+/// timing (CR 606.3 — own main phase, empty stack), once-per-turn (CR 606.3),
+/// and loyalty-cost payability (CR 606.5 — can't reduce loyalty below 0) when
+/// <see cref="Majik.Core.Game.TurnDriver"/>'s loyalty dispatcher runs; this
+/// command is the wire shape for the existing
+/// <see cref="Majik.Core.Players.Agents.PriorityAction.ActivateLoyaltyAbility"/>
+/// dispatch path. Targets (e.g. Grist's −2 "destroy target creature or
+/// planeswalker") are NOT pre-resolved here — the dispatcher re-prompts via
+/// ChooseTargetsAsync (mirrors <see cref="ActivateAbilityCommand"/>).
+/// </para>
+/// </summary>
+public sealed record ActivateLoyaltyAbilityCommand(Guid PermanentInstanceId, Guid LoyaltyAbilityId) : GameCommand;
 
 public sealed record OrderTriggersCommand(IReadOnlyList<Guid> StackObjectIdsInOrder) : GameCommand;
 

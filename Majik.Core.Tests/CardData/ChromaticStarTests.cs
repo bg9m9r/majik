@@ -116,7 +116,8 @@ public class ChromaticStarTests
         produced.Green.Should().Be(1);
         produced.TotalValue.Should().Be(1);
 
-        star.IsTapped.Should().BeTrue("activation taps the star");
+        star.IsTapped.Should().BeFalse(
+            "CR 400.7 — the sacrificed star is a new object in the graveyard and no longer tapped");
         star.Zone.Should().Be(ZoneType.Graveyard,
             "CR 701.16 — sacrifice moves the star from battlefield to owner's graveyard");
         _alice.Zones.Battlefield.GetCards().Should().NotContain(star);

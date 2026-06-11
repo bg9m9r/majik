@@ -87,10 +87,10 @@ public class NettleDroneFactoryTests
     public void TapBurn_DealsOneDamageToEachOpponent()
     {
         var card = NettleDroneFactory.Create(
-            _alice, triggers: null, opponentResolver: () => new[] { _bob });
+            _alice, triggers: null);
 
         var burn = card.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in burn.Effects) e.Execute();
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(burn, _alice, _alice, _bob);
 
         _bob.LifeTotal.Should().Be(19,
             "{T} deals 1 damage to each opponent (CR 119 — damage is life loss)");
@@ -100,7 +100,7 @@ public class NettleDroneFactoryTests
     public void TapBurn_WithoutResolver_NoOps()
     {
         var card = NettleDroneFactory.Create(
-            _alice, triggers: null, opponentResolver: null);
+            _alice, triggers: null);
 
         var burn = card.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var e in burn.Effects) e.Execute();

@@ -110,7 +110,7 @@ namespace Majik.Core.CardData.Factories;
 public static class PowerConduitFactory
 {
     public const string CardName = "Power Conduit";
-    public const string PrintedManaCost = "{1}";
+    public const string PrintedManaCost = "{2}";
 
     /// <summary>
     /// Construct Power Conduit with no live replacement bus or event

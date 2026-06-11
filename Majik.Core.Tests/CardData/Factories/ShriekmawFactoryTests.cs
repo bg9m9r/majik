@@ -79,7 +79,7 @@ public class ShriekmawFactoryTests
         var c = ShriekmawFactory.Create(_alice);
 
         c.Name.Should().Be("Shriekmaw");
-        c.ManaCost.Should().Be("{5}{B}");
+        c.ManaCost.Should().Be("{4}{B}");
         c.HasType(CardType.Creature).Should().BeTrue();
         c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
         c.BasePower.Should().Be(3);

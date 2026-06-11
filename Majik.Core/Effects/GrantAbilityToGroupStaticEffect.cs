@@ -194,6 +194,22 @@ public sealed class GrantAbilityToGroupStaticEffect : ContinuousEffect
     }
 
     /// <summary>
+    /// Force a full re-grant: revoke every current bearer's grant, then
+    /// re-<see cref="Sync"/> so <c>abilityFactory</c> runs afresh for every
+    /// current member. Use this when the BATCH OF ABILITIES the factory would
+    /// produce has changed independently of membership — e.g. Agatha's Soul
+    /// Cauldron imprinting a new creature card changes what every bearer should
+    /// have, but no permanent entered or left the group, so the per-bearer
+    /// idempotence in <see cref="Sync"/> would otherwise keep stale grants.
+    /// Idempotent; a no-op while the source is off the battlefield.
+    /// </summary>
+    public void Refresh()
+    {
+        RevokeAll();
+        Sync();
+    }
+
+    /// <summary>
     /// Revoke every live grant. Idempotent. Called when the source leaves
     /// play or the effect is unregistered from the service.
     /// </summary>

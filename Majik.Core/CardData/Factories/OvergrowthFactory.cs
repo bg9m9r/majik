@@ -72,11 +72,19 @@ public static class OvergrowthFactory
         CardDefinitionLoader.FromEmbeddedResource("overgrowth");
 
     /// <summary>
-    /// Construct Overgrowth with correct card identity only (no live
-    /// mana-trigger wiring). Suitable for factory-shape / dispatcher tests.
+    /// Construct Overgrowth with its triggered mana ability attached to
+    /// <see cref="Card.Abilities"/>. This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to in production — the live
+    /// <see cref="TriggerManager"/> auto-registers the trigger when the Aura
+    /// crosses onto the battlefield (CR 603.3), so passing a TriggerManager is
+    /// only needed for eager (pre-ETB) registration in unit tests. Without this
+    /// the prod dispatch built a do-nothing Aura: the bonus {G}{G} never fired
+    /// because the trigger lived only on the two-arg overload (which prod never
+    /// called) — the audit's MissingTrigger flag was a real bug, not a false
+    /// positive.
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        (Enchantment)CardDefinitionFactory.Build(Definition, owner);
+        Create(owner, triggers: null);
 
     /// <summary>
     /// Construct a fully-wired Overgrowth. The triggered mana ability is
@@ -91,7 +99,9 @@ public static class OvergrowthFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = Create(owner);
+        // Build identity directly (NOT via Create(owner), which now delegates
+        // here — that would recurse).
+        var card = (Enchantment)CardDefinitionFactory.Build(Definition, owner);
 
         // "Whenever enchanted land is tapped for mana, its controller adds an
         // additional {G}{G}." (CR 605.1b / 603.2.) Closure-captured payload:

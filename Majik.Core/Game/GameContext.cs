@@ -1,3 +1,4 @@
+using System.Linq;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
 
@@ -29,6 +30,31 @@ public sealed class GameContext
     /// </summary>
     public bool LandPlayAvailable { get; }
 
+    /// <summary>
+    /// The live per-turn event tally (<see cref="Game.TurnState"/>) — creatures
+    /// died this turn, attackers declared this turn, lands entered, etc. Exposed
+    /// so resolution-time effects can read dynamic counts off the context (CR
+    /// 700.6 per-turn tallies) — e.g. dynamic-X connive (X = creatures died /
+    /// attackers declared) — instead of capturing a <c>TurnState</c> by reference
+    /// at factory-build time. Null on contexts built outside a live turn (some
+    /// test harnesses, the mulligan / opening-hand windows); consumers must
+    /// null-guard. The live <see cref="TurnDriver"/> threads its owned TurnState
+    /// in via the priority loop so <c>rc.Game.TurnState</c> is non-null at
+    /// resolution in real games.
+    /// </summary>
+    public TurnState? TurnState { get; }
+
+    /// <summary>
+    /// CR 102.1 / 102.4 — every other player still in the game (not
+    /// <see cref="Self"/> and not <see cref="Players.Player.HasLost"/>). A player
+    /// is never their own opponent, and a player who has left the game is no
+    /// longer an opponent. Used by context-aware activation predicates and
+    /// effects that need the opponent set at the choice point without a captured
+    /// resolver.
+    /// </summary>
+    public IReadOnlyList<Player> Opponents =>
+        AllPlayers.Where(p => !ReferenceEquals(p, Self) && !p.HasLost).ToList();
+
     public GameContext(
         Player self,
         IReadOnlyList<Player> allPlayers,
@@ -37,6 +63,26 @@ public sealed class GameContext
         StepStateType? currentPhase,
         Majik.Core.Stack.Stack stack,
         bool landPlayAvailable = true)
+        : this(self, allPlayers, activePlayer, turnNumber, currentPhase, stack, landPlayAvailable, turnState: null)
+    {
+    }
+
+    /// <summary>
+    /// Overload that additionally threads the live <see cref="Game.TurnState"/>
+    /// through (so resolution-time effects can read per-turn tallies). The
+    /// existing 6/7-arg ctor (used widely) delegates here with a null TurnState
+    /// to stay source-compatible — adding TurnState must NOT break any existing
+    /// call site.
+    /// </summary>
+    public GameContext(
+        Player self,
+        IReadOnlyList<Player> allPlayers,
+        Player activePlayer,
+        int turnNumber,
+        StepStateType? currentPhase,
+        Majik.Core.Stack.Stack stack,
+        bool landPlayAvailable,
+        TurnState? turnState)
     {
         Self = self ?? throw new ArgumentNullException(nameof(self));
         AllPlayers = allPlayers ?? throw new ArgumentNullException(nameof(allPlayers));
@@ -45,5 +91,6 @@ public sealed class GameContext
         CurrentPhase = currentPhase;
         Stack = stack ?? throw new ArgumentNullException(nameof(stack));
         LandPlayAvailable = landPlayAvailable;
+        TurnState = turnState;
     }
 }

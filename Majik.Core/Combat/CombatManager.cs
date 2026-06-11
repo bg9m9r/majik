@@ -88,7 +88,7 @@ public class CombatManager
 
         // Determine target from first attacker
         Player? targetPlayer = null;
-        Planeswalker? targetPlaneswalker = null;
+        Permanent? targetPlaneswalker = null;
 
         if (declarationList.Count > 0)
         {
@@ -175,7 +175,7 @@ public class CombatManager
     /// player). Returns the created <see cref="Attacker"/>, or <c>null</c> when
     /// no combat is in progress.
     /// </summary>
-    public Attacker? AddTappedAndAttackingToken(Creature creature, Cards.Planeswalker? targetPlaneswalker)
+    public Attacker? AddTappedAndAttackingToken(Creature creature, Cards.Permanent? targetPlaneswalker)
     {
         if (creature == null)
         {
@@ -200,7 +200,7 @@ public class CombatManager
         // combat targets exactly one of a player / planeswalker, so pick the
         // player band only when no planeswalker is chosen.
         Player? bandPlayer = targetPlaneswalker != null ? null : _currentCombat.DefendingPlayer;
-        Cards.Planeswalker? bandWalker = targetPlaneswalker ?? _currentCombat.TargetPlaneswalker;
+        Cards.Permanent? bandWalker = targetPlaneswalker ?? _currentCombat.TargetPlaneswalker;
 
         var attacker = new Attacker(
             creature,
@@ -432,9 +432,9 @@ public class AttackerDeclaration
 {
     public Creature Creature { get; }
     public Player? TargetPlayer { get; }
-    public Planeswalker? TargetPlaneswalker { get; }
+    public Permanent? TargetPlaneswalker { get; }
 
-    public AttackerDeclaration(Creature creature, Player? targetPlayer = null, Planeswalker? targetPlaneswalker = null)
+    public AttackerDeclaration(Creature creature, Player? targetPlayer = null, Permanent? targetPlaneswalker = null)
     {
         Creature = creature ?? throw new ArgumentNullException(nameof(creature));
         TargetPlayer = targetPlayer;

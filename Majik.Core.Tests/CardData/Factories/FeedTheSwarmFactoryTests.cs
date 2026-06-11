@@ -37,7 +37,7 @@ public class FeedTheSwarmFactoryTests
 
         card.Name.Should().Be("Feed the Swarm");
         card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{B}");
+        card.ManaCost.ToString().Should().Be("{1}{B}");
         card.Owner.Should().BeSameAs(_alice);
     }
 

@@ -95,7 +95,7 @@ public static class BolassCitadelFactory
     /// (the production routing overload) for the live cast-from-top permission.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, continuousEffects: null, opponentResolver: null);
+        Create(owner, continuousEffects: null);
 
     /// <summary>
     /// Effects-aware build — the overload the production
@@ -103,28 +103,17 @@ public static class BolassCitadelFactory
     /// When <paramref name="continuousEffects"/> carries an event bus, the
     /// play-lands-and-cast-spells-from-top grant (carrying the mandatory
     /// pay-life-equal-to-mana-value alt cost) is registered (and revoked) as the
-    /// Citadel enters / leaves the battlefield. The drain ability's opponent set
-    /// is derived from the live <see cref="ContinuousEffectsService"/> when one
-    /// is supplied (its <c>AllPlayers</c> surface), else no-ops (CR 109.5).
-    /// </summary>
-    public static Artifact Create(Player owner, ContinuousEffectsService? continuousEffects)
-        => Create(owner, continuousEffects, opponentResolver: null);
-
-    /// <summary>
-    /// Construct Bolas's Citadel.
+    /// Citadel enters / leaves the battlefield. The drain ability reads "each
+    /// opponent" from the live resolution context at resolution
+    /// (<see cref="ContextOpponents"/>), so it is correct on the production
+    /// routed build.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="continuousEffects">When non-null, its event bus drives the
     /// live cast/play-from-top grant lifecycle.</param>
-    /// <param name="opponentResolver">Returns the live player list at resolution
-    /// time for the "each opponent loses 10 life" drain (CR 109.5 — non-targeted,
-    /// global). The controller is filtered out. Null ⇒ the drain no-ops (shape /
-    /// dispatch path) — same posture as the sibling each-opponent factories
-    /// (Kroxa, Marauding Blight Priest).</param>
     public static Artifact Create(
         Player owner,
-        ContinuousEffectsService? continuousEffects,
-        Func<IReadOnlyList<Player>>? opponentResolver)
+        ContinuousEffectsService? continuousEffects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -150,16 +139,18 @@ public static class BolassCitadelFactory
         // loses 10 life.
         var drainEffect = new Effect(
             $"{CardName}: each opponent loses {LifeLossPerOpponent} life",
-            () =>
+            ctx =>
             {
+                // "Each opponent" is read from the LIVE resolution context —
+                // NOT a captured resolver, which was null on the routed prod
+                // build and made the drain INERT in real games (resolver-null
+                // bug class; mirrors Stormbreath #2540 / Grist #2549).
                 var controller = citadel.Controller ?? owner;
-                var players = opponentResolver?.Invoke();
-                if (players == null) return;
-                foreach (var opponent in players)
+                foreach (var opponent in ContextOpponents.Of(ctx, controller))
                 {
-                    if (opponent == null || ReferenceEquals(opponent, controller)) continue;
-                    if (!opponent.HasLost) opponent.LoseLife(LifeLossPerOpponent);
+                    opponent.LoseLife(LifeLossPerOpponent);
                 }
+                return ValueTask.CompletedTask;
             });
 
         // CR 701.16a — thread the engine bus into the sacrifice cost so each

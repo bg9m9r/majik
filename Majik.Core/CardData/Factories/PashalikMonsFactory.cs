@@ -14,16 +14,16 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Pashalik Mons (Mercadian Masques, {3}{R}{R}).
+/// Named-card factory for Pashalik Mons (Modern Horizons 3, {2}{R}).
 ///
-/// Legendary Creature — Goblin Warrior 3/3. Oracle text (Scryfall, verified):
+/// Legendary Creature — Goblin Warrior 2/2. Oracle text (Scryfall, verified):
 ///   "Whenever Pashalik Mons or another Goblin you control dies, Pashalik
 ///    Mons deals 1 damage to any target.
 ///    {3}{R}, Sacrifice a Goblin: Create two 1/1 red Goblin creature
 ///    tokens."
 ///
 /// ## Implemented (v1)
-/// - 3/3 Legendary Creature — Goblin Warrior at {3}{R}{R}; owner/controller
+/// - 2/2 Legendary Creature — Goblin Warrior at {2}{R}; owner/controller
 ///   wired. <see cref="CardSupertype.Legendary"/> + Goblin / Warrior
 ///   subtypes so the Legend Rule (CR 704.5j) and Goblin tribal lord scopes
 ///   (Goblin Chieftain / Warchief) see Mons correctly.
@@ -72,9 +72,9 @@ namespace Majik.Core.CardData.Factories;
 public static class PashalikMonsFactory
 {
     public const string CardName = "Pashalik Mons";
-    public const string PrintedManaCost = "{3}{R}{R}";
-    public const int Power = 3;
-    public const int Toughness = 3;
+    public const string PrintedManaCost = "{2}{R}";
+    public const int Power = 2;
+    public const int Toughness = 2;
     public const int PingDamage = 1;
 
     /// <summary>The mana portion of the activated ability's cost.</summary>

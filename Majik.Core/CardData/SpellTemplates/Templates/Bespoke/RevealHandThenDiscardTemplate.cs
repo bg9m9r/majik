@@ -75,9 +75,10 @@ public sealed class RevealHandThenDiscardTemplate : ISpellTemplate
                 var pick = tp.Zones.Hand.GetCards()
                     .FirstOrDefault(c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
                 if (pick is null) return;
-                tp.Zones.Hand.RemoveCard(pick);
-                tp.Zones.Graveyard.AddCard(pick);
-                pick.SetZone(ZoneType.Graveyard);
+                // CR 701.8 — "that player discards that card": route through
+                // the central discard chokepoint so a DiscardedEvent fires
+                // (wasCost: false — effect discard) on the supplied bus.
+                Majik.Core.Primitives.Fx.DiscardCard(tp, pick, wasCost: false, eventBus);
             }) };
         });
 }

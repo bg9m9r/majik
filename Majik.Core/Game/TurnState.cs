@@ -19,6 +19,15 @@ public sealed class TurnState
     /// <summary>Total number of creatures that died this turn (Rule 702.104b).</summary>
     public int CreaturesDiedThisTurn { get; private set; }
 
+    /// <summary>
+    /// Total number of attacking creatures declared this turn (CR 508.1).
+    /// Read by dynamic-X effects keyed on the attacker count — Raffine, Scheming
+    /// Seer connives X = number of attacking creatures. Incremented by the
+    /// attacker-declaration subscriber in <see cref="TurnDriver"/> (mirrors how
+    /// <see cref="CreaturesDiedThisTurn"/> is event-driven). Reset each turn.
+    /// </summary>
+    public int AttackersDeclaredThisTurn { get; private set; }
+
     /// <summary>Total number of permanents that left the battlefield this turn.</summary>
     public int PermanentsLeftBattlefieldThisTurn { get; private set; }
 
@@ -120,6 +129,17 @@ public sealed class TurnState
             _creaturesDiedByController[formerController.Id] =
                 _creaturesDiedByController.GetValueOrDefault(formerController.Id) + 1;
         }
+    }
+
+    /// <summary>
+    /// Called when attackers are declared (CR 508.1). Adds the number of
+    /// declared attacking creatures to the per-turn attacker tally. Read by
+    /// dynamic-X "number of attacking creatures" effects (Raffine, Scheming
+    /// Seer). Negative / zero counts are ignored.
+    /// </summary>
+    public void RecordAttackersDeclared(int count)
+    {
+        if (count > 0) AttackersDeclaredThisTurn += count;
     }
 
     /// <summary>
@@ -372,6 +392,7 @@ public sealed class TurnState
 
         // ── Scalar globals ───────────────────────────────────────────────────
         CreaturesDiedThisTurn = src.CreaturesDiedThisTurn;
+        AttackersDeclaredThisTurn = src.AttackersDeclaredThisTurn;
         PermanentsLeftBattlefieldThisTurn = src.PermanentsLeftBattlefieldThisTurn;
 
         // ── Guid-keyed integer dictionaries — remap keys ─────────────────────
@@ -436,6 +457,7 @@ public sealed class TurnState
     public void Reset()
     {
         CreaturesDiedThisTurn = 0;
+        AttackersDeclaredThisTurn = 0;
         PermanentsLeftBattlefieldThisTurn = 0;
         _creaturesDiedByController.Clear();
         _permanentsLeftByController.Clear();

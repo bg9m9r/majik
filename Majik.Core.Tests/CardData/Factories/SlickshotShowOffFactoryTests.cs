@@ -56,11 +56,10 @@ public class SlickshotShowOffFactoryTests
         card.Name.Should().Be("Slickshot Show-Off");
         card.ManaCost.Should().Be("{1}{R}");
         card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mercenary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Jock).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Bird).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
         card.BasePower.Should().Be(1);
-        card.BaseToughness.Should().Be(1);
+        card.BaseToughness.Should().Be(2);
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
@@ -104,7 +103,7 @@ public class SlickshotShowOffFactoryTests
 
         // CR 514.2 / Layer 7c — +3/+0 until end of turn.
         card.Power.Should().Be(4);
-        card.Toughness.Should().Be(1);
+        card.Toughness.Should().Be(2);
     }
 
     [Fact]
@@ -122,7 +121,7 @@ public class SlickshotShowOffFactoryTests
 
         triggers.PendingCount.Should().Be(0);
         card.Power.Should().Be(1);
-        card.Toughness.Should().Be(1);
+        card.Toughness.Should().Be(2);
     }
 
     [Fact]
@@ -157,7 +156,7 @@ public class SlickshotShowOffFactoryTests
 
         // Toughness was unaffected by the +0 toughness portion across all
         // three pumps.
-        card.Toughness.Should().Be(1);
+        card.Toughness.Should().Be(2);
     }
 
     // -----------------------------------------------------------------------

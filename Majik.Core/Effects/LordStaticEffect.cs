@@ -203,4 +203,30 @@ public sealed class LordStaticEffect : ContinuousEffect
         chars.Toughness += _toughness;
         foreach (var kw in _grantedKeywords) chars.Keywords.Add(kw);
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="LordStaticEffect"/> bound to the
+    /// <paramref name="clonedSource"/> permanent for the search-sandbox clone.  All
+    /// value-type configuration fields (_subtype, _matchingKeyword, _power, _toughness,
+    /// _grantedKeywords, _includeSelf, _opponentsOnly, _allPlayers, _tokensOnly) are
+    /// copied from <c>this</c> so the reconstructed effect is behaviourally identical to
+    /// the live one within the clone universe.  The <paramref name="clonedPlayers"/>
+    /// resolver is accepted but unused — <see cref="LordStaticEffect"/> derives its player
+    /// scope from <c>Source.Controller</c>, which is correctly wired on the cloned
+    /// permanent, so no external resolver is required.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new LordStaticEffect(
+            source:          clonedSource,
+            matchingSubtype: _subtype,
+            matchingKeyword: _matchingKeyword,
+            power:           _power,
+            toughness:       _toughness,
+            grantedKeywords: _grantedKeywords,
+            includeSelf:     _includeSelf,
+            opponentsOnly:   _opponentsOnly,
+            allPlayers:      _allPlayers,
+            tokensOnly:      _tokensOnly);
 }

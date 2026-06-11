@@ -62,7 +62,7 @@ namespace Majik.Core.CardData.Factories;
 public static class GoblinKingFactory
 {
     public const string CardName = "Goblin King";
-    public const string PrintedManaCost = "{R}{R}";
+    public const string PrintedManaCost = "{1}{R}{R}";
     public const int Power = 2;
     public const int Toughness = 2;
 

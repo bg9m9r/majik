@@ -1,10 +1,12 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -89,13 +91,10 @@ public class ExhumeFactoryTests
         bob.Zones.Graveyard.AddCard(bobBear);
         bobBear.SetZone(ZoneType.Graveyard);
 
-        foreach (var effect in ExhumeFactory.BuildResolveEffect(
-            alice,
-            zoneService: null,
-            allPlayersResolver: () => new[] { alice, bob }))
-        {
-            effect.Execute();
-        }
+        // Resolve through a live GameContext so "each player" reads
+        // ctx.Game.AllPlayers (the production path) — both players return.
+        ContextResolve.ResolveEffects(
+            ExhumeFactory.BuildResolveEffect(alice), alice, alice, bob);
 
         aliceGiant.Zone.Should().Be(ZoneType.Battlefield);
         alice.Zones.Battlefield.GetCards().Should().Contain(aliceGiant);
@@ -120,16 +119,8 @@ public class ExhumeFactoryTests
         bob.Zones.Graveyard.AddCard(bear);
         bear.SetZone(ZoneType.Graveyard);
 
-        var act = () =>
-        {
-            foreach (var effect in ExhumeFactory.BuildResolveEffect(
-                alice,
-                zoneService: null,
-                allPlayersResolver: () => new[] { alice, bob }))
-            {
-                effect.Execute();
-            }
-        };
+        var act = () => ContextResolve.ResolveEffects(
+            ExhumeFactory.BuildResolveEffect(alice), alice, alice, bob);
 
         act.Should().NotThrow("empty graveyard → that player is skipped");
 

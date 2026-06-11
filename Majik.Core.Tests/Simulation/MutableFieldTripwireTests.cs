@@ -33,9 +33,12 @@ public sealed class MutableFieldTripwireTests
         {
             // ── raw backing fields ──────────────────────────────────────────
             "_abilities",                           // COPIED (AddRange — shared ability refs, definition)
+            "_backFaceLoyaltyAbilities",            // SKIPPED-DEFER: derived from _mdfcState (itself SKIPPED-DEFER); back-face loyalty abilities are sub-refs of _abilities (AddRange-copied), re-synced on transform
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)
             "_mdfcState",                           // SKIPPED-DEFER: complex, has lambda callbacks — see Task 8 concern
+            "_offBattlefieldTypes",                 // SHARED-IMMUT (off-battlefield CDA def — shared by ref in copy-ctor)
+            "_offBattlefieldSubtypes",              // SHARED-IMMUT (off-battlefield CDA def — shared by ref in copy-ctor)
             "_restrictedCastZones",                 // COPIED (AddRange — definition)
             "_subtypes",                            // COPIED (AddRange — definition)
             "_supertypes",                          // COPIED (AddRange — definition)
@@ -44,6 +47,7 @@ public sealed class MutableFieldTripwireTests
             // ── auto-property backing fields (normalized to PropName) ────────
             "AdventureSpec",                        // COPIED (definition ref — AdventureSpec = src.AdventureSpec)
             "ColorIndicator",                       // COPIED (immutable list ref)
+            "ExiledWith",                           // COPIED (ExiledWith = src.ExiledWith — imprint back-link Guid?)
             "HasGiftPromised",                      // COPIED (cast sentinel)
             "InstanceId",                           // COPIED (InstanceId = src.InstanceId — stable identity)
             "Intensity",                            // COPIED (Intensity = src.Intensity)
@@ -53,6 +57,8 @@ public sealed class MutableFieldTripwireTests
             "ManaCostValue",                        // SHARED-IMMUT (immutable value object)
             "MayPlayFromGraveyard",                 // COPIED (MayPlayFromGraveyard = src.MayPlayFromGraveyard)
             "Name",                                 // SHARED-IMMUT (definition string)
+            "OffBattlefieldPower",                  // COPIED (OffBattlefieldPower = src.OffBattlefieldPower — off-battlefield CDA def)
+            "OffBattlefieldToughness",              // COPIED (OffBattlefieldToughness = src.OffBattlefieldToughness — off-battlefield CDA def)
             "Owner",                                // COPIED (null initially; re-linked via RelinkReferences)
             "PendingCastColorCounts",               // COPIED (immutable dict ref)
             "PendingCastColors",                    // COPIED (immutable list ref)
@@ -60,6 +66,7 @@ public sealed class MutableFieldTripwireTests
             "PendingCastX",                         // COPIED (PendingCastX = src.PendingCastX)
             "PendingDelveExiledCount",              // COPIED (PendingDelveExiledCount = src.PendingDelveExiledCount)
             "ReturnToHandOnResolution",             // COPIED (ReturnToHandOnResolution = src.ReturnToHandOnResolution)
+            "SelfManagesEntersWithCounters",        // COPIED (SelfManagesEntersWithCounters = src.SelfManagesEntersWithCounters — factory self-manages X counters)
             "RuntimeEscapeCost",                    // COPIED (immutable value-object ref)
             "RuntimeEscapeExileCount",              // COPIED (RuntimeEscapeExileCount = src.RuntimeEscapeExileCount)
             "RuntimeExileCastAllowedCaster",        // COPIED + relinked via RelinkReferences (GrantRuntimeExileCast → cloned player)

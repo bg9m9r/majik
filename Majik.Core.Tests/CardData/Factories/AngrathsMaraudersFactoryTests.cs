@@ -50,7 +50,7 @@ public class AngrathsMaraudersFactoryTests
         var c = AngrathsMaraudersFactory.Create(_alice);
 
         c.Name.Should().Be("Angrath's Marauders");
-        c.ManaCost.Should().Be("{4}{R}{R}");
+        c.ManaCost.Should().Be("{5}{R}{R}");
         c.Power.Should().Be(4);
         c.Toughness.Should().Be(4);
         c.HasType(CardType.Creature).Should().BeTrue();

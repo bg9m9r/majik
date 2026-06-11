@@ -316,4 +316,15 @@ public sealed class AuraSetBasePTEffect : ContinuousEffect
         chars.Power = NewPower;
         chars.Toughness = NewToughness;
     }
+
+    /// <summary>
+    /// Sim-only: reconstruct an identical <see cref="AuraSetBasePTEffect"/> bound to
+    /// <paramref name="clonedSource"/> (the aura) for the search-sandbox clone.
+    /// AppliesTo reads the cloned aura's AttachedTo dynamically (remapped by RelinkReferences).
+    /// preserves: NewPower, NewToughness; aura → clonedSource.
+    /// </summary>
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        => new AuraSetBasePTEffect(clonedSource, NewPower, NewToughness);
 }

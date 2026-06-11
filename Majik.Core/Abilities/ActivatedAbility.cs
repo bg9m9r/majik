@@ -62,11 +62,43 @@ public class ActivatedAbility : IActivatedAbility
     private readonly Func<bool>? _canActivateCheck;
 
     /// <summary>
+    /// CR 602.5c / 605.1a — context-aware variant of the "Activate only if"
+    /// gate. When set, it is preferred over the context-less
+    /// <see cref="_canActivateCheck"/> IF a live <see cref="GameContext"/> is
+    /// available at the activation-legality check (the bot's
+    /// <c>LegalActionEnumerator</c> and the live driver both have one in scope).
+    /// Lets the gate read live game state — the opponent set, per-turn tallies —
+    /// that a captured build-time resolver can't reach on the production routed
+    /// build (Hired Claw's "an opponent lost life this turn"). Null ⇒ no
+    /// context-aware gate; the engine falls back to <see cref="_canActivateCheck"/>.
+    /// </summary>
+    private readonly Func<GameContext, bool>? _canActivateCheckCtx;
+
+    /// <summary>
     /// CR 602.5c — true iff this ability's "Activate only if" condition (if
     /// any) is currently satisfied. Always true when no gate was supplied.
-    /// Re-evaluates the predicate on each call.
+    /// Re-evaluates the predicate on each call. Context-less form; callers that
+    /// hold a <see cref="GameContext"/> should prefer
+    /// <see cref="CanActivateNow(GameContext)"/> so a context-aware gate fires.
     /// </summary>
-    public bool CanActivateNow() => _canActivateCheck?.Invoke() ?? true;
+    public bool CanActivateNow() => CanActivateNow(null);
+
+    /// <summary>
+    /// CR 602.5c — context-aware overload. Prefers the context-aware gate
+    /// (<see cref="_canActivateCheckCtx"/>) when one was supplied AND a non-null
+    /// <paramref name="game"/> is available; otherwise falls back to the
+    /// context-less <see cref="_canActivateCheck"/> (so call sites without a
+    /// GameContext still gate correctly). Always true when neither gate was
+    /// supplied.
+    /// </summary>
+    public bool CanActivateNow(GameContext? game)
+    {
+        if (_canActivateCheckCtx != null && game != null)
+        {
+            return _canActivateCheckCtx(game);
+        }
+        return _canActivateCheck?.Invoke() ?? true;
+    }
 
     /// <summary>
     /// The "Activate only if" gate predicate, exposed so the activation
@@ -77,6 +109,13 @@ public class ActivatedAbility : IActivatedAbility
     public Func<bool>? CanActivateCheck => _canActivateCheck;
 
     /// <summary>
+    /// The context-aware "Activate only if" gate predicate, exposed so the
+    /// activation service can mirror it onto the stack copy (CR 602.4). Null
+    /// when no context-aware gate was supplied.
+    /// </summary>
+    public Func<GameContext, bool>? CanActivateCheckCtx => _canActivateCheckCtx;
+
+    /// <summary>
     /// The targets chosen by the activating player's agent (parallel
     /// list-of-lists matching <see cref="TargetRequests"/>). Populated by
     /// <see cref="SetChosenTargets"/> after the agent responds. Effects
@@ -84,6 +123,30 @@ public class ActivatedAbility : IActivatedAbility
     /// collection.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<object>> ChosenTargets => _chosenTargets;
+
+    /// <summary>
+    /// STAGE 2/3 (re-sourceable abilities) — provenance flag asserting that
+    /// EVERY effect of this ability reads its source / subject off the live
+    /// <see cref="ResolutionContext"/> (its own <see cref="ResolutionContext.Source"/>,
+    /// <see cref="Controller"/>, or <see cref="ChosenTargets"/>) rather than
+    /// capturing a specific authoring permanent in a closure. When true, the
+    /// whole ability is SOUND to re-home via <see cref="RebindTo"/>: costs
+    /// already re-home (Stage 1) and the effects re-source themselves at
+    /// resolution. When false (the default), a re-sourced copy may still
+    /// reference the ORIGINAL source through a captured closure, so a consumer
+    /// like Agatha's Soul Cauldron must NOT blindly RebindTo it.
+    ///
+    /// <para>
+    /// Set true only by build paths that have audited every effect they emit
+    /// — currently the data-driven CardDef path
+    /// (<see cref="Majik.Core.CardData.Definitions.CardDefActivatedAbility"/>),
+    /// whose self-source verbs (pump / connive / explore) were migrated to read
+    /// <see cref="ResolutionContext.Source"/>, with all other verbs already
+    /// scoped to the controller / chosen targets. Preserved across
+    /// <see cref="RebindTo"/>.
+    /// </para>
+    /// </summary>
+    public bool RebindSafe { get; init; }
 
     public ActivatedAbility(
         object source,
@@ -93,7 +156,9 @@ public class ActivatedAbility : IActivatedAbility
         IEnumerable<IEffect>? effects = null,
         IEnumerable<TargetRequest>? targetRequests = null,
         bool sorcerySpeed = false,
-        Func<bool>? canActivateCheck = null)
+        Func<bool>? canActivateCheck = null,
+        bool rebindSafe = false,
+        Func<GameContext, bool>? canActivateCheckCtx = null)
     {
         if (source == null)
         {
@@ -113,7 +178,9 @@ public class ActivatedAbility : IActivatedAbility
         Id = Majik.Core.Game.DeterministicIdScope.NewId();
         Timestamp = DateTime.UtcNow;
         IsSorcerySpeed = sorcerySpeed;
+        RebindSafe = rebindSafe;
         _canActivateCheck = canActivateCheck;
+        _canActivateCheckCtx = canActivateCheckCtx;
         _resolutionState = ResolutionState.NotResolving();
 
         TargetRequests = targetRequests is null
@@ -145,23 +212,43 @@ public class ActivatedAbility : IActivatedAbility
     /// own (the stack object is sourced from the copy via
     /// <see cref="Services.AbilityActivator"/>).
     ///
-    /// NOTE (v1 boundary): cost / effect closures that captured the ORIGINAL
-    /// source permanent directly (rather than reading it from the ability) still
-    /// reference the original — those abilities must be rebuilt by a bespoke
-    /// per-card rebind. This generic rebind is correct for the common case where
-    /// the ability references only its own <see cref="Source"/> /
-    /// <see cref="Controller"/>.
+    /// STAGE 1 — COSTS re-home. Each <see cref="AdditionalCost"/> whose captured
+    /// permanent is reference-equal to this ability's own <see cref="Source"/>
+    /// is rebound to <paramref name="newSource"/> via
+    /// <see cref="AdditionalCost.RebindSource"/>, so a re-sourced ability taps /
+    /// sacrifices the NEW source rather than the original permanent. Mana costs
+    /// and non-matching costs pass through unchanged.
+    ///
+    /// STAGE 2/3 — EFFECTS are REUSED (the same <see cref="IEffect"/> objects)
+    /// and re-home iff they read their source off the live
+    /// <see cref="ResolutionContext"/> (<see cref="ResolutionContext.Source"/> =
+    /// the new source at resolution, since the rebound ability's own
+    /// <see cref="Source"/> is <paramref name="newSource"/>). The
+    /// <see cref="RebindSafe"/> flag (preserved here) records whether EVERY
+    /// effect does so; a caller that requires soundness (Agatha's grant) only
+    /// re-homes abilities for which it is true. Effects that still capture the
+    /// ORIGINAL source in a closure (un-migrated bespoke factory abilities,
+    /// <see cref="RebindSafe"/> = false) are NOT made sound by this method — the
+    /// caller must gate on the flag.
     /// </summary>
     public ActivatedAbility RebindTo(object newSource, Player newController) =>
         new(
             source: newSource ?? throw new ArgumentNullException(nameof(newSource)),
             controller: newController ?? throw new ArgumentNullException(nameof(newController)),
             targets: _targets.Count > 0 ? _targets : null,
-            costs: _costs.Count > 0 ? _costs : null,
+            // STAGE 1 — re-home source-capturing costs ({T} / sacrifice) onto
+            // the new source so the rebound ability pays its cost with the new
+            // permanent; other ICost types pass through untouched.
+            costs: _costs.Count > 0
+                ? _costs.Select(c =>
+                    c is AdditionalCost ac ? ac.RebindSource(Source, newSource) : c)
+                : null,
             effects: _effects.Count > 0 ? _effects : null,
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
             sorcerySpeed: IsSorcerySpeed,
-            canActivateCheck: _canActivateCheck);
+            canActivateCheck: _canActivateCheck,
+            rebindSafe: RebindSafe,
+            canActivateCheckCtx: _canActivateCheckCtx);
 
     /// <summary>
     /// Store the targets chosen by the activating player's agent. Called by
@@ -195,12 +282,29 @@ public class ActivatedAbility : IActivatedAbility
 
         _resolutionState = ResolutionState.Resolving();
 
-        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct);
+        // STAGE 1 — expose the ability's own source (when it is a battlefield
+        // permanent) so effects can read "their source" generically off the
+        // context (CR 113.7) rather than capturing a specific permanent.
+        var rc = ResolutionContext.For(
+            Controller, agent, game, _chosenTargets, ct, source: Source as Cards.Permanent);
 
-        // Resolution logic (Rule 608) — await each effect in order.
-        foreach (var effect in _effects)
+        // Attribute any counter performed during this ability's resolution to
+        // its controller — "a spell or ability you control counters a spell"
+        // (Baral, Chief of Compliance). Restored afterward.
+        var stack = game?.Stack;
+        var previousResolutionController = stack?.CurrentResolutionController;
+        if (stack is not null) stack.CurrentResolutionController = Controller;
+        try
         {
-            await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            // Resolution logic (Rule 608) — await each effect in order.
+            foreach (var effect in _effects)
+            {
+                await effect.ExecuteAsync(rc).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (stack is not null) stack.CurrentResolutionController = previousResolutionController;
         }
 
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);

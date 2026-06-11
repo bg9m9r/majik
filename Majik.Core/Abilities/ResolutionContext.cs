@@ -69,6 +69,26 @@ public sealed record ResolutionContext(
     /// </summary>
     public Player? TriggeringPlayer { get; init; }
 
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — the battlefield permanent that is
+    /// the SOURCE of the resolving ability (CR 113.7 / 608.2g). Lets an effect
+    /// read "its source" generically off the live context instead of capturing
+    /// a specific permanent in a closure at authoring time. This is the
+    /// context-side hook later stages use to migrate effect authoring so a
+    /// re-sourced ability (e.g. an activated ability granted by Agatha's Soul
+    /// Cauldron and re-homed to a bearer) affects the bearer rather than the
+    /// originally-captured permanent.
+    ///
+    /// <para>
+    /// Populated by <see cref="ActivatedAbility.ResolveAsync"/> and
+    /// <see cref="TriggeredAbility.ResolveAsync"/> from the ability's own
+    /// <c>Source</c> when it is a <see cref="Permanent"/>. Null on the spell
+    /// path, the legacy synchronous path, and whenever the ability's source is
+    /// not a <see cref="Permanent"/>.
+    /// </para>
+    /// </summary>
+    public Permanent? Source { get; init; }
+
     private static readonly IReadOnlyDictionary<int, Player> EmptySharedSlot =
         new Dictionary<int, Player>();
 
@@ -92,12 +112,14 @@ public sealed record ResolutionContext(
         IPlayerAgent? agent,
         GameContext? game,
         IReadOnlyList<IReadOnlyList<object>>? chosenTargets,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Permanent? source = null)
     {
         var targets = chosenTargets ?? EmptyTargets;
         return new(controller, agent, game, targets, ct)
         {
             SharedSlotControllers = SnapshotSharedSlotControllers(targets),
+            Source = source,
         };
     }
 

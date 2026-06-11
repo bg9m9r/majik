@@ -227,6 +227,19 @@ public static class FlinthoofBoarFactory
             chars.Power += MountainBonusPower;
             chars.Toughness += MountainBonusToughness;
         }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical <see cref="MountainSelfPumpStaticEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// The controller is read live from clonedSource.Controller (correctly remapped).
+        /// preserves: nothing scalar; source → clonedSource (as Creature).
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Majik.Core.Cards.Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+            => clonedSource is Majik.Core.Cards.Creature clonedCreature
+                ? new MountainSelfPumpStaticEffect(clonedCreature)
+                : null;
     }
 
     // -----------------------------------------------------------------------
