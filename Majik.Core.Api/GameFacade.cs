@@ -414,19 +414,20 @@ public sealed class GameFacade : IDisposable
                     payment = autoPayment;
                 }
             }
-            if (!manaResolver.Pay(actor, cost, payment))
-            {
-                return false; // not committed: mana payment failed
-            }
-
             try
             {
                 var def = Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<IEffect>());
+                // CR 601.2c / 601.2h / CR 732.1 — the mana payment runs INSIDE
+                // the cast flow, after target collection, via the payManaCost
+                // callback (mirrors TurnDriver.DispatchCast). A cast that
+                // becomes illegal earlier in the flow throws before any mana
+                // is paid or any source is tapped — nothing to rewind.
                 await castFlow.CastAsync(
                     actor, cast.Card, def, agent, ctx, CancellationToken.None,
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
-                    preChosenMana: payment);
+                    preChosenMana: payment,
+                    payManaCost: _ => manaResolver.Pay(actor, cost, payment));
             }
             catch (InvalidOperationException)
             {
