@@ -145,11 +145,11 @@ internal sealed class Mcts
             {
                 // Truly terminal node (no legal moves, already expanded empty).
                 // Run a rollout from this position.
-                value = _sim.Rollout(root, evaluatedPath, _config.DepthTurns);
+                value = _sim.Rollout(root, evaluatedPath, _config.DepthTurns, _config.RolloutDepth);
             }
             else
             {
-                value = _sim.Rollout(root, evaluatedPath, _config.DepthTurns);
+                value = _sim.Rollout(root, evaluatedPath, _config.DepthTurns, _config.RolloutDepth);
             }
 
             // ── Backprop ──────────────────────────────────────────────────────
