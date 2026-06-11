@@ -45,6 +45,20 @@ public sealed class CombatFlow
         _attackRestrictions = attackRestrictions;
     }
 
+    /// <param name="grantStepPriority">
+    /// CR 508.4 / 509.4 — invoked at the end of the declare-attackers step
+    /// (after attackers are declared and each <see cref="CreatureAttacksEvent"/>
+    /// has published) and again at the end of the declare-blockers step (after
+    /// blockers are declared and each <see cref="CreatureBlocksEvent"/> has
+    /// published). Players get priority in each of these steps, so the engine
+    /// runs a full priority round here: pending "attacks"/"blocks" triggers
+    /// (CR 508.1f / 509.1h) are put on the stack (CR 603.3), state-based actions
+    /// are checked (CR 704), the stack resolves, and players may respond — all
+    /// BEFORE combat proceeds to the next step. <see cref="TurnDriver"/> supplies
+    /// its real priority round here. Null (direct unit-test callers with no
+    /// priority/stack infrastructure) skips the windows, preserving the legacy
+    /// "declare → declare → damage" shape those tests assert against.
+    /// </param>
     public async Task RunCombatAsync(
         Player attacker,
         Player defender,
@@ -53,7 +67,8 @@ public sealed class CombatFlow
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> blockers,
         GameContext ctx,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<Majik.Core.StateMachine.StepStateType, CancellationToken, Task>? grantStepPriority = null)
     {
         var attackPlan = await attackerAgent.DeclareAttackersAsync(ctx, attackers, ct);
 
@@ -81,6 +96,36 @@ public sealed class CombatFlow
             return;
         }
 
+        // CR 508.4 — the declare-attackers step grants priority AFTER attackers
+        // are declared and their "whenever ~ attacks" triggers (CR 508.1f) have
+        // fired. Run a full priority round here so those pending triggers are put
+        // on the stack (CR 603.3), state-based actions are checked (CR 704), the
+        // stack resolves, and both players may respond — all BEFORE blockers are
+        // declared. Without this, attack triggers (Goblin Guide, etc.) sat
+        // pending and only drained after combat damage, far too late.
+        if (grantStepPriority != null)
+        {
+            await grantStepPriority(Majik.Core.StateMachine.StepStateType.DeclareAttackers, ct);
+        }
+
+        // CR 508.1c — an attacker that left the battlefield (or stopped being a
+        // creature / got removed from combat) during the declare-attackers
+        // priority round no longer deals or receives combat damage. Re-narrow
+        // the plan to attackers still on the battlefield so the resolved stack
+        // can't make a dead attacker swing.
+        if (grantStepPriority != null
+            && attackPlan.Attackers.Any(a => a.Attacker.Zone != ZoneType.Battlefield))
+        {
+            var stillOnBattlefield = attackPlan.Attackers
+                .Where(a => a.Attacker.Zone == ZoneType.Battlefield)
+                .ToList();
+            attackPlan = new CombatPlan(stillOnBattlefield);
+            if (attackPlan.Attackers.Count == 0)
+            {
+                return;
+            }
+        }
+
         var blockPlan = await defenderAgent.DeclareBlockersAsync(
             ctx, attackPlan.Attackers.Select(a => a.Attacker).ToList(), blockers, ct);
 
@@ -92,6 +137,16 @@ public sealed class CombatFlow
         {
             _bus.Publish(new Majik.Core.Domain.DomainEvents.CreatureBlocksEvent(
                 b.Blocker, b.Attacker));
+        }
+
+        // CR 509.4 — the declare-blockers step grants priority AFTER blockers
+        // are declared and their "whenever ~ blocks / becomes blocked" triggers
+        // (CR 509.1h) have fired. Same priority round as above: pending triggers
+        // go on the stack, SBAs run, the stack resolves, players respond — all
+        // BEFORE combat damage is dealt.
+        if (grantStepPriority != null)
+        {
+            await grantStepPriority(Majik.Core.StateMachine.StepStateType.DeclareBlockers, ct);
         }
 
         var blockersByAttacker = blockPlan.Blockers

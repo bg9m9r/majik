@@ -1212,9 +1212,32 @@ public sealed class TurnDriver
         await _combatFlow.RunCombatAsync(
             attacker, defender,
             _agents[attacker], _agents[defender],
-            eligibleAttackers, eligibleBlockers, ctx, ct);
+            eligibleAttackers, eligibleBlockers, ctx, ct,
+            // CR 508.4 / 509.4 — grant priority WITHIN the declare-attackers and
+            // declare-blockers steps. CombatFlow invokes this after attackers
+            // (then blockers) are declared and their "attacks"/"blocks" triggers
+            // have fired, so the SAME priority-round machinery used everywhere
+            // else (PriorityLoop with the agent-aware trigger drain + SBA check)
+            // drains those pending triggers onto the stack, resolves them, and
+            // lets both players respond — BEFORE combat moves on. Without this,
+            // attack/block triggers (Goblin Guide and every "whenever ~ attacks/
+            // blocks/becomes blocked" ability) only resolved after combat damage.
+            grantStepPriority: (step, roundCt) =>
+            {
+                // Advance to the proper combat step (DeclareAttackers is already
+                // current from the caller; DeclareBlockers is a real transition)
+                // so step-aware triggers + clients see the correct step before
+                // this step's priority round. SetPhase re-emits StepStartedEvent,
+                // so only fire it on an ACTUAL step change to avoid double-firing
+                // "at the beginning of declare attackers" triggers.
+                if (_currentPhase != step)
+                {
+                    SetPhase(step);
+                }
+                return PriorityRound(attacker, roundCt);
+            });
 
-        // Priority round after damage (Rule 510.2 — players get priority).
+        // Priority round after combat damage (CR 510.4 — players get priority).
         await PriorityRound(attacker, ct);
     }
 
