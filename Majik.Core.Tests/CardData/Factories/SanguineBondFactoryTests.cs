@@ -133,8 +133,9 @@ public class SanguineBondFactoryTests
         sb.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(sb);
 
-        // Drive Bob to 0 — he's now "lost" and LoseLife would throw.
-        _bob.LoseLife(20);
+        // Bob has formally lost the game (CR 704.5a — loss is the SBA, so we
+        // mark it explicitly rather than relying on LoseLife's arithmetic).
+        _bob.MarkLost();
         _bob.HasLost.Should().BeTrue();
 
         var trigger = sb.Abilities.OfType<TriggeredAbility>().First();

@@ -198,7 +198,8 @@ public class TrespassersCurseFactoryTests
         _alice.Zones.Battlefield.AddCard(curse);
         TrespassersCurseFactory.SetEnchantedPlayer(curse, _bob);
 
-        _bob.LoseLife(20);
+        // Bob has formally lost the game (CR 704.5a — loss is the SBA).
+        _bob.MarkLost();
         _bob.HasLost.Should().BeTrue();
 
         var trigger = curse.Abilities.OfType<TriggeredAbility>().First();

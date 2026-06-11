@@ -281,6 +281,12 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     public LandDropTracker LandDrops { get; } = new();
 
+    /// <summary>Read-only access to the trigger manager (used by fuzz/diagnostic observers).</summary>
+    public TriggerManager Triggers => _triggers;
+
+    /// <summary>Read-only access to the event bus (used by fuzz/diagnostic observers).</summary>
+    public EventBus EventBus => _bus;
+
     private GameFacade(Player alice, Player bob)
     {
         _alice = alice;

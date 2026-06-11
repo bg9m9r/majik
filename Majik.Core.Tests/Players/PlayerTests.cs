@@ -1,6 +1,9 @@
+using System.Collections.Generic;
 using FluentAssertions;
+using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.ValueObjects;
 using Xunit;
 
@@ -77,9 +80,12 @@ public class PlayerTests
     [Fact]
     public void GainLife_AfterLosing_ThrowsException()
     {
-        // Arrange
+        // Arrange — a player who has FORMALLY lost (marked by the SBA loop,
+        // i.e. left the game) must reject life gain. CR 704.5a — loss is the
+        // SBA, so the "has lost" state comes from MarkLost(), not from
+        // LoseLife's life arithmetic.
         var player = new Player("Alice", 20);
-        player.LoseLife(20);
+        player.MarkLost();
         player.HasLost.Should().BeTrue();
 
         // Act & Assert
@@ -103,9 +109,13 @@ public class PlayerTests
     }
 
     [Fact]
-    public void LoseLife_ReducesToZero_SetsHasLost()
+    public void LoseLife_ReducesToZero_DoesNotSetHasLostUntilSba()
     {
-        // Arrange
+        // CR 704.5a — losing the game for 0-or-less life is a STATE-BASED
+        // action. Reducing life to 0 does NOT instantaneously set HasLost;
+        // the player only loses when SBAs are next checked. (Previously this
+        // test asserted HasLost == true here, which encoded the eager-flip
+        // bug that crashed mid-payment life costs.)
         var player = new Player("Alice", 20);
 
         // Act
@@ -113,13 +123,14 @@ public class PlayerTests
 
         // Assert
         player.LifeTotal.Should().Be(0);
-        player.HasLost.Should().BeTrue();
+        player.HasLost.Should().BeFalse();
     }
 
     [Fact]
-    public void LoseLife_ReducesBelowZero_SetsHasLost()
+    public void LoseLife_ReducesBelowZero_DoesNotSetHasLostUntilSba()
     {
-        // Arrange
+        // CR 704.5a — see above; below-zero life likewise loses only at the
+        // next SBA check, not eagerly inside LoseLife.
         var player = new Player("Alice", 20);
 
         // Act
@@ -127,6 +138,35 @@ public class PlayerTests
 
         // Assert
         player.LifeTotal.Should().Be(-5);
+        player.HasLost.Should().BeFalse();
+    }
+
+    [Fact]
+    public void PayingLifeAsCost_AtZero_DoesNotBlockSamePaymentsMana_LossDeferredToSba()
+    {
+        // CR 104.3a / 119.4 / 704.5a — repro of the fuzz-harness crash:
+        // a pain/Horizon land's mana ability pays 1 life as part of a mana
+        // payment ("{T}, Pay 1 life: Add {R}/{W}"). Paying the player to 0
+        // must NOT end the game mid-payment; the cast completes and the
+        // player loses only at the next SBA check.
+        var player = new Player("Alice", 1);
+
+        // Pay 1 life as a cost — player is now at 0 life.
+        player.LoseLife(1);
+
+        // Immediately after the life payment the player has NOT yet lost
+        // (loss is a state-based action that has not run yet)...
+        player.LifeTotal.Should().Be(0);
+        player.HasLost.Should().BeFalse();
+
+        // ...so the rest of the SAME payment can still add mana to the pool.
+        player.Invoking(p => p.AddManaToPool(ManaCost.Parse("R")))
+            .Should().NotThrow();
+        player.ManaPool.Red.Should().Be(1);
+
+        // Once SBAs are checked, the 0-life player formally loses (CR 704.5a).
+        var sba = new StateBasedActions();
+        sba.CheckStateBasedActions(new List<Player> { player }, new List<ICard>());
         player.HasLost.Should().BeTrue();
     }
 
@@ -144,9 +184,11 @@ public class PlayerTests
     [Fact]
     public void LoseLife_AfterLosing_ThrowsException()
     {
-        // Arrange
+        // Arrange — a player who has FORMALLY lost (left the game via the SBA)
+        // rejects further life loss. The "has lost" state is established by
+        // MarkLost(), not by LoseLife's arithmetic (CR 704.5a).
         var player = new Player("Alice", 20);
-        player.LoseLife(20);
+        player.MarkLost();
 
         // Act & Assert
         player.Invoking(p => p.LoseLife(5))
@@ -183,9 +225,13 @@ public class PlayerTests
     [Fact]
     public void AddManaToPool_AfterLosing_ThrowsException()
     {
-        // Arrange
+        // Arrange — guard for a player who has FORMALLY lost (left the game).
+        // Establish that state via MarkLost(), not via LoseLife's arithmetic:
+        // CR 704.5a makes loss a state-based action, and a mid-payment life
+        // cost that drops a player to 0 must NOT block the AddManaToPool that
+        // finishes the same payment (that was the fuzz-harness crash).
         var player = new Player("Alice", 20);
-        player.LoseLife(20);
+        player.MarkLost();
 
         // Act & Assert
         player.Invoking(p => p.AddManaToPool(ManaCost.Parse("R")))
@@ -239,10 +285,11 @@ public class PlayerTests
     [Fact]
     public void PayMana_AfterLosing_ReturnsFalse()
     {
-        // Arrange
+        // Arrange — guard for a player who has FORMALLY lost (CR 704.5a);
+        // establish via MarkLost(), not LoseLife's arithmetic.
         var player = new Player("Alice", 20);
         player.AddManaToPool(ManaCost.Parse("R"));
-        player.LoseLife(20);
+        player.MarkLost();
         var cost = ManaCost.Parse("R");
 
         // Act

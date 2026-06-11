@@ -8,3 +8,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Majik.Core.Api.Tests")]
 [assembly: InternalsVisibleTo("Majik.Core.Tests")]
 [assembly: InternalsVisibleTo("Majik.Console")]
+[assembly: InternalsVisibleTo("Majik.Bot.Tests.Integration")]
