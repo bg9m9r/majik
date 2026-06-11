@@ -182,7 +182,7 @@ public class PrimevalTitanZoneServiceTests : IDisposable
 
         // The pending queue includes Amulet of Vigor's untap trigger
         // alongside the bounce land's bounce trigger.
-        triggers.PendingCount.Should().BeGreaterOrEqualTo(2,
+        triggers.PendingCount.Should().BeGreaterThanOrEqualTo(2,
             "Amulet of Vigor's untap trigger + bounce-land bounce trigger should both queue");
     }
 

@@ -247,7 +247,7 @@ public class AbilityGrantTests
         // chars.Keywords (the gameplay surface) is empty.
         bear.Abilities.OfType<KeywordAbility>()
             .Where(k => string.Equals(k.Keyword, "Flying", StringComparison.OrdinalIgnoreCase))
-            .Should().HaveCountLessOrEqualTo(1,
+            .Should().HaveCountLessThanOrEqualTo(1,
                 "the granted Flying ability is revoked by the Humility strip; only the native KeywordAbility marker remains on Card.Abilities");
     }
 }
