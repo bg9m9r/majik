@@ -234,6 +234,22 @@ internal static class CombatSearch
                 c /= (attackerCount + 1);
             }
 
+            // CR 509.1b — an assignment containing an illegal (blocker,
+            // attacker) pair is not an option the opponent has; skip it
+            // rather than scoring it (scoring would let phantom blocks
+            // depress the bot's view of the attack).
+            bool legal = true;
+            for (int i = 0; i < blockerCount; i++)
+            {
+                var ai = assignment[i];
+                if (ai >= 0 && !memo.CanBlock(oppBlockers[i], attackers[ai]))
+                {
+                    legal = false;
+                    break;
+                }
+            }
+            if (!legal) continue;
+
             var (botLifeLost, oppLifeLost, botKilled, oppKilled) =
                 ProjectCombatWithAssignment(attackers, oppBlockers, assignment);
             var score = CombatEval.Score(botLifeLost, oppLifeLost, botKilled, oppKilled, weights, oppLifeBefore);
