@@ -51,6 +51,15 @@ internal sealed class SearchStrategy : IBotStrategy
     private readonly bool _prioritySearchEnabled;
 
     /// <summary>
+    /// Root-level block search (default ON): <see cref="PickBlockers"/> runs
+    /// MCTS rooted at the defender's block decision against the REAL declared
+    /// attack via the engine's combat-state resume. Resolved ONCE from
+    /// <see cref="BotConfig.RootBlockSearch"/> (null → true); false is the
+    /// kill switch pinning the legacy <see cref="BlockCombatEval"/> path.
+    /// </summary>
+    private readonly bool _rootBlockSearch;
+
+    /// <summary>
     /// The opponent's decklist when their archetype is known
     /// (<see cref="BotConfig.OpponentArchetype"/>), else null. Non-null selects
     /// the determinized K-world search path in <see cref="SearchRoot"/>; null keeps
@@ -242,6 +251,7 @@ internal sealed class SearchStrategy : IBotStrategy
         // archetype lookup so default behavior is completely unchanged.
         _weights = config.WeightsOverride ?? ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _prioritySearchEnabled = config.PrioritySearchEnabled;
+        _rootBlockSearch = config.RootBlockSearch ?? true;
         var mctsConfig = ConfigFrom(config);
         var sim = new EngineSimulator(_weights);
         _mcts = new Mcts(sim, mctsConfig);
@@ -489,30 +499,22 @@ internal sealed class SearchStrategy : IBotStrategy
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Block decisions are evaluated via direct combat-outcome scoring over the
-    /// enriched candidate set produced by <see cref="SearchAgent.BuildBlockerMoves"/>
-    /// (accessible via <see cref="BlockCombatEval"/>), rather than full MCTS.
+    /// Root-level block search (default ON, <see cref="BotConfig.RootBlockSearch"/>):
+    /// MCTS rooted at the defender's block decision against the REAL declared
+    /// attack. The historical D1.5 problem — a sandbox resumed at Combat re-ran
+    /// the opponent's attack declaration from scratch, so search could never
+    /// see the real attack — is solved by the engine's combat-state resume:
+    /// the root <see cref="SimState"/> carries the live attack as an Id-level
+    /// <see cref="CombatResumeState"/> and every sandbox enters combat PAST
+    /// the declaration at the blocker ask (CR 509).
     ///
-    /// Rationale — why PickBlockers does NOT use MCTS (and should not in Phase 2
-    /// without combat-state resume support):
-    ///
-    /// The bot's block decision is made against the SPECIFIC live attack that was
-    /// just declared by the real opponent. If we launched an MCTS sandbox to search
-    /// the block decision, the sandbox would resume from a pre-combat game state and
-    /// the sandbox's opponent agent (even the adversarial HeuristicStrategy added in
-    /// Task D3) would re-derive its OWN attack from that state — which may differ
-    /// from the real attack. The MCTS would then search blocks against the WRONG
-    /// attack, producing a meaningless or misleading block plan.
-    ///
-    /// The correct fix (Phase 2) is "combat-state resume": clone the game state
-    /// AFTER attackers are declared (mid-combat) so the sandbox sees the real attack.
-    /// Until that infrastructure exists, <see cref="BlockCombatEval"/> — a direct
-    /// one-ply lethal-aware combat projector over the actual attackers — is the
-    /// correct and safe tool for this decision class.
-    ///
-    /// The evaluator is lethal-aware: a plan that lets all-attacker power through
-    /// when it would kill the defender is scored as <c>double.MinValue</c> so
-    /// chump blocks (even losing the blocker) beat taking lethal damage.
+    /// <para>Fallback guard (the D1.5 lesson): when the search fails, is
+    /// gated out, or its chosen root move is not a block plan (a defender
+    /// priority window with real options surfaced first — the search answered
+    /// a different question), fall back to <see cref="EvalBlocks"/> — the
+    /// legacy <see cref="BlockCombatEval"/> path, which also remains the
+    /// rollout-opponent block policy and the <c>RootBlockSearch=false</c>
+    /// kill-switch behavior.</para>
     /// </remarks>
     public BlockPlan PickBlockers(
         GameContext ctx,
@@ -523,12 +525,81 @@ internal sealed class SearchStrategy : IBotStrategy
         if (attackers.Count == 0 || eligible.Count == 0)
             return BlockPlan.None;
 
+        if (!_rootBlockSearch)
+            return EvalBlocks(attackers, eligible, self);
+
+        var root = SimState.Capture(
+            livePlayers: ctx.AllPlayers,
+            activePlayer: ctx.ActivePlayer,          // the ATTACKING player
+            turnNumber: ctx.TurnNumber,
+            phase: PhaseStateType.Combat,
+            searchedSeat: self,                      // the DEFENDER
+            preDeclaredAttack: Majik.Core.Combat.CombatResumeState.FromAttackers(attackers, self));
+
+        // Concurrency gate (live bots only — null gate is the ungated default).
+        // Starvation guard: a bounded wait that times out degrades THIS pick to
+        // the eval decision instead of stalling the match indefinitely.
+        if (_gate is { } gate && !gate.TryEnter())
+            return EvalBlocks(attackers, eligible, self);
+
+        SimMove chosen;
+        try
+        {
+            chosen = SearchRoot(root, ctx, self);
+        }
+        catch
+        {
+            // Any search failure → fall back to the eval path for correctness.
+            return EvalBlocks(attackers, eligible, self);
+        }
+        finally
+        {
+            // Only reached after a successful TryEnter (the timeout path
+            // returned above), so the release is always balanced.
+            _gate?.Exit();
+        }
+
+        // D1.5 guard, block edition: a non-block root decision means the
+        // search answered a different question — fall back rather than
+        // misapply it.
+        if (chosen.BlockPlan == null)
+            return EvalBlocks(attackers, eligible, self);
+
+        // Explicit empty plan = the search deliberately chose NOT to block
+        // (distinct from null above).
+        if (chosen.BlockPlan.Blockers.Count == 0)
+            return BlockPlan.None;
+
+        // ── InstanceId remap ─────────────────────────────────────────────────
+        // The chosen plan's Creature references are sandbox clones; remap both
+        // ends of every pair to the LIVE creatures. RemapBlockPlan degrades to
+        // BlockPlan.None when every pair drops (stale ids — shouldn't happen
+        // for a legal move): treat that as a remap failure and fall back.
+        var remapped = SearchAgent.RemapBlockPlan(chosen.BlockPlan, attackers, eligible);
+        return remapped.Blockers.Count == 0
+            ? EvalBlocks(attackers, eligible, self)
+            : remapped;
+    }
+
+    /// <summary>
+    /// The legacy block decision — direct combat-outcome scoring over the
+    /// enriched candidate set (chump, trade, gang blocks), lethal-aware: a
+    /// plan that lets lethal through scores <c>double.MinValue</c>, so any
+    /// survival block beats taking lethal damage. Serves as the
+    /// <see cref="PickBlockers"/> fallback floor (search failure / non-block
+    /// root decision / remap failure) and the <c>RootBlockSearch=false</c>
+    /// kill-switch path; also what rollout opponents keep using.
+    /// </summary>
+    private BlockPlan EvalBlocks(
+        IReadOnlyList<Creature> attackers,
+        IReadOnlyList<Creature> eligible,
+        Player self)
+    {
         // Enumerate the enriched candidate set (includes chump, trade, gang blocks).
         var candidates = BlockCombatEval.EnumeratePlans(attackers, eligible);
 
         // Score each candidate and pick the best.
-        var best = BlockCombatEval.PickBest(candidates, attackers, self.LifeTotal, _weights);
-        return best;
+        return BlockCombatEval.PickBest(candidates, attackers, self.LifeTotal, _weights);
     }
 
     // ── Priority decisions — MCTS-backed (Task D2) ────────────────────────────

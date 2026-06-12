@@ -17,19 +17,19 @@ namespace Majik.Bot.Tests.Search;
 /// Each puzzle has a single unambiguous correct answer and tests that the search
 /// finds it. Attacker puzzles (P1, P2) use <see cref="SearchStrategy.PickAttackers"/>;
 /// blocker puzzles (P3–P5) use <see cref="SearchStrategy.PickBlockers"/>, which
-/// routes through <see cref="BlockCombatEval"/>.
+/// (root block search) runs MCTS rooted at the defender's block decision against
+/// the REAL declared attack via the engine's combat-state resume, with
+/// <see cref="BlockCombatEval"/> as the fallback floor.
 ///
 /// <para>
-/// Architecture note — why PickAttackers uses MCTS and PickBlockers does not:
-/// <see cref="SearchStrategy.PickAttackers"/> runs a real MCTS search over a
-/// sandbox engine. The sandbox opponent (Task D3) is now a
+/// Architecture note: both decision classes run a real MCTS search over a
+/// sandbox engine. The sandbox opponent (Task D3) is a
 /// <see cref="BotPlayerAgent"/> backed by <see cref="Heuristic.HeuristicStrategy"/>
 /// with a capped combat budget, so the sandbox IS adversarial: the opponent
 /// declares blockers, allowing MCTS to observe trade outcomes and penalise
-/// bad attacks (see P2).
-/// <see cref="SearchStrategy.PickBlockers"/> bypasses MCTS entirely and uses
-/// <see cref="BlockCombatEval"/>, a direct lethal-aware combat projector over the
-/// enriched candidate set.
+/// bad attacks (see P2). Block-puzzle boards must be FAITHFUL to the live
+/// block prompt — the declared attacker is tapped (CR 508.1f) — because the
+/// block search simulates the following turns, where tapped state matters.
 /// </para>
 /// </summary>
 public class CombatPuzzleTests
@@ -267,6 +267,12 @@ public class CombatPuzzleTests
         var bot = new Player("Bot", 20); // safe at 20 life — 2 damage is irrelevant
 
         var attacker22 = AddReadyCreature(opp, "Bear22", 2, 2);
+        // Board fidelity at the block prompt: a declared attacker is TAPPED
+        // (CR 508.1f — declaring taps it unless vigilance). The root block
+        // search simulates the FOLLOWING turns, where an untapped "attacker"
+        // would unrealistically be free to block the bot's counterattack —
+        // making the chump look better than it is.
+        attacker22.Tap();
         var chump11 = AddReadyCreature(bot, "Weenie11", 1, 1);
 
         PadLibraries(bot, opp);

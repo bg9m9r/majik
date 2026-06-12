@@ -61,6 +61,16 @@ public sealed class SimState
     public IReadOnlyList<string>? ObservedPublic { get; }
 
     /// <summary>
+    /// Root block search: the LIVE game's already-declared attack (Id-level
+    /// snapshot, see <see cref="Majik.Core.Combat.CombatResumeState"/>),
+    /// threaded by <see cref="EngineSimulator"/> into every sandbox resume so
+    /// the clone enters combat PAST the declaration at the defender's block
+    /// ask (CR 509). <c>null</c> (all non-block roots) = today's behavior:
+    /// the sandbox re-runs combat from the declaration.
+    /// </summary>
+    public Majik.Core.Combat.CombatResumeState? PreDeclaredAttack { get; }
+
+    /// <summary>
     /// Cache of this world's MATERIALIZED base: the live players cloned once and
     /// resampled with REAL prod-built cards (<c>DeckCardBuilder</c>), set lazily by
     /// <see cref="EngineSimulator"/>'s <c>ResolveCloneSource</c> on the first
@@ -88,7 +98,8 @@ public sealed class SimState
         Player searchedSeat,
         IReadOnlyList<string>? opponentDecklist = null,
         int? worldSeed = null,
-        IReadOnlyList<string>? observedPublic = null)
+        IReadOnlyList<string>? observedPublic = null,
+        Majik.Core.Combat.CombatResumeState? preDeclaredAttack = null)
     {
         LivePlayers = livePlayers;
         ActivePlayer = activePlayer;
@@ -98,6 +109,7 @@ public sealed class SimState
         OpponentDecklist = opponentDecklist;
         WorldSeed = worldSeed;
         ObservedPublic = observedPublic;
+        PreDeclaredAttack = preDeclaredAttack;
     }
 
     /// <summary>
@@ -119,7 +131,7 @@ public sealed class SimState
         IReadOnlyList<string> opponentDecklist, IReadOnlyList<string>? observedPublic, int worldSeed)
     {
         ArgumentNullException.ThrowIfNull(opponentDecklist);
-        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat
+        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, PreDeclaredAttack
         // NOT preserved by design: MaterializedWorldPlayers (world cache — a new world copy must re-materialize)
         return new SimState(
             livePlayers: LivePlayers,
@@ -129,7 +141,8 @@ public sealed class SimState
             searchedSeat: SearchedSeat,
             opponentDecklist: opponentDecklist,
             worldSeed: worldSeed,
-            observedPublic: observedPublic);
+            observedPublic: observedPublic,
+            preDeclaredAttack: PreDeclaredAttack);
     }
 
     /// <summary>
@@ -148,7 +161,7 @@ public sealed class SimState
     /// </summary>
     public SimState WithWorldSeed(int worldSeed)
     {
-        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, OpponentDecklist, ObservedPublic
+        // preserves: LivePlayers, ActivePlayer, TurnNumber, Phase, SearchedSeat, OpponentDecklist, ObservedPublic, PreDeclaredAttack
         // NOT preserved by design: MaterializedWorldPlayers (world cache — a new world copy must re-materialize)
         return new SimState(
             livePlayers: LivePlayers,
@@ -158,7 +171,8 @@ public sealed class SimState
             searchedSeat: SearchedSeat,
             opponentDecklist: OpponentDecklist,
             worldSeed: worldSeed,
-            observedPublic: ObservedPublic);
+            observedPublic: ObservedPublic,
+            preDeclaredAttack: PreDeclaredAttack);
     }
 
     /// <summary>
@@ -169,12 +183,16 @@ public sealed class SimState
     /// <param name="turnNumber">Current turn number.</param>
     /// <param name="phase">Phase from which to resume each sandbox run.</param>
     /// <param name="searchedSeat">The player whose decisions the search controls.</param>
+    /// <param name="preDeclaredAttack">Root block search only: the LIVE game's
+    ///   already-declared attack, threaded into every sandbox resume so the
+    ///   clone enters combat past the declaration (CR 509). Null otherwise.</param>
     public static SimState Capture(
         IReadOnlyList<Player> livePlayers,
         Player activePlayer,
         int turnNumber,
         PhaseStateType phase,
-        Player searchedSeat)
+        Player searchedSeat,
+        Majik.Core.Combat.CombatResumeState? preDeclaredAttack = null)
     {
         ArgumentNullException.ThrowIfNull(livePlayers);
         ArgumentNullException.ThrowIfNull(activePlayer);
@@ -187,6 +205,7 @@ public sealed class SimState
             activePlayer: activePlayer,
             turnNumber: turnNumber,
             phase: phase,
-            searchedSeat: searchedSeat);
+            searchedSeat: searchedSeat,
+            preDeclaredAttack: preDeclaredAttack);
     }
 }

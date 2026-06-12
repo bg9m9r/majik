@@ -30,7 +30,8 @@ internal sealed record ResumeCtx(
     PhaseStateType Phase,
     Guid ActivePlayerId,
     IReadOnlyList<SimMove> SuffixFromParent,
-    IReadOnlyDictionary<Guid, int> LandDropsUsed)
+    IReadOnlyDictionary<Guid, int> LandDropsUsed,
+    Majik.Core.Combat.CombatResumeState? PreDeclaredAttack = null)
 {
     private static readonly IReadOnlyDictionary<Guid, int> NoDrops =
         new Dictionary<Guid, int>();
@@ -40,6 +41,13 @@ internal sealed record ResumeCtx(
     /// active seat, an empty suffix, and no consumed land drops (a root capture
     /// happens at a live decision point whose turn-tally the live engine still
     /// owns — sims have always resumed roots with a fresh tracker).
+    /// Preserves the root's <see cref="SimState.PreDeclaredAttack"/> so the
+    /// reuse path's root-cache resume (AdvanceFrom/RolloutFrom via
+    /// <c>StateFromCache</c>) replays a block-search root into the SAME
+    /// past-declaration combat the direct Advance path enters. Child-node
+    /// snapshots keep the default null: mid-combat positions are never
+    /// cache-eligible (<see cref="SnapshotPolicy"/>), so every cached child
+    /// sits after the resumed combat completed.
     /// </summary>
     public static ResumeCtx ForRoot(SimState root)
     {
@@ -47,7 +55,8 @@ internal sealed record ResumeCtx(
         return new ResumeCtx(
             root.TurnNumber, root.Phase, root.ActivePlayer.Id,
             SuffixFromParent: Array.Empty<SimMove>(),
-            LandDropsUsed: NoDrops);
+            LandDropsUsed: NoDrops,
+            PreDeclaredAttack: root.PreDeclaredAttack);
     }
 }
 

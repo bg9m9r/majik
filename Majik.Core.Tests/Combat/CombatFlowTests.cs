@@ -130,6 +130,39 @@ public class CombatFlowTests
             "every intent CombatFlow emits is combat damage (CR 510.1)");
     }
 
+    [Fact]
+    public async Task RunCombatFromBlocks_DealsDamage_WithoutRedeclaringAttack()
+    {
+        // Combat entered with a pre-built attack plan (declaration happened
+        // "live": attacker already tapped) must run blocks + damage WITHOUT
+        // re-declaring or re-firing CR 508.1f attack events.
+        var atk = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
+        atk.SetOwner(_alice); atk.SetController(_alice); atk.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(atk);
+        atk.HasSummoningSickness = false;
+        atk.Tap(); // declaration already happened live
+
+        var blk = (Creature)NamedCardFactory.Create("Grizzly Bears", _bob);
+        blk.SetOwner(_bob); blk.SetController(_bob); blk.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(blk);
+
+        var attacksFired = 0;
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(_ => attacksFired++);
+
+        var flow = new CombatFlow(_bus, _sba);
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueBlockers(BlockPlan.None);
+        var attackPlan = new CombatPlan(new[] {
+            new Majik.Core.Players.Agents.AttackerDeclaration(atk, _bob) });
+
+        await flow.RunCombatFromBlocksAsync(
+            _alice, _bob, bobAgent,
+            attackPlan, new[] { blk }, NewContext());
+
+        attacksFired.Should().Be(0, "the declaration half already ran live");
+        _bob.LifeTotal.Should().BeLessThan(20, "the damage half ran (no-block agent)");
+    }
+
     private GameContext NewContext() =>
         new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 }

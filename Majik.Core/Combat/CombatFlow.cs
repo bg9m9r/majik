@@ -126,6 +126,30 @@ public sealed class CombatFlow
             }
         }
 
+        await RunCombatFromBlocksAsync(
+            attacker, defender, defenderAgent, attackPlan, blockers, ctx, ct, grantStepPriority);
+    }
+
+    /// <summary>
+    /// CR 509+ — the post-declaration half of combat: blocker declaration,
+    /// block triggers (CR 509.1h), the declare-blockers priority window
+    /// (CR 509.4), and the damage steps (CR 510). Called by
+    /// <see cref="RunCombatAsync"/> on the normal path and directly by the
+    /// sim combat-state resume (root block search) with a rebound attack plan
+    /// whose declaration ALREADY happened live (attackers tapped, attack
+    /// triggers fired) — re-running the declaration half there would
+    /// double-fire CR 508.1f triggers.
+    /// </summary>
+    public async Task RunCombatFromBlocksAsync(
+        Player attacker,
+        Player defender,
+        IPlayerAgent defenderAgent,
+        CombatPlan attackPlan,
+        IReadOnlyList<Creature> blockers,
+        GameContext ctx,
+        CancellationToken ct = default,
+        Func<Majik.Core.StateMachine.StepStateType, CancellationToken, Task>? grantStepPriority = null)
+    {
         var blockPlan = await defenderAgent.DeclareBlockersAsync(
             ctx, attackPlan.Attackers.Select(a => a.Attacker).ToList(), blockers, ct);
 
