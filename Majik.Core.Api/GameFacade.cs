@@ -467,6 +467,14 @@ public sealed class GameFacade : IDisposable
                 }
             }
 
+            // CR 700.6 / 701.17 — if a "Sacrifice another creature" / "Sacrifice
+            // a creature" COST is on the ability, prompt the controller to choose
+            // WHICH creature to sacrifice (the same ChooseAsync prompt the portal
+            // renders) and stamp it onto the cost BEFORE payment. Without this the
+            // cost silently auto-picks the first creature (live-play bug).
+            await Majik.Core.Game.SacrificeCostPrompt.ChooseSacrificesAsync(
+                actor, activate.Ability, agents[actor], ctx);
+
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _bus);
             try
             {

@@ -20,6 +20,16 @@ public class AdditionalCost : ICost
     public string Description { get; }
     public AdditionalCostType CostType => _costType;
 
+    /// <summary>
+    /// The permanent this cost taps or sacrifices, when the parameter is a
+    /// permanent (CR 602.2 cost analysis). Null for non-permanent costs (life,
+    /// counters). Lets the priority-kinds gate tell a "{T}" self-tap ability
+    /// (blocked by summoning sickness) apart from a non-tap activated ability
+    /// (Yawgmoth's "Pay 1 life, Sacrifice another creature", which a sick
+    /// creature CAN still activate).
+    /// </summary>
+    public Cards.Permanent? Permanent => _costParameter as Cards.Permanent;
+
     private AdditionalCost(AdditionalCostType costType, string description, object? costParameter = null, IEventBus? eventBus = null)
     {
         _costType = costType;
