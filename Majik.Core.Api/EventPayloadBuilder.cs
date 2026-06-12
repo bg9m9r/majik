@@ -163,6 +163,21 @@ public static class EventPayloadBuilder
             CounterType: x.CounterType.Name,
             Amount: x.Amount,
             ControllerId: x.Controller?.Id)),
+        // CR 613 — continuous (layer) effect entering / leaving the active
+        // set. Log-only surface for the portal action log: source identity,
+        // CR-613 Layer name, human-readable Description. Public info
+        // (battlefield) — no per-viewer masking. A floating effect (no
+        // source) projects Guid.Empty / "" so the wire keys are always present.
+        ContinuousEffectAddedEvent x => Serialize(new ContinuousEffectAddedPayload(
+            SourceInstanceId: x.Effect.Source?.InstanceId ?? Guid.Empty,
+            SourceName: x.Effect.Source?.Name ?? "",
+            Layer: x.Effect.Layer.ToString(),
+            Description: x.Effect.Description)),
+        ContinuousEffectRemovedEvent x => Serialize(new ContinuousEffectRemovedPayload(
+            SourceInstanceId: x.Effect.Source?.InstanceId ?? Guid.Empty,
+            SourceName: x.Effect.Source?.Name ?? "",
+            Layer: x.Effect.Layer.ToString(),
+            Description: x.Effect.Description)),
         GameStartedEvent => Empty(),
         _ => Empty(),
     };

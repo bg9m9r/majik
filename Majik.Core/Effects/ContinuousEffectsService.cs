@@ -200,6 +200,10 @@ public sealed class ContinuousEffectsService
             src.ActiveEffects = this;
         }
         BumpGeneration();
+        // CR 613 — log-only surface for the portal action log. Public info
+        // (battlefield), no per-viewer masking. Null bus (sim / unit
+        // construction) → silently skipped.
+        _eventBus?.Publish(new ContinuousEffectAddedEvent(effect));
     }
 
     public void Unregister(ContinuousEffect effect)
@@ -210,7 +214,13 @@ public sealed class ContinuousEffectsService
         if (effect is GrantAbilityToGroupStaticEffect groupGrant) groupGrant.RevokeAll();
         // CR 613 — fire the teardown hook (e.g. restore a temporarily swapped
         // controller) only if the effect was actually registered here.
-        if (_effects.Remove(effect)) effect.OnExpired();
+        if (_effects.Remove(effect))
+        {
+            effect.OnExpired();
+            // Log-only removal surface — only when an effect was actually
+            // dropped (no spurious line for unregistering an unknown effect).
+            _eventBus?.Publish(new ContinuousEffectRemovedEvent(effect));
+        }
         BumpGeneration();
     }
 
@@ -237,6 +247,10 @@ public sealed class ContinuousEffectsService
         {
             if (e.IsActive()) return false;
             e.OnExpired();
+            // Log-only removal surface — published here (this is its own
+            // funnel; Prune does NOT route through Unregister, so no
+            // double-publish).
+            _eventBus?.Publish(new ContinuousEffectRemovedEvent(e));
             return true;
         });
         // Effects may have changed AND permanents may have left play; clear
@@ -757,6 +771,9 @@ public sealed class ContinuousEffectsService
         {
             if (!e.ExpiresAtEndOfTurn) return false;
             e.OnExpired();
+            // Log-only removal surface — published here (own funnel; the
+            // cleanup-step RemoveAll does NOT route through Unregister).
+            _eventBus?.Publish(new ContinuousEffectRemovedEvent(e));
             return true;
         });
         // Effects dropped → clear opportunistically (bounds growth) and bump.

@@ -3,6 +3,7 @@ using Majik.Core.Api;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
@@ -328,6 +329,87 @@ public class EventPayloadTests
         var e = new CounterAddedEvent(creature, Majik.Core.Counters.CounterType.Charge, 1);
 
         EventPayloadBuilder.RequiresPerViewerMasking(e).Should().BeFalse();
+    }
+
+    // ---- CR 613: ContinuousEffect add/remove payloads ----
+
+    [Fact]
+    public void ContinuousEffectAddedEvent_PayloadCarriesSourceLayerAndDescription()
+    {
+        var alice = new Player("Alice");
+        var source = new Creature("Goblin Chieftain", "1RR", 2, 2)
+        {
+            Owner = alice,
+            Controller = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var effect = new TestContinuousEffect(source);
+        var e = new ContinuousEffectAddedEvent(effect);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(source.InstanceId);
+        payload.GetProperty("sourceName").GetString().Should().Be("Goblin Chieftain");
+        payload.GetProperty("layer").GetString().Should().Be(Layer.PT_Modify.ToString());
+        payload.GetProperty("description").GetString().Should().Be("Goblin Chieftain effect");
+    }
+
+    [Fact]
+    public void ContinuousEffectRemovedEvent_PayloadCarriesSourceLayerAndDescription()
+    {
+        var alice = new Player("Alice");
+        var source = new Creature("Goblin Chieftain", "1RR", 2, 2)
+        {
+            Owner = alice,
+            Controller = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var effect = new TestContinuousEffect(source);
+        var e = new ContinuousEffectRemovedEvent(effect);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(source.InstanceId);
+        payload.GetProperty("sourceName").GetString().Should().Be("Goblin Chieftain");
+        payload.GetProperty("layer").GetString().Should().Be(Layer.PT_Modify.ToString());
+        payload.GetProperty("description").GetString().Should().Be("Goblin Chieftain effect");
+    }
+
+    [Fact]
+    public void ContinuousEffectAddedEvent_FloatingSource_EmitsEmptyGuidAndDefaultDescription()
+    {
+        // A floating effect (no source permanent) → SourceInstanceId is
+        // Guid.Empty, SourceName empty, Description the default phrase.
+        var effect = new TestContinuousEffect(source: null);
+        var e = new ContinuousEffectAddedEvent(effect);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(Guid.Empty);
+        payload.GetProperty("sourceName").GetString().Should().Be("");
+        payload.GetProperty("description").GetString().Should().Be("continuous effect");
+    }
+
+    [Fact]
+    public void ContinuousEffectEvents_AreNotPerViewerMasked()
+    {
+        // Continuous effects live on the battlefield → public info (CR 613).
+        var effect = new TestContinuousEffect(source: null);
+        EventPayloadBuilder.RequiresPerViewerMasking(new ContinuousEffectAddedEvent(effect)).Should().BeFalse();
+        EventPayloadBuilder.RequiresPerViewerMasking(new ContinuousEffectRemovedEvent(effect)).Should().BeFalse();
+    }
+
+    /// <summary>Minimal concrete effect anchored (optionally) to a source
+    /// permanent, for exercising the payload builder's Source / Layer /
+    /// Description projection.</summary>
+    private sealed class TestContinuousEffect : ContinuousEffect
+    {
+        private readonly Permanent? _source;
+        public TestContinuousEffect(Permanent? source) => _source = source;
+        public override Layer Layer => Layer.PT_Modify;
+        public override Permanent? Source => _source;
+        public override bool AppliesTo(Creature creature) => false;
+        public override void Apply(CreatureCharacteristics chars) { }
     }
 
     [Fact]

@@ -539,6 +539,54 @@
         ],
         "type": "object"
       },
+      "ContinuousEffectAddedPayload": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "sourceInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceInstanceId",
+          "sourceName",
+          "layer",
+          "description"
+        ],
+        "type": "object"
+      },
+      "ContinuousEffectRemovedPayload": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "sourceInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceInstanceId",
+          "sourceName",
+          "layer",
+          "description"
+        ],
+        "type": "object"
+      },
       "CounterAddedPayload": {
         "properties": {
           "amount": {
@@ -804,6 +852,12 @@
           "cardRevealed": {
             "$ref": "#/components/schemas/CardRevealedPayload"
           },
+          "continuousEffectAdded": {
+            "$ref": "#/components/schemas/ContinuousEffectAddedPayload"
+          },
+          "continuousEffectRemoved": {
+            "$ref": "#/components/schemas/ContinuousEffectRemovedPayload"
+          },
           "counterAdded": {
             "$ref": "#/components/schemas/CounterAddedPayload"
           },
@@ -852,7 +906,9 @@
           "playerLost",
           "stackObject",
           "damageDealt",
-          "counterAdded"
+          "counterAdded",
+          "continuousEffectAdded",
+          "continuousEffectRemoved"
         ],
         "type": "object"
       },
