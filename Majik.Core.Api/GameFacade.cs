@@ -448,9 +448,27 @@ public sealed class GameFacade : IDisposable
             var targets = new List<Majik.Core.Targeting.ITarget>();
             if (activate.Ability is Majik.Core.Abilities.ActivatedAbility aa)
             {
+                // CR 602.2b — collect the chosen targets per TargetRequest AND
+                // record them on the source ability via SetChosenTargets so the
+                // resolution-time effect closures (which read aa.ChosenTargets)
+                // see them. AbilityActivator copies sourceAbility.ChosenTargets
+                // onto the stack object, but the effect closures captured the
+                // SOURCE ability — without this stamp the chosen target was
+                // dropped (e.g. Yawgmoth's "-1/-1 on up to one target" never
+                // placed a counter). Mirrors DispatchLoyalty / TurnDriver.
+                var chosenTargets = new List<IReadOnlyList<object>>();
                 foreach (var req in aa.TargetRequests)
                 {
-                    var chosen = await agents[actor].ChooseTargetsAsync(ctx, req, ct: default);
+                    // Resolve any lazy CandidateGatherer against the live ctx so
+                    // the prompt ships the legal candidate pool (the portal
+                    // renders only legal targets); mirrors TurnDriver /
+                    // SpellCastFlow / TriggerManager.
+                    var live = req.ResolveCandidates(ctx);
+                    var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                        ? req
+                        : req.WithCandidates(live);
+                    var chosen = await agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                    chosenTargets.Add(chosen);
                     foreach (var obj in chosen)
                     {
                         var wrapper = obj switch
@@ -464,6 +482,10 @@ public sealed class GameFacade : IDisposable
                         };
                         if (wrapper != null) targets.Add(wrapper);
                     }
+                }
+                if (chosenTargets.Count > 0)
+                {
+                    aa.SetChosenTargets(chosenTargets);
                 }
             }
 
