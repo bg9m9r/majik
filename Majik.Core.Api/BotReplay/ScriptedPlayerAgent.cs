@@ -46,6 +46,11 @@ public sealed class ScriptedPlayerAgent : IPlayerAgent
     /// <summary>How many recorded decisions have been consumed so far.</summary>
     public int Consumed => _next;
 
+    /// <summary>The live-edge fall-through agent (typically a
+    /// <see cref="RecordingPlayerAgent"/> over the live bot), or null in the
+    /// strict pure-replay posture. Exposed for installation-seam tests.</summary>
+    public IPlayerAgent? Continuation => _continuation;
+
     /// <summary>True once every recorded decision has been replayed.</summary>
     public bool Exhausted => _next >= _script.Count;
 

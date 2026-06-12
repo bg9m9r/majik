@@ -50,12 +50,16 @@ public sealed class ServerGameFactory
         IReadOnlyList<ICard> bobDeck,
         string? botSeatArchetype = null,
         Action<bool>? onBotThinking = null,
-        IBotDecisionSink? extraDecisionSink = null)
+        IBotDecisionSink? extraDecisionSink = null,
+        Func<Majik.Core.Api.BotReplay.BotDecisionRecord, Task>? botDecisionRecorder = null,
+        Action<Exception>? onBotRecordingDegraded = null)
     {
         var facade = _registry.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
         if (botSeatArchetype != null)
         {
-            InstallBotAgent(facade, botSeatArchetype, onBotThinking, extraDecisionSink);
+            InstallBotAgent(
+                facade, botSeatArchetype, onBotThinking, extraDecisionSink,
+                botDecisionRecorder, botReplayScript: null, onBotRecordingDegraded);
         }
         return facade;
     }
@@ -137,17 +141,55 @@ public sealed class ServerGameFactory
     /// _botDecisionSink is the process-wide logger sink. The sink is diagnostics
     /// only — it does not affect the bot's deterministic decisions, so a
     /// rehydrate can safely pass null and still reproduce the original play.
+    ///
+    /// <para><b>Bot-decision persistence:</b> when
+    /// <paramref name="botDecisionRecorder"/> is non-null (the caller's
+    /// persistence flag is ON) the live bot is wrapped in a
+    /// <see cref="Majik.Core.Api.BotReplay.RecordingPlayerAgent"/> so every
+    /// answer is durably appended before it is returned. When
+    /// <paramref name="botReplayScript"/> is non-empty (rehydration), a
+    /// <see cref="Majik.Core.Api.BotReplay.ScriptedPlayerAgent"/> replays the
+    /// recorded answers VERBATIM and falls through to the recording wrapper at
+    /// the live edge (continuing the stream at botSeq = script.Count) — agents
+    /// cannot be swapped once the game has started, so the handoff is composed
+    /// in. With a null recorder the bot is installed bare — byte-identical to
+    /// the pre-persistence path.</para>
     /// </summary>
     private void InstallBotAgent(
         GameFacade facade,
         string botSeatArchetype,
         Action<bool>? onBotThinking,
-        IBotDecisionSink? extraDecisionSink)
+        IBotDecisionSink? extraDecisionSink,
+        Func<Majik.Core.Api.BotReplay.BotDecisionRecord, Task>? botDecisionRecorder = null,
+        IReadOnlyList<Majik.Core.Api.BotReplay.BotDecisionRecord>? botReplayScript = null,
+        Action<Exception>? onBotRecordingDegraded = null)
     {
         var composed = CompositeBotDecisionSink.Compose(_botDecisionSink, extraDecisionSink);
         var effectiveSink = ReferenceEquals(composed, NullBotDecisionSink.Instance) ? null : composed;
         var botCfg = BuildBotConfig(botSeatArchetype, effectiveSink);
-        facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking));
+
+        Majik.Core.Players.Agents.IPlayerAgent agent =
+            new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking);
+
+        if (botDecisionRecorder != null)
+        {
+            // An unsupported answer shape is a logged degrade (the live game
+            // continues unrecorded from there), never a live-game crash.
+            var degrade = onBotRecordingDegraded ?? (_ => { });
+            agent = new Majik.Core.Api.BotReplay.RecordingPlayerAgent(
+                agent,
+                botDecisionRecorder,
+                startSeq: botReplayScript?.Count ?? 0,
+                onUnsupported: ex => degrade(ex));
+        }
+
+        if (botReplayScript is { Count: > 0 })
+        {
+            agent = new Majik.Core.Api.BotReplay.ScriptedPlayerAgent(
+                botReplayScript, continuation: agent);
+        }
+
+        facade.ReplaceBobAgent(agent);
     }
 
     /// <summary>
@@ -162,29 +204,36 @@ public sealed class ServerGameFactory
     /// rebuilt deck cards bind identically.
     ///
     /// <para>For a vs-bot match the caller passes <paramref name="botSeatArchetype"/>
-    /// so the deterministic <see cref="Majik.Bot.BotPlayerAgent"/> is re-installed
-    /// on the Bob seat BEFORE replay starts — same archetype + same seed ⇒ the
-    /// bot re-makes identical in-engine decisions, and its prompts never consume
-    /// a logged human command (the bot drives itself via ChooseAsync; only human
+    /// so the bot seat is re-installed BEFORE replay starts and its prompts never
+    /// consume a logged human command (the bot drives itself in-engine; only human
     /// commands were ever logged). Omitting it on a bot match desyncs the replay.
-    /// NOTE: the identical-decision guarantee holds for the heuristic strategy;
-    /// a wall-clock-budgeted MCTS bot (<see cref="ServerBotOptions"/>) is not
-    /// run-to-run deterministic, so its rehydration replay may diverge — the
-    /// failure path is graceful (rehydrate fails, match lost, never wedged).
-    /// onBotThinking is null on rehydrate — there is no live thinking indicator to
-    /// drive during a fast-forward.</para>
+    /// The replay guarantee is RECORD/REPLAY, not same-seed recompute: the caller
+    /// passes the match's recorded <paramref name="botReplayScript"/> and the bot
+    /// seat answers every replayed prompt VERBATIM from it via
+    /// <see cref="Majik.Core.Api.BotReplay.ScriptedPlayerAgent"/> — so even the
+    /// wall-clock-budgeted MCTS strategy (<see cref="ServerBotOptions"/>)
+    /// rehydrates identically. Past the live edge the script falls through to a
+    /// fresh recording wrapper (botSeq continues at script.Count). A recorded-
+    /// stream desync still fails gracefully (rehydrate fails, match lost, never
+    /// wedged). onBotThinking is null on rehydrate — there is no live thinking
+    /// indicator to drive during a fast-forward.</para>
     /// </summary>
     public GameFacade BuildUnregisteredFacade(
         string aliceName,
         string bobName,
         IReadOnlyList<ICard> aliceDeck,
         IReadOnlyList<ICard> bobDeck,
-        string? botSeatArchetype = null)
+        string? botSeatArchetype = null,
+        IReadOnlyList<Majik.Core.Api.BotReplay.BotDecisionRecord>? botReplayScript = null,
+        Func<Majik.Core.Api.BotReplay.BotDecisionRecord, Task>? botDecisionRecorder = null,
+        Action<Exception>? onBotRecordingDegraded = null)
     {
         var facade = GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
         if (botSeatArchetype != null)
         {
-            InstallBotAgent(facade, botSeatArchetype, onBotThinking: null, extraDecisionSink: null);
+            InstallBotAgent(
+                facade, botSeatArchetype, onBotThinking: null, extraDecisionSink: null,
+                botDecisionRecorder, botReplayScript, onBotRecordingDegraded);
         }
         return facade;
     }
