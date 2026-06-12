@@ -42,7 +42,12 @@ internal static class CombatSearch
             usable = usable.OrderByDescending(c => c.Power).Take(TopKAttackers).ToList();
 
         var opp = ctx.AllPlayers.First(p => !ReferenceEquals(p, self));
-        var oppBlockers = opp.Zones.Battlefield.GetCards().OfType<Creature>().ToList();
+        // CR 509.1b — tapped creatures can't block (attacker-independent part
+        // of BlockLegality.CanBlock); per-pair restrictions (flying,
+        // protection) are checked via the memo below.
+        var oppBlockers = opp.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Where(c => !c.IsTapped).ToList();
+        var memo = new BlockLegalityMemo();
         // Capture opp's current life for the lethal-proximity ramp in CombatEval.
         int oppLifeBefore = opp.LifeTotal;
 
@@ -53,7 +58,7 @@ internal static class CombatSearch
         // Pass 1: greedy block projection over all attacker subsets.
         var (best, bestScore) = SearchSubsets(
             usable, oppBlockers, opp, weights, sw, budgetMs,
-            (subset, blockers) => ScoreSubsetGreedy(subset, blockers, weights, oppLifeBefore),
+            (subset, blockers) => ScoreSubsetGreedy(subset, blockers, weights, oppLifeBefore, memo),
             scored, deep: false);
 
         bool usedDeep = false;
@@ -68,7 +73,7 @@ internal static class CombatSearch
             scored.Clear();
             var (deepBest, deepScore) = SearchSubsets(
                 usable, oppBlockers, opp, weights, sw, budgetMs,
-                (subset, blockers) => ScoreSubsetMinimax(subset, blockers, weights, oppLifeBefore),
+                (subset, blockers) => ScoreSubsetMinimax(subset, blockers, weights, oppLifeBefore, memo),
                 scored, deep: true);
             best = deepBest;
             bestScore = deepScore;
@@ -173,10 +178,11 @@ internal static class CombatSearch
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> oppBlockers,
         ArchetypeWeights weights,
-        int oppLifeBefore)
+        int oppLifeBefore,
+        BlockLegalityMemo memo)
     {
         var (botLifeLost, oppLifeLost, botPowerKilled, oppPowerKilled)
-            = ProjectCombatGreedy(attackers, oppBlockers);
+            = ProjectCombatGreedy(attackers, oppBlockers, memo);
         return CombatEval.Score(botLifeLost, oppLifeLost, botPowerKilled, oppPowerKilled, weights, oppLifeBefore);
     }
 
@@ -189,7 +195,8 @@ internal static class CombatSearch
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> oppBlockers,
         ArchetypeWeights weights,
-        int oppLifeBefore)
+        int oppLifeBefore,
+        BlockLegalityMemo memo)
     {
         if (attackers.Count == 0)
             return CombatEval.Score(0, 0, 0, 0, weights, oppLifeBefore);
@@ -215,7 +222,7 @@ internal static class CombatSearch
         if (totalCombos < 0)
         {
             // Fall back to greedy if combos blow up (shouldn't happen with caps).
-            return ScoreSubsetGreedy(attackers, oppBlockers, weights, oppLifeBefore);
+            return ScoreSubsetGreedy(attackers, oppBlockers, weights, oppLifeBefore, memo);
         }
 
         for (long combo = 0; combo < totalCombos; combo++)
@@ -247,7 +254,8 @@ internal static class CombatSearch
     /// alternative block assignments.
     /// </summary>
     private static (int botLifeLost, int oppLifeLost, int botPowerKilled, int oppPowerKilled)
-        ProjectCombatGreedy(IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> oppBlockers)
+        ProjectCombatGreedy(IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> oppBlockers,
+            BlockLegalityMemo memo)
     {
         var ordered = attackers.OrderByDescending(c => c.Power).ToList();
         var avail = new List<Creature>(oppBlockers);
@@ -257,10 +265,11 @@ internal static class CombatSearch
 
         foreach (var att in ordered)
         {
-            var blocker = avail.Where(b => b.Toughness > att.Power)
+            // CR 509.1b — only legal (blocker, attacker) pairs may block.
+            var blocker = avail.Where(b => memo.CanBlock(b, att) && b.Toughness > att.Power)
                                .OrderByDescending(b => b.Power).FirstOrDefault();
             if (blocker == null)
-                blocker = avail.Where(b => b.Power >= att.Toughness)
+                blocker = avail.Where(b => memo.CanBlock(b, att) && b.Power >= att.Toughness)
                                .OrderByDescending(b => b.Power).FirstOrDefault();
             if (blocker == null) { oppLifeLost += att.Power; continue; }
             avail.Remove(blocker);
