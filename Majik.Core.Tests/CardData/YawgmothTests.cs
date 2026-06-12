@@ -22,9 +22,13 @@ namespace Majik.Core.Tests.CardData;
 ///
 /// The earlier "Each other player loses 1 life and discards a card" rider is no
 /// longer printed (and was inert on the routed prod build because it captured a
-/// null opponents resolver) — the factory now models the current oracle: the
-/// -1/-1 counter on up to one target creature is DEFERRED (needs targeting) and
-/// the activated ability's modelled effect is "draw a card".
+/// null opponents resolver) — the factory now models the current oracle: an
+/// optional "-1/-1 counter on up to one target creature" (CR 115.1b — a
+/// MinTargets 0 / MaxTargets 1 <see cref="Majik.Core.Players.Agents.TargetRequest"/>;
+/// the controller may decline) followed by "draw a card". These unit tests
+/// resolve the ability with no chosen target (the counter half cleanly no-ops),
+/// so they exercise the draw; the live optional-target prompt + counter
+/// placement is covered by YawgmothMinusCounterLivePlayTests.
 /// </summary>
 public class YawgmothTests
 {
@@ -155,7 +159,7 @@ public class YawgmothTests
     }
 
     // -----------------------------------------------------------------------
-    // Effects — current oracle (draw a card; -1/-1 target deferred)
+    // Effects — current oracle (optional -1/-1 target declined here; draw a card)
     // -----------------------------------------------------------------------
 
     [Fact]

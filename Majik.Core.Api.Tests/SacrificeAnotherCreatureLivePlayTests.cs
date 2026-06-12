@@ -124,11 +124,23 @@ public sealed class SacrificeAnotherCreatureLivePlayTests
 
         submitError.Should().BeNull("activating Yawgmoth at instant speed must be accepted");
 
-        // The player must have been prompted to CHOOSE which creature to
-        // sacrifice (a choice/target prompt offering the OTHER creature).
+        // CR 602.2b — targets are chosen BEFORE costs are paid, so the optional
+        // "-1/-1 counter on up to one target creature" (a ChooseTargetsCommand)
+        // is prompted first. This test focuses on the SACRIFICE COST, so decline
+        // the optional counter target (its own coverage lives in
+        // YawgmothMinusCounterLivePlayTests).
+        var targetPrompt = prompts.FirstOrDefault(p =>
+            p.ExpectedKinds.Contains(nameof(ChooseTargetsCommand)));
+        if (targetPrompt != null)
+        {
+            await facade.SubmitAsync(
+                new ChooseTargetsCommand(Array.Empty<Guid>()) { PlayerId = alice.Id });
+        }
+
+        // The player must then be prompted to CHOOSE which creature to
+        // sacrifice (a ChooseAsync PickOne offering the OTHER creature).
         var sacPrompt = prompts.FirstOrDefault(p =>
-            p.ExpectedKinds.Contains(nameof(ChooseTargetsCommand))
-            || p.ExpectedKinds.Contains(nameof(ChoiceCommand)));
+            p.ExpectedKinds.Contains(nameof(ChoiceCommand)));
         sacPrompt.Should().NotBeNull(
             "Yawgmoth's 'Sacrifice another creature' cost must prompt the controller " +
             "to choose which creature to sacrifice (CR 700.6 — the controller chooses)");
