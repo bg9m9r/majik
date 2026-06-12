@@ -268,7 +268,7 @@ public sealed class GameFacade : IDisposable
     /// to compute current characteristics. TurnDriver expires EOT effects
     /// during the cleanup step.
     /// </summary>
-    public ContinuousEffectsService ContinuousEffects { get; } = new();
+    public ContinuousEffectsService ContinuousEffects { get; }
 
     /// <summary>
     /// CR 305.2 — per-turn land-drop counter. Shared between the legacy
@@ -290,6 +290,14 @@ public sealed class GameFacade : IDisposable
     {
         _alice = alice;
         _bob = bob;
+
+        // CR 613 — wire the per-match continuous-effects service to the live
+        // EventBus. This drives the CDA memoization-cache invalidation
+        // (SubscribeAll bumps generation on every event) AND lets the service
+        // PUBLISH its log-only ContinuousEffectAdded/Removed events to the
+        // wire bridge. Constructed here (not as a field initializer) because a
+        // field initializer cannot reference the _bus instance field.
+        ContinuousEffects = new ContinuousEffectsService(_bus);
 
         // CR 110.2 / 700.6 / 611.2c — give the per-match continuous-effects
         // service the live player roster so a controller-scoped group
