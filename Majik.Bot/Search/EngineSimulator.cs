@@ -263,7 +263,11 @@ public sealed class EngineSimulator : ISearchSimulator
         var searched = cachedPlayers.FirstOrDefault(p => p.Id == searchedSeatId)
             ?? throw new InvalidOperationException("Searched seat not found in cached players.");
 
-        return SimState.Capture(cachedPlayers, active, ctx.TurnNumber, ctx.Phase, searched);
+        // PreDeclaredAttack: non-null only for the ROOT cache of a block-search
+        // root (ResumeCtx.ForRoot) — child caches are post-combat by policy.
+        return SimState.Capture(
+            cachedPlayers, active, ctx.TurnNumber, ctx.Phase, searched,
+            preDeclaredAttack: ctx.PreDeclaredAttack);
     }
 
     /// <summary>
@@ -394,7 +398,10 @@ public sealed class EngineSimulator : ISearchSimulator
             clonedActive,
             root.TurnNumber,
             maxTurns: root.TurnNumber + 100, // large cap — Advance stops at first non-pass decision
-            ct: cts.Token);
+            ct: cts.Token,
+            // Root block search: enter the resumed combat PAST the declaration
+            // with the live game's real attack (null for all non-block roots).
+            combatResume: root.PreDeclaredAttack);
 
         // Observe the run task's exceptions to avoid UnobservedTaskException
         // (we abandon it after the first non-pass decision is captured).
@@ -502,7 +509,10 @@ public sealed class EngineSimulator : ISearchSimulator
             clonedActive,
             root.TurnNumber,
             maxTurns: (anchorTurnNumber ?? root.TurnNumber) + effectiveDepthTurns,
-            ct: CancellationToken.None);
+            ct: CancellationToken.None,
+            // Root block search: same pre-declared-attack resume as Advance so
+            // a rollout launched from a block root plays the SAME combat.
+            combatResume: root.PreDeclaredAttack);
 
         // Synchronously wait — this is intentional (MCTS rollouts are
         // inherently sequential within a simulation). The run always terminates
