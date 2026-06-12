@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Majik.Bot.Tests.Integration
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Majik.Core.SourceGen", "Majik.Core.SourceGen\Majik.Core.SourceGen.csproj", "{C68FC1A6-D8C2-4759-8EB8-A6C0F2A13FBD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Majik.Bot.Probes", "Majik.Bot.Probes\Majik.Bot.Probes.csproj", "{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -167,6 +169,18 @@ Global
 		{C68FC1A6-D8C2-4759-8EB8-A6C0F2A13FBD}.Release|x64.Build.0 = Release|Any CPU
 		{C68FC1A6-D8C2-4759-8EB8-A6C0F2A13FBD}.Release|x86.ActiveCfg = Release|Any CPU
 		{C68FC1A6-D8C2-4759-8EB8-A6C0F2A13FBD}.Release|x86.Build.0 = Release|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Debug|x64.Build.0 = Debug|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Debug|x86.Build.0 = Debug|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Release|x64.ActiveCfg = Release|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Release|x64.Build.0 = Release|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Release|x86.ActiveCfg = Release|Any CPU
+		{BDC800DA-ADA8-447F-A7FC-F02588CA83D3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

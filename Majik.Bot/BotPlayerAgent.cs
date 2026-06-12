@@ -23,13 +23,28 @@ public sealed class BotPlayerAgent : IPlayerAgent
     {
         _self = self ?? throw new ArgumentNullException(nameof(self));
         _onThinking = onThinking;
+        // "frozen-fb1" — FB1, the frozen-baseline ladder's permanent reference
+        // opponent: a byte-identical snapshot of the live heuristic vendored
+        // under Majik.Bot.Frozen.FB1, cut 2026-06-12 at commit 38547ffb3.
+        // Maintenance contract: FB1 may be patched ONLY mechanically for engine
+        // API renames (behavior-preserving); FB1CharacterizationTests pins its
+        // decisions and fails loudly on any behavioral drift. When FB1 is
+        // consistently stomped, cut FB2 alongside it — old rungs stay.
         _strategy = config.Strategy switch
         {
-            "heuristic" => new HeuristicStrategy(config),
-            "mcts"      => new SearchStrategy(config),
+            "heuristic"  => new HeuristicStrategy(config),
+            "mcts"       => new SearchStrategy(config),
+            "frozen-fb1" => new Majik.Bot.Frozen.FB1.HeuristicStrategy(config),
             _ => throw new ArgumentException($"Unknown strategy: {config.Strategy}", nameof(config)),
         };
     }
+
+    /// <summary>
+    /// Test seam: the strategy instance the ctor switch installed. Lets the
+    /// wiring tests assert the <c>BotConfig.Strategy</c> → implementation
+    /// mapping without reflection. Internal — not part of the public surface.
+    /// </summary>
+    internal IBotStrategy InstalledStrategy => _strategy;
 
     /// <summary>
     /// Wraps a synchronous policy call with the optional thinking callback.
