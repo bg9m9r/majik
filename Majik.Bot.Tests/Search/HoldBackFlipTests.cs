@@ -15,7 +15,17 @@ namespace Majik.Bot.Tests.Search;
 /// vote") riding on sampled-card fidelity (this branch): a determinized board
 /// where the racing line genuinely DIES to sampled burn cast in-sim, and the
 /// levers FLIP the decision end-to-end through <see cref="DeterminizedSearch.Run"/>:
-/// defaults hold back, kill-switches race.
+/// defaults demote the race to the best SAFE line (the Squire-only attack that
+/// keeps the Guard home), kill-switches race.
+///
+/// <para>
+/// <b>Re-calibrated after the CR 509.1b block-legality fix</b> (combat models
+/// stopped counting tapped/illegal blockers): the original 2/4 Guard board no
+/// longer diverged — with phantom blocks gone, the Guard-home attack both
+/// survived the Bolt worlds and still won, so no lever changed the decision.
+/// The Guard is now 1/4 (its turn-5 swing no longer closes the 1-life gap) and
+/// all outcomes below were re-MEASURED on the real sandbox, then pinned.
+/// </para>
 ///
 /// <para>
 /// <b>Why this board could not exist before sampled-card fidelity:</b> sampled
@@ -31,7 +41,7 @@ namespace Majik.Bot.Tests.Search;
 /// <b>The board</b> (engine-behavior-exact; all facts verified by tracing the
 /// real sandbox):
 /// Alice (searched, active, turn 3, Combat) at 8 life: four 1/1 Squires + one
-/// 2/4 Guard, all ready. Bob at 6 life: a 4/5 Killer + a 3/3 Cracker + four
+/// 1/4 Guard, all ready. Bob at 6 life: a 4/5 Killer + a 3/3 Cracker + four
 /// TAPPED Mountains (tapped out: he cannot interact during Alice's combat;
 /// they untap on his turn 4), a 4-card hidden hand and an 8-card hidden
 /// library, decklist 3 Lightning Bolt + 13 Mountain.
@@ -45,22 +55,24 @@ namespace Majik.Bot.Tests.Search;
 ///   <c>TargetPolicy.SynthesizeDefaults</c> aims "any target" at the
 ///   opponent) — 3 face damage per sampled Bolt, in every line.</item>
 ///   <item>Bob's 3/3 Cracker attacks on turn 4 ONLY when Alice's Guard is
-///   gone: the opponent's combat search only respects hard blocks
-///   (blocker toughness &gt; attacker power), and the 2/4 Guard is the only
+///   home UNTAPPED: the opponent's combat search only respects hard blocks
+///   (blocker toughness &gt; attacker power), and the 1/4 Guard is the only
 ///   body that hard-blocks a 3-power attacker. The 4/5 Killer is never
 ///   deterred and attacks every turn 4 (no Alice body has toughness 5).</item>
-///   <item>Any attack that INCLUDES the Guard feeds it to the Killer's block
-///   (the engine's block policy hard-blocks the highest-power attacker:
-///   Killer, toughness 5 &gt; 2, blocks the Guard and kills it, 4 ≥ 4).</item>
+///   <item>Any attack that INCLUDES the Guard TAPS it through Bob's turn 4
+///   (the engine's block policy kills the first two 1-power attackers with
+///   Killer and Cracker; the Guard connects but is tapped), so the Cracker
+///   is freed exactly as if the Guard were dead.</item>
 /// </list>
 /// So on Bob's turn 4: Guard-committing lines take Killer 4 + Cracker 3 +
 /// 3 per sampled Bolt = 10 ≥ 8 when ONE Bolt was sampled → a real in-sim
 /// death; Guard-home lines take Killer 4 + 3 = 7 → survive at 1 life.
-/// In Bolt-free worlds the all-out race is the only +1000: 3 Squires connect
-/// at the root (Killer blocks Guard, Cracker eats a Squire) → Bob 6→3, and on
-/// turn 5 the three surviving Squires finish through Bob's TAPPED attackers
-/// (3 ≥ 3) — a genuine terminal win the partial lines cannot reach (they
-/// leave Bob at 1).
+/// In Bolt-free worlds the all-out race is the only +1000: 3 bodies connect
+/// at the root (Killer and Cracker block-and-kill SquireA/SquireB) → Bob 6→3,
+/// and on turn 5 the three survivors (two Squires + the 1-power Guard) finish
+/// through Bob's TAPPED attackers (3 ≥ 3) — a genuine terminal win the
+/// partial lines cannot reach (the Squire-only attack connects two at the
+/// root and its turn-5 swing is 3 &lt; 4, leaving Bob at 1).
 /// </para>
 ///
 /// <para>
@@ -82,6 +94,15 @@ public sealed class HoldBackFlipTests
 
     private const string AllOutKey = "Attack:{SquireA,SquireB,SquireC,SquireD,Guard}";
     private const string HoldBackKey = "Attack:{}";
+
+    /// <summary>
+    /// The best SAFE line: all four Squires attack, the Guard stays home
+    /// untapped (deterring the Cracker). Dies in no sampled world, and its
+    /// summed mean tops the safe tier (it pressures Bob without tapping the
+    /// Guard), so the risk vote demotes the race to THIS line — not to the
+    /// empty attack (also safe, but lower summed mean).
+    /// </summary>
+    private const string SafeRaceKey = "Attack:{SquireA,SquireB,SquireC,SquireD}";
 
     /// <summary>
     /// Iteration-bounded, wall-clock-unbounded Mcts (same determinism pattern
@@ -108,7 +129,7 @@ public sealed class HoldBackFlipTests
             alice.Zones.Battlefield.AddCard(c);
             c.ClearSummoningSickness();
         }
-        var guard = new Creature("Guard", "{1}{W}", 2, 4);
+        var guard = new Creature("Guard", "{1}{W}", 1, 4);
         guard.ChangeOwner(alice);
         alice.Zones.Battlefield.AddCard(guard);
         guard.ClearSummoningSickness();
@@ -151,11 +172,11 @@ public sealed class HoldBackFlipTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // (1) THE FLIP — defaults hold back, kill-switches race.
+    // (1) THE FLIP — defaults take the safe Squire-only attack, kill-switches race.
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void RiskLevers_FlipTheDecision_DefaultsHoldBack_KillSwitchesRace()
+    public void RiskLevers_FlipTheDecision_DefaultsSafeAttack_KillSwitchesRace()
     {
         var wOn = ArchetypeWeights.Default;
         wOn.HiddenReach.Should().Be(1.0, "the preset default must be the eval lever's ON state");
@@ -190,10 +211,10 @@ public sealed class HoldBackFlipTests
             {
                 sawDeadly = true;
                 allOutMean.Should().BeLessThan(-500,
-                    $"world {BaseSeed + w}: the all-out race feeds the Guard to the Killer's "
-                    + "block and taps out, so the freed Cracker + Killer crack-back plus the "
-                    + "sampled Bolt CAST IN-SIM at Alice's face (4+3+3 = 10 ≥ 8) is a genuine "
-                    + "terminal death — conditional only on the sampler's hidden-hand draw");
+                    $"world {BaseSeed + w}: the all-out race taps the Guard out, so the freed "
+                    + "Cracker + Killer crack-back plus the sampled Bolt CAST IN-SIM at "
+                    + "Alice's face (4+3+3 = 10 ≥ 8) is a genuine terminal death — "
+                    + "conditional only on the sampler's hidden-hand draw");
                 holdBackMean.Should().BeGreaterThan(-500,
                     $"world {BaseSeed + w}: holding everything back keeps the Guard home, the "
                     + "Cracker stays deterred, and Killer 4 + Bolt 3 = 7 < 8 — the SAME sampled "
@@ -205,7 +226,7 @@ public sealed class HoldBackFlipTests
                 sawCalm = true;
                 allOutMean.Should().Be(1000,
                     $"world {BaseSeed + w}: with no Bolt sampled the all-out race genuinely "
-                    + "wins — 3 Squires connect at the root (Bob 6→3) and the survivors finish "
+                    + "wins — 3 bodies connect at the root (Bob 6→3) and the survivors finish "
                     + "through Bob's tapped attackers on turn 5");
             }
 
@@ -224,7 +245,7 @@ public sealed class HoldBackFlipTests
             + "alternative the vote deliberately collapses to the legacy order");
 
         // ── THE FLIP, end-to-end through DeterminizedSearch.Run ─────────────
-        // Defaults: risk vote at −500 + HiddenReach 1.0 → hold back.
+        // Defaults: risk vote at −500 + HiddenReach 1.0 → safe Squire-only attack.
         var defaults = DeterminizedSearch.Run(
             BuildMcts(wOn), BuildHoldBackRaceRoot(BaseSeed),
             totalBudgetMs: 1600, perWorldBudgetMs: 400);
@@ -244,10 +265,10 @@ public sealed class HoldBackFlipTests
         defaults.IsAllOutAttack.Should().BeFalse(
             "at defaults the risk vote demotes every line that died in a sampled world "
             + "below the safe tier — the bot must NOT race");
-        defaults.IsEmptyAttack.Should().BeTrue(
-            "the empty attack is the best safe line (it died in no world and carries the "
-            + "highest safe summed mean), so the defaults specifically HOLD BACK");
-        defaults.Key.Should().Be(HoldBackKey);
+        defaults.Key.Should().Be(SafeRaceKey,
+            "the Squire-only attack is the best safe line (it died in no world and carries "
+            + "the highest safe summed mean — it pressures Bob while the Guard stays home "
+            + "deterring the Cracker), so the defaults specifically keep the Guard HOME");
 
         defaults.Key.Should().NotBe(killSwitches.Key,
             "the decision must genuinely FLIP: the levers, fed by burn that sampled-card "
@@ -269,23 +290,24 @@ public sealed class HoldBackFlipTests
     ///   default-depth test above): the playout reaches Bob's turn 4, the
     ///   sampled Bolt world realizes a genuine terminal death on the all-out
     ///   line (allOutMean −1000 in world 128 vs +1000 in the calm worlds),
-    ///   MinWorldMean trips the risk vote, defaults hold back.</item>
+    ///   MinWorldMean trips the risk vote, defaults demote the race to the
+    ///   safe Squire-only attack.</item>
     ///   <item><b>EndOfTurn — NO FLIP</b> (expected signal starvation): the
     ///   playout stops at Alice's turn-3 boundary, BEFORE Bob untaps — the
     ///   catastrophe (Killer 4 + Cracker 3 + Bolt 3 on Bob's turn 4) lies
     ///   entirely beyond the horizon. No world ever realizes a death; every
-    ///   world evaluates to the same benign turn-cap evals (allOut 33.2 &gt;
-    ///   holdBack 26.5 — the race looks BETTER because 3 Squires connected),
-    ///   MinWorldMean starves, the risk vote has nothing to bite on, and both
+    ///   world evaluates to benign turn-cap evals (allOut MinWorldMean ≈ 35
+    ///   — the race looks BETTER because 3 bodies connected), MinWorldMean
+    ///   starves, the risk vote has nothing to bite on, and both
     ///   defaults and kill-switches race. NOTE: this board's crack-back is
     ///   NEXT-turn; EndOfTurn still sees same-turn deaths (e.g. lethal already
     ///   on the stack), it loses exactly the +1-turn losses pinned here.</item>
     ///   <item><b>LeafEval — NO FLIP</b> (expected signal starvation): no
     ///   playout at all — the sampled Bolt is never CAST, so no terminal loss
     ///   can exist in any world. The materialized Bolt in world 128's hand only
-    ///   shades BOTH leaf evals equally via HiddenReach (allOut 29.2 /
-    ///   holdBack 22.5 vs 33.2 / 26.5 in calm worlds), preserving the race's
-    ///   lead; MinWorldMean stays benign (~29 ≫ −500) → defaults race too.</item>
+    ///   shades BOTH leaf evals equally via HiddenReach, preserving the race's
+    ///   lead; MinWorldMean stays benign (allOut ≈ 31 ≫ −500) → defaults race
+    ///   too.</item>
     /// </list>
     ///
     /// The pin is mechanism-level: per depth we assert the MinWorldMean signal
@@ -341,9 +363,10 @@ public sealed class HoldBackFlipTests
 
         if (flipSurvives)
         {
-            defaults.Key.Should().Be(HoldBackKey,
-                $"{depth}: the risk vote sees the sampled-world death and demotes the race — "
-                + "the flip must survive at the default depth (hard regression)");
+            defaults.Key.Should().Be(SafeRaceKey,
+                $"{depth}: the risk vote sees the sampled-world death and demotes the race "
+                + "to the best safe line (Squires attack, Guard home) — the flip must "
+                + "survive at the default depth (hard regression)");
             defaults.Key.Should().NotBe(killSwitches.Key, "the decision must genuinely flip");
         }
         else
@@ -376,12 +399,12 @@ public sealed class HoldBackFlipTests
         var wOn = ArchetypeWeights.Default;            // HiddenReach 1.0
         var wOff = wOn with { HiddenReach = 0.0 };     // eval lever killed
 
-        // Vote filter ON (default −500), eval lever OFF → still holds back:
-        // the vote filter alone is SUFFICIENT for the flip.
+        // Vote filter ON (default −500), eval lever OFF → still demotes to the
+        // safe Squire-only attack: the vote filter alone is SUFFICIENT for the flip.
         var voteOnly = DeterminizedSearch.Run(
             BuildMcts(wOff), BuildHoldBackRaceRoot(BaseSeed),
             totalBudgetMs: 1600, perWorldBudgetMs: 400);
-        voteOnly.Key.Should().Be(HoldBackKey,
+        voteOnly.Key.Should().Be(SafeRaceKey,
             "the two-tier vote demotes the race on its MinWorldMean terminal death alone — "
             + "no HiddenReach contribution is needed");
 
