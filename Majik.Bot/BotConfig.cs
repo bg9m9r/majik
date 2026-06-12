@@ -140,6 +140,16 @@ namespace Majik.Bot;
 /// search. The live flip of the probe-gate winner is config-only
 /// (<c>Bot__TreeStateReuse</c>).</para>
 ///
+/// <para><c>RootBlockSearch</c> optional (default null = ON). When
+/// <c>Strategy="mcts"</c>, <c>Majik.Bot.Search.SearchStrategy.PickBlockers</c>
+/// runs determinized MCTS rooted at the defender's block decision against the
+/// REAL declared attack (combat-state resume — the sandbox enters combat PAST
+/// the declaration, CR 509). Resolved by <see cref="Search.SearchStrategy"/>
+/// at construction (null → true). On ANY search failure — or when the
+/// search's chosen root move is not a block plan — the strategy falls back to
+/// the <c>BlockCombatEval</c> path, which is also what <c>false</c> (the kill
+/// switch, <c>Bot__RootBlockSearch</c>) pins permanently.</para>
+///
 /// <para><c>MaxWorlds</c> optional (default null = 8, today's behaviour). When
 /// <c>Strategy="mcts"</c> on a DETERMINIZED path (known
 /// <c>OpponentArchetype</c> or <c>InferOpponentArchetype</c>), the upper clamp
@@ -189,4 +199,5 @@ public sealed record BotConfig(
     string? RolloutDepth = null,
     bool? TreeStateReuse = null,
     int? MaxWorlds = null,
-    int? PerWorldBudgetMs = null);
+    int? PerWorldBudgetMs = null,
+    bool? RootBlockSearch = null);

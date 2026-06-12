@@ -119,6 +119,11 @@ public class BlockEnumerationTests
         att22.ChangeOwner(alice);
         alice.Zones.Battlefield.AddCard(att22);
         att22.ClearSummoningSickness();
+        // Board fidelity at the block prompt: a declared attacker is TAPPED
+        // (CR 508.1f). The root block search simulates the following turns,
+        // where an untapped "attacker" would unrealistically be free to block
+        // Bob's counterattack — skewing the chump/no-chump comparison.
+        att22.Tap();
 
         var chump = new Creature("Goblin", "{R}", 1, 1);
         chump.ChangeOwner(bob);

@@ -109,6 +109,19 @@ public sealed class ServerBotOptions
     public bool TreeStateReuse { get; set; }
 
     /// <summary>
+    /// Root-level block search (env <c>Bot__RootBlockSearch</c>; only read
+    /// when <see cref="Strategy"/> is <c>mcts</c>). When true (the default —
+    /// this lever ships ON), <c>SearchStrategy.PickBlockers</c> runs MCTS
+    /// rooted at the defender's block decision against the REAL declared
+    /// attack via the engine's combat-state resume (CR 509), falling back to
+    /// the legacy <c>BlockCombatEval</c> path on any failure. <c>false</c> is
+    /// the kill switch pinning the legacy eval path permanently. A
+    /// non-boolean env value fails fast at registration (the config-binder
+    /// conversion error crashes the boot, mirroring <see cref="TreeStateReuse"/>).
+    /// </summary>
+    public bool RootBlockSearch { get; set; } = true;
+
+    /// <summary>
     /// Upper clamp (<c>kMax</c>) on the determinized world count K (env
     /// <c>Bot__MaxWorlds</c>; only read when <see cref="Strategy"/> is
     /// <c>mcts</c>). Null (the default) keeps the engine default of 8. NOTE: K

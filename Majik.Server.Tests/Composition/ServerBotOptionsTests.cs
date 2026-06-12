@@ -174,6 +174,51 @@ public class ServerBotOptionsTests
         act.Should().NotThrow();
     }
 
+    // ── RootBlockSearch (root-level block search kill switch) ──────────────────
+
+    [Fact]
+    public void DefaultOptions_RootBlockSearch_IsTrue_AndStaysNullUnderHeuristic()
+    {
+        new ServerBotOptions().RootBlockSearch.Should().BeTrue(
+            "root block search ships ON — Bot__RootBlockSearch=false is the kill switch");
+
+        var cfg = FactoryWith(null).BuildBotConfig("Burn", decisionSink: null);
+        cfg.RootBlockSearch.Should().BeNull(
+            "the heuristic strategy never searches blocks — only mcts threads the knob");
+    }
+
+    [Fact]
+    public void MctsOptions_BuildBotConfig_CarriesRootBlockSearch()
+    {
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            RootBlockSearch = false,
+        });
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .RootBlockSearch.Should().BeFalse(
+                "the kill switch is config-only (Bot__RootBlockSearch=false pins the legacy eval path)");
+    }
+
+    [Fact]
+    public void MctsOptions_WithRootBlockSearchDisabled_BotPlayerAgent_Constructs()
+    {
+        // Proves the wired knob resolves downstream (SearchStrategy threads it
+        // at construction).
+        var factory = FactoryWith(new ServerBotOptions
+        {
+            Strategy = "mcts",
+            RootBlockSearch = false,
+        });
+        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
+
+        var seat = new Majik.Core.Players.Player("Bob", 20);
+        var act = () => new Majik.Bot.BotPlayerAgent(seat, cfg);
+
+        act.Should().NotThrow();
+    }
+
     // ── MaxWorlds / PerWorldBudgetMs (determinized world-split knobs) ──────────
 
     [Fact]
@@ -407,6 +452,18 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
+    public void AddMajikEngine_BotSection_BindsRootBlockSearch()
+    {
+        var factory = ResolveFactory(
+            ("Bot:Strategy", "mcts"),
+            ("Bot:RootBlockSearch", "false"));
+
+        factory.BuildBotConfig("Burn", decisionSink: null)
+            .RootBlockSearch.Should().BeFalse(
+                "env Bot__RootBlockSearch must reach the installed bot");
+    }
+
+    [Fact]
     public void AddMajikEngine_BotSection_BindsWorldSplitKnobs()
     {
         var factory = ResolveFactory(
@@ -494,6 +551,9 @@ public class ServerBotOptionsTests
         cfg.TreeStateReuse.Should().BeFalse(
             "the tree-reuse default is today's root-replay loop — the probe gate " +
             "flips it later via Bot__TreeStateReuse only");
+        cfg.RootBlockSearch.Should().BeTrue(
+            "root block search ships ON under mcts — Bot__RootBlockSearch=false " +
+            "is the kill switch back to the BlockCombatEval path");
         cfg.MaxWorlds.Should().BeNull(
             "the world-split defaults are today's 400 ms / kMax 8 — the probe gate " +
             "flips them later via Bot__MaxWorlds / Bot__PerWorldBudgetMs only");

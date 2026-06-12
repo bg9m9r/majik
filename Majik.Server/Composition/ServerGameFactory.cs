@@ -75,7 +75,11 @@ public sealed class ServerGameFactory
     /// <c>mcts</c> (default "FullTurnPlus" = today's playout): the heuristic
     /// never rolls out, so it stays null there. <c>TreeStateReuse</c> follows
     /// the same rule (default false = today's root-replay loop): the
-    /// heuristic never searches, so it stays null there. <c>MaxWorlds</c> /
+    /// heuristic never searches, so it stays null there.
+    /// <c>RootBlockSearch</c> follows the same rule (default TRUE — root
+    /// block search ships on; <c>Bot__RootBlockSearch=false</c> is the kill
+    /// switch pinning the legacy <c>BlockCombatEval</c> path): the heuristic
+    /// never searches blocks, so it stays null there. <c>MaxWorlds</c> /
     /// <c>PerWorldBudgetMs</c> follow the same rule (default null = today's
     /// kMax 8 / 400 ms determinized world split): the heuristic never
     /// determinizes, so they stay null there.
@@ -98,6 +102,9 @@ public sealed class ServerGameFactory
                 : null,
             TreeStateReuse: _botOptions.Strategy == "mcts"
                 ? _botOptions.TreeStateReuse
+                : null,
+            RootBlockSearch: _botOptions.Strategy == "mcts"
+                ? _botOptions.RootBlockSearch
                 : null,
             MaxWorlds: _botOptions.Strategy == "mcts"
                 ? _botOptions.MaxWorlds
