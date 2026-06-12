@@ -117,21 +117,24 @@ internal sealed class BelcherStrategy : IDeckStrategy
     // ── Mana thresholds ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Minimum mana in the floating pool required to cast Goblin Charbelcher
-    /// ({4}) AND immediately activate it ({3},{T}) in the same priority window
-    /// after resolution.  The full line costs 4 + 3 = 7 total mana, all of
-    /// which must be available as floating mana (the Belcher deck runs 0 lands,
-    /// so there is no tap-to-pay source available after rituals burn their
-    /// mana).
+    /// Minimum AVAILABLE mana (floating pool + untapped tappable sources —
+    /// <see cref="Majik.Bot.Search.LegalActionEnumerator.UntappedManaSources"/>,
+    /// the engine's auto-tap payment model) required to cast Goblin Charbelcher
+    /// ({4}) AND immediately activate it ({3},{T}) on the same turn.  The full
+    /// line costs 4 + 3 = 7 total mana. The real Belcher list is not literally
+    /// zero-source: MDFC land backs (Shatterskull Smashing et al.) and Talisman
+    /// of Conviction are tappable sources the engine's ManaPaymentResolver
+    /// auto-taps at resolution, so availability — not the floating pool — is
+    /// the correct gate (same model as casting affordability, CR 116.2a/602.2).
     ///
     /// <para>
-    /// Rationale: if the directive allowed casting Charbelcher whenever the
-    /// pool >= 4 (the bare cast cost), the pool would be 0 after the cast and
-    /// the activation would be impossible the same turn.  The heuristic fallback
-    /// also scores the cast positively at pool = 4, so without this threshold
-    /// the bot always casts Charbelcher sub-optimally and then stalls (board
-    /// shows Charbelcher but 0 mana → 0/12 belch activations observed in the
-    /// 12-game pilot run).
+    /// Rationale: if the directive allowed casting Charbelcher whenever 4 mana
+    /// was available (the bare cast cost), nothing would be left after the cast
+    /// and the activation would be impossible the same turn.  The heuristic
+    /// fallback also scores the cast positively at 4 available, so without this
+    /// threshold the bot always casts Charbelcher sub-optimally and then stalls
+    /// (board shows Charbelcher but no activation mana → 0/12 belch activations
+    /// observed in the 12-game pilot run).
     /// </para>
     /// </summary>
     private const int MinManaForFullLine = 7; // {4} cast + {3} activation
@@ -144,19 +147,19 @@ internal sealed class BelcherStrategy : IDeckStrategy
     /// <list type="number">
     ///   <item>
     ///     <b>Activate arm</b> — Charbelcher is already on the battlefield,
-    ///     untapped, and the floating pool contains ≥ {3}.  Returns the
+    ///     untapped, and {3} is AVAILABLE (floating + untapped tappable
+    ///     sources — the engine auto-taps at resolution).  Returns the
     ///     activation immediately; the belch deals ~50 damage in a single
     ///     resolution and ends the game on the spot.
     ///   </item>
     ///   <item>
-    ///     <b>Cast arm</b> — Charbelcher is in hand and the floating pool
-    ///     contains ≥ {7} ({4} for the cast + {3} for the immediate
-    ///     activation).  Directs a sorcery-speed CastSpell so that after
-    ///     resolution the pool still has ≥ {3} floating and the activate arm
-    ///     fires on the next priority call.
+    ///     <b>Cast arm</b> — Charbelcher is in hand and ≥ {7} is available
+    ///     ({4} for the cast + {3} for the immediate activation).  Directs a
+    ///     sorcery-speed CastSpell so that after resolution ≥ {3} of sources
+    ///     remain and the activate arm fires on the next priority call.
     ///     The cast arm short-circuits the heuristic's sub-optimal path of
-    ///     casting at pool = 4 (which drains the pool and strands Charbelcher
-    ///     on the board with no activation mana).
+    ///     casting at exactly 4 available (which drains everything and strands
+    ///     Charbelcher on the board with no activation mana).
     ///   </item>
     /// </list>
     ///
@@ -171,27 +174,26 @@ internal sealed class BelcherStrategy : IDeckStrategy
         var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, self));
         if (opponent is null) return null;
 
-        // ── Arm 1: activate — Charbelcher on board with {3} floating ─────────
+        // ── Arm 1: activate — Charbelcher on board, {3},{T} affordable ───────
         // BuildActivate null-guards: returns null if the permanent is absent
-        // OR if any of its costs (ManaCostCost("{3}") + AdditionalCost.Tap)
-        // cannot be paid — exactly the correct gate.
+        // OR if any of its costs cannot be afforded (ManaCostCost("{3}") vs
+        // UntappedManaSources — auto-tap model — + AdditionalCost.Tap via
+        // CanPay) — exactly the enumerator's gate.
         var activate = DeckStrategyHelpers.BuildActivate(ctx, self, GoblinCharbelcher, target: opponent);
         if (activate is not null) return activate;
 
-        // ── Arm 2: cast — Charbelcher in hand, pool ≥ 7 (full line affordable)
-        // Only fire when the floating pool already covers the cast ({4}) AND
-        // the subsequent activation ({3}).  ManaCostCost.CanPay checks the
-        // floating pool only (not tappable sources), which is correct here:
-        // the Belcher deck has no tappable mana sources after rituals resolve
-        // (Talisman / Treasure are either already tapped or absent), so the
-        // full 7 must be floating.
+        // ── Arm 2: cast — Charbelcher in hand, ≥ 7 available (full line) ─────
+        // Only fire when AVAILABLE mana (floating + untapped tappable sources,
+        // the engine's auto-tap payment model) covers the cast ({4}) AND the
+        // subsequent activation ({3}), so after the cast resolves ≥ {3} of
+        // sources remain and the activate arm fires at the next priority.
         //
         // Sorcery-window guard mirrors DeckStrategyHelpers.BuildCast: require
         // active player + main phase + empty stack (CR 116.2a).  The card is
         // a sorcery-speed permanent ({4} artifact), so instant-speed bypass
         // is not available.
         if (DeckStrategyHelpers.HasInHand(self, GoblinCharbelcher)
-            && self.ManaPool.Total >= MinManaForFullLine)
+            && Majik.Bot.Search.LegalActionEnumerator.UntappedManaSources(self) >= MinManaForFullLine)
         {
             // BuildCast applies the affordability gate (ApproxCmc({4}) = 4 ≤
             // UntappedManaSources) and the sorcery-window gate. If either fails
