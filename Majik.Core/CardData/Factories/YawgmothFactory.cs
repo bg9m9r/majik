@@ -66,9 +66,15 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>"{B}{B}, Discard a card: Proliferate."</b>: the second activated
 ///   ability is not modelled — no Proliferate primitive exists in the engine
 ///   today (CR 701.27). Deferred alongside the other counter-manipulation gaps.
-/// - <b>Sacrifice target prompt</b>: <see cref="SacrificeAnotherCreatureCost.Target"/>
-///   must be set by the agent; v1 falls back to the first eligible creature on
-///   the battlefield (deterministic).
+/// ## Sacrifice cost — prompted (the fix)
+/// - The "Sacrifice another creature" cost now implements
+///   <see cref="Costs.IChooseCreatureToSacrificeCost"/>, so the activation
+///   dispatch (<c>GameFacade.DispatchActivate</c> / <c>TurnDriver.DispatchActivate</c>)
+///   prompts the controller — via the existing <c>ChooseAsync</c> sink the
+///   portal renders as a <c>ChoiceCommand</c> — to choose WHICH creature to
+///   sacrifice BEFORE the cost is paid (CR 700.6). Previously the cost silently
+///   auto-picked the first eligible creature (live-play bug). With exactly one
+///   eligible creature the engine skips the prompt and uses it.
 /// </summary>
 [CardName("Yawgmoth, Thran Physician")]
 public static class YawgmothFactory

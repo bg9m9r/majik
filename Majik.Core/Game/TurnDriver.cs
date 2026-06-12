@@ -1038,6 +1038,14 @@ public sealed class TurnDriver
                 }
             }
 
+            // CR 700.6 / 701.17 — prompt the controller to choose WHICH creature
+            // a "Sacrifice another creature" / "Sacrifice a creature" COST
+            // sacrifices (reuses the ChooseAsync prompt the portal renders) and
+            // stamp it onto the cost before payment. Without this the cost
+            // silently auto-picks the first creature (live-play bug).
+            await Majik.Core.Game.SacrificeCostPrompt.ChooseSacrificesAsync(
+                actor, activate.Ability, _agents[actor], ctx);
+
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _eventBus);
             try
             {

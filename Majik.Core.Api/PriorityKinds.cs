@@ -90,29 +90,21 @@ public static class PriorityKinds
         // CR 602.1a — non-mana activated abilities (fetchland sacrifice,
         // equip, planeswalker loyalty, "tap: do X", etc.). IActivatedAbility
         // doesn't expose a CanActivate predicate today, so apply a
-        // conservative source-level narrowing: a tapped permanent or a
-        // summoning-sick non-haste creature can't pay a {T} cost (the
-        // overwhelmingly common shape) — skip those sources. Permanents
-        // with non-tap activated abilities (e.g. {2}: do X) that happen
-        // to be sick are a rare false-negative; the trade-off heavily
-        // favours killing the per-step prompt spam on a board of just
-        // summoning-sick creatures.
+        // conservative source-level narrowing: skip a source only when NONE of
+        // its non-mana activated abilities is currently usable.
+        //
+        // A {T} cost (CR 302.6 / 605.3a) can't be paid by a TAPPED permanent or
+        // a summoning-sick non-haste CREATURE (CR 302.6). But an ability with
+        // NO {T} cost (Yawgmoth's "Pay 1 life, Sacrifice another creature";
+        // any "{2}: do X") is usable even on a sick / tapped creature — the
+        // earlier blanket skip wrongly hid those, so a sick Yawgmoth's
+        // ActivateAbilityCommand was dropped and the activation 400'd. Narrow
+        // per-ABILITY: an ability is "currently plausibly usable" unless it
+        // taps its own (sick / already-tapped) source.
         var hasActivatedAbility = battlefield.Any(c =>
-        {
-            if (!c.Abilities.OfType<IActivatedAbility>().Any(a => a is not IManaAbility))
-            {
-                return false;
-            }
-            if (c is Majik.Core.Cards.Permanent p && p.IsTapped) return false;
-            if (c is Majik.Core.Cards.Creature cr
-                && cr.HasSummoningSickness
-                && !cr.Abilities.OfType<KeywordAbility>().Any(k =>
-                    string.Equals(k.Keyword, "Haste", StringComparison.OrdinalIgnoreCase)))
-            {
-                return false;
-            }
-            return true;
-        });
+            c.Abilities.OfType<IActivatedAbility>()
+                .Where(a => a is not IManaAbility)
+                .Any(a => AbilityPlausiblyUsable(c, a)));
         if (hasActivatedAbility)
         {
             kinds.Add(typeof(ActivateAbilityCommand));
@@ -147,6 +139,35 @@ public static class PriorityKinds
     /// </summary>
     public static bool IsPassOnly(Type[] kinds)
         => kinds.Length == 1 && kinds[0] == typeof(PassPriorityCommand);
+
+    /// <summary>
+    /// Conservative per-ability narrowing for the <see cref="ActivateAbilityCommand"/>
+    /// kind: an activated ability on <paramref name="source"/> is plausibly
+    /// usable right now UNLESS it carries a {T} cost (an
+    /// <see cref="Majik.Core.Costs.AdditionalCost"/> of type
+    /// <see cref="Majik.Core.Costs.AdditionalCostType.Tap"/> tapping the source)
+    /// that the source can't currently pay because it is already tapped or a
+    /// summoning-sick non-haste creature (CR 302.6). Abilities with no {T} cost
+    /// (Yawgmoth's "Pay 1 life, Sacrifice another creature"; "{2}: do X") stay
+    /// usable on a sick / tapped creature.
+    /// </summary>
+    private static bool AbilityPlausiblyUsable(ICard source, IActivatedAbility ability)
+    {
+        var tapsSelf = ability.Costs.OfType<Majik.Core.Costs.AdditionalCost>().Any(c =>
+            c.CostType == Majik.Core.Costs.AdditionalCostType.Tap
+            && (c.Permanent == null || ReferenceEquals(c.Permanent, source)));
+        if (!tapsSelf) return true; // no self-tap requirement — usable.
+
+        if (source is Majik.Core.Cards.Permanent p && p.IsTapped) return false;
+        if (source is Majik.Core.Cards.Creature cr
+            && cr.HasSummoningSickness
+            && !cr.Abilities.OfType<KeywordAbility>().Any(k =>
+                string.Equals(k.Keyword, "Haste", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+        return true;
+    }
 
     /// <summary>Card is castable at instant speed: Instant card type, or
     /// any card with the Flash keyword (CR 702.8).</summary>

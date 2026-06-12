@@ -238,11 +238,23 @@ public static class GristFactory
             Minus2Loyalty,
             new[]
             {
-                Fx.Inline("You may sacrifice a creature; if you do, destroy target creature or planeswalker", rc =>
+                Fx.Inline("You may sacrifice a creature; if you do, destroy target creature or planeswalker", async rc =>
                 {
-                    var toSacrifice = sacrificeResolver?.Invoke()?.FirstOrDefault();
-                    if (toSacrifice == null) return default;
-                    if (toSacrifice.Zone != ZoneType.Battlefield) return default;
+                    var controller = grist.Controller ?? owner;
+
+                    // CR 701.17 — "You may sacrifice a creature": the CONTROLLER
+                    // chooses which of THEIR creatures to sacrifice (it is not a
+                    // target — CR 115.1). Prompt the live agent via the unified
+                    // ChooseAsync sink (the same prompt the portal renders) so the
+                    // player picks; the resolver fallback only fires on the legacy
+                    // direct-resolution path (rc.Agent == null). Previously this
+                    // half relied solely on the null prod sacrificeResolver, so no
+                    // creature was ever sacrificed → the "if you do" destroy was
+                    // skipped (live-play bug).
+                    var toSacrifice = await ChooseSacrificeAsync(rc, controller, sacrificeResolver)
+                        .ConfigureAwait(false);
+                    if (toSacrifice == null) return;
+                    if (toSacrifice.Zone != ZoneType.Battlefield) return;
 
                     // CR 701.17 — sacrifice the chosen creature.
                     Fx.Sacrifice(toSacrifice);
@@ -257,12 +269,11 @@ public static class GristFactory
                         ? rc.ChosenTargets[0][0] as Permanent
                         : null)
                         ?? destroyTargetResolver?.Invoke()?.FirstOrDefault();
-                    if (toDestroy == null) return default;
-                    if (toDestroy.Zone != ZoneType.Battlefield) return default;
+                    if (toDestroy == null) return;
+                    if (toDestroy.Zone != ZoneType.Battlefield) return;
                     // CR 701.7 — "destroy" routes through the indestructible /
                     // regeneration gate via the Destroy zone-move reason.
                     Fx.MoveToGraveyard(toDestroy, ZoneMoveReason.Destroy);
-                    return default;
                 }),
             },
             targetRequests: new[] { destroyRequest }));
@@ -310,5 +321,56 @@ public static class GristFactory
         }));
 
         return grist;
+    }
+
+    /// <summary>
+    /// CR 701.17 / 115.1 — "You may sacrifice a creature": prompt the controller
+    /// to choose one of THEIR creatures to sacrifice (sacrificing is a choice,
+    /// not targeting). Uses the live agent's unified <c>ChooseAsync</c> sink
+    /// (rendered by the portal as a <c>ChoiceCommand</c> — no new wire contract);
+    /// the optional Min=0 models "you MAY". Falls back to
+    /// <paramref name="sacrificeResolver"/> only on the legacy direct-resolution
+    /// path where no live agent is threaded (<c>rc.Agent == null</c>). Returns
+    /// null when the controller declines or has no creature to sacrifice.
+    /// </summary>
+    private static async ValueTask<Creature?> ChooseSacrificeAsync(
+        ResolutionContext rc,
+        Player controller,
+        Func<IReadOnlyList<Creature>>? sacrificeResolver)
+    {
+        var eligible = controller.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .ToList();
+        if (eligible.Count == 0) return null;
+
+        // A supplied resolver represents a PRE-MADE decision (bot policy / a
+        // test scripting the sacrifice), so honour it directly — and its choice
+        // wins over a generic prompt. Only when no resolver is wired do we go to
+        // the live agent (the human-play path).
+        var resolved = sacrificeResolver?.Invoke()?.FirstOrDefault();
+        if (resolved != null) return resolved;
+
+        // Legacy direct-resolution path (no live agent and no resolver): nothing
+        // to choose with → decline.
+        if (rc.Agent == null) return null;
+
+        // CR 701.17 / 115.1 — prompt the live controller. "You may sacrifice" is
+        // optional, but Grist's −2 is a removal ability whose whole value is the
+        // sacrifice→destroy: model the choice as a mandatory PickOne over the
+        // controller's creatures (declining wastes the loyalty), matching the
+        // bot/heuristic posture that an activated removal ability should pay its
+        // own creature cost. The portal still renders a ChoiceCommand the player
+        // resolves.
+        var req = new ChoiceRequest(
+            Kind: ChoiceKind.PickOne,
+            Description: "Choose a creature to sacrifice (Grist, the Hunger Tide)",
+            Min: 1,
+            Max: 1,
+            Candidates: eligible.Cast<object>().ToList(),
+            Intent: BotIntent.Removal,
+            Optional: false);
+
+        var chosen = await rc.Agent.ChooseAsync(rc.Game!, req, rc.Ct).ConfigureAwait(false);
+        return chosen.OfType<Creature>().FirstOrDefault();
     }
 }
