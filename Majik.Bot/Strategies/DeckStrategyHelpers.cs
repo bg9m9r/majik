@@ -124,7 +124,15 @@ internal static class DeckStrategyHelpers
     /// <list type="bullet">
     ///   <item>Permanent must be on <paramref name="self"/>'s battlefield.</item>
     ///   <item>Ability must not be a mana ability (<see cref="IManaAbility"/>).</item>
-    ///   <item>All activation costs must be payable (<c>CanPay(self)</c>).</item>
+    ///   <item>CR 602.5c "Activate only if" gate honoured via the
+    ///     context-aware <c>CanActivateNow(ctx)</c> overload — same as the
+    ///     enumerator.</item>
+    ///   <item>Affordability symmetric with casting (CR 116.2a / 602.2): mana
+    ///     portion checked against
+    ///     <see cref="LegalActionEnumerator.UntappedManaSources"/> (floating +
+    ///     untapped tappable sources — the engine's <c>ManaPaymentResolver</c>
+    ///     auto-taps at resolution), non-mana costs via <c>CanPay(self)</c>
+    ///     (<see cref="LegalActionEnumerator.CanAffordAbility"/>).</item>
     /// </list>
     ///
     /// The optional <paramref name="target"/> is folded into a single-element
@@ -144,11 +152,16 @@ internal static class DeckStrategyHelpers
             .FirstOrDefault(c => c.Name == sourceName);
         if (permanent is null) return null;
 
-        // Find first payable non-mana IActivatedAbility — mirrors enumerator
-        // lines 83–88.
+        // Find first activatable + affordable non-mana IActivatedAbility —
+        // mirrors the enumerator's CR 602.5c gate + symmetric affordability
+        // (mana portion vs UntappedManaSources, non-mana costs via CanPay).
+        var manaAvailable = LegalActionEnumerator.UntappedManaSources(self);
         var ability = permanent.Abilities
             .OfType<IActivatedAbility>()
-            .FirstOrDefault(a => a is not IManaAbility && a.Costs.All(cost => cost.CanPay(self)));
+            .FirstOrDefault(a =>
+                a is not IManaAbility
+                && (a is ActivatedAbility aa ? aa.CanActivateNow(ctx) : a.CanActivateNow())
+                && LegalActionEnumerator.CanAffordAbility(a, self, manaAvailable));
         if (ability is null) return null;
 
         IReadOnlyList<object> targets = target is null
