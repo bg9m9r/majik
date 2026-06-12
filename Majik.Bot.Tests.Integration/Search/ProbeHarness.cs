@@ -592,9 +592,11 @@ internal static class ProbeHarness
             // Logged via Console + ProbeProgress because this helper is static
             // (no ITestOutputHelper); xUnit forwards Console to the test runner
             // stdout the controller reads.
-            Console.WriteLine(
+            // System.-qualified: the test assembly now (transitively) references
+            // Majik.Console, so a bare `Console` would resolve to that namespace.
+            System.Console.WriteLine(
                 $"  [{label}] game {gameIndex,2}: INCONCLUSIVE — {ex.GetType().Name}: {ex.Message}");
-            Console.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+            System.Console.WriteLine($"    stack: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
             return SeatAWinner.Inconclusive;
         }
     }
