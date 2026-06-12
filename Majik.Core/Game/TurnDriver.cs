@@ -365,7 +365,7 @@ public sealed class TurnDriver
     /// as RunTurnAsync would. Used by the bot search simulator to re-enter a cloned
     /// mid-game position. NOTE: does not run untap/upkeep/draw or reset turn trackers.
     /// </summary>
-    internal async Task RunTurnFromPhaseAsync(Player activePlayer, int turnNumber, PhaseStateType resumePhase, CancellationToken ct = default)
+    internal async Task RunTurnFromPhaseAsync(Player activePlayer, int turnNumber, PhaseStateType resumePhase, CancellationToken ct = default, Majik.Core.Combat.CombatResumeState? combatResume = null)
     {
         _currentTurnNumber = turnNumber;
         _activePlayerForStepEvents = activePlayer;
@@ -377,7 +377,13 @@ public sealed class TurnDriver
         // can end mid-turn too).
         if (resume <= ResumePoint.PreCombatMain) await RunPreCombatMainAsync(activePlayer, ct);
         if (GameIsOver()) return;
-        if (resume <= ResumePoint.Combat)        await RunCombatPhaseAsync(activePlayer, defender, ct);
+        if (resume <= ResumePoint.Combat)
+        {
+            if (combatResume != null && resume == ResumePoint.Combat)
+                await RunCombatPhaseFromBlocksAsync(activePlayer, defender, combatResume, ct);
+            else
+                await RunCombatPhaseAsync(activePlayer, defender, ct);
+        }
         if (GameIsOver()) return;
         if (resume <= ResumePoint.PostCombatMain) await RunPostCombatMainAsync(activePlayer, ct);
         if (GameIsOver()) return;
@@ -516,6 +522,65 @@ public sealed class TurnDriver
         // CR 511 — end of combat step. Emit the step event so "until end of
         // combat" durations (e.g. Firebending mana) can expire before the
         // postcombat main begins.
+        SetPhase(StepStateType.EndOfCombat);
+    }
+
+    /// <summary>
+    /// Sim-only (root block search): enter combat PAST the declaration with a
+    /// rebound attack plan. The declaration half already ran LIVE before the
+    /// clone (attackers tapped, CR 508.1f triggers fired, the declare-attackers
+    /// priority round completed), so this method must not re-publish
+    /// BeginningOfCombat/DeclareAttackers step events or re-run that half —
+    /// it assigns the backing phase fields directly instead of
+    /// <see cref="SetTurnState"/>/<see cref="SetPhase"/> (which publish), then
+    /// hands the plan to <see cref="CombatFlow.RunCombatFromBlocksAsync"/> with
+    /// the SAME grantStepPriority lambda <see cref="RunCombat"/> uses (the
+    /// DeclareBlockers transition inside it is a real, not-yet-happened step
+    /// and fires normally).
+    /// No additional-combat drain: extra-combat grants belong to the live
+    /// game's queue, not the resumed clone.
+    /// </summary>
+    private async Task RunCombatPhaseFromBlocksAsync(
+        Player activePlayer, Player defender, Majik.Core.Combat.CombatResumeState combatResume, CancellationToken ct)
+    {
+        // SetTurnState/SetPhase field writes WITHOUT their event publications:
+        // the live game already emitted PhaseStateChangedEvent(Combat) and the
+        // BeginningOfCombat/DeclareAttackers StepStartedEvents before the clone.
+        _currentTurnState = PhaseStateType.Combat;
+        _currentPhase = StepStateType.DeclareAttackers;
+
+        var plan = combatResume.Rebind(_players);
+        if (plan is null) return; // no attacker survived the clone — combat fizzles
+
+        var eligibleBlockers = defender.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => !c.IsTapped)
+            .ToList();
+
+        var ctx = new GameContext(
+            activePlayer, _players, activePlayer, _currentTurnNumber, _currentPhase, _stack);
+
+        await _combatFlow.RunCombatFromBlocksAsync(
+            activePlayer, defender, _agents[defender], plan, eligibleBlockers, ctx, ct,
+            // CR 509.4 — same in-step priority machinery RunCombat supplies;
+            // only the DeclareBlockers transition (a real, not-yet-happened
+            // step on this resume) actually changes the phase here.
+            grantStepPriority: (step, roundCt) =>
+            {
+                if (_currentPhase != step)
+                {
+                    SetPhase(step);
+                }
+                return PriorityRound(activePlayer, roundCt);
+            });
+
+        if (GameIsOver()) return;
+
+        // Priority round after combat damage (CR 510.4 — mirrors RunCombat).
+        await PriorityRound(activePlayer, ct);
+        if (GameIsOver()) return;
+
+        // CR 511 — end of combat step (mirrors RunCombatPhaseAsync's tail).
         SetPhase(StepStateType.EndOfCombat);
     }
 

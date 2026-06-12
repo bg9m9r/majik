@@ -462,12 +462,19 @@ public sealed class GameDriver
     ///   <see cref="RunGameAsync"/>). Must be &gt; <paramref name="turnNumber"/>
     ///   for any subsequent turns to run.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="combatResume">Optional (root block search): the LIVE
+    ///   game's already-declared attack, rebound into this game's players at
+    ///   combat entry. Only meaningful when <paramref name="resumePhase"/> is
+    ///   <see cref="PhaseStateType.Combat"/> — the partial turn then enters
+    ///   combat PAST the declaration (CR 509, the blocker ask). Null =
+    ///   today's behavior, byte-identical.</param>
     public async Task<GameResult> ResumeGameAsync(
         PhaseStateType resumePhase,
         Player activePlayer,
         int turnNumber,
         int maxTurns,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Majik.Core.Combat.CombatResumeState? combatResume = null)
     {
         // Install the same ambient scopes RunGameAsync installs so every
         // trigger / effect / id / registry call inside this sandbox run
@@ -485,7 +492,7 @@ public sealed class GameDriver
             return early;
 
         // Resume the partial turn at the requested phase (no untap/upkeep/draw).
-        await _turnDriver.RunTurnFromPhaseAsync(activePlayer, turnNumber, resumePhase, ct);
+        await _turnDriver.RunTurnFromPhaseAsync(activePlayer, turnNumber, resumePhase, ct, combatResume);
 
         // After the resumed partial turn, check terminal again.
         if (TryFinalizeOnSurvivorCount(turnNumber, activePlayer) is { } afterPartial)

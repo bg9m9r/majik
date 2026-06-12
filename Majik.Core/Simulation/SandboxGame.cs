@@ -222,12 +222,18 @@ public sealed class SandboxGame
     ///
     /// <para><paramref name="activePlayer"/> must be one of the CLONED players
     /// (e.g. obtained via <c>State.PlayerFor(original)</c>).</para>
+    ///
+    /// <para><paramref name="combatResume"/> (root block search): the LIVE
+    /// game's already-declared attack, rebound into the clone at combat entry
+    /// so the resumed turn enters combat PAST the declaration (CR 509, the
+    /// blocker ask). Null = today's behavior.</para>
     /// </summary>
     public Task<GameDriver.GameResult> ResumeAsync(
         PhaseStateType resumePhase,
         Player activePlayer,
         int turnNumber,
         int maxTurns,
-        CancellationToken ct = default)
-        => Driver.ResumeGameAsync(resumePhase, activePlayer, turnNumber, maxTurns, ct);
+        CancellationToken ct = default,
+        CombatResumeState? combatResume = null)
+        => Driver.ResumeGameAsync(resumePhase, activePlayer, turnNumber, maxTurns, ct, combatResume);
 }
