@@ -97,6 +97,16 @@ public enum EventType
     // amount on this event already reflects its bump.
     CounterAdded,
 
+    // CR 613 — a continuous (layer) effect entered the game's active-effects
+    // set (registered on ContinuousEffectsService). Log-only, public info
+    // (battlefield) — the portal action log records it; no per-viewer masking.
+    ContinuousEffectAdded,
+
+    // CR 613 — a continuous (layer) effect left the active-effects set
+    // (unregister / prune / end-of-turn cleanup). Twin of
+    // ContinuousEffectAdded; log-only, public info.
+    ContinuousEffectRemoved,
+
     // CR 701.40 — a permanent (creature) explored (revealed the top card
     // of its controller's library; land → hand, otherwise +1/+1 counter +
     // back-or-graveyard for the revealed card). The hook "Whenever a
