@@ -162,6 +162,31 @@ public sealed record CounterAddedPayload(
     Guid? ControllerId = null);
 
 /// <summary>
+/// CR 613 — a continuous (layer) effect entered the game's active-effects
+/// set. Log-only surface for the portal action log: the source permanent's
+/// identity, the CR-613 <c>Layer</c> name, and a human-readable
+/// <see cref="Description"/>. Public information (battlefield), so no
+/// per-viewer masking. <see cref="SourceInstanceId"/> is
+/// <see cref="System.Guid.Empty"/> for a floating effect with no source.
+/// </summary>
+public sealed record ContinuousEffectAddedPayload(
+    Guid SourceInstanceId,
+    string SourceName,
+    string Layer,
+    string Description);
+
+/// <summary>
+/// CR 613 — twin of <see cref="ContinuousEffectAddedPayload"/>: a continuous
+/// (layer) effect left the active-effects set (unregister / prune /
+/// end-of-turn cleanup). Same shape, log-only, public.
+/// </summary>
+public sealed record ContinuousEffectRemovedPayload(
+    Guid SourceInstanceId,
+    string SourceName,
+    string Layer,
+    string Description);
+
+/// <summary>
 /// PLAN 07 — OpenAPI schema anchor. The SignalR <c>event</c> channel
 /// carries <see cref="EventDto.Payload"/> as a raw <c>JsonElement</c>, so
 /// the payload record shapes are otherwise invisible to OpenAPI (SignalR
@@ -192,4 +217,6 @@ public sealed record EventPayloadCatalog(
     PlayerLostPayload PlayerLost,
     StackObjectPayload StackObject,
     DamageDealtPayload DamageDealt,
-    CounterAddedPayload CounterAdded);
+    CounterAddedPayload CounterAdded,
+    ContinuousEffectAddedPayload ContinuousEffectAdded,
+    ContinuousEffectRemovedPayload ContinuousEffectRemoved);

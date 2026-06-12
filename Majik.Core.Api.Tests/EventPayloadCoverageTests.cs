@@ -45,6 +45,8 @@ public class EventPayloadCoverageTests
         "DamageDealtEvent",
         "CombatDamageDealtEvent", // routes via the DamageDealtEvent arm
         "CounterAddedEvent",
+        nameof(ContinuousEffectAddedEvent),
+        nameof(ContinuousEffectRemovedEvent),
     };
 
     // The long-tail GameEvent subclasses that deliberately emit an empty
