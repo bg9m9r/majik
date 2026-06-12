@@ -60,6 +60,13 @@ public abstract class ContinuousEffect
     public virtual Permanent? Source => null;
 
     /// <summary>
+    /// Human-readable label for the action log (CR 613 layer effects).
+    /// Defaults to the source card name; notable effects (lords, control
+    /// swaps) may override for a more specific phrase.
+    /// </summary>
+    public virtual string Description => Source?.Name is { Length: > 0 } n ? $"{n} effect" : "continuous effect";
+
+    /// <summary>
     /// CR 613.8 — return true iff this effect depends on <paramref name="other"/>:
     /// applying <c>other</c> first would change this effect's existence, what it
     /// does, or the set of objects it applies to. Default: no dependency.
