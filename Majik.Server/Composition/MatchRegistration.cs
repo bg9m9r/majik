@@ -125,10 +125,14 @@ public static class MatchRegistration
                 new MongoEngineCommandLogStore(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
             services.AddSingleton<MongoEngineCheckpointStore>(sp =>
                 new MongoEngineCheckpointStore(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
+            services.AddSingleton<MongoBotDecisionLogStore>(sp =>
+                new MongoBotDecisionLogStore(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
             services.AddSingleton<IEngineCommandLogStore>(sp =>
                 sp.GetRequiredService<MongoEngineCommandLogStore>());
             services.AddSingleton<IEngineCheckpointStore>(sp =>
                 sp.GetRequiredService<MongoEngineCheckpointStore>());
+            services.AddSingleton<IBotDecisionLogStore>(sp =>
+                sp.GetRequiredService<MongoBotDecisionLogStore>());
             services.AddHostedService<EnginePersistenceIndexInitializer>();
         }
         else
@@ -137,6 +141,7 @@ public static class MatchRegistration
             // (the coordinator gates on Enabled before any store call).
             services.AddSingleton<IEngineCommandLogStore, InMemoryEngineCommandLogStore>();
             services.AddSingleton<IEngineCheckpointStore, InMemoryEngineCheckpointStore>();
+            services.AddSingleton<IBotDecisionLogStore, InMemoryBotDecisionLogStore>();
         }
 
         services.AddSingleton<EnginePersistenceCoordinator>(sp =>
@@ -145,6 +150,7 @@ public static class MatchRegistration
                 sp.GetRequiredService<IEngineCheckpointStore>(),
                 sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EnginePersistenceOptions>>(),
                 clock: null,
-                logger: sp.GetService<ILogger<EnginePersistenceCoordinator>>()));
+                logger: sp.GetService<ILogger<EnginePersistenceCoordinator>>(),
+                botDecisions: sp.GetRequiredService<IBotDecisionLogStore>()));
     }
 }

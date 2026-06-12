@@ -35,6 +35,7 @@ public sealed class EnginePersistenceCoordinator
 {
     private readonly IEngineCommandLogStore _log;
     private readonly IEngineCheckpointStore _checkpoints;
+    private readonly IBotDecisionLogStore _botDecisions;
     private readonly EnginePersistenceOptions _options;
     private readonly Func<DateTime> _clock;
     private readonly ILogger<EnginePersistenceCoordinator>? _logger;
@@ -44,10 +45,15 @@ public sealed class EnginePersistenceCoordinator
         IEngineCheckpointStore checkpoints,
         IOptions<EnginePersistenceOptions> options,
         Func<DateTime>? clock = null,
-        ILogger<EnginePersistenceCoordinator>? logger = null)
+        ILogger<EnginePersistenceCoordinator>? logger = null,
+        IBotDecisionLogStore? botDecisions = null)
     {
         _log = log;
         _checkpoints = checkpoints;
+        // Optional for ctor source-compat (pre-existing tests construct the
+        // coordinator without a bot store); a null store degrades to a fresh
+        // in-memory one, which is also correct for human-vs-human-only paths.
+        _botDecisions = botDecisions ?? new InMemoryBotDecisionLogStore();
         _options = options.Value;
         _clock = clock ?? (() => DateTime.UtcNow);
         _logger = logger;
@@ -90,6 +96,34 @@ public sealed class EnginePersistenceCoordinator
                     "full-log replay. MatchId={MatchId} Seq={Seq}", matchId, seq);
             }
         }
+    }
+
+    /// <summary>
+    /// Durably record one bot answer at its per-match monotonic botSeq
+    /// (idempotent on (matchId, botSeq); no-op when persistence is off).
+    /// Recorded answers are replayed VERBATIM during rehydration via
+    /// <see cref="Majik.Core.Api.BotReplay.ScriptedPlayerAgent"/> — the bot
+    /// never recomputes, so wall-clock-nondeterministic search (MCTS)
+    /// survives replica restarts.
+    /// </summary>
+    public async Task RecordBotDecisionAsync(
+        Guid matchId, Majik.Core.Api.BotReplay.BotDecisionRecord record, CancellationToken ct)
+    {
+        if (!_options.Enabled) return;
+        await _botDecisions.AppendAsync(matchId, record, ct);
+    }
+
+    /// <summary>
+    /// Read the whole recorded bot-decision stream for a match in botSeq
+    /// order (empty when persistence is off, or when the match has none —
+    /// e.g. human vs human). Replay always consumes the stream whole from
+    /// botSeq 0 — checkpoints only bundle the command prefix.
+    /// </summary>
+    public async Task<IReadOnlyList<Majik.Core.Api.BotReplay.BotDecisionRecord>> ReadBotDecisionsAsync(
+        Guid matchId, CancellationToken ct)
+    {
+        if (!_options.Enabled) return Array.Empty<Majik.Core.Api.BotReplay.BotDecisionRecord>();
+        return await _botDecisions.ReadAllAsync(matchId, ct);
     }
 
     private bool ShouldCheckpoint(long seq)
