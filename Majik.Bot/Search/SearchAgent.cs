@@ -7,6 +7,9 @@ using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
+// Aliased: importing all of Majik.Core.Combat would make BlockerDeclaration
+// ambiguous with Majik.Core.Players.Agents.BlockerDeclaration (the bot's type).
+using BlockLegality = Majik.Core.Combat.BlockLegality;
 
 namespace Majik.Bot.Search;
 
@@ -700,7 +703,7 @@ public sealed class SearchAgent : IPlayerAgent
     /// Cap: <see cref="MaxBlockMoves"/>. Enumeration terminates once the cap is
     /// reached, so the number of options is always bounded regardless of board size.
     /// </summary>
-    private static List<SimMove> BuildBlockerMoves(
+    internal static List<SimMove> BuildBlockerMoves(
         GameContext ctx,
         IReadOnlyList<Creature> attackers,
         IReadOnlyList<Creature> eligibleBlockers)
@@ -728,6 +731,8 @@ public sealed class SearchAgent : IPlayerAgent
         {
             foreach (var blk in eligibleBlockers)
             {
+                // CR 509.1b — only legal (blocker, attacker) pairs may block.
+                if (!BlockLegality.CanBlock(blk, att, out _)) continue;
                 var plan = new BlockPlan(new[] { new BlockerDeclaration(blk, att) });
                 TryAdd(SimMove.FromBlockPlan(plan));
                 if (moves.Count >= MaxBlockMoves) goto done;
@@ -742,8 +747,11 @@ public sealed class SearchAgent : IPlayerAgent
         {
             for (int i = 0; i < eligibleBlockers.Count; i++)
             {
+                // CR 509.1b — both gang members must be legal against att.
+                if (!BlockLegality.CanBlock(eligibleBlockers[i], att, out _)) continue;
                 for (int j = i + 1; j < eligibleBlockers.Count; j++)
                 {
+                    if (!BlockLegality.CanBlock(eligibleBlockers[j], att, out _)) continue;
                     var plan = new BlockPlan(new[]
                     {
                         new BlockerDeclaration(eligibleBlockers[i], att),

@@ -1,6 +1,9 @@
 using Majik.Bot.Evaluation;
 using Majik.Core.Cards;
 using Majik.Core.Players.Agents;
+// Aliased: importing all of Majik.Core.Combat would make BlockerDeclaration
+// ambiguous with Majik.Core.Players.Agents.BlockerDeclaration (the bot's type).
+using BlockLegality = Majik.Core.Combat.BlockLegality;
 
 namespace Majik.Bot.Combat;
 
@@ -80,6 +83,8 @@ internal static class BlockCombatEval
         {
             foreach (var blk in eligibleBlockers)
             {
+                // CR 509.1b — only legal (blocker, attacker) pairs may block.
+                if (!BlockLegality.CanBlock(blk, att, out _)) continue;
                 TryAdd(new BlockPlan(new[] { new BlockerDeclaration(blk, att) }));
                 if (plans.Count >= MaxBlockPlans) goto done;
             }
@@ -90,8 +95,11 @@ internal static class BlockCombatEval
         {
             for (int i = 0; i < eligibleBlockers.Count; i++)
             {
+                // CR 509.1b — both gang members must be legal against att.
+                if (!BlockLegality.CanBlock(eligibleBlockers[i], att, out _)) continue;
                 for (int j = i + 1; j < eligibleBlockers.Count; j++)
                 {
+                    if (!BlockLegality.CanBlock(eligibleBlockers[j], att, out _)) continue;
                     TryAdd(new BlockPlan(new[]
                     {
                         new BlockerDeclaration(eligibleBlockers[i], att),

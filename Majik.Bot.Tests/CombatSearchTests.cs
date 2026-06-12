@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Bot.Combat;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Tests.Helpers;
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Xunit;
 
@@ -99,5 +100,38 @@ public class CombatSearchTests
         var plan = policy.PickAttackers(s.Context, s.Self, new Creature[] { a1, a2, a3 });
 
         plan.Attackers.Should().HaveCount(3);
+    }
+
+    /// <summary>
+    /// CR 509.1b — tapped creatures can't block. The attack model must not
+    /// count them as defense. Mirror of HardBlocker_DontAttackIntoTrade_AsBurn:
+    /// same board, but the 4/4 is tapped, so the 1/1 should swing freely.
+    /// </summary>
+    [Fact]
+    public void TappedBlocker_DoesNotDeterAttack()
+    {
+        var s = new BotTestScenario();
+        var small = s.AddCreatureToBattlefield(s.Self, "Goblin", 1, 1);
+        var big = s.AddCreatureToBattlefield(s.Opponent, "Big Blocker", 4, 4);
+        big.Tap();
+        var policy = new CombatPolicy(ArchetypeWeights.Burn);
+        var plan = policy.PickAttackers(s.Context, s.Self, new Creature[] { small });
+        plan.Attackers.Should().HaveCount(1);
+    }
+
+    /// <summary>
+    /// CR 509.1b — a ground creature can't block a flyer. The attack model
+    /// must treat the flying 1/1 as unblockable here and attack.
+    /// </summary>
+    [Fact]
+    public void FlyingAttacker_NotDeterredByGroundBlocker()
+    {
+        var s = new BotTestScenario();
+        var flyer = s.AddCreatureToBattlefield(s.Self, "Bird", 1, 1);
+        flyer.AddAbility(new KeywordAbility("Flying"));
+        s.AddCreatureToBattlefield(s.Opponent, "Big Blocker", 4, 4);
+        var policy = new CombatPolicy(ArchetypeWeights.Burn);
+        var plan = policy.PickAttackers(s.Context, s.Self, new Creature[] { flyer });
+        plan.Attackers.Should().HaveCount(1);
     }
 }

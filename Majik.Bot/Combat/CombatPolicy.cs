@@ -1,6 +1,9 @@
 using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Core.Cards;
+// Aliased: importing all of Majik.Core.Combat would make BlockerDeclaration
+// ambiguous with Majik.Core.Players.Agents.BlockerDeclaration (the bot's type).
+using BlockLegality = Majik.Core.Combat.BlockLegality;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -46,7 +49,9 @@ public sealed class CombatPolicy
         var avail = new List<Creature>(eligible);
         foreach (var att in attackers.OrderByDescending(c => c.Power))
         {
-            var blocker = avail.Where(b => b.Toughness > att.Power)
+            // CR 509.1b — only legal (blocker, attacker) pairs may block.
+            var blocker = avail.Where(b => BlockLegality.CanBlock(b, att, out _)
+                                        && b.Toughness > att.Power)
                                .OrderByDescending(b => b.Power).FirstOrDefault();
             if (blocker == null) continue;
             blockers.Add(new BlockerDeclaration(blocker, att));
