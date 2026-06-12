@@ -348,6 +348,13 @@ public sealed class MatchService
                 // without a declared sideboard (a clean no-op). Folded INTO
                 // the under-id-scope build so the sideboard cards' object ids
                 // stay reproducible for id-identical rehydration (PLAN 08).
+                // Bot-decision persistence — when the engine-persistence flag
+                // is ON, wrap the bot agent in a recorder so every answer is
+                // durably appended (awaited) before it is returned. Append /
+                // encode failures are a logged degrade, never a live-game
+                // failure (mirrors RecordCommandAsync's swallow posture).
+                var botRecorder = BuildBotDecisionRecorder(matchId);
+
                 facade = CreateFacadeUnderIdScope(matchSeed,
                     () =>
                     {
@@ -356,7 +363,12 @@ public sealed class MatchService
                             creatorDeck, botDeck,
                             botSeatArchetype: bot.Archetype,
                             onBotThinking: onBotThinking,
-                            extraDecisionSink: extraSinkArg);
+                            extraDecisionSink: extraSinkArg,
+                            botDecisionRecorder: botRecorder,
+                            onBotRecordingDegraded: ex => _logger?.LogWarning(ex,
+                                "Bot-decision recording degraded (unsupported answer shape); " +
+                                "the live game continues unrecorded from here. MatchId={MatchId}",
+                                matchId));
                         if (botSideboard.Count > 0)
                         {
                             f.PopulateSideboard(f.Bob, botSideboard);
@@ -839,6 +851,37 @@ public sealed class MatchService
         sub != null && sub.StartsWith("bot:", StringComparison.Ordinal)
             ? sub["bot:".Length..]
             : null;
+
+    /// <summary>
+    /// Bot-decision persistence — the durable recorder handed to
+    /// <see cref="Composition.ServerGameFactory"/> for the Bob (bot) seat.
+    /// Null when engine persistence is OFF, so the factory installs today's
+    /// bare BotPlayerAgent (byte-identical flag-off path). The append goes
+    /// through <see cref="Persistence.EnginePersistenceCoordinator.RecordBotDecisionAsync"/>
+    /// (idempotent on (matchId, botSeq)); a store failure is swallowed +
+    /// logged — the live decision already happened, so failing the game for a
+    /// persistence hiccup would be strictly worse (mirrors the
+    /// RecordCommandAsync posture).
+    /// </summary>
+    private Func<Majik.Core.Api.BotReplay.BotDecisionRecord, Task>? BuildBotDecisionRecorder(
+        Guid matchId)
+    {
+        if (_persistence is not { Enabled: true }) return null;
+        var persistence = _persistence;
+        return async record =>
+        {
+            try
+            {
+                await persistence.RecordBotDecisionAsync(matchId, record, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex,
+                    "Durable bot-decision append failed (decision already applied in-process). " +
+                    "MatchId={MatchId} BotSeq={BotSeq}", matchId, record.BotSeq);
+            }
+        };
+    }
 
     /// <summary>Fan out the post-PlayDraw events (timeout schedule + SignalR
     /// hub publishes for play-draw-chosen / state-changed / clock-update).</summary>
@@ -1461,22 +1504,35 @@ public sealed class MatchService
             var creatorDeck = await _decks.LoadFromCardNamesAsync(creatorNames, ct);
             var opponentDeck = await _decks.LoadFromCardNamesAsync(opponentNames, ct);
 
-            // vs-bot match: re-install the deterministic BotPlayerAgent on the
-            // Bob seat of the rehydrated facade. The bot opponent is synthesized
-            // with Sub = "bot:<archetype>" (see CreateBotMatchAsync); the
-            // archetype is the suffix. Without re-installing, the rehydrated bot
-            // seat falls back to the default RemoteAgent and the prompt-driven
-            // replay dequeues human commands against bot prompts → desync. Same
-            // archetype + same persisted seed ⇒ the bot re-makes identical
-            // in-engine decisions and its prompts never consume a logged command.
+            // vs-bot match: re-install the bot seat on the rehydrated facade.
+            // The bot opponent is synthesized with Sub = "bot:<archetype>"
+            // (see CreateBotMatchAsync); the archetype is the suffix. Without
+            // re-installing, the rehydrated bot seat falls back to the default
+            // RemoteAgent and the prompt-driven replay dequeues human commands
+            // against bot prompts → desync. The replay guarantee is
+            // RECORD/REPLAY, not same-seed recompute: the match's recorded
+            // bot-decision stream is loaded whole (botSeq 0..N) and a
+            // ScriptedPlayerAgent answers every replayed bot prompt VERBATIM —
+            // wall-clock-nondeterministic MCTS rehydrates identically. Past
+            // the live edge the script falls through to a fresh recording
+            // wrapper continuing the stream at botSeq = records.Count.
             var botArchetype = BotArchetypeFromSub(match.Opponent?.Sub);
+            var botScript = botArchetype != null
+                ? await _persistence.ReadBotDecisionsAsync(matchId, ct)
+                : Array.Empty<Majik.Core.Api.BotReplay.BotDecisionRecord>();
+            var botRecorder = botArchetype != null ? BuildBotDecisionRecorder(matchId) : null;
 
             var rebuilt = await _persistence.TryRehydrateAsync(
                 matchId,
                 match.GameSeed,
                 buildFreshFacade: () => _gameFactory.BuildUnregisteredFacade(
                     match.Creator.Handle, match.Opponent?.Handle ?? "Opponent",
-                    creatorDeck, opponentDeck, botSeatArchetype: botArchetype),
+                    creatorDeck, opponentDeck, botSeatArchetype: botArchetype,
+                    botReplayScript: botScript,
+                    botDecisionRecorder: botRecorder,
+                    onBotRecordingDegraded: ex => _logger?.LogWarning(ex,
+                        "Bot-decision recording degraded post-rehydrate (unsupported answer " +
+                        "shape). MatchId={MatchId}", matchId)),
                 ct);
 
             if (rebuilt == null)
