@@ -901,6 +901,24 @@ public sealed class TurnDriver
             def = resolved
                 ?? Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
 
+            // CR 601.2b / 601.2e / 601.2f — variable-X spell: announce X NOW,
+            // BEFORE the mana-source prompt + payment below, so {X} is folded
+            // into the dispatcher's cost. Pre-fix this dispatch path prompted /
+            // paid the printed cost (X folded to generic 0) while CastAsync
+            // computed the X-inclusive totalCost AFTER the prompt and the
+            // payManaCost callback deliberately ignored it — the bot's X-spells
+            // underpaid (X effectively free). Mirrors the activated-ability X
+            // ledger (DispatchActivate, GAP 2): prompt ChooseXAsync, fold X into
+            // the cost via ManaCost.AddGenericCost, then prompt + pay that
+            // X-inclusive cost. The chosen X is forwarded to CastAsync so the
+            // flow reuses it (no double-prompt) and threads it into the resolving
+            // effect (ChosenSpellParams.X) + ETB-with-X (PendingCastX).
+            int? chosenX = null;
+            if (def.HasVariableX)
+            {
+                chosenX = await _agents[actor].ChooseXAsync(ctx, castCard, ct);
+            }
+
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
             // it just collects ManaPayment for downstream metadata.
             // When the agent elected an alternative cost (CR 118.9 —
@@ -914,6 +932,16 @@ public sealed class TurnDriver
             var cost = faceCostOverride
                 ?? cast.AlternativeCost?.AlternativeManaCost
                 ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(castCard, actor, _players);
+
+            // CR 601.2f — fold the announced X into the effective cost as
+            // generic mana, mirroring SpellCastFlow.ComputeAndApplyTotalCost
+            // (totalCost.AddGenericCost(xv)). This is what makes the mana
+            // prompt + payManaCost callback below see — and pay — the
+            // X-inclusive cost. An X=0 spell adds nothing (X is legally 0).
+            if (chosenX is { } xv && xv > 0)
+            {
+                cost = cost.AddGenericCost(xv);
+            }
 
             // CR 601.2g + CR 106.4 — pay from the player's already-floating
             // mana pool first. When the pool fully covers the cost we don't
@@ -995,6 +1023,9 @@ public sealed class TurnDriver
             // prompt above), keeping the prompt/payment pairing intact.
             // The flow-computed total cost (CR 601.2f) is deliberately unused
             // here: the agent was prompted against `cost`, so `cost` is paid.
+            // `cost` already has the announced X folded in (AddGenericCost
+            // above), so the X is paid by this same callback — the flow's
+            // totalCost (which folds X identically) matches by construction.
             bool PayCastMana(Majik.Core.ValueObjects.ManaCost totalCostFromFlow)
             {
                 // CR 106.4 — pass the cast card as the "spent on" context so
@@ -1036,7 +1067,8 @@ public sealed class TurnDriver
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
                     preChosenMana: payment,
-                    payManaCost: PayCastMana);
+                    payManaCost: PayCastMana,
+                    preChosenX: chosenX);
             }
             catch (InvalidOperationException ex)
             {
