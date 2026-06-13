@@ -5,8 +5,12 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Targeting;
 using Majik.Core.Zones;
 using Xunit;
@@ -181,5 +185,39 @@ public class BonecrusherGiantTests
 
         triggers.PendingCount.Should().Be(0,
             "the spell didn't pick Bonecrusher Giant as a target");
+    }
+
+    [Fact]
+    public void Stomp_DealsDamageToEffectivePlaneswalkerBackFace_AsLoyaltyRemoval()
+    {
+        // CR 711 / 306.7 — Stomp's "any target" can be a creature-front
+        // transform DFC flipped to its planeswalker BACK face (Ral, Monsoon
+        // Mage // Ral, Leyline Prodigy). That back face is a Creature C#
+        // instance carrying a transient loyalty body (IsEffectivePlaneswalker),
+        // NOT a Planeswalker subclass — so Stomp's 2 noncombat damage must
+        // reduce its transient loyalty, not mark it as creature damage.
+        var ces = new ContinuousEffectsService();
+        var ral = RalMonsoonMageFactory.Create(_bob);
+        ral.ActiveEffects = ces;
+        ral.SetController(_bob);
+        ral.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(ral);
+        ral.MdfcState!.Transform(); // → Ral, Leyline Prodigy, loyalty 2 PW back
+        ral.IsEffectivePlaneswalker().Should().BeTrue("the back face is an effective planeswalker");
+
+        var stompDef = BonecrusherGiantFactory.BuildAdventureSpell(_alice, raw => raw);
+        var chosen = new ChosenSpellParams(
+            ModeIndex: null,
+            X: null,
+            Targets: new IReadOnlyList<object>[] { new object[] { ral } },
+            Mana: ManaPayment.Empty);
+
+        foreach (var e in stompDef.EffectFactory(chosen)) e.Execute();
+
+        ral.GetEffectiveLoyalty().Should()
+            .Be(BonecrusherGiantFactory.StompDamage == 2 ? 0 : 2 - BonecrusherGiantFactory.StompDamage,
+                "Stomp's 2 damage removes 2 loyalty from a 2-loyalty back-face PW (CR 306.7)");
+        ral.IsLoyaltyDead().Should().BeTrue("0 loyalty trips the PW death SBA (CR 704.5j)");
+        ral.Damage.Should().Be(0, "noncombat damage to an effective PW is loyalty removal, not marked creature damage");
     }
 }

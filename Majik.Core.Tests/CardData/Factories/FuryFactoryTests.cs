@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -342,6 +343,49 @@ public class FuryFactoryTests
         damageTrigger.Resolve();
 
         pw.Loyalty.Should().Be(1);
+    }
+
+    [Fact]
+    public void EtbDamage_DealsToEffectivePlaneswalkerBackFace_AsLoyaltyRemoval()
+    {
+        // CR 711 / 306.7 — a creature-front transform DFC flipped to its
+        // planeswalker BACK face is a Creature C# instance carrying a transient
+        // loyalty body (IsEffectivePlaneswalker), NOT a Planeswalker subclass.
+        // Fury's noncombat ETB damage must reduce that transient loyalty rather
+        // than mark creature damage. Ral, Monsoon Mage // Ral, Leyline Prodigy
+        // (back face loyalty 2) is the canonical effective-PW.
+        var ces = new ContinuousEffectsService();
+        var ral = RalMonsoonMageFactory.Create(_bob);
+        ral.ActiveEffects = ces;
+        ral.SetController(_bob);
+        ral.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(ral);
+        ral.MdfcState!.Transform(); // → Ral, Leyline Prodigy, loyalty 2 PW back
+        ral.IsEffectivePlaneswalker().Should().BeTrue("the back face is an effective planeswalker");
+
+        IReadOnlyDictionary<Permanent, int> Distribute(Player _, int x) =>
+            new Dictionary<Permanent, int> { [ral] = 1 };
+
+        var fury = FuryFactory.Create(_alice, Distribute);
+        fury.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(fury);
+
+        // Seed hand size ≥ 1 so X > 0 (allocation overrides the amount anyway).
+        var filler = new Creature("F0", "R", 1, 1) { Owner = _alice };
+        filler.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(filler);
+
+        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
+            .First(t => t.TargetRequests.Count > 0);
+        damageTrigger.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { ral },
+        });
+
+        damageTrigger.Resolve();
+
+        ral.GetEffectiveLoyalty().Should().Be(1, "1 damage removes 1 loyalty from the back-face PW (CR 306.7)");
+        ral.Damage.Should().Be(0, "noncombat damage to an effective PW is loyalty removal, not marked creature damage");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
