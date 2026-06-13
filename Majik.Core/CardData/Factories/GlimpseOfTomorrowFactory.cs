@@ -62,7 +62,18 @@ namespace Majik.Core.CardData.Factories;
 public static class GlimpseOfTomorrowFactory
 {
     public const string CardName = "Glimpse of Tomorrow";
-    public const string PrintedManaCost = "{3}{R}";
+
+    /// <summary>
+    /// CR 202.1a / 117.7c — Glimpse of Tomorrow has NO printed mana cost
+    /// (Scryfall <c>mana_cost == ""</c>, mana value 0). The empty string is
+    /// the first-class no-mana-cost shape: a genuinely empty cost makes the
+    /// card uncastable from hand for its mana cost — its only legal cast path
+    /// is the printed alternative-cast mechanic (Suspend 3—{R}{R} / cascade
+    /// free cast), which resolves from Exile. The <see cref="ZoneType.Hand"/>
+    /// cast restriction stamped in <see cref="Create(Player)"/> enforces this
+    /// (CR 601.2a). Mirrors LotusBloomFactory's first-class no-mana-cost shape.
+    /// </summary>
+    public const string PrintedManaCost = "";
 
     /// <summary>
     /// Construct a Glimpse of Tomorrow sorcery owned and controlled by
@@ -77,6 +88,21 @@ public static class GlimpseOfTomorrowFactory
         var card = new Sorcery(CardName, PrintedManaCost);
         card.SetOwner(owner);
         card.SetController(owner);
+
+        // CR 105.2 / 202.2c — Glimpse of Tomorrow has no printed mana cost
+        // but is RED (Scryfall colors == ["R"]). With no mana cost to derive
+        // colour from, the colour is carried by an explicit colour indicator
+        // so CardColors.GetColors honours it. Mirrors ScryfallCardFactory's
+        // ApplyColorIndicator path for no-mana-cost cards (e.g. Dryad Arbor).
+        card.SetColorIndicator(new[] { Majik.Core.ValueObjects.ManaColor.Red });
+
+        // CR 601.2a / 117.7c — no printed mana cost means there is no mana
+        // cost to pay, so Glimpse of Tomorrow can't be cast from hand for its
+        // mana cost. The alternative-cast free cast (Suspend / cascade)
+        // resolves from Exile, which this restriction does not touch. Mirrors
+        // LotusBloomFactory's first-class no-mana-cost shape.
+        card.AddRestrictedCastZone(ZoneType.Hand);
+
         return card;
     }
 
