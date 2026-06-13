@@ -7,7 +7,9 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
 using Majik.Core.Counters;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -33,7 +35,11 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - <see cref="Card.ManaCostValue.HasX"/> reports true.
 /// - Flying keyword marker (CR 702.9).
-/// - ETB +1/+1 counters trigger: PendingCastX=4 → 4 counters (CR 122.1g).
+/// - "Enters with X +1/+1 counters" is owned by the generic
+///   <see cref="EntersWithCountersBinder"/> (NOT a self-managed ETB trigger):
+///   the factory attaches no ETB-counters trigger and does not self-manage;
+///   the binder reads <see cref="Card.PendingCastX"/> and places the counters
+///   as The Goose Mother enters (CR 614.1d). X=4 → 4 counters; X=0 → 0.
 /// - ETB Food trigger: half X rounded up (X=4 → 2 Food; X=3 → 2 Food; X=0 → 0).
 /// - Attack trigger: with a Food + "yes", sacrifices the Food and draws.
 /// - Attack trigger: with no Food, draws nothing (nothing to sacrifice).
@@ -80,33 +86,84 @@ public class TheGooseMotherFactoryTests
     // ── Trigger shape ───────────────────────────────────────────────────
 
     [Fact]
-    public void TheGooseMother_AttachesThreeTriggers()
+    public void TheGooseMother_AttachesTwoTriggers_NoEtbCountersTrigger()
     {
         var c = TheGooseMotherFactory.Create(_alice);
 
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(3,
-            "ETB-counters, ETB-Food, and attacks-sac-Food-draw triggers");
+        // CR 614.1d — the ETB counters are a binder-registered replacement, NOT
+        // a factory-attached trigger. Only the ETB-Food and attacks triggers
+        // remain factory-attached.
+        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
+            "ETB-Food and attacks-sac-Food-draw triggers; the ETB-X counters are " +
+            "owned by the EntersWithCountersBinder");
+        c.Abilities.OfType<TriggeredAbility>()
+            .Should().NotContain(t => t.Effects.Any(e => e.Description.Contains("enters with X")),
+                "the ETB-X counters clause is no longer a factory-attached trigger");
     }
 
-    // ── ETB +1/+1 counters (CR 122.1g) ──────────────────────────────────
+    // ── ETB +1/+1 counters: owned by the binder (CR 614.1d) ─────────────
+
+    private static CardEntity GooseMotherEntity() =>
+        new EmbeddedCardRepository().GetByName("The Goose Mother")!;
 
     [Fact]
-    public void TheGooseMother_EtbWithXEquals4_GainsFourPlusOneCounters()
+    public void TheGooseMother_DoesNotSelfManageEntersWithCounters()
     {
+        // The factory must leave SelfManagesEntersWithCounters false so the
+        // EntersWithCountersBinder DOES register the variable-X replacement on
+        // the prod route. Setting the flag suppresses the binder → 0 counters.
         var c = TheGooseMotherFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(c);
-        c.SetZone(ZoneType.Battlefield);
 
-        // SpellCastFlow stamps PendingCastX after ChooseXAsync; simulate.
+        c.SelfManagesEntersWithCounters.Should().BeFalse(
+            "the binder owns the ETB-X replacement; self-managing suppresses it " +
+            "and yields zero counters on the Approach-B prod route");
+    }
+
+    [Fact]
+    public void TheGooseMother_BinderReplacement_EntersWithXEquals4_Counters()
+    {
+        // The prod mechanism: factory build + binder (reads the card's real
+        // oracle text) + ZoneService move. X = 4 (cast for X=4).
+        var bus = new ReplacementBus();
+        var c = TheGooseMotherFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(c, GooseMotherEntity(), bus).Should().BeTrue(
+            "the binder matches 'enters with X +1/+1 counters on it' and registers " +
+            "the variable-X replacement");
+
+        c.SetOwner(_alice);
+        c.SetController(_alice);
+        _alice.Zones.Library.AddCard(c);
+        c.SetZone(ZoneType.Library);
         c.SetPendingCastX(4);
 
-        var etb = c.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.Effects.Any(e => e.Description.Contains("enters with X")));
-        foreach (var e in etb.Effects) e.Execute();
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(c, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         c.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4,
-            "The Goose Mother enters with X (=4) +1/+1 counters per CR 122.1g");
-        c.PendingCastX.Should().BeNull("PendingCastX stamp consumed by the ETB counters effect");
+            "The Goose Mother enters WITH X (=4) +1/+1 counters per CR 614.1d");
+    }
+
+    [Fact]
+    public void TheGooseMother_BinderReplacement_ZeroX_NoCounters()
+    {
+        // No PendingCastX stamp → X = 0 → enters as a base 2/2 with no counters.
+        var bus = new ReplacementBus();
+        var c = TheGooseMotherFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(c, GooseMotherEntity(), bus).Should().BeTrue();
+
+        c.SetOwner(_alice);
+        c.SetController(_alice);
+        _alice.Zones.Library.AddCard(c);
+        c.SetZone(ZoneType.Library);
+        // No SetPendingCastX → X defaults to 0.
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(c, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        c.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "X = 0 → zero counters placed (enters as base 2/2)");
     }
 
     // ── ETB Food: half X, rounded up ────────────────────────────────────

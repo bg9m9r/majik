@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -19,10 +20,12 @@ namespace Majik.Core.Tests.CardData;
 /// - Identity (Creature — Eldrazi, {X}, 0/0, owner / controller).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - <see cref="Card.ManaCostValue.HasX"/> reports true (X-cost spell).
-/// - ETB trigger placed via <see cref="Card.PendingCastX"/>; X=3 → 3
-///   +1/+1 counters; PendingCastX cleared post-consume.
-/// - X=0 → no counters added (and PendingCastX still cleared).
-/// - Hardened Scales bump applies through <see cref="CountersService.Add"/>.
+/// - "Enters with X +1/+1 counters" is owned by the generic
+///   <see cref="EntersWithCountersBinder"/> (NOT a self-managed ETB trigger):
+///   the factory attaches no ETB trigger and does not self-manage; the binder
+///   registers a variable-X replacement that reads
+///   <see cref="Card.PendingCastX"/> and places the counters AS the permanent
+///   enters (CR 614.1d). X=3 → 3 counters; X=0 → 0/0; Hardened Scales bumps.
 /// </summary>
 public class EndlessOneFactoryTests
 {
@@ -57,98 +60,132 @@ public class EndlessOneFactoryTests
         ((Creature)card).BaseToughness.Should().Be(0);
     }
 
+    // -----------------------------------------------------------------------
+    // ETB X +1/+1 counters: "Endless One enters with X +1/+1 counters on it"
+    // (CR 614.1d / CR 202.3b). This is NOT a factory-attached ETB trigger. The
+    // factory defers to the generic EntersWithCountersBinder, which on the prod
+    // deck-build (DeckCardBuilder APPROACH B → OverlayAdditiveBinders)
+    // registers a variable-X EntersWithCountersReplacement that reads
+    // PendingCastX and places the counters AS the permanent enters. These tests
+    // exercise that exact prod mechanism: build the factory card, run the
+    // binder against its real oracle text, then move it onto the battlefield
+    // through ZoneService and assert the counters landed.
+    //
+    // Earlier this card self-managed via an ETB trigger + the
+    // MarkSelfManagesEntersWithCounters flag; that produced ZERO counters on
+    // the Approach-B route (the trigger was never registered with a live
+    // TriggerManager and the flag suppressed the binder). The factory must NOT
+    // attach an ETB trigger NOR self-manage — both regression-guarded here.
+    // -----------------------------------------------------------------------
+
+    private static CardEntity EndlessOneEntity() =>
+        new EmbeddedCardRepository().GetByName("Endless One")!;
+
     [Fact]
-    public void EndlessOne_AttachesEtbTrigger()
+    public void EndlessOne_DoesNotAttachEtbTrigger()
     {
+        // CR 614.1d — the ETB counters are a binder-registered replacement, NOT
+        // a factory-attached TriggeredAbility. Self-managing via a trigger was
+        // the bug: the prod Approach-B route never registers it.
         var eo = EndlessOneFactory.Create(_alice);
-        eo.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Endless One has exactly one ETB trigger");
+
+        eo.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "Endless One's ETB counters are a binder-registered replacement, " +
+            "not a self-managed ETB trigger");
     }
 
     [Fact]
-    public void EndlessOne_EtbWithXEquals3_GainsThreePlusOneCounters()
+    public void EndlessOne_DoesNotSelfManageEntersWithCounters()
     {
+        // The factory must leave SelfManagesEntersWithCounters false so the
+        // EntersWithCountersBinder DOES register the variable-X replacement on
+        // the prod route. Setting the flag suppresses the binder → 0 counters.
         var eo = EndlessOneFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(eo);
-        eo.SetZone(ZoneType.Battlefield);
 
-        // SpellCastFlow stamps PendingCastX after ChooseXAsync; simulate.
+        eo.SelfManagesEntersWithCounters.Should().BeFalse(
+            "the binder owns the ETB-X replacement; self-managing suppresses it " +
+            "and yields zero counters on the Approach-B prod route");
+    }
+
+    [Fact]
+    public void EndlessOne_BinderReplacement_EntersWithXEquals3_Counters()
+    {
+        // The prod mechanism: factory build + binder (reads the card's real
+        // oracle text) + ZoneService move. X = 3 (cast {3}).
+        var bus = new ReplacementBus();
+        var eo = EndlessOneFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(eo, EndlessOneEntity(), bus).Should().BeTrue(
+            "the binder matches 'enters with X +1/+1 counters on it' and registers " +
+            "the variable-X replacement");
+
+        eo.SetOwner(_alice);
+        eo.SetController(_alice);
+        _alice.Zones.Library.AddCard(eo);
+        eo.SetZone(ZoneType.Library);
         eo.SetPendingCastX(3);
 
-        eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
-
-        var etb = eo.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(eo, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
-            "Endless One enters with X (=3) +1/+1 counters per CR 122.1g");
-        eo.PendingCastX.Should().BeNull(
-            "PendingCastX stamp consumed once the ETB effect reads it — re-entries don't double-count");
-    }
-
-    [Fact]
-    public void EndlessOne_EtbWithXEquals0_NoCountersPlaced_AndStateLossViaSba()
-    {
-        var eo = EndlessOneFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(eo);
-        eo.SetZone(ZoneType.Battlefield);
-        eo.SetPendingCastX(0);
-
-        var etb = eo.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
-
-        eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "X=0 → zero counters placed");
-        eo.PendingCastX.Should().BeNull(
-            "PendingCastX cleared regardless of X value");
-        // 0/0 + 0 counters → SBA-fodder. The Power/Toughness check is the
-        // observable state — SBA loop itself isn't run here.
-        eo.BasePower.Should().Be(0);
+            "Endless One enters WITH X (=3) +1/+1 counters per CR 614.1d → 3/3");
+        eo.BasePower.Should().Be(0, "base P/T is unchanged; counters add via Layer 7");
         eo.BaseToughness.Should().Be(0);
     }
 
     [Fact]
-    public void EndlessOne_NoPendingX_NonCastEntry_NoCountersPlaced()
+    public void EndlessOne_BinderReplacement_ZeroX_NoCounters()
     {
-        // Non-cast entries (blink, copy, etc.) leave PendingCastX = null —
-        // the ETB effect must no-op rather than throw or place arbitrary
-        // counters.
+        // No PendingCastX stamp → X = 0 → a 0/0 the SBA layer sends to the
+        // graveyard (CR 704.5f). Non-cast entries (blink, copy) take this path.
+        var bus = new ReplacementBus();
         var eo = EndlessOneFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(eo);
-        eo.SetZone(ZoneType.Battlefield);
-        eo.PendingCastX.Should().BeNull();
 
-        var etb = eo.Abilities.OfType<TriggeredAbility>().Single();
-        var act = () => { foreach (var e in etb.Effects) e.Execute(); };
-        act.Should().NotThrow();
+        EntersWithCountersBinder.Bind(eo, EndlessOneEntity(), bus).Should().BeTrue();
+
+        eo.SetOwner(_alice);
+        eo.SetController(_alice);
+        _alice.Zones.Library.AddCard(eo);
+        eo.SetZone(ZoneType.Library);
+        // No SetPendingCastX → X defaults to 0.
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(eo, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "non-cast entry leaves Endless One as a 0/0 with no counters (CR 122.1g — no chosen X)");
+            "X = 0 → zero counters placed → 0/0 SBA-fodder (CR 704.5f)");
     }
 
     [Fact]
-    public void EndlessOne_RoutesThroughCountersService_HardenedScalesBumpsApply()
+    public void EndlessOne_BinderReplacement_HardenedScalesBumpsApply()
     {
-        // Hardened Scales rewrites +1/+1 counter placements via a
-        // ReplacementBus subscriber. Wire EO with a replacement bus +
-        // register Hardened Scales' factory replacement, then cast for X=2.
-        // Expected: 2 + 1 = 3 counters land.
+        // Hardened Scales bumps the +1/+1 counters AS they enter — it observes
+        // the same ZoneMoveIntent.PlusOneCountersOnEnter channel the ETB-X
+        // replacement stamps (CR 614). Wire a +1 bump on that channel, cast for
+        // X = 2, expect 3 counters.
         var bus = new ReplacementBus();
-        // Bump amount by 1 for every PlusOnePlusOne placement (sufficient
-        // to simulate Hardened Scales without instantiating the factory).
-        bus.Register(new Majik.Core.Effects.LambdaReplacement<CounterAddIntent>(
-            applies: (intent, _) => intent.Type == CounterType.PlusOnePlusOne,
-            replace: (intent, _) => intent with { Amount = intent.Amount + 1 }));
+        bus.Register(new LambdaReplacement<ZoneMoveIntent>(
+            applies: (intent, _) => intent.ToZone == ZoneType.Battlefield
+                                    && intent.PlusOneCountersOnEnter >= 1,
+            replace: (intent, _) => intent with
+            {
+                PlusOneCountersOnEnter = intent.PlusOneCountersOnEnter + 1,
+            }));
 
-        var eo = EndlessOneFactory.Create(_alice, triggers: null, replacements: bus);
-        _alice.Zones.Battlefield.AddCard(eo);
-        eo.SetZone(ZoneType.Battlefield);
+        var eo = EndlessOneFactory.Create(_alice);
+        EntersWithCountersBinder.Bind(eo, EndlessOneEntity(), bus).Should().BeTrue();
+
+        eo.SetOwner(_alice);
+        eo.SetController(_alice);
+        _alice.Zones.Library.AddCard(eo);
+        eo.SetZone(ZoneType.Library);
         eo.SetPendingCastX(2);
 
-        var etb = eo.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(eo, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
-            "Hardened Scales (or any +1 replacement on PlusOnePlusOne placements) bumps the count via CountersService.Add");
+            "Hardened Scales (+1 on the ETB +1/+1 intent channel) bumps X (=2) → 3");
     }
 }

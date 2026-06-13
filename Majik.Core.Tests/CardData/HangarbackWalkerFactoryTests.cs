@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Xunit;
 using Artifact = Majik.Core.Cards.Artifact;
@@ -29,8 +30,11 @@ namespace Majik.Core.Tests.CardData;
 /// - Identity (Artifact Creature — Construct, {X}{X}, 0/0).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - <see cref="Card.ManaCostValue.HasX"/> reports true.
-/// - ETB trigger: PendingCastX=3 → 3 +1/+1 counters on Hangarback.
-/// - ETB trigger: no PendingCastX → 0 counters (non-cast entry).
+/// - "Enters with X +1/+1 counters" is owned by the generic
+///   <see cref="EntersWithCountersBinder"/> (NOT a self-managed ETB trigger):
+///   the factory attaches no ETB-counters trigger and does not self-manage;
+///   the binder reads <see cref="Card.PendingCastX"/> and places the counters
+///   as Hangarback enters (CR 614.1d). X=3 → 3 counters; X=0 → 0/0.
 /// - Dies trigger: with 2 counters, creates 2 Thopter tokens (1/1
 ///   artifact creature with Flying).
 /// - Dies trigger: with 0 counters, creates no tokens.
@@ -39,6 +43,9 @@ namespace Majik.Core.Tests.CardData;
 public class HangarbackWalkerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
+
+    private static CardEntity HangarbackEntity() =>
+        new EmbeddedCardRepository().GetByName("Hangarback Walker")!;
 
     [Fact]
     public void Hangarback_Identity()
@@ -69,52 +76,84 @@ public class HangarbackWalkerFactoryTests
     }
 
     [Fact]
-    public void Hangarback_AttachesEtbAndDiesTriggers()
+    public void Hangarback_AttachesDiesTriggerOnly_NoEtbCountersTrigger()
     {
         var h = HangarbackWalkerFactory.Create(_alice);
-        h.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
-            "ETB-counters and dies-tokens triggers");
+
+        // CR 614.1d — the ETB counters are a binder-registered replacement, NOT
+        // a factory-attached trigger. Only the dies-tokens trigger remains.
+        h.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
+            "only the dies-tokens trigger is factory-attached; the ETB-X counters " +
+            "are owned by the EntersWithCountersBinder");
+        h.Abilities.OfType<TriggeredAbility>().Single()
+            .Effects.Should().Contain(e => e.Description.Contains("Thopter"),
+                "the lone factory trigger is the dies-tokens trigger");
         h.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "{1}, {T}: +1/+1 counter on self");
     }
 
     [Fact]
-    public void Hangarback_EtbWithXEquals3_GainsThreePlusOneCounters()
+    public void Hangarback_DoesNotSelfManageEntersWithCounters()
     {
+        // The factory must leave SelfManagesEntersWithCounters false so the
+        // EntersWithCountersBinder DOES register the variable-X replacement on
+        // the prod route. Setting the flag suppresses the binder → 0 counters.
         var h = HangarbackWalkerFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(h);
-        h.SetZone(ZoneType.Battlefield);
 
-        // SpellCastFlow stamps PendingCastX after ChooseXAsync; simulate.
-        h.SetPendingCastX(3);
-
-        // ETB trigger is the first registered ability (ETB attached
-        // before dies trigger in HangarbackWalkerFactory.Create).
-        var etb = h.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.Effects.Any(e => e.Description.Contains("enters with X")));
-        foreach (var e in etb.Effects) e.Execute();
-
-        h.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
-            "Hangarback enters with X (=3) +1/+1 counters per CR 122.1g");
-        h.PendingCastX.Should().BeNull(
-            "PendingCastX stamp consumed; re-entries don't double-count");
+        h.SelfManagesEntersWithCounters.Should().BeFalse(
+            "the binder owns the ETB-X replacement; self-managing suppresses it " +
+            "and yields zero counters on the Approach-B prod route");
     }
 
     [Fact]
-    public void Hangarback_NonCastEntry_ZeroCounters()
+    public void Hangarback_BinderReplacement_EntersWithXEquals3_Counters()
     {
-        // PendingCastX null → 0 counters → 0/0 → SBA puts in graveyard.
+        // The prod mechanism: factory build + binder (reads the card's real
+        // oracle text, which ALSO contains a "for each +1/+1 counter" dies
+        // clause — the binder must scope its conditional-clause guard to the
+        // ETB sentence so the clean variable-X clause still binds) + ZoneService
+        // move. X = 3 (cast {3}{3}).
+        var bus = new ReplacementBus();
         var h = HangarbackWalkerFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(h);
-        h.SetZone(ZoneType.Battlefield);
-        h.PendingCastX.Should().BeNull();
 
-        var etb = h.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.Effects.Any(e => e.Description.Contains("enters with X")));
-        foreach (var e in etb.Effects) e.Execute();
+        EntersWithCountersBinder.Bind(h, HangarbackEntity(), bus).Should().BeTrue(
+            "the binder matches 'enters with X +1/+1 counters on it' even though the " +
+            "card carries an unrelated 'for each +1/+1 counter' dies clause");
+
+        h.SetOwner(_alice);
+        h.SetController(_alice);
+        _alice.Zones.Library.AddCard(h);
+        h.SetZone(ZoneType.Library);
+        h.SetPendingCastX(3);
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(h, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        h.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
+            "Hangarback enters WITH X (=3) +1/+1 counters per CR 614.1d → 3/3");
+    }
+
+    [Fact]
+    public void Hangarback_BinderReplacement_ZeroX_NoCounters()
+    {
+        // No PendingCastX stamp → X = 0 → a 0/0 the SBA layer sends to the
+        // graveyard (CR 704.5f). Non-cast entries (blink, copy) take this path.
+        var bus = new ReplacementBus();
+        var h = HangarbackWalkerFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(h, HangarbackEntity(), bus).Should().BeTrue();
+
+        h.SetOwner(_alice);
+        h.SetController(_alice);
+        _alice.Zones.Library.AddCard(h);
+        h.SetZone(ZoneType.Library);
+        // No SetPendingCastX → X defaults to 0.
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(h, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         h.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "non-cast entry → no PendingCastX → zero counters");
+            "X = 0 → zero counters placed → 0/0 SBA-fodder (CR 704.5f)");
     }
 
     [Fact]

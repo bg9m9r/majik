@@ -158,19 +158,44 @@ public static class TheGooseMotherFactory
 
         card.SetController(owner);
 
-        // CR 614.1d — self-manages its X +1/+1 counters via the ETB trigger
-        // below (and the Food ETB shares the same cast-time X); flag so the
-        // generic binder doesn't register a second variable-X replacement.
-        card.MarkSelfManagesEntersWithCounters();
+        // ----------------------------------------------------------------
+        // "The Goose Mother enters with X +1/+1 counters on it" (CR 614.1d /
+        // CR 202.3b) is NOT wired by this factory. It is registered by the
+        // generic EntersWithCountersBinder as a variable-X
+        // EntersWithCountersReplacement. On the production deck-build
+        // (DeckCardBuilder APPROACH B) the binder runs in OverlayAdditiveBinders
+        // against the live ReplacementBus, matches the oracle text ("enters with
+        // X +1/+1 counters on it"), reads the chosen X off Card.PendingCastX
+        // (stamped by SpellCastFlow after ChooseXAsync), and stamps
+        // ZoneMoveIntent.PlusOneCountersOnEnter so the permanent enters WITH the
+        // counters (no transient 0/0 window). Hardened Scales / Doubling Season
+        // compose on that same ETB intent channel (CR 614).
+        //
+        // The factory deliberately does NOT MarkSelfManagesEntersWithCounters()
+        // and does NOT attach an ETB TriggeredAbility for the counters — that
+        // was the bug (the same one Walking Ballista had, #2635): the prod
+        // Approach-B route calls NamedCardFactory.Create with no TriggerManager,
+        // so a self-managed ETB trigger is never registered and never fires, AND
+        // the self-manage flag suppresses the binder — the one mechanism that
+        // route DOES run — yielding ZERO counters in real play. Only the
+        // counters wiring changes; Flying, the ETB Food clause, and the
+        // attacks-sacrifice-a-Food-draw trigger below are unchanged.
+        //
+        // The Food ETB still needs the cast-time X. The binder reads
+        // Card.PendingCastX but does NOT clear it, so the Food trigger reads the
+        // same value off the stamp (and clears it once consumed, below).
+        // ----------------------------------------------------------------
 
         // CR 702.9 — Flying. KeywordAbility marker only; consumed by
         // CombatAbilities.HasFlying so block-legality observes it.
         card.AddAbility(new KeywordAbility(FlyingKeyword, card, owner));
 
-        // Shared cast-time X. The counters ETB consumes PendingCastX; the
-        // Food ETB needs the same value. Whichever ETB ability resolves first
-        // captures X here (CR 603.3b — either order is correct), so the second
-        // reads the captured value rather than the cleared PendingCastX.
+        // Cast-time X for the Food clause. The "enters with X +1/+1 counters"
+        // clause is now owned by the binder (see note above) and reads
+        // PendingCastX without clearing it, so the Food ETB reads the same
+        // stamp here. Snapshot once (so a later non-cast re-entry that re-fires
+        // the trigger doesn't pick up a stale value) and clear the stamp once
+        // consumed.
         int? xAtEntry = null;
         int CaptureX()
         {
@@ -179,42 +204,13 @@ public static class TheGooseMotherFactory
         }
 
         // ----------------------------------------------------------------
-        // ETB +1/+1 counters trigger — CR 603.6a / CR 122.1g.
-        //   "The Goose Mother enters with X +1/+1 counters on it."
-        // Same v1 ETB-counter pattern as Hangarback Walker: read PendingCastX
-        // (stamped by SpellCastFlow after ChooseXAsync), place that many
-        // +1/+1 counters via CountersService.Add (CR 614 replacement bus),
-        // then clear the stamp so re-entries don't reuse it.
-        // ----------------------------------------------------------------
-        var countersEffect = new Effect(
-            $"{CardName}: enters with X +1/+1 counters (CR 122.1g)",
-            () =>
-            {
-                var x = CaptureX();
-                if (x > 0)
-                {
-                    CountersService.Add(card, CounterType.PlusOnePlusOne, x, replacements, eventBus);
-                }
-                card.ClearPendingCastX();
-            });
-
-        var countersTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(card),
-            effects: new IEffect[] { countersEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(countersTrigger);
-        triggers?.RegisterTriggeredAbility(countersTrigger);
-
-        // ----------------------------------------------------------------
         // ETB Food trigger — CR 603.6a / CR 111.10.
         //   "When The Goose Mother enters, create half X Food tokens,
         //    rounded up."
-        // Distinct second ETB ability. ceil(X / 2) = (X + 1) / 2 in integer
-        // arithmetic (CR 107.16 — round up). Reads the shared cast-time X so
-        // it is independent of which ETB ability resolved first.
+        // ceil(X / 2) = (X + 1) / 2 in integer arithmetic (CR 107.16 — round
+        // up). Reads the cast-time X off PendingCastX (the binder leaves it
+        // intact), then clears the stamp so a non-cast re-entry doesn't reuse
+        // it.
         // ----------------------------------------------------------------
         var foodEffect = new Effect(
             $"{CardName}: create half X Food tokens, rounded up (CR 111.10)",
@@ -227,6 +223,7 @@ public static class TheGooseMotherFactory
                 {
                     TokenFactory.CreateFood(controller, zones);
                 }
+                card.ClearPendingCastX();
             });
 
         var foodTrigger = new TriggeredAbility(

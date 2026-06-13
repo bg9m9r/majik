@@ -64,10 +64,14 @@ public static class EntersWithCountersBinder
         // have no stamp → X = 0 → no counters.
         var vx = VariableXPattern.Match(text);
         if (vx.Success
-            && text.IndexOf("for each", StringComparison.OrdinalIgnoreCase) < 0
+            // Scope the "for each" conditional-shape guard to the SENTENCE that
+            // carries the matched "enters with X" clause — a card may carry an
+            // unrelated "for each" elsewhere (Hangarback Walker's dies clause:
+            // "create a … Thopter … for each +1/+1 counter"), which must NOT
+            // disqualify its clean variable-X ETB clause.
+            && !MatchSentenceHasForEach(text, vx)
             // CR 614.1d — skip when the card's factory ALREADY wires its own
-            // X-counter mechanism (Hangarback / Endless One / Stonecoil /
-            // Goose Mother); registering here would double the counters.
+            // X-counter mechanism; registering here would double the counters.
             && (card as Card)?.SelfManagesEntersWithCounters != true)
         {
             replacements.Register(new EntersWithCountersReplacement(
@@ -78,6 +82,26 @@ public static class EntersWithCountersBinder
         }
 
         return false;
+    }
+
+    // True when the SENTENCE containing the matched "enters with X +1/+1
+    // counters on it" clause also contains "for each" — i.e. the conditional
+    // "enters with … for each Y" shape that still needs a context predicate
+    // (out of scope). Scoping to the sentence (bounded by sentence terminators
+    // '.', '!', '?' and newlines) keeps an unrelated "for each" in a DIFFERENT
+    // ability of the same card (e.g. Hangarback Walker's dies clause) from
+    // disqualifying the clean variable-X ETB clause.
+    private static bool MatchSentenceHasForEach(string text, Match match)
+    {
+        static bool IsBoundary(char c) => c is '.' or '!' or '?' or '\n' or '\r';
+
+        var start = match.Index;
+        while (start > 0 && !IsBoundary(text[start - 1])) start--;
+
+        var end = match.Index + match.Length;
+        while (end < text.Length && !IsBoundary(text[end])) end++;
+
+        return text.IndexOf("for each", start, end - start, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static int WordToInt(string s) =>
