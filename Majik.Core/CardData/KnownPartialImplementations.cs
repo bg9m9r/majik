@@ -52,6 +52,21 @@ public static class KnownPartialImplementations
                 + "RebindTo path picks them up automatically. Targeting + Legendary supertype + "
                 + "mana-colour-substitution done (#2497)."),
 
+            ["Tameshi, Reality Architect"] = new CardGap(
+                CardGapSeverity.Partial,
+                "Trigger DONE: 'Whenever one or more noncreature permanents are returned to hand, "
+                + "draw a card. This ability triggers only once each turn.' — once-per-turn-gated "
+                + "draw on a battlefield→Hand CardMovedEvent for a noncreature card. DEFERRED: the "
+                + "'{X}{W}, Return a land you control to its owner's hand: Return target artifact or "
+                + "enchantment card with mana value X or less from your graveyard to the battlefield. "
+                + "Activate only as a sorcery.' activated ability is NOT emitted — the activated-"
+                + "ability path has no per-activation X ledger (AbilityActivationFlow never prompts "
+                + "for X; only the spell cast path does via ChosenSpellParams.X), so an {X} cost "
+                + "resolves to 0 on the production routed build and the mv≤X graveyard filter would "
+                + "only ever return mv-0 cards. Wiring it now would be a silent partial. Blocked on a "
+                + "per-activation X ledger; the 'return a chosen land' additional cost is card-local-"
+                + "authorable and is NOT the blocker."),
+
             // --- Re-derived from the faithful BotDeckImplementationAuditTests
             // run (cards built via the real GameFacade.Create + PopulateSideboard
             // path, full binder set incl. OracleLandActivatedAbilityBinder +
