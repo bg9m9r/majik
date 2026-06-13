@@ -1,0 +1,7 @@
+{
+  "name": "Hydroelectric Laboratory",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}
