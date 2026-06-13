@@ -146,20 +146,21 @@ public class EldraziTempleTests
     // -----------------------------------------------------------------------
     // Spend-restriction posture — see factory xmldoc.
     //
-    // Engine has no spend-restriction tag surface today (same as Cavern
-    // of Souls); the {C}{C} ability produces 2 generic that can pay
-    // any cost in v1. These tests pin that behaviour so the deferral
-    // remains observable.
+    // The {C}{C} ability stamps an Eldrazi-only SpendRestriction; the payment
+    // gate now ENFORCES it on colorless mana (see
+    // SpendRestrictionProvenanceGateTests). These tests pin the raw activation
+    // shape (produces 2 generic / colorless when tapped); the gate-enforcement
+    // assertions live in SpendRestrictionProvenanceGateTests.
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void EldraziTemple_DoubleColorlessAbility_ActivatesAsTwoGeneric_V1()
+    public void EldraziTemple_DoubleColorlessAbility_ActivatesAsTwoGeneric()
     {
-        // CR 605.3 / 605.4 — mana abilities produce mana when activated.
-        // v1: the spend-restriction rider is deferred, so the activated
-        // mana is untagged generic and can pay any spell cost. When the
-        // rider lands, the production will additionally tag the entries
-        // with the Eldrazi-only predicate.
+        // CR 605.3 / 605.4 — mana abilities produce mana when activated. The
+        // raw Activate() output is 2 generic / colorless; the Eldrazi-only
+        // spend-restriction is applied by the payment gate at spend time
+        // (CR 106.4), not at production, so the produced ManaCost itself is
+        // plain colorless here.
         var land = EldraziTempleFactory.Create(_alice);
         var doubleAbility = land.Abilities.OfType<ManaAbility>()
             .Single(m => m.ManaGenerated.Generic == 2);

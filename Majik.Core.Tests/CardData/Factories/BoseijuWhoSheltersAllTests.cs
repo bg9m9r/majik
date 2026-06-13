@@ -23,9 +23,14 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The "Pay 2 life" activation gate (CR 119.4) and that activating both
 ///   taps the land and pays 2 life.
 ///
-/// Deferred (not asserted — see factory xmldoc): the "that spell can't be
-/// countered" rider (per-slot mana provenance + cast-time flag) and the
-/// production-path enters-tapped replacement (owned by EntersTappedBinder).
+/// The "that spell can't be countered" rider (per-slot mana provenance +
+/// cast-time flag) is now wired — its mana ability carries a
+/// ProvenanceReaction (asserted here); the end-to-end gate behaviour
+/// (Boseiju mana spent on an instant/sorcery → that spell uncounterable)
+/// lives in <c>SpendRestrictionProvenanceGateTests</c>.
+///
+/// Deferred (not asserted — see factory xmldoc): the production-path
+/// enters-tapped replacement (owned by EntersTappedBinder).
 /// </summary>
 [Trait("Color", "C")]
 public class BoseijuWhoSheltersAllTests
@@ -134,6 +139,21 @@ public class BoseijuWhoSheltersAllTests
         produced.Generic.Should().Be(1, "one {C} produced");
         bos.IsTapped.Should().BeTrue("{T} is part of the activation cost");
         _alice.LifeTotal.Should().Be(18, "Pay 2 life is the additional activation cost");
+    }
+
+    [Fact]
+    public void Boseiju_ManaAbility_CarriesUncounterableProvenanceReaction()
+    {
+        // CR 701.5b / 106.4 — the {C} ability rides a ProvenanceReaction that
+        // marks an instant/sorcery spell uncounterable when Boseiju's mana
+        // pays for it. End-to-end gate behaviour is in
+        // SpendRestrictionProvenanceGateTests; here we pin that the reaction
+        // is wired at all.
+        var bos = BoseijuWhoSheltersAllFactory.Create(_alice);
+        var mana = bos.Abilities.OfType<ManaAbility>().Single();
+
+        mana.ProvenanceReaction.Should().NotBeNull(
+            "the uncounterable rider fires via the slot-provenance reaction");
     }
 
     [Fact]
