@@ -240,6 +240,20 @@ public static class LandActivatedAbilityBinder
         @"Destroy\s+target\s+(?<nonbasic>nonbasic\s+)?land\b(?<opp>[^.]*opponent\s+controls)?",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Demolition Field's both-players search-for-basic rider clauses that ride
+    // AFTER "Destroy target nonbasic land an opponent controls." (CR 701.19 /
+    // CR 701.20a). Two distinct "may search … for a basic land card, put it
+    // onto the battlefield, then shuffle" clauses: one for the destroyed land's
+    // controller ("That land's controller may search their library …"), one for
+    // the activator ("You may search your library …"). Note: NO "tapped" — the
+    // basics enter untapped (unlike the Panorama tapped fetch).
+    private static readonly Regex DestroyedControllerSearchBasic = new(
+        @"That\s+land'?s\s+controller\s+may\s+search\s+their\s+library\s+for\s+a\s+basic\s+land\s+card\s*,\s*put\s+it\s+onto\s+the\s+battlefield",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ActivatorSearchBasic = new(
+        @"You\s+may\s+search\s+your\s+library\s+for\s+a\s+basic\s+land\s+card\s*,\s*put\s+it\s+onto\s+the\s+battlefield",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // "Creatures you control gain <keyword>[ and <keyword>] until end of turn."
     // The mass until-EOT keyword-grant family (Vault of the Archangel). The
     // <kw> capture is the keyword list ("deathtouch and lifelink", "trample",
@@ -701,7 +715,11 @@ public static class LandActivatedAbilityBinder
         {
             var nonbasicOnly = destm.Groups["nonbasic"].Success;
             var opponentOnly = destm.Groups["opp"].Success;
-            BindDestroyTargetLand(land, controller, cost, nonbasicOnly, opponentOnly);
+            // Demolition Field's both-players search-for-basic rider: detect the
+            // "controller may search" + "you may search" follow-up clauses on
+            // the SAME ability so they sequence after the destroy.
+            var searchRider = ParseDestroyBasicSearchRider(effectText);
+            BindDestroyTargetLand(land, controller, cost, nonbasicOnly, opponentOnly, searchRider);
             return true;
         }
 
@@ -1281,33 +1299,80 @@ public static class LandActivatedAbilityBinder
             _ => 1,
         };
 
+    // The two search-for-basic riders that follow a "Destroy target nonbasic
+    // land an opponent controls" half on a SINGLE ability (Demolition Field):
+    // the destroyed land's controller and the activator each "may search …
+    // for a basic land card, put it onto the battlefield, then shuffle".
+    private readonly record struct DestroyBasicSearchRider(
+        bool DestroyedControllerSearches, bool ActivatorSearches)
+    {
+        public bool Any => DestroyedControllerSearches || ActivatorSearches;
+    }
+
+    /// <summary>Detect Demolition Field's both-players search-for-basic rider in
+    /// the effect clause that follows the destroy half.</summary>
+    private static DestroyBasicSearchRider ParseDestroyBasicSearchRider(string effectText)
+        => new(
+            DestroyedControllerSearchBasic.IsMatch(effectText),
+            ActivatorSearchBasic.IsMatch(effectText));
+
     // ----------------------------------------------------------------------
     // Destroy target [nonbasic] land [an opponent controls] — Ghost Quarter /
     // Field of Ruin / Tectonic Edge / Demolition Field / Encroaching Wastes.
     // (CR 701.7 / CR 608.2b). TargetRequest over battlefield lands (filtered to
-    // nonbasic / opponent-controlled per the printed clause). The
-    // "controller may search for a basic land" rider is deferred (the
-    // destroy — the removal signal — binds); the activate-only timing gates
-    // (Tectonic Edge's "opponent controls four or more lands") are deferred too.
+    // nonbasic / opponent-controlled per the printed clause).
+    //
+    // Demolition Field's both-players search-for-basic rider (CR 701.19 /
+    // CR 701.20a) NOW BINDS here (v1-deferrals demolition-field-search-rider):
+    // after the destroy, the destroyed land's controller (only if a land was
+    // actually destroyed — CR 608.2b illegal-target → no "that land's
+    // controller") then the activator each "may search their/your library for a
+    // basic land card, put it onto the battlefield, then shuffle". The basics
+    // enter UNTAPPED (Demolition Field prints no "tapped"). Each is a "may"
+    // search routed through the player's IPlayerAgent (decline / empty library
+    // still shuffles, CR 701.20a). The other timing gates (Tectonic Edge's
+    // "opponent controls four or more lands") remain deferred.
     // ----------------------------------------------------------------------
     private static void BindDestroyTargetLand(
-        Land land, Player controller, string cost, bool nonbasicOnly, bool opponentOnly)
+        Land land, Player controller, string cost,
+        bool nonbasicOnly, bool opponentOnly, DestroyBasicSearchRider rider = default)
     {
         var costs = BuildCosts(land, cost, out _);
 
         ActivatedAbility? ability = null;
+        var label = $"{land.Name}: destroy target {(nonbasicOnly ? "nonbasic " : "")}land" +
+                    (opponentOnly ? " an opponent controls" : "");
+        if (rider.Any) label += "; then search-for-basic rider";
+
         var effect = new Effect(
-            $"{land.Name}: destroy target {(nonbasicOnly ? "nonbasic " : "")}land" +
-            (opponentOnly ? " an opponent controls" : ""),
-            () =>
+            label,
+            async ctx =>
             {
-                if (FirstChosen(ability) is not ICard target) return;
-                if (target.Zone != ZoneType.Battlefield) return;
-                if (!target.HasType(CardType.Land)) return;
-                if (nonbasicOnly && target.HasSupertype(CardSupertype.Basic)) return;
-                if (opponentOnly && target is Permanent p &&
-                    ReferenceEquals(p.Controller, land.Controller ?? controller)) return;
-                Fx.MoveToGraveyard(target, ZoneMoveReason.Destroy);
+                Player? destroyedLandController = null;
+                if (FirstChosen(ability) is ICard target
+                    && target.Zone == ZoneType.Battlefield
+                    && target.HasType(CardType.Land)
+                    && !(nonbasicOnly && target.HasSupertype(CardSupertype.Basic))
+                    && !(opponentOnly && target is Permanent p &&
+                         ReferenceEquals(p.Controller, land.Controller ?? controller)))
+                {
+                    destroyedLandController = (target as Permanent)?.Controller;
+                    Fx.MoveToGraveyard(target, ZoneMoveReason.Destroy);
+                }
+
+                if (!rider.Any) return;
+
+                // Tutor riders in printed order: the destroyed land's controller
+                // first (only if a land was actually destroyed), then the
+                // activator. Each is a "may" search; the basics enter untapped.
+                if (rider.DestroyedControllerSearches && destroyedLandController != null)
+                {
+                    await TutorBasicLandUntapped(ctx, destroyedLandController).ConfigureAwait(false);
+                }
+                if (rider.ActivatorSearches)
+                {
+                    await TutorBasicLandUntapped(ctx, land.Controller ?? controller).ConfigureAwait(false);
+                }
             });
 
         ability = new ActivatedAbility(
@@ -1324,6 +1389,41 @@ public static class LandActivatedAbilityBinder
             });
 
         land.AddAbility(ability);
+    }
+
+    /// <summary>CR 701.19a / 701.20a — <paramref name="player"/> may search
+    /// their library for a basic land card, put it onto the battlefield
+    /// UNTAPPED, then shuffle (the shuffle fires whether or not a card is found,
+    /// CR 701.20a). The pick is routed through the player's agent; an empty
+    /// candidate pool / declined search still shuffles.</summary>
+    private static async ValueTask TutorBasicLandUntapped(ResolutionContext ctx, Player player)
+    {
+        if (player == null) return;
+
+        var candidates = player.Zones.Library.GetCards()
+            .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
+            .ToList();
+
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
+
+        if (pick != null)
+        {
+            var zones = ZoneServiceRegistry.Get(player);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+            }
+            else
+            {
+                player.Zones.Library.RemoveCard(pick);
+                player.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(player);
+            }
+        }
+
+        LibraryShuffle.ShuffleLibrary(player, "demolition-field-tutor");
     }
 
     // ----------------------------------------------------------------------
