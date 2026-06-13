@@ -39,6 +39,14 @@ public static class AmassAction
         // CR 701.49b: otherwise create a 0/0 black [tribe] Army creature token.
         if (army == null)
         {
+            // The amass resolve closure is frequently built with a null
+            // ZoneService (the single-arg NamedCardFactory.Create path, e.g.
+            // Orcish Bowmasters). Resolve the live service from the per-game
+            // registry so CreateArmy routes the token onto the battlefield via
+            // ZoneService.MoveCardTo → CardMovedEvent, making the token visible
+            // to clients. Outside a game scope the registry returns null and
+            // CreateArmy falls back to raw AddCard (shape / dispatcher tests).
+            zones ??= ZoneServiceRegistry.Get(controller);
             army = TokenFactory.CreateArmy(controller, tribe, zones);
         }
 
