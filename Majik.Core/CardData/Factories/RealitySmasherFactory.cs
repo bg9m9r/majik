@@ -53,15 +53,31 @@ namespace Majik.Core.CardData.Factories;
 ///   play). Agent-driven "may discard" prompting is deferred behind the same
 ///   queue as Ward / Mana Leak / the rest of the soft-counter family.
 ///
-/// ## Wiring overloads
-/// - <see cref="Create(Player)"/> — shape only. The ward trigger is attached
-///   for dispatcher / structural + audit tests but not registered (no stack /
-///   trigger manager), so the counter is a no-op. This is the overload
-///   <see cref="NamedCardFactory"/> dispatches to.
+/// ## Wiring overloads + prod build path
+/// - <see cref="Create(Player)"/> — the overload <see cref="NamedCardFactory"/>
+///   dispatches to (the production <c>GameFacade.BuildDeckCard</c> path). The
+///   ward trigger is ATTACHED to the card shape, so:
+///   (1) the Class B trigger-wiring audit sees a resident
+///   <see cref="ITriggeredAbility"/>, and
+///   (2) <see cref="TriggerManager"/> auto-registers it the first time the card
+///   crosses onto the battlefield (CR 603.6a — <c>CardMovedEvent</c> →
+///   <c>SyncCardRegistration</c>), so the ward FIRES on a matching
+///   <see cref="TargetsChosenEvent"/> in a real game with no explicit
+///   registration call.
+///   The counter itself reaches the LIVE stack at resolution off
+///   <see cref="Majik.Core.Abilities.ResolutionContext.Game"/>
+///   (<c>ctx.Game.Stack</c>, CR 608) — the
+///   <see cref="Majik.Core.Services.StackResolver"/> hands every resolving
+///   trigger a live <see cref="Majik.Core.Game.GameContext"/> — so the
+///   counter/discard is NOT a no-op on this path (the prior gap: the effect
+///   read a construction-time stack that is null here).
 /// - <see cref="Create(Player, Majik.Core.Stack.Stack?, TriggerManager?)"/>
-///   — fully wired. The targeted-by trigger is registered so a matching
-///   <see cref="TargetsChosenEvent"/> surfaces as pending; the stack handle
-///   drives the counter on resolution.
+///   — explicit-wiring shape-test overload. The targeted-by trigger is
+///   registered eagerly so a matching <see cref="TargetsChosenEvent"/> surfaces
+///   as pending; the captured stack handle is the resolution fallback for the
+///   legacy synchronous <see cref="Majik.Core.Abilities.IEffect.Execute"/>
+///   path (no GameContext). Resolving via the async path uses the live
+///   context stack identically to the prod path.
 /// </summary>
 [CardName("Reality Smasher")]
 public static class RealitySmasherFactory
@@ -175,36 +191,54 @@ public static class RealitySmasherFactory
             return false;
         });
 
+        // CR 608 — the ward resolves through the LIVE stack handed to it via
+        // ResolutionContext.Game.Stack. The production build path
+        // (NamedCardFactory.Create → Create(owner)) passes NO captured stack,
+        // so reading a construction-time `stack` would make the counter a
+        // silent no-op in real games (the WardEffect was built but never
+        // reached). Prefer the live context stack; fall back to the captured
+        // `stack` only for the explicit Create(owner, stack, triggers)
+        // shape-test overload (which may resolve via the legacy sync path with
+        // no GameContext).
         var wardEffect = new Effect(
             $"{CardName} — counter that spell unless its controller discards a card",
-            () =>
+            ctx =>
             {
                 var source = capturedSource;
                 capturedSource = null;
-                if (source == null || stack == null) return;
+
+                var liveStack = ctx.Game?.Stack ?? stack;
+                if (source == null || liveStack == null)
+                    return System.Threading.Tasks.ValueTask.CompletedTask;
 
                 // CR 608.2b — recheck the targeting spell is still on the stack
                 // at resolution. If it already left, nothing to counter.
-                if (!stack.GetAll().Contains(source)) return;
+                if (!liveStack.GetAll().Contains(source))
+                    return System.Threading.Tasks.ValueTask.CompletedTask;
 
                 var caster = source.Controller;
-                if (caster == null) return;
+                if (caster == null)
+                    return System.Threading.Tasks.ValueTask.CompletedTask;
 
                 // CR 702.21f — "unless its controller discards a card." The
                 // bound WardEffect charges the DiscardACardCost when the caster
                 // can (and, in v1, auto-chooses to) pay. Resolve returns true
                 // when the spell should be COUNTERED (cost not paid).
-                if (!ward.Resolve(caster)) return; // discarded → not countered.
+                if (!ward.Resolve(caster))
+                    return System.Threading.Tasks.ValueTask.CompletedTask; // discarded → not countered.
 
                 // CR 701.5b — counter the spell. RemoveFromStack returns false
                 // for an uncounterable spell (it stays put).
-                if (!OracleSpellBinder.RemoveFromStack(stack, source)) return;
+                if (!OracleSpellBinder.RemoveFromStack(liveStack, source))
+                    return System.Threading.Tasks.ValueTask.CompletedTask;
 
                 // CR 701.5b — a countered SPELL goes to its owner's graveyard.
                 if (source is Majik.Core.Spells.ISpell spell && spell.Card is Card spellCard)
                 {
                     spellCard.SetZone(ZoneType.Graveyard);
                 }
+
+                return System.Threading.Tasks.ValueTask.CompletedTask;
             });
 
         var trigger = new TriggeredAbility(

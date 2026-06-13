@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
@@ -6,7 +7,9 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.StateMachine;
 using Majik.Core.Targeting;
 using Xunit;
 
@@ -260,6 +263,99 @@ public class RealitySmasherFactoryTests
         stack.GetAll().Should().NotContain(spell, "Bob can't discard, so his spell is countered");
         bolt.Zone.Should().Be(Majik.Core.Zones.ZoneType.Graveyard,
             "a countered spell goes to its owner's graveyard (CR 701.5b)");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // PROD BUILD PATH (NamedCardFactory.Create — no stack/trigger args).
+    //
+    // GameFacade.BuildDeckCard builds every deck card via
+    // NamedCardFactory.Create(name, owner[, effects]); the source generator
+    // dispatches to RealitySmasherFactory.Create(owner) — which receives NO
+    // live Stack. The ward trigger is auto-registered by TriggerManager when
+    // the card crosses onto the battlefield (CardMovedEvent → SyncCardRegistration),
+    // and on resolution the StackResolver hands the trigger a live GameContext.
+    // The ward effect must reach the live stack off ResolutionContext.Game.Stack
+    // (CR 608) — NOT a stack captured at construction (null on this path) — or
+    // the counter is a silent no-op in real games.
+    // ──────────────────────────────────────────────────────────────────────
+
+    private static GameContext LiveContext(
+        Player self, Player opp, Majik.Core.Stack.Stack stack) =>
+        new(self, new[] { self, opp }, self, 1, StepStateType.PreCombatMain, stack);
+
+    [Fact]
+    public async Task RealitySmasher_ProdPath_ControllerCannotDiscard_SpellCountered()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        // PROD path — NamedCardFactory.Create dispatches to Create(owner): no
+        // captured stack. TriggerManager auto-binds the ward via CardMovedEvent.
+        var smasher = (Creature)NamedCardFactory.Create("Reality Smasher", _alice);
+        smasher.SetController(_alice);
+        // Mirror ZoneService prod ordering: set the zone THEN publish the move
+        // event, so TriggerManager's auto-bind sees the card already on the
+        // battlefield (ActiveZones contains its current zone).
+        smasher.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(smasher);
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(
+            smasher, Majik.Core.Zones.ZoneType.Hand, Majik.Core.Zones.ZoneType.Battlefield));
+
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _bob };
+        var spell = new Majik.Core.Spells.Spell(bolt, _bob, new[] { Target.Permanent(smasher) });
+        bolt.SetZone(Majik.Core.Zones.ZoneType.Stack);
+        stack.Push(spell);
+
+        // Bob's hand is empty → can't discard → ward counters his spell.
+        bus.Publish(new TargetsChosenEvent(spell, spell.Targets));
+        triggers.PendingCount.Should().Be(1,
+            "the ward trigger must be auto-registered on the prod build path");
+
+        var trigger = smasher.Abilities.OfType<TriggeredAbility>().Single();
+        await trigger.ResolveAsync(agent: null, LiveContext(_alice, _bob, stack));
+
+        stack.GetAll().Should().NotContain(spell,
+            "the ward must counter through the LIVE stack (ResolutionContext.Game.Stack)");
+        bolt.Zone.Should().Be(Majik.Core.Zones.ZoneType.Graveyard,
+            "a countered spell goes to its owner's graveyard (CR 701.5b)");
+    }
+
+    [Fact]
+    public async Task RealitySmasher_ProdPath_ControllerDiscards_SpellNotCountered()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        var smasher = (Creature)NamedCardFactory.Create("Reality Smasher", _alice);
+        smasher.SetController(_alice);
+        // Mirror ZoneService prod ordering: set the zone THEN publish the move
+        // event, so TriggerManager's auto-bind sees the card already on the
+        // battlefield (ActiveZones contains its current zone).
+        smasher.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(smasher);
+        bus.Publish(new Majik.Core.Events.CardMovedEvent(
+            smasher, Majik.Core.Zones.ZoneType.Hand, Majik.Core.Zones.ZoneType.Battlefield));
+
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _bob };
+        var spell = new Majik.Core.Spells.Spell(bolt, _bob, new[] { Target.Permanent(smasher) });
+        bolt.SetZone(Majik.Core.Zones.ZoneType.Stack);
+        stack.Push(spell);
+
+        // Bob has a card → he pays the ward discard → spell survives.
+        var spare = new Creature("Spare", "{1}", 1, 1) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Hand.AddCard(spare);
+
+        bus.Publish(new TargetsChosenEvent(spell, spell.Targets));
+        var trigger = smasher.Abilities.OfType<TriggeredAbility>().Single();
+        await trigger.ResolveAsync(agent: null, LiveContext(_alice, _bob, stack));
+
+        stack.GetAll().Should().Contain(spell,
+            "Bob discarded a card to satisfy the ward — his spell survives");
+        bolt.Zone.Should().Be(Majik.Core.Zones.ZoneType.Stack);
+        _bob.Zones.Graveyard.GetCards().Should().Contain(spare,
+            "the ward discard cost was paid");
     }
 
     private readonly Player _bob = new("Bob", 20);
