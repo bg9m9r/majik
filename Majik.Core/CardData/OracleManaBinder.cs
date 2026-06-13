@@ -128,6 +128,19 @@ public static class OracleManaBinder
         @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+type\s+that\s+a\s+land\s+you\s+control\s+could\s+produce",
         RegexOptions.IgnoreCase);
 
+    // "{T}: Add {A} or {B}. Each opponent gains 1 life." — Grove of the
+    // Burnwillows (Future Sight), the "reverse painland". The coloured modes
+    // produce one of two colours AND give each opponent 1 life (CR 119.3). This
+    // is a bare-{T} modal line, so TapForModalManaRegex would otherwise bind the
+    // two coloured options WITHOUT the lifegain rider — the rider must be
+    // intercepted here. Mana abilities resolve immediately with no
+    // ResolutionContext (CR 605.3), so the "each opponent" set is read off the
+    // ambient GamePlayersRegistry at activation (CR 102.4 — controller excluded).
+    // Group 1/2 = the two producible colours.
+    private static readonly Regex EachOpponentGainsLifeDualManaRegex = new(
+        @"\{T\}\s*:\s*Add\s+(\{[WUBRGC]\})\s+or\s+(\{[WUBRGC]\})\.\s*Each\s+opponent\s+gains\s+1\s+life",
+        RegexOptions.IgnoreCase);
+
     // "{T}, Pay 2 life: Add {C}." — Boseiju, Who Shelters All (Champions of
     // Kamigawa). A {C}-producing mana ability with an additional "lose 2 life"
     // activation cost (CR 605.1a / 119.4). The "spent on an instant/sorcery →
@@ -283,6 +296,30 @@ public static class OracleManaBinder
         // carry this shape, so it's a no-op on non-lands.
         if (card is Land payLifeLand)
         {
+            // Grove of the Burnwillows — "{T}: Add {R} or {G}. Each opponent
+            // gains 1 life." The two coloured modes carry an "each opponent
+            // gains 1 life" rider (CR 119.3); the printed line is also a bare-{T}
+            // modal, so TapForModalManaRegex would otherwise bind {R}/{G} WITHOUT
+            // the rider (the deferral). Bind the riderful coloured modes here,
+            // then strip the clause so the remaining "{T}: Add {C}." mode binds
+            // normally below. Mana abilities have no ResolutionContext (CR 605.3),
+            // so the opponent set is read off the ambient GamePlayersRegistry at
+            // activation (CR 102.4 — controller excluded). Lands are never routed
+            // through their [CardName] factory, so this binder is the only prod
+            // path for the rider (v1-deferrals #3b residual b).
+            var grove = EachOpponentGainsLifeDualManaRegex.Match(text);
+            if (grove.Success)
+            {
+                var colorA = grove.Groups[1].Value.Replace("{", "").Replace("}", "");
+                var colorB = grove.Groups[2].Value.Replace("{", "").Replace("}", "");
+                AttachOpponentGainColoredMana(payLifeLand, controller, colorA);
+                AttachOpponentGainColoredMana(payLifeLand, controller, colorB);
+                // Drop the modal clause so the residual "{T}: Add {C}." mode is
+                // bound (once) by the bare-{T} fallback at the end of this method
+                // (which reads the local `text`, not entity.OracleText).
+                text = EachOpponentGainsLifeDualManaRegex.Replace(text, string.Empty);
+            }
+
             // Reflecting Pool — six dynamic-output mana abilities (WUBRG + {C}),
             // each gated on some OTHER land the controller controls being able
             // to produce that type (recomputed every legality check). Ports the
@@ -379,6 +416,43 @@ public static class OracleManaBinder
         {
             card.AddAbility(new ManaAbility(card, controller, cost));
         }
+    }
+
+    /// <summary>
+    /// Attach a Grove-of-the-Burnwillows coloured mode:
+    /// <c>{T}: Add &lt;color&gt;. Each opponent gains 1 life.</c>
+    ///
+    /// <para>Built on the existing additional-cost overload of
+    /// <see cref="ManaAbility"/>: tapping pays {T} (CR 605.1a); the
+    /// <c>additionalCostPayer</c> then walks the opponents of
+    /// <paramref name="controller"/> — read from the live
+    /// <see cref="Majik.Core.Game.GamePlayersRegistry"/> AT ACTIVATION (mana
+    /// abilities resolve immediately with no ResolutionContext, CR 605.3) — and
+    /// grants each 1 life (CR 119.3). CR 102.4 — the controller is never its own
+    /// opponent; <see cref="Majik.Core.Game.GamePlayersRegistry.OpponentsOf"/>
+    /// already excludes it. No life-floor gate — granting opponents life is never
+    /// a "pay" cost. When no live game scope is installed (shape-only paths) the
+    /// opponent set is empty, so the rider is a safe no-op while the mana + tap
+    /// still fire.</para>
+    /// </summary>
+    private static void AttachOpponentGainColoredMana(Land land, Player controller, string color)
+    {
+        const int lifeGainPerOpponent = 1;
+        land.AddAbility(new ManaAbility(
+            source: land,
+            controller: controller,
+            manaGenerated: ManaCost.Parse(color),
+            canActivateCheck: () => !land.IsTapped,
+            additionalCostPayer: activator =>
+            {
+                // CR 102.4 — "each opponent" of the ability's controller, read
+                // from the live player set at activation. The controller passed
+                // to the payer (`activator`) IS the ability's controller.
+                foreach (var opp in Majik.Core.Game.GamePlayersRegistry.OpponentsOf(activator))
+                {
+                    opp.GainLife(lifeGainPerOpponent);
+                }
+            }));
     }
 
     /// <summary>

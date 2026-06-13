@@ -53,6 +53,7 @@ public static class GameRegistryScope
         var scopes = new IDisposable[]
         {
             AgentRegistry.PushScope(),
+            GamePlayersRegistry.PushScope(),
             GameRandomRegistry.PushScope(),
             EventBusRegistry.PushScope(),
             ZoneServiceRegistry.PushScope(),

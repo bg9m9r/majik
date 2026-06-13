@@ -103,9 +103,17 @@ public static class GroveOfTheBurnwillowsFactory
     /// Attach a <c>{T}: Add &lt;color&gt;. Each opponent gains 1 life.</c>
     /// mana ability. Built via the additional-cost overload of
     /// <see cref="ManaAbility"/>: tapping pays {T}; the
-    /// <c>additionalCostPayer</c> then walks the resolver-supplied
-    /// opponents (CR 102.4 — controller excluded) and grants each 1 life
-    /// (CR 119.3). No life-floor gate — there is nothing to pay.
+    /// <c>additionalCostPayer</c> then walks the opponents (CR 102.4 —
+    /// controller excluded) and grants each 1 life (CR 119.3). No life-floor
+    /// gate — there is nothing to pay.
+    ///
+    /// <para>Opponent source, in priority order: the explicit
+    /// <paramref name="opponentResolver"/> if supplied (legacy factory-direct
+    /// tests), otherwise the live
+    /// <see cref="Majik.Core.Game.GamePlayersRegistry"/> read at activation
+    /// (mana abilities have no ResolutionContext, CR 605.3). This is the same
+    /// ambient seam the prod binder path (<see cref="OracleManaBinder"/>) uses,
+    /// so a Grove built either way fires the rider in a live game.</para>
     /// </summary>
     private static void AttachOpponentGainColoredMana(
         Land land, Player controller, string color, Func<IReadOnlyList<Player>>? opponentResolver)
@@ -118,8 +126,11 @@ public static class GroveOfTheBurnwillowsFactory
             canActivateCheck: () => !land.IsTapped,
             additionalCostPayer: _ =>
             {
-                var opponents = opponentResolver?.Invoke();
-                if (opponents == null) return;
+                // Explicit resolver wins (legacy tests); else read the live
+                // opponents off the ambient registry at activation.
+                var opponents = opponentResolver?.Invoke()
+                    ?? (IReadOnlyList<Player>)Majik.Core.Game.GamePlayersRegistry
+                        .OpponentsOf(controller).ToList();
                 foreach (var opp in opponents)
                 {
                     // CR 102.4 — the controller is not its own opponent.
