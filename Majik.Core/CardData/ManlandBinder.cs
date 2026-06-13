@@ -41,9 +41,6 @@ namespace Majik.Core.CardData;
 /// <para><b>Deferred (per-card riders this generic binder does NOT bind).</b>
 /// See v1-deferrals + the per-pattern comments below:
 /// <list type="bullet">
-///   <item>Colour identity of the animated body (Layer 5) — no colour-setting
-///     primitive exists; the "blue and black" text is recorded in the
-///     effect-name string only (same gap as the factories).</item>
 ///   <item>Animate riders carrying a <b>granted quoted ability</b> ("with
 ///     \"{X}: …\"" / "with \"Whenever this creature attacks, …\"") — Den of
 ///     the Bugbear, Raging Ravine, Lavaclaw Reaches, Wandering Fumarole,
@@ -75,6 +72,14 @@ namespace Majik.Core.CardData;
 /// <see cref="TriggeredAbility.ChosenTargets"/> on resolution (CR 608.2b
 /// resolve-time legality recheck). Fortress is non-targeted; it captures the
 /// defending player off the live <see cref="Events.CreatureAttacksEvent"/>.</para>
+///
+/// <para><b>Colour identity of the animated body (Layer 5, now bound — CR
+/// 613.1e).</b> The colour words in the becomes-clause body ("blue and black",
+/// "white and blue", …) are parsed into <see cref="Majik.Core.ValueObjects.ManaColor"/>s
+/// and wired into an EOT-expiring <see cref="Effects.SetColorsEffect"/>
+/// registered alongside the Layer-4 type grant + Layer-7b P/T set. It lifts in
+/// the cleanup step (CR 514.2) so the land reverts to its printed colourless
+/// state. An artifact-only / colourless body registers no colour effect.</para>
 /// </summary>
 public static class ManlandBinder
 {
@@ -111,6 +116,19 @@ public static class ManlandBinder
     {
         "white", "blue", "black", "red", "green", "colorless", "and",
     };
+
+    // The colour words that map to a real ManaColor for the Layer-5 colour grant
+    // (CR 613.1e). "colorless" / "and" carry no colour (the animated body becomes
+    // colourless when no colour word is present — CR 105.2).
+    private static readonly Dictionary<string, Majik.Core.ValueObjects.ManaColor> ColorMap =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["white"] = Majik.Core.ValueObjects.ManaColor.White,
+            ["blue"] = Majik.Core.ValueObjects.ManaColor.Blue,
+            ["black"] = Majik.Core.ValueObjects.ManaColor.Black,
+            ["red"] = Majik.Core.ValueObjects.ManaColor.Red,
+            ["green"] = Majik.Core.ValueObjects.ManaColor.Green,
+        };
 
     // Simple printed keywords a manland can animate with (CR 702). Multi-word
     // keywords are matched before single-word ones. Anything not in this set
@@ -236,6 +254,12 @@ public static class ManlandBinder
         var (subtype, isArtifact) = ParseBody(m.Groups["body"].Value);
         if (subtype is null) return false; // unknown / "all creature types" → defer
 
+        // CR 613.1e — the colour words in the body ("blue and black",
+        // "white and blue", …) set the animated body's colour at Layer 5. Parse
+        // them out of the same body fragment used for the subtype; an empty list
+        // means the body is colourless (CR 105.2 — e.g. an artifact-only manland).
+        var colors = ParseColors(m.Groups["body"].Value);
+
         // Keyword tail — the "with <kw…>" segment of the remainder, up to the
         // first sentence terminator OUTSIDE a quote. A quoted granted ability
         // ("with \"…\"") is deferred: bind the body + any simple keywords that
@@ -253,8 +277,12 @@ public static class ManlandBinder
         // Both ExpiresAtEndOfTurn (CR 514.2 cleanup step lifts the animation).
         var capturedSubtype = subtype.Value;
         var extraTypes = isArtifact ? new[] { CardType.Artifact } : null;
+        var capturedColors = colors;
+        var colorLabel = capturedColors.Count > 0
+            ? string.Join(" and ", capturedColors.Select(c => c.ToString().ToLowerInvariant())) + " "
+            : "";
         var animateEffect = new Effect(
-            $"{land.Name}: becomes {power}/{toughness} {capturedSubtype} " +
+            $"{land.Name}: becomes {power}/{toughness} {colorLabel}{capturedSubtype} " +
             $"{(isArtifact ? "artifact " : "")}creature until EOT (still a land)",
             () =>
             {
@@ -265,6 +293,17 @@ public static class ManlandBinder
                     extraTypes: extraTypes));
                 effects.Register(new ManlandCycleBecomesPTEffect(
                     land, power, toughness));
+                // CR 613.1e (Layer 5) — set the animated body's colour(s). Skip
+                // when colourless (no colour word parsed) so a colourless body
+                // isn't given an inert empty SET effect.
+                if (capturedColors.Count > 0)
+                {
+                    effects.Register(new SetColorsEffect(
+                        land,
+                        scope: p => ReferenceEquals(p, land),
+                        colors: capturedColors,
+                        expiresAtEndOfTurn: true));
+                }
             });
 
         land.AddAbility(new ActivatedAbility(
@@ -277,6 +316,26 @@ public static class ManlandBinder
         BindAttackTrigger(land, text, controller, effects, triggers);
 
         return true;
+    }
+
+    /// <summary>
+    /// Parse the colour words from the body group ("blue and black",
+    /// "white and blue", "red", …) into their <see cref="Majik.Core.ValueObjects.ManaColor"/>s,
+    /// in printed order. "colorless" / "and" carry no colour; an artifact-only
+    /// body yields an empty list (CR 105.2 — colourless). Used for the Layer-5
+    /// colour grant (CR 613.1e).
+    /// </summary>
+    private static List<Majik.Core.ValueObjects.ManaColor> ParseColors(string body)
+    {
+        var result = new List<Majik.Core.ValueObjects.ManaColor>();
+        foreach (var tok in body.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (ColorMap.TryGetValue(tok, out var color) && !result.Contains(color))
+            {
+                result.Add(color);
+            }
+        }
+        return result;
     }
 
     /// <summary>

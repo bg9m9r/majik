@@ -30,11 +30,13 @@ public sealed class SetColorsEffect : ContinuousEffect
     private readonly Permanent _source;
     private readonly Func<Permanent, bool> _scope;
     private readonly IReadOnlyList<ManaColor> _colors;
+    private readonly bool _expiresAtEndOfTurn;
 
     public SetColorsEffect(
         Permanent source,
         Func<Permanent, bool> scope,
-        IEnumerable<ManaColor> colors)
+        IEnumerable<ManaColor> colors,
+        bool expiresAtEndOfTurn = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
@@ -43,6 +45,7 @@ public sealed class SetColorsEffect : ContinuousEffect
             .Where(c => c != ManaColor.Generic && c != ManaColor.Colorless)
             .Distinct()
             .ToList();
+        _expiresAtEndOfTurn = expiresAtEndOfTurn;
     }
 
     /// <summary>CR 105.2c — "is all colors" convenience: SET to W/U/B/R/G.</summary>
@@ -52,6 +55,14 @@ public sealed class SetColorsEffect : ContinuousEffect
     public override Layer Layer => Layer.Color;
 
     public override Permanent? Source => _source;
+
+    /// <summary>
+    /// CR 514.2 — set true by "until end of turn" colour grants (e.g. a manland
+    /// that becomes "blue and black … until end of turn") so the colour change
+    /// is lifted in the cleanup step alongside the animation's type / P/T effects.
+    /// Defaults false (a static "is all colours" colour-set persists).
+    /// </summary>
+    public override bool ExpiresAtEndOfTurn => _expiresAtEndOfTurn;
 
     public override bool IsActive() =>
         _source.Zone == Majik.Core.Zones.ZoneType.Battlefield;
