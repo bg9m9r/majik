@@ -14,23 +14,29 @@ namespace Majik.Core.Tests.CardData;
 
 /// <summary>
 /// Tests for <see cref="GoblinCharbelcherFactory"/> — Artifact {4} with a
-/// single activated ability:
+/// single activated ability (real Mirrodin oracle text):
 ///   "{3}, {T}: Reveal cards from the top of your library until you reveal
-///    a nonland card. Goblin Charbelcher deals damage equal to the number
-///    of land cards revealed this way to any target. If all revealed
-///    cards are Mountains, double that damage. Then put the revealed
-///    cards on the bottom of your library in a random order."
+///    a land card. Goblin Charbelcher deals damage equal to the number of
+///    nonland cards revealed this way to any target. If the revealed land
+///    card was a Mountain, Goblin Charbelcher deals double that damage
+///    instead. Put the revealed cards on the bottom of your library in any
+///    order."
 ///
 /// Covers:
 /// - Identity (Artifact, {4}, owner/controller).
 /// - NamedCardFactory dispatch.
 /// - Activated ability shape: {3} mana + {T} + 1..1 "any target" request.
-/// - Reveal terminates on the first nonland; lands stack damage.
-/// - All-Mountains doubling clause.
-/// - Nonland mixed in disables the doubling.
-/// - Revealed cards bottom in deterministic order under a seeded RNG.
-/// - Empty library + no nonland (mono-Mountain pile) — reveal exits
-///   cleanly and the doubling applies.
+/// - Reveal terminates on the first LAND; nonlands stack damage.
+/// - Mountain-terminator doubling clause.
+/// - A non-Mountain terminating land does not double.
+/// - Landless library → reveal walks to exhaustion, damage = whole library.
+/// - Empty library → reveal exits cleanly, zero damage.
+///
+/// 2026-06-13 (Belcher Phase B): the prior assertions encoded an INVERTED
+/// implementation (reveal-until-nonland, damage = land count) — the opposite
+/// of the printed card, which silently killed the Belcher combo (a landless
+/// library dealt 0). Rewritten to the real oracle (reveal-until-land, damage
+/// = nonland count).
 /// </summary>
 public class GoblinCharbelcherTests
 {
@@ -89,22 +95,23 @@ public class GoblinCharbelcherTests
     }
 
     // -----------------------------------------------------------------------
-    // Resolution — reveal-until-nonland + damage to target
+    // Resolution — reveal-until-LAND + damage = nonland count to target
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void ResolveBelch_RevealsUntilNonland_DealsDamageEqualToLandCount()
+    public void ResolveBelch_RevealsUntilLand_DealsDamageEqualToNonlandCount()
     {
-        // Library top → bottom: Land, Land, Land, Nonland, Land
-        // Reveal stops at the first nonland; 3 lands revealed → 3 damage.
-        // Lands are not all Mountains (we use Forests), so no doubling.
+        // Library top → bottom: Nonland, Nonland, Nonland, Forest, Nonland
+        // Reveal stops at the first LAND (the Forest); 3 nonlands revealed
+        // before it → 3 damage. The terminating land is a Forest (not a
+        // Mountain), so no doubling.
         SeedLibrary(_alice, new[]
         {
-            (kind: LandKind.Forest,   land: true),
-            (kind: LandKind.Forest,   land: true),
-            (kind: LandKind.Forest,   land: true),
+            (kind: LandKind.Nonland,  land: false),
+            (kind: LandKind.Nonland,  land: false),
             (kind: LandKind.Nonland,  land: false),
             (kind: LandKind.Forest,   land: true),
+            (kind: LandKind.Nonland,  land: false),
         });
 
         // Seed the RNG so the random-bottom step is deterministic.
@@ -112,93 +119,88 @@ public class GoblinCharbelcherTests
 
         var result = GoblinCharbelcherFactory.ResolveBelch(_alice, _bob);
 
-        result.LandCount.Should().Be(3);
-        result.AllMountains.Should().BeFalse();
+        result.NonlandCount.Should().Be(3);
+        result.RevealedLandIsMountain.Should().BeFalse();
         result.Damage.Should().Be(3);
         _bob.LifeTotal.Should().Be(17);
 
-        // 4 cards revealed (3 lands + 1 nonland terminator); the 5th land
+        // 4 cards revealed (3 nonlands + 1 land terminator); the 5th card
         // is still on top of the library (untouched).
         result.Revealed.Should().HaveCount(4);
         _alice.Zones.Library.Count.Should().Be(5,
-            "all four revealed cards were bottomed; one untouched land remains plus four bottomed = five total");
+            "all four revealed cards were bottomed; one untouched card remains plus four bottomed = five total");
     }
 
     [Fact]
-    public void ResolveBelch_AllMountains_DoublesDamage()
+    public void ResolveBelch_MountainTerminator_DoublesDamage()
     {
-        // 5 Mountains, then a nonland terminator. 5 lands revealed.
-        // BUT a nonland appears (not a Mountain) — so allMountains
-        // flips false. To exercise the doubling, the reveal must exit by
-        // exhausting the library with no nonland (a mono-Mountain library).
-        // First test the no-doubling path, then a separate test the pure
-        // doubling case.
+        // 3 nonlands, then a Mountain terminator. 3 nonlands revealed and the
+        // revealed land was a Mountain → 3 × 2 = 6 damage.
         SeedLibrary(_alice, new[]
         {
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
             (kind: LandKind.Nonland,  land: false),
+            (kind: LandKind.Nonland,  land: false),
+            (kind: LandKind.Nonland,  land: false),
+            (kind: LandKind.Mountain, land: true),
         });
 
         GameRandomRegistry.Set(_alice, new GameRandom(seed: 1));
 
         var result = GoblinCharbelcherFactory.ResolveBelch(_alice, _bob);
 
-        result.LandCount.Should().Be(3);
-        result.AllMountains.Should().BeFalse("the nonland terminator is not a Mountain");
-        result.Damage.Should().Be(3);
-        _bob.LifeTotal.Should().Be(17);
+        result.NonlandCount.Should().Be(3);
+        result.RevealedLandIsMountain.Should().BeTrue("the terminating land is a Mountain");
+        result.Damage.Should().Be(6);
+        _bob.LifeTotal.Should().Be(14);
     }
 
     [Fact]
-    public void ResolveBelch_MonoMountainLibrary_AllMountainsDoubles_RevealEndsByExhaustion()
+    public void ResolveBelch_LandlessLibrary_RevealWalksToExhaustion_DamageEqualsLibrary()
     {
-        // No nonland in the deck → reveal exhausts the library, every
-        // revealed card was a Mountain → doubling applies.
-        // 5 Mountains → 5 lands × 2 = 10 damage.
+        // No land in the deck → reveal exhausts the library; every card is a
+        // nonland → damage = whole library (no Mountain terminator → no
+        // doubling). 5 nonlands → 5 damage. THIS is the Belcher kill shape.
         SeedLibrary(_alice, new[]
         {
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
+            (kind: LandKind.Nonland, land: false),
+            (kind: LandKind.Nonland, land: false),
+            (kind: LandKind.Nonland, land: false),
+            (kind: LandKind.Nonland, land: false),
+            (kind: LandKind.Nonland, land: false),
         });
 
         GameRandomRegistry.Set(_alice, new GameRandom(seed: 7));
 
         var result = GoblinCharbelcherFactory.ResolveBelch(_alice, _bob);
 
-        result.LandCount.Should().Be(5);
-        result.AllMountains.Should().BeTrue("library is all Mountains; reveal exited on library-empty");
-        result.Damage.Should().Be(10);
-        _bob.LifeTotal.Should().Be(10);
+        result.NonlandCount.Should().Be(5);
+        result.RevealedLandIsMountain.Should().BeFalse("no land was revealed at all");
+        result.Damage.Should().Be(5);
+        _bob.LifeTotal.Should().Be(15);
 
         // All five reveals bottomed; library count is still 5.
         _alice.Zones.Library.Count.Should().Be(5);
     }
 
     [Fact]
-    public void ResolveBelch_FirstCardIsNonland_ZeroDamage_DoublingDoesNotApply()
+    public void ResolveBelch_FirstCardIsLand_ZeroDamage()
     {
-        // First card is a nonland — zero lands revealed → 0 damage; the
-        // nonland terminator flips allMountains false (a nonland is not a
-        // Mountain). 0 × 1 = 0.
+        // First card is a land — zero nonlands revealed before it → 0 damage.
+        // Even a Mountain terminator doubles 0 = 0.
         SeedLibrary(_alice, new[]
         {
+            (kind: LandKind.Mountain, land: true),
             (kind: LandKind.Nonland,  land: false),
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
+            (kind: LandKind.Nonland,  land: false),
         });
 
         GameRandomRegistry.Set(_alice, new GameRandom(seed: 2));
 
         var result = GoblinCharbelcherFactory.ResolveBelch(_alice, _bob);
 
-        result.LandCount.Should().Be(0);
-        result.AllMountains.Should().BeFalse();
-        result.Damage.Should().Be(0);
+        result.NonlandCount.Should().Be(0);
+        result.RevealedLandIsMountain.Should().BeTrue();
+        result.Damage.Should().Be(0, "0 nonlands revealed, 0 × 2 = 0");
         _bob.LifeTotal.Should().Be(20, "no damage was dealt");
     }
 
@@ -210,7 +212,7 @@ public class GoblinCharbelcherTests
 
         var result = GoblinCharbelcherFactory.ResolveBelch(_alice, _bob);
 
-        result.LandCount.Should().Be(0);
+        result.NonlandCount.Should().Be(0);
         result.Damage.Should().Be(0);
         _bob.LifeTotal.Should().Be(20);
     }
@@ -223,16 +225,16 @@ public class GoblinCharbelcherTests
         // the cost was paid.
         SeedLibrary(_alice, new[]
         {
-            (kind: LandKind.Mountain, land: true),
-            (kind: LandKind.Mountain, land: true),
             (kind: LandKind.Nonland,  land: false),
+            (kind: LandKind.Nonland,  land: false),
+            (kind: LandKind.Mountain, land: true),
         });
         GameRandomRegistry.Set(_alice, new GameRandom(seed: 3));
 
         var result = GoblinCharbelcherFactory.ResolveBelch(_alice, target: null);
 
-        result.LandCount.Should().Be(2);
-        result.Damage.Should().Be(2);
+        result.NonlandCount.Should().Be(2);
+        result.Damage.Should().Be(4, "2 nonlands × Mountain-double = 4 (computed but not dealt)");
         _bob.LifeTotal.Should().Be(20);
         _alice.LifeTotal.Should().Be(20);
         _alice.Zones.Library.Count.Should().Be(3, "all three reveals were bottomed");
