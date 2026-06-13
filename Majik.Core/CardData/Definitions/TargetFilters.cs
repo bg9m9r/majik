@@ -334,6 +334,56 @@ public static class TargetFilters
         return true;
     }
 
+    /// <summary>
+    /// CR 109.5 / 603.3 — build the lazy candidate gatherer for the
+    /// exile-until-leaves removal cluster (<c>exile_until_leaves</c>: Oblivion
+    /// Ring / Banishing Light / Cast Out / Leyline Binding / Glass Casket /
+    /// Portable Hole / Detention Sphere). The gatherer enumerates the live legal
+    /// ETB targets against the resolving <see cref="GameContext"/> so the shared
+    /// targeting pipeline (<see cref="Majik.Core.Targeting.TargetCollection"/>)
+    /// can prompt the controller's agent — WITHOUT it the live trigger drain
+    /// offers an empty pool and the ETB silently fizzles in the prod path.
+    ///
+    /// <para>The composed predicate IS the printed restriction set, layered on
+    /// top of the base <paramref name="filter"/>:</para>
+    /// <list type="bullet">
+    ///   <item><paramref name="opponentControlsOnly"/> — "an opponent controls"
+    ///   (CR 109.5): only permanents NOT controlled by the resolving controller
+    ///   (<see cref="GameContext.Self"/>).</item>
+    ///   <item><paramref name="maxManaValue"/> — "with mana value N or less"
+    ///   (CR 202.3): mana-value cap (Glass Casket = 3, Portable Hole = 2).</item>
+    /// </list>
+    /// "another" (<c>excludeSelf</c> — Oblivion Ring) and the same-name sweep are
+    /// NOT folded in here: they need the live source-card reference, which this
+    /// context-free gatherer lacks. The runtime's resolution-time legality
+    /// re-check (CR 608.2b) still enforces them, so an over-offered self pick
+    /// fizzles cleanly. The mana-value cap and opponent rider — which the
+    /// resolving context CAN see — are applied so the agent is offered the right
+    /// pool for the common removal cases.
+    /// </summary>
+    public static Func<GameContext, IReadOnlyList<object>> ExileUntilLeavesCandidates(
+        string? filter, bool opponentControlsOnly, int? maxManaValue)
+    {
+        var normalized = (filter ?? "").Trim().ToLowerInvariant();
+        var (_, predicate) = Resolve(normalized, "exile");
+        return ctx => Gather(ctx, o =>
+        {
+            if (!predicate(o)) return false;
+            if (opponentControlsOnly
+                && o is Permanent p
+                && ReferenceEquals(p.Controller, ctx.Self))
+            {
+                return false;
+            }
+            if (maxManaValue is int cap && o is Card mv
+                && mv.ManaCostValue.TotalValue > cap)
+            {
+                return false;
+            }
+            return true;
+        });
+    }
+
     private static bool OnBattlefield(ICard card) => card.Zone == ZoneType.Battlefield;
 
     private static bool InGraveyard(ICard card) => card.Zone == ZoneType.Graveyard;

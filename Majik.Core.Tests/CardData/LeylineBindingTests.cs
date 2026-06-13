@@ -5,7 +5,13 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
+using Majik.Core.StateMachine;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -285,5 +291,111 @@ public class LeylineBindingTests
         ltb.Resolve();
 
         _bob.Zones.Battlefield.GetCards().Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // Live prod-path: ETB exile resolves through the bus + TriggerManager +
+    // the async targeted-trigger drain that PROMPTS the agent (CR 603.3).
+    //
+    // The earlier tests poke the ETB ability directly (SetChosenTargets +
+    // Resolve). This case mirrors GriefTests' end-to-end posture instead: it
+    // registers Leyline Binding's abilities with a live TriggerManager, fires
+    // the ETB via a real CardMovedEvent (enter battlefield), then drains the
+    // pending trigger through PutPendingTriggersOnStackAsync so the engine's
+    // shared targeting pipeline (TargetCollection.CollectAsync) GATHERS the
+    // legal candidates and prompts the agent — the exact path the live
+    // GameFacade build uses for an Enchantment ETB trigger.
+    //
+    // Without a candidate gatherer on the exile_until_leaves verb the agent is
+    // offered ZERO targets and the ETB silently fizzles in prod — the gap this
+    // covers.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task LeylineBinding_Etb_ResolvesThroughLiveAgentPrompt_ExilesOpponentPermanent()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var resolver = new StackResolver(bus, new ZoneService(bus));
+
+        // Live Leyline Binding on the battlefield, abilities bus-registered.
+        var lb = LeylineBindingFactory.Create(_alice, triggers);
+        lb.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(lb);
+
+        // Bob's nonland permanent (the only legal ETB target — "an opponent
+        // controls") plus one of Alice's own creatures that must NOT be offered.
+        var bobsCreature = new Creature("Tarmogoyf", "{1}{G}", 0, 1);
+        bobsCreature.SetOwner(_bob);
+        bobsCreature.SetController(_bob);
+        bobsCreature.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bobsCreature);
+
+        var aliceCreature = new Creature("Bird", "{1}{W}", 1, 2);
+        aliceCreature.SetOwner(_alice);
+        aliceCreature.SetController(_alice);
+        aliceCreature.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(aliceCreature);
+
+        // Fire the ETB through the bus exactly as a real enter would.
+        bus.Publish(new CardMovedEvent(lb, ZoneType.Stack, ZoneType.Battlefield));
+        triggers.PendingCount.Should().Be(1, "ETB exile trigger fired on enter");
+
+        // Candidate-aware agent: it picks FROM the candidates the engine
+        // gathered + offered, so an empty pool (no gatherer) yields no pick.
+        var agent = new PickOpponentPermanentAgent(_bob);
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+        var ctx = new GameContext(
+            _alice, new[] { _alice, _bob }, _alice, 1,
+            StepStateType.PreCombatMain, stack);
+
+        await triggers.PutPendingTriggersOnStackAsync(_alice, agents, ctx);
+
+        // The engine offered exactly the opponent's nonland permanent — not
+        // Alice's own Bird ("an opponent controls", CR 109.5).
+        agent.OfferedCandidates.Should().ContainSingle()
+            .Which.Should().BeSameAs(bobsCreature);
+
+        while (!stack.IsEmpty)
+        {
+            resolver.ResolveTop(stack);
+        }
+
+        bobsCreature.Zone.Should().Be(ZoneType.Exile,
+            "the ETB exile resolved end-to-end through the live agent prompt");
+        _bob.Zones.Exile.GetCards().Should().Contain(bobsCreature);
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(bobsCreature);
+        aliceCreature.Zone.Should().Be(ZoneType.Battlefield,
+            "Alice's own permanent was never a legal candidate");
+    }
+
+    /// <summary>
+    /// Picks the named opponent's permanent out of the candidates the engine's
+    /// targeting pipeline GATHERED and offered (captured for assertion), proving
+    /// the candidate gatherer surfaced the legal target rather than the agent
+    /// reaching past an empty pool.
+    /// </summary>
+    private sealed class PickOpponentPermanentAgent : DelegatingAgent
+    {
+        private readonly Player _opponent;
+        public IReadOnlyList<object> OfferedCandidates { get; private set; } =
+            System.Array.Empty<object>();
+
+        public PickOpponentPermanentAgent(Player opponent) => _opponent = opponent;
+
+        public override Task<IReadOnlyList<object>> ChooseTargetsAsync(
+            GameContext ctx, TargetRequest request,
+            System.Threading.CancellationToken ct = default)
+        {
+            OfferedCandidates = request.LegalCandidates;
+            var pick = request.LegalCandidates
+                .OfType<Permanent>()
+                .FirstOrDefault(p => ReferenceEquals(p.Controller, _opponent));
+            IReadOnlyList<object> result = pick is null
+                ? System.Array.Empty<object>()
+                : new object[] { pick };
+            return Task.FromResult(result);
+        }
     }
 }
