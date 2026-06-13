@@ -50,6 +50,18 @@ namespace Majik.Core.CardData;
 ///     <c>"Sacrifice this creature: It deals N damage to &lt;…&gt;."</c> Same as
 ///     above but the cost is <see cref="AdditionalCost.Sacrifice"/>(bearer)
 ///     instead of a mana/tap cost — exactly Mogg Fanatic.</item>
+///   <item><b>Self-keyword grant</b> —
+///     <c>"{cost}: This creature gains &lt;keyword&gt; until end of turn."</c>
+///     (the keyword sibling of firebreathing). Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose resolution registers a
+///     <see cref="GrantKeywordUntilEndOfTurnEffect"/> for the named keyword
+///     against the BEARER's own <see cref="Creature.ActiveEffects"/> (CR 613.1f
+///     Layer 6; CR 514.2 expiry). ONLY the closed set of simple,
+///     parameter-free combat/evasion keywords is reconstructed (flying, first
+///     strike, double strike, deathtouch, trample, lifelink, vigilance, haste,
+///     reach, menace, indestructible, hexproof) — a parameterised or unknown
+///     keyword is skipped as unsound. Sound to re-home: the effect targets the
+///     bearer, never the exiled card.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -105,6 +117,34 @@ public static class OracleActivatedAbilityBinder
     private static readonly Regex SacPingerRegex = new(
         @"^Sacrifice this creature:\s*It deals (\d+) damage to (any target|target creature|target player)\.$",
         RegexOptions.IgnoreCase);
+
+    // "{cost}: This creature gains <keyword> until end of turn."
+    private static readonly Regex SelfKeywordGrantRegex = new(
+        @"^(" + CostList + @")\s*:\s*This creature gains (.+?) until end of turn\.$",
+        RegexOptions.IgnoreCase);
+
+    // The closed set of simple, parameter-free keywords this binder will grant
+    // via a self-keyword-grant ability. Each maps the oracle spelling → the
+    // canonical keyword name CreatureCharacteristics.Keywords stores (the set is
+    // OrdinalIgnoreCase, so casing is for readability). Parameterised keywords
+    // (ward N, protection from X) and anything not here is skipped as unsound —
+    // a granted keyword must be reconstructable EXACTLY (CR 613.1f).
+    private static readonly IReadOnlyDictionary<string, string> GrantableKeywords =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["flying"] = "Flying",
+            ["first strike"] = "First Strike",
+            ["double strike"] = "Double Strike",
+            ["deathtouch"] = "Deathtouch",
+            ["trample"] = "Trample",
+            ["lifelink"] = "Lifelink",
+            ["vigilance"] = "Vigilance",
+            ["haste"] = "Haste",
+            ["reach"] = "Reach",
+            ["menace"] = "Menace",
+            ["indestructible"] = "Indestructible",
+            ["hexproof"] = "Hexproof",
+        };
 
     // A single tap symbol inside a cost list.
     private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
@@ -166,6 +206,14 @@ public static class OracleActivatedAbilityBinder
                 result.Add(BuildPinger(costs, amount, sacPing.Groups[2].Value, bearer, controller));
                 continue;
             }
+
+            var kwGrant = SelfKeywordGrantRegex.Match(line);
+            if (kwGrant.Success)
+            {
+                var ability = TryBuildSelfKeywordGrant(kwGrant, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
         }
 
         return result;
@@ -204,6 +252,45 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { pumpEffect });
+    }
+
+    /// <summary>
+    /// Build a self-keyword grant: "{cost}: This creature gains &lt;keyword&gt;
+    /// until end of turn." Like firebreathing this is a creature-only Layer-6
+    /// effect (CR 613.1f) registered against the bearer's own
+    /// <see cref="Creature.ActiveEffects"/>, so a non-creature bearer can't
+    /// carry it soundly — returns null then (skip, don't emit broken). Only the
+    /// closed <see cref="GrantableKeywords"/> set is reconstructed; an unknown or
+    /// parameterised keyword is skipped (CR 613.1f — a granted ability must be
+    /// modelled exactly).
+    /// </summary>
+    private static ActivatedAbility? TryBuildSelfKeywordGrant(
+        Match match, Permanent bearer, Player controller)
+    {
+        if (bearer is not Creature creatureBearer) return null;
+
+        var rawKeyword = match.Groups[2].Value.Trim();
+        if (!GrantableKeywords.TryGetValue(rawKeyword, out var keyword)) return null;
+
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var grantEffect = new Effect(
+            $"Granted: this creature gains {keyword} until end of turn",
+            () =>
+            {
+                // CR 613.1f Layer 6 — register against the BEARER's own effects
+                // service. null ActiveEffects (shape-only path) → the grant
+                // silently no-ops, same posture as the self-pump rebuild.
+                creatureBearer.ActiveEffects?.Register(
+                    new GrantKeywordUntilEndOfTurnEffect(creatureBearer, keyword));
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { grantEffect });
     }
 
     /// <summary>

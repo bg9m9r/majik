@@ -99,11 +99,12 @@ namespace Majik.Core.CardData.Factories;
 ///       closures (not <see cref="ActivatedAbility.RebindSafe"/>) or it carries
 ///       no engine-built ability at all (oracle-text-only). It reconstructs the
 ///       soundly-rebuildable shapes from oracle text: firebreathing / self-pump
-///       ("{cost}: This creature gets +X/+Y until end of turn"), pinger
-///       ("{cost}: This creature deals N damage to …"), and sacrifice-self
-///       pinger ("Sacrifice this creature: It deals N damage to …"). Cost
-///       grammar: any ", "-separated list of generic / coloured mana pips and
-///       {T}.</item>
+///       ("{cost}: This creature gets +X/+Y until end of turn"), self-keyword
+///       grant ("{cost}: This creature gains &lt;simple keyword&gt; until end of
+///       turn"), pinger ("{cost}: This creature deals N damage to …"), and
+///       sacrifice-self pinger ("Sacrifice this creature: It deals N damage to
+///       …"). Cost grammar: any ", "-separated list of generic / coloured mana
+///       pips and {T}.</item>
 ///   </list>
 ///
 /// ## Deferred (precise remaining gap)
@@ -339,9 +340,11 @@ public static class AgathasSoulCauldronFactory
     ///     <see cref="OracleManaBinder.ParseTapManaCosts"/>; rebuilt as fresh
     ///     <see cref="ManaAbility"/> instances sourced on the bearer.</item>
     ///   <item><b>NON-mana activated abilities</b> — firebreathing / self-pump
-    ///     ("{cost}: This creature gets +X/+Y until end of turn"), pingers
-    ///     ("{cost}: This creature deals N damage to …"), and sacrifice-self
-    ///     pingers ("Sacrifice this creature: It deals N damage to …") via
+    ///     ("{cost}: This creature gets +X/+Y until end of turn"), self-keyword
+    ///     grants ("{cost}: This creature gains &lt;simple keyword&gt; until end
+    ///     of turn"), pingers ("{cost}: This creature deals N damage to …"), and
+    ///     sacrifice-self pingers ("Sacrifice this creature: It deals N damage
+    ///     to …") via
     ///     <see cref="OracleActivatedAbilityBinder.RebuildActivatedAbilities"/>;
     ///     rebuilt as fresh <see cref="ActivatedAbility"/> instances whose cost
     ///     taps/sacrifices the BEARER and whose effect references the BEARER
