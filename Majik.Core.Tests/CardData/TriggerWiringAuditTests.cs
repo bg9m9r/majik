@@ -48,6 +48,11 @@ namespace Majik.Core.Tests.CardData;
 ///   2076 implemented, 599 with trigger text, 0 sagas, 599 factory-backed,
 ///   0 binder-only, 588 pass cleanly, 10 in KnownNonTriggerCards,
 ///   11 in KnownMissingTriggerBugs.
+/// UPDATE (2026-06-13): KnownMissingTriggerBugs trimmed to 7 — Leyline of
+///   Combustion / Leyline of Lightning / Mirari's Wake / Necrodominance were
+///   paid down (their triggers now bind on card.Abilities and ride the prod
+///   async agent-aware targeted-trigger drain), so the real-pool audit
+///   verifies them directly.
 /// </summary>
 public class TriggerWiringAuditTests
 {
@@ -238,29 +243,13 @@ public class TriggerWiringAuditTests
                 "The O-Ring pattern (ETB exile + LTB return) needs factory work; " +
                 "see card-type-modeling-discrepancies memory.",
 
-            ["Leyline of Combustion"] =
-                "// BUG: 'Whenever you or a permanent you control becomes the target of a spell " +
-                "or ability an opponent controls, Leyline of Combustion deals 2 damage to that " +
-                "opponent.' — LeylineOfCombustionFactory explicitly defers this trigger in v1 " +
-                "(factory doc: 'needs a targeting-resolution trigger surface'). Not wired.",
-
-            ["Leyline of Lightning"] =
-                "// BUG: 'Whenever you cast your first spell each turn, Leyline of Lightning " +
-                "deals 1 damage to target player or planeswalker.' — LeylineOfLightningFactory " +
-                "explicitly defers this trigger (factory doc: 'needs a per-turn spells-cast " +
-                "counter plus a first-only gate'). Not wired.",
-
-            ["Mirari's Wake"] =
-                "// BUG: 'Whenever you tap a land for mana, add one mana of any type that land " +
-                "produced.' — MirariWakeFactory.Create(Player, ContinuousEffectsService?) only " +
-                "registers ControllerCreatureAnthemEffect (+1/+1 static anthem); the mana-bonus " +
-                "triggered mana ability is not wired at all in the factory.",
-
-            ["Necrodominance"] =
-                "// BUG: 'At the beginning of your end step, you may pay any amount of life. " +
-                "If you do, draw that many cards.' — NecrodominanceFactory.Create adds static " +
-                "abilities (SkipDraw, damage-riders) and an activated ability, but the end-step " +
-                "draw trigger is not wired as ITriggeredAbility.",
+            // Leyline of Combustion, Leyline of Lightning, Mirari's Wake, and
+            // Necrodominance were paid down — their triggers are now bound to
+            // card.Abilities by their factories (PRs #2502, #2519, #2520, and
+            // the leyline-lightning-first-spell-per-turn-trigger deferral
+            // pay-down) and ride the prod async agent-aware targeted-trigger
+            // drain (#3b/#12). The real-pool audit now verifies them directly;
+            // their KnownMissingTriggerBugs entries were removed.
 
             ["Reality Smasher"] =
                 "// BUG: 'Whenever Reality Smasher becomes the target of a spell or ability an " +
