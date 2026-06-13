@@ -309,6 +309,50 @@ public class BoardEvalTests
         (boosted - baseline).Should().BeApproximately(7.0, 1e-9);
     }
 
+    /// <summary>
+    /// A2 NEUTRALITY GUARD (deck-strategy framework landing). The Strategic term
+    /// must contribute EXACTLY ZERO — leaving the eval byte-identical to the
+    /// pre-framework engine — for any archetype that has NO registered
+    /// <see cref="Majik.Bot.Strategies.IDeckStrategy"/>. Neutrality is structural,
+    /// not weight-based: <c>weights.Strategic</c> is 1.0 by default, but the term is
+    /// <c>weights.Strategic * (deck?.StrategicScore(...) ?? 0.0)</c>, so an
+    /// unregistered archetype resolves <c>deck == null</c> via
+    /// <see cref="Majik.Bot.Strategies.DeckStrategyRegistry"/> and the product is 0.
+    ///
+    /// <para>This proves the framework does NOT shift the play/eval of existing
+    /// decks (Burn / Prowess / BorosEnergy / AzoriusControl / and every Default
+    /// archetype such as Sultai / EldraziTron). If a strategy were ever
+    /// accidentally registered for one of these names, the registry lookup would
+    /// return non-null and this test would fail loudly.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("Burn")]
+    [InlineData("Prowess")]
+    [InlineData("BorosEnergy")]
+    [InlineData("AzoriusControl")]
+    [InlineData("Sultai")]
+    [InlineData("EldraziTron")]
+    [InlineData("AzoriusLotusBelcher")] // the new #2630 deck — strategy is wired in Phase C, NOT here
+    public void Score_StrategicTerm_IsNeutral_ForArchetypesWithoutRegisteredStrategy(string archetype)
+    {
+        // The registry is the production resolution path used by both
+        // HeuristicStrategy and SearchStrategy: deck = registry.For(archetypeName).
+        var deck = Majik.Bot.Strategies.DeckStrategyRegistry.For(archetype);
+        deck.Should().BeNull(
+            because: $"'{archetype}' has no [DeckStrategy] registered — Phase A ships the seam only");
+
+        var s = new BotTestScenario();
+        // Strategic = 1.0 (the live default) so the ONLY thing that could move the
+        // score is a non-null strategy. Prove it does not.
+        var weights = ArchetypeWeights.ForArchetype(archetype);
+
+        var withTermActive = BoardEval.Score(s.Context, s.Self, weights, deck: deck);
+        var preFramework    = BoardEval.Score(s.Context, s.Self, weights, deck: null);
+
+        withTermActive.Should().Be(preFramework,
+            because: "with no registered strategy the Strategic term must be exactly 0 — eval byte-identical to pre-framework");
+    }
+
     private sealed class StubStrategy : Majik.Bot.Strategies.IDeckStrategy
     {
         private readonly double _v;
