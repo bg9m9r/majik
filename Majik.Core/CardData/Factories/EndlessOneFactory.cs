@@ -107,47 +107,35 @@ public static class EndlessOneFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 614.1d — self-manages its X +1/+1 counters via the ETB trigger
-        // below; flag so the generic binder doesn't double them.
-        card.MarkSelfManagesEntersWithCounters();
-
         // ----------------------------------------------------------------
-        // ETB +1/+1 counters trigger — CR 603.6a / CR 122.1g.
-        //   "Endless One enters with X +1/+1 counters on it."
-        // v1 folds 122.1g "as it enters with N counters" into the ETB
-        // trigger effect: read PendingCastX (stamped by SpellCastFlow
-        // right after ChooseXAsync), apply that many +1/+1 counters via
-        // CountersService.Add (so Hardened Scales / Doubling Season
-        // replacements re-write the amount), then clear the stamp so
-        // re-entries (blink, copy) don't reuse the value. PendingCastX
-        // is null for non-cast entries → 0 counters → 0/0 → SBA puts it
-        // in the graveyard (CR 704.5f), matching the printed behaviour.
+        // "Endless One enters with X +1/+1 counters on it" (CR 614.1d /
+        // CR 202.3b) is NOT wired by this factory. It is registered by the
+        // generic EntersWithCountersBinder as a variable-X
+        // EntersWithCountersReplacement. On the production deck-build
+        // (DeckCardBuilder APPROACH B) the binder runs in
+        // OverlayAdditiveBinders against the live ReplacementBus, matches
+        // Endless One's oracle text ("enters with X +1/+1 counters on it"),
+        // reads the chosen X off Card.PendingCastX (stamped by SpellCastFlow
+        // after ChooseXAsync), and stamps ZoneMoveIntent.PlusOneCountersOnEnter
+        // so the permanent enters WITH the counters (no transient 0/0 window).
+        // Hardened Scales / Doubling Season compose on that same ETB intent
+        // channel (CR 614).
+        //
+        // The factory deliberately does NOT MarkSelfManagesEntersWithCounters()
+        // and does NOT attach an ETB TriggeredAbility — that was the bug (the
+        // same one Walking Ballista had, #2635): the prod Approach-B route
+        // calls NamedCardFactory.Create with no TriggerManager, so a
+        // self-managed ETB trigger is never registered and never fires, AND the
+        // self-manage flag suppresses the binder — the one mechanism that route
+        // DOES run — yielding ZERO counters in real play.
+        //
+        // triggers / replacements remain on the signature for overload-API
+        // compatibility with shape/dispatcher tests; the X-counter mechanism no
+        // longer consumes them (the binder owns the ReplacementBus on the live
+        // path).
         // ----------------------------------------------------------------
-        var etbEffect = new Effect(
-            $"{CardName}: enters with X +1/+1 counters (CR 122.1g)",
-            () =>
-            {
-                var x = card.PendingCastX ?? 0;
-                if (x > 0)
-                {
-                    // CR 614 — routes through ReplacementBus so Hardened
-                    // Scales bumps + Doubling Season doubles apply (and
-                    // stack — Hardened-then-Doubling rewrites X +1 then
-                    // 2*(X+1) per CR 614.1 ordering).
-                    CountersService.Add(card, CounterType.PlusOnePlusOne, x, replacements);
-                }
-                card.ClearPendingCastX();
-            });
-
-        var etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(card),
-            effects: new IEffect[] { etbEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(etbTrigger);
-        triggers?.RegisterTriggeredAbility(etbTrigger);
+        _ = triggers;
+        _ = replacements;
 
         return card;
     }

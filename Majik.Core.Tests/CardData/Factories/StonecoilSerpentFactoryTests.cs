@@ -7,8 +7,10 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Rules;
+using Majik.Core.Services;
 using Majik.Core.Spells;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -27,7 +29,12 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///
 /// Covers identity, NamedCardFactory dispatch, the two combat keyword
 /// riders (Reach / Trample), protection from multicolored (spell-predicate
-/// surface — CR 702.16), and the ETB X +1/+1 counters trigger (CR 122.1g).
+/// surface — CR 702.16), and the "enters with X +1/+1 counters" mechanism.
+/// The latter is owned by the generic <see cref="EntersWithCountersBinder"/>
+/// (NOT a self-managed ETB trigger): the factory attaches no ETB-counters
+/// trigger and does not self-manage; the binder reads
+/// <see cref="Card.PendingCastX"/> and places the counters as Stonecoil enters
+/// (CR 614.1d).
 /// </summary>
 public class StonecoilSerpentFactoryTests
 {
@@ -100,40 +107,80 @@ public class StonecoilSerpentFactoryTests
     }
 
     [Fact]
-    public void Stonecoil_EtbWithXEquals4_GainsFourPlusOneCounters()
+    public void Stonecoil_DoesNotAttachEtbTrigger()
     {
+        // CR 614.1d — the ETB counters are a binder-registered replacement, NOT
+        // a factory-attached TriggeredAbility.
         var s = StonecoilSerpentFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(s);
-        s.SetZone(ZoneType.Battlefield);
 
-        // SpellCastFlow stamps PendingCastX after ChooseXAsync; simulate.
-        s.SetPendingCastX(4);
-
-        var etb = s.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.Effects.Any(e => e.Description.Contains("enters with X")));
-        foreach (var e in etb.Effects) e.Execute();
-
-        s.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4,
-            "Stonecoil Serpent enters with X (=4) +1/+1 counters per CR 122.1g");
-        s.PendingCastX.Should().BeNull(
-            "PendingCastX stamp consumed; re-entries don't double-count");
+        s.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "Stonecoil's ETB counters are a binder-registered replacement, " +
+            "not a self-managed ETB trigger");
     }
 
     [Fact]
-    public void Stonecoil_NonCastEntry_ZeroCounters()
+    public void Stonecoil_DoesNotSelfManageEntersWithCounters()
     {
+        // The factory must leave SelfManagesEntersWithCounters false so the
+        // EntersWithCountersBinder DOES register the variable-X replacement on
+        // the prod route. Setting the flag suppresses the binder → 0 counters.
         var s = StonecoilSerpentFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(s);
-        s.SetZone(ZoneType.Battlefield);
-        s.PendingCastX.Should().BeNull();
 
-        var etb = s.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.Effects.Any(e => e.Description.Contains("enters with X")));
-        foreach (var e in etb.Effects) e.Execute();
+        s.SelfManagesEntersWithCounters.Should().BeFalse(
+            "the binder owns the ETB-X replacement; self-managing suppresses it " +
+            "and yields zero counters on the Approach-B prod route");
+    }
+
+    [Fact]
+    public void Stonecoil_BinderReplacement_EntersWithXEquals4_Counters()
+    {
+        // The prod mechanism: factory build + binder (reads the card's real
+        // oracle text) + ZoneService move. X = 4 (cast {4}).
+        var bus = new ReplacementBus();
+        var s = StonecoilSerpentFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(s, StonecoilEntity(), bus).Should().BeTrue(
+            "the binder matches 'enters with X +1/+1 counters on it' and registers " +
+            "the variable-X replacement");
+
+        s.SetOwner(_alice);
+        s.SetController(_alice);
+        _alice.Zones.Library.AddCard(s);
+        s.SetZone(ZoneType.Library);
+        s.SetPendingCastX(4);
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(s, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        s.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4,
+            "Stonecoil Serpent enters WITH X (=4) +1/+1 counters per CR 614.1d → 4/4");
+    }
+
+    [Fact]
+    public void Stonecoil_BinderReplacement_ZeroX_NoCounters()
+    {
+        // No PendingCastX stamp → X = 0 → a 0/0 the SBA layer sends to the
+        // graveyard (CR 704.5f). Non-cast entries (blink, copy) take this path.
+        var bus = new ReplacementBus();
+        var s = StonecoilSerpentFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(s, StonecoilEntity(), bus).Should().BeTrue();
+
+        s.SetOwner(_alice);
+        s.SetController(_alice);
+        _alice.Zones.Library.AddCard(s);
+        s.SetZone(ZoneType.Library);
+        // No SetPendingCastX → X defaults to 0.
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(s, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         s.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "non-cast entry → no PendingCastX → zero counters");
+            "X = 0 → zero counters placed → 0/0 SBA-fodder (CR 704.5f)");
     }
+
+    private static CardEntity StonecoilEntity() =>
+        new EmbeddedCardRepository().GetByName("Stonecoil Serpent")!;
 
     private static ISpell MakeSpell(string manaCost)
     {

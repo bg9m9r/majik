@@ -340,4 +340,78 @@ public class FactoryRoutingTests
         mdfc.CastableBackFace!.IsLand.Should().BeTrue("Soporific Springs is a land back face");
         mdfc.CastableBackFace!.Name.Should().Be("Soporific Springs");
     }
+
+    // -----------------------------------------------------------------------
+    // ETB-X +1/+1 counters cohort — the same prod-routing bug Walking Ballista
+    // had (#2635). A card whose factory wired its X +1/+1 counters as a
+    // self-managed ETB TriggeredAbility + MarkSelfManagesEntersWithCounters()
+    // enters with ZERO counters on the PROD Approach-B route: that route builds
+    // via NamedCardFactory.Create with no TriggerManager (the ETB trigger never
+    // fires) AND the self-manage flag suppresses the one mechanism the route
+    // DOES run (EntersWithCountersBinder). The fix defers entirely to the
+    // binder, which reads PendingCastX and stamps
+    // ZoneMoveIntent.PlusOneCountersOnEnter (CR 614.1d).
+    //
+    // These tests drive the prod ReplacementBus the way the Walking Ballista
+    // routing tests do: build through GameFacade.Create, stamp PendingCastX,
+    // then Apply the ETB ZoneMoveIntent and assert PlusOneCountersOnEnter.
+    // -----------------------------------------------------------------------
+
+    private static int EntersWithCountersOnRoute(string name, string manaCost, int? castX)
+    {
+        var deck = new List<ICard> { new Creature(name, manaCost, 0, 0) };
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, Array.Empty<ICard>(), cardRepo: Repo());
+        var card = (Creature)LibraryCardNamed(facade, facade.Alice, name);
+
+        if (castX is int x) ((Card)card).SetPendingCastX(x);
+        card.SetController(facade.Alice);
+
+        var intent = new Majik.Core.Effects.ZoneMoveIntent(
+            card, ZoneType.Hand, ZoneType.Battlefield, Controller: facade.Alice);
+        var replaced = facade.Replacements.Apply(intent);
+
+        replaced.Should().NotBeNull();
+        return replaced!.PlusOneCountersOnEnter;
+    }
+
+    [Fact]
+    public void EndlessOne_RoutedThroughFactory_EntersWithXCounters() =>
+        EntersWithCountersOnRoute("Endless One", "{X}", castX: 3).Should().Be(3,
+            "Endless One enters with X (=3) +1/+1 counters (CR 614.1d), not 0/0");
+
+    [Fact]
+    public void EndlessOne_RoutedThroughFactory_ZeroX_EntersWithNoCounters() =>
+        EntersWithCountersOnRoute("Endless One", "{X}", castX: null).Should().Be(0,
+            "X = 0 → enters as a 0/0 (which the SBA layer then sends to the graveyard)");
+
+    [Fact]
+    public void HangarbackWalker_RoutedThroughFactory_EntersWithXCounters() =>
+        EntersWithCountersOnRoute("Hangarback Walker", "{X}{X}", castX: 3).Should().Be(3,
+            "Hangarback Walker enters with X (=3) +1/+1 counters (CR 614.1d), not 0/0");
+
+    [Fact]
+    public void HangarbackWalker_RoutedThroughFactory_ZeroX_EntersWithNoCounters() =>
+        EntersWithCountersOnRoute("Hangarback Walker", "{X}{X}", castX: null).Should().Be(0,
+            "X = 0 → enters as a 0/0 (which the SBA layer then sends to the graveyard)");
+
+    [Fact]
+    public void StonecoilSerpent_RoutedThroughFactory_EntersWithXCounters() =>
+        EntersWithCountersOnRoute("Stonecoil Serpent", "{X}", castX: 3).Should().Be(3,
+            "Stonecoil Serpent enters with X (=3) +1/+1 counters (CR 614.1d), not 0/0");
+
+    [Fact]
+    public void StonecoilSerpent_RoutedThroughFactory_ZeroX_EntersWithNoCounters() =>
+        EntersWithCountersOnRoute("Stonecoil Serpent", "{X}", castX: null).Should().Be(0,
+            "X = 0 → enters as a 0/0 (which the SBA layer then sends to the graveyard)");
+
+    [Fact]
+    public void TheGooseMother_RoutedThroughFactory_EntersWithXCounters() =>
+        EntersWithCountersOnRoute("The Goose Mother", "{X}{G}{U}", castX: 3).Should().Be(3,
+            "The Goose Mother enters with X (=3) +1/+1 counters (CR 614.1d), not just base 2/2");
+
+    [Fact]
+    public void TheGooseMother_RoutedThroughFactory_ZeroX_EntersWithNoCounters() =>
+        EntersWithCountersOnRoute("The Goose Mother", "{X}{G}{U}", castX: null).Should().Be(0,
+            "X = 0 → enters with no +1/+1 counters (base 2/2, CR 614.1d)");
 }
