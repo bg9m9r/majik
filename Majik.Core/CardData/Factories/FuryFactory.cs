@@ -6,6 +6,7 @@ using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -140,15 +141,12 @@ public static class FuryFactory
                 {
                     if (amount <= 0) continue;
                     if (perm.Zone != ZoneType.Battlefield) continue; // illegal at resolution
-                    switch (perm)
-                    {
-                        case Creature c:
-                            c.TakeDamage(amount);
-                            break;
-                        case Planeswalker pw:
-                            pw.RemoveLoyalty(amount);
-                            break;
-                    }
+                    // CR 119 — routed through the canonical Fx.DealDamageAny
+                    // seam: a real Planeswalker → RemoveLoyalty (CR 120.3c), a
+                    // creature-front DFC flipped to its planeswalker BACK face
+                    // (CR 711, IsEffectivePlaneswalker) → transient loyalty
+                    // removal (CR 306.7), and a plain Creature → marked damage.
+                    Fx.DealDamageAny(perm, amount);
                 }
             });
 

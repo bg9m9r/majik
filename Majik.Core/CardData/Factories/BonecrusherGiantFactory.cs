@@ -7,6 +7,7 @@ using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Targeting;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -236,26 +237,15 @@ public static class BonecrusherGiantFactory
                 {
                     new Effect("Stomp: deal 2 damage to any target", () =>
                     {
-                        // CR 119.2 — damage from an instant. Damage to a
-                        // creature → TakeDamage (lethal SBA picks up).
-                        // Damage to a player → LoseLife (Bonecrusher's own
-                        // pattern — engine has no separate "deal damage
-                        // to a player" outside combat in v1).
-                        switch (resolved)
-                        {
-                            case Creature creature:
-                                creature.TakeDamage(StompDamage);
-                                break;
-                            case Player player:
-                                player.LoseLife(StompDamage);
-                                break;
-                            case Planeswalker pw:
-                                // CR 120.3c — non-combat damage to a
-                                // planeswalker is removal of that many
-                                // loyalty counters.
-                                pw.RemoveLoyalty(StompDamage);
-                                break;
-                        }
+                        // CR 119.2 — damage from an instant. Routed through the
+                        // canonical Fx.DealDamageAny seam so the full "any
+                        // target" shape is covered: Player → LoseLife,
+                        // real Planeswalker → RemoveLoyalty (CR 120.3c), a
+                        // creature-front DFC flipped to its planeswalker BACK
+                        // face (CR 711, IsEffectivePlaneswalker) → transient
+                        // loyalty removal (CR 306.7 / 120.3), and a plain
+                        // Creature → marked damage (lethal SBA picks up).
+                        Fx.DealDamageAny(resolved, StompDamage);
                     }),
                 };
             });
