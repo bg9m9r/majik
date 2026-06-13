@@ -146,6 +146,12 @@ public static class ManlandBinder
     private static readonly Regex Anthem = new(
         @"other creatures you control get \+(?<p>\d+)/\+(?<t>\d+) until end of turn",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Restless Anchorage — "create a Map token." Non-targeted artifact-token
+    // mint (CR 111.10). The Map's "{1},{T}, Sacrifice: target creature you
+    // control explores" ability ships on the token from TokenFactory.CreateMap.
+    private static readonly Regex CreateMapToken = new(
+        @"create a Map token",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // --- Targeted / defender-capturing Restless attack triggers (CR 603.3) ---
     // Restless Bivouac — "put a +1/+1 counter on target creature you control."
@@ -431,6 +437,19 @@ public static class ManlandBinder
                     {
                         effects.Register(new PumpUntilEndOfTurnEffect(creature, p, t));
                     }
+                });
+        }
+        else if (CreateMapToken.IsMatch(effectText))
+        {
+            // Restless Anchorage — "create a Map token." Non-targeted artifact
+            // token mint (CR 111.10). TokenFactory.CreateMap ships the Map's
+            // "{1},{T}, Sacrifice: target creature you control explores" ability.
+            effect = new Effect(
+                $"{land.Name}: create a Map token (attack trigger, CR 111.10)",
+                () =>
+                {
+                    var ctrl = land.Controller ?? controller;
+                    Majik.Core.Tokens.TokenFactory.CreateMap(ctrl);
                 });
         }
 
