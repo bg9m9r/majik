@@ -140,6 +140,14 @@ public sealed class BotPlayerAgent : IPlayerAgent
         => WrapAsync<IReadOnlyList<object>>(() =>
         {
             var candidates = req.Candidates ?? Array.Empty<object>();
+
+            // CR 712.3 — MDFC face prompt: route the face choice through
+            // MdfcFacePolicy (deliberate land-vs-spell pick) instead of the
+            // first-candidate default, which always picks the front face and so
+            // leaves MDFC-land hands mana-locked (Belcher trace, 2026-06-12).
+            if (MdfcFacePolicy.TryPick(ctx, _self, candidates, out var face))
+                return new object[] { face };
+
             if (req.Kind == ChoiceKind.YesNo)
             {
                 // Bot always accepts (mirrors the wire Yes/No posture above).
