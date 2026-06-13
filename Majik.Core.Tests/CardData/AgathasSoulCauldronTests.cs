@@ -731,6 +731,52 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_SelfKeywordGrant_RehomesKeywordToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{R}: This creature gains first strike until end of
+        // turn." (Firebreathing's keyword sibling — a self-keyword grant.)
+        var fervent = new Creature("Fervent Stub", "1R", 2, 2);
+        fervent.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(fervent);
+        fervent.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Fervent Stub", "{R}: This creature gains first strike until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), fervent);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's self-keyword grant");
+        var grant = granted[0];
+        grant.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        grant.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("R"));
+
+        // The BEARER should not yet have first strike.
+        effects.Compute(bearer).Keywords.Should().NotContain("First Strike");
+
+        // Activating it grants the BEARER first strike until end of turn (CR 613.1f
+        // Layer 6), not the exiled card.
+        foreach (var effect in grant.Effects) effect.Execute();
+        effects.Compute(bearer).Keywords.Should().Contain("First Strike",
+            "the re-homed self-keyword grant gives the BEARER the keyword");
+
+        // CR 514.2 — the grant expires at cleanup.
+        effects.ExpireEndOfTurn();
+        effects.Compute(bearer).Keywords.Should().NotContain("First Strike",
+            "the granted keyword expires at end of turn");
+    }
+
+    [Fact]
     public void Grant_NonMana_Pinger_RehomesTapAndDamageToBearer()
     {
         var alice = new Player("Alice", 20);
@@ -814,6 +860,36 @@ public class AgathasSoulCauldronTests
         sacCost.Pay(alice);
         bearer.Zone.Should().Be(ZoneType.Graveyard, "the BEARER is sacrificed, not the exiled card");
         mogg.Zone.Should().Be(ZoneType.Exile, "the exiled imprinted card stays exiled");
+    }
+
+    [Fact]
+    public void Grant_NonMana_ParameterisedKeywordGrant_IsSkippedAsUnsound()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A self-keyword grant for a PARAMETERISED keyword ("protection from
+        // red") — outside the binder's closed simple-keyword set. It must be
+        // skipped, not emitted broken (CR 613.1f — only exactly-modellable
+        // grants are reconstructed).
+        var warded = new Creature("Warded Stub", "1W", 2, 2);
+        warded.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(warded);
+        warded.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Warded Stub", "{W}: This creature gains protection from red until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), warded);
+
+        GrantedActivated(bearer).Should().BeEmpty(
+            "a parameterised keyword grant is outside the reconstructable simple-keyword set and is skipped");
     }
 
     [Fact]
