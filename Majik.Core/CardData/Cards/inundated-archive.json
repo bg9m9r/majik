@@ -1,0 +1,8 @@
+{
+  "name": "Inundated Archive",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
