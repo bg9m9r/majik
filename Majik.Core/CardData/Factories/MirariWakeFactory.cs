@@ -57,11 +57,23 @@ namespace Majik.Core.CardData.Factories;
 /// <c>ActiveZones</c> gate, CR 603.1), so registering at deck-build time is
 /// harmless until it resolves.
 ///
-/// ## Deferred (v1 gaps)
+/// Both clauses are fully wired through the production build path: the
+/// source-gen dispatcher routes the effects-aware
+/// <c>NamedCardFactory.Create(name, owner, effects)</c> (the path
+/// <c>GameFacade.BuildDeckCard</c> uses) to the
+/// <c>Create(Player, ContinuousEffectsService)</c> overload below, which
+/// registers BOTH the anthem and the mana-doubling trigger. The
+/// "mana-bonus trigger" gap is therefore CLOSED — see
+/// <c>MirariWakeTests.TappingYourLandForMana_AddsAdditionalManaOfThatType</c>
+/// and the prod-path guard
+/// <c>MirariWakeTests.MirarisWake_ProdPath_BindsManaDoublingTrigger</c>.
+///
+/// ## Accepted v1 simplification (shared, not specific to this card)
 /// - <b>LTB unregister</b>: the anthem stays on the layers service across
 ///   zone changes; <see cref="ContinuousEffect.IsActive"/> gates it off
 ///   when Mirari's Wake leaves the battlefield. Same posture as Goblin
-///   Chieftain / Engineered Plague.
+///   Chieftain / Engineered Plague — a generic continuous-effect lifecycle
+///   simplification, not a mana-trigger gap.
 /// </summary>
 [CardName("Mirari's Wake")]
 public static class MirariWakeFactory
