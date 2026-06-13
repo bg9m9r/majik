@@ -197,6 +197,13 @@ public sealed class GameDriver
             Majik.Core.Services.ZoneServiceRegistry.Set(p, _zoneService);
         }
 
+        // CR 102.4 — register the live seated players so mana-ability riders
+        // that read "each opponent" (Grove of the Burnwillows' "Each opponent
+        // gains 1 life") can resolve the opponent set at activation. Mana
+        // abilities resolve immediately with no ResolutionContext (CR 605.3),
+        // so this ambient registry is their analogue of ContextOpponents.
+        GamePlayersRegistry.Set(_players);
+
         // Seed the per-game AgentRegistry store from the driver's own agent
         // map (the real per-seat agents — control rerouting only affects the
         // indexer, not enumeration). Effect closures that prompt a player

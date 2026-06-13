@@ -864,6 +864,10 @@ public sealed class GameFacade : IDisposable
         using var registryScope = Majik.Core.Game.GameRegistryScope.PushForGame();
         AgentRegistry.Set(_alice, _aliceAgentEffective);
         AgentRegistry.Set(_bob, _bobAgentEffective);
+        // CR 102.4 — register the live seats so mana-ability "each opponent"
+        // riders (Grove of the Burnwillows) resolve the opponent set at
+        // activation on the single-round path too (mirrors GameDriver).
+        Majik.Core.Game.GamePlayersRegistry.Set(new[] { _alice, _bob });
         await _loop.RunUntilRoundEndsAsync(_alice, ct).ConfigureAwait(false);
     }
 
