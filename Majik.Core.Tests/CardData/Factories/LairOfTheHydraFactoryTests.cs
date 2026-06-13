@@ -148,6 +148,30 @@ public class LairOfTheHydraFactoryTests
         pt.NewToughness.Should().Be(LairOfTheHydraFactory.MinX);
     }
 
+    [Fact]
+    public void Animate_ReadsChosenX_FromLedger_WhenNoProvider()
+    {
+        // GAP 2 end-to-end: no xValueProvider wired (prod shape). The animate
+        // ability reads the per-activation X from the ledger
+        // (ActivatedAbility.ChosenX → ResolutionContext.ChosenX). X=4 → a 4/4
+        // body; previously this resolved X=0 (clamped to the 1/1 minimum).
+        var effects = new ContinuousEffectsService();
+        var land = LairOfTheHydraFactory.Create(
+            _alice, effects, replacements: null, xValueProvider: null);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = land.Abilities.OfType<ActivatedAbility>().Single();
+        animate.SetChosenX(4);
+        Majik.Core.Tests.Helpers.ContextResolve.Resolve(animate, _alice);
+
+        var pt = GetRegisteredEffects(effects)
+            .OfType<ManlandCycleBecomesPTEffect>()
+            .Single();
+        pt.NewPower.Should().Be(4, "X=4 from the ledger → 4/4 body (was 0/0 before GAP 2)");
+        pt.NewToughness.Should().Be(4);
+    }
+
     // -----------------------------------------------------------------------
     // Conditional ETB-tapped — "two or more other lands"
     // -----------------------------------------------------------------------

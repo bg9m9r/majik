@@ -115,6 +115,14 @@ public class AbilityActivator
         {
             activatedAbility.SetChosenTargets(sourceAbility.ChosenTargets);
         }
+        // GAP 2 — mirror the per-activation chosen X onto the stack object so its
+        // resolution effect reads the real X (ResolutionContext.ChosenX), not 0.
+        // Parallel to the ChosenTargets copy above (CR 602.4 — the stack object
+        // carries the same characteristics as the original).
+        if (sourceAbility?.ChosenX is { } chosenX)
+        {
+            activatedAbility.SetChosenX(chosenX);
+        }
 
         // Add ability to stack
         _stack.Push(activatedAbility);

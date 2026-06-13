@@ -89,6 +89,18 @@ public sealed record ResolutionContext(
     /// </summary>
     public Permanent? Source { get; init; }
 
+    /// <summary>
+    /// GAP 2 — the X chosen for a variable-X ({X}-cost) ACTIVATED ability,
+    /// threaded from <see cref="ActivatedAbility.ChosenX"/> by
+    /// <see cref="ActivatedAbility.ResolveAsync"/>. Lets the resolution effect
+    /// read the real chosen X (Steel Hellkite's destroy-mv-X sweep, Lair of the
+    /// Hydra's X/X body, Tameshi's mv ≤ X reanimation) off the live context
+    /// instead of a captured <c>Func&lt;int&gt;</c> closure that resolves to 0 on
+    /// the production routed build. Null when no {X} was chosen (the spell path,
+    /// the legacy sync path, non-X abilities); effects treat null as 0.
+    /// </summary>
+    public int? ChosenX { get; init; }
+
     private static readonly IReadOnlyDictionary<int, Player> EmptySharedSlot =
         new Dictionary<int, Player>();
 
@@ -113,13 +125,15 @@ public sealed record ResolutionContext(
         GameContext? game,
         IReadOnlyList<IReadOnlyList<object>>? chosenTargets,
         CancellationToken ct = default,
-        Permanent? source = null)
+        Permanent? source = null,
+        int? chosenX = null)
     {
         var targets = chosenTargets ?? EmptyTargets;
         return new(controller, agent, game, targets, ct)
         {
             SharedSlotControllers = SnapshotSharedSlotControllers(targets),
             Source = source,
+            ChosenX = chosenX,
         };
     }
 

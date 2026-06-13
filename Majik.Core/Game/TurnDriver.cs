@@ -1133,10 +1133,30 @@ public sealed class TurnDriver
             await Majik.Core.Game.SacrificeCostPrompt.ChooseSacrificesAsync(
                 actor, activate.Ability, _agents[actor], ctx);
 
+            // GAP 2 — variable-X cost (CR 601.2e analogue). When the ability's
+            // mana cost contains {X} (the SAME ManaCost.HasX predicate the spell
+            // path reads via SpellDefinition.HasVariableX), prompt the activating
+            // player's agent for X, record it on the source ability so the
+            // resolution effect reads the real value (ResolutionContext.ChosenX —
+            // mirrored onto the stack copy by AbilityActivator), and expand {X} →
+            // X generic in the costs via the spell path's ManaCost.AddGenericCost
+            // machinery (VariableXCostExpansion). A non-X ability skips this and
+            // pays its printed costs unchanged.
+            var costsToPay = activate.Ability.Costs;
+            if (activate.Ability is Majik.Core.Abilities.ActivatedAbility aaForX
+                && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
+                && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
+            {
+                var x = await _agents[actor].ChooseXAsync(ctx, xSource, ct: default);
+                aaForX.SetChosenX(x);
+                costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
+                    activate.Ability.Costs, x);
+            }
+
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _eventBus);
             try
             {
-                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs, ctx);
+                activator.ActivateAbility(activate.Ability, actor, targets, costsToPay, ctx);
             }
             catch (InvalidOperationException)
             {

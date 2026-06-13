@@ -62,11 +62,30 @@ public sealed class AbilityActivationFlow
             aa.SetChosenTargets(collected);
         }
 
-        // Mana payment (if cost supplied).
-        if (cost != null && !cost.IsZero)
+        // GAP 2 — variable-X cost (CR 601.2e analogue for activated abilities).
+        // After targets, before mana payment: if the cost contains {X} (the SAME
+        // predicate the spell path uses — ManaCost.HasX, surfaced as
+        // SpellDefinition.HasVariableX), prompt the agent for X, record it on the
+        // ability (mirrors ChosenTargets so the resolution effect reads it), and
+        // expand {X} → X generic in the cost via the spell path's
+        // ManaCost.AddGenericCost machinery (SpellCastFlow.ComputeAndApplyTotalCost
+        // does the same fold). A non-X cost skips this entirely (no prompt).
+        var effectiveCost = cost;
+        if (cost is { HasX: true } && ability.Source is Cards.ICard xSource)
         {
-            _ = await agent.ChooseManaSourcesAsync(ctx, cost, ct);
-            activator.PayMana(cost);
+            var x = await agent.ChooseXAsync(ctx, xSource, ct);
+            if (ability is ActivatedAbility aaForX)
+            {
+                aaForX.SetChosenX(x);
+            }
+            effectiveCost = cost.AddGenericCost(x);
+        }
+
+        // Mana payment (if cost supplied).
+        if (effectiveCost != null && !effectiveCost.IsZero)
+        {
+            _ = await agent.ChooseManaSourcesAsync(ctx, effectiveCost, ct);
+            activator.PayMana(effectiveCost);
         }
 
         // NOTE: this MVP flow pays ONLY the explicit mana `cost`; it does NOT

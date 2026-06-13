@@ -96,7 +96,69 @@ public sealed class BotPlayerAgent : IPlayerAgent
         => WrapAsync(() => _strategy.PickTargets(ctx, _self, request), ct);
 
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
-        => WrapAsync(() => _strategy.PickX(ctx, _self), ct);
+        => WrapAsync(() => PickXForSource(ctx, source), ct);
+
+    /// <summary>
+    /// GAP 2 — X policy. SPELLS keep the legacy <see cref="IBotStrategy.PickX"/>
+    /// posture (land count) UNCHANGED, so existing decks' flip / masking
+    /// decisions don't move. A variable-X ACTIVATED ABILITY (its source is a
+    /// permanent we control on the battlefield) instead gets a sensible non-zero
+    /// default that is always LEGAL — clamped to the mana actually available
+    /// (floating pool + untapped sources, minus the cost's fixed pips) so the
+    /// expanded {X} payment can't fail. Simple, not optimal:
+    /// <list type="bullet">
+    ///   <item>Tameshi, Reality Architect — X = mana value of the best
+    ///   artifact/enchantment card in our graveyard, clamped to affordable.</item>
+    ///   <item>Steel Hellkite / Lair of the Hydra / any other {X} ability —
+    ///   X = the affordable amount (a non-zero useful size / sweep mv).</item>
+    /// </list>
+    /// </summary>
+    private int PickXForSource(GameContext ctx, ICard source)
+    {
+        // Only battlefield permanents WE control are activated-ability X sources;
+        // spells (in hand / on the stack) keep the legacy policy untouched so the
+        // bot's existing spell-X decisions (and the flip / masking surface that
+        // depends on them) are unchanged.
+        if (source is not Majik.Core.Cards.Permanent perm
+            || perm.Zone != Majik.Core.Zones.ZoneType.Battlefield
+            || !ReferenceEquals(perm.Controller, _self))
+        {
+            return _strategy.PickX(ctx, _self);
+        }
+
+        // Affordable X = total available mana minus the {X} ability's fixed
+        // (non-X) pips. The variable-X ability is the one whose ManaCostCost has
+        // HasX; fall back to PickX when none is found (defensive).
+        var xAbility = perm.Abilities
+            .OfType<Majik.Core.Abilities.ActivatedAbility>()
+            .FirstOrDefault(a => a.Costs
+                .OfType<Majik.Core.Costs.ManaCostCost>()
+                .Any(m => m.Cost.HasX));
+        if (xAbility is null) return _strategy.PickX(ctx, _self);
+
+        var fixedPips = xAbility.Costs
+            .OfType<Majik.Core.Costs.ManaCostCost>()
+            .Where(m => m.Cost.HasX)
+            .Sum(m => m.Cost.TotalValue); // {X} contributes 0; counts the {W}/{G}/… base.
+        var available = Majik.Bot.Search.LegalActionEnumerator.UntappedManaSources(_self);
+        var affordableX = Math.Max(0, available - fixedPips);
+
+        // Tameshi — aim X at the best reanimation target's mana value.
+        if (string.Equals(source.Name, "Tameshi, Reality Architect", StringComparison.Ordinal))
+        {
+            var bestTargetMv = _self.Zones.Graveyard.GetCards()
+                .Where(c => c.HasType(Majik.Core.Cards.Types.CardType.Artifact)
+                            || c.HasType(Majik.Core.Cards.Types.CardType.Enchantment))
+                .Select(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost).TotalValue)
+                .DefaultIfEmpty(0)
+                .Max();
+            return Math.Min(affordableX, bestTargetMv);
+        }
+
+        // Steel Hellkite / Lair of the Hydra / generic {X} ability — spend the
+        // affordable amount (a non-zero sweep mv / creature size).
+        return affordableX;
+    }
 
     public Task<int> ChooseModeAsync(
         GameContext ctx,

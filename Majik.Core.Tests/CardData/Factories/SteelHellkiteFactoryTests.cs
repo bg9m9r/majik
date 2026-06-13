@@ -223,6 +223,34 @@ public class SteelHellkiteFactoryTests
     }
 
     [Fact]
+    public void DestructionSweep_ReadsChosenX_FromLedger_WhenNoProvider()
+    {
+        // GAP 2 end-to-end: no xValueProvider wired (prod shape). The sweep now
+        // reads the per-activation X from the ledger (ActivatedAbility.ChosenX →
+        // ResolutionContext.ChosenX). X=3 destroys Bob's mv-3 nonland permanents;
+        // previously this resolved X=0 and destroyed nothing.
+        var bus = new EventBus();
+        var hellkite = SteelHellkiteFactory.Create(_alice, xValueProvider: null, eventBus: bus);
+        hellkite.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(hellkite);
+
+        var bobThree = MakePermanent(_bob, "Hill Giant", "{2}{R}", 3, 3); // mv 3 — destroyed.
+        var bobTwo = MakePermanent(_bob, "Grizzly Bears", "{1}{G}", 2, 2);  // mv 2 — survives.
+
+        bus.Publish(new CombatDamageDealtEvent(hellkite, _bob, amount: 3));
+
+        var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
+        sweep.SetChosenX(3);
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
+
+        _bob.Zones.Graveyard.GetCards().Should().Contain(bobThree,
+            "X=3 from the ledger destroys Bob's mv-3 permanent (was 0 before GAP 2)");
+        _bob.Zones.Battlefield.GetCards().Should().Contain(bobTwo,
+            "mv-2 does not match X=3");
+    }
+
+    [Fact]
     public void DestructionSweep_DoesNotDestroyTokens()
     {
         var bus = new EventBus();
