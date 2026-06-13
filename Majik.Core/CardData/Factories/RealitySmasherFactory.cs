@@ -2,9 +2,14 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Stack;
+using Majik.Core.Targeting;
 using Majik.Core.ValueObjects;
+using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -20,14 +25,43 @@ namespace Majik.Core.CardData.Factories;
 /// - 5/5 Creature — Eldrazi at {4}{C}.
 /// - Trample (CR 702.19) + Haste (CR 702.10) as <see cref="KeywordAbility"/>
 ///   markers — same wiring shape as Slickshot Show-Off's Flying + Haste pair.
-/// - <b>Printed "discard a card" Ward variant (CR 702.21)</b>: shipped as
-///   a <see cref="KeywordAbility"/>("Ward") marker so the discovery surface
-///   stays uniform with Kappa Cannoneer / other Ward carriers, plus a bound
-///   <see cref="WardEffect"/> via <see cref="BuildWardEffect"/> whose payment
-///   is a real <see cref="DiscardACardCost"/> (non-mana ward, CR 702.21c).
-///   <see cref="WardEffect.Resolve"/> counters an opponent's targeting
-///   spell/ability unless they discard a card — the discard rider is now
-///   functional, not structural-only.
+/// - <b>Ward—Discard a card (CR 702.21)</b>: shipped as a
+///   <see cref="KeywordAbility"/>("Ward") marker so the discovery surface
+///   stays uniform with Kappa Cannoneer / other Ward carriers, PLUS a real
+///   <see cref="TriggeredAbility"/> over <see cref="TargetsChosenEvent"/>
+///   (CR 702.21e — Ward is a triggered ability). The predicate gates on
+///   (a) the targeting spell being controlled by an OPPONENT of Reality
+///   Smasher's controller (CR 102.1 — "an opponent controls"), and
+///   (b) Reality Smasher ITSELF being among the chosen targets
+///   ("this creature becomes the target"). On resolution the bound
+///   <see cref="WardEffect"/> charges a real <see cref="DiscardACardCost"/>
+///   (CR 702.21c — a non-mana ward); if the opponent can't (or won't)
+///   discard, the spell is countered via
+///   <see cref="OracleSpellBinder.RemoveFromStack"/> (CR 701.5b — a
+///   countered spell goes to its owner's graveyard).
+///   Same TargetsChosenEvent attachment point + opponent-target predicate
+///   shape as <see cref="UnsettledMarinerFactory"/> / Leyline of Combustion,
+///   narrowed to "this creature" only and with a discard (rather than {1})
+///   ward cost.
+///
+/// ## Notes
+/// - <b>"Whenever this creature becomes the target of a SPELL" (not "or
+///   ability")</b>: the printed oracle only covers spells, so the predicate
+///   gates the targeting stack object on <see cref="Majik.Core.Spells.ISpell"/>.
+/// - <b>Auto-discard</b>: the "unless its controller discards a card" choice
+///   is auto-taken when the opponent has a card (pay-when-able, the rational
+///   play). Agent-driven "may discard" prompting is deferred behind the same
+///   queue as Ward / Mana Leak / the rest of the soft-counter family.
+///
+/// ## Wiring overloads
+/// - <see cref="Create(Player)"/> — shape only. The ward trigger is attached
+///   for dispatcher / structural + audit tests but not registered (no stack /
+///   trigger manager), so the counter is a no-op. This is the overload
+///   <see cref="NamedCardFactory"/> dispatches to.
+/// - <see cref="Create(Player, Majik.Core.Stack.Stack?, TriggerManager?)"/>
+///   — fully wired. The targeted-by trigger is registered so a matching
+///   <see cref="TargetsChosenEvent"/> surfaces as pending; the stack handle
+///   drives the counter on resolution.
 /// </summary>
 [CardName("Reality Smasher")]
 public static class RealitySmasherFactory
@@ -37,9 +71,7 @@ public static class RealitySmasherFactory
     public const int Power = 5;
     public const int Toughness = 5;
 
-    /// <summary>Printed Ward cost — non-mana (discard a card). Carried as a
-    /// documentation constant; see class xmldoc for the deferred wiring
-    /// gap.</summary>
+    /// <summary>Printed Ward cost — non-mana (discard a card).</summary>
     public const string WardDiscardCost = "Discard a card";
 
     /// <summary>
@@ -48,19 +80,39 @@ public static class RealitySmasherFactory
     /// "discard a card" rider (see <see cref="WardDiscardCost"/>), modelled
     /// via <see cref="DiscardACardCost"/>; the mana portion is
     /// <see cref="ManaCost.Zero"/>. <see cref="WardEffect.Resolve"/> charges
-    /// the discard when an opponent's spell/ability targets Reality Smasher
-    /// (same posture as <see cref="KappaCannoneerFactory.BuildWardEffect"/>'s
-    /// mana ward).
+    /// the discard when an opponent's spell targets Reality Smasher (same
+    /// posture as <see cref="KappaCannoneerFactory.BuildWardEffect"/>'s mana
+    /// ward).
     /// </summary>
     public static WardEffect BuildWardEffect(Creature card) =>
         new(card, new DiscardACardCost());
 
     /// <summary>
-    /// Construct Reality Smasher. Trample + Haste + Ward keyword markers
-    /// attached; the Ward trigger / non-mana discard rider is structural-
-    /// only (see class xmldoc).
+    /// Construct Reality Smasher with no live wiring. Trample + Haste + Ward
+    /// keyword markers and the ward <see cref="TriggeredAbility"/> are attached
+    /// to the card shape; the trigger is not registered (no stack / trigger
+    /// manager) so the counter is a no-op. This is the overload
+    /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) =>
+        Create(owner, stack: null, triggers: null);
+
+    /// <summary>
+    /// Construct Reality Smasher with optional runtime services.
+    /// </summary>
+    /// <param name="owner">Card owner / initial controller.</param>
+    /// <param name="stack">Live stack — required for the ward to remove the
+    /// targeting spell on resolution via
+    /// <see cref="OracleSpellBinder.RemoveFromStack"/>. May be null for shape
+    /// tests (the trigger still fires + resolves harmlessly).</param>
+    /// <param name="triggers">TriggerManager — when supplied the targeted-by
+    /// trigger is registered so a matching <see cref="TargetsChosenEvent"/>
+    /// surfaces as pending. May be null — the trigger is still attached to the
+    /// card shape.</param>
+    public static Creature Create(
+        Player owner,
+        Majik.Core.Stack.Stack? stack,
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -75,14 +127,112 @@ public static class RealitySmasherFactory
         card.SetController(owner);
 
         // CR 702.19 — Trample. CR 702.10 — Haste. CR 702.21 — Ward
-        // (printed: "discard a card"). All shipped as keyword markers
-        // consumed by CombatValidator / CombatAbilities / the future
-        // Ward-trigger primitive. Same wiring posture as Kappa Cannoneer
-        // (Ward marker + standalone WardEffect helper).
+        // (printed: "discard a card"). Trample/Haste are keyword markers
+        // consumed by CombatValidator / CombatAbilities; the Ward marker
+        // pairs with the real triggered ability wired below.
         card.AddAbility(new KeywordAbility("Trample", card, owner));
         card.AddAbility(new KeywordAbility("Haste", card, owner));
         card.AddAbility(new KeywordAbility("Ward", card, owner));
 
+        // ----------------------------------------------------------------
+        // Ward—Discard a card — CR 702.21e / 109.5 / 701.5.
+        //   "Whenever this creature becomes the target of a spell an opponent
+        //    controls, counter that spell unless its controller discards a
+        //    card."
+        //
+        // Fires on TargetsChosenEvent where:
+        //   (a) the targeting stack object is a SPELL (printed "a spell",
+        //       NOT "a spell or ability") whose controller is an OPPONENT of
+        //       Reality Smasher's controller (CR 102.1).
+        //   (b) Reality Smasher ITSELF is among the chosen targets ("this
+        //       creature becomes the target", CR 702.21e).
+        // ----------------------------------------------------------------
+        IStackObject? capturedSource = null;
+        var ward = BuildWardEffect(card);
+
+        var condition = new EventTriggerCondition<TargetsChosenEvent>((e, _) =>
+        {
+            var controller = card.Controller ?? owner;
+
+            // (a) "a spell an opponent controls" (CR 102.1) — the targeting
+            //     stack object must be a spell, controlled by an opponent.
+            if (e.StackObject is not Majik.Core.Spells.ISpell) return false;
+            var sourceController = e.StackObject.Controller;
+            if (sourceController == null) return false;
+            if (ReferenceEquals(sourceController, controller)) return false;
+
+            // (b) "this creature becomes the target" — Reality Smasher itself
+            //     must be one of the chosen targets.
+            foreach (var t in e.Targets)
+            {
+                if (TargetIsThisCreature(t, card))
+                {
+                    capturedSource = e.StackObject;
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        var wardEffect = new Effect(
+            $"{CardName} — counter that spell unless its controller discards a card",
+            () =>
+            {
+                var source = capturedSource;
+                capturedSource = null;
+                if (source == null || stack == null) return;
+
+                // CR 608.2b — recheck the targeting spell is still on the stack
+                // at resolution. If it already left, nothing to counter.
+                if (!stack.GetAll().Contains(source)) return;
+
+                var caster = source.Controller;
+                if (caster == null) return;
+
+                // CR 702.21f — "unless its controller discards a card." The
+                // bound WardEffect charges the DiscardACardCost when the caster
+                // can (and, in v1, auto-chooses to) pay. Resolve returns true
+                // when the spell should be COUNTERED (cost not paid).
+                if (!ward.Resolve(caster)) return; // discarded → not countered.
+
+                // CR 701.5b — counter the spell. RemoveFromStack returns false
+                // for an uncounterable spell (it stays put).
+                if (!OracleSpellBinder.RemoveFromStack(stack, source)) return;
+
+                // CR 701.5b — a countered SPELL goes to its owner's graveyard.
+                if (source is Majik.Core.Spells.ISpell spell && spell.Card is Card spellCard)
+                {
+                    spellCard.SetZone(ZoneType.Graveyard);
+                }
+            });
+
+        var trigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: condition,
+            effects: new IEffect[] { wardEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(trigger);
+        triggers?.RegisterTriggeredAbility(trigger);
+
         return card;
+    }
+
+    /// <summary>
+    /// CR 702.21e — is <paramref name="target"/> Reality Smasher itself? True
+    /// when the target is the permanent/card shape of <paramref name="card"/>.
+    /// </summary>
+    private static bool TargetIsThisCreature(ITarget target, Creature card)
+    {
+        if (target is not Target concrete) return false;
+
+        return concrete.TargetType switch
+        {
+            TargetType.Permanent or TargetType.Card =>
+                ReferenceEquals(concrete.TargetObject, card),
+            _ => false,
+        };
     }
 }
