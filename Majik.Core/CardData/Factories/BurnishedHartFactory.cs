@@ -73,9 +73,22 @@ public static class BurnishedHartFactory
     /// basics to battlefield tapped" activated ability is attached
     /// structurally.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, effects: null);
+
+    /// <summary>
+    /// Effects-aware overload the source-gen routes on the production
+    /// <see cref="Majik.Core.Api.GameFacade"/> build (Festival-Crasher
+    /// pattern). Threads <c>effects.EventBus</c> into the self-sacrifice so
+    /// paying the sac cost publishes a
+    /// <see cref="Majik.Core.Events.PermanentSacrificedEvent"/> (CR 701.16a),
+    /// the seam aristocrat payoffs read. Null preserves the legacy
+    /// publish-nothing posture.
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
+
+        var eventBus = effects?.EventBus;
 
         var card = new Creature(
             name: CardName,
@@ -105,7 +118,7 @@ public static class BurnishedHartFactory
             async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                SacrificeSelf(card, owner, controller);
+                SacrificeSelf(card, owner, controller, eventBus);
                 await TutorUpToTwoBasicsToBattlefieldTappedAsync(controller, ctx).ConfigureAwait(false);
             });
 
@@ -115,7 +128,11 @@ public static class BurnishedHartFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{3}"),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — thread the bus into the SAC COST so the LIVE
+                // activation path publishes PermanentSacrificedEvent (the
+                // closure's SacrificeSelf is a bus-aware fallback for the
+                // resolve-only dispatcher/test path).
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { tutorEffect });
 
@@ -126,11 +143,23 @@ public static class BurnishedHartFactory
 
     /// <summary>
     /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent.
+    /// owner's graveyard. Idempotent. When <paramref name="eventBus"/> is
+    /// supplied (the prod effects-aware build) the move routes through
+    /// <see cref="Primitives.Fx.Sacrifice(Cards.ICard, Player, Events.IEventBus)"/>,
+    /// publishing a <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+    /// (CR 701.16a) crediting <paramref name="controller"/>. Null bus = bare
+    /// owner-routed move (dispatcher / shape test path).
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner, Player controller)
+    private static void SacrificeSelf(Creature card, Player owner, Player controller, Events.IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Primitives.Fx.Sacrifice(card, controller, eventBus);
+            return;
+        }
+
         controller.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);

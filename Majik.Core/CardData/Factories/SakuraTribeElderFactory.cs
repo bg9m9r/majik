@@ -41,13 +41,15 @@ namespace Majik.Core.CardData.Factories;
 ///   supertype + Land card type, so Forest / Island / Plains / Mountain /
 ///   Swamp / Wastes are all legal targets but a dual or fetch is not.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Sacrifice payment side effects</b>: the engine's generic
-///   <see cref="AdditionalCost"/> sacrifice payment is currently a no-op
-///   stub. The effect closure performs the zone move directly so behaviour
-///   is observable — same posture as Caustic Caterpillar / Expedition Map /
-///   Pyrite Spellbomb. Remove the explicit move-to-graveyard once
-///   <see cref="AdditionalCost.Pay"/> performs the sacrifice itself.
+/// ## Sacrifice-event bus (class-(b) pay-down)
+/// The effects-aware <see cref="Create(Player, Effects.ContinuousEffectsService)"/>
+/// overload (source-gen-routed on the prod GameFacade build, Festival-Crasher
+/// pattern) threads <c>effects.EventBus</c> into BOTH the sac
+/// <see cref="AdditionalCost"/> (live activation publishes
+/// <see cref="Majik.Core.Events.PermanentSacrificedEvent"/> via
+/// <see cref="AdditionalCost.Pay"/>) AND the bus-aware <c>SacrificeSelf</c>
+/// fallback (resolve-only dispatcher/test path). CR 701.16a — one publish per
+/// path. Aristocrat "whenever a/an [opponent] sacrifices…" payoffs now fire.
 /// - <b>Sorcery-speed-only flag</b>: Sakura-Tribe Elder's sacrifice ability
 ///   has no sorcery-speed restriction printed (CR 307 — STE is a creature,
 ///   not a Saga); the activation timing follows ActionValidator's standard
@@ -70,9 +72,23 @@ public static class SakuraTribeElderFactory
     /// <paramref name="owner"/>. The single "sacrifice: tutor a basic land
     /// to battlefield tapped" activated ability is attached structurally.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, effects: null);
+
+    /// <summary>
+    /// Effects-aware overload the source-gen routes on the production
+    /// <see cref="Majik.Core.Api.GameFacade"/> build (Festival-Crasher
+    /// pattern). The only thing it adds over <see cref="Create(Player)"/> is
+    /// threading <c>effects.EventBus</c> into the self-sacrifice so paying
+    /// the cost publishes a <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+    /// (CR 701.16a) — the seam aristocrat "whenever a/an opponent sacrifices…"
+    /// payoffs read. A null <paramref name="effects"/> (or a service with no
+    /// wired bus) preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
+
+        var eventBus = effects?.EventBus;
 
         var card = new Creature(
             name: CardName,
@@ -98,7 +114,7 @@ public static class SakuraTribeElderFactory
             async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                SacrificeSelf(card, owner, controller);
+                SacrificeSelf(card, owner, controller, eventBus);
                 await TutorBasicLandToBattlefieldTappedAsync(controller, ctx)
                     .ConfigureAwait(false);
             });
@@ -108,7 +124,12 @@ public static class SakuraTribeElderFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — thread the bus into the SAC COST so the LIVE
+                // activation path (AbilityActivator → CostPayment → cost.Pay)
+                // publishes PermanentSacrificedEvent. The closure's
+                // SacrificeSelf is a bus-aware fallback for the resolve-only
+                // dispatcher/test path where the cost was never pre-paid.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { tutorEffect });
 
@@ -119,14 +140,29 @@ public static class SakuraTribeElderFactory
 
     /// <summary>
     /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent. Mirrors the closure used by
-    /// <see cref="CausticCaterpillarFactory"/> / Expedition Map / Mind Stone
-    /// — the generic <see cref="AdditionalCost.Pay"/> sacrifice path is a
-    /// no-op stub.
+    /// owner's graveyard. Idempotent. When <paramref name="eventBus"/> is
+    /// supplied (the prod effects-aware build) the move routes through
+    /// <see cref="Primitives.Fx.Sacrifice(Cards.ICard, Player, Events.IEventBus)"/>,
+    /// which publishes a <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+    /// (CR 701.16a) crediting <paramref name="controller"/> as the sacrificing
+    /// player — the seam aristocrat payoffs read. With no bus it falls back to
+    /// the bare owner-routed zone move (publish-nothing, dispatcher / shape
+    /// test path).
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner, Player controller)
+    private static void SacrificeSelf(Creature card, Player owner, Player controller, Events.IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            // CR 701.16a — the sacrificing player is the permanent's
+            // controller; Fx.Sacrifice snapshots token-ness, routes the move
+            // (Sacrifice reason — bypasses Indestructible / regeneration), and
+            // publishes PermanentSacrificedEvent after the move.
+            Primitives.Fx.Sacrifice(card, controller, eventBus);
+            return;
+        }
+
         var holder = controller;
         holder.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);

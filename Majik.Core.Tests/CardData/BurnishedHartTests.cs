@@ -49,6 +49,34 @@ public class BurnishedHartTests
     }
 
     [Fact]
+    public void SacSelf_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // class-(b) sac-bus pay-down (mirrors Sakura-Tribe Elder): the
+        // effects-aware Create(Player, ContinuousEffectsService) overload the
+        // source-gen routes on the prod GameFacade build threads
+        // effects.EventBus so the self-sacrifice publishes
+        // PermanentSacrificedEvent (CR 701.16a) — aristocrat-payoff seam.
+        var bus = new global::Majik.Core.Events.EventBus();
+        var effects = new global::Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var captured = new List<global::Majik.Core.Events.PermanentSacrificedEvent>();
+        bus.Subscribe<global::Majik.Core.Events.PermanentSacrificedEvent>(captured.Add);
+
+        var built = NamedCardFactory.Create("Burnished Hart", _alice, effects);
+        built.Should().BeOfType<Creature>();
+        var hart = (Creature)built;
+        _alice.Zones.Battlefield.AddCard(hart);
+        hart.SetZone(ZoneType.Battlefield);
+
+        var sac = hart.Abilities.OfType<ActivatedAbility>().Single();
+        sac.Resolve();
+
+        captured.Should().ContainSingle()
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(hart);
+    }
+
+    [Fact]
     public void NamedCardFactory_Dispatches_BurnishedHart()
     {
         var card = NamedCardFactory.Create("Burnished Hart", _alice);

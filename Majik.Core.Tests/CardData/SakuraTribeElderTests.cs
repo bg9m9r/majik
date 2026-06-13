@@ -62,6 +62,47 @@ public class SakuraTribeElderTests
     }
 
     // -----------------------------------------------------------------------
+    // Sacrifice-event bus threading (class-(b) pay-down)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SacSelf_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // class-(b) sac-bus pay-down: Sakura-Tribe Elder's ONLY routed
+        // overload was Create(Player) with no IEventBus, so its self-sacrifice
+        // published no PermanentSacrificedEvent (CR 701.16a) and aristocrat
+        // "whenever an opponent sacrifices…" payoffs never saw it. The new
+        // effects-aware Create(Player, ContinuousEffectsService) overload —
+        // which the source-gen routes on the prod GameFacade build
+        // (NamedCardFactory.Create(name, owner, effects)) — threads
+        // effects.EventBus to Fx.Sacrifice(perm, player, bus) so the event
+        // now fires. This drives the card EXACTLY as prod does.
+        var bus = new global::Majik.Core.Events.EventBus();
+        var effects = new global::Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var captured = new List<global::Majik.Core.Events.PermanentSacrificedEvent>();
+        bus.Subscribe<global::Majik.Core.Events.PermanentSacrificedEvent>(captured.Add);
+
+        // Prod dispatch path: GameFacade.BuildDeckCard → NamedCardFactory
+        // .Create(name, owner, effects) → effects-aware overload.
+        var built = NamedCardFactory.Create("Sakura-Tribe Elder", _alice, effects);
+        built.Should().BeOfType<Creature>();
+        var elder = (Creature)built;
+        _alice.Zones.Battlefield.AddCard(elder);
+        elder.SetZone(ZoneType.Battlefield);
+
+        var sac = elder.Abilities.OfType<ActivatedAbility>().Single();
+        sac.Resolve();
+
+        captured.Should().ContainSingle(
+            "the prod effects-aware dispatch threads the bus so the self-sacrifice "
+            + "publishes PermanentSacrificedEvent (CR 701.16a)")
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(elder);
+        elder.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    // -----------------------------------------------------------------------
     // Ability shape
     // -----------------------------------------------------------------------
 
