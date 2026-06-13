@@ -7,6 +7,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
@@ -76,14 +77,23 @@ namespace Majik.Core.CardData;
 ///     Then you may have it become a 0/0 Elemental creature" — the animate is
 ///     conditional on a prior counter step (same posture
 ///     <see cref="ManlandBinder"/> defers).</item>
-///   <item><b>Count-linked / attack-rider token riders.</b> Treasure Vault's
-///     "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens" NOW BINDS
-///     here via <see cref="BindCreateXTreasures"/> — the count is the
-///     activation's X (read at resolution off the per-activation X ledger,
-///     <see cref="Majik.Core.Abilities.ResolutionContext.ChosenX"/>, GAP 2).
-///     Dalkovan Encampment's "Whenever you attack this turn …" delayed token
-///     rider still defers (no attack-rider / delayed-trigger token primitive on
-///     the binder path).</item>
+///   <item><b>Count-linked / attack-rider / richer-shape token riders — ALL NOW
+///     BIND here.</b> Treasure Vault's "{X}{X}, {T}, Sacrifice this land: Create
+///     X Treasure tokens" binds via <see cref="BindCreateXTreasures"/> — the
+///     count is the activation's X (read at resolution off the per-activation X
+///     ledger, <see cref="Majik.Core.Abilities.ResolutionContext.ChosenX"/>,
+///     GAP 2). Mirrex's "{3}, {T}: Create a 1/1 colorless Phyrexian Mite artifact
+///     creature token with toxic 1 and \"This token can't block.\"" binds via
+///     <see cref="BindCreateMiteToken"/> (the richer artifact-creature + toxic +
+///     can't-block shape — the can't-block rider is now enforced at block
+///     declaration, CR 509.1a). Dalkovan Encampment's "{2}{W}, {T}: Whenever you
+///     attack this turn, create two 1/1 red Warrior creature tokens …" binds via
+///     <see cref="BindAttackRiderTokens"/> — the activated ability's resolution
+///     installs a one-turn "whenever you attack" trigger (CR 508.1f) auto-cleaned
+///     at the next end step (CR 603.7). v1 defers only the printed "tapped and
+///     attacking" combat-insertion + per-token EOT sacrifice (same gap as Geist
+///     of Saint Traft / Goblin Rabblemaster — no mid-combat creature insertion
+///     surface).</item>
 ///   <item><b>Desert</b> — "{T}: deal 1 damage to target attacking creature.
 ///     Activate only during the end of combat step" — fully modelled by the
 ///     bespoke <see cref="Factories.DesertFactory"/>: the "end of combat step"
@@ -164,6 +174,29 @@ public static class LandActivatedAbilityBinder
     // shape has no fixed-token spec the simple-token path can parse.
     private static readonly Regex CreateXTreasures = new(
         @"^Create\s+X\s+Treasure\s+tokens?\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Create a 1/1 colorless Phyrexian Mite artifact creature token with toxic 1
+    // and \"This token can't block.\"" — Mirrex's richer-shape token (CR 111.1 /
+    // 111.4). The artifact-creature + toxic + can't-block riders make the simple
+    // CreateSimpleToken path reject it (TryParseTokenSpec bails on the non-subtype
+    // words "artifact"/"with"/"toxic"), so it gets its own recognizer. We capture
+    // the P/T, the toxic arg, and (implicitly) the can't-block rider.
+    private static readonly Regex CreateMiteToken = new(
+        @"^Create\s+a\s+(?<p>\d+)/(?<t>\d+)\s+colorless\s+Phyrexian\s+Mite\s+artifact\s+creature\s+token" +
+        @"(?:\s+with\s+toxic\s+(?<toxic>\d+))?" +
+        @"(?<cantblock>.*?can't\s+block\.?)?",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Whenever you attack this turn, create two 1/1 red Warrior creature tokens
+    // that are tapped and attacking. Sacrifice them at the beginning of the next
+    // end step." — Dalkovan Encampment's attack-rider delayed-token effect. The
+    // activated ability's RESOLUTION installs a one-turn "whenever a creature you
+    // control attacks" trigger that mints N P/T <color> <Subtype> tokens
+    // (CR 508.1f / CR 603.7). Captures the count word, P/T, colour, subtype.
+    private static readonly Regex AttackRiderTokens = new(
+        @"^Whenever\s+you\s+attack\s+this\s+turn,\s*create\s+(?<count>a|one|two|three)\s+" +
+        @"(?<p>\d+)/(?<t>\d+)\s+(?<color>white|blue|black|red|green)\s+(?<subtype>[A-Za-z]+)\s+creature\s+tokens?\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // "This land deals N damage to each opponent."
@@ -298,7 +331,7 @@ public static class LandActivatedAbilityBinder
             // skipped — Channel is a deferred family (no discard-activation seam).
             if (!cost.Contains("{T}", StringComparison.OrdinalIgnoreCase)) continue;
 
-            if (BindLine(land, controller, effects, cost, effectText))
+            if (BindLine(land, controller, effects, triggers, cost, effectText))
                 boundAny = true;
         }
 
@@ -530,7 +563,7 @@ public static class LandActivatedAbilityBinder
 
     private static bool BindLine(
         Land land, Player controller, ContinuousEffectsService effects,
-        string cost, string effectText)
+        TriggerManager? triggers, string cost, string effectText)
     {
         // --- Scry (Castle Vantress) ---------------------------------------
         if (ScryEffect.Match(effectText) is { Success: true } sm)
@@ -619,6 +652,25 @@ public static class LandActivatedAbilityBinder
         if (CreateXTreasures.IsMatch(effectText))
         {
             BindCreateXTreasures(land, controller, cost);
+            return true;
+        }
+
+        // --- Create a Phyrexian Mite token (Mirrex) — richer token shape ----
+        //     (artifact-creature + toxic + can't-block). Checked before the
+        //     simple-token path (which rejects the richer riders).
+        if (CreateMiteToken.Match(effectText) is { Success: true } mite)
+        {
+            BindCreateMiteToken(land, controller, cost, mite);
+            return true;
+        }
+
+        // --- Attack-rider delayed token trigger (Dalkovan Encampment) -------
+        //     "{cost}: Whenever you attack this turn, create N P/T <color>
+        //     <Subtype> tokens …". The activated ability installs a one-turn
+        //     attack trigger with the live TriggerManager (CR 508.1f / 603.7).
+        if (AttackRiderTokens.Match(effectText) is { Success: true } rider)
+        {
+            BindAttackRiderTokens(land, controller, cost, triggers, rider);
             return true;
         }
 
@@ -1075,6 +1127,159 @@ public static class LandActivatedAbilityBinder
         land.AddAbility(new ActivatedAbility(
             source: land, controller: controller, costs: costs, effects: new IEffect[] { effect }));
     }
+
+    // ----------------------------------------------------------------------
+    // Create a Phyrexian Mite token — Mirrex
+    // "{3}, {T}: Create a 1/1 colorless Phyrexian Mite artifact creature token
+    //  with toxic 1 and \"This token can't block.\"" (CR 111.1 / 111.4).
+    //
+    // The richer token shape the simple-token path can't carry: the Mite is an
+    // ARTIFACT creature (CR 111.1 — Artifact stamped additively after the
+    // Creature shell), colourless (empty colour override), and carries two
+    // markers — toxic N (CR 702.180, parameterised KeywordAbility honoured by
+    // the damage system) and "can't block" (CR 509.1a, a "CantBlock" KeywordAbility
+    // now enforced at block-declaration by CombatValidator via
+    // CombatAbilities.HasCantBlock). Minted through the TokenCreationIntent path
+    // so token-doublers (Doubling Season) can rewrite the count.
+    // ----------------------------------------------------------------------
+    private static void BindCreateMiteToken(Land land, Player controller, string cost, Match m)
+    {
+        var costs = BuildCosts(land, cost, out _);
+        var power = int.Parse(m.Groups["p"].Value);
+        var toughness = int.Parse(m.Groups["t"].Value);
+        var toxic = m.Groups["toxic"].Success ? int.Parse(m.Groups["toxic"].Value) : 0;
+        var cantBlock = m.Groups["cantblock"].Success
+            && m.Groups["cantblock"].Value.Length > 0;
+
+        var effect = new Effect(
+            $"{land.Name}: create a {power}/{toughness} colorless Phyrexian Mite artifact creature token",
+            () =>
+            {
+                var ctrl = land.Controller ?? controller;
+                var spec = new TokenFactory.TokenSpec(
+                    Name: "Phyrexian Mite",
+                    Power: power, Toughness: toughness,
+                    Subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Mite },
+                    Keywords: null,
+                    Colors: Array.Empty<ManaColor>());
+
+                var tokens = TokenFactory.CreateOnBattlefield(
+                    spec, ctrl, count: 1,
+                    zones: ZoneServiceRegistry.Get(ctrl),
+                    replacements: null);
+
+                foreach (var token in tokens)
+                {
+                    // CR 111.1 — Artifact stamped additively (artifact creature).
+                    token.AddCardType(CardType.Artifact);
+                    if (toxic > 0)
+                        token.AddAbility(new KeywordAbility("toxic", token, ctrl, arg: toxic));
+                    if (cantBlock)
+                        token.AddAbility(new KeywordAbility("CantBlock", token, ctrl));
+                }
+            });
+
+        land.AddAbility(new ActivatedAbility(
+            source: land, controller: controller, costs: costs, effects: new IEffect[] { effect }));
+    }
+
+    // ----------------------------------------------------------------------
+    // Attack-rider delayed token trigger — Dalkovan Encampment
+    // "{2}{W}, {T}: Whenever you attack this turn, create two 1/1 red Warrior
+    //  creature tokens that are tapped and attacking. Sacrifice them at the
+    //  beginning of the next end step." (CR 508.1f / CR 603.7).
+    //
+    // The activated ability's RESOLUTION installs a one-turn "whenever a creature
+    // you control attacks" TriggeredAbility with the live TriggerManager that
+    // mints N P/T <color> <Subtype> tokens per attack, plus a companion
+    // DelayedTriggeredAbility (CR 603.7) that unregisters the attack trigger at
+    // the start of the next end step (modelling the "this turn" duration). When
+    // no TriggerManager is threaded (shape-only build) the activation is an inert
+    // no-op — same posture as DalkovanEncampmentFactory.
+    //
+    // v1 deferrals (mirroring DalkovanEncampmentFactory): the printed tokens enter
+    // "tapped and attacking" and are sacrificed at the next end step — the engine
+    // has no surface to insert a creature into an in-progress combat mid-trigger
+    // (same gap as Geist of Saint Traft's Angel / Goblin Rabblemaster), so v1
+    // tokens land on the battlefield untapped, not in an attacker slot, and the
+    // per-token "sacrifice at next end step" rider is not wired. The card-advantage
+    // signal — N tokens per attack — binds.
+    // ----------------------------------------------------------------------
+    private static void BindAttackRiderTokens(
+        Land land, Player controller, string cost, TriggerManager? triggers, Match m)
+    {
+        var costs = BuildCosts(land, cost, out _);
+        var count = ParseCountWord(m.Groups["count"].Value);
+        var power = int.Parse(m.Groups["p"].Value);
+        var toughness = int.Parse(m.Groups["t"].Value);
+        TryParseColor(m.Groups["color"].Value, out var color);
+        Enum.TryParse<CardSubtype>(m.Groups["subtype"].Value, ignoreCase: true, out var subtype);
+
+        var spec = new TokenFactory.TokenSpec(
+            Name: subtype.ToString(),
+            Power: power, Toughness: toughness,
+            Subtypes: new[] { subtype },
+            Keywords: null,
+            Colors: new[] { color });
+
+        var effect = new Effect(
+            $"{land.Name}: install this-turn attack trigger → {count} {power}/{toughness} {color} {subtype} tokens per attack",
+            () =>
+            {
+                if (triggers == null) return;
+                var ctrl = land.Controller ?? controller;
+
+                var tokenEffect = new Effect(
+                    $"{land.Name}: create {count} {power}/{toughness} {color} {subtype} tokens (attack trigger)",
+                    () =>
+                    {
+                        var c = land.Controller ?? controller;
+                        TokenFactory.CreateOnBattlefield(
+                            spec, c, count: count,
+                            zones: ZoneServiceRegistry.Get(c),
+                            replacements: null);
+                    });
+
+                var attackTrigger = new TriggeredAbility(
+                    source: land,
+                    controller: ctrl,
+                    condition: new EventTriggerCondition<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(
+                        (e, _) => ReferenceEquals(e.Attacker.Controller, land.Controller ?? controller)),
+                    effects: new IEffect[] { tokenEffect },
+                    activeZones: new[] { ZoneType.Battlefield });
+
+                triggers.RegisterTriggeredAbility(attackTrigger);
+
+                // CR 603.7 — unregister the attack trigger at the next end step,
+                // modelling the printed "this turn" duration.
+                var resolvedAt = LogicalClockScope.Current.NextTimestamp();
+                var cleanup = new DelayedTriggeredAbility(
+                    source: land,
+                    controller: ctrl,
+                    condition: new EventTriggerCondition<StepStartedEvent>(
+                        (e, _) => e.StepType == Majik.Core.StateMachine.StepStateType.End
+                                  && e.Timestamp > resolvedAt),
+                    effects: new IEffect[]
+                    {
+                        new Effect(
+                            $"{land.Name}: unregister attack-token trigger (EOT cleanup)",
+                            () => triggers.UnregisterTriggeredAbility(attackTrigger)),
+                    });
+                triggers.RegisterDelayed(cleanup);
+            });
+
+        land.AddAbility(new ActivatedAbility(
+            source: land, controller: controller, costs: costs, effects: new IEffect[] { effect }));
+    }
+
+    private static int ParseCountWord(string word) =>
+        word.ToLowerInvariant() switch
+        {
+            "a" or "one" => 1,
+            "two" => 2,
+            "three" => 3,
+            _ => 1,
+        };
 
     // ----------------------------------------------------------------------
     // Destroy target [nonbasic] land [an opponent controls] — Ghost Quarter /

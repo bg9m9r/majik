@@ -74,11 +74,11 @@ namespace Majik.Core.CardData.Factories;
 ///   damage system" per <see cref="Parsing.KeywordRegistry"/> — the marker is
 ///   recorded for inspection, same posture as every other toxic source.
 /// - <b>"This token can't block."</b> is recorded as a <see cref="KeywordAbility"/>
-///   marker (<c>"CantBlock"</c>). The combat block-legality path
-///   (<see cref="Majik.Core.Combat.BlockLegality.CanBlock"/>) does not yet read
-///   a blocker-side "can't block" restriction, so this is observable but not
-///   yet enforced — a deliberate v1 deferral (the engine has no blocker-side
-///   can't-block primitive), not a half-built mechanic.
+///   marker (<c>"CantBlock"</c>) and NOW ENFORCED at block declaration: the
+///   combat block-legality path (<see cref="Majik.Core.Combat.CombatValidator"/>)
+///   reads the intrinsic restriction via
+///   <see cref="Majik.Core.Combat.CombatAbilities.HasCantBlock"/> (CR 509.1a), so
+///   the Mite can't be declared as a blocker.
 /// - <b>Agent prompt for the any-colour pip</b>: reuses the Lotus Cobra /
 ///   Crumbling Vestige deferral — defaults to Green.
 /// </summary>
@@ -215,9 +215,9 @@ public static class MirrexFactory
         // semantics are handled by the damage system per KeywordRegistry.
         token.AddAbility(new KeywordAbility("toxic", token, controller, arg: TokenToxic));
 
-        // "This token can't block." — recorded as a marker (CR 509.1a). The
-        // block-legality path does not yet read a blocker-side can't-block
-        // restriction; see the factory Notes (v1 deferral).
+        // "This token can't block." — recorded as a "CantBlock" marker (CR 509.1a)
+        // and enforced at block declaration by CombatValidator via
+        // CombatAbilities.HasCantBlock.
         token.AddAbility(new KeywordAbility("CantBlock", token, controller));
 
         return token;

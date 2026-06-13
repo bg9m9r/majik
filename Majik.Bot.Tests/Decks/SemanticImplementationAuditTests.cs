@@ -376,15 +376,21 @@ public class SemanticImplementationAuditTests
             "Hive of the Eye Tyrant",        // quoted "exile target card from defending player's GY" attack trigger
             "Crawling Barrens",              // counters-then-conditional-animate (no fixed-subtype animate)
 
-            // -- Token riders with no generic primitive on the binder path. --
+            // -- Token riders — ALL NOW BIND in prod, removed from this allowlist. --
             // Treasure Vault ("{X}{X}, {T}, Sacrifice this land: Create X
-            // Treasure tokens") is NO LONGER deferred: the count-linked Treasure
-            // mint now binds in prod via LandActivatedAbilityBinder
+            // Treasure tokens") binds via LandActivatedAbilityBinder
             // (BindCreateXTreasures, reading the per-activation X off
-            // ResolutionContext.ChosenX), so it stops tripping the detector and
-            // is removed from this allowlist.
-            "Dalkovan Encampment",           // delayed "Whenever you attack this turn, create two tapped+attacking Warriors" rider
-            "Mirrex",                         // token carries toxic 1 + a quoted "can't block" ability (richer token shape)
+            // ResolutionContext.ChosenX). Mirrex's "{3}, {T}: Create a 1/1
+            // colorless Phyrexian Mite artifact creature token with toxic 1 and
+            // \"This token can't block.\"" binds via BindCreateMiteToken (richer
+            // artifact-creature + toxic + can't-block shape; the can't-block rider
+            // is now enforced at block declaration, CR 509.1a). Dalkovan
+            // Encampment's "{2}{W}, {T}: Whenever you attack this turn, create two
+            // 1/1 red Warrior creature tokens …" binds via BindAttackRiderTokens
+            // (the activated ability installs a one-turn attack trigger, CR 508.1f /
+            // 603.7). All three stop tripping the create-token detector and are
+            // removed from this allowlist; the only deferral left is the printed
+            // "tapped and attacking" combat insertion (no mid-combat surface).
 
             // -- Other residual deferrals. --
             "Demolition Field",              // destroy binds; the both-players "search for a basic land" rider is deferred

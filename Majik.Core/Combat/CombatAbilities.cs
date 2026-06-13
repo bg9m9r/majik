@@ -24,6 +24,17 @@ public static class CombatAbilities
     public static bool HasDefender(Creature c) => Has(c, "Defender");
 
     /// <summary>
+    /// CR 509.1a — true when <paramref name="c"/> has an intrinsic "can't block"
+    /// restriction (recorded as a <c>"CantBlock"</c> <see cref="KeywordAbility"/>
+    /// marker on the creature itself, e.g. Mirrex's Phyrexian Mite token's quoted
+    /// "This token can't block."). Distinct from the per-turn effect-installed
+    /// <see cref="CombatRestriction.CannotBlock"/> (Falter / Magmatic Chasm) which
+    /// CombatValidator checks separately — this is the printed/granted static.
+    /// A creature with this restriction can't be declared as a blocker.
+    /// </summary>
+    public static bool HasCantBlock(Creature c) => Has(c, "CantBlock");
+
+    /// <summary>
     /// CR 702.90a — Wither. A source with wither deals damage to creatures
     /// in the form of -1/-1 counters (CR 702.90b). Read at every
     /// creature-damage application site so the -1/-1-counter form is applied
