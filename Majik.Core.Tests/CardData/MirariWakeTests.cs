@@ -26,8 +26,12 @@ namespace Majik.Core.Tests.CardData;
 /// - Opponent's creatures untouched.
 /// - LTB lifts the bonus.
 /// - Two copies stack additively.
-///
-/// Mana-tap doubling is deferred (see factory xmldoc) — not covered here.
+/// - Mana-tap doubling (CR 605.1b): the trigger fires when YOU tap a land
+///   for mana and re-adds one mana of the produced type; a non-land mana
+///   source or an opponent's tap does not trigger.
+/// - Prod-path guard: the effects-aware source-gen dispatch
+///   (<see cref="NamedCardFactory"/>.Create(name, owner, effects)) binds the
+///   mana-doubling trigger — the path <c>GameFacade.BuildDeckCard</c> uses.
 /// </summary>
 public class MirariWakeTests
 {
@@ -165,6 +169,67 @@ public class MirariWakeTests
         var tapTrigger = wake.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
         tapTrigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
+    }
+
+    /// <summary>
+    /// Prod-path guard (CR 605.1b). The production deck build
+    /// (<c>GameFacade.BuildDeckCard</c>) materialises a factory-backed card via
+    /// <c>NamedCardFactory.Create(name, owner, effects)</c>, which the source
+    /// generator routes to <see cref="MirariWakeFactory"/>'s
+    /// <c>Create(Player, ContinuousEffectsService)</c> overload. That overload
+    /// both registers the anthem AND attaches the mana-doubling trigger,
+    /// resolving the ambient per-game <see cref="TriggerManager"/> from
+    /// <see cref="TriggerManagerRegistry"/>. This asserts the trigger is BOTH
+    /// resident on the card shape and registered with the live manager on the
+    /// prod path — not just the bare <c>Create(Player)</c> path — so it actually
+    /// fires in a real match (the same posture as Festival Crasher / Kiln Fiend's
+    /// effects-aware-dispatch guards).
+    /// </summary>
+    [Fact]
+    public void MirarisWake_ProdPath_BindsManaDoublingTrigger()
+    {
+        using var _ = TriggerManagerRegistry.PushScope();
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        TriggerManagerRegistry.Set(triggers);
+
+        var effects = new ContinuousEffectsService();
+
+        // The exact entrypoint GameFacade.BuildDeckCard uses for factory-backed
+        // cards: NamedCardFactory.Create(name, owner, effects).
+        var card = NamedCardFactory.Create("Mirari's Wake", _alice, effects);
+        card.Should().BeOfType<Enchantment>();
+
+        // (a) The mana-doubling trigger is resident on the card shape built via
+        //     the prod (effects-aware) dispatch — unlike Overgrowth/Utopia Sprawl
+        //     whose mana trigger only exists on the TriggerManager overload.
+        var resident = ((Enchantment)card).Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.TargetRequests.Count == 0);
+        resident.ActiveZones.Should().Contain(ZoneType.Battlefield);
+
+        // (b) … and it was registered with the ambient live TriggerManager, so
+        //     it fires end-to-end. Tap a Forest for {G} → trigger doubles it.
+        card.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(card);
+
+        var forest = (Land)NamedCardFactory.Create("Forest", _alice);
+        forest.SetController(_alice);
+        forest.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+
+        var activator = new ManaAbilityActivator(bus);
+        activator.ActivateManaAbility(forest.Abilities.OfType<IManaAbility>().Single(), _alice);
+
+        _alice.ManaPool.Green.Should().Be(1, "the Forest's own {G}");
+        triggers.PendingCount.Should().Be(1,
+            "the prod-path build registered the mana-doubling trigger with the ambient manager");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.ManaPool.Green.Should().Be(2,
+            "Mirari's Wake adds an additional {G} of the type the land produced (CR 605.1b) on the prod path");
     }
 
     /// <summary>
