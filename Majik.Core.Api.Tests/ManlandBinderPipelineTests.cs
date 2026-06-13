@@ -656,6 +656,252 @@ public class ManlandBinderPipelineTests
         alice.LifeTotal.Should().Be(aliceBefore + 2, "you gain 2 life");
     }
 
+    // -----------------------------------------------------------------------
+    // GRANTED QUOTED ABILITIES / KEYWORDS ON ANIMATE (close
+    // mass-keyword-grant-until-eot). The animate line carries a granted
+    // quoted attack trigger ("with \"Whenever this creature attacks, …\"") or
+    // a parameterized keyword (ward {N}) or a conditional first strike
+    // ("with \"During your turn, this creature has first strike.\""). Before
+    // this slice these were dropped by ManlandBinder; now they bind on animate.
+    // -----------------------------------------------------------------------
+
+    private const string DenOfTheBugbearOracle =
+        "If you control two or more other lands, this land enters tapped.\n" +
+        "{T}: Add {R}.\n" +
+        "{3}{R}: Until end of turn, this land becomes a 3/2 red Goblin creature " +
+        "with \"Whenever this creature attacks, create a 1/1 red Goblin creature " +
+        "token that's tapped and attacking.\" It's still a land.";
+
+    [Fact]
+    public void Prod_DenOfTheBugbear_Animate_GrantsAttackTokenTrigger()
+    {
+        // The quoted "Whenever this creature attacks, create a 1/1 red Goblin
+        // token" granted ability binds on animate (CR 508.1f). Before animating
+        // the land has NO attack trigger; after animating the granted trigger
+        // exists and, when fired, mints exactly one Goblin token.
+        var repo = new FakeCardRepo();
+        repo.Add("Den of the Bugbear", "Land", oracleText: DenOfTheBugbearOracle, colors: "R");
+        var land = new Land("Den of the Bugbear", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // No granted attack trigger before animating.
+        live.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "the quoted attack trigger is granted only on animate, not at bind time");
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        // 3/2 Goblin.
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(3);
+        cc.Toughness.Should().Be(2);
+        cc.Subtypes.Should().Contain(CardSubtype.Goblin);
+
+        // The granted attack trigger now exists; firing it mints one Goblin.
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the granted attack trigger is added on animate").Subject;
+        var goblinsBefore = alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Goblin");
+        foreach (var e in trigger.Effects) e.Execute();
+        alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Goblin")
+            .Should().Be(goblinsBefore + 1, "the granted attack trigger mints one 1/1 Goblin token");
+    }
+
+    private const string RagingRavineOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {R} or {G}.\n" +
+        "{2}{R}{G}: Until end of turn, this land becomes a 3/3 red and green " +
+        "Elemental creature with \"Whenever this creature attacks, put a +1/+1 " +
+        "counter on it.\" It's still a land.";
+
+    [Fact]
+    public void Prod_RagingRavine_Animate_GrantsAttackCounterTrigger()
+    {
+        // The quoted "Whenever this creature attacks, put a +1/+1 counter on it"
+        // granted ability binds on animate; firing it adds a counter to the land.
+        var repo = new FakeCardRepo();
+        repo.Add("Raging Ravine", "Land", oracleText: RagingRavineOracle, colors: "R,G");
+        var land = new Land("Raging Ravine", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the granted +1/+1-on-attack trigger is added on animate").Subject;
+        trigger.TargetRequests.Should().BeEmpty("the counter goes on the land itself (non-targeted)");
+
+        var before = land.Counters.Count(CounterType.PlusOnePlusOne);
+        foreach (var e in trigger.Effects) e.Execute();
+        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(before + 1,
+            "the granted attack trigger puts a +1/+1 counter on the animated land");
+    }
+
+    private const string HiveOfTheEyeTyrantOracle =
+        "If you control two or more other lands, this land enters tapped.\n" +
+        "{T}: Add {B}.\n" +
+        "{3}{B}: Until end of turn, this land becomes a 3/3 black Beholder creature " +
+        "with menace and \"Whenever this creature attacks, exile target card from " +
+        "defending player's graveyard.\" It's still a land.";
+
+    [Fact]
+    public void Prod_HiveOfTheEyeTyrant_Animate_GrantsMenaceAndAttackExileTrigger()
+    {
+        // The simple keyword (menace) AND the quoted "Whenever this creature
+        // attacks, exile target card from defending player's graveyard" granted
+        // ability both bind on animate. The trigger carries a 1..1 TargetRequest.
+        var repo = new FakeCardRepo();
+        repo.Add("Hive of the Eye Tyrant", "Land", oracleText: HiveOfTheEyeTyrantOracle, colors: "B");
+        var land = new Land("Hive of the Eye Tyrant", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        var bob = facade.Bob;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Keywords.Should().Contain("Menace", "the printed simple keyword binds alongside the quoted rider");
+        cc.Subtypes.Should().Contain(CardSubtype.Beholder);
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the granted exile-graveyard attack trigger is added on animate").Subject;
+        trigger.TargetRequests.Should().ContainSingle()
+            .Which.Description.Should().Contain("graveyard");
+
+        // A card in Bob's graveyard; the agent picks it; resolution exiles it.
+        var gyCard = new Creature("Goblin", "{R}", 1, 1, null, new[] { CardSubtype.Goblin });
+        gyCard.SetOwner(bob);
+        bob.Zones.Graveyard.AddCard(gyCard); gyCard.SetZone(ZoneType.Graveyard);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { gyCard });
+        CollectAndExecute(trigger, Ctx(facade), agent);
+
+        gyCard.Zone.Should().Be(ZoneType.Exile, "the agent-chosen graveyard card is exiled");
+    }
+
+    private const string HallOfStormGiantsOracle =
+        "If you control two or more other lands, this land enters tapped.\n" +
+        "{T}: Add {U}.\n" +
+        "{5}{U}: Until end of turn, this land becomes a 7/7 blue Giant creature " +
+        "with ward {3}. It's still a land.";
+
+    [Fact]
+    public void Prod_HallOfStormGiants_Animate_GrantsWardKeyword()
+    {
+        // "ward {3}" is a parameterized keyword the simple-keyword path dropped.
+        // It now binds as a Ward keyword marker on animate (CR 702.21).
+        var repo = new FakeCardRepo();
+        repo.Add("Hall of Storm Giants", "Land", oracleText: HallOfStormGiantsOracle, colors: "U");
+        var land = new Land("Hall of Storm Giants", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(7);
+        cc.Toughness.Should().Be(7);
+        cc.Subtypes.Should().Contain(CardSubtype.Giant);
+        cc.Keywords.Should().Contain("Ward", "ward {3} binds as a Ward keyword marker on animate");
+    }
+
+    private const string RestlessSpireOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {U} or {R}.\n" +
+        "{U}{R}: Until end of turn, this land becomes a 2/1 blue and red Elemental " +
+        "creature with \"During your turn, this creature has first strike.\" It's " +
+        "still a land.\n" +
+        "Whenever this land attacks, scry 1.";
+
+    [Fact]
+    public void Prod_RestlessSpire_Animate_GrantsFirstStrike()
+    {
+        // The quoted conditional "During your turn, this creature has first
+        // strike" binds as a flat First Strike grant on animate (v1 posture —
+        // observationally equivalent: the body only exists during the
+        // controller's turn). The printed scry attack trigger also binds.
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Spire", "Land", oracleText: RestlessSpireOracle, colors: "U,R");
+        var land = new Land("Restless Spire", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(2);
+        cc.Toughness.Should().Be(1);
+        cc.Keywords.Should().Contain("First Strike",
+            "the quoted \"During your turn, this creature has first strike\" binds flatly on animate");
+
+        // The intrinsic printed "Whenever this land attacks, scry 1" trigger
+        // also binds (non-targeted).
+        live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the printed scry attack trigger binds")
+            .Which.TargetRequests.Should().BeEmpty();
+    }
+
+    private const string CaveOfTheFrostDragonOracle =
+        "If you control two or more other lands, this land enters tapped.\n" +
+        "{T}: Add {W}.\n" +
+        "{4}{W}: This land becomes a 3/4 white Dragon creature with flying until " +
+        "end of turn. It's still a land.";
+
+    [Fact]
+    public void Prod_CaveOfTheFrostDragon_Animate_GrantsFlying()
+    {
+        // Simple keyword (flying) — already covered, but verified end-to-end so
+        // the card is closed alongside its cycle siblings.
+        var repo = new FakeCardRepo();
+        repo.Add("Cave of the Frost Dragon", "Land", oracleText: CaveOfTheFrostDragonOracle, colors: "W");
+        var land = new Land("Cave of the Frost Dragon", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(3);
+        cc.Toughness.Should().Be(4);
+        cc.Subtypes.Should().Contain(CardSubtype.Dragon);
+        cc.Keywords.Should().Contain("Flying");
+    }
+
     [Fact]
     public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
     {
