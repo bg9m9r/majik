@@ -380,15 +380,12 @@ public class SemanticImplementationAuditTests
             // yet. They stay flagged-but-allowlisted (honest deferral, not a
             // silent gap). See v1-deferrals #12 for the running list.
 
-            // -- Channel family: the cost is "{cost}, Discard this card" (a
-            // discard-from-HAND activation, NOT a battlefield {T} activation).
-            // No binder-reachable "discard this card to activate" cost seam
-            // exists, so the whole family is deferred rather than modelled wrong. --
-            "Boseiju, Who Endures",          // Channel: destroy target artifact/enchantment/nonbasic land
-            "Otawara, Soaring City",         // Channel: return target permanent to hand
-            "Takenuma, Abandoned Mire",      // Channel: mill 3, return creature/PW from GY
-            "Eiganjo, Seat of the Empire",   // Channel: 4 damage to attacking/blocking creature
-            "Sokenzan, Crucible of Defiance",// Channel: create two 1/1 Spirit tokens with haste
+            // -- Channel family (CR 702.74): NOW BOUND. LandActivatedAbilityBinder
+            // recognises the "Channel — {cost}, Discard this card: <effect>" line
+            // and emits an activated ability with DiscardSelfCost (the hand-zone
+            // activation seam, CR 702.74a) + ManaCostCost, each effect mapping to
+            // an existing one-shot verb (destroy / bounce / mill / damage /
+            // token). Removed from the allowlist — the detector no longer trips. --
 
             // -- Creature-land quoted granted abilities / conditional animate.
             // The N/N animate body binds via ManlandBinder; the QUOTED attack

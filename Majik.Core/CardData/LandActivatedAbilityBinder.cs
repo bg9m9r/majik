@@ -57,14 +57,21 @@ namespace Majik.Core.CardData;
 /// agent-chosen target off the ability's <see cref="ActivatedAbility.ChosenTargets"/>
 /// with a CR 608.2b resolve-time legality recheck.</para>
 ///
+/// <para><b>Channel</b> (CR 702.74; Boseiju Who Endures, Otawara, Takenuma,
+/// Eiganjo, Sokenzan) — the activation cost is "{cost}, Discard this card", a
+/// discard-from-HAND activation, NOT a battlefield {T} activation. NOW BOUND
+/// here via <see cref="BindChannel"/>: a <see cref="DiscardSelfCost"/> (the
+/// hand-zone activation seam, CR 702.74a) sits alongside a
+/// <see cref="ManaCostCost"/> in the standard activated-ability cost list, and
+/// each cycle member's effect maps to an existing one-shot verb
+/// (destroy / bounce / mill / damage / token). The "costs {1} less per
+/// legendary creature you control" cost-reduction rider (CR 118.9) and the
+/// per-member follow-up riders (Boseiju's basic-land search, Eiganjo's live
+/// combat-state gate, Takenuma's "may") are deferred — see the
+/// <see cref="BindChannel"/> xmldoc.</para>
+///
 /// <para><b>Deferred families / riders.</b>
 /// <list type="bullet">
-///   <item><b>Channel</b> (Boseiju Who Endures, Otawara, Takenuma, Eiganjo,
-///     Sokenzan) — the activation cost is "{cost}, Discard this card", a
-///     discard-from-HAND activation, NOT a battlefield {T} activation. No
-///     binder-reachable "discard this card from hand to activate" cost seam
-///     exists, so the whole Channel family is deferred rather than modelled
-///     wrong.</item>
 ///   <item><b>Crawling Barrens</b> — "Put two +1/+1 counters on this land.
 ///     Then you may have it become a 0/0 Elemental creature" — the animate is
 ///     conditional on a prior counter step (same posture
@@ -104,6 +111,17 @@ public static class LandActivatedAbilityBinder
     private static readonly Regex SacrificeSelf = new(
         @"Sacrifice\s+(?:this\s+land|this\s+permanent)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Channel (CR 702.74). "Channel — {cost}, Discard this card: <effect>".
+    // The cost segment is the mana before ", Discard this card"; the effect is
+    // everything after the colon up to the next sentence boundary that begins a
+    // separate clause. We capture the whole effect clause and dispatch it to a
+    // per-cycle-member builder. Unlike every other line this binder handles, the
+    // Channel cost has NO {T} — it is a discard-from-HAND activation, so it is
+    // recognised by its own regex BEFORE the {T} gate in Bind().
+    private static readonly Regex ChannelLine = new(
+        @"^Channel\s+[—-]\s+(?<cost>(?:\{[^}]+\})+)\s*,\s*Discard\s+this\s+card\s*:\s*(?<effect>.+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Multiline);
 
     // --- Effect-clause dispatch regexes -----------------------------------
 
@@ -226,10 +244,31 @@ public static class LandActivatedAbilityBinder
 
         var boundAny = false;
 
+        // --- Channel (CR 702.74) — a discard-from-HAND activation. Recognised
+        //     FIRST because its cost has no {T} and would be filtered by the
+        //     {T} gate below. Each cycle member binds exactly one Channel
+        //     ActivatedAbility (mana + DiscardSelfCost). ---
+        foreach (Match channelMatch in ChannelLine.Matches(text))
+        {
+            if (BindChannel(
+                    land, controller,
+                    channelMatch.Groups["cost"].Value,
+                    channelMatch.Groups["effect"].Value.Trim()))
+            {
+                boundAny = true;
+            }
+        }
+
         foreach (Match line in ActivationLine.Matches(text))
         {
             var cost = line.Groups["cost"].Value;
             var effectText = line.Groups["effect"].Value.Trim();
+
+            // Channel lines are handled above by their own recognizer; the
+            // generic ActivationLine regex also matches "Channel — …: …", so
+            // skip it here to avoid a duplicate (effect-less) ability.
+            if (line.Groups["keyword"].Value.Trim()
+                    .Equals("Channel", StringComparison.OrdinalIgnoreCase)) continue;
 
             // The bare mana line ("{T}: Add {U}", "{T}: Add one mana of any
             // color") is OracleManaBinder's job — skip it here.
@@ -272,6 +311,202 @@ public static class LandActivatedAbilityBinder
         }
 
         return costs;
+    }
+
+    // ======================================================================
+    // Channel (CR 702.74) — discard-from-HAND activated ability.
+    //
+    // The Channel cost is "{cost}, Discard this card" — a discard-from-hand
+    // activation, NOT a battlefield {T} tap. The seam is the existing
+    // DiscardSelfCost (CR 702.74a — gates payment to the controller's Hand
+    // zone) sitting alongside a ManaCostCost in the standard activated-ability
+    // cost list; the ability is attached to the land object regardless of zone
+    // (the same card instance moves Hand → Graveyard via the discard cost, then
+    // resolves). The effect bodies reuse the existing one-shot verbs
+    // (Fx.MoveToGraveyard / BounceToHand / Mill / DealDamageAny / TokenFactory)
+    // — exactly the verbs the rest of this binder already emits.
+    //
+    // Deferred riders (each consistent with the deferrals the rest of this
+    // binder already takes; none affects which Channel ability binds):
+    //   - "This ability costs {1} less to activate for each legendary creature
+    //     you control" — a cost-reduction rider (CR 118.9). No binder-reachable
+    //     dynamic cost-reduction seam on this path; the full mana cost binds.
+    //   - Boseiju — the "that player may search their library for a basic land"
+    //     follow-up after destroying a land (an opponent's optional search).
+    //   - Eiganjo — the live "attacking or blocking" combat-state target gate
+    //     (resolve is permissive: any chosen creature is dealt the damage).
+    //   - Takenuma — the "may" rider on the graveyard return (auto-accepts).
+    // ======================================================================
+    private static bool BindChannel(
+        Land land, Player controller, string costSegment, string effectText)
+    {
+        var costs = new List<ICost> { new ManaCostCost(costSegment), new DiscardSelfCost(land) };
+
+        IEffect? effect = null;
+        TargetRequest[] targets = Array.Empty<TargetRequest>();
+        ActivatedAbility? ability = null;
+
+        // --- Boseiju — destroy target artifact/enchantment/nonbasic land ----
+        if (Regex.IsMatch(effectText,
+                @"^Destroy\s+target\s+artifact,\s*enchantment,\s*or\s+nonbasic\s+land",
+                RegexOptions.IgnoreCase))
+        {
+            effect = new Effect(
+                $"{land.Name} (Channel): destroy target artifact, enchantment, or nonbasic land an opponent controls",
+                () =>
+                {
+                    if (FirstChosen(ability) is not ICard target) return;
+                    if (target.Zone != ZoneType.Battlefield) return;
+                    if (!(target.HasType(CardType.Artifact) || target.HasType(CardType.Enchantment)
+                          || (target.HasType(CardType.Land) && !target.HasSupertype(CardSupertype.Basic)))) return;
+                    Fx.MoveToGraveyard(target, ZoneMoveReason.Destroy);
+                });
+            targets = new[]
+            {
+                new TargetRequest(
+                    Description: "target artifact, enchantment, or nonbasic land an opponent controls",
+                    MinTargets: 1, MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    CandidateGatherer: ctx => GatherBoseijuTargets(ctx, land, controller)),
+            };
+        }
+        // --- Otawara — return target permanent to its owner's hand ----------
+        else if (Regex.IsMatch(effectText,
+                     @"^Return\s+target\s+artifact,\s*creature,\s*enchantment,\s*or\s+planeswalker\s+to\s+its\s+owner'?s\s+hand",
+                     RegexOptions.IgnoreCase))
+        {
+            effect = new Effect(
+                $"{land.Name} (Channel): return target artifact, creature, enchantment, or planeswalker to its owner's hand",
+                () =>
+                {
+                    if (FirstChosen(ability) is not ICard target) return;
+                    if (target.Zone != ZoneType.Battlefield) return;
+                    if (target.HasType(CardType.Land)) return; // nonland gate
+                    Fx.BounceToHand(target, ZoneServiceRegistry.Get(land.Controller ?? controller));
+                });
+            targets = new[]
+            {
+                new TargetRequest(
+                    Description: "target artifact, creature, enchantment, or planeswalker",
+                    MinTargets: 1, MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Bounce,
+                    CandidateGatherer: ctx => GatherOtawaraTargets(ctx)),
+            };
+        }
+        // --- Eiganjo — deal 4 damage to target attacking/blocking creature --
+        else if (Regex.Match(effectText,
+                     @"^It\s+deals\s+(?<n>\d+)\s+damage\s+to\s+target\s+attacking\s+or\s+blocking\s+creature",
+                     RegexOptions.IgnoreCase) is { Success: true } eig)
+        {
+            var n = int.Parse(eig.Groups["n"].Value);
+            effect = new Effect(
+                $"{land.Name} (Channel): deal {n} damage to target attacking or blocking creature",
+                () =>
+                {
+                    if (FirstChosen(ability) is not Creature target) return;
+                    if (target.Zone != ZoneType.Battlefield) return;
+                    Fx.DealDamageAny(target, n);
+                });
+            targets = new[]
+            {
+                new TargetRequest(
+                    Description: "target attacking or blocking creature",
+                    MinTargets: 1, MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    CandidateGatherer: ctx => GatherAllCreatures(ctx)),
+            };
+        }
+        // --- Takenuma — mill 3, then return a creature/PW from your graveyard
+        else if (Regex.IsMatch(effectText,
+                     @"^Mill\s+three\s+cards,\s*then\s+return\s+a\s+creature\s+or\s+planeswalker\s+card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
+                     RegexOptions.IgnoreCase))
+        {
+            effect = new Effect(
+                $"{land.Name} (Channel): mill three cards, then return a creature or planeswalker card from your graveyard to your hand",
+                async ctx =>
+                {
+                    var ctrl = land.Controller ?? controller;
+                    Fx.Mill(ctrl, 3);
+
+                    var eligible = ctrl.Zones.Graveyard.GetCards()
+                        .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+                        .ToList();
+                    if (eligible.Count == 0) return;
+
+                    var agent = ctx.Agent ?? AgentRegistry.Get(ctrl);
+                    var pick = agent != null
+                        ? await agent.ChooseLibraryPickAsync(ctx.Game, eligible, "creature or planeswalker card").ConfigureAwait(false)
+                        : eligible[0];
+                    pick ??= eligible[0];
+
+                    Fx.ReturnFromGraveyardToHand(pick, ZoneServiceRegistry.Get(ctrl));
+                });
+        }
+        // --- Sokenzan — create two 1/1 colorless Spirit tokens w/ haste -----
+        else if (Regex.IsMatch(effectText,
+                     @"^Create\s+two\s+1/1\s+colorless\s+Spirit\s+creature\s+tokens",
+                     RegexOptions.IgnoreCase))
+        {
+            effect = new Effect(
+                $"{land.Name} (Channel): create two 1/1 colorless Spirit creature tokens with haste",
+                () =>
+                {
+                    var ctrl = land.Controller ?? controller;
+                    var zones = ZoneServiceRegistry.Get(ctrl);
+                    for (var i = 0; i < 2; i++)
+                    {
+                        TokenFactory.CreateOnBattlefield(
+                            new TokenFactory.TokenSpec(
+                                Name: "Spirit",
+                                Power: 1,
+                                Toughness: 1,
+                                Subtypes: new[] { CardSubtype.Spirit },
+                                Keywords: new[] { "Haste" },
+                                Colors: Array.Empty<ManaColor>()),
+                            ctrl, zones);
+                    }
+                });
+        }
+
+        if (effect is null) return false;
+
+        ability = new ActivatedAbility(
+            source: land, controller: controller, costs: costs,
+            effects: new IEffect[] { effect }, targetRequests: targets);
+        land.AddAbility(ability);
+        return true;
+    }
+
+    private static IReadOnlyList<object> GatherBoseijuTargets(
+        GameContext ctx, Land land, Player controller)
+    {
+        var you = land.Controller ?? controller;
+        var result = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+        {
+            if (ReferenceEquals(p, you)) continue; // "an opponent controls"
+            foreach (var c in p.Zones.Battlefield.GetCards())
+            {
+                if (c.HasType(CardType.Artifact) || c.HasType(CardType.Enchantment)
+                    || (c.HasType(CardType.Land) && !c.HasSupertype(CardSupertype.Basic)))
+                {
+                    result.Add(c);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<object> GatherOtawaraTargets(GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+            foreach (var c in p.Zones.Battlefield.GetCards())
+                if (!c.HasType(CardType.Land)) result.Add(c);
+        return result;
     }
 
     private static bool BindLine(
