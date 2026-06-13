@@ -31,7 +31,7 @@ namespace Majik.Core.Costs;
 /// of these — each picks (and removes) one card, so the next instance sees a
 /// smaller hand. CR 601.2g atomicity (the whole escalate bill is affordable
 /// before any single discard) is enforced by the caller
-/// (<c>SpellCastFlow.PayEscalateCosts</c> via <c>EscalateSpec.CanPayExtraModes</c>).
+/// (<c>SpellCastFlow.BuildAndPrecheckEscalateCosts</c> via <c>EscalateSpec.CanPayExtraModes</c>).
 /// </summary>
 public sealed class EscalateDiscardAdditionalCost : IAdditionalCost
 {

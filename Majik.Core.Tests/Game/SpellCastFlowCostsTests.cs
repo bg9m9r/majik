@@ -115,6 +115,91 @@ public class SpellCastFlowCostsTests
     }
 
     // -----------------------------------------------------------------
+    // CR 601.2h / CR 731.1 — a NON-MANA additional cost (sacrifice / discard /
+    // exile rider) is paid with the rest of the total cost at the END of
+    // casting, AFTER target collection (CR 601.2c). A cast that becomes illegal
+    // at targeting must rewind with the rider STILL UNPAID — the engine used to
+    // pay these riders up front (before target collection) so a targeting
+    // failure refunded the never-paid mana but stranded an already-paid
+    // discard / sacrifice. (Mirrors the mana-half regression tests in
+    // TurnDriverCastManaRefundTests.)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task CallerSacrificeCost_NotPaidWhenTargetingFails_CR731Rewind()
+    {
+        var bear = new Creature("Bear", "1G", 2, 2)
+        { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        // An edict-style spell with a required target and NO legal candidate:
+        // target collection throws (CR 601.2c) — the sacrifice rider must not
+        // have been paid yet (CR 601.2h ordering).
+        var spell = new Instant("Sac Edict", "B") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(spell);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(System.Array.Empty<object>()); // no legal target to pick
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
+
+        var def = new SpellDefinition(
+            Modes: System.Array.Empty<string>(), HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target creature", 1, 1, System.Array.Empty<object>()) },
+            EffectFactory: _ => System.Array.Empty<IEffect>());
+
+        var act = async () => await _flow.CastAsync(
+            _alice, spell, def, agent, ctx,
+            additionalCosts: new[] { new SacrificeCreatureCost(bear) });
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>();
+
+        bear.Zone.Should().Be(ZoneType.Battlefield,
+            "CR 731.1 — the illegal cast rewinds, so the sacrifice additional " +
+            "cost (paid at CR 601.2h, after target collection) is never committed");
+        _alice.Zones.Battlefield.GetCards().Should().Contain(bear);
+        spell.Zone.Should().Be(ZoneType.Hand);
+        _stack.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DefinitionDiscardCost_NotPaidWhenTargetingFails_CR731Rewind()
+    {
+        var heldCard = new Instant("Held Card", "1") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(heldCard);
+
+        var spell = new Sorcery("Discard Rider Spell", "B") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(spell);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(System.Array.Empty<object>()); // no legal target to pick
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
+
+        var def = new SpellDefinition(
+            Modes: System.Array.Empty<string>(), HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target creature", 1, 1, System.Array.Empty<object>()) },
+            EffectFactory: _ => System.Array.Empty<IEffect>(),
+            ModeIntents: null,
+            AdditionalCosts: new IAdditionalCost[]
+            {
+                new DiscardACardAdditionalCost { Target = heldCard },
+            });
+
+        var act = async () => await _flow.CastAsync(_alice, spell, def, agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>();
+
+        heldCard.Zone.Should().Be(ZoneType.Hand,
+            "CR 731.1 — the discard additional cost (paid at CR 601.2h) is never " +
+            "committed when the cast fails at target collection");
+        _alice.Zones.Hand.GetCards().Should().Contain(heldCard);
+        _stack.Count.Should().Be(0);
+    }
+
+    // -----------------------------------------------------------------
     // New: enforced additional costs declared on SpellDefinition itself
     // (template-bound "As an additional cost to cast this spell, …")
     // -----------------------------------------------------------------

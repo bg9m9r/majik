@@ -157,8 +157,12 @@ public sealed class SpellCastFlow
         PayEscapeRiderIfAny(card, caster, alternativeCost);
 
         // CR 601.2f — merge caller-supplied additional costs with the ones the
-        // SpellDefinition itself declares, pre-check legality, then pay them.
-        var mergedAdditional = BuildAndPayAdditionalCosts(definition, additionalCosts, caster);
+        // SpellDefinition itself declares and pre-check legality (CR 601.2g —
+        // no partial payment). The actual PAYMENT is deferred to the
+        // CR 601.2h point below (next to the mana payment), AFTER target
+        // collection (CR 601.2c) — so a targeting failure throws before any
+        // discard / sacrifice / exile rider is paid (CR 731.1 rewind).
+        var mergedAdditional = BuildAndPrecheckAdditionalCosts(definition, additionalCosts, caster);
 
         // CR 701.59 — Gift cast-time prompt (must run BEFORE target collection
         // because Gift spells upgrade their target predicate when promised).
@@ -174,15 +178,17 @@ public sealed class SpellCastFlow
         IReadOnlyList<int>? modeIndexes =
             definition.IsMultiMode && modeChoice.Count > 0 ? modeChoice : null;
 
-        // CR 702.121 — Escalate. Pay the escalate additional cost once for
-        // each mode chosen BEYOND the first (CR 702.121a), as part of casting
-        // (CR 601.2f). Each payment is a fresh cost instance; an unpayable
-        // extra mode makes the whole cast illegal (CR 601.2g — no partial
-        // payment). The paid instances are appended to the merged additional
-        // costs so downstream effect closures / cleanup see them.
+        // CR 702.121 — Escalate. Build one escalate additional-cost instance
+        // for each mode chosen BEYOND the first (CR 702.121a), pre-check that
+        // the whole escalate bill is affordable (CR 601.2g — no partial
+        // payment), and append the instances to the merged additional costs so
+        // downstream effect closures / cleanup see them. PAYMENT is deferred to
+        // the CR 601.2h point below (alongside the other additional costs and
+        // mana), so an unpayable escalate or a later targeting failure aborts
+        // the cast before any escalate discard / pay-life is committed.
         if (definition.Escalate is { } escalate && modeChoice.Count > 1)
         {
-            PayEscalateCosts(escalate, card, caster, modeChoice.Count - 1, mergedAdditional);
+            BuildAndPrecheckEscalateCosts(escalate, card, caster, modeChoice.Count - 1, mergedAdditional);
         }
 
         // CR 601.2e + CR 202.3b — choose X and stamp the value on the card so
@@ -207,6 +213,18 @@ public sealed class SpellCastFlow
         // CR 601.2g / CR 605.1 — mana sourcing. Reuse pre-chosen mana when the
         // caller (TurnDriver) already prompted, otherwise prompt the agent.
         var mana = preChosenMana ?? await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
+
+        // CR 601.2h — pay the non-mana additional costs (discard / sacrifice /
+        // exile / pay-life riders, plus any escalate instances) NOW, after
+        // target collection (CR 601.2c) and total-cost determination
+        // (CR 601.2f). The early pass only pre-checked legality; deferring the
+        // actual irreversible payment to here means a targeting failure (which
+        // throws inside CollectTargetsAsync above) aborts the cast before any
+        // card is discarded / permanent sacrificed (CR 731.1 rewind). This
+        // runs BEFORE EffectFactory below because sacrifice-coupled effects
+        // (e.g. Eldritch Evolution) read the sacrificed permanent off the paid
+        // cost instance eagerly when the factory is invoked.
+        PayAdditionalCosts(mergedAdditional, caster);
 
         var chosen = new ChosenSpellParams(
             mode, xValue, collectedTargets, mana, ctx.AllPlayers,
@@ -392,11 +410,13 @@ public sealed class SpellCastFlow
         }
     }
 
-    /// <summary>CR 601.2f — additional costs first, before mana payment.
-    /// Merges caller-supplied costs with definition-supplied costs,
-    /// pre-checks legality (CR 601.2g — no partial payment), then pays
-    /// each.</summary>
-    private static List<IAdditionalCost> BuildAndPayAdditionalCosts(
+    /// <summary>CR 601.2f / CR 601.2g — merge caller-supplied costs with
+    /// definition-supplied costs and pre-check legality (no partial payment).
+    /// Does NOT pay — the actual non-mana payment is deferred to the CR 601.2h
+    /// point (after target collection, CR 601.2c) via
+    /// <see cref="PayAdditionalCosts"/>, so a targeting failure refunds nothing
+    /// already paid because nothing has been paid yet (CR 731.1 rewind).</summary>
+    private static List<IAdditionalCost> BuildAndPrecheckAdditionalCosts(
         SpellDefinition definition,
         IReadOnlyList<IAdditionalCost>? additionalCosts,
         Player caster)
@@ -420,6 +440,31 @@ public sealed class SpellCastFlow
             }
         }
 
+        return mergedAdditional;
+    }
+
+    /// <summary>CR 601.2h — pay every accumulated non-mana additional cost
+    /// (discard / sacrifice / exile / pay-life riders, plus any escalate
+    /// instances appended during mode choice). Invoked LAST, after target
+    /// collection (CR 601.2c) and immediately before the mana payment, so an
+    /// illegal cast (insufficient targets, sorcery-speed violation) throws
+    /// before any of these irreversible payments is made (CR 731.1 — the
+    /// whole action is reversed and any payments already made are canceled).
+    /// Re-checks affordability defensively (CR 601.2g — no partial payment):
+    /// the early pre-check already ran, but state may have shifted (e.g. an
+    /// escalate discard consuming the last card a later sacrifice needed).</summary>
+    private static void PayAdditionalCosts(
+        IReadOnlyList<IAdditionalCost> mergedAdditional, Player caster)
+    {
+        foreach (var addCost in mergedAdditional)
+        {
+            if (!addCost.CanPay(caster))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot pay additional cost: {addCost.Description}");
+            }
+        }
+
         foreach (var addCost in mergedAdditional)
         {
             if (!addCost.Pay(caster))
@@ -428,8 +473,6 @@ public sealed class SpellCastFlow
                     $"Failed to pay additional cost: {addCost.Description}");
             }
         }
-
-        return mergedAdditional;
     }
 
     /// <summary>CR 701.59 — Bloomburrow Gift cast-time prompt. Promised gifts
@@ -490,17 +533,20 @@ public sealed class SpellCastFlow
             definition.ModeIntents, ct);
     }
 
-    /// <summary>CR 702.121 / CR 601.2f / CR 601.2g — pay the escalate
+    /// <summary>CR 702.121 / CR 601.2f / CR 601.2g — build the escalate
     /// additional cost <paramref name="extraModes"/> times (one per mode
-    /// chosen beyond the first). Each payment is a fresh cost instance from
-    /// <see cref="EscalateSpec.BuildPerModeCost"/>; all are affordability-
-    /// checked before any is committed so a shortfall can't leave a
-    /// half-paid escalate (e.g. one card discarded then the cast aborts).
-    /// Paid instances are appended to <paramref name="mergedAdditional"/> so
-    /// downstream effect / cleanup machinery can read them. Throws
+    /// chosen beyond the first) and pre-check affordability. Each instance is
+    /// a fresh cost from <see cref="EscalateSpec.BuildPerModeCost"/>; the whole
+    /// bill is affordability-checked up front so a shortfall can't leave a
+    /// half-paid escalate. The built instances are appended to
+    /// <paramref name="mergedAdditional"/> so downstream effect / cleanup
+    /// machinery can read them AND so the deferred CR 601.2h payment pass
+    /// (<see cref="PayAdditionalCosts"/>) pays them alongside the other
+    /// additional costs — after target collection, so a targeting failure
+    /// aborts before any escalate discard / pay-life is committed. Throws
     /// <see cref="InvalidOperationException"/> when the total escalate cost
     /// can't be paid — making the cast illegal.</summary>
-    private static void PayEscalateCosts(
+    private static void BuildAndPrecheckEscalateCosts(
         EscalateSpec escalate,
         ICard card,
         Player caster,
@@ -509,12 +555,12 @@ public sealed class SpellCastFlow
     {
         if (extraModes <= 0) return;
 
-        // CR 601.2g — confirm the WHOLE escalate bill is affordable BEFORE
-        // paying any single instance, so a shortfall can't leave a half-paid
-        // escalate (one card discarded then the cast aborts). The aggregate
-        // probe counts the depletable resource (hand size for discard, life
-        // for pay-life); when no probe is supplied this is permissive and the
-        // per-payment guard below still catches a mid-sequence shortfall.
+        // CR 601.2g — confirm the WHOLE escalate bill is affordable BEFORE the
+        // cast proceeds, so a shortfall can't leave a half-paid escalate (one
+        // card discarded then the cast aborts). The aggregate probe counts the
+        // depletable resource (hand size for discard, life for pay-life); when
+        // no probe is supplied this is permissive and the per-cost CanPay guard
+        // in PayAdditionalCosts still catches a mid-sequence shortfall.
         if (!escalate.CanPayExtraModes(caster, extraModes))
         {
             throw new InvalidOperationException(
@@ -525,7 +571,7 @@ public sealed class SpellCastFlow
         for (var i = 0; i < extraModes; i++)
         {
             var cost = escalate.BuildPerModeCost(card);
-            if (!cost.CanPay(caster) || !cost.Pay(caster))
+            if (!cost.CanPay(caster))
             {
                 throw new InvalidOperationException(
                     $"Cannot pay Escalate cost ({escalate.Description}) for {card.Name}: " +
