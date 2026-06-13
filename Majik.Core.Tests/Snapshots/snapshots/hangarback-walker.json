@@ -39,8 +39,10 @@
     }
   },
   "replacements": {
-    "count": 0,
-    "list": []
+    "count": 1,
+    "list": [
+      "EntersWithCountersReplacement"
+    ]
   },
   "mdfc": null
 }
