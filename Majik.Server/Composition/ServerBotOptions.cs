@@ -6,10 +6,9 @@ namespace Majik.Server.Composition;
 /// the MCTS search bot.
 ///
 /// <para>
-/// <b>Default = <c>heuristic</c>:</b> dev, tests, and durable-log rehydration
-/// replay (which RE-COMPUTES bot decisions and relies on their determinism —
-/// see <c>MatchService.TryRehydrateAndDispatchAsync</c>) keep today's cheap
-/// deterministic brain unless the deployment opts in.
+/// <b>Default = <c>heuristic</c>:</b> dev and tests keep today's cheap
+/// deterministic brain unless the deployment opts in. (This is a cost /
+/// playtest default, NOT a rehydration constraint — see the next paragraph.)
 /// </para>
 ///
 /// <para>
@@ -26,13 +25,25 @@ namespace Majik.Server.Composition;
 /// </para>
 ///
 /// <para>
-/// <b>Known tradeoff (deliberate):</b> a wall-clock-capped search is not
-/// deterministic across runs, so a bot match that has to be REHYDRATED after
-/// a replica restart may fail to replay (the failure path is graceful — the
-/// match is lost, never wedged). The heuristic default preserves replay
-/// determinism everywhere else; revisit if bot-match rehydration losses show
-/// up in practice (fix = persist bot decisions, or an iteration-bound
-/// deterministic replay mode).
+/// <b>Rehydration is wall-clock-safe (deferral #14, paid down):</b> a
+/// wall-clock-capped search is not deterministic across runs, but rehydration
+/// no longer RE-COMPUTES bot decisions. Every bot answer is durably recorded
+/// at the <c>IPlayerAgent</c> boundary (<c>RecordingPlayerAgent</c> →
+/// <c>EnginePersistenceCoordinator.RecordBotDecisionAsync</c>); on a replica
+/// restart the rehydrate path
+/// (<c>MatchService.TryRehydrateAndRegisterAsync</c>) loads the recorded
+/// stream whole and a <c>ScriptedPlayerAgent</c> replays every bot prompt
+/// VERBATIM (codec-decoded against the rebuilt facade's live objects), then
+/// falls through to a fresh recording wrapper at the live edge. NOTHING is
+/// recomputed, so the wall-clock-budgeted <c>mcts</c> strategy rehydrates
+/// id-identically regardless of iteration-count variance
+/// (<c>BotMatchRehydrationTests.MctsBotMatch_Rehydrates_IdenticallyToTheCrashedOriginal</c>).
+/// A corrupt / truncated stream still stops the replay GRACEFULLY (the desync
+/// guard throws inside the replay → the match is lost, never wedged;
+/// <c>PerturbedBotDecision_FailsRehydrationGracefully_NoWedgeNoCrash</c>).
+/// The remaining heuristic default is purely a cost / strength-playtest
+/// choice — flipping <c>Strategy=mcts</c> live no longer risks rehydrate
+/// divergence.
 /// </para>
 /// </summary>
 public sealed class ServerBotOptions
