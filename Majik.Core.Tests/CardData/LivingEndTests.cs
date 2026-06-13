@@ -59,10 +59,15 @@ public class LivingEndTests
         var le = LivingEndFactory.Create(_alice);
 
         le.Name.Should().Be("Living End");
-        le.ManaCost.Should().Be("{2}{B}{B}{B}");
+        // CR 202.1a — no printed mana cost (Scryfall mana_cost == ""); the
+        // first-class no-mana-cost shape. Only castable via Suspend / cascade.
+        le.ManaCost.Should().BeEmpty();
+        le.ManaCostValue.TotalValue.Should().Be(0);
         le.HasType(CardType.Sorcery).Should().BeTrue();
         le.Owner.Should().BeSameAs(_alice);
         le.Controller.Should().BeSameAs(_alice);
+        le.RestrictedCastZones.Should().Contain(ZoneType.Hand,
+            "no printed mana cost — uncastable from hand for its mana cost (CR 601.2a).");
     }
 
     [Fact]

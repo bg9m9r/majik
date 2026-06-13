@@ -37,11 +37,15 @@ public class CrashingFootfallsTests
         var card = CrashingFootfallsFactory.Create(_alice);
 
         card.Name.Should().Be("Crashing Footfalls");
-        card.ManaCost.Should().Be("{1}{R}{G}{W}");
+        // CR 202.1a — no printed mana cost (Scryfall mana_cost == ""); the
+        // first-class no-mana-cost shape. Only castable via Suspend / cascade.
+        card.ManaCost.Should().BeEmpty();
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.Owner.Should().Be(_alice);
         card.Controller.Should().Be(_alice);
-        card.ManaCostValue.TotalValue.Should().Be(4);
+        card.ManaCostValue.TotalValue.Should().Be(0);
+        card.RestrictedCastZones.Should().Contain(ZoneType.Hand,
+            "no printed mana cost — uncastable from hand for its mana cost (CR 601.2a).");
     }
 
     [Fact]

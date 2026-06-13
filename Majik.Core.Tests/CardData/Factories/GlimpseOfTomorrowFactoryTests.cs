@@ -33,9 +33,16 @@ public class GlimpseOfTomorrowFactoryTests
         var card = GlimpseOfTomorrowFactory.Create(_alice);
 
         card.Name.Should().Be("Glimpse of Tomorrow");
-        card.ManaCost.Should().Be("{3}{R}");
+        // CR 202.1a — no printed mana cost (Scryfall mana_cost == ""); the
+        // first-class no-mana-cost shape. Only castable via Suspend / cascade.
+        card.ManaCost.Should().BeEmpty();
+        card.ManaCostValue.TotalValue.Should().Be(0);
         card.HasType(CardType.Sorcery).Should().BeTrue();
+        // CR 105.2 / 202.2c — still RED via a colour indicator (no mana cost
+        // to derive colour from). Scryfall reports colors == ["R"].
         CardColors.GetColors(card).Should().Contain(ManaColor.Red);
+        card.RestrictedCastZones.Should().Contain(ZoneType.Hand,
+            "no printed mana cost — uncastable from hand for its mana cost (CR 601.2a).");
         card.Should().BeOfType<Sorcery>();
     }
     [Fact]

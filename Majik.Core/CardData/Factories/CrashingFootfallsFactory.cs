@@ -48,7 +48,27 @@ namespace Majik.Core.CardData.Factories;
 public static class CrashingFootfallsFactory
 {
     public const string CardName = "Crashing Footfalls";
-    public const string PrintedManaCost = "{1}{R}{G}{W}";
+
+    /// <summary>
+    /// CR 202.1a / 117.7c — Crashing Footfalls has NO printed mana cost
+    /// (Scryfall <c>mana_cost == ""</c>, mana value 0). The empty string is
+    /// the first-class no-mana-cost shape: a genuinely empty cost makes the
+    /// card uncastable from hand for its mana cost — its only legal cast
+    /// path is the printed alternative-cast mechanic (Suspend 4—{G} /
+    /// cascade free cast), which resolves from Exile. The
+    /// <see cref="ZoneType.Hand"/> cast restriction stamped in
+    /// <see cref="Create(Player, TriggerManager, Func{ICard, bool}, Action{CascadeAction.CascadeResult})"/>
+    /// enforces this (CR 601.2a).
+    /// </summary>
+    public const string PrintedManaCost = "";
+
+    /// <summary>
+    /// CR 702.85b — the mana-value cap a cascade trigger on this card uses
+    /// when it fires (exile until a nonland card with mana value &lt; this
+    /// value). Kept as an explicit constant rather than derived from the now-
+    /// empty printed cost: a self-cascade off an MV-0 card whiffs, but the
+    /// surrounding cascade machinery + bidding heuristics read this named cap.
+    /// </summary>
     public const int CascadeSourceManaValue = 4;
     public const int TokenCount = 2;
     public const int TokenPower = 4;
@@ -91,6 +111,13 @@ public static class CrashingFootfallsFactory
         var card = new Sorcery(CardName, PrintedManaCost);
         card.SetOwner(owner);
         card.SetController(owner);
+
+        // CR 601.2a / 117.7c — no printed mana cost means there is no mana
+        // cost to pay, so Crashing Footfalls can't be cast from hand for its
+        // mana cost. The alternative-cast free cast (Suspend / cascade)
+        // resolves from Exile, which this restriction does not touch. Mirrors
+        // LotusBloomFactory's first-class no-mana-cost shape.
+        card.AddRestrictedCastZone(ZoneType.Hand);
 
         // CR 702.85 — Cascade. "When you cast this spell, exile cards from
         // the top of your library until you exile a nonland card whose
