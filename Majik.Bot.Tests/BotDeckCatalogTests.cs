@@ -17,6 +17,7 @@ public class BotDeckCatalogTests
             "Neobrand", "EsperBlink", "SultaiMidrange", "MonoBlackMidrange",
             "AzoriusBlink", "AzoriusControl", "BorosLandDestruction", "Rhinos",
             "DomainZoo", "GruulBroodscale", "EldraziBroodscale",
+            "AzoriusLotusBelcher",
         });
     }
 

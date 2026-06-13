@@ -355,5 +355,20 @@ internal static class BotDeckSideboards
                 "Pithing Needle", "Pithing Needle",
                 "Chalice of the Void", "Chalice of the Void",
             },
+
+            // Azorius Lotus Belcher (WU artifact-combo control) — extra free /
+            // cheap counters to protect the combo, plus sweepers, graveyard +
+            // artifact hate, and a Boseiju for must-answer permanents.
+            ["AzoriusLotusBelcher"] = new[]
+            {
+                "Dovin's Veto", "Dovin's Veto",
+                "Mystical Dispute", "Mystical Dispute",
+                "Flusterstorm",
+                "Subtlety", "Subtlety",
+                "Supreme Verdict", "Supreme Verdict",
+                "Rest in Peace", "Rest in Peace",
+                "Hurkyl's Recall", "Hurkyl's Recall",
+                "Boseiju, Who Endures", "Boseiju, Who Endures",
+            },
         };
 }
