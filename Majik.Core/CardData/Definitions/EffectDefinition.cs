@@ -453,17 +453,23 @@ public sealed class ExileUntilLeavesEffectDef : EffectDefinition
 
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
-        // The candidate gatherer is built in the runtime (it needs the live
-        // source card's controller to apply the "an opponent controls" /
-        // "another" riders against the resolving GameContext), so the request
-        // declared here is a placeholder the runtime replaces. We still emit a
-        // 1..1 request so the owning ability reserves a target slot.
+        // CR 603.3 — the request carries a lazy CandidateGatherer so the shared
+        // targeting pipeline (TargetCollection.CollectAsync) gathers the live
+        // legal ETB targets against the resolving GameContext and prompts the
+        // controller's agent. Without it the live trigger drain offers an empty
+        // pool and the ETB silently fizzles on the prod path (an Enchantment ETB
+        // exile routed through the GameFacade async drain). The gatherer applies
+        // the context-visible riders ("an opponent controls" via ctx.Self, the
+        // mana-value cap); "another" (excludeSelf) + the same-name sweep are
+        // enforced by the runtime's resolution-time legality re-check (CR 608.2b).
         new Majik.Core.Players.Agents.TargetRequest(
             Description: BuildDescription(),
             MinTargets: 1,
             MaxTargets: 1,
             LegalCandidates: System.Array.Empty<object>(),
-            Intent: Majik.Core.Cards.BotIntent.Removal);
+            Intent: Majik.Core.Cards.BotIntent.Removal,
+            CandidateGatherer: TargetFilters.ExileUntilLeavesCandidates(
+                TargetFilter, OpponentControlsOnly, MaxManaValue));
 
     private string BuildDescription()
     {
