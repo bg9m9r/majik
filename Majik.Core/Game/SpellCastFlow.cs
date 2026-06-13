@@ -140,7 +140,8 @@ public sealed class SpellCastFlow
         IAlternativeCost? alternativeCost = null,
         Majik.Core.Players.Agents.ManaPayment? preChosenMana = null,
         DelveCost? delveCost = null,
-        Func<ManaCost, bool>? payManaCost = null)
+        Func<ManaCost, bool>? payManaCost = null,
+        int? preChosenX = null)
     {
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -192,8 +193,19 @@ public sealed class SpellCastFlow
         }
 
         // CR 601.2e + CR 202.3b — choose X and stamp the value on the card so
-        // permanents whose ETB references X can read it.
-        int? xValue = await PromptForXAsync(definition, card, ctx, agent, ct);
+        // permanents whose ETB references X can read it. When the caller (the
+        // TurnDriver / GameFacade dispatch path) already prompted X BEFORE
+        // collecting the mana sources — so the dispatcher's mana prompt +
+        // payManaCost callback could see the X-inclusive cost (CR 601.2b/f) —
+        // reuse that pre-chosen value here instead of re-prompting (CR 601.2g:
+        // one X announcement per cast). Still stamp PendingCastX so ETB-with-X
+        // effects read it even on the dispatch path.
+        int? xValue = preChosenX
+            ?? await PromptForXAsync(definition, card, ctx, agent, ct);
+        if (preChosenX is { } && definition.HasVariableX && card is Card concretePreX)
+        {
+            concretePreX.SetPendingCastX(preChosenX.Value);
+        }
 
         // CR 601.2c — collect targets in declaration order. For a multi-mode
         // ("choose one or more") spell whose target requests are index-aligned
