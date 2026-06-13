@@ -505,10 +505,28 @@ public sealed class GameFacade : IDisposable
             await Majik.Core.Game.SacrificeCostPrompt.ChooseSacrificesAsync(
                 actor, activate.Ability, agents[actor], ctx);
 
+            // GAP 2 — variable-X cost (CR 601.2e analogue). Mirrors
+            // TurnDriver.DispatchActivate: when the ability's mana cost contains
+            // {X} (ManaCost.HasX), prompt the agent for X, record it on the
+            // source ability (ResolutionContext.ChosenX, mirrored onto the stack
+            // copy by AbilityActivator), and expand {X} → X generic in the costs
+            // via the spell path's ManaCost.AddGenericCost machinery. A non-X
+            // ability pays its printed costs unchanged.
+            var costsToPay = activate.Ability.Costs;
+            if (activate.Ability is Majik.Core.Abilities.ActivatedAbility aaForX
+                && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
+                && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
+            {
+                var x = await agents[actor].ChooseXAsync(ctx, xSource, ct: default);
+                aaForX.SetChosenX(x);
+                costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
+                    activate.Ability.Costs, x);
+            }
+
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _bus);
             try
             {
-                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs);
+                activator.ActivateAbility(activate.Ability, actor, targets, costsToPay);
             }
             catch (InvalidOperationException)
             {

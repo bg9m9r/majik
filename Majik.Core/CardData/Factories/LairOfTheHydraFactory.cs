@@ -161,11 +161,18 @@ public static class LairOfTheHydraFactory
         // ----------------------------------------------------------------
         var animateEffect = new Effect(
             $"{CardName}: becomes an X/X green Hydra creature until EOT (still a land)",
-            () =>
+            ctx =>
             {
-                if (effects == null) return; // no service wired — shape-only path
+                if (effects == null) return ValueTask.CompletedTask; // shape-only path
 
-                var x = Math.Max(MinX, xValueProvider?.Invoke() ?? 0);
+                // GAP 2 — X comes from the per-activation ledger
+                // (ResolutionContext.ChosenX, threaded by ActivatedAbility.
+                // ResolveAsync). The xValueProvider closure is kept ONLY as an
+                // optional override for shape/unit tests; when supplied it wins,
+                // otherwise prod reads the chosen X (was always 0 before GAP 2).
+                // "X can't be 0" (CR 107.1b) clamps the body to a minimum 1/1.
+                var rawX = xValueProvider?.Invoke() ?? ctx.ChosenX ?? 0;
+                var x = Math.Max(MinX, rawX);
 
                 // Layer 4 — add Creature type + Hydra subtype. No printed
                 // keywords on the animated body. Printed Land type stays
@@ -178,6 +185,7 @@ public static class LairOfTheHydraFactory
 
                 // Layer 7b — set base P/T to X/X (CR 613.7b).
                 effects.Register(new ManlandCycleBecomesPTEffect(land, x, x));
+                return ValueTask.CompletedTask;
             });
 
         land.AddAbility(new ActivatedAbility(

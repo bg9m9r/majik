@@ -200,7 +200,13 @@ public static class SteelHellkiteFactory
             $"{CardName}: destroy each nontoken permanent with mv = X whose controller took combat damage from this card this turn",
             ctx =>
             {
-                ResolveDestroySweep(owner, xValueProvider, ctx.Game?.AllPlayers, combatVictims);
+                // GAP 2 — X comes from the per-activation ledger
+                // (ResolutionContext.ChosenX, threaded by ActivatedAbility.
+                // ResolveAsync). The xValueProvider closure is kept ONLY as an
+                // optional override for shape/unit tests; when supplied it wins,
+                // otherwise prod reads the chosen X (was always 0 before GAP 2).
+                var x = xValueProvider?.Invoke() ?? ctx.ChosenX ?? 0;
+                ResolveDestroySweep(owner, x, ctx.Game?.AllPlayers, combatVictims);
                 return ValueTask.CompletedTask;
             });
 
@@ -244,11 +250,10 @@ public static class SteelHellkiteFactory
     // --- {X}: destroy sweep (CR 701.7b) -----------------------------------
     private static void ResolveDestroySweep(
         Player owner,
-        Func<int>? xValueProvider,
+        int x,
         IReadOnlyList<Player>? allPlayers,
         HashSet<Player> combatVictims)
     {
-        var x = xValueProvider?.Invoke() ?? 0;
         if (combatVictims.Count == 0) return;
 
         var players = allPlayers ?? (IReadOnlyList<Player>)new[] { owner };

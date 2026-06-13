@@ -24,6 +24,13 @@ public class ActivatedAbility : IActivatedAbility
     private IReadOnlyList<IReadOnlyList<object>> _chosenTargets =
         Array.Empty<IReadOnlyList<object>>();
 
+    // GAP 2 (per-activation variable-X ledger) — the X chosen by the
+    // activating player's agent during AbilityActivationFlow / the TurnDriver
+    // dispatcher. Null = no {X} in cost / not yet chosen. Reset per activation
+    // (mirror _chosenTargets) so a re-activation that doesn't choose X cannot
+    // reuse a stale value.
+    private int? _chosenX;
+
     public Guid Id { get; }
     public Player Controller { get; }
     public DateTime Timestamp { get; }
@@ -123,6 +130,19 @@ public class ActivatedAbility : IActivatedAbility
     /// collection.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<object>> ChosenTargets => _chosenTargets;
+
+    /// <summary>
+    /// GAP 2 — the X chosen by the activating player's agent for a variable-X
+    /// ({X}-cost) activated ability. Parallel to <see cref="ChosenTargets"/>:
+    /// populated by <see cref="SetChosenX"/> during activation
+    /// (<see cref="Game.AbilityActivationFlow.ActivateAsync"/> + the live
+    /// <c>TurnDriver</c> dispatcher), then surfaced to resolution effects via
+    /// <see cref="ResolutionContext.ChosenX"/>. Null when the cost has no {X}
+    /// or the agent has not yet chosen — effects treat null as 0
+    /// (<c>ChosenX ?? 0</c>). Reset per activation so a stale value can't leak
+    /// into a later re-activation.
+    /// </summary>
+    public int? ChosenX => _chosenX;
 
     /// <summary>
     /// STAGE 2/3 (re-sourceable abilities) — provenance flag asserting that
@@ -260,6 +280,17 @@ public class ActivatedAbility : IActivatedAbility
         _chosenTargets = chosen ?? Array.Empty<IReadOnlyList<object>>();
     }
 
+    /// <summary>
+    /// GAP 2 — record the X chosen for this activation (CR 601.2e analogue for
+    /// activated abilities). Called by the activation flow after the agent's
+    /// <see cref="Players.Agents.IPlayerAgent.ChooseXAsync"/> response, before
+    /// mana payment. The {X} in the mana cost is expanded to X generic at
+    /// payment time (shared with the spell path via
+    /// <see cref="ValueObjects.ManaCost.AddGenericCost"/>); this value is what
+    /// the resolution effect reads.
+    /// </summary>
+    public void SetChosenX(int x) => _chosenX = x;
+
     public void Resolve() => ResolveAsync(null, null).GetAwaiter().GetResult();
 
     /// <summary>
@@ -286,7 +317,8 @@ public class ActivatedAbility : IActivatedAbility
         // permanent) so effects can read "their source" generically off the
         // context (CR 113.7) rather than capturing a specific permanent.
         var rc = ResolutionContext.For(
-            Controller, agent, game, _chosenTargets, ct, source: Source as Cards.Permanent);
+            Controller, agent, game, _chosenTargets, ct, source: Source as Cards.Permanent,
+            chosenX: _chosenX);
 
         // Attribute any counter performed during this ability's resolution to
         // its controller — "a spell or ability you control counters a spell"
