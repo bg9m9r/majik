@@ -342,6 +342,45 @@ public class ManaPaymentResolverTests
         payment.Should().BeSameAs(ManaPayment.Empty);
     }
 
+    [Fact]
+    public void TryAutoSelectSources_MultiManaSource_CoversTwoGeneric_WithOneTap()
+    {
+        // CR 605 — Sol Ring's "{T}: Add {C}{C}" produces TWO generic from a
+        // single tap. Paying {2} must select ONLY the Sol Ring (one source);
+        // the greedy generic loop previously selected one source per generic
+        // UNIT, so it would have also tapped the Forest and floated the
+        // surplus mana (deferral mana-payment-over-select, residual (c)).
+        var solRing = NamedCardFactory.Create("Sol Ring", _alice);
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(solRing, forest);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("2"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().ContainSingle()
+            .Which.Should().BeSameAs(solRing);
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_MultiManaSource_CoversColoredPlusGeneric_NoExtraTap()
+    {
+        // Sol Ring ({C}{C}) covers both generic units of {2}{G}; a single
+        // Forest covers the {G}. Two sources total, not three — the surplus-
+        // source over-select must not fire after a 2-output source.
+        var solRing = NamedCardFactory.Create("Sol Ring", _alice);
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        var spare = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(solRing, forest, spare);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("2G"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().HaveCount(2);
+        payment.Sources.Should().Contain(solRing);
+    }
+
     private void OnBattlefield(params ICard[] cards)
     {
         foreach (var c in cards)

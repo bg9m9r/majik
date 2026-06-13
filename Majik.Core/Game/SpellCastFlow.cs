@@ -268,6 +268,26 @@ public sealed class SpellCastFlow
 
         // CR 601.2 / CR 113.5 — capture source zone BEFORE the Hand → Stack
         // move so the "cast from hand" sentinel can branch on it.
+        //
+        // CR 601.2a says the card moves to the stack as the FIRST proposal
+        // step, ahead of cost determination and target collection. The engine
+        // deliberately defers the physical move to HERE (after every step that
+        // can make the cast illegal has run) for two interlocking reasons, both
+        // of which depend on the card still residing in its ORIGIN zone above:
+        //   * the source-zone gates read card.Zone live —
+        //     ValidateCastingPermissionAndAltCost checks the Library-top-cast
+        //     permission (CR 601.3e) and the alt-cost's CanCastFor zone
+        //     restriction (CR 118.9); CostReduction.GetEffectiveCost and the
+        //     targeting candidate pools also resolve against the origin zone;
+        //   * the from-graveyard riders (Delve's CR 702.66b exile, Escape's
+        //     CR 702.138a exile) move OTHER graveyard cards while the cast card
+        //     is itself still in the graveyard — exiling it early would corrupt
+        //     the "N OTHER cards" count.
+        // Because nothing observes the card on the stack until Push below, the
+        // late move is behaviourally identical to the rules-order move (CR 731.1
+        // makes the whole proposal atomic anyway). This is the deliberate
+        // residual of the mana-payment-over-select deferral, item (d): kept late
+        // ON PURPOSE — the strict-601.2a reorder is NOT a safe change.
         var sourceZoneAtCast = card.Zone;
         _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
 

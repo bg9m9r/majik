@@ -146,12 +146,26 @@ public sealed class ManaPaymentResolver
         if (!TrySelectFor(m => m.Green, needG)) return false;
 
         // 2) Cover the remaining generic with any unused untapped source.
-        for (int i = 0; i < needGeneric; i++)
+        // CR 106.1c — generic can be paid with mana of ANY type, so a single
+        // multi-mana source (Sol Ring's {C}{C}, Mind Stone-class rocks, the
+        // ritual lands) covers as many generic units as its total output. Use
+        // PER-SOURCE accounting: subtract each selected source's full output
+        // from the remaining generic before selecting the next. The earlier
+        // per-UNIT loop tapped one source per generic point, so a 2-output
+        // source still pulled a second land and floated the surplus (cosmetic
+        // tap-waste; deferral mana-payment-over-select residual (c)).
+        int remainingGeneric = needGeneric;
+        while (remainingGeneric > 0)
         {
             var pick = candidates.FirstOrDefault(c => !used.Contains(c.Card));
             if (pick.Card == null) return false;
             used.Add(pick.Card);
             selected.Add(pick.Card);
+            // A source's generic contribution is its largest single-ability
+            // total output (every option pays generic; pick the most-paying
+            // one). At least 1, so a zero-total guard can't loop forever.
+            int output = pick.Abilities.Max(a => a.ManaGenerated.TotalValue);
+            remainingGeneric -= Math.Max(1, output);
         }
 
         var candidate = new ManaPayment(selected);
