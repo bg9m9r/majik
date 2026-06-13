@@ -18924,6 +18924,55 @@
     "Red"
   ]
 }
+==== inundated-archive ====
+{
+  "name": "Inundated Archive",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 2,
+      "list": [
+        "mana:B",
+        "mana:U"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== inventors-apprentice ====
 {
   "name": "Inventor\u0027s Apprentice",
@@ -43959,6 +44008,55 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== waterlogged-teachings ====
+{
+  "name": "Waterlogged Teachings",
+  "manaCost": "{3}{U/B}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Blue"
+  ]
 }
 ==== wear ====
 {
