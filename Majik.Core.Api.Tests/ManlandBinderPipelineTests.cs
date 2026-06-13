@@ -158,6 +158,44 @@ public class ManlandBinderPipelineTests
     }
 
     [Fact]
+    public void Prod_CreepingTarPit_Animate_BodyIsBlueAndBlack_RevertsColourlessAtEot()
+    {
+        // CR 613.1e / Layer 5 — the animate line names "blue and black", so the
+        // animated body's effective colour set must be {Blue, Black}. A manland
+        // is a colourless Land off the battlefield; before this the body entered
+        // colourless (the parsed colour words were dropped).
+        var repo = new FakeCardRepo();
+        repo.Add("Creeping Tar Pit", "Land", oracleText: TarPitOracle, colors: "U,B");
+        var land = new Land("Creeping Tar Pit", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Printed land is colourless before animating.
+        facade.ContinuousEffects.Compute((Permanent)land).Colors
+            .Should().BeEmpty("a manland is a colourless Land until activated");
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        facade.ContinuousEffects.Compute((Permanent)land).Colors
+            .Should().BeEquivalentTo(new[]
+            {
+                Majik.Core.ValueObjects.ManaColor.Blue,
+                Majik.Core.ValueObjects.ManaColor.Black,
+            }, "the animate line names \"blue and black\" (CR 613.1e Layer 5)");
+
+        // CR 514.2 — "until end of turn" colour SET expires at cleanup; the land
+        // reverts to colourless along with the rest of the animation.
+        facade.ContinuousEffects.ExpireEndOfTurn();
+        facade.ContinuousEffects.Compute((Permanent)land).Colors
+            .Should().BeEmpty("the colour SET expires at end of turn with the animation");
+    }
+
+    [Fact]
     public void Prod_CelestialColonnade_Animate_GrantsFlyingAndVigilance_4_4()
     {
         var repo = new FakeCardRepo();
@@ -178,6 +216,11 @@ public class ManlandBinderPipelineTests
         chars.Subtypes.Should().Contain(CardSubtype.Elemental);
         chars.Keywords.Should().Contain("Flying");
         chars.Keywords.Should().Contain("Vigilance");
+        chars.Colors.Should().BeEquivalentTo(new[]
+        {
+            Majik.Core.ValueObjects.ManaColor.White,
+            Majik.Core.ValueObjects.ManaColor.Blue,
+        }, "the animate line names \"white and blue\" (CR 613.1e Layer 5)");
         var cc = chars.Should().BeOfType<CreatureCharacteristics>().Subject;
         cc.Power.Should().Be(4);
         cc.Toughness.Should().Be(4);
