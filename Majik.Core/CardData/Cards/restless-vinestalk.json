@@ -1,0 +1,8 @@
+{
+  "name": "Restless Vinestalk",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}

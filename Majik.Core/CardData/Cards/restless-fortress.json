@@ -1,0 +1,8 @@
+{
+  "name": "Restless Fortress",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}

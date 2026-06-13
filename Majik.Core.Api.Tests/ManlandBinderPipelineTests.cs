@@ -356,6 +356,55 @@ public class ManlandBinderPipelineTests
         bob.Zones.Library.GetCards().Count().Should().Be(bobLibBefore - 4);
     }
 
+    private const string RestlessAnchorageOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {W} or {U}.\n" +
+        "{1}{W}{U}: Until end of turn, this land becomes a 2/3 white and blue " +
+        "Bird creature with flying. It's still a land.\n" +
+        "Whenever this land attacks, create a Map token.";
+
+    [Fact]
+    public void Prod_RestlessAnchorage_CreateMapAttackTrigger_BindsAndAnimates()
+    {
+        // Restless Anchorage's "create a Map token" attack trigger is a
+        // non-targeted self-contained Restless rider — it binds in prod as a
+        // simple TriggeredAbility (no TargetRequest). The animate ability
+        // (2/3 Bird, flying) binds too.
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Anchorage", "Land", oracleText: RestlessAnchorageOracle, colors: "W,U");
+        var land = new Land("Restless Anchorage", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        live.Abilities.OfType<ActivatedAbility>()
+            .Count(a => a.Costs.OfType<ManaCostCost>().Any())
+            .Should().Be(1, "the animate ability binds");
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the 'create a Map token' attack trigger is bound").Subject;
+        trigger.TargetRequests.Should().BeEmpty("create-a-Map is non-targeted");
+
+        // Fire the trigger → exactly one Map token appears on the controller's
+        // battlefield.
+        var mapsBefore = alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Map");
+        foreach (var e in trigger.Effects) e.Execute();
+        alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Map")
+            .Should().Be(mapsBefore + 1, "the attack trigger mints exactly one Map token");
+
+        // The animate ability still upgrades the land to a 2/3 flier.
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(2);
+        cc.Toughness.Should().Be(3);
+        cc.Keywords.Should().Contain("Flying");
+        cc.Subtypes.Should().Contain(CardSubtype.Bird);
+    }
+
     [Fact]
     public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
     {
