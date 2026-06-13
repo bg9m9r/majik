@@ -731,6 +731,50 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_SignedPump_RehomesNegativeDeltaSelfPumpToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature with a SIGNED-delta self-pump — a real Modern shape
+        // (Aetherling "{1}: ~ gets +1/-1", Canyon Crab "{1}{U}: ~ gets +2/-2",
+        // the Flowstone cycle "{R}: ~ gets +1/-1"). The negative toughness delta
+        // is fully sound to re-home: PumpUntilEndOfTurnEffect takes raw ints, so
+        // it adds the signed deltas to the BEARER's characteristics.
+        var crab = new Creature("Canyon Stub", "2U", 0, 4);
+        crab.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(crab);
+        crab.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones, power: 2, toughness: 5);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Canyon Stub", "{1}{U}: This creature gets +2/-2 until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), crab);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's signed self-pump");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+
+        // Activating it applies +2/-2 to the BEARER (CR 613.1f Layer 7c).
+        // Base 2/5 + the +1/+1 counter = 3/6 before the pump → 5/4 after.
+        var powerBefore = bearer.GetPower();
+        var toughnessBefore = bearer.GetToughness();
+        foreach (var effect in pump.Effects) effect.Execute();
+        bearer.GetPower().Should().Be(powerBefore + 2,
+            "the re-homed signed self-pump raises the BEARER's power by +2");
+        bearer.GetToughness().Should().Be(toughnessBefore - 2,
+            "the negative toughness delta lowers the BEARER's toughness by 2");
+    }
+
+    [Fact]
     public void Grant_NonMana_SelfKeywordGrant_RehomesKeywordToBearer()
     {
         var alice = new Player("Alice", 20);

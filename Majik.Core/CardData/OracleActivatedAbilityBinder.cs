@@ -35,11 +35,14 @@ namespace Majik.Core.CardData;
 /// <h3>Shapes rebuilt</h3>
 /// <list type="bullet">
 ///   <item><b>Firebreathing / self-pump</b> —
-///     <c>"{cost}: This creature gets +X/+Y until end of turn."</c> Rebuilt as a
+///     <c>"{cost}: This creature gets ±X/±Y until end of turn."</c> Rebuilt as a
 ///     no-target <see cref="ActivatedAbility"/> whose resolution registers a
-///     <see cref="PumpUntilEndOfTurnEffect"/>(+X, +Y) against the BEARER's own
+///     <see cref="PumpUntilEndOfTurnEffect"/>(±X, ±Y) against the BEARER's own
 ///     <see cref="Creature.ActiveEffects"/> (CR 613.1f Layer 7c; CR 514.2
-///     expiry) — exactly the primitive Fiery Hellhound uses.</item>
+///     expiry) — the all-positive form is exactly the primitive Fiery Hellhound
+///     uses; a signed delta (a negative power/toughness leg, as on Aetherling /
+///     Canyon Crab / Darklit Gargoyle / the Flowstone cycle) is equally sound to
+///     re-home because the effect adds the raw signed ints to the bearer.</item>
 ///   <item><b>Pinger</b> —
 ///     <c>"{cost}: This creature deals N damage to &lt;any target | target
 ///     creature | target player&gt;."</c> Rebuilt with a 1..1
@@ -65,11 +68,13 @@ namespace Majik.Core.CardData;
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
-/// A cost is a <c>", "</c>-separated list of mana symbols (<c>{2}</c>,
-/// <c>{R}</c>, …) and/or the tap symbol (<c>{T}</c>). The mana symbols are
-/// folded into a single <see cref="ManaCostCost"/>; a <c>{T}</c> becomes
+/// A cost is a <c>", "</c>-separated list of mana-symbol RUNS (each a
+/// concatenation of one or more pips the way real oracle text writes a
+/// multi-symbol cost — <c>{2}</c>, <c>{R}</c>, <c>{1}{U}</c>, <c>{2}{R}</c>, …)
+/// and/or the tap symbol (<c>{T}</c>). All the mana symbols are folded into a
+/// single <see cref="ManaCostCost"/>; a <c>{T}</c> becomes
 /// <see cref="AdditionalCost.Tap"/>(bearer). So <c>"{R}, {T}:"</c>,
-/// <c>"{T}:"</c>, and <c>"{2}:"</c> are all handled. The
+/// <c>"{T}:"</c>, <c>"{2}:"</c>, and <c>"{1}{U}:"</c> are all handled. The
 /// <c>"Sacrifice this creature:"</c> cost becomes
 /// <see cref="AdditionalCost.Sacrifice"/>(bearer).
 ///
@@ -96,16 +101,25 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleActivatedAbilityBinder
 {
-    // A cost token is either {T} or a single mana pip we can model exactly:
-    // generic digits or one of W/U/B/R/G/C. Anything else ({X}, {E}, {S},
-    // Phyrexian {R/P}, etc.) is intentionally NOT matched so the clause is
-    // skipped as unsound. The cost is a ", "-separated list of these.
-    private const string CostToken = @"(?:\{T\}|\{(?:\d+|[WUBRGC])\})";
+    // A cost token is either {T} or a RUN of one-or-more concatenated mana pips
+    // we can model exactly — generic digits and/or W/U/B/R/G/C — written the way
+    // oracle text spells a multi-symbol cost ("{R}", "{2}", "{1}{U}", "{2}{R}").
+    // Anything else ({X}, {E}, {S}, Phyrexian {R/P}, etc.) is intentionally NOT
+    // matched so the clause is skipped as unsound. The cost is a ", "-separated
+    // list of these (TryBuildCostList re-validates each token before folding).
+    private const string CostToken = @"(?:\{T\}|(?:\{(?:\d+|[WUBRGC])\})+)";
     private const string CostList = CostToken + @"(?:\s*,\s*" + CostToken + @")*";
 
-    // "{cost}: This creature gets +X/+Y until end of turn."
+    // "{cost}: This creature gets ±X/±Y until end of turn."
+    // Each delta carries its OWN sign so signed-pump shapes — a negative
+    // toughness/power leg as on Aetherling ({1}: +1/-1), Canyon Crab
+    // ({1}{U}: +2/-2), Darklit Gargoyle ({B}: +2/-1) and the Flowstone cycle
+    // ({R}: +1/-1) — are reconstructed too, not just the all-positive
+    // firebreathing form. A negative delta is sound to re-home: the rebuilt
+    // PumpUntilEndOfTurnEffect adds the signed ints to the BEARER's
+    // characteristics (CR 613.1f Layer 7c).
     private static readonly Regex SelfPumpRegex = new(
-        @"^(" + CostList + @")\s*:\s*This creature gets \+(\d+)/\+(\d+) until end of turn\.$",
+        @"^(" + CostList + @")\s*:\s*This creature gets ([+-]\d+)/([+-]\d+) until end of turn\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: This creature deals N damage to <target form>."
@@ -375,8 +389,13 @@ public static class OracleActivatedAbilityBinder
                 continue;
             }
 
-            // A mana pip we can model exactly: {N} generic or one of W/U/B/R/G/C.
-            if (Regex.IsMatch(token, @"^\{(?:\d+|[WUBRGC])\}$", RegexOptions.IgnoreCase))
+            // A run of one or more mana pips we can model exactly, written
+            // CONCATENATED the way real oracle text spells a multi-symbol cost:
+            // {N} generic and/or W/U/B/R/G/C coloured pips (e.g. "{1}{U}",
+            // "{2}{R}", "{B}"). The whole token must be nothing BUT such pips —
+            // a stray {E}/{S}/{R/P}/{X} makes the run unmodellable and the clause
+            // is skipped below.
+            if (Regex.IsMatch(token, @"^(?:\{(?:\d+|[WUBRGC])\})+$", RegexOptions.IgnoreCase))
             {
                 manaSymbols.Append(token);
                 continue;
