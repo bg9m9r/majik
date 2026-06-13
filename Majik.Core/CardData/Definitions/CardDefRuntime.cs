@@ -2843,14 +2843,14 @@ public static class CardDefRuntime
             $"{card.Name}: draw {amount} card(s)",
             () =>
             {
-                for (var i = 0; i < amount; i++)
-                {
-                    var top = controller.Zones.Library.GetCards().FirstOrDefault();
-                    if (top == null) return; // empty library — SBAs handle loss elsewhere
-                    controller.Zones.Library.RemoveCard(top);
-                    controller.Zones.Hand.AddCard(top);
-                    top.SetZone(ZoneType.Hand);
-                }
+                // CR 121.1 — route the draw through Fx.DrawCards so (a) any
+                // attached ReplacementBus (Dredge etc.) gets a shot per draw
+                // (CR 614) and (b) a draw from an empty library flags the
+                // controller for the SBA-driven loss (CR 120.3 / 704.5b) via
+                // Player.MarkTriedToDrawFromEmptyLibrary — the same posture the
+                // bespoke cantrip factories (Serum Visions / Opt / Consider)
+                // carried before they were folded onto this declarative verb.
+                Fx.DrawCards(controller, amount);
             });
     }
 
