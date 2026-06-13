@@ -38,12 +38,15 @@ namespace Majik.Core.CardData;
 /// through <see cref="ContinuousEffectsService.Compute(Permanent)"/>'s
 /// creature-row upgrade.</para>
 ///
+/// <para><b>Colour identity of the animated body (Layer 5, CR 613.1e).</b> The
+/// animate line names the body's colour(s) ("blue and black", "white and blue",
+/// …). The binder parses those colour words and, on animate, registers a
+/// <see cref="SetColorsEffect"/> scoped to the land (expiring at end of turn)
+/// so the animated body enters as its printed colour instead of colourless.</para>
+///
 /// <para><b>Deferred (per-card riders this generic binder does NOT bind).</b>
 /// See v1-deferrals + the per-pattern comments below:
 /// <list type="bullet">
-///   <item>Colour identity of the animated body (Layer 5) — no colour-setting
-///     primitive exists; the "blue and black" text is recorded in the
-///     effect-name string only (same gap as the factories).</item>
 ///   <item>Animate riders carrying a <b>granted quoted ability</b> ("with
 ///     \"{X}: …\"" / "with \"Whenever this creature attacks, …\"") — Den of
 ///     the Bugbear, Raging Ravine, Lavaclaw Reaches, Wandering Fumarole,
@@ -111,6 +114,18 @@ public static class ManlandBinder
     {
         "white", "blue", "black", "red", "green", "colorless", "and",
     };
+
+    // CR 105.1 — map each printed colour word to its ManaColor. "colorless" /
+    // "and" carry no colour and are filtered (SetColorsEffect drops Colorless).
+    private static readonly IReadOnlyDictionary<string, Majik.Core.ValueObjects.ManaColor> ColorWordToColor =
+        new Dictionary<string, Majik.Core.ValueObjects.ManaColor>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["white"] = Majik.Core.ValueObjects.ManaColor.White,
+            ["blue"] = Majik.Core.ValueObjects.ManaColor.Blue,
+            ["black"] = Majik.Core.ValueObjects.ManaColor.Black,
+            ["red"] = Majik.Core.ValueObjects.ManaColor.Red,
+            ["green"] = Majik.Core.ValueObjects.ManaColor.Green,
+        };
 
     // Simple printed keywords a manland can animate with (CR 702). Multi-word
     // keywords are matched before single-word ones. Anything not in this set
@@ -233,7 +248,7 @@ public static class ManlandBinder
         // "becomes a … creature with all creature types" (Mutavault) and X/X
         // (Lair of the Hydra) never reach here (no fixed subtype / no digit
         // P/T) — they defer.
-        var (subtype, isArtifact) = ParseBody(m.Groups["body"].Value);
+        var (subtype, isArtifact, bodyColors) = ParseBody(m.Groups["body"].Value);
         if (subtype is null) return false; // unknown / "all creature types" → defer
 
         // Keyword tail — the "with <kw…>" segment of the remainder, up to the
@@ -253,8 +268,15 @@ public static class ManlandBinder
         // Both ExpiresAtEndOfTurn (CR 514.2 cleanup step lifts the animation).
         var capturedSubtype = subtype.Value;
         var extraTypes = isArtifact ? new[] { CardType.Artifact } : null;
+        // CR 613.1e (Layer 5) — the animate line names the body's colour(s)
+        // ("blue and black", "white and blue", …). Animated manlands are
+        // colourless Lands; SET the parsed colours onto the body for the
+        // animation's duration so it enters as its printed colour instead of
+        // colourless. No colour word (or only "colorless") → no SET registered.
+        var capturedColors = bodyColors;
         var animateEffect = new Effect(
-            $"{land.Name}: becomes {power}/{toughness} {capturedSubtype} " +
+            $"{land.Name}: becomes {power}/{toughness} " +
+            $"{string.Join(" and ", capturedColors)} {capturedSubtype} " +
             $"{(isArtifact ? "artifact " : "")}creature until EOT (still a land)",
             () =>
             {
@@ -265,6 +287,14 @@ public static class ManlandBinder
                     extraTypes: extraTypes));
                 effects.Register(new ManlandCycleBecomesPTEffect(
                     land, power, toughness));
+                if (capturedColors.Count > 0)
+                {
+                    effects.Register(new SetColorsEffect(
+                        source: land,
+                        scope: p => ReferenceEquals(p, land),
+                        colors: capturedColors,
+                        expiresAtEndOfTurn: true));
+                }
             });
 
         land.AddAbility(new ActivatedAbility(
@@ -280,17 +310,32 @@ public static class ManlandBinder
     }
 
     /// <summary>
-    /// Strip leading colour words from the body group, detect a trailing
-    /// "artifact" supertype word, and Enum.TryParse the trailing token as a
-    /// <see cref="CardSubtype"/>. Returns (null, _) for an unknown / multi-word
-    /// subtype (defer). The bool is true when the body is an artifact creature.
+    /// Parse the body group "&lt;colors&gt; [artifact] &lt;Subtype&gt;" into the
+    /// animated body's colours (CR 105.1), an artifact-supertype flag, and the
+    /// <see cref="CardSubtype"/>. The colour words are captured (in printed
+    /// order, deduped) for the Layer-5 SET; the remaining tokens after stripping
+    /// colour words + "artifact" yield the subtype. Returns
+    /// <c>(null, _, _)</c> for an unknown / multi-word subtype (defer).
     /// </summary>
-    private static (CardSubtype? Subtype, bool IsArtifact) ParseBody(string body)
+    private static (CardSubtype? Subtype, bool IsArtifact, IReadOnlyList<Majik.Core.ValueObjects.ManaColor> Colors) ParseBody(string body)
     {
-        var tokens = body.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        var rawTokens = body.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        // CR 105.1 — colour words in printed order (deduped), e.g. "blue and
+        // black" → [Blue, Black]. "colorless"/"and" carry no colour.
+        var colors = new List<Majik.Core.ValueObjects.ManaColor>();
+        foreach (var t in rawTokens)
+        {
+            if (ColorWordToColor.TryGetValue(t, out var c) && !colors.Contains(c))
+            {
+                colors.Add(c);
+            }
+        }
+
+        var tokens = rawTokens
             .Where(t => !ColorWords.Contains(t))
             .ToList();
-        if (tokens.Count == 0) return (null, false);
+        if (tokens.Count == 0) return (null, false, colors);
 
         var isArtifact = false;
         // "<Subtype> artifact" never happens; the printed order is
@@ -301,14 +346,14 @@ public static class ManlandBinder
         {
             isArtifact = true;
         }
-        if (tokens.Count == 0) return (null, isArtifact);
+        if (tokens.Count == 0) return (null, isArtifact, colors);
 
         // Normalise hyphenated subtypes to their PascalCase enum name
         // ("Assembly-Worker" → "AssemblyWorker" — Mishra's Factory / Foundry).
         var token = tokens[^1].Replace("-", "");
         return Enum.TryParse<CardSubtype>(token, ignoreCase: true, out var st)
-            ? (st, isArtifact)
-            : (null, isArtifact);
+            ? (st, isArtifact, colors)
+            : (null, isArtifact, colors);
     }
 
     /// <summary>
