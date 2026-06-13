@@ -67,10 +67,18 @@ namespace Majik.Core.CardData.Factories;
 /// ## Deferred (v1 gaps, documented for v1-deferrals #19)
 /// - Birgi's "this mana doesn't empty" rider (mana-no-empty) is not modelled —
 ///   the trigger adds {R} to the pool only.
-/// - Harnfel's "you may play those cards" play-as-a-LAND corner (CR 305.2) is
-///   not separately wired — the grant authorises CASTING the exiled cards
-///   (matching the impulse-draw family pattern in
-///   <see cref="RecklessImpulseFactory"/> / <see cref="LightUpTheStageFactory"/>).
+///
+/// ## Play-as-a-LAND corner (CR 305.2 / 601.1) — implemented
+/// - "You may play those cards this turn" covers BOTH the spell-cast half and
+///   the land-play half. A LAND in the exile pile is PLAYED, not cast (CR
+///   601.1), so <see cref="ExilePlayPermission.GrantUntil"/> additionally
+///   stamps a runtime exile land-play grant
+///   (<see cref="Card.RuntimeExileLandPlayAllowedPlayer"/>) on each exiled
+///   land. <see cref="ExilePlayPermission.PlayableLandsFromExile"/> surfaces it
+///   to the land-drop enumeration so the controller may play it from exile
+///   (still consuming the CR 305.2 land drop via
+///   <see cref="Majik.Core.Game.LandDropTracker"/>); the SAME shared revocation
+///   clears the land-play half at the controller's next Cleanup step.
 /// </summary>
 [CardName("Birgi, God of Storytelling")]
 public static class BirgiGodOfStorytellingFactory
@@ -263,7 +271,15 @@ public static class BirgiGodOfStorytellingFactory
                             controller, ExilePlayExpiry.EndOfTurn, bus,
                             () =>
                             {
-                                foreach (var s in stamped) s.ClearRuntimeExileCast();
+                                // CR 305.2 — clear BOTH halves of the play
+                                // permission (the spell-cast grant AND the
+                                // exiled-land land-play grant) under the one
+                                // shared "this turn" subscription.
+                                foreach (var s in stamped)
+                                {
+                                    s.ClearRuntimeExileCast();
+                                    s.ClearRuntimeExileLandPlay();
+                                }
                             });
                     }),
             });

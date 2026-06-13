@@ -76,6 +76,7 @@ public sealed class MutableFieldTripwireTests
             "RuntimeExileCastAllowedCaster",        // COPIED + relinked via RelinkReferences (GrantRuntimeExileCast → cloned player)
             "RuntimeExileCastCost",                 // COPIED (immutable value-object ref)
             "RuntimeExileCastSpendAsAnyColor",      // COPIED (scalar bool)
+            "RuntimeExileLandPlayAllowedPlayer",    // COPIED + relinked via RelinkReferences (GrantRuntimeExileLandPlay → cloned player)
             "RuntimeFlashbackCost",                 // COPIED (immutable value-object ref)
             "RuntimeGraveyardCastCost",             // COPIED (immutable value-object ref)
             "RuntimeGraveyardNonOwnerCastAllowedCaster", // COPIED + relinked via RelinkReferences (GrantRuntimeGraveyardNonOwnerCast → cloned player)

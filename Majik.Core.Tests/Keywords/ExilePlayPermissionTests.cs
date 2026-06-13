@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Keywords;
@@ -155,5 +156,68 @@ public class ExilePlayPermissionTests
         act.Should().NotThrow();
         card.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
             "no bus = nothing scheduled; grant untouched");
+    }
+
+    // ── land-play half of CR 305.2 (Harnfel) ────────────────────────────────
+
+    private static Land NewExiledLand(Player owner, string name = "Forest")
+    {
+        var land = new Land(name);
+        land.SetOwner(owner);
+        owner.Zones.Exile.AddCard(land);
+        land.SetZone(ZoneType.Exile);
+        return land;
+    }
+
+    [Fact]
+    public void GrantUntil_OnExiledLand_StampsLandPlayPermission()
+    {
+        // CR 305.2 / 601.1 — a LAND in a "you may play those cards this turn"
+        // exile pile is PLAYED, not cast: it needs the land-play grant, not the
+        // spell-cast grant (a cast grant never makes a land a legal play source).
+        var land = NewExiledLand(_alice);
+
+        ExilePlayPermission.GrantUntil(
+            land, _alice, land.ManaCostValue, ExilePlayExpiry.EndOfTurn);
+
+        land.RuntimeExileLandPlayAllowedPlayer.Should().BeSameAs(_alice,
+            "an exiled land receives the land-play half of the play permission");
+
+        ExilePlayPermission.PlayableLandsFromExile(_alice)
+            .Should().ContainSingle().Which.Should().BeSameAs(land);
+        ExilePlayPermission.PlayableLandsFromExile(_bob)
+            .Should().BeEmpty("the grant nominates Alice only");
+    }
+
+    [Fact]
+    public void GrantUntil_OnExiledLand_EndOfTurn_RevokesLandPlayPermission()
+    {
+        var bus = new EventBus();
+        var land = NewExiledLand(_alice);
+
+        ExilePlayPermission.GrantUntil(
+            land, _alice, land.ManaCostValue, ExilePlayExpiry.EndOfTurn, bus);
+
+        land.RuntimeExileLandPlayAllowedPlayer.Should().BeSameAs(_alice);
+
+        // First cleanup the player owns ends "this turn" — both halves clear.
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
+        land.RuntimeExileLandPlayAllowedPlayer.Should().BeNull(
+            "the land-play grant expires with the rest of the permission (CR 514.2)");
+        ExilePlayPermission.PlayableLandsFromExile(_alice).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GrantUntil_OnExiledNonland_DoesNotStampLandPlayPermission()
+    {
+        // A nonland card under the same permission is castable (the cast half),
+        // never land-playable — PlayableLandsFromExile must not surface it.
+        var card = NewExiled(_alice);
+
+        ExilePlayPermission.GrantUntil(
+            card, _alice, card.ManaCostValue, ExilePlayExpiry.EndOfTurn);
+
+        card.RuntimeExileLandPlayAllowedPlayer.Should().BeNull();
+        ExilePlayPermission.PlayableLandsFromExile(_alice).Should().BeEmpty();
     }
 }

@@ -125,6 +125,12 @@ public class Card : ICard
         if (src.RuntimeExileCastAllowedCaster is { } exA && players.TryGetValue(exA, out var cExA))
             GrantRuntimeExileCast(cExA, src.RuntimeExileCastCost!, src.RuntimeExileCastSpendAsAnyColor);
 
+        // Relink exile land-play grant (CR 305.2 — the land-play half): remap the
+        // granted player to the cloned player so ReferenceEquals checks against
+        // the cloned player succeed. Mirrors the exile-cast relink above.
+        if (src.RuntimeExileLandPlayAllowedPlayer is { } lpA && players.TryGetValue(lpA, out var cLpA))
+            GrantRuntimeExileLandPlay(cLpA);
+
         // Relink graveyard-non-owner-cast grant: same pattern as above.
         // Preserves companion fields (cost, anyTypeMana).
         if (src.RuntimeGraveyardNonOwnerCastAllowedCaster is { } gyA && players.TryGetValue(gyA, out var cGyA))
@@ -303,6 +309,49 @@ public class Card : ICard
         RuntimeExileCastAllowedCaster = null;
         RuntimeExileCastCost = null;
         RuntimeExileCastSpendAsAnyColor = false;
+    }
+
+    /// <summary>
+    /// CR 305.2 / CR 118.9 — runtime "you may PLAY this exiled LAND" grant. The
+    /// land-play half of the same temporary "you may play those cards this
+    /// turn" permission that <see cref="RuntimeExileCastAllowedCaster"/> covers
+    /// for the spell-CAST half (Harnfel, Horn of Bounty: "Exile the top two
+    /// cards of your library. You may play those cards this turn." — a card in
+    /// that exile pile that is a LAND is PLAYED, not cast, CR 305.2 / 601.1).
+    ///
+    /// <para>
+    /// When non-null, the named player may play this card as a land from the
+    /// Exile zone, still consuming their normal land drop (CR 305.2 — the
+    /// per-turn cap is enforced by <see cref="Majik.Core.Game.LandDropTracker"/>
+    /// on the play path). Mirrors <see cref="RuntimeExileCastAllowedCaster"/>,
+    /// the cast analogue; the granted player need not be the owner. Cleared at
+    /// end of turn by the granting effect's bus subscription (the SAME
+    /// <see cref="Keywords.ExilePlayPermission"/> revocation that clears the
+    /// cast grant).
+    /// </para>
+    /// </summary>
+    public Player? RuntimeExileLandPlayAllowedPlayer { get; private set; }
+
+    /// <summary>
+    /// Stamp an exile land-play grant on this card (CR 305.2).
+    /// <paramref name="allowedPlayer"/> is the player who may play it as a land
+    /// (need not be the owner). Idempotent — later grants overwrite earlier
+    /// ones. Cleared at EOT by the granting effect's bookkeeping. Distinct from
+    /// <see cref="GrantRuntimeExileCast"/> (the spell-cast half): a LAND in an
+    /// impulse-style "you may play those cards this turn" exile pile is PLAYED,
+    /// not cast (CR 601.1), so it needs this land-play permission rather than a
+    /// cast permission.
+    /// </summary>
+    public void GrantRuntimeExileLandPlay(Player allowedPlayer)
+    {
+        ArgumentNullException.ThrowIfNull(allowedPlayer);
+        RuntimeExileLandPlayAllowedPlayer = allowedPlayer;
+    }
+
+    /// <summary>Clear any runtime exile land-play grant on this card.</summary>
+    public void ClearRuntimeExileLandPlay()
+    {
+        RuntimeExileLandPlayAllowedPlayer = null;
     }
 
     /// <summary>
@@ -1616,6 +1665,7 @@ public class Card : ICard
         RuntimeExileCastAllowedCaster = src.RuntimeExileCastAllowedCaster;
         RuntimeExileCastCost = src.RuntimeExileCastCost;
         RuntimeExileCastSpendAsAnyColor = src.RuntimeExileCastSpendAsAnyColor;
+        RuntimeExileLandPlayAllowedPlayer = src.RuntimeExileLandPlayAllowedPlayer;
         RuntimeGraveyardNonOwnerCastAllowedCaster = src.RuntimeGraveyardNonOwnerCastAllowedCaster;
         RuntimeGraveyardNonOwnerCastCost = src.RuntimeGraveyardNonOwnerCastCost;
         RuntimeGraveyardNonOwnerCastAnyTypeMana = src.RuntimeGraveyardNonOwnerCastAnyTypeMana;
