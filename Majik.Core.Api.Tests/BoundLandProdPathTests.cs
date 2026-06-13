@@ -58,8 +58,8 @@ public class BoundLandProdPathTests
     [Theory]
     [InlineData("Reflecting Pool", 6)]   // WUBRG + {C} dynamic mana abilities
     [InlineData("Boseiju, Who Shelters All", 1)] // {T}, Pay 2 life: Add {C}
-    [InlineData("Sunken Citadel", 10)]   // 5 single + 5 restricted-double
-    [InlineData("Temple of the Dragon Queen", 5)] // 5 chosen-colour
+    [InlineData("Sunken Citadel", 2)]    // 1 chosen-colour single + 1 restricted-double (CR 614.12)
+    [InlineData("Temple of the Dragon Queen", 1)] // 1 chosen-colour single-pip (CR 614.12)
     public void FormerlyStubLand_NowHasBoundManaAbilities(string name, int expectedManaAbilities)
     {
         var card = BuildThroughProd(name)[name];
