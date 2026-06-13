@@ -553,6 +553,50 @@ public class LandActivatedAbilityBinderPipelineTests
     // 8. CHANNEL — deferred family (discard-from-hand activation seam)
     // ======================================================================
 
+    // ======================================================================
+    // 11. MASS until-EOT KEYWORD GRANT — Vault of the Archangel
+    // "{2}{W}{B}, {T}: Creatures you control gain deathtouch and lifelink
+    // until end of turn." (CR 613.1c Layer 6 / CR 514.2 cleanup expiry)
+    // ======================================================================
+
+    private const string VaultOfTheArchangelOracle =
+        "{T}: Add {C}.\n" +
+        "{2}{W}{B}, {T}: Creatures you control gain deathtouch and lifelink until end of turn.";
+
+    [Fact]
+    public void Prod_VaultOfTheArchangel_GrantsDeathtouchAndLifelinkToYourCreatures()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Vault of the Archangel", "Land", oracleText: VaultOfTheArchangelOracle, colors: "");
+        var land = new Land("Vault of the Archangel", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+
+        var mine = new Creature("Bear", "{G}", 2, 2, null, new[] { CardSubtype.Bear });
+        mine.SetOwner(alice); mine.SetController(alice);
+        alice.Zones.Battlefield.AddCard(mine); mine.SetZone(ZoneType.Battlefield);
+
+        // Bob's creature must NOT gain the keywords ("Creatures you control").
+        var theirs = new Creature("Ogre", "{R}", 3, 3, null, new[] { CardSubtype.Ogre });
+        theirs.SetOwner(facade.Bob); theirs.SetController(facade.Bob);
+        facade.Bob.Zones.Battlefield.AddCard(theirs); theirs.SetZone(ZoneType.Battlefield);
+
+        var ability = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in ability.Effects) e.Execute();
+
+        mine.HasEffectiveKeyword("Deathtouch").Should().BeTrue(
+            "the controller's creature gains deathtouch until end of turn");
+        mine.HasEffectiveKeyword("Lifelink").Should().BeTrue(
+            "the controller's creature gains lifelink until end of turn");
+        theirs.HasEffectiveKeyword("Deathtouch").Should().BeFalse(
+            "'Creatures you control' excludes the opponent's creature");
+        theirs.HasEffectiveKeyword("Lifelink").Should().BeFalse(
+            "'Creatures you control' excludes the opponent's creature");
+    }
+
     [Fact(Skip = "Channel is a discard-this-card-from-HAND activation, not a {T} battlefield activation. " +
                  "No binder-reachable 'discard this card to activate' cost seam exists, so the whole " +
                  "Channel family (Boseiju Who Endures, Otawara, Takenuma, Eiganjo, Sokenzan) is deferred " +

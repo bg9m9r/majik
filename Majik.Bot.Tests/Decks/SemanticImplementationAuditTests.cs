@@ -408,7 +408,11 @@ public class SemanticImplementationAuditTests
             // -- Other residual deferrals. --
             "Demolition Field",              // destroy binds; the both-players "search for a basic land" rider is deferred
             "Desert",                         // "{T}: deal 1 to target attacking creature" gated to the end-of-combat step — no binder-reachable timing seam
-            "Vault of the Archangel",        // "Creatures you control gain deathtouch and lifelink until EOT" — mass until-EOT keyword grant, no primitive
+            // Vault of the Archangel ("Creatures you control gain deathtouch and
+            // lifelink until end of turn") is NO LONGER deferred: the mass
+            // until-EOT keyword grant now binds in prod via
+            // LandActivatedAbilityBinder (BindGrantKeywordsToCreaturesYouControl),
+            // so it stops tripping the detector and is removed from this allowlist.
         };
 
     private sealed record EffectSignal(string Label, Func<string, bool> Oracle, string[] MechanicFragments);
@@ -722,26 +726,36 @@ public class SemanticImplementationAuditTests
     }
 
     /// <summary>The genuine-gap sentinel — a binder-chain-only land whose
-    /// special effect is GENUINELY DEAD in prod MUST stay flagged. Vault of the
-    /// Archangel promises "Creatures you control gain deathtouch and lifelink"
-    /// (a mass until-EOT keyword grant) — there is no binder-reachable
-    /// keyword-grant primitive, so it is a deliberate deferral
-    /// (<see cref="EffectCoverageAllowlist"/> entry, v1-deferrals #12). If this
-    /// ever stops flagging, the land was either fixed (move it off the deferral
-    /// list) or the heuristic over-suppressed.
+    /// special effect is GENUINELY DEAD in prod MUST stay flagged. Desert
+    /// promises "{T}: This land deals 1 damage to target attacking creature.
+    /// Activate only during the end of combat step." — the end-of-combat-step
+    /// timing gate has no binder-reachable <c>canActivate</c> timing seam, so it
+    /// is a deliberate deferral (<see cref="EffectCoverageAllowlist"/> entry,
+    /// v1-deferrals #12). If this ever stops flagging, the land was either fixed
+    /// (move it off the deferral list) or the heuristic over-suppressed.
     ///
-    /// <para>NOTE — Castle Vantress's "Scry 2" was the prior sentinel; it is now
-    /// BOUND in prod via <c>LandActivatedAbilityBinder</c> (v1-deferrals #12), so
-    /// the sentinel moved to a still-genuinely-deferred land.</para></summary>
+    /// <para>NOTE — Castle Vantress's "Scry 2" and Vault of the Archangel's mass
+    /// "Creatures you control gain deathtouch and lifelink until end of turn"
+    /// grant were the prior sentinels; both are now BOUND in prod via
+    /// <c>LandActivatedAbilityBinder</c> (v1-deferrals #12), so the sentinel
+    /// moved to a still-genuinely-deferred land (Desert's end-of-combat-timed
+    /// ping).</para></summary>
     [Fact]
     public void Heuristic_GenuineLandGap_StillFlagged()
     {
-        var entity = Repo.GetByName("Vault of the Archangel");
+        var entity = Repo.GetByName("Desert");
         entity.Should().NotBeNull();
-        LiveCards.TryGetValue("Vault of the Archangel", out var card).Should().BeTrue();
+        LiveCards.TryGetValue("Desert", out var card).Should().BeTrue();
 
-        DetectMissingEffectSignals(card!, entity!).Should().Contain("gain N life",
-            "the mass deathtouch/lifelink keyword grant is genuinely unbound (no keyword-grant primitive — v1-deferrals #12)");
+        DetectMissingEffectSignals(card!, entity!).Should().Contain("deals N damage",
+            "Desert's end-of-combat-timed ping is genuinely unbound (no binder-reachable end-of-combat timing seam — v1-deferrals #12)");
+
+        // Vault of the Archangel's mass keyword grant, by contrast, is now BOUND
+        // in prod via LandActivatedAbilityBinder.
+        var vault = Repo.GetByName("Vault of the Archangel");
+        LiveCards.TryGetValue("Vault of the Archangel", out var vaultCard).Should().BeTrue();
+        DetectMissingEffectSignals(vaultCard!, vault!).Should().BeEmpty(
+            "Vault's mass deathtouch/lifelink keyword grant now binds via LandActivatedAbilityBinder");
 
         // Castle Vantress's scry, by contrast, is now BOUND in prod.
         var vantress = Repo.GetByName("Castle Vantress");

@@ -22,7 +22,8 @@ namespace Majik.Core.CardData;
 /// <summary>
 /// Production binder for the <b>generic utility-land activated abilities</b>
 /// that no other binder covers — the long tail of "draw a card", "scry N",
-/// "+1/+1 counter", "create a token", "deal N damage / gain N life", "return
+/// "+1/+1 counter", "create a token", "deal N damage / gain N life",
+/// "creatures you control gain &lt;keyword&gt; until end of turn", "return
 /// from graveyard", and "destroy / search-for-basic land" activated abilities
 /// printed on nonbasic lands (Castle Vantress, Gavony Township, Castle
 /// Ardenvale, Ramunap Ruins, Buried Ruin, Ghost Quarter, the Panorama cycle, …).
@@ -72,9 +73,6 @@ namespace Majik.Core.CardData;
 ///     "Create X Treasure tokens", Dalkovan Encampment's
 ///     "Whenever you attack this turn …" delayed token rider) — no generic
 ///     count-linked / attack-rider token primitive; deferred.</item>
-///   <item><b>Vault of the Archangel</b> — "Creatures you control gain
-///     deathtouch and lifelink until end of turn" (mass keyword grant) has no
-///     generic until-EOT keyword-grant primitive reachable here; deferred.</item>
 ///   <item><b>Desert</b> — "{T}: deal 1 damage to target attacking creature.
 ///     Activate only during the end of combat step" — the combat-step timing
 ///     gate has no binder-reachable canActivate seam; deferred.</item>
@@ -171,6 +169,37 @@ public static class LandActivatedAbilityBinder
     private static readonly Regex DestroyTargetLand = new(
         @"Destroy\s+target\s+(?<nonbasic>nonbasic\s+)?land\b(?<opp>[^.]*opponent\s+controls)?",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Creatures you control gain <keyword>[ and <keyword>] until end of turn."
+    // The mass until-EOT keyword-grant family (Vault of the Archangel). The
+    // <kw> capture is the keyword list ("deathtouch and lifelink", "trample",
+    // "first strike and vigilance"); it is split + canonicalized in code. CR
+    // 613.1c Layer 6 grant, CR 514.2 cleanup expiry.
+    private static readonly Regex CreaturesYouControlGainKeywords = new(
+        @"Creatures\s+you\s+control\s+gain\s+(?<kw>.+?)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // The keywords reachable through the generic mass-grant binder. Combat-
+    // relevant evasion / damage keywords that the engine's combat + damage
+    // paths already honour off a creature's effective keyword set (CR 702).
+    // A grant line naming a keyword OUTSIDE this set is NOT bound here (it
+    // would need a primitive the binder can't reach) — the whole line defers.
+    private static readonly Dictionary<string, string> GrantableKeywords =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["deathtouch"] = "Deathtouch",
+            ["lifelink"] = "Lifelink",
+            ["trample"] = "Trample",
+            ["vigilance"] = "Vigilance",
+            ["first strike"] = "First strike",
+            ["double strike"] = "Double strike",
+            ["haste"] = "Haste",
+            ["flying"] = "Flying",
+            ["menace"] = "Menace",
+            ["reach"] = "Reach",
+            ["hexproof"] = "Hexproof",
+            ["indestructible"] = "Indestructible",
+        };
 
     /// <summary>
     /// Inspect <paramref name="entity"/>'s oracle text and bind every generic
@@ -303,6 +332,15 @@ public static class LandActivatedAbilityBinder
         {
             var n = int.Parse(gm.Groups["n"].Value);
             BindGainLife(land, controller, cost, n);
+            return true;
+        }
+
+        // --- Mass until-EOT keyword grant to your creatures (Vault of the
+        //     Archangel) -------------------------------------------------------
+        if (CreaturesYouControlGainKeywords.Match(effectText) is { Success: true } kwm
+            && TryParseGrantedKeywords(kwm.Groups["kw"].Value, out var grantedKeywords))
+        {
+            BindGrantKeywordsToCreaturesYouControl(land, controller, effects, cost, grantedKeywords!);
             return true;
         }
 
@@ -456,6 +494,59 @@ public static class LandActivatedAbilityBinder
                 foreach (var c in ctrl.Zones.Battlefield.GetCards().OfType<Creature>().ToList())
                 {
                     c.Counters.Add(CounterType.PlusOnePlusOne, 1);
+                }
+            });
+
+        land.AddAbility(new ActivatedAbility(
+            source: land, controller: controller, costs: costs, effects: new IEffect[] { effect }));
+    }
+
+    // ----------------------------------------------------------------------
+    // Mass until-EOT keyword grant to "creatures you control" — Vault of the
+    // Archangel "{2}{W}{B}, {T}: Creatures you control gain deathtouch and
+    // lifelink until end of turn." (CR 613.1c Layer 6 ability addition;
+    // CR 514.2 cleanup-step expiry).
+    //
+    // This is the GROUP-apply form of the existing single-target
+    // grant_keyword_until_eot_target verb
+    // (CardDefRuntime.BuildGrantKeywordUntilEotTargetEffect): instead of one
+    // chosen creature it walks the controller's battlefield at RESOLUTION
+    // (CR 611.2c — a one-shot grant; creatures that enter later this turn are
+    // not retroactively granted) and registers a
+    // GrantKeywordUntilEndOfTurnEffect per keyword on each creature's OWN
+    // ActiveEffects layer service (CR 613.1c). Both grants auto-expire in the
+    // cleanup step via ContinuousEffect.ExpiresAtEndOfTurn (CR 514.2). The
+    // controller's Battlefield zone already scopes "you control" (CR — only
+    // the activating player's creatures). Opponent creatures are untouched.
+    //
+    // Resolution-time read of land.Controller carries the ability across a
+    // control change (CR 109.5); falls back to the bind-time controller.
+    // ----------------------------------------------------------------------
+    private static void BindGrantKeywordsToCreaturesYouControl(
+        Land land, Player controller, ContinuousEffectsService effects,
+        string cost, IReadOnlyList<string> keywords)
+    {
+        var costs = BuildCosts(land, cost, out _);
+        var label = string.Join(" and ", keywords).ToLowerInvariant();
+        var effect = new Effect(
+            $"{land.Name}: creatures you control gain {label} until end of turn",
+            () =>
+            {
+                var ctrl = land.Controller ?? controller;
+                foreach (var creature in ctrl.Zones.Battlefield.GetCards()
+                             .OfType<Creature>().ToList())
+                {
+                    // CR 613 — register on each creature's own layer service. In
+                    // prod every battlefield permanent already carries the shared
+                    // ContinuousEffectsService; wire the binder's service for any
+                    // creature that was added without one so the grant is honoured
+                    // and torn down at cleanup.
+                    var svc = creature.ActiveEffects ?? effects;
+                    creature.ActiveEffects ??= svc;
+                    foreach (var kw in keywords)
+                    {
+                        svc.Register(new GrantKeywordUntilEndOfTurnEffect(creature, kw));
+                    }
                 }
             });
 
@@ -870,6 +961,33 @@ public static class LandActivatedAbilityBinder
             case "green": color = ManaColor.Green; return true;
             default: color = default; return false;
         }
+    }
+
+    /// <summary>Parse the keyword list captured from "Creatures you control gain
+    /// &lt;list&gt; until end of turn" (e.g. "deathtouch and lifelink",
+    /// "trample", "first strike and vigilance") into the engine's canonical
+    /// keyword names. Splits on " and " / "," and canonicalizes each token via
+    /// <see cref="GrantableKeywords"/>. Returns <c>false</c> (so the line defers
+    /// rather than binds wrong) when the list is empty or names ANY keyword
+    /// outside the binder-reachable grantable set.</summary>
+    private static bool TryParseGrantedKeywords(string list, out IReadOnlyList<string>? keywords)
+    {
+        keywords = null;
+        var tokens = Regex.Split(list.Trim(), @"\s*,\s*|\s+and\s+", RegexOptions.IgnoreCase)
+            .Select(t => t.Trim())
+            .Where(t => t.Length > 0)
+            .ToList();
+        if (tokens.Count == 0) return false;
+
+        var canonical = new List<string>();
+        foreach (var tok in tokens)
+        {
+            if (!GrantableKeywords.TryGetValue(tok, out var name)) return false;
+            if (!canonical.Contains(name)) canonical.Add(name);
+        }
+
+        keywords = canonical;
+        return true;
     }
 
     /// <summary>Pull a trailing "gain N life" rider out of an effect clause
