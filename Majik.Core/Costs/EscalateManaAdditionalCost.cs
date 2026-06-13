@@ -16,7 +16,7 @@ namespace Majik.Core.Costs;
 /// extra mode by <see cref="Majik.Core.Game.EscalateSpec.BuildPerModeCost"/>,
 /// so choosing N modes creates (N − 1) of these. CR 601.2g atomicity (the
 /// whole escalate bill is affordable before any single payment) is enforced
-/// by the caller (<c>SpellCastFlow.PayEscalateCosts</c> via
+/// by the caller (<c>SpellCastFlow.BuildAndPrecheckEscalateCosts</c> via
 /// <c>EscalateSpec.CanPayExtraModes</c>); each instance still re-checks its
 /// own affordability so a mid-sequence shortfall can't half-pay.
 /// </para>
