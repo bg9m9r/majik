@@ -31,6 +31,7 @@ public static class BotDeckCatalog
         ["DomainZoo"]           = DomainZooDeck.Cards,
         ["GruulBroodscale"]     = GruulBroodscaleDeck.Cards,
         ["EldraziBroodscale"]   = EldraziBroodscaleDeck.Cards,
+        ["AzoriusLotusBelcher"] = AzoriusLotusBelcherDeck.Cards,
     };
 
     public static IReadOnlyCollection<string> Archetypes => _decks.Keys;
@@ -90,6 +91,7 @@ public static class BotDeckCatalog
         "DomainZoo"           => "Bot — Domain Zoo",
         "GruulBroodscale"     => "Bot — Gruul Broodscale",
         "EldraziBroodscale"   => "Bot — Eldrazi Broodscale",
+        "AzoriusLotusBelcher" => "Bot — Azorius Lotus Belcher",
         _ => $"Bot — {archetype}",
     };
 
