@@ -112,6 +112,45 @@ public interface IPlayerAgent
         GameContext ctx, ICard source, CancellationToken ct = default);
 
     /// <summary>
+    /// CR 614.12 / CR 601.2c — "as this enters / as you cast this, choose a
+    /// color" (Sunken Citadel, Temple of the Dragon Queen, Coldsteel Heart,
+    /// Utopia Sprawl, …). Picks one of the five mana colours — colourless is
+    /// not a colour (CR 105.1 / 105.2c). Mirrors the bespoke
+    /// <c>ChooseColorAsync</c> Sungold Sentinel's Coven grant already routes
+    /// through <see cref="ChooseAsync"/> as a <see cref="ChoiceKind.PickOne"/>;
+    /// promoted onto the interface so the binder-chain ETB choose-color
+    /// replacement can prompt without a bespoke per-card closure.
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.PickOne"/> over
+    /// the five colours, classified <see cref="BotIntent.Ramp"/> (a
+    /// mana-fixing decision). Falls back to <paramref name="fallback"/> when no
+    /// agent / game answers (the deterministic pre-agent posture — strictly one
+    /// producible colour, never the old over-permissive five-WUBRG binding).
+    /// </para>
+    /// </summary>
+    async Task<ManaColor> ChooseColorAsync(
+        GameContext? ctx,
+        string sourceLabel,
+        ManaColor fallback = ManaColor.White,
+        CancellationToken ct = default)
+    {
+        var colors = new object[]
+        {
+            ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green,
+        };
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne,
+            sourceLabel,
+            Min: 1, Max: 1,
+            Candidates: colors,
+            Intent: BotIntent.Ramp,
+            Optional: false);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 && chosen[0] is ManaColor c ? c : fallback;
+    }
+
+    /// <summary>
     /// Pick a mode index for a modal spell or ability.
     /// <paramref name="modeIntents"/> is parallel to <paramref name="modes"/>
     /// when populated, carrying each mode's

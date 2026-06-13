@@ -140,17 +140,49 @@ public class BoundLandBinderTests
         OracleManaBinder.Bind(land, _repo.GetByName("Sunken Citadel")!, _alice);
 
         var mana = land.Abilities.OfType<ManaAbility>().ToList();
-        mana.Should().HaveCount(10, "five single-pip + five double-pip (one per WUBRG)");
+        mana.Should().HaveCount(2,
+            "one chosen-colour single-pip + one chosen-colour double-pip " +
+            "(CR 614.12 — exactly the printed single chosen colour, not five WUBRG)");
 
-        // Five single-pip abilities, one per WUBRG.
+        // One single-pip ability (the chosen colour, dynamic).
         var singles = mana.Where(a => a.ManaGenerated.TotalValue == 1).ToList();
-        singles.Should().HaveCount(5);
+        singles.Should().ContainSingle();
+        singles[0].SpendRestriction.Should().BeNull(
+            "only the double-mana ability carries the land-source spend rider");
 
-        // Five double-pip abilities, each carrying the land-ability-only rider.
+        // One double-pip ability carrying the land-ability-only rider.
         var doubles = mana.Where(a => a.ManaGenerated.TotalValue == 2).ToList();
-        doubles.Should().HaveCount(5);
-        doubles.Should().OnlyContain(a => a.SpendRestriction != null,
+        doubles.Should().ContainSingle();
+        doubles[0].SpendRestriction.Should().NotBeNull(
             "the double-mana ability is land-ability spend-restricted (CR 106.4)");
+    }
+
+    [Fact]
+    public void SunkenCitadel_ChosenColorAbilities_TrackTheEtbColorChoice()
+    {
+        // CR 614.12 — the chosen-colour holder drives BOTH abilities. Default
+        // (pre-choice) is White; stamping the holder (what the ETB
+        // ChooseColorReplacement does) flips both the single and double pip.
+        var land = MakeLandShell("Sunken Citadel");
+        OracleManaBinder.Bind(land, _repo.GetByName("Sunken Citadel")!, _alice);
+
+        var choice = OracleManaBinder.GetColorChoice(land);
+        choice.Should().NotBeNull("a chosen-colour land seeds a ColorChoice holder");
+
+        var single = land.Abilities.OfType<ManaAbility>().Single(a => a.ManaGenerated.TotalValue == 1);
+        var dbl = land.Abilities.OfType<ManaAbility>().Single(a => a.ManaGenerated.TotalValue == 2);
+
+        // Default seed: White.
+        single.Activate().White.Should().Be(1, "default chosen colour is White");
+        land.Untap();
+
+        // Stamp Blue (the ETB choice) → both abilities now produce blue.
+        choice!.Choose(Majik.Core.ValueObjects.ManaColor.Blue);
+        single.Activate().Blue.Should().Be(1, "single-pip ability tracks the chosen colour");
+        land.Untap();
+        var two = dbl.Activate();
+        two.Blue.Should().Be(2, "double-pip ability tracks the chosen colour");
+        two.White.Should().Be(0);
     }
 
     // -----------------------------------------------------------------------
@@ -164,9 +196,11 @@ public class BoundLandBinderTests
         OracleManaBinder.Bind(land, _repo.GetByName("Temple of the Dragon Queen")!, _alice);
 
         var mana = land.Abilities.OfType<ManaAbility>().ToList();
-        mana.Should().HaveCount(5, "five single-pip chosen-colour abilities (one per WUBRG)");
-        mana.Should().OnlyContain(a => a.ManaGenerated.TotalValue == 1);
-        mana.Should().OnlyContain(a => a.SpendRestriction == null,
+        mana.Should().ContainSingle(
+            "one chosen-colour single-pip ability (CR 614.12 — the printed " +
+            "single chosen colour, not five WUBRG); Temple has no double-mana ability");
+        mana[0].ManaGenerated.TotalValue.Should().Be(1);
+        mana[0].SpendRestriction.Should().BeNull(
             "Temple has no land-ability spend restriction");
     }
 }

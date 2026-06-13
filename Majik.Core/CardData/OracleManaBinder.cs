@@ -28,6 +28,30 @@ public static class OracleManaBinder
     private static IReadOnlyDictionary<CardSubtype, string> BasicLandColors
         => BasicLandManaColors.Map;
 
+    // CR 614.12 — per-land "as it enters, choose a color" holder. Keyed off
+    // the land so the synthesized chosen-colour ManaAbility (which reads the
+    // holder at activation) and the ETB ChooseColorReplacement (which stamps
+    // it as the land enters) share one instance without a public mutable
+    // property on Land. ConditionalWeakTable mirrors UnclaimedTerritory's
+    // chosen-creature-type idiom; entries are GC'd with the land.
+    private static readonly
+        System.Runtime.CompilerServices.ConditionalWeakTable<Land, ColorChoice>
+        _chosenColors = new();
+
+    /// <summary>
+    /// CR 614.12 — the <see cref="ColorChoice"/> a "choose a color" land
+    /// (Sunken Citadel, Temple of the Dragon Queen) created when its mana
+    /// abilities were bound, or <c>null</c> for any other land. The
+    /// binder-chain ETB choose-color replacement (registered in
+    /// <see cref="ScryfallCardFactory"/>) looks this up to wire the agent
+    /// prompt that stamps the chosen colour.
+    /// </summary>
+    public static ColorChoice? GetColorChoice(Land land)
+    {
+        ArgumentNullException.ThrowIfNull(land);
+        return _chosenColors.TryGetValue(land, out var choice) ? choice : null;
+    }
+
     // {T}: Add {R}.  or  {T}: Add {R}{R}.  or  {T}: Add one {G}.
     private static readonly Regex TapForManaRegex = new(
         @"\{T\}\s*:\s*Add\s+((?:\{[WUBRGC]\}\s*)+)",
@@ -116,27 +140,25 @@ public static class OracleManaBinder
         RegexOptions.IgnoreCase);
 
     // "{T}: Add one mana of the chosen color." — Sunken Citadel /
-    // Temple of the Dragon Queen "as it enters, choose a color" cycle. There
-    // is no agent colour-choice surface in the binder layer yet (deferred
-    // engine-wide — same posture as Sejiri Steppe / Crumbling Vestige), so the
-    // faithful-but-pragmatic modelling is five fixed-type ManaAbility instances
-    // (one per WUBRG), exactly like the any-colour lands (Glimmervoid / Mox
-    // Opal) — the bot taps for whichever colour it needs. This is strictly
-    // MORE permissive than the printed single-chosen-colour card; the precise
-    // choose-a-color restriction unlocks when the agent colour-choice surface
-    // lands. Ports the colour-bearing half of SunkenCitadelFactory /
-    // TempleOfTheDragonQueenFactory.
+    // Temple of the Dragon Queen "as it enters, choose a color" cycle
+    // (CR 614.12). The chosen colour is decided as the land enters by the ETB
+    // ChooseColorReplacement (registered via ChooseColorLandBinder on the
+    // ScryfallCardFactory replacement bus), which prompts the controller's
+    // agent (IPlayerAgent.ChooseColorAsync) and stamps the pick onto a shared
+    // ColorChoice holder. The synthesized ManaAbility reads that holder through
+    // a dynamic generator at activation, so exactly the SINGLE chosen colour is
+    // producible — the printed restriction, not the old over-permissive
+    // five-WUBRG binding. See BindChosenColorLand below.
     private static readonly Regex ChosenColorOneManaRegex = new(
         @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+the\s+chosen\s+color",
         RegexOptions.IgnoreCase);
 
     // "{T}: Add two mana of the chosen color. Spend this mana only to activate
     // abilities of land sources." — Sunken Citadel's restricted double-mana
-    // ability (CR 605.1a / 106.4). Five fixed-type double-pip ManaAbility
-    // instances (one per WUBRG), each stamped with a land-ability-only
-    // SpendRestriction. Payment-gate enforcement of the restriction is DEFERRED
-    // (ManaPool stores bucketed colour counts, no per-slot tags yet — same
-    // deferral as Eldrazi Temple); the rider is observational metadata today.
+    // ability (CR 605.1a / 106.4). One dynamic-output double-pip ManaAbility
+    // reading the shared ColorChoice (the chosen colour decided at ETB), stamped
+    // with a land-ability-only SpendRestriction enforced by the
+    // ManaPaymentResolver (CR 106.4).
     private static readonly Regex ChosenColorTwoManaLandAbilityRegex = new(
         @"\{T\}\s*:\s*Add\s+two\s+mana\s+of\s+the\s+chosen\s+color\.\s*Spend\s+this\s+mana\s+only\s+to\s+activate\s+abilities\s+of\s+land\s+sources",
         RegexOptions.IgnoreCase);
@@ -292,11 +314,11 @@ public static class OracleManaBinder
 
             // Sunken Citadel / Temple of the Dragon Queen — "{T}: Add one mana
             // of the chosen color" (+ Sunken Citadel's restricted double-mana
-            // ability). No agent colour-choice surface in the binder yet, so
-            // five WUBRG instances are bound (bot taps for the colour it needs)
-            // — the precise single-chosen-colour gate is deferred. The
-            // double-mana clause additionally stamps a land-ability-only
-            // SpendRestriction (payment-gate enforcement deferred).
+            // ability). The chosen colour is decided "as it enters" (CR 614.12)
+            // by the ETB ChooseColorReplacement and read by a dynamic-output
+            // ManaAbility, so exactly the single chosen colour is producible.
+            // The double-mana clause additionally stamps a land-ability-only
+            // SpendRestriction (CR 106.4).
             if (ChosenColorOneManaRegex.IsMatch(text))
             {
                 BindChosenColorLand(payLifeLand, text, controller);
@@ -502,38 +524,58 @@ public static class OracleManaBinder
 
     /// <summary>
     /// Wire the "{T}: Add one mana of the chosen color" cycle (Sunken Citadel /
-    /// Temple of the Dragon Queen). Five fixed-type single-pip ManaAbility
-    /// instances (one per WUBRG) — the bot taps for whichever colour it needs,
-    /// since the binder layer has no agent colour-choice surface yet (the
-    /// precise single-chosen-colour gate is deferred). When the oracle also
-    /// carries Sunken Citadel's "{T}: Add two mana of the chosen color. Spend
-    /// this mana only to activate abilities of land sources." clause, five
-    /// double-pip ManaAbility instances are added too, each stamped with a
-    /// land-ability-only <see cref="Majik.Core.Mana.SpendRestriction"/>
-    /// (payment-gate enforcement deferred — same posture as Eldrazi Temple).
+    /// Temple of the Dragon Queen — CR 614.12). Creates one shared
+    /// <see cref="ColorChoice"/> holder (retrievable via
+    /// <see cref="GetColorChoice"/>) and a single dynamic-output
+    /// <see cref="ManaAbility"/> whose generator reads it, so exactly the SINGLE
+    /// chosen colour is producible — the printed restriction, not the old
+    /// over-permissive five-WUBRG binding. The colour is decided "as it enters"
+    /// by the ETB <see cref="Majik.Core.Effects.ChooseColorReplacement"/>
+    /// (registered via <see cref="ChooseColorLandBinder"/>), which prompts the
+    /// controller's agent and stamps the pick onto the holder. When the oracle
+    /// also carries Sunken Citadel's "{T}: Add two mana of the chosen color.
+    /// Spend this mana only to activate abilities of land sources." clause, a
+    /// second dynamic double-pip ability is added, reading the same holder and
+    /// stamped with a land-ability-only
+    /// <see cref="Majik.Core.Mana.SpendRestriction"/> (CR 106.4).
     /// </summary>
     private static void BindChosenColorLand(Land land, string text, Player controller)
     {
-        foreach (var color in new[] { "W", "U", "B", "R", "G" })
-        {
-            land.AddAbility(new ManaAbility(
-                source: land,
-                controller: controller,
-                manaGenerated: ManaCost.Parse(color),
-                canActivateCheck: () => !land.IsTapped));
-        }
+        // CR 614.12 — one shared per-land choice holder. Seeded to a
+        // deterministic default (White) so a pre-ETB / no-agent activation
+        // produces exactly ONE colour (strictly narrower than the old
+        // over-permissive five-WUBRG binding); the ETB ChooseColorReplacement
+        // (registered in ScryfallCardFactory) stamps the agent's real pick as
+        // the land enters, and these dynamic abilities then produce it.
+        var choice = new ColorChoice(ManaColor.White);
+        _chosenColors.AddOrUpdate(land, choice);
+
+        // "{T}: Add one mana of the chosen color." — a single dynamic-output
+        // ManaAbility reading the holder (CR 605.1a). The printed seed (the
+        // current chosen colour's pip) lets pre-activation inspectors — the
+        // bot's mana picker, UI mana-source hints — see a real colour instead
+        // of Zero.
+        land.AddAbility(new ManaAbility(
+            source: land,
+            controller: controller,
+            manaGenerator: () => choice.SinglePip(),
+            canActivateCheck: () => !land.IsTapped,
+            printedManaGenerated: choice.SinglePip()));
 
         if (ChosenColorTwoManaLandAbilityRegex.IsMatch(text))
         {
-            foreach (var color in new[] { "W", "U", "B", "R", "G" })
-            {
-                land.AddAbility(new ManaAbility(
-                    source: land,
-                    controller: controller,
-                    manaGenerated: ManaCost.Parse(color + color),
-                    canActivateCheck: () => !land.IsTapped,
-                    spendRestriction: SunkenCitadelLandAbilitiesOnly));
-            }
+            // "{T}: Add two mana of the chosen color. Spend this mana only to
+            // activate abilities of land sources." — one dynamic double-pip
+            // ability, same holder, carrying the land-ability-only spend rider
+            // (CR 106.4; payment-gate enforcement is the resolver's job and is
+            // already live for static SpendRestrictions).
+            land.AddAbility(new ManaAbility(
+                source: land,
+                controller: controller,
+                manaGenerator: () => choice.DoublePip(),
+                canActivateCheck: () => !land.IsTapped,
+                printedManaGenerated: choice.DoublePip(),
+                spendRestriction: SunkenCitadelLandAbilitiesOnly));
         }
     }
 

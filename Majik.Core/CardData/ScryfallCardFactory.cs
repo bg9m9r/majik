@@ -128,6 +128,13 @@ public sealed class ScryfallCardFactory
             // Flames). Register unconditionally.
             EntersWithCountersBinder.Bind(card, entity, _replacements);
 
+            // CR 614.12 — "as this land enters, choose a color" (Sunken
+            // Citadel, Temple of the Dragon Queen). Co-exists with the
+            // enters-tapped chain (both lands also enter tapped). Registers the
+            // agent-prompting ChooseColorReplacement when OracleManaBinder
+            // created a ColorChoice for this land; no-op otherwise.
+            ChooseColorLandBinder.Bind(card, _replacements);
+
             // ETB-as-copy (CR 706.10) — Clone family. Requires the
             // continuous-effects service since the replacement registers a
             // CopyEffect on resolve.
