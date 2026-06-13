@@ -307,32 +307,13 @@ public sealed class MatchService
                 Action<bool>? onBotThinking = hubForCallback != null
                     ? thinking => hubForCallback.PublishBotThinking(matchId, thinking)
                     : null;
-                // Per-match SignalR sink for bot decision diagnostics. Gated
-                // on the same flag the logger sink reads so wire + stdout
-                // toggle in lockstep. The sink captures matchId at
-                // construction; its lifetime is bounded by the facade —
-                // when the facade is deleted (Abandon / Concede / Timeout
-                // funnel through _gameFactory.Delete) the bot agent that
-                // holds the reference goes with it.
-                IBotDecisionSink? signalrSink = null;
-                if (_hub != null && _gameFactory.BotDecisionLoggingEnabled)
-                {
-                    signalrSink = new SignalrBotDecisionSink(matchId, _hub);
-                }
-
-                // Per-match replay sink. Always wired when the replay
-                // buffer is registered — unlike SignalrBotDecisionSink
-                // it isn't gated on Bot:DecisionLogging:Enabled, because
-                // the replay endpoint is meant to capture every game we
-                // can. Composed with signalrSink (if present) via
-                // CompositeBotDecisionSink so both observers see each
-                // decision; the existing extraDecisionSink composition
-                // inside ServerGameFactory.Create then folds in the
-                // process-wide logger sink.
-                IBotDecisionSink? replaySink = _replayBuffer != null
-                    ? new ReplayBufferBotDecisionSink(matchId, _replayBuffer)
-                    : null;
-                var perMatchSink = Majik.Bot.Diagnostics.CompositeBotDecisionSink.Compose(signalrSink, replaySink);
+                // Per-match decision sinks (SignalR diagnostics channel +
+                // replay buffer), composed into one fan-out observer. The
+                // gating rules live in BuildPerMatchBotDecisionSink so they
+                // can be unit-tested directly. The composed sink is then
+                // folded together with the process-wide logger sink inside
+                // ServerGameFactory.Create via extraDecisionSink.
+                var perMatchSink = BuildPerMatchBotDecisionSink(_hub, _replayBuffer, matchId);
                 var extraSinkArg = ReferenceEquals(perMatchSink, Majik.Bot.Diagnostics.NullBotDecisionSink.Instance)
                     ? null
                     : perMatchSink;
@@ -793,6 +774,46 @@ public sealed class MatchService
     /// <summary>Boot the engine for the just-decided first-player slot and
     /// wire the Slice 5a auto-pass prefs provider so the engine can short-
     /// circuit the human's priority prompt when prefs match.</summary>
+    /// <summary>
+    /// Compose the per-match bot-decision observers for a vs-bot match:
+    /// the SignalR diagnostics channel and the replay buffer.
+    ///
+    /// <para>The <see cref="SignalrBotDecisionSink"/> feeds the shipped,
+    /// user-facing "bot decisions" panel — so it is wired whenever a hub
+    /// is present, INDEPENDENT of the dev stdout logging flag
+    /// (<c>Bot:DecisionLogging:Enabled</c>, which only toggles the
+    /// process-wide <see cref="Majik.Bot.Diagnostics.LoggerBotDecisionSink"/>
+    /// for zero prod log overhead). The push is a cheap per-decision group
+    /// broadcast carrying no hidden information (see
+    /// <see cref="SignalrBotDecisionSink"/>), so there is no reason to gate
+    /// it behind the stdout diagnostic. Coupling it to that flag is exactly
+    /// the bug that left the panel empty in prod.</para>
+    ///
+    /// <para>The <see cref="ReplayBufferBotDecisionSink"/> is wired whenever
+    /// the replay buffer is registered — the replay endpoint is meant to
+    /// capture every game we can. Both are composed via
+    /// <see cref="Majik.Bot.Diagnostics.CompositeBotDecisionSink"/> so each
+    /// decision fans out to both observers (returning
+    /// <see cref="Majik.Bot.Diagnostics.NullBotDecisionSink"/> when neither
+    /// is present). The sinks capture matchId at construction; their lifetime
+    /// is bounded by the facade — when it is deleted (Abandon / Concede /
+    /// Timeout funnel through <c>_gameFactory.Delete</c>) the bot agent that
+    /// holds the reference goes with it.</para>
+    /// </summary>
+    internal static IBotDecisionSink BuildPerMatchBotDecisionSink(
+        IMatchHubPublisher? hub,
+        MatchReplayBuffer? replayBuffer,
+        Guid matchId)
+    {
+        IBotDecisionSink? signalrSink = hub != null
+            ? new SignalrBotDecisionSink(matchId, hub)
+            : null;
+        IBotDecisionSink? replaySink = replayBuffer != null
+            ? new ReplayBufferBotDecisionSink(matchId, replayBuffer)
+            : null;
+        return Majik.Bot.Diagnostics.CompositeBotDecisionSink.Compose(signalrSink, replaySink);
+    }
+
     private void StartGameForFirstPlayer(Match match, int firstPlayerSlot)
     {
         if (_gameFactory == null || match.GameId is not Guid gid) return;

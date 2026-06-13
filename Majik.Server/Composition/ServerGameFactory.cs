@@ -34,12 +34,17 @@ public sealed class ServerGameFactory
     }
 
     /// <summary>
-    /// Mirrors the <c>Bot:DecisionLogging:Enabled</c> config flag. Callers
-    /// that want to compose a per-match decision sink (e.g.
-    /// <see cref="Majik.Server.Matches.SignalrBotDecisionSink"/> keyed on
-    /// matchId) gate on this so the SignalR fan-out toggles in lockstep
-    /// with the singleton logger sink — no half-on state where the wire
-    /// channel is alive but server stdout is quiet (or vice versa).
+    /// Mirrors the <c>Bot:DecisionLogging:Enabled</c> config flag. This
+    /// gates ONLY the process-wide stdout
+    /// <see cref="Majik.Bot.Diagnostics.LoggerBotDecisionSink"/> (a dev
+    /// diagnostic, default-off in prod for zero log overhead). It does NOT
+    /// gate the per-match
+    /// <see cref="Majik.Server.Matches.SignalrBotDecisionSink"/>: that is the
+    /// always-on, user-facing diagnostics channel feeding the shipped "bot
+    /// decisions" panel, so it is wired whenever a hub is present
+    /// (see <see cref="Majik.Server.Matches.MatchService.BuildPerMatchBotDecisionSink"/>).
+    /// The SignalR push carries no hidden information and is independent of
+    /// stdout logging.
     /// </summary>
     public bool BotDecisionLoggingEnabled { get; }
 
