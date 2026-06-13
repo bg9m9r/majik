@@ -2,8 +2,10 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
+using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -112,5 +114,44 @@ public class AmassActionTests
         Action act = () => AmassAction.Apply(null!, 1, CardSubtype.Orc);
 
         act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Apply_NewArmyToken_PublishesCardMovedEventToBattlefield()
+    {
+        // Regression: in a live match the amass resolve closure is built with a
+        // null ZoneService (the single-arg NamedCardFactory.Create path), so the
+        // new Army token previously entered the battlefield via raw AddCard with
+        // NO CardMovedEvent — the portal never learned the token existed.
+        // The fix resolves the live ZoneService from ZoneServiceRegistry.
+        var bus = new EventBus();
+        var zones = new ZoneService(bus);
+        var alice = new Player("Alice", 20);
+
+        var moves = new List<CardMovedEvent>();
+        bus.Subscribe<CardMovedEvent>(moves.Add);
+
+        // Mirror the live-game wiring: the service is registered for the player,
+        // but the amass call site passes zones: null (the captured-null path).
+        ZoneServiceRegistry.Set(alice, zones);
+        try
+        {
+            var army = AmassAction.Apply(alice, 1, CardSubtype.Orc, zones: null);
+
+            // Token exists on the battlefield...
+            army.IsToken.Should().BeTrue();
+            army.Zone.Should().Be(ZoneType.Battlefield);
+            alice.Zones.Battlefield.GetCards().Should().Contain(army);
+
+            // ...AND a CardMovedEvent to the battlefield fired for it, so the
+            // portal renders the Orc Army.
+            moves.Should().ContainSingle(e =>
+                ReferenceEquals(e.Card, army) && e.ToZone == ZoneType.Battlefield,
+                "amass must publish CardMovedEvent so the token is visible to clients");
+        }
+        finally
+        {
+            ZoneServiceRegistry.Clear();
+        }
     }
 }
