@@ -202,7 +202,7 @@ internal static class LegalActionEnumerator
     /// at resolution.
     /// </para>
     /// </summary>
-    private static bool CanAffordAbility(IActivatedAbility ability, Player self, int manaAvailable)
+    internal static bool CanAffordAbility(IActivatedAbility ability, Player self, int manaAvailable)
     {
         foreach (var cost in ability.Costs)
         {

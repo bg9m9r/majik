@@ -1,6 +1,7 @@
 using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Search;
+using Majik.Bot.Strategies;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -23,6 +24,7 @@ public class PriorityPolicy
     protected readonly ArchetypeWeights _weights;
     private readonly IBotDecisionSink _sink;
     private readonly Majik.Core.Diagnostics.VanillaShellTracker? _vanillaTracker;
+    private readonly IDeckStrategy? _deck;
 
     /// <summary>Tracks activated-ability IDs we've already fired this turn so
     /// the priority pump doesn't infinite-loop on the same activation. Reset
@@ -64,20 +66,42 @@ public class PriorityPolicy
     private Guid? _lastLoyaltyProposed;
 
     public PriorityPolicy(ArchetypeWeights weights)
-        : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null) { }
+        : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null, deck: null) { }
 
     public PriorityPolicy(ArchetypeWeights weights, IBotDecisionSink sink)
-        : this(weights, sink, vanillaTracker: null) { }
+        : this(weights, sink, vanillaTracker: null, deck: null) { }
 
     public PriorityPolicy(
         ArchetypeWeights weights,
         IBotDecisionSink sink,
         Majik.Core.Diagnostics.VanillaShellTracker? vanillaTracker)
+        : this(weights, sink, vanillaTracker, deck: null) { }
+
+    /// <summary>
+    /// Full-param constructor (sink + vanillaTracker + deck). Used by
+    /// <see cref="HeuristicStrategy"/> to thread the resolved deck strategy.
+    /// <paramref name="deck"/> null → unchanged behavior.
+    /// </summary>
+    public PriorityPolicy(
+        ArchetypeWeights weights,
+        IBotDecisionSink sink,
+        Majik.Core.Diagnostics.VanillaShellTracker? vanillaTracker,
+        IDeckStrategy? deck)
     {
         _weights = weights;
         _sink = sink ?? NullBotDecisionSink.Instance;
         _vanillaTracker = vanillaTracker;
+        _deck = deck;
     }
+
+    /// <summary>
+    /// Two-param constructor for callers that only need weights + deck.
+    /// Null deck → unchanged behavior.
+    /// </summary>
+    public PriorityPolicy(
+        ArchetypeWeights weights,
+        IDeckStrategy? deck)
+        : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null, deck: deck) { }
 
     public virtual PriorityAction Pick(GameContext ctx, Player self)
     {
@@ -133,7 +157,7 @@ public class PriorityPolicy
             _lastLoyaltyProposed = null;
         }
 
-        var current = BoardEval.Score(ctx, self, _weights);
+        var current = BoardEval.Score(ctx, self, _weights, _deck);
 
         PriorityAction best = PriorityAction.Pass;
         double bestScore = current;

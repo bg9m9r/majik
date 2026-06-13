@@ -1,6 +1,10 @@
 using FluentAssertions;
 using Majik.Bot.Evaluation;
 using Majik.Bot.Tests.Helpers;
+using Majik.Core.Cards;
+using Majik.Core.Game;
+using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Xunit;
 
 namespace Majik.Bot.Tests;
@@ -283,6 +287,79 @@ public class BoardEvalTests
             .Should().BeGreaterThan(
                 BoardEval.Score(lowLoyalty.Context, lowLoyalty.Self, w),
                 because: "8 loyalty represents more accumulated value than 3 loyalty");
+    }
+
+    // ── Strategic bonus term tests ──────────────────────────────────────────
+
+    /// <summary>
+    /// When a deck strategy returns a positive strategic score, the eval with
+    /// that strategy must exceed the baseline (no strategy) by exactly
+    /// <c>weights.Strategic * strategyScore</c>.
+    /// </summary>
+    [Fact]
+    public void Score_IncludesStrategicBonus_WhenDeckStrategyProvided()
+    {
+        var s = new BotTestScenario();   // self/opp, neutral board
+        var weights = ArchetypeWeights.Default with { Strategic = 1.0 };
+        var withStrat = new StubStrategy(7.0);
+
+        var baseline = BoardEval.Score(s.Context, s.Self, weights, deck: null);
+        var boosted  = BoardEval.Score(s.Context, s.Self, weights, deck: withStrat);
+
+        (boosted - baseline).Should().BeApproximately(7.0, 1e-9);
+    }
+
+    /// <summary>
+    /// A2 NEUTRALITY GUARD (deck-strategy framework landing). The Strategic term
+    /// must contribute EXACTLY ZERO — leaving the eval byte-identical to the
+    /// pre-framework engine — for any archetype that has NO registered
+    /// <see cref="Majik.Bot.Strategies.IDeckStrategy"/>. Neutrality is structural,
+    /// not weight-based: <c>weights.Strategic</c> is 1.0 by default, but the term is
+    /// <c>weights.Strategic * (deck?.StrategicScore(...) ?? 0.0)</c>, so an
+    /// unregistered archetype resolves <c>deck == null</c> via
+    /// <see cref="Majik.Bot.Strategies.DeckStrategyRegistry"/> and the product is 0.
+    ///
+    /// <para>This proves the framework does NOT shift the play/eval of existing
+    /// decks (Burn / Prowess / BorosEnergy / AzoriusControl / and every Default
+    /// archetype such as Sultai / EldraziTron). If a strategy were ever
+    /// accidentally registered for one of these names, the registry lookup would
+    /// return non-null and this test would fail loudly.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("Burn")]
+    [InlineData("Prowess")]
+    [InlineData("BorosEnergy")]
+    [InlineData("AzoriusControl")]
+    [InlineData("Sultai")]
+    [InlineData("EldraziTron")]
+    [InlineData("AzoriusLotusBelcher")] // the new #2630 deck — strategy is wired in Phase C, NOT here
+    public void Score_StrategicTerm_IsNeutral_ForArchetypesWithoutRegisteredStrategy(string archetype)
+    {
+        // The registry is the production resolution path used by both
+        // HeuristicStrategy and SearchStrategy: deck = registry.For(archetypeName).
+        var deck = Majik.Bot.Strategies.DeckStrategyRegistry.For(archetype);
+        deck.Should().BeNull(
+            because: $"'{archetype}' has no [DeckStrategy] registered — Phase A ships the seam only");
+
+        var s = new BotTestScenario();
+        // Strategic = 1.0 (the live default) so the ONLY thing that could move the
+        // score is a non-null strategy. Prove it does not.
+        var weights = ArchetypeWeights.ForArchetype(archetype);
+
+        var withTermActive = BoardEval.Score(s.Context, s.Self, weights, deck: deck);
+        var preFramework    = BoardEval.Score(s.Context, s.Self, weights, deck: null);
+
+        withTermActive.Should().Be(preFramework,
+            because: "with no registered strategy the Strategic term must be exactly 0 — eval byte-identical to pre-framework");
+    }
+
+    private sealed class StubStrategy : Majik.Bot.Strategies.IDeckStrategy
+    {
+        private readonly double _v;
+        public StubStrategy(double v) => _v = v;
+        public double StrategicScore(GameContext ctx, Player self) => _v;
+        public PriorityAction? TryGetNextWinningAction(GameContext ctx, Player self) => null;
+        public MulliganDecision? AdviseMulligan(IReadOnlyList<ICard> hand, int n) => null;
     }
 
     // ── Non-regression: existing dominant terms are not overridden ──────────
