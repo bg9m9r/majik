@@ -53,6 +53,22 @@ internal static class LegalActionEnumerator
             var landInHand = self.Zones.Hand.GetCards().OfType<Land>().FirstOrDefault();
             if (landInHand != null)
                 result.Add(new PriorityAction.PlayLand(landInHand));
+
+            // CR 305 / 712.3 — an MDFC back-face LAND play is a land play, not a
+            // spell: surface it whenever the land drop is available, regardless
+            // of front-face affordability (the engine's CastSpell dispatch raises
+            // the face prompt; MdfcFacePolicy picks the land face). Without this
+            // arm a 0-land MDFC hand is permanently mana-locked: the CastSpell arm
+            // below gates on front-face affordability, so at 0 mana the face-choice
+            // point is never reached (Belcher trace, 2026-06-12).
+            foreach (var card in self.Zones.Hand.GetCards())
+            {
+                if (card is Card c
+                    && c.MdfcState is { CanCastEitherFace: true, CastableBackFace: { IsLand: true } })
+                {
+                    result.Add(new PriorityAction.CastSpell(c, Array.Empty<object>()));
+                }
+            }
         }
 
         // Spell casts: any player with priority may cast a spell when timing
