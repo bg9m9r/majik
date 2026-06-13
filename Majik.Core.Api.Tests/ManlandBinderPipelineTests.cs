@@ -656,6 +656,105 @@ public class ManlandBinderPipelineTests
         alice.LifeTotal.Should().Be(aliceBefore + 2, "you gain 2 life");
     }
 
+    // -----------------------------------------------------------------------
+    // QUOTED ABILITY ON ANIMATE — "becomes a … creature with \"Whenever this
+    // creature attacks, …\"". The quoted attack trigger is granted via a
+    // GrantAbilityEffect scoped to the animation (ExpiresAtEndOfTurn), reusing
+    // the same effect shapes the standalone Restless attack triggers use.
+    // Closes the manland-quoted-ability-on-animate deferral.
+    // -----------------------------------------------------------------------
+
+    private const string DenOfTheBugbearOracle =
+        "If you control two or more other lands, this land enters tapped.\n" +
+        "{T}: Add {R}.\n" +
+        "{3}{R}: Until end of turn, this land becomes a 3/2 red Goblin creature " +
+        "with \"Whenever this creature attacks, create a 1/1 red Goblin creature " +
+        "token that's tapped and attacking.\" It's still a land.";
+
+    [Fact]
+    public void Prod_DenOfTheBugbear_AnimateGrantsQuotedAttackTrigger_MintsGoblinToken()
+    {
+        // The quoted "Whenever this creature attacks, create a 1/1 red Goblin
+        // token …" rider must bind in prod. Before activation there is NO
+        // attack trigger on the land (the quoted ability is granted only while
+        // animated). After activating the animate ability, the granted trigger
+        // appears; firing it mints exactly one Goblin token.
+        var repo = new FakeCardRepo();
+        repo.Add("Den of the Bugbear", "Land", oracleText: DenOfTheBugbearOracle, colors: "R");
+        var land = new Land("Den of the Bugbear", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Animate ability binds; the quoted trigger is NOT yet on the card
+        // (granted only while animated, CR 613.1f).
+        live.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "the quoted attack trigger is granted only while animated");
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        // Animation upgraded the land to a 3/2 Goblin AND granted the trigger.
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(3);
+        cc.Toughness.Should().Be(2);
+        cc.Subtypes.Should().Contain(CardSubtype.Goblin);
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the quoted attack trigger is granted while animated").Subject;
+
+        var goblinsBefore = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.Name == "Goblin");
+        foreach (var e in trigger.Effects) e.Execute();
+        alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Goblin")
+            .Should().Be(goblinsBefore + 1,
+                "the granted attack trigger mints exactly one 1/1 red Goblin token");
+
+        // CR 514.2 — the grant expires at end of turn with the animation; the
+        // trigger is revoked.
+        facade.ContinuousEffects.ExpireEndOfTurn();
+        live.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "the granted trigger is revoked when the animation expires");
+    }
+
+    private const string RagingRavineOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {R} or {G}.\n" +
+        "{2}{R}{G}: Until end of turn, this land becomes a 3/3 red and green " +
+        "Elemental creature with \"Whenever this creature attacks, put a +1/+1 " +
+        "counter on it.\" It's still a land.";
+
+    [Fact]
+    public void Prod_RagingRavine_AnimateGrantsQuotedAttackTrigger_SelfCounter()
+    {
+        // The quoted "Whenever this creature attacks, put a +1/+1 counter on
+        // it." rider grants a self-counter trigger while animated.
+        var repo = new FakeCardRepo();
+        repo.Add("Raging Ravine", "Land", oracleText: RagingRavineOracle, colors: "R,G");
+        var land = new Land("Raging Ravine", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the quoted self-counter attack trigger is granted while animated").Subject;
+        trigger.TargetRequests.Should().BeEmpty("\"on it\" is non-targeted self-reference");
+
+        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
+        foreach (var e in trigger.Effects) e.Execute();
+        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the granted attack trigger puts a +1/+1 counter on the animated land itself");
+    }
+
     [Fact]
     public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
     {

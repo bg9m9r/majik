@@ -47,12 +47,18 @@ namespace Majik.Core.CardData;
 /// <para><b>Deferred (per-card riders this generic binder does NOT bind).</b>
 /// See v1-deferrals + the per-pattern comments below:
 /// <list type="bullet">
-///   <item>Animate riders carrying a <b>granted quoted ability</b> ("with
-///     \"{X}: …\"" / "with \"Whenever this creature attacks, …\"") — Den of
-///     the Bugbear, Raging Ravine, Lavaclaw Reaches, Wandering Fumarole,
-///     Restless Spire's conditional first strike, Hall of Storm Giants' ward.
-///     The N/N body + simple keywords still bind; the granted ability is
-///     dropped (no granted-activated/triggered-on-animate primitive).</item>
+///   <item>Animate riders carrying a <b>granted quoted ability</b> (CR
+///     613.1f, "with \"…\"") — the self-contained, non-targeted "Whenever
+///     this creature attacks, …" shapes now BIND: Den of the Bugbear's
+///     create-a-Goblin-token and Raging Ravine's put-a-+1/+1-counter-on-it
+///     are parsed out of the quoted span and granted to the animated land via
+///     a <see cref="GrantAbilityEffect"/> scoped to the animation
+///     (ExpiresAtEndOfTurn). Still deferred (quote shapes with no realizable
+///     primitive yet): activated <c>{X}:</c> / <c>{0}:</c> pumps (Lavaclaw
+///     Reaches, Wandering Fumarole), Restless Spire's conditional first
+///     strike, Hall of Storm Giants' ward, and Hive of the Eye Tyrant's
+///     TARGETED exile (needs the agent-target plumbing through the grant).
+///     For all of these the N/N body + simple keywords still bind.</item>
 ///   <item>"becomes a … with all creature types" (Mutavault) and X/X bodies
 ///     (Lair of the Hydra) — non-fixed subtype / non-fixed P/T.</item>
 ///   <item>A "Put counters … Then you may have it become …" preamble
@@ -145,6 +151,23 @@ public static class ManlandBinder
         ("haste", "Haste"),
         ("infect", "Infect"),
     };
+
+    // --- Quoted granted ability (on the animate line) ---------------------
+    // CR 613.1f — "becomes a … creature with \"<quoted ability>\"". The quoted
+    // span is a full ability the body has only while animated. We bind the
+    // self-contained, non-targeted "Whenever this creature attacks, …" shapes
+    // reusing the same effect primitives the standalone Restless triggers use.
+    //
+    // Den of the Bugbear — "Whenever this creature attacks, create a 1/1 red
+    // Goblin creature token that's tapped and attacking."
+    private static readonly Regex QuotedCreateColoredToken = new(
+        @"Whenever this creature attacks,\s*create a\s+(?<p>\d+)/(?<t>\d+)\s+" +
+        @"(?<color>white|blue|black|red|green)\s+(?<subtype>[A-Za-z]+)\s+creature token",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Raging Ravine — "Whenever this creature attacks, put a +1/+1 counter on it."
+    private static readonly Regex QuotedSelfCounter = new(
+        @"Whenever this creature attacks,\s*put a \+1/\+1 counter on it",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // --- Attack trigger ---------------------------------------------------
     // "Whenever this land attacks, <effect>." The non-targeted Restless
@@ -253,9 +276,17 @@ public static class ManlandBinder
 
         // Keyword tail — the "with <kw…>" segment of the remainder, up to the
         // first sentence terminator OUTSIDE a quote. A quoted granted ability
-        // ("with \"…\"") is deferred: bind the body + any simple keywords that
-        // precede the quote, drop the quoted rider.
+        // ("with \"…\"") still binds its simple keywords here (the keyword
+        // walker skips the quote interior); the quoted ability itself is bound
+        // separately below via a GrantAbilityEffect scoped to the animation.
         var keywords = ParseKeywords(rest);
+
+        // CR 613.1f — a quoted granted ability on the animate line ("becomes a
+        // … creature with \"Whenever this creature attacks, …\""). Parse the
+        // quoted span into an ability factory; while animated, the ability is
+        // granted to the land via GrantAbilityEffect (ExpiresAtEndOfTurn) so it
+        // is gained on activation and revoked at cleanup with the animation.
+        var quotedAbilityFactory = ParseQuotedGrantedAbility(rest, controller);
 
         var costText = m.Groups["cost"].Value;
 
@@ -294,6 +325,30 @@ public static class ManlandBinder
                         scope: p => ReferenceEquals(p, land),
                         colors: capturedColors,
                         expiresAtEndOfTurn: true));
+                }
+
+                // CR 613.1f — grant the quoted ability while animated. The
+                // grant is scoped to the land itself and ExpiresAtEndOfTurn, so
+                // it is revoked in the cleanup step alongside the rest of the
+                // animation. Sync() eagerly so the granted ability appears on
+                // the land's ability list at resolution (mirrors the
+                // equipment re-equip path documented on GrantAbilityEffect).
+                if (quotedAbilityFactory is not null)
+                {
+                    var grant = new GrantAbilityEffect(
+                        source: land,
+                        targetSelector: () => land,
+                        abilityFactory: bearer => quotedAbilityFactory(bearer),
+                        expiresAtEndOfTurn: true);
+                    effects.Register(grant);
+                    grant.Sync();
+                    // Register the granted trigger with the live TriggerManager
+                    // so a CreatureAttacksEvent matching the animated land lands
+                    // it on the stack (CR 508.1f) in real games.
+                    if (grant.GrantedAbility is TriggeredAbility grantedTrigger)
+                    {
+                        triggers?.RegisterTriggeredAbility(grantedTrigger);
+                    }
                 }
             });
 
@@ -397,6 +452,83 @@ public static class ManlandBinder
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// CR 613.1f — extract a quoted granted ability ("with \"…\"") from the
+    /// becomes-clause remainder and return a factory that builds it for a given
+    /// bearer (the animated land). Returns <c>null</c> when there is no quoted
+    /// span, or when the quote is a shape this binder doesn't yet realize (those
+    /// stay deferred — the body + simple keywords still bind). Only the
+    /// self-contained, non-targeted "Whenever this creature attacks, …" shapes
+    /// are bound here; targeted / activated quoted abilities are deferred.
+    /// </summary>
+    private static Func<Permanent, IAbility>? ParseQuotedGrantedAbility(
+        string rest, Player controller)
+    {
+        if (string.IsNullOrWhiteSpace(rest)) return null;
+
+        // Pull out the FIRST quoted span on the becomes-clause remainder.
+        var open = rest.IndexOf('"');
+        if (open < 0) return null;
+        var close = rest.IndexOf('"', open + 1);
+        if (close < 0) return null;
+        var quoted = rest.Substring(open + 1, close - open - 1);
+
+        // Den of the Bugbear — create a 1/1 <color> <Subtype> creature token.
+        var tok = QuotedCreateColoredToken.Match(quoted);
+        if (tok.Success &&
+            Enum.TryParse<CardSubtype>(tok.Groups["subtype"].Value, ignoreCase: true, out var tokSubtype) &&
+            ColorWordToColor.TryGetValue(tok.Groups["color"].Value, out var tokColor) &&
+            int.TryParse(tok.Groups["p"].Value, out var tokP) &&
+            int.TryParse(tok.Groups["t"].Value, out var tokT))
+        {
+            var tokenName = tok.Groups["subtype"].Value;
+            return bearer =>
+            {
+                var effect = new Effect(
+                    $"{bearer.Name} (animated): create a {tokP}/{tokT} {tokColor} {tokenName} token (quoted attack trigger, CR 508.1f)",
+                    () =>
+                    {
+                        var ctrl = bearer.Controller ?? controller;
+                        var spec = new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                            Name: tokenName,
+                            Power: tokP,
+                            Toughness: tokT,
+                            Subtypes: new[] { tokSubtype },
+                            Keywords: null,
+                            Colors: new[] { tokColor });
+                        Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(spec, ctrl);
+                    });
+                return new TriggeredAbility(
+                    source: bearer,
+                    controller: bearer.Controller ?? controller,
+                    condition: Triggers.OnAttackSelf(bearer),
+                    effects: new IEffect[] { effect },
+                    activeZones: new[] { ZoneType.Battlefield });
+            };
+        }
+
+        // Raging Ravine — put a +1/+1 counter on it (self-reference).
+        if (QuotedSelfCounter.IsMatch(quoted))
+        {
+            return bearer =>
+            {
+                var effect = new Effect(
+                    $"{bearer.Name} (animated): put a +1/+1 counter on it (quoted attack trigger, CR 508.1f)",
+                    () => bearer.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1));
+                return new TriggeredAbility(
+                    source: bearer,
+                    controller: bearer.Controller ?? controller,
+                    condition: Triggers.OnAttackSelf(bearer),
+                    effects: new IEffect[] { effect },
+                    activeZones: new[] { ZoneType.Battlefield });
+            };
+        }
+
+        // Any other quoted shape (activated {X}: pumps, ward, conditional first
+        // strike, targeted exile) stays deferred — see v1-deferrals.
+        return null;
     }
 
     /// <summary>
