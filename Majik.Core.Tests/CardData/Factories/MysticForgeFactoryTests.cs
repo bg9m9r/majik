@@ -238,4 +238,45 @@ public class MysticForgeFactoryTests : IDisposable
         action.Should().Be(PriorityAction.Pass,
             "without a cast-from-top grant the library top is not castable");
     }
+
+    // -----------------------------------------------------------------------
+    // End-to-end: the REAL Mystic Forge factory's own grant drives an actual
+    // SpellCastFlow cast of the top-of-library artifact (Library → Stack), not
+    // a hand-rolled registry grant. This is the "card is genuinely wired" seam:
+    // the factory's LibraryTopPlayStaticEffect lifecycle + SpellCastFlow's
+    // cast-source authorization (CR 601.3e / 113.5) cooperate in one path.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task MysticForge_GrantAuthorizes_RealSpellCastFlowTopCast()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var zones = new ZoneService(bus);
+        var effects = new ContinuousEffectsService(bus);
+        var flow = new SpellCastFlow(stack, zones, bus);
+
+        // Build the production (effects-aware) Mystic Forge and put it on the
+        // battlefield — this attaches the live cast-from-top grant lifecycle.
+        var forge = MysticForgeFactory.Create(_alice, effects);
+        EnterBattlefield(zones, _alice, forge);
+
+        // A {0} artifact on top — colorless + artifact, castable under either
+        // grant arm, free so affordability never gates the path.
+        var ornithopter = PutOnTopOfLibrary(new Artifact("Ornithopter", "{0}"));
+
+        var ctx = new GameContext(_alice, new[] { _alice, _alice }, _alice,
+            1, StepStateType.PreCombatMain, stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var spell = await flow.CastAsync(_alice, ornithopter,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        stack.Count.Should().Be(1, "Mystic Forge authorizes the top-of-library cast");
+        ornithopter.Zone.Should().Be(ZoneType.Stack);
+        spell.WasCastFromLibrary.Should().BeTrue(
+            "cast-from-library sentinel is stamped (CR 113.5)");
+    }
 }
