@@ -1,11 +1,7 @@
-using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
-using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
-using Majik.Core.Services;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -45,23 +41,30 @@ namespace Majik.Core.CardData.Factories;
 /// <c>card.Name</c> at build time) follows the requested printed name.
 ///
 /// ## Implemented
-/// - <b>ETB X counters (CR 603.6a / CR 122.1g)</b>: on entering the
-///   battlefield Walking Ballista places X +1/+1 counters on itself.
-///   X is read from <see cref="Card.PendingCastX"/> (stamped by
-///   <see cref="Majik.Core.Game.SpellCastFlow"/> at cast time right after
-///   the caster's <c>ChooseXAsync</c>), then the stamp is consumed so a
-///   later non-cast battlefield entry (blink, copy) doesn't reuse it —
-///   such an entry leaves Walking Ballista as a 0/0 with zero counters
-///   (the SBA pass per CR 704.5f immediately puts it in the graveyard).
-///   Counter placement routes through <see cref="CountersService.Add"/>
-///   when a <see cref="ReplacementBus"/> is supplied so Hardened Scales /
-///   Doubling Season rewrite the amount before it commits (CR 614 /
-///   CR 121.2). This is the same PendingCastX → ETB-counter mechanism as
-///   <see cref="HangarbackWalkerFactory"/> (the closest analogue — {X}{X}
-///   Artifact Creature — Construct 0/0) and <see cref="EndlessOneFactory"/>.
-///   The card flags <see cref="Card.MarkSelfManagesEntersWithCounters"/>
-///   so the generic EntersWithCountersBinder doesn't also register a
-///   variable-X replacement and double the counters.
+/// - <b>ETB X counters (CR 614.1d / CR 202.3b)</b>: Walking Ballista enters
+///   the battlefield WITH X +1/+1 counters on it. This is NOT wired by the
+///   factory — it is registered by the generic
+///   <see cref="Majik.Core.CardData.EntersWithCountersBinder"/> as a
+///   variable-X <see cref="Majik.Core.Effects.EntersWithCountersReplacement"/>,
+///   exactly like Endless One / Hangarback Walker / Stonecoil Serpent. On the
+///   production deck-build (<see cref="Majik.Core.CardData.DeckCardBuilder"/>
+///   APPROACH B) the binder runs in <c>OverlayAdditiveBinders</c> against the
+///   live <see cref="ReplacementBus"/>: it matches the "enters with X +1/+1
+///   counters on it" oracle text, reads the chosen X off
+///   <see cref="Card.PendingCastX"/> (stamped by
+///   <see cref="Majik.Core.Game.SpellCastFlow"/> after the caster's
+///   <c>ChooseXAsync</c>), and stamps
+///   <see cref="Majik.Core.Effects.ZoneMoveIntent.PlusOneCountersOnEnter"/> so
+///   the permanent enters with the counters already on it (CR 614.1d — no
+///   transient 0/0 window). Hardened Scales / Doubling Season compose because
+///   they observe the same ETB intent channel (CR 614 / CR 121.2). A non-cast
+///   entry (blink / copy / token) has no <see cref="Card.PendingCastX"/> stamp
+///   → X = 0 → enters as a 0/0 → the SBA pass (CR 704.5f) sends it to the
+///   graveyard. NOTE: the factory deliberately does NOT
+///   <see cref="Card.MarkSelfManagesEntersWithCounters"/> — doing so suppresses
+///   the binder, and the prod Approach-B route never registers a self-managed
+///   ETB trigger with a live TriggerManager, so self-managing yields ZERO
+///   counters in real play (the bug this card's factory previously had).
 /// - <b>Sorcery-speed restriction on {4}</b>: JSON
 ///   <c>"sorcerySpeed": true</c> threads through
 ///   <c>CardDefinitionFactory</c> onto the runtime ActivatedAbility's
@@ -141,69 +144,43 @@ public static class WalkingBallistaFactory
     }
 
     /// <summary>
-    /// Build the JSON-driven Walking Ballista runtime card and attach the
-    /// "enters with X +1/+1 counters" ETB trigger (CR 603.6a / CR 122.1g)
-    /// on top. The JSON definition supplies the two activated abilities
-    /// ({4}: put a counter; remove a counter: deal 1 damage); this method
-    /// adds the spell-cast-X → ETB-counter behaviour that the JSON schema
-    /// doesn't yet express, mirroring <see cref="HangarbackWalkerFactory"/>
-    /// and <see cref="EndlessOneFactory"/>.
+    /// Build the JSON-driven Walking Ballista runtime card. The JSON
+    /// definition supplies the two activated abilities ({4}: put a +1/+1
+    /// counter; remove a +1/+1 counter: deal 1 damage to any target).
     ///
-    /// X is read from <see cref="Card.PendingCastX"/> (stamped by
-    /// SpellCastFlow after ChooseXAsync) and the stamp is consumed so
-    /// re-entries (blink, copy) don't reuse it. Counter placement routes
-    /// through <see cref="CountersService.Add"/> so a supplied
-    /// <see cref="ReplacementBus"/> (Hardened Scales / Doubling Season)
-    /// can rewrite the count (CR 614).
+    /// <para><b>"Enters with X +1/+1 counters" (CR 614.1d / CR 202.3b) is NOT
+    /// wired here.</b> It is registered as a variable-X
+    /// <see cref="EntersWithCountersReplacement"/> by the generic
+    /// <see cref="EntersWithCountersBinder"/> — the same binder that handles
+    /// every other "enters with N/X +1/+1 counters" card (Endless One,
+    /// Hangarback Walker, Stonecoil Serpent, …). On the production deck-build
+    /// (<see cref="DeckCardBuilder"/> APPROACH B — instance swap) the binder
+    /// runs inside <c>OverlayAdditiveBinders</c> against the live game
+    /// <see cref="ReplacementBus"/>, matches Walking Ballista's oracle text
+    /// ("…enters with X +1/+1 counters on it"), and registers a dynamic
+    /// replacement that reads the chosen X off <see cref="Card.PendingCastX"/>
+    /// at entry. It stamps <see cref="Effects.ZoneMoveIntent.PlusOneCountersOnEnter"/>
+    /// so the permanent enters WITH the counters (CR 614.1d — no transient 0/0
+    /// window the SBA layer would immediately kill, and Hardened Scales /
+    /// Doubling Season compose correctly because they observe the same ETB
+    /// intent channel).</para>
+    ///
+    /// <para><b>Why not self-manage via an ETB trigger?</b> An earlier port
+    /// folded the X counters into an ETB <c>TriggeredAbility</c> and flagged
+    /// <see cref="Card.MarkSelfManagesEntersWithCounters"/> to suppress the
+    /// binder (the posture Hangarback Walker / Endless One still carry). That
+    /// produced ZERO counters on the Approach-B prod route: the routed build
+    /// calls <see cref="Majik.Core.CardData.NamedCardFactory"/> with no
+    /// TriggerManager, so the self-managed ETB trigger was never registered
+    /// and never fired — AND the suppression flag stopped the binder from
+    /// registering the replacement that the route DOES run. Deferring entirely
+    /// to the binder's replacement is the correct fix: it is the one mechanism
+    /// the production route actually executes, and it places the counters AS
+    /// the permanent enters (CR 614.1d) rather than after the fact.</para>
     /// </summary>
     private static Creature BuildWithEtbCounters(
         CardDefinition definition, Player owner, ReplacementBus? replacements)
-    {
-        var card = (Creature)CardDefinitionFactory.Build(definition, owner, replacements);
-
-        // CR 614.1d — this factory wires its own "enters with X +1/+1
-        // counters" via the ETB trigger below; flag it so the generic
-        // EntersWithCountersBinder does NOT also register a variable-X
-        // replacement and double the counters (same posture as
-        // Hangarback Walker / Endless One).
-        card.MarkSelfManagesEntersWithCounters();
-
-        // ----------------------------------------------------------------
-        // ETB +1/+1 counters trigger — CR 603.6a / CR 122.1g.
-        //   "Walking Ballista enters the battlefield with X +1/+1 counters
-        //    on it."
-        // Read PendingCastX (stamped by SpellCastFlow right after
-        // ChooseXAsync), apply that many +1/+1 counters via
-        // CountersService.Add (so Hardened Scales / Doubling Season rewrite
-        // the amount), then clear the stamp so re-entries (blink, copy)
-        // don't reuse the value. PendingCastX is null for non-cast entries
-        // → 0 counters → 0/0 → SBA puts it in the graveyard (CR 704.5f),
-        // matching the printed behaviour. Same pattern as Hangarback Walker
-        // / Endless One.
-        // ----------------------------------------------------------------
-        var etbEffect = new Effect(
-            $"{card.Name}: enters with X +1/+1 counters (CR 122.1g)",
-            () =>
-            {
-                var x = card.PendingCastX ?? 0;
-                if (x > 0)
-                {
-                    CountersService.Add(card, CounterType.PlusOnePlusOne, x, replacements);
-                }
-                card.ClearPendingCastX();
-            });
-
-        var etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(card),
-            effects: new IEffect[] { etbEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(etbTrigger);
-
-        return card;
-    }
+        => (Creature)CardDefinitionFactory.Build(definition, owner, replacements);
 
     /// <summary>
     /// Return a copy of the shared Walking Ballista

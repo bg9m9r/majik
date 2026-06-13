@@ -7,6 +7,7 @@ using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -167,114 +168,142 @@ public class WalkingBallistaTests
     }
 
     // -----------------------------------------------------------------------
-    // ETB X +1/+1 counters: "enters the battlefield with X +1/+1 counters"
-    // (CR 122.1g). X is read from PendingCastX, stamped by SpellCastFlow at
-    // cast time — simulated here the same way the Hangarback / Endless One
-    // tests do. Same PendingCastX → ETB-counter mechanism.
+    // ETB X +1/+1 counters: "[this creature] enters with X +1/+1 counters on
+    // it" (CR 614.1d / CR 202.3b). This is NOT a factory-attached ETB trigger.
+    // The factory deliberately leaves it to the generic
+    // EntersWithCountersBinder, which on the prod deck-build (DeckCardBuilder
+    // APPROACH B → OverlayAdditiveBinders) registers a variable-X
+    // EntersWithCountersReplacement that reads PendingCastX and places the
+    // counters AS the permanent enters. These tests exercise that exact prod
+    // mechanism: build the factory card, run the binder against its real
+    // oracle text, then move it onto the battlefield through ZoneService and
+    // assert the counters landed.
+    //
+    // Earlier this card self-managed via an ETB trigger + the
+    // MarkSelfManagesEntersWithCounters flag; that produced ZERO counters on
+    // the Approach-B route (the trigger was never registered with a live
+    // TriggerManager and the flag suppressed the binder). The factory must NOT
+    // attach an ETB trigger NOR self-manage — both regression-guarded here.
     // -----------------------------------------------------------------------
 
+    private static CardEntity BallistaEntity(string name = WalkingBallistaFactory.CardName) =>
+        new EmbeddedCardRepository().GetByName(name)!;
+
     [Fact]
-    public void WalkingBallista_AttachesEtbTrigger()
+    public void WalkingBallista_DoesNotAttachEtbTrigger()
     {
+        // CR 614.1d — the ETB counters are a replacement registered by the
+        // binder, NOT a factory-attached TriggeredAbility. Self-managing via a
+        // trigger was the bug: the prod Approach-B route never registers it.
         var wb = WalkingBallistaFactory.Create(_alice);
 
-        wb.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Walking Ballista has exactly one ETB (enters-with-X-counters) trigger");
+        wb.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "Walking Ballista's ETB counters are a binder-registered replacement, " +
+            "not a self-managed ETB trigger");
     }
 
     [Fact]
-    public void WalkingBallista_EtbWithXEquals3_GainsThreePlusOneCounters()
+    public void WalkingBallista_DoesNotSelfManageEntersWithCounters()
     {
+        // The factory must leave SelfManagesEntersWithCounters false so the
+        // EntersWithCountersBinder DOES register the variable-X replacement on
+        // the prod route. Setting the flag suppresses the binder → 0 counters.
         var wb = WalkingBallistaFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(wb);
-        wb.SetZone(ZoneType.Battlefield);
 
-        // SpellCastFlow stamps PendingCastX after ChooseXAsync; simulate.
+        wb.SelfManagesEntersWithCounters.Should().BeFalse(
+            "the binder owns the ETB-X replacement; self-managing suppresses it " +
+            "and yields zero counters on the Approach-B prod route");
+    }
+
+    [Fact]
+    public void WalkingBallista_BinderReplacement_EntersWithXEquals3_Counters()
+    {
+        // The prod mechanism: factory build + binder (reads the card's real
+        // oracle text) + ZoneService move. X = 3 (cast {3}{3}).
+        var bus = new ReplacementBus();
+        var wb = WalkingBallistaFactory.Create(_alice);
+
+        EntersWithCountersBinder.Bind(wb, BallistaEntity(), bus).Should().BeTrue(
+            "the binder matches 'enters with X +1/+1 counters on it' and registers " +
+            "the variable-X replacement");
+
+        wb.SetOwner(_alice);
+        wb.SetController(_alice);
+        _alice.Zones.Library.AddCard(wb);
+        wb.SetZone(ZoneType.Library);
         wb.SetPendingCastX(3);
 
-        wb.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(wb, ZoneType.Library, ZoneType.Battlefield, _alice);
 
-        var etb = wb.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
-
-        // 0/0 base + three +1/+1 counters → a 3/3 once the Layer-7 P/T
-        // system folds them in (CR 122.1c). Counter count is the harness-
-        // observable state without a wired ContinuousEffectsService (same
-        // assertion shape as Hangarback / Endless One).
         wb.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
-            "Walking Ballista enters with X (=3) +1/+1 counters per CR 122.1g → 3/3");
+            "Walking Ballista enters WITH X (=3) +1/+1 counters per CR 614.1d → 3/3");
         wb.BasePower.Should().Be(0, "base P/T is unchanged; counters add via Layer 7");
         wb.BaseToughness.Should().Be(0);
-        wb.PendingCastX.Should().BeNull(
-            "PendingCastX stamp consumed once the ETB effect reads it — re-entries don't double-count");
     }
 
     [Fact]
-    public void WalkingBallista_EtbWithXEquals0_NoCountersPlaced_StaysZeroZero()
+    public void WalkingBallista_BinderReplacement_ZeroX_NoCounters()
     {
-        var wb = WalkingBallistaFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(wb);
-        wb.SetZone(ZoneType.Battlefield);
-        wb.SetPendingCastX(0);
-
-        var etb = wb.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
-
-        wb.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "X=0 → zero counters placed → 0/0 SBA-fodder (dies to CR 704.5f)");
-        wb.BasePower.Should().Be(0);
-        wb.BaseToughness.Should().Be(0);
-        wb.PendingCastX.Should().BeNull("PendingCastX cleared regardless of X value");
-    }
-
-    [Fact]
-    public void WalkingBallista_NoPendingX_NonCastEntry_NoCountersPlaced()
-    {
-        // Non-cast entries (blink, copy, etc.) leave PendingCastX = null —
-        // the ETB effect must no-op rather than throw or place arbitrary
-        // counters.
-        var wb = WalkingBallistaFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(wb);
-        wb.SetZone(ZoneType.Battlefield);
-        wb.PendingCastX.Should().BeNull();
-
-        var etb = wb.Abilities.OfType<TriggeredAbility>().Single();
-        var act = () => { foreach (var e in etb.Effects) e.Execute(); };
-        act.Should().NotThrow();
-
-        wb.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "non-cast entry leaves Walking Ballista as a 0/0 with no counters (CR 122.1g — no chosen X)");
-    }
-
-    [Fact]
-    public void WalkingBallista_RoutesThroughCountersService_HardenedScalesBumpsApply()
-    {
-        // Hardened Scales rewrites +1/+1 counter placements via a
-        // ReplacementBus subscriber. Wire WB with a replacement bus that
-        // bumps every PlusOnePlusOne placement by 1, then cast for X=2.
-        // Expected: 2 + 1 = 3 counters land.
+        // No PendingCastX stamp → X = 0 → a 0/0 the SBA layer sends to the
+        // graveyard (CR 704.5f). Non-cast entries (blink, copy) take this path.
         var bus = new ReplacementBus();
-        bus.Register(new LambdaReplacement<CounterAddIntent>(
-            applies: (intent, _) => intent.Type == CounterType.PlusOnePlusOne,
-            replace: (intent, _) => intent with { Amount = intent.Amount + 1 }));
+        var wb = WalkingBallistaFactory.Create(_alice);
 
-        var wb = WalkingBallistaFactory.Create(_alice, replacements: bus);
-        _alice.Zones.Battlefield.AddCard(wb);
-        wb.SetZone(ZoneType.Battlefield);
+        EntersWithCountersBinder.Bind(wb, BallistaEntity(), bus).Should().BeTrue();
+
+        wb.SetOwner(_alice);
+        wb.SetController(_alice);
+        _alice.Zones.Library.AddCard(wb);
+        wb.SetZone(ZoneType.Library);
+        // No SetPendingCastX → X defaults to 0.
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(wb, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        wb.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "X = 0 → zero counters placed → 0/0 SBA-fodder (CR 704.5f)");
+    }
+
+    [Fact]
+    public void WalkingBallista_BinderReplacement_HardenedScalesBumpsApply()
+    {
+        // Hardened Scales bumps the +1/+1 counters AS they enter — it observes
+        // the same ZoneMoveIntent.PlusOneCountersOnEnter channel the ETB-X
+        // replacement stamps (CR 614). Wire a +1 bump on that channel, cast for
+        // X = 2, expect 3 counters.
+        var bus = new ReplacementBus();
+        bus.Register(new LambdaReplacement<ZoneMoveIntent>(
+            applies: (intent, _) => intent.ToZone == ZoneType.Battlefield
+                                    && intent.PlusOneCountersOnEnter >= 1,
+            replace: (intent, _) => intent with
+            {
+                PlusOneCountersOnEnter = intent.PlusOneCountersOnEnter + 1,
+            }));
+
+        var wb = WalkingBallistaFactory.Create(_alice);
+        EntersWithCountersBinder.Bind(wb, BallistaEntity(), bus).Should().BeTrue();
+
+        wb.SetOwner(_alice);
+        wb.SetController(_alice);
+        _alice.Zones.Library.AddCard(wb);
+        wb.SetZone(ZoneType.Library);
         wb.SetPendingCastX(2);
 
-        var etb = wb.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(wb, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         wb.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
-            "Hardened Scales (+1 replacement on PlusOnePlusOne placements) bumps the count via CountersService.Add");
+            "Hardened Scales (+1 on the ETB +1/+1 intent channel) bumps X (=2) → 3");
     }
 
     // -----------------------------------------------------------------------
     // Assaultron Invader — byte-for-byte functional reprint (Fallout / PIP),
     // served by the same factory via the shared CardDefinition. The ETB-X
-    // counters fix flows for free because the reprint routes through the
-    // same BuildWithEtbCounters path.
+    // counters flow through the same generic binder mechanism, keyed on the
+    // shared oracle text. (Assaultron is not in the embedded Modern pool, so
+    // it can never reach the prod deck-build route; its ETB-X is exercised here
+    // against Walking Ballista's equivalent oracle text.)
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -287,29 +316,38 @@ public class WalkingBallistaTests
         card.HasType(CardType.Creature).Should().BeTrue();
         card.HasType(CardType.Artifact).Should().BeTrue();
         card.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Assaultron Invader carries the same ETB-counters trigger as Walking Ballista");
+        card.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "Assaultron Invader carries no self-managed ETB trigger, same as Walking Ballista");
     }
 
     [Fact]
-    public void AssaultronInvader_EtbWithXEquals3_GainsThreePlusOneCounters()
+    public void AssaultronInvader_BinderReplacement_EntersWithXEquals3_Counters()
     {
+        var bus = new ReplacementBus();
         var ai = WalkingBallistaFactory.Create(
             _alice, WalkingBallistaFactory.AssaultronInvaderCardName);
 
         ai.Name.Should().Be(WalkingBallistaFactory.AssaultronInvaderCardName);
+        ai.SelfManagesEntersWithCounters.Should().BeFalse(
+            "the reprint also defers ETB-X to the binder");
 
-        _alice.Zones.Battlefield.AddCard(ai);
-        ai.SetZone(ZoneType.Battlefield);
+        // Functional reprint → identical oracle text. Bind with Walking
+        // Ballista's entity (same "enters with X +1/+1 counters on it" text).
+        var entity = BallistaEntity();
+        EntersWithCountersBinder.Bind(ai, entity, bus).Should().BeTrue();
+
+        ai.SetOwner(_alice);
+        ai.SetController(_alice);
+        _alice.Zones.Library.AddCard(ai);
+        ai.SetZone(ZoneType.Library);
         ai.SetPendingCastX(3);
 
-        var etb = ai.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var e in etb.Effects) e.Execute();
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(ai, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         ai.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
-            "the reprint enters with X (=3) +1/+1 counters via the same factory path → 3/3");
+            "the reprint enters with X (=3) +1/+1 counters via the same binder replacement → 3/3");
         ai.BasePower.Should().Be(0);
         ai.BaseToughness.Should().Be(0);
-        ai.PendingCastX.Should().BeNull();
     }
 }
