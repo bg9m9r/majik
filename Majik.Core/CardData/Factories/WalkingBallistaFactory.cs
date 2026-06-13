@@ -1,7 +1,11 @@
+using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
+using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
+using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -40,12 +44,24 @@ namespace Majik.Core.CardData.Factories;
 /// name (and therefore every ability's description, which is derived from
 /// <c>card.Name</c> at build time) follows the requested printed name.
 ///
-/// ## Deferred (v1 gaps, see linked issues)
-/// - <b>ETB X counters</b>: requires plumbing ChosenSpellParams.X through
-///   the ZoneMoveIntent / ETB hook layer. Until that infrastructure
-///   exists, Walking Ballista enters as a 0/0 with zero counters
-///   (state-based actions will immediately put it in the graveyard —
-///   acceptable for unit tests that pre-seed counters manually).
+/// ## Implemented
+/// - <b>ETB X counters (CR 603.6a / CR 122.1g)</b>: on entering the
+///   battlefield Walking Ballista places X +1/+1 counters on itself.
+///   X is read from <see cref="Card.PendingCastX"/> (stamped by
+///   <see cref="Majik.Core.Game.SpellCastFlow"/> at cast time right after
+///   the caster's <c>ChooseXAsync</c>), then the stamp is consumed so a
+///   later non-cast battlefield entry (blink, copy) doesn't reuse it —
+///   such an entry leaves Walking Ballista as a 0/0 with zero counters
+///   (the SBA pass per CR 704.5f immediately puts it in the graveyard).
+///   Counter placement routes through <see cref="CountersService.Add"/>
+///   when a <see cref="ReplacementBus"/> is supplied so Hardened Scales /
+///   Doubling Season rewrite the amount before it commits (CR 614 /
+///   CR 121.2). This is the same PendingCastX → ETB-counter mechanism as
+///   <see cref="HangarbackWalkerFactory"/> (the closest analogue — {X}{X}
+///   Artifact Creature — Construct 0/0) and <see cref="EndlessOneFactory"/>.
+///   The card flags <see cref="Card.MarkSelfManagesEntersWithCounters"/>
+///   so the generic EntersWithCountersBinder doesn't also register a
+///   variable-X replacement and double the counters.
 /// - <b>Sorcery-speed restriction on {4}</b>: JSON
 ///   <c>"sorcerySpeed": true</c> threads through
 ///   <c>CardDefinitionFactory</c> onto the runtime ActivatedAbility's
@@ -93,7 +109,7 @@ public static class WalkingBallistaFactory
     /// Doubling Season replacements can rewrite the count (CR 614).
     /// </summary>
     public static Creature Create(Player owner, ReplacementBus? replacements) =>
-        (Creature)CardDefinitionFactory.Build(Definition, owner, replacements);
+        BuildWithEtbCounters(Definition, owner, replacements);
 
     /// <summary>
     /// Build the card for the requested printed name. Supports the
@@ -121,7 +137,72 @@ public static class WalkingBallistaFactory
                 nameof(cardName)),
         };
 
-        return (Creature)CardDefinitionFactory.Build(definition, owner, replacements: null);
+        return BuildWithEtbCounters(definition, owner, replacements: null);
+    }
+
+    /// <summary>
+    /// Build the JSON-driven Walking Ballista runtime card and attach the
+    /// "enters with X +1/+1 counters" ETB trigger (CR 603.6a / CR 122.1g)
+    /// on top. The JSON definition supplies the two activated abilities
+    /// ({4}: put a counter; remove a counter: deal 1 damage); this method
+    /// adds the spell-cast-X → ETB-counter behaviour that the JSON schema
+    /// doesn't yet express, mirroring <see cref="HangarbackWalkerFactory"/>
+    /// and <see cref="EndlessOneFactory"/>.
+    ///
+    /// X is read from <see cref="Card.PendingCastX"/> (stamped by
+    /// SpellCastFlow after ChooseXAsync) and the stamp is consumed so
+    /// re-entries (blink, copy) don't reuse it. Counter placement routes
+    /// through <see cref="CountersService.Add"/> so a supplied
+    /// <see cref="ReplacementBus"/> (Hardened Scales / Doubling Season)
+    /// can rewrite the count (CR 614).
+    /// </summary>
+    private static Creature BuildWithEtbCounters(
+        CardDefinition definition, Player owner, ReplacementBus? replacements)
+    {
+        var card = (Creature)CardDefinitionFactory.Build(definition, owner, replacements);
+
+        // CR 614.1d — this factory wires its own "enters with X +1/+1
+        // counters" via the ETB trigger below; flag it so the generic
+        // EntersWithCountersBinder does NOT also register a variable-X
+        // replacement and double the counters (same posture as
+        // Hangarback Walker / Endless One).
+        card.MarkSelfManagesEntersWithCounters();
+
+        // ----------------------------------------------------------------
+        // ETB +1/+1 counters trigger — CR 603.6a / CR 122.1g.
+        //   "Walking Ballista enters the battlefield with X +1/+1 counters
+        //    on it."
+        // Read PendingCastX (stamped by SpellCastFlow right after
+        // ChooseXAsync), apply that many +1/+1 counters via
+        // CountersService.Add (so Hardened Scales / Doubling Season rewrite
+        // the amount), then clear the stamp so re-entries (blink, copy)
+        // don't reuse the value. PendingCastX is null for non-cast entries
+        // → 0 counters → 0/0 → SBA puts it in the graveyard (CR 704.5f),
+        // matching the printed behaviour. Same pattern as Hangarback Walker
+        // / Endless One.
+        // ----------------------------------------------------------------
+        var etbEffect = new Effect(
+            $"{card.Name}: enters with X +1/+1 counters (CR 122.1g)",
+            () =>
+            {
+                var x = card.PendingCastX ?? 0;
+                if (x > 0)
+                {
+                    CountersService.Add(card, CounterType.PlusOnePlusOne, x, replacements);
+                }
+                card.ClearPendingCastX();
+            });
+
+        var etbTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: Triggers.OnEnterBattlefieldSelf(card),
+            effects: new IEffect[] { etbEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(etbTrigger);
+
+        return card;
     }
 
     /// <summary>
