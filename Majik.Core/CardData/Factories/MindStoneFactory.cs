@@ -1,6 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
@@ -46,8 +48,30 @@ public static class MindStoneFactory
 
     /// <summary>
     /// Construct Mind Stone owned and controlled by <paramref name="owner"/>.
+    /// Shape-only — no event bus, so the self-sacrifice cost publishes nothing
+    /// (legacy posture; dispatcher / structural tests).
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -72,7 +96,7 @@ public static class MindStoneFactory
             "Mind Stone: draw a card + sac self",
             () =>
             {
-                SacrificeSelf(stone, owner);
+                SacrificeSelf(stone, owner, eventBus);
                 Fx.DrawCards(owner, 1);
             });
 
@@ -83,7 +107,11 @@ public static class MindStoneFactory
             {
                 new ManaCostCost("{1}"),
                 AdditionalCost.Tap(stone),
-                AdditionalCost.Sacrifice(stone),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment → cost.Pay) publishes PermanentSacrificedEvent;
+                // the closure's SacrificeSelf is the bus-aware fallback for the
+                // resolve-only dispatcher/test path.
+                AdditionalCost.Sacrifice(stone, eventBus),
             },
             effects: new IEffect[] { drawEffect });
 
@@ -94,12 +122,24 @@ public static class MindStoneFactory
 
     /// <summary>
     /// Move <paramref name="stone"/> from the battlefield to its owner's
-    /// graveyard. Idempotent — no-op if already off the battlefield.
-    /// Mirrors the closure used by Pyrite Spellbomb / Aether Spellbomb.
+    /// graveyard. Idempotent — no-op if already off the battlefield. When
+    /// <paramref name="eventBus"/> is supplied (prod effects-aware build) the
+    /// move routes through
+    /// <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>, publishing a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null bus = bare
+    /// owner-routed move. In the live activation path the cost already moved
+    /// the stone, so this closure no-ops (single publish either way).
     /// </summary>
-    private static void SacrificeSelf(Artifact stone, Player owner)
+    private static void SacrificeSelf(Artifact stone, Player owner, IEventBus? eventBus)
     {
         if (stone.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(stone, stone.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(stone);
         owner.Zones.Graveyard.AddCard(stone);
         stone.SetZone(ZoneType.Graveyard);

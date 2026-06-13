@@ -57,6 +57,34 @@ public class MindStoneTests
         card.ManaCost.Should().Be("{2}");
     }
 
+    [Fact]
+    public void SacSelf_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // class-(b) sac-bus pay-down: the effects-aware
+        // Create(Player, ContinuousEffectsService) overload the source-gen
+        // routes on the prod GameFacade build threads effects.EventBus so the
+        // {1},{T},Sac draw ability's self-sacrifice publishes
+        // PermanentSacrificedEvent (CR 701.16a).
+        var bus = new global::Majik.Core.Events.EventBus();
+        var effects = new global::Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var captured = new List<global::Majik.Core.Events.PermanentSacrificedEvent>();
+        bus.Subscribe<global::Majik.Core.Events.PermanentSacrificedEvent>(captured.Add);
+
+        var built = NamedCardFactory.Create("Mind Stone", _alice, effects);
+        built.Should().BeOfType<Artifact>();
+        var stone = (Artifact)built;
+        _alice.Zones.Battlefield.AddCard(stone);
+        stone.SetZone(ZoneType.Battlefield);
+
+        var draw = stone.Abilities.OfType<ActivatedAbility>().Single();
+        draw.Resolve();
+
+        captured.Should().ContainSingle()
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(stone);
+    }
+
     // --------------------------------------------------------------
     // Ability shape
     // --------------------------------------------------------------
