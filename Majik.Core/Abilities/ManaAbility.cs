@@ -97,6 +97,28 @@ public class ManaAbility : IManaAbility
         Func<ManaCost> manaGenerator,
         Func<bool>? canActivateCheck = null,
         ManaCost? printedManaGenerated = null)
+        : this(source, controller, manaGenerator, canActivateCheck, printedManaGenerated, spendRestriction: null)
+    {
+    }
+
+    /// <summary>
+    /// Construct a DYNAMIC-output mana ability whose generated mana also
+    /// carries a <see cref="SpendRestriction"/> — Sunken Citadel's
+    /// "{T}: Add two mana of the chosen color. Spend this mana only to activate
+    /// abilities of land sources." (the chosen colour is decided "as it enters"
+    /// per CR 614.12, so the produced colour is dynamic, read from a
+    /// <see cref="Majik.Core.CardData.ColorChoice"/> holder at activation).
+    /// Composes the dynamic <paramref name="manaGenerator"/> with the
+    /// <paramref name="spendRestriction"/> the resolver stamps onto every
+    /// produced unit (CR 106.4).
+    /// </summary>
+    public ManaAbility(
+        object source,
+        Player controller,
+        Func<ManaCost> manaGenerator,
+        Func<bool>? canActivateCheck,
+        ManaCost? printedManaGenerated,
+        SpendRestriction? spendRestriction)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -106,6 +128,7 @@ public class ManaAbility : IManaAbility
         // generator runs at Activate time.
         ManaGenerated = printedManaGenerated ?? ManaCost.Zero;
         _tapsAsCost = true;
+        SpendRestriction = spendRestriction;
     }
 
     /// <summary>
