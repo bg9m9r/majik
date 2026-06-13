@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -147,5 +148,67 @@ public class DesertFactoryTests
         DesertFactory.IsEndOfCombatStep(StepStateType.DeclareAttackers).Should().BeFalse();
         DesertFactory.IsEndOfCombatStep(StepStateType.PostCombatMain).Should().BeFalse();
         DesertFactory.IsEndOfCombatStep(StepStateType.PreCombatMain).Should().BeFalse();
+    }
+
+    // -----------------------------------------------------------------------
+    // Context-aware activation gate — CR 602.5b "Activate only during the end
+    // of combat step". The pinger now carries a canActivateCheckCtx that reads
+    // the live step off the GameContext (GameContext.CurrentPhase, the live
+    // StepStateType), so AbilityActivator.CanActivate / the bot's
+    // LegalActionEnumerator reject the activation outside the end-of-combat step
+    // on the production routed build — not merely the public predicate.
+    // -----------------------------------------------------------------------
+
+    private GameContext ContextAtStep(StepStateType step) =>
+        new(
+            self: _alice,
+            allPlayers: new[] { _alice },
+            activePlayer: _alice,
+            turnNumber: 1,
+            currentPhase: step,
+            stack: new Majik.Core.Stack.Stack());
+
+    [Fact]
+    public void Desert_Pinger_CanActivateNow_TrueOnlyDuringEndOfCombatStep()
+    {
+        var land = DesertFactory.Create(_alice);
+        var pinger = land.Abilities.OfType<ActivatedAbility>().Single();
+
+        pinger.CanActivateNow(ContextAtStep(StepStateType.EndOfCombat)).Should().BeTrue(
+            "CR 602.5b — the pinger may be activated during the end of combat step");
+        pinger.CanActivateNow(ContextAtStep(StepStateType.DeclareAttackers)).Should().BeFalse(
+            "the declare-attackers step is not the end of combat step");
+        pinger.CanActivateNow(ContextAtStep(StepStateType.DeclareBlockers)).Should().BeFalse(
+            "the declare-blockers step is not the end of combat step");
+        pinger.CanActivateNow(ContextAtStep(StepStateType.CombatDamage)).Should().BeFalse(
+            "the combat-damage step is not the end of combat step");
+        pinger.CanActivateNow(ContextAtStep(StepStateType.PostCombatMain)).Should().BeFalse(
+            "the post-combat main phase is not the end of combat step");
+        pinger.CanActivateNow(ContextAtStep(StepStateType.Upkeep)).Should().BeFalse(
+            "the upkeep step is not the end of combat step");
+    }
+
+    [Fact]
+    public void Desert_Pinger_CanActivateNow_ContextLess_TrueForShapeTests()
+    {
+        // CR 602.5c — the context-less overload (no GameContext) can't reach the
+        // step, so it falls back to "true" (the gate is context-aware only).
+        // This keeps construction-only / shape tests and harnesses that don't
+        // thread a GameContext from being wedged by the timing rider.
+        var land = DesertFactory.Create(_alice);
+        var pinger = land.Abilities.OfType<ActivatedAbility>().Single();
+
+        pinger.CanActivateNow().Should().BeTrue(
+            "the context-less consult has no step to gate on (CR 602.5c fallback)");
+    }
+
+    [Fact]
+    public void Desert_Pinger_CanActivateCheckCtx_IsWired()
+    {
+        var land = DesertFactory.Create(_alice);
+        var pinger = land.Abilities.OfType<ActivatedAbility>().Single();
+
+        pinger.CanActivateCheckCtx.Should().NotBeNull(
+            "the end-of-combat timing rider is modelled as the context-aware gate");
     }
 }

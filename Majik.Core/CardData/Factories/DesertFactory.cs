@@ -44,7 +44,21 @@ namespace Majik.Core.CardData.Factories;
 ///   though only a creature is a legal target here). CR 608.2b — no chosen
 ///   target → clean no-op.
 ///
-/// ## v1 posture (documented narrowings — no new mechanic)
+///   * <b>"Activate only during the end of combat step" (CR 602.5b)</b> — a
+///     timing activation restriction, modelled as the ability's CONTEXT-AWARE
+///     <c>canActivateCheckCtx</c> gate (the same seam Hired Claw's "an opponent
+///     lost life this turn" rider uses). The gate reads the live step off the
+///     <see cref="Majik.Core.Game.GameContext.CurrentPhase"/> the engine threads
+///     into every activation-legality consult (the live TurnDriver / GameFacade
+///     dispatch path and the bot's <c>LegalActionEnumerator</c>), so the timing
+///     restriction now WORKS on the production routed build — the public
+///     <see cref="IsEndOfCombatStep"/> predicate (kept for direct bot-policy /
+///     action-validator use) is the same gate, not a stand-in. The context-less
+///     consult falls back to "true" (CR 602.5c posture) so shape-only tests
+///     aren't wedged. The ability stays instant-speed (the restriction is the
+///     timing rider, not sorcery speed).
+///
+/// ## v1 posture (documented narrowing — no new mechanic)
 /// - <b>"attacking" candidate restriction</b> — same gap as
 ///   <see cref="RestlessRidgelineFactory"/>: the engine has no per-<see cref="Creature"/>
 ///   "is attacking" flag reachable from this factory closure (attacking state
@@ -52,16 +66,6 @@ namespace Majik.Core.CardData.Factories;
 ///   battlefield creatures; the "attacking" qualifier is recorded in the
 ///   request description. Resolution honours whatever target the
 ///   controller/agent supplied.
-/// - <b>"Activate only during the end of combat step" (CR 602.5b)</b> — a
-///   timing activation restriction. The current step is not reachable from this
-///   factory closure (it lives in the game's phase machine, not on
-///   <see cref="Player"/>), so — exactly as <see cref="BarbarianRingFactory"/>
-///   exposes its Threshold gate — the step gate is surfaced as the public
-///   <see cref="IsEndOfCombatStep"/> predicate for bot-policy /
-///   action-validator use until <c>IActivatedAbility</c> ships a step-aware
-///   <c>CanActivate</c> hook. The dispatcher path does not wire live phase
-///   state, so the ability is constructed instant-speed (the restriction is the
-///   timing rider, not sorcery speed).
 /// </summary>
 [CardName("Desert")]
 public static class DesertFactory
@@ -129,7 +133,22 @@ public static class DesertFactory
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(land) },
             effects: new IEffect[] { damageEffect },
-            targetRequests: new[] { targetRequest });
+            targetRequests: new[] { targetRequest },
+            // CR 602.5b — "Activate only during the end of combat step." Modelled
+            // as the ability's CONTEXT-AWARE canActivateCheckCtx gate (the same
+            // seam Hired Claw's "an opponent lost life this turn" rider uses):
+            // true iff the live step threaded onto the GameContext is the
+            // end-of-combat step. The engine supplies a GameContext at every
+            // activation-legality consult (AbilityActivator.CanActivate on the
+            // live TurnDriver/GameFacade dispatch path, and the bot's
+            // LegalActionEnumerator), so the timing restriction now WORKS on the
+            // production routed build — it is no longer merely the public
+            // IsEndOfCombatStep predicate. GameContext.CurrentPhase carries the
+            // live StepStateType (its name predates the CR phase/step rename).
+            // The context-less consult (no GameContext) falls back to "true" so
+            // shape-only tests / harnesses without a live step aren't wedged.
+            canActivateCheckCtx: ctx =>
+                ctx.CurrentPhase is { } step && IsEndOfCombatStep(step));
 
         land.AddAbility(pinger);
 
