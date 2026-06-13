@@ -44,15 +44,33 @@ namespace Majik.Core.CardData;
 /// <see cref="SetColorsEffect"/> scoped to the land (expiring at end of turn)
 /// so the animated body enters as its printed colour instead of colourless.</para>
 ///
+/// <para><b>Granted quoted abilities / parameterized keywords on animate (now
+/// bound, CR 613.1c / CR 508.1f).</b> The animate line can carry a granted
+/// quoted ability or a parameterized keyword in its remainder; these now bind:
+/// <list type="bullet">
+///   <item><b>ward {N}</b> (Hall of Storm Giants) — bound as a "Ward" keyword
+///     marker on the animated body (CR 702.21; the {N} cost is recorded in the
+///     marker only, same marker-only posture as the simple keywords).</item>
+///   <item><b>Quoted "Whenever this creature attacks, &lt;effect&gt;" trigger</b>
+///     — registered as a <see cref="TriggeredAbility"/> at animate-resolution
+///     (<see cref="ParseQuotedAttackTrigger"/>). Bound effect bodies: create a
+///     fixed creature token (Den of the Bugbear), put a +1/+1 counter on it
+///     (Raging Ravine), exile target card from a graveyard (Hive of the Eye
+///     Tyrant). Unrecognised bodies still defer.</item>
+///   <item><b>Quoted "During your turn, this creature has first strike."</b>
+///     (Restless Spire) — bound flatly as a First Strike keyword on animate
+///     (the body only exists during the controller's turn, so the qualifier is
+///     observationally always-true; matches RestlessSpireFactory).</item>
+/// </list>
+/// </para>
+///
 /// <para><b>Deferred (per-card riders this generic binder does NOT bind).</b>
 /// See v1-deferrals + the per-pattern comments below:
 /// <list type="bullet">
-///   <item>Animate riders carrying a <b>granted quoted ability</b> ("with
-///     \"{X}: …\"" / "with \"Whenever this creature attacks, …\"") — Den of
-///     the Bugbear, Raging Ravine, Lavaclaw Reaches, Wandering Fumarole,
-///     Restless Spire's conditional first strike, Hall of Storm Giants' ward.
-///     The N/N body + simple keywords still bind; the granted ability is
-///     dropped (no granted-activated/triggered-on-animate primitive).</item>
+///   <item>Animate riders carrying a <b>granted quoted ACTIVATED ability</b>
+///     ("with \"{X}: …\"") — Lavaclaw Reaches, Wandering Fumarole (firebreathing
+///     pump). The N/N body + simple keywords still bind; the granted activated
+///     ability is dropped (no granted-activated-on-animate primitive).</item>
 ///   <item>"becomes a … with all creature types" (Mutavault) and X/X bodies
 ///     (Lair of the Hydra) — non-fixed subtype / non-fixed P/T.</item>
 ///   <item>A "Put counters … Then you may have it become …" preamble
@@ -252,10 +270,29 @@ public static class ManlandBinder
         if (subtype is null) return false; // unknown / "all creature types" → defer
 
         // Keyword tail — the "with <kw…>" segment of the remainder, up to the
-        // first sentence terminator OUTSIDE a quote. A quoted granted ability
-        // ("with \"…\"") is deferred: bind the body + any simple keywords that
-        // precede the quote, drop the quoted rider.
-        var keywords = ParseKeywords(rest);
+        // first sentence terminator OUTSIDE a quote. Simple keywords (CR 702)
+        // that precede the quote bind here; ward {N} binds as a marker.
+        var keywords = ParseKeywords(rest).ToList();
+
+        // Quoted granted abilities ("with \"…\"") — CR 613.1c / CR 508.1f.
+        // Two shapes bound (the rest still defer):
+        //   1) A conditional STATIC keyword grant ("During your turn, this
+        //      creature has first strike." — Restless Spire). Bound flatly as a
+        //      First Strike keyword on animate (v1 posture — the body only
+        //      exists during the controller's turn, so "during your turn" is
+        //      observationally always-true while it can attack; matches
+        //      RestlessSpireFactory).
+        //   2) A granted "Whenever this creature attacks, <effect>" TRIGGER
+        //      (Den of the Bugbear / Raging Ravine / Hive of the Eye Tyrant) —
+        //      registered as a TriggeredAbility at animate-resolution (see
+        //      grantedAttackQuote below).
+        var grantedKeywordFromQuote = ParseQuotedConditionalKeyword(rest);
+        if (grantedKeywordFromQuote is not null &&
+            !keywords.Contains(grantedKeywordFromQuote))
+        {
+            keywords.Add(grantedKeywordFromQuote);
+        }
+        var grantedAttackQuote = ParseQuotedAttackTrigger(rest, land, controller, triggers);
 
         var costText = m.Groups["cost"].Value;
 
@@ -295,6 +332,16 @@ public static class ManlandBinder
                         colors: capturedColors,
                         expiresAtEndOfTurn: true));
                 }
+
+                // CR 508.1f — granted quoted "Whenever this creature attacks,
+                // <effect>" trigger. Registered at animate-resolution and
+                // attached to the land (matches the per-card factories'
+                // animate-time grant). A land can only attack while it's the
+                // animated creature (CR 508.1a), so leaving it attached after
+                // the animation expires is observationally equivalent to an
+                // until-EOT grant (the land can't attack once it's no longer a
+                // creature). Mirrors RagingRavineFactory / DenOfTheBugbearFactory.
+                grantedAttackQuote?.Invoke();
             });
 
         land.AddAbility(new ActivatedAbility(
@@ -396,6 +443,18 @@ public static class ManlandBinder
                 result.Add(keyword);
             }
         }
+
+        // Ward {N} (CR 702.21) — a parameterized keyword the SimpleKeywords
+        // table can't carry. Hall of Storm Giants animates "with ward {3}".
+        // Bind it as a "Ward" keyword marker on the animated body (same
+        // marker-only posture as HallOfStormGiantsFactory — combat/targeting
+        // Ward enforcement reads the effective keyword set; the {N} cost is
+        // recorded in the marker only).
+        if (Regex.IsMatch(lower, @"\bward\b"))
+        {
+            result.Add("Ward");
+        }
+
         return result;
     }
 
@@ -857,6 +916,191 @@ public static class ManlandBinder
             }
         }
         return result;
+    }
+
+    // --- Quoted granted abilities on animate (CR 613.1c / CR 508.1f) -------
+    // The body group from AnimateLine stops at "creature"; the quoted granted
+    // ability lives in <rest>, between double quotes. These two helpers scan
+    // <rest> for the quoted riders we bind.
+
+    // A quoted "Whenever this creature attacks, <effect>." granted trigger.
+    private static readonly Regex QuotedAttackTrigger = new(
+        "\"\\s*Whenever this creature attacks,\\s*(?<effect>[^\"]*?)\\.?\\s*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // A quoted conditional STATIC keyword grant — "During your turn, this
+    // creature has first strike." (Restless Spire). Bound flatly (v1 posture).
+    private static readonly Regex QuotedConditionalFirstStrike = new(
+        "\"[^\"]*\\bfirst strike\\b[^\"]*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Recognise a quoted conditional first-strike grant in the animate
+    /// remainder and return the canonical keyword to add flatly to the
+    /// animated body. Returns null when no such quoted rider is present.
+    /// CR 702.7 — first strike; the "during your turn" qualifier is recorded
+    /// only (the body never exists outside the controller's turn).
+    /// </summary>
+    private static string? ParseQuotedConditionalKeyword(string rest)
+    {
+        if (string.IsNullOrWhiteSpace(rest)) return null;
+        return QuotedConditionalFirstStrike.IsMatch(rest) ? "First Strike" : null;
+    }
+
+    /// <summary>
+    /// Recognise a quoted "Whenever this creature attacks, &lt;effect&gt;"
+    /// granted trigger in the animate remainder and return an action that, when
+    /// invoked at animate-resolution, registers the corresponding
+    /// <see cref="TriggeredAbility"/> on <paramref name="land"/> (CR 508.1f).
+    /// Returns null for an unrecognised effect body (deferred — the body +
+    /// simple keywords still animate). Bound effect bodies:
+    /// <list type="bullet">
+    ///   <item>"create a [N/N] [color] &lt;Subtype&gt; creature token …" — a
+    ///     simple fixed creature token (Den of the Bugbear's Goblin). The
+    ///     "tapped and attacking" rider is recorded but the token enters as a
+    ///     normal untapped permanent (same posture as DenOfTheBugbearFactory).</item>
+    ///   <item>"put a +1/+1 counter on it" — a +1/+1 counter on the land itself
+    ///     (Raging Ravine).</item>
+    ///   <item>"exile target card from [defending player's] graveyard" — a 1..1
+    ///     TargetRequest over graveyard cards; resolution exiles the chosen card
+    ///     (Hive of the Eye Tyrant; the defending-player scoping is simplified
+    ///     to any graveyard, matching HiveOfTheEyeTyrantFactory).</item>
+    /// </list>
+    /// </summary>
+    private static Action? ParseQuotedAttackTrigger(
+        string rest, Land land, Player controller, TriggerManager? triggers)
+    {
+        if (string.IsNullOrWhiteSpace(rest)) return null;
+        var qm = QuotedAttackTrigger.Match(rest);
+        if (!qm.Success) return null;
+        var effectText = qm.Groups["effect"].Value.Trim();
+
+        // --- "create a 1/1 red Goblin creature token …" (Den of the Bugbear) -
+        var tokenM = Regex.Match(
+            effectText,
+            @"create a (?<p>\d+)/(?<t>\d+)\s+(?<rest>.+?)\s+creature token",
+            RegexOptions.IgnoreCase);
+        if (tokenM.Success &&
+            TryParseTokenBody(tokenM.Groups["rest"].Value,
+                out var subtype, out var colors))
+        {
+            var p = int.Parse(tokenM.Groups["p"].Value);
+            var t = int.Parse(tokenM.Groups["t"].Value);
+            return () =>
+            {
+                var tokenEffect = new Effect(
+                    $"{land.Name}: create a {p}/{t} {subtype} token (granted attack trigger, CR 508.1f)",
+                    () =>
+                    {
+                        var ctrl = land.Controller ?? controller;
+                        var spec = new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                            Name: subtype.ToString(),
+                            Power: p,
+                            Toughness: t,
+                            Subtypes: new[] { subtype },
+                            Keywords: null,
+                            Colors: colors);
+                        Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(spec, ctrl);
+                    });
+                var trigger = new TriggeredAbility(
+                    source: land,
+                    controller: controller,
+                    condition: Triggers.OnAttackSelf(land),
+                    effects: new IEffect[] { tokenEffect },
+                    activeZones: new[] { ZoneType.Battlefield });
+                land.AddAbility(trigger);
+                triggers?.RegisterTriggeredAbility(trigger);
+            };
+        }
+
+        // --- "put a +1/+1 counter on it" (Raging Ravine) --------------------
+        if (Regex.IsMatch(effectText,
+                @"put a \+1/\+1 counter on it", RegexOptions.IgnoreCase))
+        {
+            return () =>
+            {
+                var counterEffect = new Effect(
+                    $"{land.Name}: put a +1/+1 counter on itself (granted attack trigger, CR 508.1f)",
+                    () =>
+                    {
+                        if (land.Zone != ZoneType.Battlefield) return;
+                        land.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
+                    });
+                var trigger = new TriggeredAbility(
+                    source: land,
+                    controller: controller,
+                    condition: Triggers.OnAttackSelf(land),
+                    effects: new IEffect[] { counterEffect },
+                    activeZones: new[] { ZoneType.Battlefield });
+                land.AddAbility(trigger);
+                triggers?.RegisterTriggeredAbility(trigger);
+            };
+        }
+
+        // --- "exile target card from [defending player's] graveyard" (Hive) -
+        if (Regex.IsMatch(effectText,
+                @"exile target card from .*graveyard", RegexOptions.IgnoreCase))
+        {
+            return () =>
+            {
+                TriggeredAbility? trigger = null;
+                var exileEffect = new Effect(
+                    $"{land.Name}: exile target card from a graveyard (granted attack trigger, CR 508.1f)",
+                    () =>
+                    {
+                        var chosen = FirstChosen(trigger);
+                        if (chosen is not ICard card) return;
+                        if (card.Zone != ZoneType.Graveyard) return;
+                        Majik.Core.Primitives.Fx.MoveToExile(card);
+                    });
+                trigger = new TriggeredAbility(
+                    source: land,
+                    controller: controller,
+                    condition: Triggers.OnAttackSelf(land),
+                    effects: new IEffect[] { exileEffect },
+                    activeZones: new[] { ZoneType.Battlefield },
+                    targetRequests: new[]
+                    {
+                        new Majik.Core.Players.Agents.TargetRequest(
+                            Description: "target card from a graveyard",
+                            MinTargets: 1,
+                            MaxTargets: 1,
+                            LegalCandidates: Array.Empty<object>(),
+                            Intent: BotIntent.Removal,
+                            CandidateGatherer: ctx => GatherGraveyardCards(ctx)),
+                    });
+                land.AddAbility(trigger);
+                triggers?.RegisterTriggeredAbility(trigger);
+            };
+        }
+
+        // Unrecognised quoted attack-trigger body — defer (body + simple
+        // keywords still animate). Recorded in v1-deferrals.
+        return null;
+    }
+
+    /// <summary>
+    /// Parse a token body "&lt;colors&gt; &lt;Subtype&gt;" (e.g. "red Goblin")
+    /// from a quoted "create a N/N &lt;body&gt; creature token" rider into its
+    /// <see cref="CardSubtype"/> and printed colours (CR 105.1). Returns false
+    /// for an unknown subtype (defer).
+    /// </summary>
+    private static bool TryParseTokenBody(
+        string body, out CardSubtype subtype,
+        out IReadOnlyList<Majik.Core.ValueObjects.ManaColor> colors)
+    {
+        subtype = default;
+        var clrs = new List<Majik.Core.ValueObjects.ManaColor>();
+        var tokens = body.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var tk in tokens)
+        {
+            if (ColorWordToColor.TryGetValue(tk, out var c) && !clrs.Contains(c)) clrs.Add(c);
+        }
+        colors = clrs;
+        var nonColor = tokens.Where(tk => !ColorWords.Contains(tk)).ToList();
+        if (nonColor.Count == 0) return false;
+        var token = nonColor[^1].Replace("-", "");
+        return Enum.TryParse(token, ignoreCase: true, out subtype);
     }
 
     private static int WordToInt(string s) =>
