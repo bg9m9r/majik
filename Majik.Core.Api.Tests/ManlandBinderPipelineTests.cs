@@ -902,6 +902,157 @@ public class ManlandBinderPipelineTests
         cc.Keywords.Should().Contain("Flying");
     }
 
+    // -----------------------------------------------------------------------
+    // EXOTIC ANIMATE BODIES — "all creature types" + X/X (close
+    // manland-exotic-animate-shapes). Before this slice ManlandBinder deferred
+    // these (no fixed subtype / no digit P/T) so Mutavault / Faceless Haven /
+    // Soulstone Sanctuary / Lair of the Hydra were land-dead in real games.
+    // -----------------------------------------------------------------------
+
+    private const string MutavaultOracle =
+        "{T}: Add {C}.\n" +
+        "{1}: This land becomes a 2/2 creature with all creature types until " +
+        "end of turn. It's still a land.";
+
+    [Fact]
+    public void Prod_Mutavault_Animate_BecomesEveryCreatureType_2_2()
+    {
+        // "all creature types" (CR 205.3m) — no fixed subtype. Binds via the
+        // prod binder chain; the animated body gets every creature subtype the
+        // engine models + base 2/2, still a land.
+        var repo = new FakeCardRepo();
+        repo.Add("Mutavault", "Land", oracleText: MutavaultOracle);
+        var land = new Land("Mutavault", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Types.Should().Contain(CardType.Land, "It's still a land");
+        cc.Types.Should().Contain(CardType.Creature);
+        cc.Power.Should().Be(2);
+        cc.Toughness.Should().Be(2);
+        // A representative sample of "every creature type".
+        cc.Subtypes.Should().Contain(CardSubtype.Goblin);
+        cc.Subtypes.Should().Contain(CardSubtype.Elf);
+        cc.Subtypes.Should().Contain(CardSubtype.Dragon);
+    }
+
+    private const string FacelessHavenOracle =
+        "{T}: Add {C}.\n" +
+        "{S}{S}{S}: This land becomes a 4/3 creature with vigilance and all " +
+        "creature types until end of turn. It's still a land. ({S} can be paid " +
+        "with one mana from a snow source.)";
+
+    [Fact]
+    public void Prod_FacelessHaven_Animate_EveryCreatureType_Vigilance_4_3()
+    {
+        // "with vigilance and all creature types" — the simple keyword binds
+        // alongside the every-creature-type grant.
+        var repo = new FakeCardRepo();
+        repo.Add("Faceless Haven", "Snow Land", oracleText: FacelessHavenOracle);
+        var land = new Land("Faceless Haven", new[] { CardSupertype.Snow }, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(4);
+        cc.Toughness.Should().Be(3);
+        cc.Keywords.Should().Contain("Vigilance");
+        cc.Subtypes.Should().Contain(CardSubtype.Zombie);
+    }
+
+    private const string SoulstoneSanctuaryOracle =
+        "{T}: Add {C}.\n" +
+        "{4}: This land becomes a 3/3 creature with vigilance and all creature " +
+        "types. It's still a land.";
+
+    [Fact]
+    public void Prod_SoulstoneSanctuary_Animate_EveryCreatureType_Vigilance_3_3()
+    {
+        // No "until end of turn" — the animation is permanent (CR 613.1c). The
+        // body still gets every creature type + vigilance + base 3/3.
+        var repo = new FakeCardRepo();
+        repo.Add("Soulstone Sanctuary", "Land", oracleText: SoulstoneSanctuaryOracle);
+        var land = new Land("Soulstone Sanctuary", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(3);
+        cc.Toughness.Should().Be(3);
+        cc.Keywords.Should().Contain("Vigilance");
+        cc.Subtypes.Should().Contain(CardSubtype.Human);
+
+        // No "until end of turn" → the animation does NOT expire at cleanup.
+        facade.ContinuousEffects.ExpireEndOfTurn();
+        facade.ContinuousEffects.Compute((Permanent)land).Types
+            .Should().Contain(CardType.Creature,
+                "Soulstone Sanctuary's animate has no 'until end of turn' — it is permanent");
+    }
+
+    private const string LairOfTheHydraOracle =
+        "If you control two or more other lands, this land enters tapped.\n" +
+        "{T}: Add {G}.\n" +
+        "{X}{G}: Until end of turn, this land becomes an X/X green Hydra " +
+        "creature. It's still a land. X can't be 0.";
+
+    [Fact]
+    public async Task Prod_LairOfTheHydra_Animate_XX_GreenHydra_Binds()
+    {
+        // X/X body (CR 613.7b reads the X paid). Binds via the prod binder
+        // chain with a variable-X animate ability; the X paid sets the base
+        // power/toughness of the green Hydra. Still a land.
+        var repo = new FakeCardRepo();
+        repo.Add("Lair of the Hydra", "Land", oracleText: LairOfTheHydraOracle, colors: "G");
+        var land = new Land("Lair of the Hydra", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Should().ContainSingle("the {X}{G} animate ability binds in prod").Subject;
+
+        // GAP 2 — the X paid is threaded via ResolutionContext.ChosenX. Drive
+        // the effect with X = 5 (the same path AbilityActivator uses).
+        var rctx = ResolutionContext.For(alice, agent: null, game: null, chosenTargets: null, chosenX: 5);
+        foreach (var e in animate.Effects)
+            await e.ExecuteAsync(rctx);
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Types.Should().Contain(CardType.Land, "It's still a land");
+        cc.Subtypes.Should().Contain(CardSubtype.Hydra);
+        cc.Power.Should().Be(5, "X/X body reads the X paid (X=5)");
+        cc.Toughness.Should().Be(5);
+        cc.Colors.Should().Contain(Majik.Core.ValueObjects.ManaColor.Green);
+    }
+
     [Fact]
     public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
     {

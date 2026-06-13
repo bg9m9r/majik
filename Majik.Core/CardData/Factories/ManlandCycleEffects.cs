@@ -54,6 +54,7 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
     private readonly string[] _keywords;
     private readonly CardSubtype[] _subtypes;
     private readonly CardType[] _extraTypes;
+    private readonly bool _expiresAtEndOfTurn;
 
     public ManlandCycleAnimateEffect(Permanent target, IEnumerable<string> keywords)
         : this(target, keywords, subtypes: null, extraTypes: null)
@@ -76,7 +77,8 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
         Permanent target,
         IEnumerable<string> keywords,
         IEnumerable<CardSubtype>? subtypes,
-        IEnumerable<CardType>? extraTypes)
+        IEnumerable<CardType>? extraTypes,
+        bool expiresAtEndOfTurn = true)
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
         _keywords = (keywords ?? throw new ArgumentNullException(nameof(keywords))).ToArray();
@@ -86,6 +88,7 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
         _extraTypes = extraTypes != null
             ? extraTypes.ToArray()
             : Array.Empty<CardType>();
+        _expiresAtEndOfTurn = expiresAtEndOfTurn;
     }
 
     /// <summary>The permanent being animated.</summary>
@@ -107,7 +110,7 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
     public override bool IsActive() =>
         _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
 
-    public override bool ExpiresAtEndOfTurn => true;
+    public override bool ExpiresAtEndOfTurn => _expiresAtEndOfTurn;
 
     public override bool AppliesTo(Creature creature) => AppliesTo((Permanent)creature);
 
@@ -151,6 +154,7 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
 public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
 {
     private readonly Permanent _target;
+    private readonly bool _expiresAtEndOfTurn;
 
     /// <summary>The base power the target becomes (CR 613.7b).</summary>
     public int NewPower { get; }
@@ -158,11 +162,13 @@ public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
     /// <summary>The base toughness the target becomes (CR 613.7b).</summary>
     public int NewToughness { get; }
 
-    public ManlandCycleBecomesPTEffect(Permanent target, int power, int toughness)
+    public ManlandCycleBecomesPTEffect(
+        Permanent target, int power, int toughness, bool expiresAtEndOfTurn = true)
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
         NewPower = power;
         NewToughness = toughness;
+        _expiresAtEndOfTurn = expiresAtEndOfTurn;
     }
 
     public override Layer Layer => Layer.PT_SetBase;
@@ -172,7 +178,7 @@ public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
     public override bool IsActive() =>
         _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
 
-    public override bool ExpiresAtEndOfTurn => true;
+    public override bool ExpiresAtEndOfTurn => _expiresAtEndOfTurn;
 
     public override bool AppliesTo(Creature creature) => ReferenceEquals(creature, _target);
 
@@ -199,5 +205,7 @@ public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
     internal override ContinuousEffect? CloneForSim(
         Permanent clonedSource,
         System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
-        => new ManlandCycleBecomesPTEffect(clonedSource, NewPower, NewToughness);
+        // preserves: NewPower, NewToughness, ExpiresAtEndOfTurn; target → clonedSource.
+        => new ManlandCycleBecomesPTEffect(
+            clonedSource, NewPower, NewToughness, ExpiresAtEndOfTurn);
 }
