@@ -378,21 +378,68 @@ public static class LandActivatedAbilityBinder
     // (Fx.MoveToGraveyard / BounceToHand / Mill / DealDamageAny / TokenFactory)
     // — exactly the verbs the rest of this binder already emits.
     //
+    // CR 118.9 cost-reduction rider — NOW BOUND. "This ability costs {1} less
+    // to activate for each legendary creature you control" (Boseiju + the whole
+    // Channel cycle) binds the Channel mana cost as a
+    // DynamicGenericReductionManaCost whose generic component drops by the count
+    // of legendary creatures the controller controls, computed at payment
+    // against live board state (ChannelLegendaryReductionRider regex +
+    // LegendaryCreaturesControlled below).
+    //
     // Deferred riders (each consistent with the deferrals the rest of this
     // binder already takes; none affects which Channel ability binds):
-    //   - "This ability costs {1} less to activate for each legendary creature
-    //     you control" — a cost-reduction rider (CR 118.9). No binder-reachable
-    //     dynamic cost-reduction seam on this path; the full mana cost binds.
     //   - Boseiju — the "that player may search their library for a basic land"
     //     follow-up after destroying a land (an opponent's optional search).
     //   - Eiganjo — the live "attacking or blocking" combat-state target gate
     //     (resolve is permissive: any chosen creature is dealt the damage).
     //   - Takenuma — the "may" rider on the graveyard return (auto-accepts).
     // ======================================================================
+    // CR 118.9 cost-reduction rider on a Channel ability: "This ability costs
+    // {1} less to activate for each legendary creature you control." The
+    // reduction count is the number of legendary creatures the controller
+    // controls, evaluated at activation/payment against live board state.
+    private static readonly Regex ChannelLegendaryReductionRider = new(
+        @"This\s+ability\s+costs\s+\{1\}\s+less\s+to\s+activate\s+for\s+each\s+legendary\s+creature\s+you\s+control",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// CR 118.9 — count the legendary creatures <paramref name="player"/>
+    /// controls (battlefield only), the reduction amount for the Channel
+    /// "costs {1} less per legendary creature you control" rider. A legendary
+    /// non-creature (the Channel land itself, a legendary artifact) and a
+    /// non-legendary creature do NOT count.
+    /// </summary>
+    private static int LegendaryCreaturesControlled(Player player)
+    {
+        var count = 0;
+        foreach (var card in player.Zones.Battlefield.GetCards())
+        {
+            if (card is Creature c
+                && c.HasType(CardType.Creature)
+                && c.HasSupertype(CardSupertype.Legendary))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private static bool BindChannel(
         Land land, Player controller, string costSegment, string effectText)
     {
-        var costs = new List<ICost> { new ManaCostCost(costSegment), new DiscardSelfCost(land) };
+        // CR 118.9 — the Channel mana cost binds as a self-reducing cost when
+        // the "costs {1} less to activate for each legendary creature you
+        // control" rider is present (Boseiju and the whole Channel cycle). The
+        // reduction is computed against the PAYING player's live board at
+        // activation/payment, transparently through the standard
+        // CanPay/Pay surface (no dispatch-site change needed — same seam every
+        // cost-payment path consults). Without the rider the plain fixed
+        // ManaCostCost binds.
+        ManaCostCost channelManaCost = ChannelLegendaryReductionRider.IsMatch(effectText)
+            ? new DynamicGenericReductionManaCost(costSegment, LegendaryCreaturesControlled)
+            : new ManaCostCost(costSegment);
+
+        var costs = new List<ICost> { channelManaCost, new DiscardSelfCost(land) };
 
         IEffect? effect = null;
         TargetRequest[] targets = Array.Empty<TargetRequest>();
