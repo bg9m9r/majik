@@ -164,6 +164,55 @@ public class LeylineOfCombustionFactoryTests
             "Combustion only fires for a spell or ability an OPPONENT controls");
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // PROD BUILD PATH (NamedCardFactory.Create — no eventBus/trigger args).
+    //
+    // GameFacade.BuildDeckCard builds every deck card via
+    // NamedCardFactory.Create(name, owner); the source generator dispatches to
+    // LeylineOfCombustionFactory.Create(owner) — which receives NO live
+    // TriggerManager. The becomes-targeted trigger is auto-registered by
+    // TriggerManager when the card crosses onto the battlefield (CR 603.6a —
+    // CardMovedEvent → SyncCardRegistration). This proves the trigger fires +
+    // resolves through the prod build path (the seam the leyline-trigger
+    // deferral named), not just the explicit-wiring factory overload.
+    // ──────────────────────────────────────────────────────────────────────
+
+    private static GameContext LiveContext(
+        Player self, Player opp, Majik.Core.Stack.Stack stack) =>
+        new(self, new[] { self, opp }, self, 1, Majik.Core.StateMachine.StepStateType.PreCombatMain, stack);
+
+    [Fact]
+    public async System.Threading.Tasks.Task ProdPath_OpponentTargetsYou_AutoRegistersAndDealsTwoDamage()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        // PROD path — NamedCardFactory.Create dispatches to Create(owner): no
+        // captured TriggerManager. TriggerManager auto-binds the becomes-
+        // targeted trigger via CardMovedEvent when the leyline enters play.
+        var leyline = (Enchantment)NamedCardFactory.Create("Leyline of Combustion", _alice);
+        leyline.SetController(_alice);
+        leyline.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(leyline);
+        bus.Publish(new CardMovedEvent(leyline, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Bob's spell targets Alice → opponent-targets-you gate fires.
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _bob };
+        var spell = new Majik.Core.Spells.Spell(bolt, _bob, new[] { Target.Player(_alice) });
+        bus.Publish(new TargetsChosenEvent(spell, spell.Targets));
+
+        triggers.PendingCount.Should().Be(1,
+            "the becomes-targeted trigger must be auto-registered on the prod build path");
+
+        var trigger = leyline.Abilities.OfType<TriggeredAbility>().Single();
+        _bob.LifeTotal.Should().Be(20);
+        await trigger.ResolveAsync(agent: null, LiveContext(_alice, _bob, stack));
+
+        _bob.LifeTotal.Should().Be(18,
+            "Combustion deals 2 damage to the controller of the targeting spell (Bob) on the prod path");
+    }
+
     private static void PlaceOnBattlefield(Enchantment leyline, Player owner)
     {
         owner.Zones.Battlefield.AddCard(leyline);

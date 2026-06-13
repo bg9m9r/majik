@@ -9,6 +9,7 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.StateMachine;
 using Majik.Core.Targeting;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -197,6 +198,59 @@ public class LeylineOfLightningFactoryTests
 
         pw.Loyalty.Should().Be(3,
             "1 damage to a planeswalker removes 1 loyalty (CR 306.7)");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // PROD BUILD PATH (NamedCardFactory.Create — no eventBus/trigger args).
+    //
+    // GameFacade.BuildDeckCard builds every deck card via
+    // NamedCardFactory.Create(name, owner); the source generator dispatches to
+    // LeylineOfLightningFactory.Create(owner) — which receives NO live
+    // TriggerManager. The on-cast trigger is auto-registered by TriggerManager
+    // when the card crosses onto the battlefield (CR 603.6a — CardMovedEvent →
+    // SyncCardRegistration). On resolution the StackResolver hands the trigger
+    // a live GameContext (CR 608). This proves the trigger that previously sat
+    // inert on the shape now FIRES + RESOLVES through the prod build path — the
+    // seam the leyline-trigger deferral named (PriorityLoop async trigger
+    // drain → agent target collection → resolution).
+    // ──────────────────────────────────────────────────────────────────────
+
+    private static GameContext LiveContext(
+        Player self, Player opp, Majik.Core.Stack.Stack stack) =>
+        new(self, new[] { self, opp }, self, 1, StepStateType.PreCombatMain, stack);
+
+    [Fact]
+    public async System.Threading.Tasks.Task ProdPath_ControllerCast_AutoRegistersAndPayingOne_DealsOneDamage()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        // PROD path — NamedCardFactory.Create dispatches to Create(owner): no
+        // captured TriggerManager. TriggerManager auto-binds the on-cast
+        // trigger via CardMovedEvent when the leyline enters the battlefield.
+        var leyline = (Enchantment)NamedCardFactory.Create("Leyline of Lightning", _alice);
+        leyline.SetController(_alice);
+        leyline.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(leyline);
+        bus.Publish(new CardMovedEvent(leyline, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Alice casts a spell → SpellCastEvent → trigger surfaces as pending on
+        // the auto-registered ability (no explicit registration call).
+        CastSpell(_alice, bus);
+        triggers.PendingCount.Should().Be(1,
+            "the on-cast trigger must be auto-registered on the prod build path");
+
+        // Alice floats {1} so the optional payment resolves; she chose Bob.
+        _alice.AddManaToPool(ManaCost.Zero.AddGenericCost(1));
+        var trigger = leyline.Abilities.OfType<TriggeredAbility>().Single();
+        trigger.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { _bob } });
+
+        _bob.LifeTotal.Should().Be(20);
+        await trigger.ResolveAsync(agent: null, LiveContext(_alice, _bob, stack));
+
+        _bob.LifeTotal.Should().Be(19,
+            "paid {1} → Leyline deals 1 damage to the chosen player through the live resolution context");
     }
 
     private static void CastSpell(Player caster, EventBus bus)
