@@ -317,16 +317,12 @@ internal static class LibrarySpellFactory
 
     // ---------- Primitives ----------
 
+    // CR 121.1 — route the shared "draw N" cantrip tail through the centralised
+    // Fx.DrawCards primitive (cantrip-factory-harvest pay-down). Fx.DrawCards
+    // applies the CR 614 draw-replacement bus per draw AND flags the
+    // draw-from-empty state-based loss (CR 120.3 / 704.5b) on a draw past an
+    // empty library — both of which the prior hand-rolled loop skipped.
     private static void DrawCards_(Player player, int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            var top = player.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null) return;
-            player.Zones.Library.RemoveCard(top);
-            player.Zones.Hand.AddCard(top);
-            top.SetZone(ZoneType.Hand);
-        }
-    }
+        => Majik.Core.Primitives.Fx.DrawCards(player, n);
 
 }

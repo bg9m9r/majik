@@ -60,21 +60,11 @@ public static class JacesIngenuityFactory
         {
             new Effect("Jace's Ingenuity: draw three cards.", () =>
             {
-                // CR 121.1 — three simple top-of-library draws. Empty
-                // library mid-draw flags the SBA loss (CR 704.5b) and
-                // short-circuits the remaining draws.
-                for (var i = 0; i < 3; i++)
-                {
-                    var top = caster.Zones.Library.GetCards().FirstOrDefault();
-                    if (top == null)
-                    {
-                        caster.MarkTriedToDrawFromEmptyLibrary();
-                        break;
-                    }
-                    caster.Zones.Library.RemoveCard(top);
-                    caster.Zones.Hand.AddCard(top);
-                    top.SetZone(ZoneType.Hand);
-                }
+                // CR 121.1 — route through the shared Fx.DrawCards primitive
+                // (cantrip-factory-harvest pay-down): applies the CR 614
+                // draw-replacement bus per draw and flags the draw-from-empty
+                // SBA loss (CR 120.3 / 704.5b) on a draw past an empty library.
+                Majik.Core.Primitives.Fx.DrawCards(caster, 3);
             }),
         };
     }

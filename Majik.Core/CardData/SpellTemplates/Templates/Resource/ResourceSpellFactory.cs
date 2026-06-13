@@ -66,17 +66,16 @@ internal static class ResourceSpellFactory
 
     // ---------- Primitives ----------
 
+    // CR 121.1 — route the shared "draw N cards" cantrip path through the
+    // centralised Fx.DrawCards primitive (cantrip-factory-harvest pay-down).
+    // Fx.DrawCards applies the CR 614 draw-replacement bus per draw AND, on a
+    // draw past an empty library, flags the draw-from-empty state-based loss
+    // (CR 120.3 / 704.5b) via Player.MarkTriedToDrawFromEmptyLibrary — both of
+    // which the prior hand-rolled loop silently skipped (it `return`ed without
+    // marking the flag). This is the same primitive the JSON `draw_card` verb
+    // and Opt / Serum Visions already resolve through.
     private static void DrawCards_(Player player, int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            var top = player.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null) return;
-            player.Zones.Library.RemoveCard(top);
-            player.Zones.Hand.AddCard(top);
-            top.SetZone(Majik.Core.Zones.ZoneType.Hand);
-        }
-    }
+        => Majik.Core.Primitives.Fx.DrawCards(player, n);
 
     private static void DiscardCards(Player player, int n)
         // CR 701.8 — route through Fx.Discard (effect discard, wasCost: false)
