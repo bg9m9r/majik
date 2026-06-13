@@ -99,7 +99,8 @@ namespace Majik.Core.CardData.Factories;
 ///       closures (not <see cref="ActivatedAbility.RebindSafe"/>) or it carries
 ///       no engine-built ability at all (oracle-text-only). It reconstructs the
 ///       soundly-rebuildable shapes from oracle text: firebreathing / self-pump
-///       ("{cost}: This creature gets +X/+Y until end of turn"), self-keyword
+///       ("{cost}: This creature gets ±X/±Y until end of turn" — including a
+///       SIGNED/negative delta as on Aetherling / Canyon Crab / Flowstone), self-keyword
 ///       grant ("{cost}: This creature gains &lt;simple keyword&gt; until end of
 ///       turn"), pinger ("{cost}: This creature deals N damage to …"), and
 ///       sacrifice-self pinger ("Sacrifice this creature: It deals N damage to
