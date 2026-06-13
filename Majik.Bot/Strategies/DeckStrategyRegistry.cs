@@ -23,9 +23,15 @@ internal static class DeckStrategyRegistry
         var map = new Dictionary<string, IDeckStrategy>();
         foreach (var t in asm.GetTypes())
         {
-            var attr = t.GetCustomAttribute<DeckStrategyAttribute>();
-            if (attr is null || t.IsAbstract || !typeof(IDeckStrategy).IsAssignableFrom(t)) continue;
-            map[attr.DeckName] = (IDeckStrategy)Activator.CreateInstance(t)!;
+            if (t.IsAbstract || !typeof(IDeckStrategy).IsAssignableFrom(t)) continue;
+            var attrs = t.GetCustomAttributes<DeckStrategyAttribute>().ToList();
+            if (attrs.Count == 0) continue;
+            // One instance shared across every archetype key the class declares
+            // ([DeckStrategy] is AllowMultiple — e.g. BelcherComboSolver serves
+            // both "AzoriusLotusBelcher" and "Belcher").
+            var instance = (IDeckStrategy)Activator.CreateInstance(t)!;
+            foreach (var attr in attrs)
+                map[attr.DeckName] = instance;
         }
         return map;
     }

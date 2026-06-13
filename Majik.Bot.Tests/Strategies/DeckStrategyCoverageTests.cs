@@ -62,11 +62,6 @@ public sealed class DeckStrategyCoverageTests
         "DomainZoo",
         "GruulBroodscale",
         "EldraziBroodscale",
-        // Added on main as #2630 (after the framework branch was cut). Phase A
-        // ships the deck-strategy seam strength-neutral; the BelcherComboSolver
-        // that wires this archetype's [DeckStrategy] lands in Phase C. Remove
-        // this entry then.
-        "AzoriusLotusBelcher",
     ];
 
     // ── Coverage tripwire ──────────────────────────────────────────────────────

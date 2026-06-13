@@ -131,7 +131,7 @@ public sealed class DeckStrategyLiftTests
 
     /// <summary>
     /// Controlled lift probe: Belcher mirror, MCTS both seats.
-    /// Seat A = WITH real <see cref="BelcherStrategy"/> (DIRECTIVE atomic kill);
+    /// Seat A = WITH real <see cref="BelcherComboSolver"/> (DIRECTIVE atomic kill);
     /// Seat B = WITH <see cref="NullDeckStrategy"/> (strategy disabled).
     /// Seeds alternate which seat holds the strategy so seat bias cancels.
     ///
@@ -219,7 +219,7 @@ public sealed class DeckStrategyLiftTests
             MaxMctsBudgetMs: MctsBudgetMs,
             PrioritySearchEnabled: true);
 
-        var instrumented = new InstrumentedDeckStrategy(new BelcherStrategy());
+        var instrumented = new InstrumentedDeckStrategy(new BelcherComboSolver());
         var withStrat    = new SearchStrategy(mctsConfig, deckOverride: instrumented);
         var withoutStrat = new SearchStrategy(mctsConfig, deckOverride: new NullDeckStrategy());
 

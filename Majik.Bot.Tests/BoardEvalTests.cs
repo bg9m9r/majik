@@ -332,7 +332,6 @@ public class BoardEvalTests
     [InlineData("AzoriusControl")]
     [InlineData("Sultai")]
     [InlineData("EldraziTron")]
-    [InlineData("AzoriusLotusBelcher")] // the new #2630 deck — strategy is wired in Phase C, NOT here
     public void Score_StrategicTerm_IsNeutral_ForArchetypesWithoutRegisteredStrategy(string archetype)
     {
         // The registry is the production resolution path used by both
