@@ -45,10 +45,14 @@ namespace Majik.Core.Tests.CardData;
 ///   3. New unexplained gaps → the real-pool test fails and lists them.
 ///
 /// POOL STATS (as of 2026-06-13):
-///   Festival Crasher + Kiln Fiend removed from KnownMissingTriggerBugs after
-///   the missing-trigger-effects-overload-dispatch deferral was paid down —
-///   both now bind their cast-pump trigger through the prod build path and the
-///   real-pool audit verifies them directly. KnownMissingTriggerBugs = 9.
+///   KnownMissingTriggerBugs is now EMPTY — the missing-trigger-card-fixes
+///   deferral wired Reality Smasher's Ward—Discard trigger (the last genuine
+///   gap) and removed the 10 already-fixed stale entries (Baral, Asmoran,
+///   Bloodthirsty Adversary, Festival Crasher, Kiln Fiend, Leyline Binding,
+///   Leyline of Combustion, Leyline of Lightning, Mirari's Wake,
+///   Necrodominance). Every implemented card with trigger text now binds an
+///   ITriggeredAbility through its prod build path; the real-pool audit
+///   verifies them all directly with no allowlist.
 /// </summary>
 public class TriggerWiringAuditTests
 {
@@ -198,72 +202,22 @@ public class TriggerWiringAuditTests
     private static readonly IReadOnlyDictionary<string, string> KnownMissingTriggerBugs =
         new Dictionary<string, string>
         {
-            ["Baral, Chief of Compliance"] =
-                "// BUG: 'Whenever a spell or ability you control is countered, you may draw a card, " +
-                "then discard a card.' — BaralChiefOfComplianceFactory.Create(Player) only adds " +
-                "SpellCostReductionAbility; the looting trigger is not wired anywhere in the factory.",
-
-            ["Asmoranomardicadaistinaculdacar"] =
-                "// BUG: 'Whenever you discard one or more cards, create a 1/1 Goblin Cook token.' — " +
-                "factory Create(Player) adds KeywordAbility markers for food-library mechanics but " +
-                "does not wire the discard-triggered token creation as ITriggeredAbility.",
-
-            ["Bloodthirsty Adversary"] =
-                "// BUG: 'When this creature enters, you may pay {2}{R} any number of times. " +
-                "When you pay this cost one or more times, put that many +1/+1 counters on it " +
-                "and exile that many instant and/or sorcery cards with mana value ≤ 3 from your " +
-                "graveyard with haste.' — Reflexive trigger (CR 603.2) not exposed as " +
-                "ITriggeredAbility in BloodthirstyAdversaryFactory.Create(Player).",
-
-            // Festival Crasher + Kiln Fiend FIXED — the
-            // missing-trigger-effects-overload-dispatch deferral is paid down.
-            // Both factories now expose the source-gen-recognised
-            // Create(Player, ContinuousEffectsService) overload, so the prod
-            // GameFacade routed build (NamedCardFactory.Create(name, owner,
-            // effects) → the generated *WithEffects dispatcher) wires the
-            // cast-instant/sorcery pump trigger (CR 603.1). The real-pool audit
-            // now verifies them through the prod build path instead of allow-
-            // listing the bug. See FestivalCrasherFactoryTests /
-            // KilnFiendFactoryTests EffectsAwareDispatch_*_OnProdPath guards.
-
-            ["Leyline Binding"] =
-                "// BUG: 'When this enchantment enters, exile target nonland permanent an " +
-                "opponent controls until this enchantment leaves the battlefield.' — " +
-                "LeylineBindingFactory.Create(Player) adds DomainCostReductionAbility (static) " +
-                "but does NOT wire the ETB exile trigger as ITriggeredAbility. " +
-                "The O-Ring pattern (ETB exile + LTB return) needs factory work; " +
-                "see card-type-modeling-discrepancies memory.",
-
-            ["Leyline of Combustion"] =
-                "// BUG: 'Whenever you or a permanent you control becomes the target of a spell " +
-                "or ability an opponent controls, Leyline of Combustion deals 2 damage to that " +
-                "opponent.' — LeylineOfCombustionFactory explicitly defers this trigger in v1 " +
-                "(factory doc: 'needs a targeting-resolution trigger surface'). Not wired.",
-
-            ["Leyline of Lightning"] =
-                "// BUG: 'Whenever you cast your first spell each turn, Leyline of Lightning " +
-                "deals 1 damage to target player or planeswalker.' — LeylineOfLightningFactory " +
-                "explicitly defers this trigger (factory doc: 'needs a per-turn spells-cast " +
-                "counter plus a first-only gate'). Not wired.",
-
-            ["Mirari's Wake"] =
-                "// BUG: 'Whenever you tap a land for mana, add one mana of any type that land " +
-                "produced.' — MirariWakeFactory.Create(Player, ContinuousEffectsService?) only " +
-                "registers ControllerCreatureAnthemEffect (+1/+1 static anthem); the mana-bonus " +
-                "triggered mana ability is not wired at all in the factory.",
-
-            ["Necrodominance"] =
-                "// BUG: 'At the beginning of your end step, you may pay any amount of life. " +
-                "If you do, draw that many cards.' — NecrodominanceFactory.Create adds static " +
-                "abilities (SkipDraw, damage-riders) and an activated ability, but the end-step " +
-                "draw trigger is not wired as ITriggeredAbility.",
-
-            ["Reality Smasher"] =
-                "// BUG: 'Whenever Reality Smasher becomes the target of a spell or ability an " +
-                "opponent controls, counter it unless its controller discards a card.' — " +
-                "RealitySmasherFactory.Create(Player) adds keyword abilities only; the " +
-                "target-counter/discard trigger is deferred (factory doc mentions " +
-                "'Ward trigger / non-mana discard rider is structural').",
+            // All Class B missing-trigger bugs that were tracked here have been
+            // paid down (PR: missing-trigger-card-fixes). The factories now bind
+            // a real ITriggeredAbility through their prod build path:
+            //   - Baral, Chief of Compliance   — counter→loot (SpellCounteredEvent).
+            //   - Asmoranomardicadaistinaculdacar — discard→Cook token.
+            //   - Bloodthirsty Adversary        — ETB reflexive trigger (CR 603.2).
+            //   - Festival Crasher / Kiln Fiend — cast-instant/sorcery pump
+            //                                     (effects-aware dispatch).
+            //   - Leyline Binding               — ETB exile (O-Ring remodel).
+            //   - Leyline of Combustion         — becomes-targeted (TargetsChosenEvent).
+            //   - Leyline of Lightning          — on-cast {1}: damage.
+            //   - Mirari's Wake                 — tap-land-for-mana doubling.
+            //   - Necrodominance                — end-step pay-life-then-draw.
+            //   - Reality Smasher               — Ward—Discard (TargetsChosenEvent).
+            // The audit re-checks each on every run; if any regresses it
+            // resurfaces in the real-pool test below.
         };
 
     // ──────────────────────────────────────────────────────────────────────
