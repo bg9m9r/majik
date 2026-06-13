@@ -172,6 +172,17 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             }
         }
 
+        // CR 305.2 — Harnfel, Horn of Bounty: "you may play those cards this
+        // turn." A LAND in that exile pile carries a runtime exile land-play
+        // grant; surface it as a legal land drop (played from Exile, still
+        // consuming the CR 305.2 land drop via the loop's LandDropTracker).
+        if (land == null)
+        {
+            var exileLand = Keywords.ExilePlayPermission.PlayableLandsFromExile(ctx.Self)
+                .FirstOrDefault(c => !_failedThisTurn.Contains(c.InstanceId));
+            if (exileLand != null) land = exileLand;
+        }
+
         if (land == null) return null;
         _lastProposed = land.InstanceId;
         return new PriorityAction.PlayLand(land);

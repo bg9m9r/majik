@@ -54,6 +54,17 @@ internal static class LegalActionEnumerator
             if (landInHand != null)
                 result.Add(new PriorityAction.PlayLand(landInHand));
 
+            // CR 305.2 — Harnfel, Horn of Bounty: "you may play those cards this
+            // turn." A LAND in our exile pile carries a runtime land-play grant
+            // and is PLAYED, not cast (CR 601.1) — surface it as a land drop so
+            // the search bot isn't blind to a free land sitting in exile. Played
+            // from Exile; still consumes the CR 305.2 land drop via the loop's
+            // LandDropTracker.
+            var exileLand = Majik.Core.Keywords.ExilePlayPermission
+                .PlayableLandsFromExile(self).FirstOrDefault();
+            if (landInHand == null && exileLand != null)
+                result.Add(new PriorityAction.PlayLand(exileLand));
+
             // CR 305 / 712.3 — an MDFC back-face LAND play is a land play, not a
             // spell: surface it whenever the land drop is available, regardless
             // of front-face affordability (the engine's CastSpell dispatch raises

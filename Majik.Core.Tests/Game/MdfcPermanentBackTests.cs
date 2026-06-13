@@ -239,4 +239,59 @@ public class MdfcPermanentBackTests : IDisposable
             "the play permission does not linger past 'this turn'");
         top2.RuntimeExileCastAllowedCaster.Should().BeNull();
     }
+
+    private static Land LibraryLand(Player owner, string name = "Forest")
+    {
+        var land = new Land(name);
+        land.SetOwner(owner);
+        owner.Zones.Library.AddCard(land);
+        land.SetZone(ZoneType.Library);
+        return land;
+    }
+
+    [Fact]
+    public void Harnfel_Activate_ExiledLand_IsPlayableAsLandFromExile()
+    {
+        // CR 305.2 / 601.1 — "you may play those cards this turn." A LAND in the
+        // exile pile is PLAYED, not cast: it must carry the land-play grant and
+        // surface as a legal land drop from exile (the spell-cast grant alone
+        // never makes a land playable).
+        var harnfel = BirgiGodOfStorytellingFactory.BuildHarnfel(_alice);
+        var land = LibraryLand(_alice, "Forest");
+        var spell = LibraryCard(_alice, "Top2", "{1}{R}");
+
+        var ability = harnfel.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        _alice.Zones.Exile.GetCards().Should().Contain(new ICard[] { land, spell });
+
+        // The land carries the land-play half (CR 305.2); the nonland spell does not.
+        land.RuntimeExileLandPlayAllowedPlayer.Should().BeSameAs(_alice);
+        spell.RuntimeExileLandPlayAllowedPlayer.Should().BeNull(
+            "a nonland card is cast, not played as a land");
+
+        Majik.Core.Keywords.ExilePlayPermission.PlayableLandsFromExile(_alice)
+            .Should().ContainSingle().Which.Should().BeSameAs(land);
+    }
+
+    [Fact]
+    public void Harnfel_ExiledLand_LandPlayPermission_ExpiresAtEndOfTurn()
+    {
+        var bus = new EventBus();
+        var harnfel = BirgiGodOfStorytellingFactory.BuildHarnfel(_alice, bus);
+        var land = LibraryLand(_alice, "Forest");
+
+        var ability = harnfel.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        land.RuntimeExileLandPlayAllowedPlayer.Should().BeSameAs(_alice);
+
+        // CR 514.2 — the same shared revocation clears the land-play half.
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
+
+        land.RuntimeExileLandPlayAllowedPlayer.Should().BeNull(
+            "the land-play permission does not linger past 'this turn'");
+        Majik.Core.Keywords.ExilePlayPermission.PlayableLandsFromExile(_alice)
+            .Should().BeEmpty();
+    }
 }

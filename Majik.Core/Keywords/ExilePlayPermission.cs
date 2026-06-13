@@ -114,9 +114,22 @@ public static class ExilePlayPermission
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(cost);
 
+        // CR 305.2 / 601.1 — "you may play those cards this turn" is a PLAY
+        // permission, and a land is PLAYED, not cast. A spell-CAST grant
+        // (ExileCastAlternativeCost) never makes a LAND playable from exile,
+        // so when the exiled card is a land we additionally stamp the land-play
+        // half of the permission. The cast grant is still stamped (harmless on
+        // a land — it is never a legal cast source), keeping the call shape
+        // uniform; the land-play grant is the one the land-play path consults.
         exiledCard.GrantRuntimeExileCast(caster, cost, spendAsAnyColor);
+        var isLand = exiledCard.HasType(Cards.Types.CardType.Land);
+        if (isLand) exiledCard.GrantRuntimeExileLandPlay(caster);
 
-        void Revoke() => exiledCard.ClearRuntimeExileCast();
+        void Revoke()
+        {
+            exiledCard.ClearRuntimeExileCast();
+            if (isLand) exiledCard.ClearRuntimeExileLandPlay();
+        }
 
         ScheduleRevocation(caster, expiry, eventBus, Revoke);
         return Revoke;
@@ -164,5 +177,31 @@ public static class ExilePlayPermission
             if (handler != null) eventBus.Unsubscribe(handler);
         };
         eventBus.Subscribe(handler);
+    }
+
+    /// <summary>
+    /// CR 305.2 — the cards in <paramref name="player"/>'s Exile zone that carry
+    /// a runtime land-play grant (<see cref="Card.RuntimeExileLandPlayAllowedPlayer"/>)
+    /// nominating <paramref name="player"/> and are lands — i.e. lands the
+    /// player may PLAY from exile this turn (Harnfel, Horn of Bounty). The agent
+    /// land-drop enumeration consults this so an exiled land surfaces as a legal
+    /// land drop, parallel to
+    /// <see cref="Rules.LibraryTopPlayPermissions.PlayableLandFromTop"/> on the
+    /// library-top side. Playing one still consumes the normal land drop
+    /// (enforced by <see cref="Game.LandDropTracker"/>); this is only the
+    /// zone-source-legality surface.
+    /// </summary>
+    public static IEnumerable<Card> PlayableLandsFromExile(Player player)
+    {
+        if (player == null) yield break;
+        foreach (var c in player.Zones.Exile.GetCards())
+        {
+            if (c is Card concrete
+                && ReferenceEquals(concrete.RuntimeExileLandPlayAllowedPlayer, player)
+                && concrete.HasType(Cards.Types.CardType.Land))
+            {
+                yield return concrete;
+            }
+        }
     }
 }
