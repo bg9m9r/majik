@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -61,7 +62,20 @@ public static class NihilSpellbombFactory
     /// graveyard only when no target is provided.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, triggers: null);
+        Create(owner, triggers: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer. The dies trigger auto-binds on the live
+    /// manager's first zone crossing, so no TriggerManager is needed here.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Nihil Spellbomb with optional TriggerManager wiring. When
@@ -71,7 +85,19 @@ public static class NihilSpellbombFactory
     /// </summary>
     public static Artifact Create(
         Player owner,
-        TriggerManager? triggers)
+        TriggerManager? triggers) =>
+        Create(owner, triggers, eventBus: null);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(
+        Player owner,
+        TriggerManager? triggers,
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -128,7 +154,7 @@ public static class NihilSpellbombFactory
             costs: new ICost[]
             {
                 AdditionalCost.Tap(spellbomb),
-                AdditionalCost.Sacrifice(spellbomb),
+                AdditionalCost.Sacrifice(spellbomb, eventBus),
             },
             effects: new IEffect[] { exileEffect },
             targetRequests: new[]
