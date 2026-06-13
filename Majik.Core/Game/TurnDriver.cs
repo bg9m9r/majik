@@ -1076,6 +1076,23 @@ public sealed class TurnDriver
             var targets = new List<Majik.Core.Targeting.ITarget>();
             if (activate.Ability is Majik.Core.Abilities.ActivatedAbility aa)
             {
+                // CR 602.2b — collect the chosen targets per TargetRequest AND
+                // record them on the source ability via SetChosenTargets so the
+                // resolution-time effect closures (which read aa.ChosenTargets)
+                // see them. AbilityActivator copies sourceAbility.ChosenTargets
+                // onto the stack object, but bespoke factory closures captured
+                // the SOURCE ability — without this stamp the chosen targets
+                // were dropped (e.g. Agatha's Soul Cauldron never placed its
+                // +1/+1 counter, which cascaded into the imprint grant never
+                // firing). Mirrors GameFacade.DispatchActivate / DispatchLoyalty.
+                //
+                // ChosenTargets is grouped PER REQUEST and index-aligned with
+                // TargetRequests: ChosenTargets[i] holds the raw objects chosen
+                // for TargetRequests[i]. An optional request (MinTargets 0) the
+                // agent declines still contributes an EMPTY inner list so later
+                // requests keep their index (Agatha reads chosen[1][0] for the
+                // recipient — request index 1 must stay the recipient group).
+                var chosenTargets = new List<IReadOnlyList<object>>();
                 foreach (var req in aa.TargetRequests)
                 {
                     // Resolve any lazy CandidateGatherer against the live ctx
@@ -1087,6 +1104,7 @@ public sealed class TurnDriver
                         ? req
                         : req.WithCandidates(live);
                     var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                    chosenTargets.Add(chosen);
                     foreach (var obj in chosen)
                     {
                         var wrapper = obj switch
@@ -1100,6 +1118,10 @@ public sealed class TurnDriver
                         };
                         if (wrapper != null) targets.Add(wrapper);
                     }
+                }
+                if (chosenTargets.Count > 0)
+                {
+                    aa.SetChosenTargets(chosenTargets);
                 }
             }
 
