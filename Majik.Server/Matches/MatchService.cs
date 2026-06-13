@@ -1504,6 +1504,42 @@ public sealed class MatchService
             Match match, GameCommand command, string callerSub, Guid matchId, Guid gid,
             CancellationToken ct)
     {
+        // Shared rebuild → claim → register → attach-bridge step (also used by
+        // the GET-state self-heal path). On a successful rebuild the resumed
+        // full-game loop is already live; here we additionally dispatch the
+        // command that triggered the rehydrate.
+        var (rehydrated, transient) =
+            await TryRehydrateAndRegisterAsync(match, matchId, gid, ct);
+        if (rehydrated == null) return (null, transient);
+
+        // Dispatch the command that triggered the rehydrate against the now-live
+        // facade — the same local path a normal command takes.
+        return (await ExecuteCommandOnLocalFacadeAsync(
+            match, rehydrated, command, callerSub, matchId, gid, ct), null);
+    }
+
+    /// <summary>
+    /// Shared "rebuild + claim + register + attach bridge" used by BOTH the
+    /// command path (<see cref="TryRehydrateAndDispatchAsync"/>) and the
+    /// GET-state self-heal path (<see cref="GetGameStateAsync"/>). The only
+    /// difference between the two callers is what happens AFTER a successful
+    /// rebuild: the command path dispatches the just-arrived command; the GET
+    /// path simply serves the resumed facade's state (the resumed full-game loop
+    /// drives the bot forward on its own — that is what unwedges a crashed
+    /// bot-turn match with no human command to trigger a rebuild).
+    ///
+    /// <para>Returns <c>(facade, null)</c> on a successful rebuild+register.
+    /// Returns <c>(null, transient)</c> with a retry signal when a concurrent
+    /// rehydrate already registered the facade between our claim and our register
+    /// (the caller retries and hits the now-live fast path). Returns
+    /// <c>(null, null)</c> when there's nothing to rehydrate (no durable log) or
+    /// we didn't win the ownership claim, so the caller falls through to its
+    /// existing cross-replica / not-started behaviour unchanged.</para>
+    /// </summary>
+    private async Task<(GameFacade? Facade, Result<bool>? Transient)>
+        TryRehydrateAndRegisterAsync(
+            Match match, Guid matchId, Guid gid, CancellationToken ct)
+    {
         if (_persistence is not { Enabled: true } || _gameFactory == null)
             return (null, null);
 
@@ -1543,6 +1579,16 @@ public sealed class MatchService
                 : Array.Empty<Majik.Core.Api.BotReplay.BotDecisionRecord>();
             var botRecorder = botArchetype != null ? BuildBotDecisionRecorder(matchId) : null;
 
+            // Bug fix — re-wire the per-match SignalR bot-decision sink on the
+            // rehydrate path (built the SAME way as the create path, applying the
+            // same NullBotDecisionSink short-circuit as extraSinkArg). Without
+            // this the rehydrated facade published decisions to no one and the
+            // portal's bot-decisions panel stayed empty for the rest of the match.
+            var perMatchSink = BuildPerMatchBotDecisionSink(_hub, _replayBuffer, matchId);
+            var extraSinkArg = ReferenceEquals(perMatchSink, Majik.Bot.Diagnostics.NullBotDecisionSink.Instance)
+                ? null
+                : perMatchSink;
+
             var rebuilt = await _persistence.TryRehydrateAsync(
                 matchId,
                 match.GameSeed,
@@ -1553,7 +1599,8 @@ public sealed class MatchService
                     botDecisionRecorder: botRecorder,
                     onBotRecordingDegraded: ex => _logger?.LogWarning(ex,
                         "Bot-decision recording degraded post-rehydrate (unsupported answer " +
-                        "shape). MatchId={MatchId}", matchId)),
+                        "shape). MatchId={MatchId}", matchId),
+                    extraDecisionSink: extraSinkArg),
                 ct);
 
             if (rebuilt == null)
@@ -1593,10 +1640,10 @@ public sealed class MatchService
             "Rehydrated crashed game on this replica. MatchId={MatchId} GameId={GameId}",
             matchId, gid);
 
-        // Dispatch the command that triggered the rehydrate against the now-live
-        // facade — the same local path a normal command takes.
-        return (await ExecuteCommandOnLocalFacadeAsync(
-            match, rehydrated, command, callerSub, matchId, gid, ct), null);
+        // The resumed full-game loop is live (GameFacade.Rehydrate restarted it);
+        // hand the registered facade back to the caller, which either dispatches
+        // the triggering command (command path) or serves its state (GET path).
+        return (rehydrated, null);
     }
 
     // -----------------------------------------------------------------------
@@ -1621,16 +1668,34 @@ public sealed class MatchService
         var facade = _gameFactory.Get(gid);
         if (facade == null)
         {
-            // Facade entirely missing on this replica. Legitimately
-            // game-not-started from this node's perspective — could be a
-            // cross-replica request where the owner is another instance,
-            // or the engine simply hasn't been booted yet. Log so the
-            // bot-match "No game state." regression (PR #168 follow-up)
-            // is observable in prod instead of silently dead.
-            _logger?.LogWarning(
-                "GetGameStateAsync: facade missing on this replica. MatchId={MatchId} GameId={GameId} CallerSub={CallerSub}",
-                matchId, gid, callerSub);
-            return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+            // Facade missing on this replica. Before giving up, try to SELF-HEAL:
+            // when persistence is on and the match is live, this GET is a
+            // rehydration trigger. This is what unwedges a crashed/redeployed
+            // human-vs-bot match on the BOT's turn — no human command arrives to
+            // drive the command-path rehydrate, so without this the match froze
+            // at its last snapshot. The same rebuild→claim→register→attach-bridge
+            // flow the command path uses runs here; there is just no command to
+            // dispatch afterwards — the resumed full-game loop drives the bot
+            // forward on its own. Losers of the ownership claim / no durable log
+            // fall through to the existing game-not-started behaviour below.
+            if (match.State == MatchState.Playing && _persistence is { Enabled: true })
+            {
+                var (rehydrated, _) = await TryRehydrateAndRegisterAsync(match, matchId, gid, ct);
+                facade = rehydrated ?? _gameFactory.Get(gid);
+            }
+
+            if (facade == null)
+            {
+                // Still missing — legitimately game-not-started from this node's
+                // perspective (cross-replica request the owner is another
+                // instance, no durable log, or the engine isn't booted yet). Log
+                // so the bot-match "No game state." regression (PR #168 follow-up)
+                // is observable in prod instead of silently dead.
+                _logger?.LogWarning(
+                    "GetGameStateAsync: facade missing on this replica. MatchId={MatchId} GameId={GameId} CallerSub={CallerSub}",
+                    matchId, gid, callerSub);
+                return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+            }
         }
 
         // CR 706 — return the per-viewer snapshot so the opponent's hand

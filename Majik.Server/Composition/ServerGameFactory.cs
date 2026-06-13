@@ -231,13 +231,18 @@ public sealed class ServerGameFactory
         string? botSeatArchetype = null,
         IReadOnlyList<Majik.Core.Api.BotReplay.BotDecisionRecord>? botReplayScript = null,
         Func<Majik.Core.Api.BotReplay.BotDecisionRecord, Task>? botDecisionRecorder = null,
-        Action<Exception>? onBotRecordingDegraded = null)
+        Action<Exception>? onBotRecordingDegraded = null,
+        IBotDecisionSink? extraDecisionSink = null)
     {
         var facade = GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
         if (botSeatArchetype != null)
         {
+            // Bug fix — forward the per-match SignalR decision sink so a
+            // rehydrated bot match re-publishes its decisions on the
+            // "bot-decision" channel (the create path passes its per-match sink
+            // here too; passing null left the portal panel empty post-rehydrate).
             InstallBotAgent(
-                facade, botSeatArchetype, onBotThinking: null, extraDecisionSink: null,
+                facade, botSeatArchetype, onBotThinking: null, extraDecisionSink,
                 botDecisionRecorder, botReplayScript, onBotRecordingDegraded);
         }
         return facade;
