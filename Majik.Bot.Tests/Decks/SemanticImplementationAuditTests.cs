@@ -398,7 +398,12 @@ public class SemanticImplementationAuditTests
             "Crawling Barrens",              // counters-then-conditional-animate (no fixed-subtype animate)
 
             // -- Token riders with no generic primitive on the binder path. --
-            "Treasure Vault",                // "{X}{X}, …: Create X Treasure tokens" — count-linked mass token
+            // Treasure Vault ("{X}{X}, {T}, Sacrifice this land: Create X
+            // Treasure tokens") is NO LONGER deferred: the count-linked Treasure
+            // mint now binds in prod via LandActivatedAbilityBinder
+            // (BindCreateXTreasures, reading the per-activation X off
+            // ResolutionContext.ChosenX), so it stops tripping the detector and
+            // is removed from this allowlist.
             "Dalkovan Encampment",           // delayed "Whenever you attack this turn, create two tapped+attacking Warriors" rider
             "Mirrex",                         // token carries toxic 1 + a quoted "can't block" ability (richer token shape)
 

@@ -76,10 +76,14 @@ namespace Majik.Core.CardData;
 ///     Then you may have it become a 0/0 Elemental creature" — the animate is
 ///     conditional on a prior counter step (same posture
 ///     <see cref="ManlandBinder"/> defers).</item>
-///   <item><b>Count-linked / mass-treasure token riders</b> (Treasure Vault's
-///     "Create X Treasure tokens", Dalkovan Encampment's
-///     "Whenever you attack this turn …" delayed token rider) — no generic
-///     count-linked / attack-rider token primitive; deferred.</item>
+///   <item><b>Count-linked / attack-rider token riders.</b> Treasure Vault's
+///     "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens" NOW BINDS
+///     here via <see cref="BindCreateXTreasures"/> — the count is the
+///     activation's X (read at resolution off the per-activation X ledger,
+///     <see cref="Majik.Core.Abilities.ResolutionContext.ChosenX"/>, GAP 2).
+///     Dalkovan Encampment's "Whenever you attack this turn …" delayed token
+///     rider still defers (no attack-rider / delayed-trigger token primitive on
+///     the binder path).</item>
 ///   <item><b>Desert</b> — "{T}: deal 1 damage to target attacking creature.
 ///     Activate only during the end of combat step" — the combat-step timing
 ///     gate has no binder-reachable canActivate seam; deferred.</item>
@@ -145,6 +149,17 @@ public static class LandActivatedAbilityBinder
     // "Create a 1/1 white Human creature token" — simple single fixed token.
     private static readonly Regex CreateSimpleToken = new(
         @"^Create\s+a\s+(?<p>\d+)/(?<t>\d+)\s+(?<rest>.+?)\s+creature\s+token\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Create X Treasure tokens" — the count-linked Treasure mint (Treasure
+    // Vault's "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens").
+    // The count is the activation's X (CR 107.3 — read at RESOLUTION off the
+    // per-activation X ledger, ResolutionContext.ChosenX, GAP 2). CR 111.10 —
+    // each Treasure is a colourless artifact with "{T}, Sacrifice this artifact:
+    // Add one mana of any color." Bound here because the X-count + Treasure
+    // shape has no fixed-token spec the simple-token path can parse.
+    private static readonly Regex CreateXTreasures = new(
+        @"^Create\s+X\s+Treasure\s+tokens?\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // "This land deals N damage to each opponent."
@@ -596,6 +611,13 @@ public static class LandActivatedAbilityBinder
             }
         }
 
+        // --- Create X Treasure tokens (Treasure Vault) — count-linked mint -
+        if (CreateXTreasures.IsMatch(effectText))
+        {
+            BindCreateXTreasures(land, controller, cost);
+            return true;
+        }
+
         // --- Create a simple fixed creature token (Castle Ardenvale) -------
         if (CreateSimpleToken.Match(effectText) is { Success: true } tm &&
             TryParseTokenSpec(tm, out var spec))
@@ -998,6 +1020,52 @@ public static class LandActivatedAbilityBinder
             {
                 var ctrl = land.Controller ?? controller;
                 TokenFactory.CreateOnBattlefield(spec, ctrl, ZoneServiceRegistry.Get(ctrl));
+            });
+
+        land.AddAbility(new ActivatedAbility(
+            source: land, controller: controller, costs: costs, effects: new IEffect[] { effect }));
+    }
+
+    // ----------------------------------------------------------------------
+    // Create X Treasure tokens — Treasure Vault
+    // "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens." (CR 602)
+    //
+    // The cost {X}{X} parses into a ManaCostCost via BuildCosts (the
+    // ManaSymbol regex covers {X}); + Tap + Sacrifice-self (BuildCosts reads
+    // "Sacrifice this land"). The live activation flow expands the {X} cost and
+    // stamps the chosen X onto the ability (TurnDriver →
+    // VariableXCostExpansion + ActivatedAbility.SetChosenX), surfacing it to
+    // resolution via ResolutionContext.ChosenX (GAP 2 — the same ledger Steel
+    // Hellkite / Lair of the Hydra read). At resolution the effect reads
+    // ctx.ChosenX (null ⇒ 0, the legal-but-useless "activate for X=0" path) and
+    // mints that many Treasure tokens (CR 111.10 — each a colourless artifact
+    // with "{T}, Sacrifice this artifact: Add one mana of any color") under the
+    // source's live controller, routed through ZoneService so each Treasure's
+    // ETB CardMovedEvent fires.
+    //
+    // v1 simplification (consistent with the rest of the codebase's {X}{X}
+    // handling, e.g. Blast Zone): ManaCost tracks only a HasX flag, not the
+    // X-pip COUNT, so the {X}{X} cost expands to X (not 2X) generic at payment.
+    // The token COUNT — the deferral's count-linked primitive — is correct
+    // (X tokens for the chosen X); the {X}{X} double-payment exactness is a
+    // separate, pre-existing engine-wide concern.
+    // ----------------------------------------------------------------------
+    private static void BindCreateXTreasures(Land land, Player controller, string cost)
+    {
+        var costs = BuildCosts(land, cost, out _);
+
+        var effect = new Effect(
+            $"{land.Name}: create X Treasure tokens",
+            ctx =>
+            {
+                var ctrl = land.Controller ?? controller;
+                var x = ctx.ChosenX ?? 0;
+                var zones = ZoneServiceRegistry.Get(ctrl);
+                for (var i = 0; i < x; i++)
+                {
+                    TokenFactory.CreateTreasure(ctrl, zones);
+                }
+                return ValueTask.CompletedTask;
             });
 
         land.AddAbility(new ActivatedAbility(

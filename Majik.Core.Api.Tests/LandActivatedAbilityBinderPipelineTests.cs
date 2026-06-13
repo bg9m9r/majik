@@ -597,6 +597,74 @@ public class LandActivatedAbilityBinderPipelineTests
             "'Creatures you control' excludes the opponent's creature");
     }
 
+    // ======================================================================
+    // 12. COUNT-LINKED TREASURE TOKEN — Treasure Vault
+    // "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens."
+    // The token count is read from the per-activation X ledger
+    // (ResolutionContext.ChosenX, GAP 2) — CR 111.10 Treasure tokens.
+    // ======================================================================
+
+    private const string TreasureVaultOracle =
+        "{T}: Add {C}.\n" +
+        "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens.";
+
+    [Fact]
+    public async Task Prod_TreasureVault_CreatesXTreasureTokens()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Treasure Vault", "Land", oracleText: TreasureVaultOracle, colors: "");
+        var land = new Land("Treasure Vault", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+
+        var artifactsBefore = alice.Zones.Battlefield.GetCards()
+            .Where(c => c.HasType(CardType.Artifact)).Count();
+
+        // The {X}{X}, {T}, Sacrifice ability — distinguished from the bare
+        // {T}: Add {C} mana ability by carrying a ManaCostCost ({X}{X}).
+        var ability = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+
+        // X = 3 chosen at activation; the resolution effect reads it off
+        // ResolutionContext.ChosenX (the same ledger TurnDriver stamps in prod).
+        foreach (var e in ability.Effects)
+            await e.ExecuteAsync(ResolutionContext.For(alice, null, Ctx(facade), null, chosenX: 3));
+
+        var treasures = alice.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(c => c.HasType(CardType.Artifact) && c.HasSubtype(CardSubtype.Treasure))
+            .ToList();
+        treasures.Count.Should().Be(3, "X = 3 ⇒ three Treasure tokens created");
+        treasures.Should().OnlyContain(t => t.IsToken, "each created Treasure is a token");
+        alice.Zones.Battlefield.GetCards().Where(c => c.HasType(CardType.Artifact)).Count()
+            .Should().Be(artifactsBefore + 3);
+    }
+
+    [Fact]
+    public void Prod_TreasureVault_XLedgerDefaultsToZero_NoTokens()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Treasure Vault", "Land", oracleText: TreasureVaultOracle, colors: "");
+        var land = new Land("Treasure Vault", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+
+        var ability = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+
+        // No ChosenX threaded (legacy/shape path) ⇒ X defaults to 0, a legal
+        // but useless activation: zero Treasures minted.
+        foreach (var e in ability.Effects) e.Execute();
+
+        alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasType(CardType.Artifact) && c.HasSubtype(CardSubtype.Treasure))
+            .Should().Be(0, "X defaults to 0 when no ChosenX is threaded");
+    }
+
     [Fact(Skip = "Channel is a discard-this-card-from-HAND activation, not a {T} battlefield activation. " +
                  "No binder-reachable 'discard this card to activate' cost seam exists, so the whole " +
                  "Channel family (Boseiju Who Endures, Otawara, Takenuma, Eiganjo, Sokenzan) is deferred " +
