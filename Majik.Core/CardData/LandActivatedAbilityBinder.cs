@@ -85,8 +85,12 @@ namespace Majik.Core.CardData;
 ///     rider still defers (no attack-rider / delayed-trigger token primitive on
 ///     the binder path).</item>
 ///   <item><b>Desert</b> — "{T}: deal 1 damage to target attacking creature.
-///     Activate only during the end of combat step" — the combat-step timing
-///     gate has no binder-reachable canActivate seam; deferred.</item>
+///     Activate only during the end of combat step" — fully modelled by the
+///     bespoke <see cref="Factories.DesertFactory"/>: the "end of combat step"
+///     timing rider (CR 602.5b) is the ability's context-aware
+///     <c>canActivateCheckCtx</c> gate, reading the live step off
+///     <see cref="Game.GameContext.CurrentPhase"/>. (The binder path itself
+///     still has no step-aware emit, but Desert no longer needs one.)</item>
 /// </list>
 /// </para>
 /// </summary>
