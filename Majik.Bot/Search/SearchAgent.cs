@@ -489,6 +489,29 @@ public sealed class SearchAgent : IPlayerAgent
     private bool IsSubstantivePriorityWindow(GameContext ctx) =>
         LegalActionEnumerator.ForPriority(ctx, _seat).Count > 1;
 
+    // ── Declarative choice sink — face policy + fallback ──────────────────────
+
+    /// <summary>
+    /// CR 712.3 — the MDFC face prompt is NOT a searched decision (it fires
+    /// mid-cast, inside the CastSpell the search already chose), so it flows
+    /// through this declarative sink rather than <see cref="ChoosePriorityActionAsync"/>.
+    /// SearchAgent does not override the interface-default <c>ChooseAsync</c>
+    /// otherwise, which picks the first candidate — the front face — and leaves
+    /// MDFC-land hands mana-locked in BOTH capture and rollout modes (the searched
+    /// seat is a SearchAgent in both). Route MDFC face prompts through
+    /// <see cref="Heuristic.MdfcFacePolicy"/> (same policy as BotPlayerAgent / the
+    /// sandbox opponent) so the deadlock case resolves to the land face; every
+    /// other prompt delegates to the deterministic fallback unchanged.
+    /// </summary>
+    public Task<IReadOnlyList<object>> ChooseAsync(
+        GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+    {
+        var candidates = req.Candidates ?? Array.Empty<object>();
+        if (Heuristic.MdfcFacePolicy.TryPick(ctx, _seat, candidates, out var face))
+            return Task.FromResult<IReadOnlyList<object>>(new object[] { face });
+        return _fallback.ChooseAsync(ctx, req, ct);
+    }
+
     // ── Non-searched prompts — delegate to fallback ───────────────────────────
 
     public Task<MulliganDecision> ChooseMulliganAsync(
