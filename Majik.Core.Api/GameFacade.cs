@@ -387,6 +387,30 @@ public sealed class GameFacade : IDisposable
             var cost = cast.AlternativeCost?.AlternativeManaCost
                 ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor, ctx.AllPlayers);
 
+            // CR 601.2b / 601.2e / 601.2f — variable-X permanent spell (Walking
+            // Ballista, Hangarback Walker, Endless One): announce X NOW, BEFORE
+            // the mana-source prompt + payment below, and fold it into the
+            // dispatcher's cost. Mirrors the already-fixed
+            // TurnDriver.DispatchCast twin (keep-in-sync invariant): pre-fix this
+            // facade path prompted/paid the printed cost with X folded to generic
+            // 0, while SpellCastFlow.CastAsync computed the X-inclusive totalCost
+            // AFTER the prompt and the payManaCost callback paid the X-free cost —
+            // so an X-spell cast through this loop underpaid (X effectively free).
+            // The card's effective ManaCost carries the {X} pip (HasX), so we key
+            // off that rather than a SpellDefinition flag (this facade path uses a
+            // Vanilla def). The chosen X is forwarded to CastAsync (preChosenX) so
+            // the flow reuses it (no double-prompt) and threads it into the
+            // resolving effect (ChosenSpellParams.X) + ETB-with-X (PendingCastX).
+            int? chosenX = null;
+            if (cast.AlternativeCost == null && cost.HasX)
+            {
+                chosenX = await agent.ChooseXAsync(ctx, cast.Card, CancellationToken.None);
+                if (chosenX is { } xv && xv > 0)
+                {
+                    cost = cost.AddGenericCost(xv);
+                }
+            }
+
             // CR 601.2g + CR 106.4 — pay from floating pool first when it
             // fully covers the cost (drag-to-cast UX: float via
             // ActivateManaAbilityCommand, then cast silently). Mirrors
@@ -440,7 +464,8 @@ public sealed class GameFacade : IDisposable
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
                     preChosenMana: payment,
-                    payManaCost: _ => manaResolver.Pay(actor, cost, payment));
+                    payManaCost: _ => manaResolver.Pay(actor, cost, payment),
+                    preChosenX: chosenX);
             }
             catch (InvalidOperationException)
             {
