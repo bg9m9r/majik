@@ -44,10 +44,11 @@ namespace Majik.Core.Tests.CardData;
 ///      File follow-up PRs for each BUG entry.
 ///   3. New unexplained gaps → the real-pool test fails and lists them.
 ///
-/// POOL STATS (as of 2026-06-06):
-///   2076 implemented, 599 with trigger text, 0 sagas, 599 factory-backed,
-///   0 binder-only, 588 pass cleanly, 10 in KnownNonTriggerCards,
-///   11 in KnownMissingTriggerBugs.
+/// POOL STATS (as of 2026-06-13):
+///   Festival Crasher + Kiln Fiend removed from KnownMissingTriggerBugs after
+///   the missing-trigger-effects-overload-dispatch deferral was paid down —
+///   both now bind their cast-pump trigger through the prod build path and the
+///   real-pool audit verifies them directly. KnownMissingTriggerBugs = 9.
 /// </summary>
 public class TriggerWiringAuditTests
 {
@@ -214,21 +215,16 @@ public class TriggerWiringAuditTests
                 "graveyard with haste.' — Reflexive trigger (CR 603.2) not exposed as " +
                 "ITriggeredAbility in BloodthirstyAdversaryFactory.Create(Player).",
 
-            ["Festival Crasher"] =
-                "// BUG: 'Whenever you cast an instant or sorcery spell, this creature gets " +
-                "+2/+0 until end of turn.' — FestivalCrasherFactory.Create(owner) delegates to " +
-                "Create(owner, effects: null, triggers: null); the pump trigger is only wired " +
-                "when effects != null, but the source generator never dispatches with effects " +
-                "(no Create(Player, ContinuousEffectsService) overload registered). " +
-                "In prod GameFacade passes effects to the effects-aware dispatch which doesn't " +
-                "exist for this factory — trigger is silently dropped.",
-
-            ["Kiln Fiend"] =
-                "// BUG: 'Whenever you cast an instant or sorcery spell, this creature gets " +
-                "+3/+0 until end of turn.' — KilnFiendFactory.Create(owner) delegates to " +
-                "Create(owner, effects: null, triggers: null); trigger is only wired when " +
-                "effects != null. No effects-aware source-gen dispatch. Same root cause as " +
-                "Festival Crasher.",
+            // Festival Crasher + Kiln Fiend FIXED — the
+            // missing-trigger-effects-overload-dispatch deferral is paid down.
+            // Both factories now expose the source-gen-recognised
+            // Create(Player, ContinuousEffectsService) overload, so the prod
+            // GameFacade routed build (NamedCardFactory.Create(name, owner,
+            // effects) → the generated *WithEffects dispatcher) wires the
+            // cast-instant/sorcery pump trigger (CR 603.1). The real-pool audit
+            // now verifies them through the prod build path instead of allow-
+            // listing the bug. See FestivalCrasherFactoryTests /
+            // KilnFiendFactoryTests EffectsAwareDispatch_*_OnProdPath guards.
 
             ["Leyline Binding"] =
                 "// BUG: 'When this enchantment enters, exile target nonland permanent an " +
