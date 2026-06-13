@@ -15,10 +15,11 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// Artifact. Oracle text:
 ///   "{3}, {T}: Reveal cards from the top of your library until you reveal
-///    a nonland card. Goblin Charbelcher deals damage equal to the number
-///    of land cards revealed this way to any target. If all revealed cards
-///    are Mountains, double that damage. Then put the revealed cards on
-///    the bottom of your library in a random order."
+///    a land card. Goblin Charbelcher deals damage equal to the number of
+///    nonland cards revealed this way to any target. If the revealed land
+///    card was a Mountain, Goblin Charbelcher deals double that damage
+///    instead. Put the revealed cards on the bottom of your library in any
+///    order."
 ///
 /// ## Implemented (v1)
 /// - Card identity (Artifact, mana cost {4}).
@@ -26,19 +27,28 @@ namespace Majik.Core.CardData.Factories;
 ///   with <see cref="ManaCostCost"/>("{3}") + <see cref="AdditionalCost.Tap"/>
 ///   and a 1..1 "any target" <see cref="TargetRequest"/>. Resolution walks
 ///   the controller's library from the top, peeling cards into a local
-///   reveal list until a nonland card appears (or the library runs dry,
-///   CR 608.2b — clean stop). Lands are counted; non-Mountain lands flip
-///   the "all-Mountains" gate. Damage = land-count × (all-Mountains ? 2 : 1)
-///   routed through <see cref="Fx.DealDamageAny"/> so Player / Creature /
-///   Planeswalker targets all funnel through the right damage shape (CR
-///   119.3 / CR 306.7). Then the revealed pile is randomised via
-///   <see cref="GameRandom.Shuffle"/> and bottomed onto the controller's
-///   library via raw <c>Zone.AddCard</c> appends (CR 701.20 — distinct
-///   from a full library shuffle).
-/// - The nonland terminator itself is part of the revealed pile (CR oracle
-///   text: "Then put the revealed cards on the bottom" — every card seen,
-///   including the nonland trigger, gets bottomed). Mirrors how
+///   reveal list until a LAND card appears (or the library runs dry,
+///   CR 608.2b — clean stop). NONLAND cards are counted toward damage; the
+///   terminating land is not. Damage = nonland-count × (terminating land is
+///   a Mountain ? 2 : 1) routed through <see cref="Fx.DealDamageAny"/> so
+///   Player / Creature / Planeswalker targets all funnel through the right
+///   damage shape (CR 119.3 / CR 306.7). Then the revealed pile is randomised
+///   via <see cref="GameRandom.Shuffle"/> and bottomed onto the controller's
+///   library via raw <c>Zone.AddCard</c> appends (CR 701.20 — distinct from a
+///   full library shuffle).
+/// - The terminating land itself is part of the revealed pile (oracle text:
+///   "Put the revealed cards on the bottom" — every card seen, including the
+///   land trigger, gets bottomed). Mirrors how
 ///   <see cref="TibaltsTrickeryFactory"/> bottoms its full exile pile.
+///
+/// ## 2026-06-13 correctness fix (Belcher Phase B)
+/// - The reveal-terminator and damage-count were previously INVERTED (revealed
+///   until a NONLAND, counted LANDS) — the exact opposite of the printed card.
+///   That made a landless / MDFC-front library deal ZERO damage and silently
+///   killed the entire Azorius Lotus Belcher combo. Corrected to the real
+///   oracle: reveal-until-LAND, damage = NONLAND count. See
+///   <c>Majik.Core.Tests/Combo/CharbelcherKillLineTests.cs</c> for the
+///   regression.
 /// - <b>Random library reorder</b> uses
 ///   <see cref="GameRandomRegistry.Get"/> for seed-stable replay so tests
 ///   pinning a seed see the same bottom order; tests that don't pin a seed
@@ -78,14 +88,14 @@ public static class GoblinCharbelcherFactory
 
         // ----------------------------------------------------------------
         // {3}, {T}: Reveal cards from the top of your library until you
-        // reveal a nonland card. ~ deals damage equal to the number of
-        // land cards revealed this way to any target. If all revealed
-        // cards are Mountains, double that damage. Then put the revealed
-        // cards on the bottom of your library in a random order.
+        // reveal a LAND card. ~ deals damage equal to the number of NONLAND
+        // cards revealed this way to any target. If the revealed land card
+        // was a Mountain, double that damage instead. Then put the revealed
+        // cards on the bottom of your library in any order.
         // ----------------------------------------------------------------
         ActivatedAbility? belchAbility = null;
         var belchEffect = new Effect(
-            "Goblin Charbelcher: reveal-until-nonland + damage + random-bottom",
+            "Goblin Charbelcher: reveal-until-land + nonland-damage + random-bottom",
             () =>
             {
                 object? target = null;
@@ -137,8 +147,8 @@ public static class GoblinCharbelcherFactory
 
         var library = controller.Zones.Library;
         var revealed = new List<ICard>();
-        var landCount = 0;
-        var allMountains = true; // vacuously true; flipped by any non-Mountain reveal.
+        var nonlandCount = 0;
+        var terminatingLandIsMountain = false;
 
         while (true)
         {
@@ -150,29 +160,25 @@ public static class GoblinCharbelcherFactory
 
             if (top.HasType(CardType.Land))
             {
-                landCount++;
-                if (!top.HasSubtype(CardSubtype.Mountain))
-                {
-                    allMountains = false;
-                }
-                // Continue revealing — lands don't terminate.
-                continue;
+                // Oracle terminator: "Reveal cards ... until you reveal a LAND
+                // card." The land itself is revealed (joins the bottom pile) but
+                // is NOT counted toward damage (damage = NONLAND cards). The
+                // "double if the revealed land was a Mountain" clause keys off
+                // THIS terminating land (CR 701.20 / the Mirrodin oracle text).
+                terminatingLandIsMountain = top.HasSubtype(CardSubtype.Mountain);
+                break;
             }
 
-            // Nonland reveal — the printed terminator. It still counts as
-            // "revealed this way" so it joins the bottom-shuffle pile, but
-            // it does NOT contribute to the land count nor satisfy
-            // "all Mountains" (a nonland is not a Mountain).
-            allMountains = false;
-            break;
+            // Nonland reveal — keeps the reveal going and contributes to the
+            // damage count.
+            nonlandCount++;
         }
 
-        // If the reveal exited via library-empty with zero non-Mountains
-        // seen, allMountains stays true. The "all revealed cards are
-        // Mountains" check is vacuously true with zero reveals too (no
-        // counterexample), but in that case damage is 0 × 2 = 0 — same
-        // outcome.
-        var damage = landCount * (allMountains ? 2 : 1);
+        // Damage equals the number of NONLAND cards revealed this way, doubled
+        // when the revealed (terminating) land card was a Mountain. If the
+        // library ran dry with no land revealed, every card was a nonland and
+        // there is no Mountain to double — damage = nonlandCount.
+        var damage = nonlandCount * (terminatingLandIsMountain ? 2 : 1);
 
         if (target != null && damage > 0)
         {
@@ -191,21 +197,22 @@ public static class GoblinCharbelcherFactory
 
         return new BelcherResolution(
             Revealed: revealed,
-            LandCount: landCount,
-            AllMountains: allMountains,
+            NonlandCount: nonlandCount,
+            RevealedLandIsMountain: terminatingLandIsMountain,
             Damage: damage);
     }
 
     /// <summary>
     /// Observation record describing one Goblin Charbelcher activation —
-    /// the revealed pile, the land tally, the all-Mountains gate, and the
-    /// final damage figure. Returned by <see cref="ResolveBelch"/> for
-    /// tests / bots that want to inspect the resolution without observing
-    /// it through the target.
+    /// the revealed pile, the nonland tally (= the damage base before the
+    /// Mountain doubling), whether the terminating land was a Mountain, and
+    /// the final damage figure. Returned by <see cref="ResolveBelch"/> for
+    /// tests / bots that want to inspect the resolution without observing it
+    /// through the target.
     /// </summary>
     public sealed record BelcherResolution(
         IReadOnlyList<ICard> Revealed,
-        int LandCount,
-        bool AllMountains,
+        int NonlandCount,
+        bool RevealedLandIsMountain,
         int Damage);
 }
