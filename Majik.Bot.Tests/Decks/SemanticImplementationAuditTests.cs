@@ -393,7 +393,12 @@ public class SemanticImplementationAuditTests
             // "tapped and attacking" combat insertion (no mid-combat surface).
 
             // -- Other residual deferrals. --
-            "Demolition Field",              // destroy binds; the both-players "search for a basic land" rider is deferred
+            // Demolition Field is NO LONGER deferred: the both-players
+            // "search for a basic land" rider now binds in prod via
+            // LandActivatedAbilityBinder.BindDestroyTargetLand (after the
+            // destroy, the destroyed land's controller then the activator each
+            // may tutor a basic onto the battlefield untapped, then shuffle —
+            // CR 701.19 / 701.20a). Removed from this allowlist.
             "Desert",                         // "{T}: deal 1 to target attacking creature" gated to the end-of-combat step — no binder-reachable timing seam
             // Vault of the Archangel ("Creatures you control gain deathtouch and
             // lifelink until end of turn") is NO LONGER deferred: the mass
