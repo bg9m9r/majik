@@ -597,6 +597,33 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 701.5b / 106.4 — transient "this spell can't be countered" stamp set
+    /// at mana-PAY time, BEFORE the <see cref="Majik.Core.Spells.Spell"/> object
+    /// exists. Boseiju, Who Shelters All ("If that mana is spent on an instant
+    /// or sorcery spell, that spell can't be countered.") rides its produced
+    /// {C} with a <see cref="Majik.Core.Abilities.ManaAbility.ProvenanceReaction"/>
+    /// that, when one of its colorless units pays a pip on this card (and it is
+    /// an instant or sorcery), sets this flag. The cast flow's
+    /// <c>StampSpellAndCardSentinels</c> reads it onto
+    /// <see cref="Majik.Core.Spells.ISpell.CannotBeCountered"/> and clears it,
+    /// so only the spell that consumed the mana benefits and a later non-cast
+    /// entry (blink, copy) never reuses it. Parallels <see cref="PendingCastX"/>
+    /// / <see cref="PendingCastColorCounts"/> as a per-cast, pay-time stamp.
+    /// </summary>
+    public bool PendingCastUncounterable { get; private set; }
+
+    /// <summary>Stamp the "this spell can't be countered" rider at pay time
+    /// (Boseiju, Who Shelters All). Idempotent — multiple qualifying mana units
+    /// spent on the same spell only set the flag once.</summary>
+    public void MarkPendingCastUncounterable() => PendingCastUncounterable = true;
+
+    /// <summary>Clear the pay-time uncounterable stamp. Called by
+    /// <c>SpellCastFlow.StampSpellAndCardSentinels</c> once it has copied the
+    /// flag onto the spell, so a later non-cast battlefield entry doesn't
+    /// reuse it.</summary>
+    public void ClearPendingCastUncounterable() => PendingCastUncounterable = false;
+
+    /// <summary>
     /// CR 614.1d — set by a <c>[CardName]</c> factory that ALREADY wires its
     /// own "enters with X +1/+1 counters" handling (e.g. an ETB trigger that
     /// reads <see cref="PendingCastX"/> — Hangarback Walker, Endless One,
@@ -1681,6 +1708,7 @@ public class Card : ICard
         ReturnToHandOnResolution = src.ReturnToHandOnResolution;
         PendingCastColors = src.PendingCastColors;
         PendingCastColorCounts = src.PendingCastColorCounts;
+        PendingCastUncounterable = src.PendingCastUncounterable;
         TotalManaSpentThisCast = src.TotalManaSpentThisCast;
         PendingCastTargets = src.PendingCastTargets;
     }

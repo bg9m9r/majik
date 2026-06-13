@@ -1032,6 +1032,25 @@ public sealed class SpellCastFlow
             spell.CannotBeCountered = true;
         }
 
+        // CR 701.5b / 106.4 — pay-time uncounterable rider (Boseiju, Who
+        // Shelters All: "If that mana is spent on an instant or sorcery spell,
+        // that spell can't be countered."). The mana ability's provenance
+        // reaction stamped PendingCastUncounterable on the card when one of its
+        // {C} units paid a pip on this (instant/sorcery) spell during the
+        // CR 601.2h mana payment, which ran just before this spell object was
+        // constructed. Copy the stamp onto the spell, then clear it so a later
+        // non-cast battlefield entry (blink, copy) never reuses it.
+        if (!spell.CannotBeCountered
+            && card is Card concreteForUncounterable
+            && concreteForUncounterable.PendingCastUncounterable)
+        {
+            spell.CannotBeCountered = true;
+        }
+        if (card is Card concreteToClearUncounterable)
+        {
+            concreteToClearUncounterable.ClearPendingCastUncounterable();
+        }
+
         // CR 701.5b — one-shot "next spell can't be countered" rider from an
         // activated ability (e.g. Mistrise Village's {U}{T} activation). The
         // flag is consumed on the first cast so only that spell benefits.

@@ -67,6 +67,7 @@ public sealed class MutableFieldTripwireTests
             "PendingCastColorCounts",               // COPIED (immutable dict ref)
             "PendingCastColors",                    // COPIED (immutable list ref)
             "PendingCastTargets",                   // COPIED (PendingCastTargets = src.PendingCastTargets)
+            "PendingCastUncounterable",             // COPIED (PendingCastUncounterable = src.PendingCastUncounterable — Boseiju pay-time rider)
             "PendingCastX",                         // COPIED (PendingCastX = src.PendingCastX)
             "PendingDelveExiledCount",              // COPIED (PendingDelveExiledCount = src.PendingDelveExiledCount)
             "ReturnToHandOnResolution",             // COPIED (ReturnToHandOnResolution = src.ReturnToHandOnResolution)

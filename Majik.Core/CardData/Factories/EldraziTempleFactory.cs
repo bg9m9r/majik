@@ -25,7 +25,7 @@ namespace Majik.Core.CardData.Factories;
 ///   distinguishable from {T}: Add {C} by its <c>ManaGenerated.Generic
 ///   == 2</c>.
 ///
-/// ## Spend-restriction (v1 data, payment-gate deferred)
+/// ## Spend-restriction (v1 — payment-gate ENFORCED)
 /// - <b>"Spend this mana only to cast Eldrazi spells or activate
 ///   abilities of Eldrazi"</b>: the {C}{C} <see cref="ManaAbility"/>
 ///   stamps a <see cref="Majik.Core.Mana.SpendRestriction"/> with the
@@ -37,17 +37,13 @@ namespace Majik.Core.CardData.Factories;
 ///   separate path that doesn't surface an <c>ISpell</c>); the predicate
 ///   is conservative — spell-side only.
 ///
-///   <b>Payment-gate enforcement</b> for COLORED restricted mana is now
-///   live (Ancient Ziggurat / Cavern of Souls — see those factories'
-///   xmldoc). Eldrazi Temple, however, produces COLORLESS ({C}{C}) mana,
-///   which folds into the engine's generic bucket and is never recorded in
-///   the colored per-slot provenance ledger the gate consumes ("generic
-///   mana is never tagged" — <see cref="Majik.Core.Mana.ManaProvenanceSlot"/>).
-///   So Eldrazi Temple's restriction stays observational metadata until the
-///   provenance ledger grows a colorless/generic slot dimension — a separate
-///   slice. The factory still stamps the rider so it unlocks the moment that
-///   lands. (The "or activated abilities of Eldrazi" half also remains
-///   spell-only.)
+///   <b>Payment-gate enforcement</b> is now live for this COLORLESS ({C}{C})
+///   mana too: the per-slot provenance ledger tracks a {C} unit in its own
+///   <see cref="Majik.Core.ValueObjects.ManaColor.Colorless"/> dimension (CR
+///   107.4c), and <see cref="Majik.Core.Costs.ManaPaymentResolver"/> withholds
+///   a restricted colorless unit from the bucketed spend when the cast spell
+///   doesn't satisfy the rider — so the {C}{C} can only pay an Eldrazi spell.
+///   (The "or activated abilities of Eldrazi" half remains spell-only.)
 /// </summary>
 [CardName("Eldrazi Temple")]
 public static class EldraziTempleFactory
@@ -78,11 +74,11 @@ public static class EldraziTempleFactory
         // {T}: Add {C}{C}. Spend this mana only to cast Eldrazi spells
         //   or activate abilities of Eldrazi.
         // Second ManaAbility producing 2 generic, with a SpendRestriction
-        // stamping the Eldrazi-subtype predicate on the generated mana.
-        // The colored spend-restriction gate is live (Ziggurat / Cavern),
-        // but this ability's mana is COLORLESS ({C}{C}) — it folds into the
-        // generic bucket, which the colored provenance ledger doesn't track,
-        // so the gate doesn't yet enforce this rider (see class xmldoc).
+        // stamping the Eldrazi-subtype predicate on the generated mana. The
+        // spend-restriction gate is live for COLORLESS ({C}{C}) mana via the
+        // ManaColor.Colorless provenance slot dimension (CR 107.4c): the
+        // resolver withholds this restricted {C}{C} from a non-Eldrazi spend
+        // (see class xmldoc + SpendRestrictionProvenanceGateTests).
         // ----------------------------------------------------------------
         var eldraziRestriction = new SpendRestriction(
             "Eldrazi spell or ability",

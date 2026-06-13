@@ -645,13 +645,19 @@ public class Player
             AddProvenanceSlots(source, ValueObjects.ManaColor.Green, mana.Green, onSpent, restriction, doesNotEmpty);
             // CR 106.1b — colorless ({C}) mana is stored in the Generic pool
             // bucket but, unlike generic-cost pips, is a real produced unit
-            // that can carry a spend-restriction or doesn't-empty rider (Karn,
+            // that can carry a spend-restriction, a doesn't-empty rider (Karn,
             // Legacy Reforged adds {C} that can't pay nonartifact spells and
-            // doesn't empty). Tag those as ManaColor.Colorless slots so the
-            // payment gate and the EmptyManaPool sweep can find them. Plain
-            // generic pips (covered-cost mana) are never tagged — only a
-            // colorless unit produced WITH a rider records a slot.
-            if (restriction != null || doesNotEmpty)
+            // doesn't empty), OR a spend REACTION (Boseiju, Who Shelters All's
+            // {C}: "If that mana is spent on an instant or sorcery spell, that
+            // spell can't be countered."). Tag those as ManaColor.Colorless
+            // slots so the payment gate, the spend reaction, and the
+            // EmptyManaPool sweep can find them. Plain generic pips
+            // (covered-cost mana) are never tagged — only a colorless unit
+            // produced WITH a rider OR a reaction records a slot. (Colored
+            // units above always record once provenanceSource is set, so the
+            // reaction fires there for free — Arena of Glory's {R}{R}; the
+            // colorless bucket needs this explicit reaction case.)
+            if (restriction != null || doesNotEmpty || onSpent != null)
             {
                 AddProvenanceSlots(source, ValueObjects.ManaColor.Colorless, mana.Colorless, onSpent, restriction, doesNotEmpty);
             }

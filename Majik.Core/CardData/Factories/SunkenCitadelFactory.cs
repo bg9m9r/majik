@@ -65,12 +65,14 @@ namespace Majik.Core.CardData.Factories;
 /// <i>no</i> spell — the mana may only pay activation costs of land sources'
 /// abilities — so the predicate returns <c>false</c> for every spell.
 ///
-/// <b>Payment-gate enforcement</b> (filtering tagged pool entries when paying a
-/// non-land-ability cost) is deferred until
-/// <see cref="Majik.Core.ValueObjects.ManaPool"/> grows per-slot tags — today
-/// the pool stores bucketed colour counts only, so the rider is observational
-/// metadata on the ability. Same posture as Eldrazi Temple / Cavern of Souls /
-/// Delighted Halfling; all unlock together when the resolver consumes the tag.
+/// <b>Payment-gate enforcement</b> is now live: the resolver consumes the
+/// per-slot <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> ledger and
+/// withholds any restricted unit the cast spell doesn't satisfy from the
+/// bucketed spend (CR 106.4). Since this restriction's predicate denies every
+/// spell, the double-mana can never pay a spell pip — only a land source's
+/// activation cost (a non-spell context the gate leaves spendable). Same gate
+/// as Eldrazi Temple / Cavern of Souls / Ancient Ziggurat (see
+/// SpendRestrictionProvenanceGateTests).
 /// </para>
 ///
 /// <para>
@@ -129,7 +131,9 @@ public static class SunkenCitadelFactory
         // {T}: Add two mana of the chosen color. Spend this mana only to
         // activate abilities of land sources (CR 605.1a / 106.4). Two pips of
         // the chosen color, stamped with the land-ability-only spend rider.
-        // Payment-gate enforcement is deferred (see class xmldoc).
+        // Payment-gate enforcement is live — the resolver withholds this mana
+        // from any spell spend (the predicate denies every spell; see class
+        // xmldoc).
         var producedDouble = DoubleManaCostForColor(chosenColor);
         land.AddAbility(new ManaAbility(
             land, owner, producedDouble,
