@@ -173,6 +173,24 @@ public class CombatValidatorTests
     }
 
     [Fact]
+    public void CanBlock_IntrinsicCantBlock_ReturnsFalse()
+    {
+        // CR 509.1a — a creature with an intrinsic "can't block" restriction
+        // (e.g. Mirrex's Phyrexian Mite token's quoted "This token can't block.",
+        // recorded as a "CantBlock" KeywordAbility) can't be declared as a blocker.
+        var attackingPlayer = new Player("Alice", 20);
+        var defendingPlayer = new Player("Bob", 20);
+        var attackerCreature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = attackingPlayer };
+        var blockerCreature = new Creature("Phyrexian Mite", "", 1, 1) { Controller = defendingPlayer };
+        blockerCreature.SetZone(ZoneType.Battlefield);
+        blockerCreature.AddAbility(new Majik.Core.Abilities.KeywordAbility(
+            "CantBlock", blockerCreature, defendingPlayer));
+        var attacker = new Attacker(attackerCreature, defendingPlayer);
+
+        _validator.CanBlock(blockerCreature, attacker, defendingPlayer).Should().BeFalse();
+    }
+
+    [Fact]
     public void CanBlock_NullCreature_ReturnsFalse()
     {
         // Arrange

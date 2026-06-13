@@ -665,6 +665,127 @@ public class LandActivatedAbilityBinderPipelineTests
             .Should().Be(0, "X defaults to 0 when no ChosenX is threaded");
     }
 
+    // ======================================================================
+    // 13. RICHER-SHAPE TOKEN — Mirrex's Phyrexian Mite
+    // "{3}, {T}: Create a 1/1 colorless Phyrexian Mite artifact creature token
+    //  with toxic 1 and \"This token can't block.\""
+    // The simple-token parser rejects the artifact-creature + toxic + can't-block
+    // riders, so this binds via the dedicated Mite recognizer (CR 111.1 / 111.4).
+    // ======================================================================
+
+    private const string MirrexOracle =
+        "{T}: Add {C}.\n" +
+        "{T}: Add one mana of any color. Activate only if this land entered this turn.\n" +
+        "{3}, {T}: Create a 1/1 colorless Phyrexian Mite artifact creature token " +
+        "with toxic 1 and \"This token can't block.\" " +
+        "(Players dealt combat damage by it also get a poison counter.)";
+
+    [Fact]
+    public void Prod_Mirrex_CreatesPhyrexianMiteToken_ArtifactCreature_ToxicCantBlock()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Mirrex", "Land — Sphere", oracleText: MirrexOracle, colors: "");
+        var land = new Land("Mirrex", null, new[] { CardSubtype.Sphere });
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+
+        // The {3}, {T} token ability — distinguished from the two mana abilities
+        // (which are ManaAbility, not ActivatedAbility).
+        var ability = live.Abilities.OfType<ActivatedAbility>().Single();
+
+        foreach (var e in ability.Effects) e.Execute();
+
+        var mite = alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Single(c => c.Name == "Phyrexian Mite");
+        mite.IsToken.Should().BeTrue();
+        mite.Power.Should().Be(1);
+        mite.Toughness.Should().Be(1);
+        mite.HasType(CardType.Artifact).Should().BeTrue("CR 111.1 — Mite is an artifact creature");
+        mite.HasType(CardType.Creature).Should().BeTrue();
+        mite.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
+        mite.HasSubtype(CardSubtype.Mite).Should().BeTrue();
+        mite.GetEffectiveColors().Should().BeEmpty("a colorless token");
+        // toxic 1 + can't-block markers (CR 702.180 / CR 509.1a).
+        mite.Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "toxic" && k.Arg == 1);
+        mite.Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "CantBlock");
+        // CR 509.1a — the Mite can't be declared as a blocker.
+        Majik.Core.Combat.CombatAbilities.HasCantBlock(mite).Should().BeTrue();
+    }
+
+    // ======================================================================
+    // 14. ATTACK-RIDER DELAYED TOKEN TRIGGER — Dalkovan Encampment
+    // "{2}{W}, {T}: Whenever you attack this turn, create two 1/1 red Warrior
+    //  creature tokens that are tapped and attacking. Sacrifice them at the
+    //  beginning of the next end step."
+    // Activating the ability installs a one-turn "whenever you attack" trigger
+    // that mints two 1/1 red Warriors per combat (CR 508.1f / CR 603.7).
+    // ======================================================================
+
+    private const string DalkovanOracle =
+        "This land enters tapped unless you control a Swamp or a Mountain.\n" +
+        "{T}: Add {W}.\n" +
+        "{2}{W}, {T}: Whenever you attack this turn, create two 1/1 red Warrior " +
+        "creature tokens that are tapped and attacking. Sacrifice them at the " +
+        "beginning of the next end step.";
+
+    [Fact]
+    public async Task Prod_DalkovanEncampment_AttackRider_InstallsTrigger_MintsWarriorsOnAttack()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Dalkovan Encampment", "Land", oracleText: DalkovanOracle, colors: "");
+        var land = new Land("Dalkovan Encampment", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+
+        // The {2}{W}, {T} attack-rider ability — the only ActivatedAbility (the
+        // {T}: Add {W} line is a ManaAbility).
+        var ability = live.Abilities.OfType<ActivatedAbility>().Single();
+        ability.Costs.OfType<ManaCostCost>().Should().ContainSingle();
+
+        // No attack-rider trigger registered yet (the activated ability installs
+        // it only on resolution).
+        var triggers = facade.Triggers;
+
+        // Activate: resolve the ability ⇒ install the this-turn attack trigger
+        // with the live TriggerManager.
+        foreach (var e in ability.Effects) e.Execute();
+
+        var warriorsBefore = alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Count(c => c.Name == "Warrior");
+
+        // A creature you control is declared as an attacker (CR 508.1f) ⇒ the
+        // installed "whenever you attack this turn" trigger fires.
+        var attacker = new Creature("Bear", "{1}{G}", 2, 2);
+        attacker.SetOwner(alice);
+        attacker.SetController(alice);
+        alice.Zones.Battlefield.AddCard(attacker);
+        attacker.SetZone(ZoneType.Battlefield);
+
+        triggers.EvaluateTriggers(
+            new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(attacker, facade.Bob));
+        triggers.PendingCount.Should().Be(1,
+            "a creature Alice controls attacked while the rider is live");
+
+        // Drain the pending trigger onto the stack and resolve it (CR 603.3).
+        await triggers.PutPendingTriggersOnStackAsync(
+            alice, new Dictionary<Player, IPlayerAgent>(), Ctx(facade));
+        while (facade.LiveStack.Pop() is { } obj)
+            await obj.ResolveAsync(null, Ctx(facade));
+
+        var warriors = alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Where(c => c.Name == "Warrior").ToList();
+        warriors.Count.Should().Be(warriorsBefore + 2, "two 1/1 red Warriors per attack");
+        warriors.Should().OnlyContain(w => w.IsToken && w.Power == 1 && w.Toughness == 1);
+        warriors.Should().OnlyContain(w =>
+            w.GetEffectiveColors().Contains(Majik.Core.ValueObjects.ManaColor.Red));
+    }
+
     [Fact(Skip = "Channel is a discard-this-card-from-HAND activation, not a {T} battlefield activation. " +
                  "No binder-reachable 'discard this card to activate' cost seam exists, so the whole " +
                  "Channel family (Boseiju Who Endures, Otawara, Takenuma, Eiganjo, Sokenzan) is deferred " +

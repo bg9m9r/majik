@@ -100,6 +100,15 @@ public class CombatValidator
             return false;
         }
 
+        // Intrinsic "can't block" restriction (CR 509.1a) — a printed / granted
+        // "This creature can't block." static (e.g. Mirrex's Phyrexian Mite token
+        // with its quoted "This token can't block."). Distinct from the per-turn
+        // effect-installed CannotBlock restriction checked below.
+        if (CombatAbilities.HasCantBlock(creature))
+        {
+            return false;
+        }
+
         // Creature must be able to block flying if attacker has flying (Rule 509.1d)
         if (CombatAbilities.HasFlying(attacker.Creature) && !CombatAbilities.CanBlockFlying(creature))
         {
