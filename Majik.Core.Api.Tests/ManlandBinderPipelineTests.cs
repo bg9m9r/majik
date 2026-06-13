@@ -448,6 +448,214 @@ public class ManlandBinderPipelineTests
         cc.Subtypes.Should().Contain(CardSubtype.Bird);
     }
 
+    // -----------------------------------------------------------------------
+    // Remaining targeted / defender-capturing Restless triggers, end-to-end
+    // through the prod binder chain (close manland-targeted-restless-triggers).
+    // -----------------------------------------------------------------------
+
+    // Faithful to Scryfall oracle text (Wilds of Eldraine "Restless" cycle).
+    private const string RestlessRidgelineOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {R} or {G}.\n" +
+        "{2}{R}{G}: This land becomes a 3/4 red and green Dinosaur creature " +
+        "until end of turn. It's still a land.\n" +
+        "Whenever this land attacks, another target attacking creature gets " +
+        "+2/+0 until end of turn. Untap that creature.";
+
+    [Fact]
+    public void Prod_RestlessRidgeline_AttackTrigger_PumpsAndUntapsTheAgentChosenCreature()
+    {
+        // "another target attacking creature gets +2/+0 until end of turn.
+        // Untap that creature." — 1..1 target over OTHER creatures. Binds in
+        // prod with a real TargetRequest; resolution affects the AGENT'S pick.
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Ridgeline", "Land", oracleText: RestlessRidgelineOracle, colors: "R,G");
+        var land = new Land("Restless Ridgeline", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var first = new Creature("Bear A", "{G}", 2, 2, null, new[] { CardSubtype.Bear });
+        var second = new Creature("Bear B", "{G}", 2, 2, null, new[] { CardSubtype.Bear });
+        foreach (var c in new[] { first, second })
+        {
+            c.SetOwner(alice); c.SetController(alice);
+            alice.Zones.Battlefield.AddCard(c); c.SetZone(ZoneType.Battlefield);
+        }
+        second.Tap(); // tapped (attacking) — the trigger should untap it.
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the targeted pump+untap trigger is bound in prod").Subject;
+        trigger.TargetRequests.Should().ContainSingle()
+            .Which.Description.Should().Be("another target attacking creature");
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { second });
+        CollectAndExecute(trigger, Ctx(facade), agent);
+
+        facade.ContinuousEffects.Compute(second).Power.Should().Be(4,
+            "the AGENT-CHOSEN creature gets +2/+0");
+        second.IsTapped.Should().BeFalse("the chosen creature is untapped");
+        facade.ContinuousEffects.Compute(first).Power.Should().Be(2,
+            "the non-chosen creature is untouched (not first-eligible)");
+    }
+
+    private const string RestlessVinestalkOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {G} or {U}.\n" +
+        "{3}{G}{U}: Until end of turn, this land becomes a 5/5 green and blue " +
+        "Plant creature with trample. It's still a land.\n" +
+        "Whenever this land attacks, up to one other target creature has base " +
+        "power and toughness 3/3 until end of turn.";
+
+    [Fact]
+    public void Prod_RestlessVinestalk_AttackTrigger_SetsBasePTOnAgentChosenCreature()
+    {
+        // "up to one other target creature has base power and toughness 3/3
+        // until end of turn." — 0..1 target over OTHER creatures. Binds in
+        // prod; resolution set-bases the AGENT'S pick to 3/3 (CR 613.7b).
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Vinestalk", "Land", oracleText: RestlessVinestalkOracle, colors: "G,U");
+        var land = new Land("Restless Vinestalk", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var hill = new Creature("Hill Giant", "{3}{G}", 3, 3, null, new[] { CardSubtype.Giant });
+        var grizzly = new Creature("Grizzly", "{1}{G}", 7, 7, null, new[] { CardSubtype.Bear });
+        foreach (var c in new[] { hill, grizzly })
+        {
+            c.SetOwner(alice); c.SetController(alice);
+            alice.Zones.Battlefield.AddCard(c); c.SetZone(ZoneType.Battlefield);
+        }
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the up-to-one set-base-P/T trigger is bound in prod").Subject;
+        trigger.TargetRequests.Should().ContainSingle()
+            .Which.MinTargets.Should().Be(0, "it is \"up to one\"");
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { grizzly });
+        CollectAndExecute(trigger, Ctx(facade), agent);
+
+        var gc = facade.ContinuousEffects.Compute(grizzly)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        gc.Power.Should().Be(3, "the AGENT-CHOSEN creature's base P/T becomes 3/3");
+        gc.Toughness.Should().Be(3);
+        facade.ContinuousEffects.Compute(hill).Power.Should().Be(3,
+            "the non-chosen creature keeps its printed 3/3 (untouched)");
+    }
+
+    private const string RestlessCottageOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {B} or {G}.\n" +
+        "{2}{B}{G}: This land becomes a 4/4 black and green Horror creature " +
+        "until end of turn. It's still a land.\n" +
+        "Whenever this land attacks, create a Food token and exile up to one " +
+        "target card from a graveyard.";
+
+    [Fact]
+    public void Prod_RestlessCottage_AttackTrigger_FoodPlusExilesAgentChosenGraveyardCard()
+    {
+        // "create a Food token, then exile up to one target card from a
+        // graveyard." — Food is unconditional; the exile is the 0..1 target.
+        // Binds in prod; resolution mints Food + exiles the AGENT'S pick.
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Cottage", "Land", oracleText: RestlessCottageOracle, colors: "B,G");
+        var land = new Land("Restless Cottage", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        var bob = facade.Bob;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Two cards in Bob's graveyard — the agent picks the second to exile.
+        var gy1 = new Creature("Goblin", "{R}", 1, 1, null, new[] { CardSubtype.Goblin });
+        var gy2 = new Creature("Wizard", "{U}", 1, 1, null, new[] { CardSubtype.Wizard });
+        foreach (var c in new[] { gy1, gy2 })
+        {
+            c.SetOwner(bob);
+            bob.Zones.Graveyard.AddCard(c); c.SetZone(ZoneType.Graveyard);
+        }
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the Food+exile trigger is bound in prod").Subject;
+        trigger.TargetRequests.Should().ContainSingle()
+            .Which.MinTargets.Should().Be(0, "the exile is \"up to one\"");
+
+        var foodBefore = alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Food");
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { gy2 });
+        CollectAndExecute(trigger, Ctx(facade), agent);
+
+        alice.Zones.Battlefield.GetCards().Count(c => c.Name == "Food")
+            .Should().Be(foodBefore + 1, "the Food token is created unconditionally");
+        gy2.Zone.Should().Be(ZoneType.Exile, "the AGENT-CHOSEN graveyard card is exiled");
+        gy1.Zone.Should().Be(ZoneType.Graveyard, "the non-chosen card stays in the graveyard");
+    }
+
+    private const string RestlessFortressOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {W} or {B}.\n" +
+        "{2}{W}{B}: This land becomes a 1/4 white and black Nightmare creature " +
+        "until end of turn. It's still a land.\n" +
+        "Whenever this land attacks, defending player loses 2 life and you " +
+        "gain 2 life.";
+
+    [Fact]
+    public void Prod_RestlessFortress_DefenderDrain_CapturesDefenderOffCreatureAttacksEvent()
+    {
+        // The headline of the manland-targeted-restless-triggers deferral:
+        // Fortress's drain captures the defending player off the live
+        // CreatureAttacksEvent (CR 506.2) — non-targeted. Verify the trigger
+        // binds through the prod binder chain (NOT the [CardName] factory,
+        // which is land-dead) and, once its condition observes the event,
+        // drains the captured defender and the controller gains.
+        var repo = new FakeCardRepo();
+        repo.Add("Restless Fortress", "Land", oracleText: RestlessFortressOracle, colors: "W,B");
+        var land = new Land("Restless Fortress", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        var bob = facade.Bob;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the defender-drain trigger is bound in prod").Subject;
+        trigger.TargetRequests.Should().BeEmpty(
+            "the drain is non-targeted — the defender is captured off the event");
+
+        var aliceBefore = alice.LifeTotal;
+        var bobBefore = bob.LifeTotal;
+
+        // CR 506.2 — the binder's EventTriggerCondition captures the defending
+        // player off the live CreatureAttacksEvent as a SIDE EFFECT when the
+        // condition runs (same posture as RestlessFortressFactory's unit test).
+        // CreatureAttacksEvent.Attacker is typed Creature, so the unit-level
+        // event carries a dummy Creature in the attacker slot; the capture of
+        // the defender (Bob) is what resolution reads. (Live combat firing the
+        // event with the animated land itself as attacker rides the broader
+        // "a Land instance is never a Creature" combat-integration gap shared
+        // by EVERY Restless attack trigger — out of scope here; the BINDING +
+        // defender capture + drain are what this prod-path test asserts.)
+        var dummyAttacker = new Creature("dummy", "{0}", 1, 1);
+        var ev = new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(
+            attacker: dummyAttacker, defendingPlayerOrPlaneswalker: bob);
+        trigger.Condition.Matches(ev, trigger);
+
+        foreach (var e in trigger.Effects) e.Execute();
+
+        bob.LifeTotal.Should().Be(bobBefore - 2,
+            "the captured defending player loses 2 life");
+        alice.LifeTotal.Should().Be(aliceBefore + 2, "you gain 2 life");
+    }
+
     [Fact]
     public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
     {
