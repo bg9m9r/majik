@@ -133,6 +133,58 @@ public class PriorityLoopLandDropTests
     }
 
     [Fact]
+    public async Task PlayLand_FromExile_HarnfelGrant_EntersBattlefield_AndConsumesDrop()
+    {
+        // CR 305.2 — Harnfel, Horn of Bounty ("you may play those cards this
+        // turn") on an exiled LAND stamps a runtime exile land-play grant. The
+        // land is PLAYED, not cast, from the Exile zone. This proves the FULL
+        // live path: an exiled land carrying the grant, proposed as a
+        // PlayLand by an agent, is executed by the PriorityLoop straight from
+        // Exile onto the battlefield (ZoneService.MoveCardToAsync moves it from
+        // whatever zone it occupies) and still spends the one CR 305.2 land
+        // drop. The agent-enumeration surface (PlayableLandsFromExile) +
+        // the grant stamp are unit-covered elsewhere; this closes the
+        // execution half — the loop actually plays the exiled land.
+        var land = (Card)NamedCardFactory.Create("Mountain", _alice);
+        _alice.Zones.Exile.AddCard(land);
+        land.SetZone(ZoneType.Exile);
+
+        // Stamp the land-play half of Harnfel's "this turn" permission.
+        Majik.Core.Keywords.ExilePlayPermission.GrantUntil(
+            land, _alice, land.ManaCostValue,
+            Majik.Core.Keywords.ExilePlayExpiry.EndOfTurn);
+
+        Majik.Core.Keywords.ExilePlayPermission.PlayableLandsFromExile(_alice)
+            .Should().ContainSingle().Which.Should().BeSameAs(land,
+                "the exiled land surfaces as a legal land drop from exile");
+
+        var tracker = new LandDropTracker();
+
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueuePriority(new PriorityAction.PlayLand(land));
+        aliceAgent.QueuePriority(PriorityAction.Pass);
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueuePriority(PriorityAction.Pass);
+        bobAgent.QueuePriority(PriorityAction.Pass);
+
+        var loop = new PriorityLoop(
+            new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
+            new Dictionary<Player, IPlayerAgent>
+            { [_alice] = aliceAgent, [_bob] = bobAgent },
+            () => 1, () => StepStateType.PreCombatMain, tracker);
+
+        await loop.RunUntilRoundEndsAsync(_alice);
+
+        land.Zone.Should().Be(ZoneType.Battlefield,
+            "the exiled land is played from Exile onto the battlefield");
+        _alice.Zones.Exile.GetCards().Should().NotContain(land,
+            "playing it from exile removes it from the exile zone");
+        _alice.Zones.Battlefield.GetCards().Should().Contain(land);
+        tracker.DropsUsedThisTurn(_alice).Should().Be(1,
+            "playing a land from exile still consumes the CR 305.2 land drop");
+    }
+
+    [Fact]
     public void Ctor_NullLandDropTracker_Throws()
     {
         // CR 305.2 — the per-turn one-land cap is engine-level and unconditional.
