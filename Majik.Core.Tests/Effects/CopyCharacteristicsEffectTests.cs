@@ -339,6 +339,82 @@ public class CopyCharacteristicsEffectTests
     }
 
     [Fact]
+    public void Copy_OntoCreature_SurfacesCopiedManaValueThroughEffectiveManaValue()
+    {
+        var svc = new ContinuousEffectsService();
+        var copier = new Creature("Clone", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        // Source mana value 6 ({4}{W}{W}); the clone's printed mana value is 4
+        // ({3}{U}). CR 202.3b / 707.2 — mana value is derived from the (copied)
+        // mana cost, so the EFFECTIVE mana value must report the source's 6.
+        var bigCreature = new Creature("Serra Angel", "{4}{W}{W}", 4, 4);
+
+        svc.Register(new CopyCharacteristicsEffect(copier, bigCreature));
+
+        copier.ManaCostValue.TotalValue.Should().Be(4,
+            "the printed mana value is immutable (CR 707.2 records the copy in the layer system)");
+        copier.GetEffectiveManaValue().Should().Be(6,
+            "the effective mana value is derived from the copied {4}{W}{W} cost");
+    }
+
+    [Fact]
+    public void EffectiveManaValue_WithoutCopy_FallsBackToPrintedManaValue()
+    {
+        var svc = new ContinuousEffectsService();
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+
+        bear.GetEffectiveManaValue().Should().Be(2);
+    }
+
+    [Fact]
+    public void EffectiveManaValue_WithNullActiveEffects_FallsBackToPrintedManaValue()
+    {
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.GetEffectiveManaValue().Should().Be(2);
+    }
+
+    [Fact]
+    public void ManaValueTargetFilter_ReadsCopiedManaValue_OnBattlefieldClone()
+    {
+        var svc = new ContinuousEffectsService();
+        // A printed mana value 2 creature ({1}{G}) on the battlefield.
+        var clone = new Creature("Grizzly Bears", "{1}{G}", 2, 2)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+
+        // Before the copy: printed mana value 2 — does NOT satisfy
+        // "permanent with mana value 4 or greater".
+        Majik.Core.CardData.Definitions.TargetFilters
+            .Matches("permanent_mana_value_ge_4", clone)
+            .Should().BeFalse();
+
+        // CR 707.2 — becomes a copy of a mana value 6 creature ({4}{W}{W}).
+        var bigCreature = new Creature("Serra Angel", "{4}{W}{W}", 4, 4);
+        svc.Register(new CopyCharacteristicsEffect(clone, bigCreature));
+
+        // Now the effective mana value is 6, so the filter matches — the call
+        // site reads the EFFECTIVE (copied) mana value, not the printed {1}{G}.
+        Majik.Core.CardData.Definitions.TargetFilters
+            .Matches("permanent_mana_value_ge_4", clone)
+            .Should().BeTrue("the clone's effective mana value (6) satisfies the filter");
+    }
+
+    [Fact]
     public void EffectiveName_WithoutCopy_FallsBackToPrintedName()
     {
         var svc = new ContinuousEffectsService();

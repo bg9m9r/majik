@@ -168,7 +168,10 @@ public static class BileBlightFactory
         if (resolved is not Creature target) return;
         if (target.Zone != ZoneType.Battlefield) return;
 
-        var targetName = target.Name;
+        // CR 201.2 / 707.2 — same-name matching reads the EFFECTIVE name so a
+        // clone of the target (whose printed Card.Name differs but whose copied
+        // identity matches) is swept in. Mirrors Izzet Staticaster (#2475).
+        var targetName = target.GetEffectiveName();
 
         // CR 201.2 — collect every creature (target included) whose name
         // matches, across every battlefield, controller-agnostic. Snapshot
@@ -178,7 +181,7 @@ public static class BileBlightFactory
         var toAffect = allPlayers
             .SelectMany(pl => pl.Zones.Battlefield.GetCards())
             .OfType<Creature>()
-            .Where(c => string.Equals(c.Name, targetName, StringComparison.Ordinal))
+            .Where(c => string.Equals(c.GetEffectiveName(), targetName, StringComparison.Ordinal))
             .ToList();
 
         foreach (var creature in toAffect)

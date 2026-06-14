@@ -180,7 +180,9 @@ public static class EchoingTruthFactory
         if (target.Zone != ZoneType.Battlefield) return;
         if (target.HasType(CardType.Land)) return;
 
-        var targetName = target.Name;
+        // CR 201.2 / 707.2 — same-name matching reads the EFFECTIVE name so a
+        // clone of the target is bounced too. Mirrors Izzet Staticaster (#2475).
+        var targetName = target.GetEffectiveName();
 
         // CR 201.2 — collect every permanent (target included) whose name
         // matches, across every battlefield, controller-agnostic. Snapshot
@@ -189,7 +191,7 @@ public static class EchoingTruthFactory
         var toBounce = allPlayers
             .SelectMany(pl => pl.Zones.Battlefield.GetCards())
             .OfType<Permanent>()
-            .Where(perm => string.Equals(perm.Name, targetName, StringComparison.Ordinal))
+            .Where(perm => string.Equals(perm.GetEffectiveName(), targetName, StringComparison.Ordinal))
             .ToList();
 
         foreach (var perm in toBounce)
