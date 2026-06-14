@@ -1,0 +1,9 @@
+{
+  "name": "Hostile Investigator",
+  "types": ["Creature"],
+  "subtypes": ["Ogre", "Rogue", "Detective"],
+  "manaCost": "{3}{B}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
