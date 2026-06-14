@@ -3,8 +3,11 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -83,7 +86,28 @@ public static class CatharCommandoFactory
     /// single "{1}, sacrifice: destroy target artifact or enchantment"
     /// activated ability.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> + the
+    /// resolve-path <c>SacrificeSelf</c> fallback so the sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -108,7 +132,7 @@ public static class CatharCommandoFactory
             $"{CardName}: sacrifice self + destroy target artifact/enchantment",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
 
                 if (sacAbility == null
                     || sacAbility.ChosenTargets.Count == 0
@@ -138,7 +162,7 @@ public static class CatharCommandoFactory
             costs: new ICost[]
             {
                 new ManaCostCost(ActivationManaCost),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]
@@ -163,9 +187,16 @@ public static class CatharCommandoFactory
     /// <see cref="AdditionalCost.Pay"/> sacrifice path is a no-op stub, so the
     /// effect closure performs the zone move directly.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);

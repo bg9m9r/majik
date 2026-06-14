@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -73,7 +75,28 @@ public static class GoblinCratermakerFactory
     /// attached; the activating player chooses which to use at activation
     /// time.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into BOTH modes' self-sacrifice <see cref="AdditionalCost"/> +
+    /// the resolve-path <c>SacrificeSelf</c> fallback so the sacrifice
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null
+    /// preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -104,7 +127,7 @@ public static class GoblinCratermakerFactory
                     Fx.DealDamage(target, DamageAmount);
                 }
 
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
             });
 
         damageAbility = new ActivatedAbility(
@@ -113,7 +136,7 @@ public static class GoblinCratermakerFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{1}"),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { damageEffect },
             targetRequests: new[]
@@ -148,7 +171,7 @@ public static class GoblinCratermakerFactory
                     Fx.MoveToGraveyard(target, ZoneMoveReason.Destroy);
                 }
 
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
             });
 
         destroyAbility = new ActivatedAbility(
@@ -157,7 +180,7 @@ public static class GoblinCratermakerFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{1}"),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { destroyEffect },
             targetRequests: new[]
@@ -190,12 +213,23 @@ public static class GoblinCratermakerFactory
     /// <summary>
     /// Move <paramref name="cratermaker"/> from the battlefield to its
     /// owner's graveyard. Idempotent — no-op if already off the
-    /// battlefield. Mirrors the closure used by Pyrite / Aether / Nihil
-    /// Spellbomb's sac-self effects.
+    /// battlefield. When <paramref name="eventBus"/> is supplied (prod
+    /// effects-aware build) the move routes through
+    /// <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>, publishing a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). In the live
+    /// activation path the cost already moved + published, so this no-ops
+    /// (single publish either way). Null bus = bare owner-routed move.
     /// </summary>
-    private static void SacrificeSelf(Creature cratermaker, Player owner)
+    private static void SacrificeSelf(Creature cratermaker, Player owner, IEventBus? eventBus)
     {
         if (cratermaker.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(cratermaker, cratermaker.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(cratermaker);
         owner.Zones.Graveyard.AddCard(cratermaker);
         cratermaker.SetZone(ZoneType.Graveyard);

@@ -3,7 +3,10 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -72,7 +75,19 @@ public static class EngineeredExplosivesFactory
     /// Suitable for shape / dispatcher tests.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, xValueProvider: null);
+        Create(owner, xValueProvider: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, xValueProvider: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Engineered Explosives. When <paramref name="xValueProvider"/>
@@ -87,7 +102,20 @@ public static class EngineeredExplosivesFactory
     /// </summary>
     public static Artifact Create(
         Player owner,
-        Func<int>? xValueProvider)
+        Func<int>? xValueProvider) =>
+        Create(owner, xValueProvider, eventBus: null);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> + the
+    /// resolve-path sweep closure so the sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(
+        Player owner,
+        Func<int>? xValueProvider,
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -148,12 +176,24 @@ public static class EngineeredExplosivesFactory
                 var target = card.Counters.Count(CounterType.Charge);
 
                 // Sacrifice payment is a no-op stub — move EE to graveyard
-                // here so SBAs + visible state line up.
+                // here so SBAs + visible state line up. When a bus is wired
+                // (prod effects-aware build) route through Fx.Sacrifice so the
+                // resolve-only dispatcher/test path publishes
+                // PermanentSacrificedEvent (CR 701.16a); the live activation
+                // path already moved + published via the sac cost, so this
+                // no-ops there (single publish either way).
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    owner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(card);
+                        owner.Zones.Graveyard.AddCard(card);
+                        card.SetZone(ZoneType.Graveyard);
+                    }
                 }
 
                 // "Each nonland permanent" — across every player's battlefield,
@@ -193,7 +233,7 @@ public static class EngineeredExplosivesFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{2}"),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sweepEffect });
 

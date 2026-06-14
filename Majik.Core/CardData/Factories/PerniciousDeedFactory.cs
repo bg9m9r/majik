@@ -2,7 +2,10 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -66,7 +69,19 @@ public static class PerniciousDeedFactory
     /// path can't know X — see <paramref name="xValueProvider"/> deferral).
     /// </summary>
     public static Enchantment Create(Player owner) =>
-        Create(owner, xValueProvider: null);
+        Create(owner, xValueProvider: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Enchantment Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, xValueProvider: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Pernicious Deed. When <paramref name="xValueProvider"/>
@@ -80,7 +95,20 @@ public static class PerniciousDeedFactory
     /// </summary>
     public static Enchantment Create(
         Player owner,
-        Func<int>? xValueProvider)
+        Func<int>? xValueProvider) =>
+        Create(owner, xValueProvider, eventBus: null);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> + the
+    /// resolve-path sweep closure so the sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Enchantment Create(
+        Player owner,
+        Func<int>? xValueProvider,
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -114,12 +142,24 @@ public static class PerniciousDeedFactory
 
                 // Sacrifice payment is a no-op stub — move Pernicious
                 // Deed to its owner's graveyard here so SBAs + visible
-                // state line up with CR 701.16.
+                // state line up with CR 701.16. When a bus is wired (prod
+                // effects-aware build) route through Fx.Sacrifice so the
+                // resolve-only dispatcher/test path publishes
+                // PermanentSacrificedEvent (CR 701.16a); the live activation
+                // path already moved + published via the sac cost, so this
+                // no-ops there (single publish either way).
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    owner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(card);
+                        owner.Zones.Graveyard.AddCard(card);
+                        card.SetZone(ZoneType.Graveyard);
+                    }
                 }
 
                 // "Each artifact, creature, and enchantment" — across every
@@ -170,7 +210,7 @@ public static class PerniciousDeedFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{X}"),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sweepEffect });
 
