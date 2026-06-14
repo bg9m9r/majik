@@ -307,6 +307,48 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 603.1 + CR 701.16 + CR 109.5 — "Whenever an opponent sacrifices
+    /// a [type] permanent, …" trigger. Fires on the dedicated
+    /// <see cref="PermanentSacrificedEvent"/> (published by the bus-aware
+    /// sacrifice paths — cost / edict / land-binder / token self-sac) when
+    /// the <see cref="PermanentSacrificedEvent.SacrificingPlayer"/> is NOT
+    /// <paramref name="controller"/> (every other player in the game is an
+    /// opponent — CR 102.1). The opponent-scoped mirror of a "whenever you
+    /// sacrifice …" clause; this is the producer-side primitive the
+    /// Blood-Artist-on-opponent-sac / It-That-Betrays / Vengeful-Tracker
+    /// payoff family consumes.
+    ///
+    /// <para>
+    /// When <paramref name="ofType"/> is supplied the sacrificed permanent
+    /// must have that card type ("sacrifices an <b>artifact</b>" — Vengeful
+    /// Tracker; "sacrifices a <b>creature</b>" — Blood Artist-on-opponent
+    /// shape). When null any permanent type matches ("sacrifices a
+    /// permanent"). The card type is read off the sacrificed card's
+    /// last-known types (it is already in its owner's graveyard by the time
+    /// the event publishes, CR 701.16a — but card-type membership is a
+    /// printed/characteristic property, not zone-dependent).
+    /// </para>
+    ///
+    /// <para>
+    /// This predicate does NOT filter on
+    /// <see cref="PermanentSacrificedEvent.WasToken"/> — "an opponent
+    /// sacrifices an artifact/permanent" fires on a token just the same
+    /// (Vengeful Tracker, Blood Artist). A "nontoken permanent" clause (It
+    /// That Betrays — which must pull the card back out of the graveyard,
+    /// impossible for a token per CR 111.7) adds that filter on top of this
+    /// predicate.
+    /// </para>
+    /// </summary>
+    public static ITriggerCondition OnOpponentSacrifices(
+        Player controller, CardType? ofType = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        return new EventTriggerCondition<PermanentSacrificedEvent>((e, _) =>
+            !ReferenceEquals(e.SacrificingPlayer, controller)
+            && (ofType is null || e.SacrificedCard.HasType(ofType.Value)));
+    }
+
+    /// <summary>
     /// CR 121 / CR 603.6 — "Whenever one or more +1/+1 counters are put on a
     /// permanent you control, …" trigger. Fires on
     /// <see cref="CounterAddedEvent"/> where the event's

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -81,6 +82,55 @@ public class TriggersTests
     public void OnEnterBattlefieldSelf_NullSource_Throws()
     {
         var act = () => Triggers.OnEnterBattlefieldSelf(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ------------------------------------------------------------------
+    // OnOpponentSacrifices — CR 603.1 + CR 701.16 + CR 109.5. The
+    // controller-gated "whenever an opponent sacrifices …" predicate over
+    // the dedicated PermanentSacrificedEvent (the Blood-Artist-on-opponent-
+    // sac / Vengeful-Tracker payoff family).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void OnOpponentSacrifices_MatchesOpponentNotController()
+    {
+        var cond = Triggers.OnOpponentSacrifices(_alice);
+
+        var oppPerm = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = _bob };
+        var ownPerm = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = _alice };
+
+        // Bob (an opponent of Alice) sacrifices — matches.
+        cond.Matches(new PermanentSacrificedEvent(oppPerm, _bob, wasToken: false), _ability.Object)
+            .Should().BeTrue("Bob is an opponent of the controller (Alice)");
+
+        // Alice (the controller) sacrifices her own — does NOT match.
+        cond.Matches(new PermanentSacrificedEvent(ownPerm, _alice, wasToken: false), _ability.Object)
+            .Should().BeFalse("the controller's own sacrifice is not 'an opponent sacrifices'");
+    }
+
+    [Fact]
+    public void OnOpponentSacrifices_WithTypeFilter_MatchesOnlyThatType()
+    {
+        // "Whenever an opponent sacrifices an artifact" (Vengeful Tracker).
+        var cond = Triggers.OnOpponentSacrifices(_alice, CardType.Artifact);
+
+        var artifact = new Artifact("Bottle Cap", "1") { Owner = _bob };
+        var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = _bob };
+
+        cond.Matches(new PermanentSacrificedEvent(artifact, _bob, wasToken: false), _ability.Object)
+            .Should().BeTrue("an opponent sacrificed an artifact");
+        cond.Matches(new PermanentSacrificedEvent(creature, _bob, wasToken: false), _ability.Object)
+            .Should().BeFalse("a creature is not an artifact");
+        cond.Matches(new PermanentSacrificedEvent(artifact, _alice, wasToken: false), _ability.Object)
+            .Should().BeFalse("the controller's own artifact sacrifice does not fire 'an opponent sacrifices'");
+    }
+
+    [Fact]
+    public void OnOpponentSacrifices_NullController_Throws()
+    {
+        var act = () => Triggers.OnOpponentSacrifices(null!);
 
         act.Should().Throw<ArgumentNullException>();
     }
