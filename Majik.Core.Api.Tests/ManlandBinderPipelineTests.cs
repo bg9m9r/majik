@@ -1053,6 +1053,126 @@ public class ManlandBinderPipelineTests
         cc.Colors.Should().Contain(Majik.Core.ValueObjects.ManaColor.Green);
     }
 
+    // -----------------------------------------------------------------------
+    // GRANTED QUOTED ACTIVATED ABILITY ON ANIMATE (close
+    // granted-quoted-ability-on-animate). The animate line carries a granted
+    // quoted ACTIVATED ability — "with \"{X}: …\"" — that previously dropped
+    // (no granted-activated-on-animate primitive reachable from the binder).
+    // Two shapes now bind on animate: firebreathing (Lavaclaw Reaches) and the
+    // P/T switch (Wandering Fumarole).
+    // -----------------------------------------------------------------------
+
+    private const string LavaclawReachesOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {B} or {R}.\n" +
+        "{1}{B}{R}: Until end of turn, this land becomes a 2/2 black and red " +
+        "Elemental creature with \"{X}: This creature gets +X/+0 until end of " +
+        "turn.\" It's still a land.";
+
+    [Fact]
+    public async Task Prod_LavaclawReaches_Animate_GrantsFirebreathingActivatedAbility()
+    {
+        // The quoted "{X}: This creature gets +X/+0 until end of turn"
+        // firebreathing ability binds on animate (CR 508.1f / 613.1f). Before
+        // animating the land has only the {1}{B}{R} animate ability + the mana
+        // abilities; after animating, a {X}-cost activated ability is granted to
+        // the body, and resolving it with X=3 pumps the body to 5/2.
+        var repo = new FakeCardRepo();
+        repo.Add("Lavaclaw Reaches", "Land", oracleText: LavaclawReachesOracle, colors: "B,R");
+        var land = new Land("Lavaclaw Reaches", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        // 2/2 black-and-red Elemental, still a land.
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(2);
+        cc.Toughness.Should().Be(2);
+        cc.Subtypes.Should().Contain(CardSubtype.Elemental);
+
+        // The granted firebreathing activated ability now exists on the land
+        // (a new ActivatedAbility that is NOT the animate ability and has no
+        // mana-cost {B}{R} signature — its cost is {X}).
+        var granted = live.Abilities.OfType<ActivatedAbility>()
+            .Where(a => !ReferenceEquals(a, animate))
+            .ToList();
+        granted.Should().ContainSingle("the {X} firebreathing ability is granted on animate");
+
+        // Resolving the granted ability with X=3 pumps the body to 5/2.
+        var fire = granted.Single();
+        var rctx = ResolutionContext.For(alice, agent: null, game: null, chosenTargets: null, chosenX: 3);
+        foreach (var e in fire.Effects)
+            await e.ExecuteAsync(rctx);
+
+        var cc2 = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc2.Power.Should().Be(5, "firebreathing +X/+0 with X=3 → 2+3 = 5 power");
+        cc2.Toughness.Should().Be(2, "toughness unchanged by +X/+0");
+
+        // CR 514.2 — animate + firebreathing pump expire at cleanup; the land
+        // reverts (no Creature type) and the granted ability is revoked.
+        facade.ContinuousEffects.ExpireEndOfTurn();
+        facade.ContinuousEffects.Compute((Permanent)land).Types
+            .Should().NotContain(CardType.Creature, "animation expires at end of turn");
+        live.Abilities.OfType<ActivatedAbility>()
+            .Where(a => !ReferenceEquals(a, animate))
+            .Should().BeEmpty("the granted firebreathing ability is revoked at end of turn (CR 613.6e)");
+    }
+
+    private const string WanderingFumaroleOracle =
+        "This land enters tapped.\n" +
+        "{T}: Add {U} or {R}.\n" +
+        "{2}{U}{R}: Until end of turn, this land becomes a 1/4 blue and red " +
+        "Elemental creature with \"{0}: Switch this creature's power and " +
+        "toughness until end of turn.\" It's still a land.";
+
+    [Fact]
+    public void Prod_WanderingFumarole_Animate_GrantsSwitchPTActivatedAbility()
+    {
+        // The quoted "{0}: Switch this creature's power and toughness until end
+        // of turn" ability binds on animate (CR 508.1f / 613.1f). Body is 1/4;
+        // resolving the granted {0} ability switches it to 4/1.
+        var repo = new FakeCardRepo();
+        repo.Add("Wandering Fumarole", "Land", oracleText: WanderingFumaroleOracle, colors: "U,R");
+        var land = new Land("Wandering Fumarole", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Power.Should().Be(1);
+        cc.Toughness.Should().Be(4);
+        cc.Subtypes.Should().Contain(CardSubtype.Elemental);
+
+        var granted = live.Abilities.OfType<ActivatedAbility>()
+            .Where(a => !ReferenceEquals(a, animate))
+            .ToList();
+        granted.Should().ContainSingle("the {0} switch-P/T ability is granted on animate");
+
+        // Resolving the granted {0} ability switches the body to 4/1.
+        var switchAbility = granted.Single();
+        foreach (var e in switchAbility.Effects) e.Execute();
+
+        var cc2 = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc2.Power.Should().Be(4, "switch swaps 1/4 → 4/1");
+        cc2.Toughness.Should().Be(1);
+    }
+
     [Fact]
     public void Prod_RestlessReef_AttackTrigger_NoAgent_IsCleanNoOp()
     {

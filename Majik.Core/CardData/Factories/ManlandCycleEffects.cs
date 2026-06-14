@@ -209,3 +209,114 @@ public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
         => new ManlandCycleBecomesPTEffect(
             clonedSource, NewPower, NewToughness, ExpiresAtEndOfTurn);
 }
+
+/// <summary>
+/// Manland cycle — a <b>granted activated ability's</b> resolution: Layer 7c
+/// <c>+P/+0</c> firebreathing pump keyed to the animated <see cref="Permanent"/>
+/// (not a <see cref="Creature"/> instance). Lavaclaw Reaches animates with the
+/// granted quoted ability <c>"{X}: This creature gets +X/+0 until end of turn."</c>;
+/// resolving it registers this effect with <c>p = X</c> (CR 613.7c, EOT expiry
+/// per CR 514.2).
+///
+/// <para><b>Why a Permanent-keyed pump (not <see cref="PumpUntilEndOfTurnEffect"/>).</b>
+/// A manland stays a <see cref="Land"/> runtime instance while animated (the
+/// engine never re-instances it as a <see cref="Creature"/>), so a pump keyed
+/// by reference to a <see cref="Creature"/> would never match. This effect
+/// overrides <see cref="AppliesTo(Permanent)"/> by reference to the land, and
+/// writes to the <see cref="CreatureCharacteristics"/> the service produces once
+/// <see cref="ContinuousEffectsService.Compute(Permanent)"/> upgrades the
+/// animated Land to a creature row (CR 613.1c) — the same shim posture as
+/// <see cref="ManlandCycleBecomesPTEffect"/>.</para>
+/// </summary>
+public sealed class ManlandCyclePumpEffect : ContinuousEffect
+{
+    private readonly Permanent _target;
+    private readonly int _power;
+    private readonly int _toughness;
+
+    public ManlandCyclePumpEffect(Permanent target, int power, int toughness)
+    {
+        _target = target ?? throw new ArgumentNullException(nameof(target));
+        _power = power;
+        _toughness = toughness;
+    }
+
+    /// <summary>The +power granted (firebreathing X).</summary>
+    public int Power => _power;
+
+    /// <summary>The +toughness granted (0 for firebreathing).</summary>
+    public int Toughness => _toughness;
+
+    public override Layer Layer => Layer.PT_Modify;
+
+    public override Permanent? Source => _target;
+
+    public override bool IsActive() =>
+        _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
+
+    public override bool ExpiresAtEndOfTurn => true;
+
+    public override bool AppliesTo(Creature creature) => ReferenceEquals(creature, _target);
+
+    public override bool AppliesTo(Permanent permanent) => ReferenceEquals(permanent, _target);
+
+    public override void Apply(CreatureCharacteristics chars)
+    {
+        chars.Power += _power;
+        chars.Toughness += _toughness;
+    }
+
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        // preserves: Power, Toughness; target → clonedSource.
+        => new ManlandCyclePumpEffect(clonedSource, _power, _toughness);
+}
+
+/// <summary>
+/// Manland cycle — a <b>granted activated ability's</b> resolution: Layer 7d
+/// P/T switch keyed to the animated <see cref="Permanent"/> (not a
+/// <see cref="Creature"/> instance). Wandering Fumarole animates with the
+/// granted quoted ability <c>"{0}: Switch this creature's power and toughness
+/// until end of turn."</c>; resolving it registers this effect (CR 613.7d,
+/// applies last within layer 7; EOT expiry per CR 514.2).
+///
+/// <para>Permanent-keyed for the same reason as
+/// <see cref="ManlandCyclePumpEffect"/>: the animated manland is a
+/// <see cref="Land"/> runtime instance, so a switch keyed by reference to a
+/// <see cref="Creature"/> (the existing <see cref="SwitchPTEffect"/>) would
+/// never match the land's creature row.</para>
+/// </summary>
+public sealed class ManlandCycleSwitchPTEffect : ContinuousEffect
+{
+    private readonly Permanent _target;
+
+    public ManlandCycleSwitchPTEffect(Permanent target)
+    {
+        _target = target ?? throw new ArgumentNullException(nameof(target));
+    }
+
+    public override Layer Layer => Layer.PT_Switch;
+
+    public override Permanent? Source => _target;
+
+    public override bool IsActive() =>
+        _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
+
+    public override bool ExpiresAtEndOfTurn => true;
+
+    public override bool AppliesTo(Creature creature) => ReferenceEquals(creature, _target);
+
+    public override bool AppliesTo(Permanent permanent) => ReferenceEquals(permanent, _target);
+
+    public override void Apply(CreatureCharacteristics chars)
+    {
+        (chars.Power, chars.Toughness) = (chars.Toughness, chars.Power);
+    }
+
+    internal override ContinuousEffect? CloneForSim(
+        Permanent clonedSource,
+        System.Func<System.Collections.Generic.IReadOnlyList<Majik.Core.Players.Player>>? clonedPlayers)
+        // preserves: nothing beyond the target reference; target → clonedSource.
+        => new ManlandCycleSwitchPTEffect(clonedSource);
+}

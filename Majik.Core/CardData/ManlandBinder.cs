@@ -61,6 +61,14 @@ namespace Majik.Core.CardData;
 ///     (Restless Spire) — bound flatly as a First Strike keyword on animate
 ///     (the body only exists during the controller's turn, so the qualifier is
 ///     observationally always-true; matches RestlessSpireFactory).</item>
+///   <item><b>Quoted granted ACTIVATED ability "with \"{cost}: &lt;effect&gt;\""</b>
+///     — registered at animate-resolution via a <see cref="GrantAbilityEffect"/>
+///     (CR 613.1f; revoked when the animation lifts per CR 613.6e). Bound
+///     bodies (<see cref="ParseQuotedActivatedAbility"/>): firebreathing
+///     <c>"{X}: This creature gets +X/+0 until end of turn."</c> (Lavaclaw
+///     Reaches — the +X reads <see cref="ResolutionContext.ChosenX"/>) and
+///     <c>"{0}: Switch this creature's power and toughness until end of turn."</c>
+///     (Wandering Fumarole). Unrecognised bodies still defer.</item>
 /// </list>
 /// </para>
 ///
@@ -85,10 +93,6 @@ namespace Majik.Core.CardData;
 /// <para><b>Deferred (per-card riders this generic binder does NOT bind).</b>
 /// See v1-deferrals + the per-pattern comments below:
 /// <list type="bullet">
-///   <item>Animate riders carrying a <b>granted quoted ACTIVATED ability</b>
-///     ("with \"{X}: …\"") — Lavaclaw Reaches, Wandering Fumarole (firebreathing
-///     pump). The N/N body + simple keywords still bind; the granted activated
-///     ability is dropped (no granted-activated-on-animate primitive).</item>
 ///   <item>A "Put counters … Then you may have it become …" preamble
 ///     (Crawling Barrens) — the animate is conditional on a prior counter
 ///     step.</item>
@@ -340,6 +344,13 @@ public static class ManlandBinder
         }
         var grantedAttackQuote = ParseQuotedAttackTrigger(rest, land, controller, triggers);
 
+        // CR 613.1f — granted quoted ACTIVATED ability ("with \"{X}: …\"").
+        // Two firebreathing-family shapes bind (Lavaclaw Reaches, Wandering
+        // Fumarole); the rest defer. Registered at animate-resolution via a
+        // GrantAbilityEffect so it is revoked when the animation expires
+        // (CR 613.6e). Returns null when no such quoted activated rider exists.
+        var grantedActivatedQuote = ParseQuotedActivatedAbility(rest, land, controller, effects);
+
         var costText = m.Groups["cost"].Value;
 
         // The animate effect re-uses the cycle's shared continuous-effect
@@ -405,6 +416,12 @@ public static class ManlandBinder
             // until-EOT grant (the land can't attack once it's no longer a
             // creature). Mirrors RagingRavineFactory / DenOfTheBugbearFactory.
             grantedAttackQuote?.Invoke();
+
+            // CR 613.1f — granted quoted ACTIVATED ability on animate. Same
+            // animate-resolution timing as the granted attack trigger; the
+            // GrantAbilityEffect attaches the parsed activated ability to the
+            // animated body and revokes it when the animation lifts.
+            grantedActivatedQuote?.Invoke();
             return ValueTask.CompletedTask;
         };
 
@@ -1148,6 +1165,119 @@ public static class ManlandBinder
         // Unrecognised quoted attack-trigger body — defer (body + simple
         // keywords still animate). Recorded in v1-deferrals.
         return null;
+    }
+
+    // A quoted granted ACTIVATED ability — "{cost}: <effect>." (CR 602 /
+    // 613.1f). The cost is a mana-cost token sequence ({0}, {X}, {1}{R}, …);
+    // the effect body is parsed in code for the firebreathing-family shapes.
+    private static readonly Regex QuotedActivatedAbility = new(
+        "\"\\s*(?<cost>(?:\\{[^}]+\\})+)\\s*:\\s*(?<effect>[^\"]*?)\\.?\\s*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "This creature gets +X/+0 until end of turn." — firebreathing (the +X
+    // ties to the {X} cost; Lavaclaw Reaches). Also matches a fixed "+N/+0".
+    private static readonly Regex FirebreathingBody = new(
+        @"^this creature gets \+(?<p>x|\d+)/\+0(?: until end of turn)?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Switch this creature's power and toughness until end of turn."
+    // (Wandering Fumarole).
+    private static readonly Regex SwitchPTBody = new(
+        @"^switch this creature's power and toughness(?: until end of turn)?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Recognise a quoted granted ACTIVATED ability ("with \"{cost}: …\"") in
+    /// the animate remainder and return an action that, when invoked at
+    /// animate-resolution, registers a <see cref="GrantAbilityEffect"/>
+    /// (CR 613.1f, Layer 6) attaching the parsed <see cref="ActivatedAbility"/>
+    /// to the animated body for the animation's duration (revoked at end of
+    /// turn per CR 613.6e). Returns null for an unrecognised body (deferred —
+    /// the N/N body + simple keywords still animate). Bound effect bodies:
+    /// <list type="bullet">
+    ///   <item><b>"{X}: This creature gets +X/+0 until end of turn."</b> —
+    ///     firebreathing (Lavaclaw Reaches). The granted ability's resolution
+    ///     reads the X paid from <see cref="ResolutionContext.ChosenX"/>
+    ///     (GAP 2 per-activation X ledger) and registers a Layer-7c +X/+0 pump
+    ///     keyed to the animated land permanent.</item>
+    ///   <item><b>"{0}: Switch this creature's power and toughness until end of
+    ///     turn."</b> — the P/T switch (Wandering Fumarole). Resolution
+    ///     registers a Layer-7d switch keyed to the land permanent.</item>
+    /// </list>
+    /// </summary>
+    private static Action? ParseQuotedActivatedAbility(
+        string rest, Land land, Player controller, ContinuousEffectsService effects)
+    {
+        if (string.IsNullOrWhiteSpace(rest)) return null;
+        var qm = QuotedActivatedAbility.Match(rest);
+        if (!qm.Success) return null;
+
+        var costText = qm.Groups["cost"].Value.Trim();
+        var effectText = qm.Groups["effect"].Value.Trim();
+
+        // --- firebreathing "{X}: This creature gets +X/+0 until EOT" ---------
+        var fb = FirebreathingBody.Match(effectText);
+        if (fb.Success)
+        {
+            var isXPump = fb.Groups["p"].Value.Equals("x", StringComparison.OrdinalIgnoreCase);
+            var fixedPump = isXPump ? 0 : int.Parse(fb.Groups["p"].Value);
+            return () => RegisterGrantedActivated(
+                land, controller, effects, costText,
+                resolve: ctx =>
+                {
+                    if (land.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                    // CR 107.3 — the +X ties to the same {X} paid for the
+                    // ability; read it from the per-activation X ledger.
+                    var amount = isXPump ? Math.Max(0, ctx.ChosenX ?? 0) : fixedPump;
+                    if (amount == 0) return ValueTask.CompletedTask;
+                    effects.Register(new Majik.Core.CardData.Factories.ManlandCyclePumpEffect(
+                        land, amount, 0));
+                    return ValueTask.CompletedTask;
+                });
+        }
+
+        // --- "{0}: Switch this creature's power and toughness until EOT" -----
+        if (SwitchPTBody.IsMatch(effectText))
+        {
+            return () => RegisterGrantedActivated(
+                land, controller, effects, costText,
+                resolve: _ =>
+                {
+                    if (land.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                    effects.Register(new Majik.Core.CardData.Factories.ManlandCycleSwitchPTEffect(land));
+                    return ValueTask.CompletedTask;
+                });
+        }
+
+        // Unrecognised quoted activated-ability body — defer (body + simple
+        // keywords still animate). Recorded in v1-deferrals.
+        return null;
+    }
+
+    /// <summary>
+    /// Register a <see cref="GrantAbilityEffect"/> (EOT-expiring) that grants
+    /// the animated <paramref name="land"/> a quoted activated ability with the
+    /// given mana <paramref name="costText"/> and a one-shot resolution body.
+    /// The grant is revoked when the animation lifts (CR 613.6e).
+    /// </summary>
+    private static void RegisterGrantedActivated(
+        Land land, Player controller, ContinuousEffectsService effects,
+        string costText, Func<ResolutionContext, ValueTask> resolve)
+    {
+        effects.Register(new GrantAbilityEffect(
+            source: land,
+            targetSelector: () => land,
+            abilityFactory: bearer => new ActivatedAbility(
+                source: bearer,
+                controller: controller,
+                costs: new ICost[] { new ManaCostCost(costText) },
+                effects: new IEffect[]
+                {
+                    new Effect(
+                        $"{land.Name}: granted \"{costText}: …\" (CR 613.1f)",
+                        resolve),
+                }),
+            expiresAtEndOfTurn: true));
     }
 
     /// <summary>
