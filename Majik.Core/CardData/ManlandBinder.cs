@@ -118,11 +118,14 @@ namespace Majik.Core.CardData;
 ///     count-linked token rider has no generic primitive yet; deferred.</item>
 ///   <item><b>Earthbend</b> (Ba Sing Se) — "{2}{G}, {T}: Earthbend 2. Activate
 ///     only as a sorcery." is a fundamentally different shape: it does NOT
-///     animate THIS land — it targets ANOTHER land you control (becomes a 0/0
-///     creature with haste, gets two +1/+1 counters, and a "when it dies or is
-///     exiled, return it tapped" delayed trigger). The AnimateLine regex keys on
-///     "this land becomes …", so Earthbend never matches here; it needs a
-///     target-a-land + counters + delayed-return primitive of its own. Deferred.</item>
+///     animate THIS land — it targets ANOTHER land you control. The AnimateLine
+///     regex keys on "this land becomes …", so Earthbend never matches HERE.
+///     NOW BOUND in <see cref="LandActivatedAbilityBinder"/> instead (the prod
+///     binder for generic utility-land activated abilities): a sorcery-speed
+///     "target land you control" activated ability routing to the shared
+///     <see cref="Majik.Core.Keywords.EarthbendAction"/> primitive (animate to a
+///     0/0 creature with haste that's still a land, two +1/+1 counters, and the
+///     one-shot "when it dies or is exiled, return it tapped" delayed trigger).</item>
 /// </list>
 /// </para>
 ///
