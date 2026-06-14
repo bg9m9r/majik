@@ -211,10 +211,12 @@ public class EmptyTheWarrensTests
         var evt = new SpellCastEvent(spell);
         storm.Condition.Matches(evt, storm).Should().BeTrue();
 
-        // SpellCopier.PushCopyOfTopSpell re-executes the original effect
-        // list per copy; observable contract is 3 copies × 2 + original
-        // 2 = 8 tokens.
+        // SpellCopier.PushCopyOfTopSpell pushes each copy as a distinct stack
+        // object (CR 706.10a); draining the stack resolves them (then they
+        // cease to exist, CR 707.10c). Observable contract is 3 copies × 2 +
+        // original 2 = 8 tokens.
         foreach (var e in storm.Effects) e.Execute();
+        new Majik.Core.Services.StackResolver().ResolveAll(stack);
         foreach (var e in spell.Effects) e.Execute();
 
         _alice.Zones.Battlefield.GetCards().OfType<Creature>()

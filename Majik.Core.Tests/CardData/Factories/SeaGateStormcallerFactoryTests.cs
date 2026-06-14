@@ -117,7 +117,9 @@ public class SeaGateStormcallerFactoryTests
         triggers.PendingCount.Should().Be(1, "delayed trigger fired on the qualifying instant cast");
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        // The copy trigger pushes a distinct copy stack object (CR 706.10a);
+        // draining the stack resolves it (then it ceases to exist, CR 707.10c).
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
         count[0].Should().Be(1, "unkicked Stormcaller copies the spell once (CR 707.10)");
     }
@@ -141,7 +143,9 @@ public class SeaGateStormcallerFactoryTests
 
         bus.Publish(new SpellCastEvent(spell));
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        // Kicked → the trigger pushes TWO distinct copy stack objects; drain
+        // the stack to resolve both (CR 706.10a / 707.10c).
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
         count[0].Should().Be(2, "kicked Stormcaller copies the spell twice (CR 707.10)");
     }
@@ -165,7 +169,9 @@ public class SeaGateStormcallerFactoryTests
         bus.Publish(new SpellCastEvent(spell));
         triggers.PendingCount.Should().Be(1, "MV-2 sorcery qualifies");
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        // copyCount:2 → two distinct copy stack objects pushed; drain both
+        // (CR 706.10a / 707.10c).
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
         box[0].Should().Be(2);
     }

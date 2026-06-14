@@ -231,6 +231,23 @@ public class Spell : ISpell
     /// </summary>
     public bool CannotBeCountered { get; set; }
 
+    /// <summary>
+    /// CR 707.10 / 706.10a — "a copy of a spell". A copy is itself a spell
+    /// placed on the stack (so it is a distinct <see cref="IStackObject"/>),
+    /// but it has NO card in any zone — its <see cref="Card"/> is the snapshot
+    /// of the copied spell's characteristics shared with the original. When a
+    /// copy finishes resolving (or otherwise leaves the stack) it ceases to
+    /// exist as a state-based action (CR 707.10c / CR 110.5g): it is NOT moved
+    /// to a graveyard / battlefield. <see cref="Majik.Core.Services.StackResolver"/>
+    /// reads this flag to skip the post-resolution zone move so a copy never
+    /// drags the original card (which is still on the stack or already in
+    /// another zone) anywhere — the original is left exactly where it was.
+    ///
+    /// Constructed by <see cref="Majik.Core.Services.SpellCopier"/>; defaults
+    /// to <c>false</c> so a normally-cast spell resolves into a zone as usual.
+    /// </summary>
+    public bool IsCopy { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)

@@ -78,6 +78,9 @@ public class SpellCopierTargetsTests
         var spell = BuildTargetedSpell(_alice, target: _bob, hits);
 
         SpellCopier.PushCopyOfTopSpell(stack, spell);
+        // The copy is now a distinct stack object (CR 706.10a); drain the
+        // stack so it resolves (then ceases to exist, CR 707.10c).
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
         // The copy must resolve against the ORIGINAL spell's chosen target
         // (CR 707.10a — targets reused verbatim in the v1 stub), NOT an empty
@@ -101,6 +104,7 @@ public class SpellCopierTargetsTests
             effects: new IEffect[] { new Effect("count", () => ran++) });
 
         SpellCopier.PushCopyOfTopSpell(stack, spell);
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
         ran.Should().Be(1, "untargeted copy still re-runs its effects once");
     }

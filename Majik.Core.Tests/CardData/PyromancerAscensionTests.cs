@@ -254,10 +254,11 @@ public class PyromancerAscensionTests
     [Fact]
     public void CopyTrigger_PushesCopy_ReExecutesSpellEffects()
     {
+        var stack = new Majik.Core.Stack.Stack();
         var p = PyromancerAscensionFactory.Create(
             _alice,
             triggers: null,
-            stack: new Majik.Core.Stack.Stack());
+            stack: stack);
         p.SetZone(ZoneType.Battlefield);
         Majik.Core.Primitives.Fx.PlaceCounter(p, CounterType.Quest, 2);
 
@@ -277,9 +278,12 @@ public class PyromancerAscensionTests
         var evt = new SpellCastEvent(spell);
         copyTrigger.Condition.Matches(evt, copyTrigger).Should().BeTrue();
 
-        // Resolve original + copy.
+        // Resolve original + copy. The copy trigger pushes a distinct copy
+        // stack object (CR 706.10a); draining the stack resolves it (then it
+        // ceases to exist, CR 707.10c).
         foreach (var e in spell.Effects) e.Execute();
         foreach (var e in copyTrigger.Effects) e.Execute();
+        new Majik.Core.Services.StackResolver().ResolveAll(stack);
 
         ticks.Should().Be(2,
             "the original spell + the Ascension copy each execute the tick effect once");

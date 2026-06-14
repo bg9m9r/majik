@@ -234,12 +234,13 @@ public class BrainFreezeTests
         var evt = new SpellCastEvent(spell);
         stormTrigger.Condition.Matches(evt, stormTrigger).Should().BeTrue();
 
-        // Resolve order in v1: SpellCopier.PushCopyOfTopSpell re-executes
-        // the original spell's effect list in place, then the original
-        // spell resolves normally. Either order yields the same observable
-        // mill total since each copy is independent and the target is
-        // pinned to Bob.
+        // SpellCopier.PushCopyOfTopSpell now pushes each copy as a distinct
+        // stack object (CR 706.10a); the storm trigger's effect runs, putting
+        // 3 copies on the stack. Drain the stack so each copy resolves (and
+        // then ceases to exist, CR 707.10c), then resolve the original's
+        // effects. Each copy is independent and pinned to Bob.
         foreach (var e in stormTrigger.Effects) e.Execute();
+        new Majik.Core.Services.StackResolver().ResolveAll(stack);
         foreach (var e in spell.Effects) e.Execute();
 
         // 3 copies × mill 3 + original mill 3 = 12.

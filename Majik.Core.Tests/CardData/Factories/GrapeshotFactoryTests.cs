@@ -220,8 +220,11 @@ public class GrapeshotFactoryTests
         var evt = new SpellCastEvent(spell);
         stormTrigger.Condition.Matches(evt, stormTrigger).Should().BeTrue();
 
-        // Resolve storm (5 copies each dealing 1) then original (1).
+        // Resolve storm (5 copies each dealing 1) then original (1). Each copy
+        // is now a distinct stack object (CR 706.10a); drain the stack to
+        // resolve them (then they cease to exist, CR 707.10c).
         foreach (var e in stormTrigger.Effects) e.Execute();
+        new Majik.Core.Services.StackResolver().ResolveAll(stack);
         foreach (var e in spell.Effects) e.Execute();
 
         _bob.LifeTotal.Should().Be(14,

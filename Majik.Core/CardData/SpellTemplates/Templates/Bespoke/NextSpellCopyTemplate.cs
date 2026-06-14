@@ -26,9 +26,9 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Bespoke;
 ///   we don't want Doublecast to copy itself).
 /// - When the trigger fires it calls
 ///   <see cref="SpellCopier.PushCopyOfTopSpell"/> with the just-cast
-///   spell. v1 is a lossy stub — see <see cref="SpellCopier"/> for the
-///   list of gaps (no real stack object, no retargeting, simultaneous
-///   resolution).
+///   spell, which puts a distinct copy stack object on the stack
+///   (CR 706.10a) that resolves and then ceases to exist (CR 707.10c).
+///   The residual gap is retargeting — see <see cref="SpellCopier"/>.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>"You may choose new targets for the copy"</b>: the v1 copier reuses
