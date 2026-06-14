@@ -381,6 +381,83 @@ public class ManaPaymentResolverTests
         payment.Sources.Should().Contain(solRing);
     }
 
+    [Fact]
+    public void TryAutoSelectSources_MultiColoredSource_CoversTwoColoredPips_WithOneTap()
+    {
+        // CR 605 / 106.1c — a source whose mana ability adds {G}{G} (two of the
+        // SAME color) covers BOTH colored pips of {G}{G} with a single tap.
+        // The colored-selection loop previously picked one source per colored
+        // UNIT (symmetric to the generic over-select residual (c)): the first
+        // {G} grabbed the {G}{G} source, then the second {G} found no OTHER
+        // unused green source → auto-select FAILED for a payable cost
+        // (under-select). Per-source per-color accounting must subtract the
+        // {G}{G} source's full green yield before looking for the next source.
+        var dualGreen = MakeMultiColorSource("GG");
+        OnBattlefield(dualGreen);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("GG"), out var payment);
+
+        ok.Should().BeTrue("a single {G}{G} source covers both green pips (CR 605)");
+        payment.Sources.Should().ContainSingle().Which.Should().BeSameAs(dualGreen);
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_MultiColoredSource_DoesNotOverSelectExtraColorSource()
+    {
+        // A {G}{G} source covers both green pips of {G}{G}; a spare Forest must
+        // NOT also be tapped. Pre-fix the per-unit colored loop grabbed the
+        // {G}{G} source for the first pip then the spare Forest for the second,
+        // tapping two sources and floating the surplus green (cosmetic
+        // tap-waste — the colored analogue of the generic residual (c)).
+        var dualGreen = MakeMultiColorSource("GG");
+        var spare = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(dualGreen, spare);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("GG"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().ContainSingle()
+            .Which.Should().BeSameAs(dualGreen);
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_MultiColoredSource_CoversColoredThenGeneric()
+    {
+        // A {G}{G} source has surplus after one {G} pip; the leftover green
+        // pays a generic unit too (CR 106.1c — generic accepts any mana). {1}{G}
+        // is therefore covered by the single {G}{G} source — no second tap.
+        var dualGreen = MakeMultiColorSource("GG");
+        var spare = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(dualGreen, spare);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("1G"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().ContainSingle()
+            .Which.Should().BeSameAs(dualGreen);
+    }
+
+    /// <summary>Build a battlefield permanent whose single mana ability adds the
+    /// parsed multi-mana amount (e.g. "GG" → "{T}: Add {G}{G}"), for exercising
+    /// the multi-color auto-select packing. Uses a plain Forest shell + an
+    /// explicit <see cref="ManaAbility"/> so the produced amount is fixed.</summary>
+    private ICard MakeMultiColorSource(string amount)
+    {
+        var card = NamedCardFactory.Create("Forest", _alice);
+        var concrete = (Permanent)card;
+        // Replace the printed single-G ability with the multi-mana one so
+        // EffectiveManaAbilities.For sees exactly one ability producing `amount`.
+        foreach (var existing in concrete.Abilities.OfType<ManaAbility>().ToList())
+        {
+            concrete.RemoveAbility(existing);
+        }
+        concrete.AddAbility(new ManaAbility(concrete, _alice, ManaCost.Parse(amount)));
+        return card;
+    }
+
     private void OnBattlefield(params ICard[] cards)
     {
         foreach (var c in cards)
