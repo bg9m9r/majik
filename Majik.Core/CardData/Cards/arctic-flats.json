@@ -1,0 +1,9 @@
+{
+  "name": "Arctic Flats",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
