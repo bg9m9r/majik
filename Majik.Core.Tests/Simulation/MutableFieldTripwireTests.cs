@@ -107,6 +107,7 @@ public sealed class MutableFieldTripwireTests
             "_hasSummoningSickness",    // COPIED (_hasSummoningSickness = src._hasSummoningSickness)
             "_imprintedCards",          // SKIPPED-DEFER: List<ICard> ref-bearing — Task 5/6 deferred
             "_isTapped",                // COPIED (_isTapped = src._isTapped)
+            "_markedDamage",            // COPIED (_markedDamage = src._markedDamage — Permanent-level combat-body marked damage; inert on Creature, which overrides MarkedDamage)
             "_regenerationShields",     // COPIED (_regenerationShields = src._regenerationShields)
             "_transientLoyalty",        // COPIED (_transientLoyalty = src._transientLoyalty)
 
@@ -120,6 +121,7 @@ public sealed class MutableFieldTripwireTests
             "IsFaceDown",               // COPIED (IsFaceDown = src.IsFaceDown)
             "IsToken",                  // COPIED (IsToken = src.IsToken)
             "LoyaltyAbilityActivatedThisTurn", // COPIED (LoyaltyAbilityActivatedThisTurn = src.LoyaltyAbilityActivatedThisTurn)
+            "MarkedForDestructionByDeathtouch", // COPIED (MarkedForDestructionByDeathtouch = src.MarkedForDestructionByDeathtouch — virtual; Creature overrides with its own backing field)
             "SagaState",                // SKIPPED-DEFER: complex attached tracker — Task 6 deferred
             "WasDealtDamageThisTurn",   // COPIED (WasDealtDamageThisTurn = src.WasDealtDamageThisTurn)
         },

@@ -25,7 +25,70 @@ public sealed class CreatureDeathCheck : IStateBasedActionCheck
         {
             if (TryDestroyCreature(creatures[i], ctx)) anyExecuted = true;
         }
+
+        // CR 613.1c / 704.5f / 711 — an animated NON-creature C# instance (a
+        // manland: a Land computing as a creature via a Layer-4 type grant; a
+        // Karn-animated artifact) is NOT in ctx.Creatures (it's not a Creature
+        // instance) but IS effectively a creature, so the lethal-damage /
+        // 0-toughness destroy SBA must reach it too. It carries its combat body
+        // through the lifted Permanent-level surface (GetEffectiveToughness /
+        // MarkedDamage / HasLethalMarkedDamage). Scan permanents that are
+        // effectively-but-not-instance creatures; real Creatures are handled
+        // above, and a permanent carrying a loyalty body (a planeswalker) is
+        // governed by the planeswalker-death SBA, not this one.
+        var permanents = ctx.Permanents;
+        for (var i = 0; i < permanents.Count; i++)
+        {
+            var perm = permanents[i];
+            if (perm is Creature) continue;
+            if (perm.IsEffectivePlaneswalker()) continue;
+            if (!perm.IsEffectivelyCreature()) continue;
+            if (TryDestroyEffectiveCreaturePermanent(perm, ctx)) anyExecuted = true;
+        }
+
         return anyExecuted;
+    }
+
+    /// <summary>CR 704.5f / 711 — destroy an animated NON-creature permanent
+    /// (a manland / animated artifact computing as a creature) that has lethal
+    /// marked damage or 0 effective toughness, reading the lifted
+    /// <see cref="Permanent"/>-level combat-body surface. Mirrors
+    /// <see cref="TryDestroyCreature"/> for the non-Creature case. Returns true
+    /// when the SBA actually fired.</summary>
+    private static bool TryDestroyEffectiveCreaturePermanent(Permanent perm, SbaContext ctx)
+    {
+        if (perm.Zone != ZoneType.Battlefield) return false;
+        // CR 702.12 — indestructible (intrinsic layer-granted OR externally
+        // granted) resists the destroy SBA. The intrinsic check reads the
+        // layer-computed keyword set directly (CombatAbilities.HasIndestructible
+        // is Creature-typed; this permanent is a non-Creature instance).
+        if (perm.ActiveEffects != null &&
+            perm.ActiveEffects.Compute(perm).Keywords.Contains("Indestructible")) return false;
+        if (Majik.Core.Rules.IndestructibleGrantRegistry.HasGrantedIndestructible(perm)) return false;
+
+        // CR 704.5f — a creature with toughness 0 dies; with lethal marked
+        // damage (or deathtouch-marked) dies. HasLethalMarkedDamage folds in the
+        // deathtouch flag; the explicit 0-toughness check covers an animated
+        // body whose set-base toughness is 0 (no damage needed).
+        var zeroToughness = perm.GetEffectiveToughness() <= 0;
+        var dies = zeroToughness || perm.HasLethalMarkedDamage();
+        if (!dies) return false;
+
+        if (ctx.Replacements != null)
+        {
+            var result = ctx.Replacements.Apply(new DestroyIntent(perm));
+            if (result == null)
+            {
+                perm.MarkedForDestructionByDeathtouch = false;
+                return false;
+            }
+        }
+
+        if (ctx.ZoneService != null) ctx.ZoneService.MoveCardTo(perm, ZoneType.Graveyard);
+        else perm.SetZone(ZoneType.Graveyard);
+
+        ctx.EventBus?.Publish(new StateBasedActionExecutedEvent($"Creature {perm.Name} died"));
+        return true;
     }
 
     /// <summary>CR 704.5f / 702.12 / 613.1f — destroy <paramref name="creature"/>

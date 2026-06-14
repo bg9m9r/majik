@@ -217,8 +217,38 @@ public class Creature : Permanent
     /// CR 702.2b — set by combat when a deathtouch source deals nonzero
     /// damage to this creature. The SBA pass uses this as a synonym for
     /// "lethal damage marked." Cleared in cleanup along with Damage.
+    /// Overrides the <see cref="Permanent"/>-level field with the creature's own
+    /// authoritative store (single source of truth — see the combat-body surface
+    /// on <see cref="Permanent"/>).
     /// </summary>
-    public bool MarkedForDestructionByDeathtouch { get; set; }
+    public override bool MarkedForDestructionByDeathtouch { get; set; }
+
+    // -----------------------------------------------------------------------
+    // Permanent-level combat-body surface (CR 119 / 613 / 704.5f) — a real
+    // Creature routes every member to its own authoritative Power/Toughness/
+    // Damage fields so the lifted Permanent surface is inert on it (mirrors how
+    // Planeswalker overrides the transient-loyalty surface). An animated
+    // non-Creature instance uses the Permanent defaults instead.
+    // -----------------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public override int GetEffectivePower() => Power;
+
+    /// <inheritdoc/>
+    public override int GetEffectiveToughness() => Toughness;
+
+    /// <inheritdoc/>
+    public override int MarkedDamage => Damage;
+
+    /// <inheritdoc/>
+    public override void MarkDamage(int amount) => TakeDamage(amount);
+
+    /// <inheritdoc/>
+    public override void ClearMarkedDamage()
+    {
+        ClearDamage();
+        MarkedForDestructionByDeathtouch = false;
+    }
 
     /// <summary>CR 903.3 — flagged if this creature is its controller's
     /// commander. Combat damage from a commander is tracked per-opponent
