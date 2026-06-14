@@ -215,6 +215,63 @@ public class YawgmothTests
     }
 
     // -----------------------------------------------------------------------
+    // RE-SOURCE-SAFE (agatha-oracle-shape-yawgmoth-pay-life-counter-pump-loop):
+    // the activated ability reads its source/controller off the live
+    // ResolutionContext, so it is marked RebindSafe and Agatha's Soul Cauldron
+    // can re-home the REAL ability (including its multi-leg pay-life +
+    // sacrifice-another cost) to a bearer.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Yawgmoth_Ability_IsRebindSafe()
+    {
+        var yawg = YawgmothFactory.Create(_alice);
+        var ab = yawg.Abilities.OfType<ActivatedAbility>().Single();
+
+        ab.RebindSafe.Should().BeTrue(
+            "every effect reads ResolutionContext.Source / Controller, so the "
+            + "ability is sound to re-home via RebindTo (CR 707.2)");
+    }
+
+    [Fact]
+    public void Yawgmoth_RebindTo_RehomesSacrificeAnotherCost_ExcludesNewSource()
+    {
+        // The multi-leg cost wrinkle: SacrificeAnotherCreatureCost captures the
+        // ability's source ("another creature" = a creature OTHER than the
+        // source). After RebindTo(newSource), the rebound cost must exclude the
+        // NEW source, not the original Yawgmoth.
+        var bob = new Player("Bob", 20);
+        var yawg = YawgmothFactory.Create(_alice);
+        var ab = yawg.Abilities.OfType<ActivatedAbility>().Single();
+
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bearer);
+
+        var rebound = ab.RebindTo(bearer, bob);
+
+        var reboundSac = rebound.Costs.OfType<SacrificeAnotherCreatureCost>().Single();
+
+        // The bearer (the new source) is the ONLY creature on Bob's battlefield;
+        // "sacrifice another creature" must therefore find NOTHING — the rebound
+        // cost excludes the bearer, proving its captured source was re-homed.
+        reboundSac.EligibleSacrifices(bob).Should().BeEmpty(
+            "the re-homed sacrifice-another cost excludes the NEW source (bearer)");
+        reboundSac.CanPay(bob).Should().BeFalse(
+            "with only the bearer on the battlefield there is no OTHER creature to sacrifice");
+
+        // The pay-1-life leg passes through unchanged (it captures no permanent).
+        rebound.Costs.OfType<AdditionalCost>()
+            .Should().Contain(c => c.Description.Contains("1 life"),
+                "the pay-life leg survives the rebind");
+
+        // Provenance preserved.
+        rebound.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        rebound.Source.Should().BeSameAs(bearer);
+    }
+
+    // -----------------------------------------------------------------------
     // PROD-PATH: GameFacade routed build wires the activated ability
     // -----------------------------------------------------------------------
 
