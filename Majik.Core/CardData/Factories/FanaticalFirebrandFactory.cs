@@ -70,6 +70,28 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Fx.DealDamageAny"/> route silently no-ops on a creature
 ///   no longer on the battlefield (lethal-damage check requires zone =
 ///   battlefield), matching real-card behaviour.
+///
+/// ## Re-sourceable (fanatical-firebrand-sac-self-pinger-rebind)
+///
+/// The ability is marked <see cref="ActivatedAbility.RebindSafe"/> = true so
+/// Agatha's Soul Cauldron's group-grant can re-home the ENTIRE
+/// "{T}, Sacrifice this creature: it deals 1 damage to any target"
+/// sac-self-pinger (the Mogg Fanatic class) onto each counter-bearing
+/// creature via <see cref="ActivatedAbility.RebindTo"/> (CR 707.2 / 613.1f):
+/// <list type="bullet">
+///   <item>STAGE 1 re-homes the source-capturing <see cref="AdditionalCost.Tap"/>
+///     + <see cref="AdditionalCost.Sacrifice"/> costs to the new bearer via
+///     <see cref="AdditionalCost.RebindSource"/>, so the rebound ability taps +
+///     sacrifices the bearer, not the original Firebrand.</item>
+///   <item>The resolution closure reads the live
+///     <see cref="ResolutionContext.Source"/> (the ability's own source at
+///     resolution = the new bearer after a rebind) for BOTH the sacrifice and
+///     the "it deals 1 damage" damage source, and reads
+///     <see cref="ResolutionContext.ChosenTargets"/> for the any-target —
+///     never capturing the original <c>card</c> except on the context-less
+///     legacy sync fallback (<see cref="ResolutionContext.Legacy"/>, Source
+///     null). Mirrors the migrated Skithiryx / Mortivore regenerate batch.</item>
+/// </list>
 /// </summary>
 [CardName("Fanatical Firebrand")]
 public static class FanaticalFirebrandFactory
@@ -130,39 +152,51 @@ public static class FanaticalFirebrandFactory
         // the effect closure because the generic AdditionalCost.Sacrifice
         // payment is a no-op stub (mirrors Pyrite Spellbomb).
         // ----------------------------------------------------------------
-        ActivatedAbility? pingAbility = null;
+        // RE-SOURCE-SAFE (fanatical-firebrand-sac-self-pinger-rebind): the
+        // closure reads the live ResolutionContext.Source (the ability's own
+        // source at resolution — the new bearer after an Agatha RebindTo)
+        // rather than capturing `card`, falling back to `card` only on the
+        // context-less legacy sync path (ResolutionContext.Legacy, Source null).
+        // Both the sacrifice and the "it deals 1 damage" source re-home; the
+        // any-target is read off ctx.ChosenTargets so a rebound copy uses ITS
+        // chosen target. Mirrors the migrated Skithiryx / Mortivore batch.
         var pingEffect = new Effect(
             $"{CardName}: 1 damage to any target + sac self",
-            () =>
+            ctx =>
             {
-                // Sacrifice payment — battlefield → owner's graveyard.
+                var subject = (ctx.Source as Permanent) ?? card;
+
+                // Sacrifice payment — battlefield → controller's graveyard.
                 // CR 701.16 — idempotent guard against stale activations.
                 // Sac BEFORE the damage so the "it deals 1 damage" source
-                // is the Firebrand on its way to the graveyard; for the
-                // damage-receiving-target check this doesn't matter
-                // (Fx.DealDamageAny only inspects the target), but the
-                // zone-state semantics line up with CR 117.5 (last-known-
-                // information on a card that's left the battlefield).
-                if (card.Zone == ZoneType.Battlefield)
+                // is the (last-known-information) creature on its way to the
+                // graveyard (CR 117.5). For the damage-receiving-target check
+                // this doesn't matter (Fx.DealDamageAny only inspects the
+                // target), but the zone-state semantics line up.
+                if (subject.Zone == ZoneType.Battlefield)
                 {
                     // CR 701.16a — route the resolve-closure sacrifice through
                     // the bus-aware Fx.Sacrifice overload when a bus is wired so
                     // PermanentSacrificedEvent fires; bus-less = move only.
-                    var controller = card.Controller ?? owner;
-                    if (eventBus != null) Fx.Sacrifice(card, controller, eventBus);
-                    else Fx.Sacrifice(card);
+                    var controller = subject.Controller ?? owner;
+                    if (eventBus != null) Fx.Sacrifice(subject, controller, eventBus);
+                    else Fx.Sacrifice(subject);
                 }
 
-                if (pingAbility != null
-                    && pingAbility.ChosenTargets.Count > 0
-                    && pingAbility.ChosenTargets[0].Count > 0)
+                if (ctx.ChosenTargets.Count > 0
+                    && ctx.ChosenTargets[0].Count > 0)
                 {
-                    var target = pingAbility.ChosenTargets[0][0];
-                    Fx.DealDamageAny(target, PingDamage);
+                    var target = ctx.ChosenTargets[0][0];
+                    // CR 119.3 — the damage's source is the (last-known) subject
+                    // creature; pass it so source-aware damage hooks attribute
+                    // correctly after a rebind.
+                    Fx.DealDamageAny(target, PingDamage, subject as Creature);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
-        pingAbility = new ActivatedAbility(
+        var pingAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -178,7 +212,8 @@ public static class FanaticalFirebrandFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>()),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(pingAbility);
 

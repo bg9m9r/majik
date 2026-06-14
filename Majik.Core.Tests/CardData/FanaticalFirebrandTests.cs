@@ -152,6 +152,68 @@ public class FanaticalFirebrandTests
         _alice.Zones.Graveyard.GetCards().Should().Contain(fb);
     }
 
+    // -----------------------------------------------------------------------
+    // Re-source-safe (fanatical-firebrand-sac-self-pinger-rebind) — the whole
+    // {T}, Sacrifice this creature: ping ability re-homes onto a new bearer via
+    // ActivatedAbility.RebindTo (Agatha's Soul Cauldron group-grant; CR 707.2 /
+    // 613.1f). The Mogg-Fanatic-class sac-self-pinger family.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void FanaticalFirebrand_PingAbility_IsRebindSafe()
+    {
+        var fb = FanaticalFirebrandFactory.Create(_alice);
+        var ability = fb.Abilities.OfType<ActivatedAbility>().Single();
+
+        ability.RebindSafe.Should().BeTrue(
+            "the sac-self-pinger reads its source off ResolutionContext.Source "
+            + "and its costs re-home, so Agatha's group-grant may RebindTo it");
+    }
+
+    [Fact]
+    public void RebindTo_PingAbility_SacrificesNewBearer_AndDealsDamageFromIt_NotOriginal()
+    {
+        // Arrange — Firebrand (the printed source) plus a DIFFERENT creature
+        // (the counter-bearer Agatha re-homes the ability to).
+        var fb = FanaticalFirebrandFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(fb);
+        fb.SetZone(ZoneType.Battlefield);
+
+        var bearer = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bearer.SetOwner(_alice);
+        bearer.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — the bearer has been under control since before this turn,
+        // so the {T} tap cost is legal (mirrors a real Agatha-grant scenario).
+        bearer.ClearSummoningSickness();
+
+        var ability = fb.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Act — re-home the ENTIRE ability onto the bearer (CR 707.2 / 613.1f).
+        var rebound = ability.RebindTo(bearer, _alice);
+
+        // STAGE 1 — pay the re-homed source-capturing costs (tap + sacrifice):
+        // they must hit the bearer, not the original Firebrand.
+        foreach (var cost in rebound.Costs)
+        {
+            cost.Pay(_alice);
+        }
+
+        rebound.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { _bob },
+        });
+        rebound.Resolve();
+
+        // Sacrifice re-homed: the BEARER went to the graveyard; Firebrand stays.
+        bearer.Zone.Should().Be(ZoneType.Graveyard, "the rebound sac hits the bearer");
+        fb.Zone.Should().Be(ZoneType.Battlefield, "the original Firebrand is untouched");
+
+        // Damage source re-homed: 1 damage dealt to Bob from the bearer's copy.
+        _bob.LifeTotal.Should().Be(19, "the rebound ability still deals 1 to any target");
+    }
+
     [Fact]
     public void Activate_Ping_PlaneswalkerTarget_RoutesToLoyaltyRemoval()
     {
