@@ -7,6 +7,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
@@ -272,22 +273,65 @@ public static class KaitoBaneOfNightmaresFactory
         }));
 
         // -- −2: Tap target creature. Put two stun counters on it. ----------
-        // CR 606 + tap + CR 122.1c (stun counters).
-        kaito.AddAbility(new LoyaltyAbility(kaito, Minus2Loyalty, () =>
-        {
-            var candidates = tapTargetResolver?.Invoke();
-            if (candidates == null) return;
-            foreach (var p in candidates)
-            {
-                if (p == null) continue;
-                if (p.Zone != ZoneType.Battlefield) continue;
-                if (!p.HasType(CardType.Creature)) continue;
+        // CR 606 (loyalty) + CR 701.20a (tap) + CR 122.1c (stun counters). The
+        // TAP target is a real target chosen by the activating player's agent:
+        // the ability declares a TargetRequest (gathering every battlefield
+        // creature — "target creature" is unrestricted, CR 115.4), the loyalty
+        // dispatch path (TurnDriver.DispatchLoyalty → CandidateGatherer →
+        // agent.ChooseTargetsAsync → SetChosenTargets) prompts for it, and the
+        // effect taps the CHOSEN permanent read off the ResolutionContext
+        // (CR 602.2b / 608.2g). The captured tapTargetResolver is the legacy
+        // direct-activation fallback (no chosen targets / rc.ChosenTargets
+        // empty) — it was null on the routed prod build, which made the −2
+        // INERT in real games (resolver-null bug class; mirrors Grist's −2
+        // destroy-target #2549 / Teferi's −3 nonland-permanent target).
+        //
+        // Candidates are gathered live at activation (every battlefield
+        // creature, any controller) so the target reflects board state when the
+        // ability is put on the stack.
+        var tapRequest = new TargetRequest(
+            Description: "Tap target creature",
+            MinTargets: 1, // "Tap target creature" — a mandatory single target.
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Removal,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Permanent>()
+                .Where(c => c.HasType(CardType.Creature))
+                .Cast<object>()
+                .ToList());
 
-                Fx.Tap(p);
-                p.Counters.Add(CounterType.Stun, StunCountersPlaced);
-                return; // "target creature" — a single permanent.
-            }
-        }));
+        kaito.AddAbility(new LoyaltyAbility(
+            kaito,
+            Minus2Loyalty,
+            new[]
+            {
+                Fx.Inline("Tap target creature; put two stun counters on it", rc =>
+                {
+                    // Prefer the agent-chosen target off the ResolutionContext
+                    // (slot 0); fall back to the resolver on the legacy direct-
+                    // activation path (no chosen targets).
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Permanent
+                        : null)
+                        ?? tapTargetResolver?.Invoke()?.FirstOrDefault();
+
+                    // CR 608.2b — re-check the target's legality on resolution.
+                    // A target that has left the battlefield or is no longer a
+                    // creature is illegal; the ability does nothing to it (the
+                    // loyalty cost was already paid, CR 606.3).
+                    if (target == null) return default;
+                    if (target.Zone != ZoneType.Battlefield) return default;
+                    if (!target.HasType(CardType.Creature)) return default;
+
+                    // CR 701.20a (tap) + CR 122.1c (stun counters).
+                    Fx.Tap(target);
+                    target.Counters.Add(CounterType.Stun, StunCountersPlaced);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { tapRequest }));
 
         // -- Static: "During your turn, as long as Kaito has one or more
         //    loyalty counters on him, he's a 3/4 Ninja creature and has
