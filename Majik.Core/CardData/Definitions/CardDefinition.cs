@@ -315,6 +315,20 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
     /// </summary>
     public string? OptionalManaCost { get; set; }
 
+    /// <summary>
+    /// CR 603.4 — the <b>free</b> optional "you may [effect]" rider on the WHOLE
+    /// triggered ability (no payment, just a yes/no choice). <c>false</c> (the
+    /// default) = the effect list runs unconditionally. When <c>true</c>, at
+    /// resolution the ability prompts the controller's agent yes/no and runs
+    /// <see cref="Effects"/> only on "yes". Models the bare "you may …" clause
+    /// (Mortician Beetle's "you may put a +1/+1 counter on this creature"). The
+    /// cost-free sibling of <see cref="OptionalManaCost"/>; the two are mutually
+    /// exclusive (a mana cost already implies the choice). Target choice still
+    /// happens as the trigger goes on the stack (CR 603.3d), so a wrapped
+    /// targeted effect still declares its <c>TargetRequest</c>.
+    /// </summary>
+    public bool Optional { get; set; }
+
     /// <inheritdoc />
     public override CardDefAbility ToCardDefAbility()
     {
@@ -338,11 +352,21 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
         var optionalCost = string.IsNullOrWhiteSpace(OptionalManaCost)
             ? (Majik.Core.ValueObjects.ManaCost?)null
             : Majik.Core.ValueObjects.ManaCost.Parse(OptionalManaCost);
+        // CR 603.4 — a free "you may …" rider gates the WHOLE effect list behind
+        // a yes/no choice with no payment. Mutually exclusive with the mana
+        // rider (a mana cost already implies the optional choice).
+        if (Optional && optionalCost is not null)
+        {
+            throw new InvalidOperationException(
+                "A triggered ability cannot set both 'optional': true and "
+                + "'optionalManaCost' — the mana cost already implies the "
+                + "optional choice.");
+        }
         // A leaves-the-battlefield trigger (e.g. dies_self) carries its own
         // active-zone override so the built TriggeredAbility stays observable
         // from the Graveyard (CR 603.6d / CR 700.4); all other shapes pass
         // null = engine default (battlefield only).
         return new CardDefTriggeredAbility(
-            triggerBuilder, effectSpecs, Trigger.ActiveZones, optionalCost);
+            triggerBuilder, effectSpecs, Trigger.ActiveZones, optionalCost, Optional);
     }
 }
