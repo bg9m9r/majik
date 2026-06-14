@@ -140,6 +140,42 @@ public class AbilityActivatorTests
             ev => ev.SacrificedCard == source && ev.SacrificingPlayer == player);
     }
 
+    // icost-pay-central-bus-seam (class-(b) tail) — CR 701.16. The broad
+    // sac-cost factory family builds its "Sacrifice CARDNAME:" cost as a
+    // BUS-LESS AdditionalCost.Sacrifice(perm) (the single-arg Create(Player)
+    // overload supplies no bus). Because AdditionalCost is now IBusAwareCost
+    // and AbilityActivator threads its live bus into CostPayment, activating
+    // such an ability publishes a PermanentSacrificedEvent WITHOUT the factory
+    // needing a bespoke bus-bearing Create overload — the central seam delivers
+    // the bus at the Pay drive site. This is the prod path the class-(b) tail
+    // (Goblin Cratermaker, Cathar Commando, Mind Stone, …) rides.
+    [Fact]
+    public void ActivateAbility_BuslessAdditionalSacrificeCost_PublishesViaCentralSeam()
+    {
+        // Arrange — real bus on the activator; cost built WITHOUT a bus.
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var activator = new AbilityActivator(stack, bus);
+        var seen = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+
+        var player = new Player("Alice", 20);
+        var source = new Creature("Mogg Fanatic", "R", 1, 1) { Owner = player, Controller = player };
+        source.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        player.Zones.Battlefield.AddCard(source);
+        var ability = new ActivatedAbility(source, player);
+        // Bus-less AdditionalCost — the class-(b) factory shape.
+        var costs = new List<ICost> { AdditionalCost.Sacrifice(source) };
+
+        // Act
+        activator.ActivateAbility(ability, player, null, costs);
+
+        // Assert — sacrificed AND the aristocrat event fired off the seam.
+        source.Zone.Should().Be(Majik.Core.Zones.ZoneType.Graveyard);
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == source && ev.SacrificingPlayer == player && !ev.WasToken);
+    }
+
     [Fact]
     public void ActivateAbility_PublishesEvents()
     {
