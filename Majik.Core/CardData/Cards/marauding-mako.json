@@ -1,0 +1,8 @@
+{
+  "name": "Marauding Mako",
+  "types": ["Creature"],
+  "subtypes": ["Shark", "Pirate"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1
+}
