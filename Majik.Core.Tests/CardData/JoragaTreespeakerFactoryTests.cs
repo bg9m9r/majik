@@ -195,4 +195,39 @@ public class JoragaTreespeakerFactoryTests
         ManaAbilityCount(p).Should().Be(1,
             "the {LEVEL 1-4} self mana ability is restored");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-factory-resolutioncontext-source-migration — the level-up
+    // activated ability ("{1}{G}: Put a level counter on this") now reads its
+    // source off ResolutionContext.Source and is marked RebindSafe, so Agatha's
+    // Soul Cauldron can re-home it onto a counter-bearing bearer (CR 707.2).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void LevelUp_IsRebindSafe()
+    {
+        var joraga = JoragaTreespeakerFactory.Create(_alice);
+
+        var levelUp = joraga.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        levelUp.RebindSafe.Should().BeTrue(
+            "the level-counter placement reads ResolutionContext.Source (not the " +
+            "captured card), so Agatha's Soul Cauldron may re-home it");
+    }
+
+    [Fact]
+    public async Task LevelUp_ResolvesViaContextSource_CountsOnOwnSource()
+    {
+        // Re-source seam: the effect places the level counter on
+        // ResolutionContext.Source (threaded by ActivatedAbility.ResolveAsync),
+        // which on the un-rebound path is Joraga itself.
+        var joraga = JoragaTreespeakerFactory.Create(_alice);
+        var levelUp = joraga.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        joraga.Counters.Count(CounterType.Level).Should().Be(0);
+        await levelUp.ResolveAsync(agent: null, game: null);
+        joraga.Counters.Count(CounterType.Level).Should().Be(1,
+            "resolving the un-rebound level-up puts a level counter on its own source");
+    }
 }
