@@ -251,8 +251,11 @@ public class SteelHellkiteFactoryTests
     }
 
     [Fact]
-    public void DestructionSweep_DoesNotDestroyTokens()
+    public void DestructionSweep_ExcludesLands_NotTokens()
     {
+        // Scryfall oracle: "Destroy each NONLAND permanent…". A nonland TOKEN
+        // with the matching mv IS destroyed (it is a nonland permanent); a LAND
+        // is never destroyed (lands have mv 0, so X=0 would otherwise sweep them).
         var bus = new EventBus();
         var hellkite = SteelHellkiteFactory.Create(
             _alice,
@@ -260,9 +263,16 @@ public class SteelHellkiteFactoryTests
             eventBus: bus);
         hellkite.SetZone(ZoneType.Battlefield);
 
-        // Bob has a token at mv 0.
+        // Bob has a nonland token at mv 0 → destroyed.
         var bobToken = MakePermanent(_bob, "Soldier", "{0}", 1, 1);
         bobToken.MarkAsToken();
+
+        // Bob also controls a land (mv 0) → NOT destroyed (nonland filter).
+        var bobLand = new Majik.Core.Cards.Land("Wastes");
+        bobLand.SetOwner(_bob);
+        bobLand.SetController(_bob);
+        bobLand.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bobLand);
 
         bus.Publish(new CombatDamageDealtEvent(hellkite, _bob, amount: 1));
 
@@ -270,7 +280,48 @@ public class SteelHellkiteFactoryTests
             .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
         ContextResolve.Resolve(sweep, _alice, _alice, _bob);
 
-        _bob.Zones.Battlefield.GetCards().Should().Contain(bobToken,
-            "tokens are excluded from Steel Hellkite's destruction sweep ('each nontoken permanent').");
+        _bob.Zones.Graveyard.GetCards().Should().Contain(bobToken,
+            "a nonland token with mv = X is destroyed (oracle: 'each nonland permanent').");
+        _bob.Zones.Battlefield.GetCards().Should().Contain(bobLand,
+            "lands are never destroyed by Steel Hellkite's sweep.");
+    }
+
+    [Fact]
+    public void DestructionSweep_KeysVictimsBySource_NotForeignDamage()
+    {
+        // RE-SOURCE-SAFE tracker: damage dealt by SOME OTHER permanent must not
+        // populate Steel Hellkite's own victim set. Only damage whose source is
+        // the sweep's live source (here, Steel Hellkite itself) counts.
+        var bus = new EventBus();
+        var hellkite = SteelHellkiteFactory.Create(_alice, xValueProvider: () => 2, eventBus: bus);
+        hellkite.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(hellkite);
+
+        var bobBear = MakePermanent(_bob, "Grizzly Bears", "{1}{G}", 2, 2); // mv 2.
+
+        // A DIFFERENT attacker deals combat damage to Bob — must NOT count for
+        // Steel Hellkite's sweep.
+        var otherAttacker = MakePermanent(_alice, "Random Beater", "{2}", 3, 3);
+        bus.Publish(new CombatDamageDealtEvent(otherAttacker, _bob, amount: 3));
+
+        var sweep = hellkite.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
+        ContextResolve.Resolve(sweep, _alice, _alice, _bob);
+
+        _bob.Zones.Battlefield.GetCards().Should().Contain(bobBear,
+            "only damage dealt BY THE SWEEP'S SOURCE this turn populates its victim set.");
+    }
+
+    [Fact]
+    public void DestructionSweep_IsRebindSafe()
+    {
+        // The {X} sweep reads its source + X + victim set off the live
+        // ResolutionContext, so Agatha's Soul Cauldron may re-home it to a
+        // bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f).
+        var c = SteelHellkiteFactory.Create(_alice);
+        var sweep = c.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any(m => m.Description == "X"));
+        sweep.RebindSafe.Should().BeTrue(
+            "the re-sourced sweep reads ResolutionContext.Source for the 'damaged by this creature this turn' linkage.");
     }
 }

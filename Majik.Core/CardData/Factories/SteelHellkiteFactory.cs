@@ -14,12 +14,12 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Steel Hellkite (Scars of Mirrodin, {6}).
 ///
-/// Artifact Creature — Dragon 5/5. Oracle text:
+/// Artifact Creature — Dragon 5/5. Oracle text (Scryfall):
 ///   "Flying.
-///    {2}: Steel Hellkite gets +1/+0 until end of turn.
-///    {X}: Destroy each nontoken permanent with mana value X whose
-///    controller was dealt combat damage by Steel Hellkite this turn.
-///    Activate only during your turn."
+///    {2}: This creature gets +1/+0 until end of turn.
+///    {X}: Destroy each nonland permanent with mana value X whose
+///    controller was dealt combat damage by this creature this turn.
+///    Activate only once each turn."
 ///
 /// ## Implemented (v1)
 /// - 5/5 Artifact Creature — Dragon at {6} (multi-type via
@@ -32,25 +32,32 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="PumpUntilEndOfTurnEffect"/> on Steel Hellkite for +1/+0
 ///   via <see cref="Creature.ActiveEffects"/>. No sorcery-speed gate
 ///   (printed as instant-speed pump).
-/// - <b>{X}: Destroy each nontoken permanent with mv = X whose
-///   controller was dealt combat damage by Steel Hellkite this turn.
-///   Activate only during your turn.</b>
+/// - <b>{X}: Destroy each nonland permanent with mv = X whose
+///   controller was dealt combat damage by this creature this turn.
+///   Activate only once each turn.</b>
 ///   <list type="bullet">
-///     <item>Mana cost <c>{X}</c> via <see cref="ManaCostCost"/>; X-value
-///     resolution mirrors <see cref="BlastZoneFactory"/>'s
-///     <c>chargeXValueProvider</c> closure (engine has no per-activation
-///     X ledger). Default = 0 in the shape-only path.</item>
-///     <item><b>Combat-damage-victim tracking</b>: an event-bus
-///     subscriber on <see cref="CombatDamageDealtEvent"/> accumulates the
-///     <see cref="Player"/> controllers of every entity Steel Hellkite
-///     dealt combat damage to this turn. Damage to a creature /
-///     planeswalker contributes its controller; damage to a player
-///     contributes that player. The set is reset on
-///     <see cref="TurnStartedEvent"/> (CR 700.5 — "this turn" memory
-///     ends at the cleanup step of the same turn; resetting on the next
-///     turn-start is observationally identical for the "during your
-///     turn" activation gate and discards stale state across turn
-///     boundaries).</item>
+///     <item>Mana cost <c>{X}</c> via <see cref="ManaCostCost"/>; X reads the
+///     per-activation ledger (<see cref="ResolutionContext.ChosenX"/>, GAP 2).
+///     The <c>xValueProvider</c> closure is kept ONLY as a shape/unit-test
+///     override.</item>
+///     <item><b>Combat-damage-victim tracking (RE-SOURCE-SAFE)</b>: an
+///     event-bus subscriber on <see cref="CombatDamageDealtEvent"/>
+///     accumulates the <see cref="Player"/> controllers of every entity
+///     dealt combat damage this turn, KEYED BY THE DAMAGE-SOURCE PERMANENT
+///     (<c>Dictionary&lt;Permanent, HashSet&lt;Player&gt;&gt;</c>). Damage to
+///     a creature / planeswalker contributes its controller; damage to a
+///     player contributes that player. Keying by source — rather than gating
+///     on a captured Steel Hellkite reference — is what makes the "damaged by
+///     this creature this turn" linkage RE-SOURCEABLE: the {X} sweep is marked
+///     <see cref="ActivatedAbility.RebindSafe"/> and reads its victim set off
+///     its LIVE source (<see cref="ResolutionContext.Source"/>), so when
+///     Agatha's Soul Cauldron re-homes it to a BEARER via
+///     <see cref="ActivatedAbility.RebindTo"/> the sweep destroys permanents
+///     whose controller the BEARER damaged (CR 707.2 / 613.1f), never the
+///     exiled Steel Hellkite's stale linkage. The map is reset on
+///     <see cref="TurnStartedEvent"/> (CR 700.5 — "this turn" memory ends at
+///     the cleanup step; resetting on the next turn-start is observationally
+///     identical and discards stale state across turn boundaries).</item>
 ///     <item><b>Sorcery-speed-like gate</b> ("Activate only during your
 ///     turn") via <see cref="ActivatedAbility"/>'s
 ///     <c>sorcerySpeed</c> flag — true here, so
@@ -62,12 +69,13 @@ namespace Majik.Core.CardData.Factories;
 ///     activations) and matches the same posture Steel Hellkite-style
 ///     "during your turn" cards take in this repo until a dedicated
 ///     "any-phase your-turn-only" rider lands.</item>
-///     <item>Sweep iterates every battlefield supplied by the
-///     <paramref name="allPlayersResolver"/> (falls back to controller-
-///     only when null) and destroys every <b>nontoken</b> permanent
-///     (CR 111.1 — token detection via <see cref="Permanent.IsToken"/>)
-///     whose <see cref="Card.ManaCostValue"/>'s total equals X AND
-///     whose controller is in the tracked victim set.</item>
+///     <item>Sweep iterates every battlefield read from the live
+///     <c>ctx.Game.AllPlayers</c> (falls back to controller-only when no live
+///     game context) and destroys every <b>nonland</b> permanent (Scryfall
+///     oracle "each nonland permanent" — land detection via
+///     <see cref="Card.HasType"/>(<see cref="CardType.Land"/>)) whose
+///     <see cref="Card.ManaCostValue"/>'s total equals X AND whose controller
+///     is in the tracked victim set for the sweep's live source.</item>
 ///   </list>
 ///
 /// ## Source-closure injection
@@ -190,27 +198,40 @@ public static class SteelHellkiteFactory
             rebindSafe: true));
 
         // ----------------------------------------------------------------
-        // Combat-damage-victim tracker. Accumulates the controllers of
-        // every entity Steel Hellkite dealt combat damage to THIS turn.
+        // Combat-damage-victim tracker (RE-SOURCE-SAFE, agatha-rebind…sweep).
+        //
+        // Accumulates the controllers of every entity dealt combat damage THIS
+        // turn, keyed BY THE DAMAGE-SOURCE PERMANENT (CR 510.1c). Keying by
+        // source — instead of gating to the single captured Steel Hellkite —
+        // is what makes the "damaged by ~ this turn" linkage RE-SOURCEABLE:
+        // when Agatha's Soul Cauldron re-homes the {X} sweep to a BEARER via
+        // ActivatedAbility.RebindTo, the rebound ability reuses THIS SAME effect
+        // closure (and this same shared map), and the sweep resolves the victim
+        // set for its LIVE source (ResolutionContext.Source = the bearer), so it
+        // destroys permanents whose controller the BEARER damaged — never the
+        // exiled Steel Hellkite's stale linkage. The map subscribes to the live
+        // game's event bus, so the bearer's CombatDamageDealtEvent is captured
+        // exactly the way Steel Hellkite's own is.
+        //
         // Reset on TurnStartedEvent (CR 700.5 — "this turn" memory).
         // ----------------------------------------------------------------
-        var combatVictims = new HashSet<Player>();
+        var combatVictimsBySource = new Dictionary<Permanent, HashSet<Player>>();
 
         if (eventBus != null)
         {
-            eventBus.Subscribe<CombatDamageDealtEvent>(e => TrackCombatVictim(e, card, combatVictims));
-            eventBus.Subscribe<TurnStartedEvent>(_ => combatVictims.Clear());
+            eventBus.Subscribe<CombatDamageDealtEvent>(e => TrackCombatVictim(e, combatVictimsBySource));
+            eventBus.Subscribe<TurnStartedEvent>(_ => combatVictimsBySource.Clear());
         }
 
         // ----------------------------------------------------------------
-        // {X}: Destroy each nontoken permanent with mv = X whose
-        // controller was dealt combat damage by Steel Hellkite this turn.
-        // CR 602 + CR 117.1a / 307.5 — sorcery-speed-equivalent gate via
-        // ActivatedAbility.sorcerySpeed (see class xmldoc for the v1
-        // caveat on "during your turn").
+        // {X}: Destroy each nonland permanent with mana value X whose
+        // controller was dealt combat damage by this creature this turn.
+        // (Scryfall oracle; CR 701.7b destroy.) CR 117.1a / 307.5 —
+        // sorcery-speed-equivalent gate via ActivatedAbility.sorcerySpeed
+        // (see class xmldoc for the v1 caveat on the "once each turn" rider).
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
-            $"{CardName}: destroy each nontoken permanent with mv = X whose controller took combat damage from this card this turn",
+            $"{CardName}: destroy each nonland permanent with mv = X whose controller took combat damage from this creature this turn",
             ctx =>
             {
                 // GAP 2 — X comes from the per-activation ledger
@@ -219,7 +240,18 @@ public static class SteelHellkiteFactory
                 // optional override for shape/unit tests; when supplied it wins,
                 // otherwise prod reads the chosen X (was always 0 before GAP 2).
                 var x = xValueProvider?.Invoke() ?? ctx.ChosenX ?? 0;
-                ResolveDestroySweep(owner, x, ctx.Game?.AllPlayers, combatVictims);
+
+                // RE-SOURCE — "this creature" is the ability's LIVE source
+                // (ResolutionContext.Source: the bearer when re-homed by Agatha,
+                // Steel Hellkite itself otherwise). Fall back to `card` only on
+                // the context-less legacy/shape path. The victim set is the one
+                // tracked for THAT source.
+                var sweepSource = ctx.Source ?? card;
+                var victims = combatVictimsBySource.TryGetValue(sweepSource, out var v)
+                    ? v
+                    : EmptyVictims;
+
+                ResolveDestroySweep(owner, x, ctx.Game?.AllPlayers, victims);
                 return ValueTask.CompletedTask;
             });
 
@@ -228,36 +260,50 @@ public static class SteelHellkiteFactory
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{X}") },
             effects: new IEffect[] { sweepEffect },
-            sorcerySpeed: true));
+            sorcerySpeed: true,
+            rebindSafe: true));
 
         return card;
     }
 
+    private static readonly HashSet<Player> EmptyVictims = new();
+
     // --- Combat-damage-victim tracker (CR 510.1c / 700.5) -----------------
+    // RE-SOURCE-SAFE: keyed by the damage-SOURCE permanent (e.Source), not the
+    // captured Steel Hellkite, so the "damaged by this creature this turn"
+    // linkage is per-source and a re-homed (Agatha) ability reads the bearer's
+    // own victim set off ResolutionContext.Source.
     private static void TrackCombatVictim(
         CombatDamageDealtEvent e,
-        Creature card,
-        HashSet<Player> combatVictims)
+        Dictionary<Permanent, HashSet<Player>> combatVictimsBySource)
     {
-        if (!ReferenceEquals(e.Source, card)) return;
+        if (e.Source is null) return;
         if (e.Amount <= 0) return;
+
+        Player? victim = null;
 
         // Damage to a creature / planeswalker → its controller.
         // CombatDamageDealtEvent.Target is ICard? (null when the target is
         // a player — see the dual-ctor on the event).
         if (e.Target is ICard targetCard)
         {
-            var c = targetCard.Controller;
-            if (c != null) combatVictims.Add(c);
-            return;
+            victim = targetCard.Controller;
         }
-
         // Damage to a player → read TargetPlayer off the base
         // DamageDealtEvent (set by the Player-target ctor).
-        if (e.TargetPlayer is { } victimPlayer)
+        else if (e.TargetPlayer is { } victimPlayer)
         {
-            combatVictims.Add(victimPlayer);
+            victim = victimPlayer;
         }
+
+        if (victim == null) return;
+
+        if (!combatVictimsBySource.TryGetValue(e.Source, out var set))
+        {
+            set = new HashSet<Player>();
+            combatVictimsBySource[e.Source] = set;
+        }
+        set.Add(victim);
     }
 
     // --- {X}: destroy sweep (CR 701.7b) -----------------------------------
@@ -282,9 +328,11 @@ public static class SteelHellkiteFactory
     {
         // Snapshot — we mutate the battlefield list inside the loop.
         // Mirror Engineered Explosives / Blast Zone pattern.
+        // CR (Scryfall oracle): "each NONLAND permanent" — lands are excluded
+        // (a land's mv is 0, so without this filter X=0 would sweep lands too).
         var victims = p.Zones.Battlefield.GetCards()
             .OfType<Permanent>()
-            .Where(c => !c.IsToken)
+            .Where(c => !c.HasType(CardType.Land))
             .Where(c => c.Controller != null && combatVictims.Contains(c.Controller))
             .Where(c => c.ManaCostValue.TotalValue == x)
             .ToList();

@@ -135,7 +135,17 @@ namespace Majik.Core.CardData.Factories;
 ///   the real ability re-homes it), <see cref="MortivoreFactory"/> and
 ///   <see cref="RiverBoaFactory"/> now read
 ///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> and are
-///   <see cref="ActivatedAbility.RebindSafe"/>. The residual is now confined to
+///   <see cref="ActivatedAbility.RebindSafe"/>. The variable-X mv-sweep batch
+///   has joined: <see cref="SteelHellkiteFactory"/>'s "{X}: Destroy each nonland
+///   permanent with mv X whose controller was dealt combat damage by this
+///   creature this turn" now keys its combat-victim tracker by the
+///   damage-SOURCE permanent and reads its victim set + X off the live
+///   <see cref="Majik.Core.Abilities.ResolutionContext"/>
+///   (<see cref="Majik.Core.Abilities.ResolutionContext.Source"/> +
+///   <see cref="Majik.Core.Abilities.ResolutionContext.ChosenX"/>), so RebindTo
+///   re-homes the REAL sweep to a bearer and it destroys permanents whose
+///   controller the BEARER damaged — never the exiled card's stale linkage. The
+///   residual is now confined to
 ///   the remaining un-migrated bespoke-factory closures — every data-driven
 ///   activated ability is covered. A correct partial beats a broken "all".
 ///   Tracked: v1-deferrals.
