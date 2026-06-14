@@ -110,7 +110,13 @@ public sealed class PayPerAttackerRestriction : AttackRestriction
     {
         if (!IsActive) return false;
         if (ReferenceEquals(defender, _protectedPlayer)) return true;
-        if (_protectsPlaneswalkers && defender is Planeswalker pw)
+        // CR 711 — typed Permanent (not the Planeswalker subclass) so a
+        // creature-front transform DFC flipped to its planeswalker back, which
+        // carries a transient loyalty body (IsEffectivePlaneswalker) without
+        // re-classing the runtime object, is also protected. Mirrors the
+        // defender-side combat widening (Combat.TargetPlaneswalker /
+        // CombatValidator.CanAttackPlaneswalker / DamageIntent.TargetPlaneswalker).
+        if (_protectsPlaneswalkers && defender is Permanent pw && pw.IsEffectivePlaneswalker())
             return ReferenceEquals(pw.Controller, _protectedPlayer);
         return false;
     }
