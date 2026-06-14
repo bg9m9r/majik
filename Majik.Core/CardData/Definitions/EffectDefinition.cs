@@ -53,6 +53,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(PumpTargetEffectDef), "pump_target")]
 [JsonDerivedType(typeof(PumpSelfEffectDef), "pump_self")]
 [JsonDerivedType(typeof(GrantKeywordUntilEotTargetEffectDef), "grant_keyword_until_eot_target")]
+[JsonDerivedType(typeof(GrantKeywordToCreaturesYouControlEffectDef), "grant_keyword_until_eot_group")]
 [JsonDerivedType(typeof(BecomesArtifactTargetEffectDef), "becomes_artifact_target")]
 [JsonDerivedType(typeof(DamageAndTapEachFlyerOpponentsControlEffectDef), "damage_and_tap_each_flyer_opponents_control")]
 [JsonDerivedType(typeof(CounterTargetSpellEffectDef), "counter_target_spell")]
@@ -1365,6 +1366,43 @@ public sealed class GrantKeywordUntilEotTargetEffectDef : EffectDefinition
         TargetFilters.ToTargetRequest(
             TargetFilter, $"gain {Keyword} until end of turn",
             Majik.Core.Cards.BotIntent.Buff);
+}
+
+/// <summary>
+/// "Creatures you control gain &lt;keyword(s)&gt; until end of turn" (CR 613.1c
+/// Layer-6 ability addition; CR 514.2 cleanup-step expiry) — the GROUP-apply
+/// sibling of <see cref="GrantKeywordUntilEotTargetEffectDef"/>. This is the
+/// declarative form of the regex-bound
+/// <see cref="Majik.Core.CardData.LandActivatedAbilityBinder"/>
+/// <c>BindGrantKeywordsToCreaturesYouControl</c> primitive, used by
+/// Vault of the Archangel ("{2}{W}{B}, {T}: Creatures you control gain
+/// deathtouch and lifelink until end of turn") and generalizing to any
+/// "creatures you control gain &lt;kw&gt; until end of turn" activated land.
+///
+/// <para>Untargeted (self-selecting "creatures you control"), so
+/// <see cref="ToTargetRequest"/> returns <c>null</c>. At resolution the runtime
+/// walks the activating player's battlefield (CR 611.2c — a one-shot,
+/// resolution-time snapshot) and registers one
+/// <see cref="Majik.Core.Effects.GrantKeywordUntilEndOfTurnEffect"/> per
+/// keyword on each creature's OWN
+/// <see cref="Majik.Core.Effects.ContinuousEffectsService"/>; the controller's
+/// Battlefield zone scopes "you control", so opponent creatures are
+/// untouched.</para>
+///
+/// <para>The keyword HashSet under
+/// <see cref="Majik.Core.Cards.CreatureCharacteristics.Keywords"/> uses
+/// <see cref="System.StringComparer.OrdinalIgnoreCase"/>, so casing is
+/// irrelevant; the engine's canonical capitalization is preferred for
+/// readability.</para>
+/// </summary>
+public sealed class GrantKeywordToCreaturesYouControlEffectDef : EffectDefinition
+{
+    /// <summary>The keyword(s) granted to each creature you control until end
+    /// of turn (e.g. <c>["Deathtouch", "Lifelink"]</c>, <c>["Trample"]</c>).</summary>
+    public List<string> Keywords { get; set; } = new();
+
+    // Untargeted — the group self-selects "creatures you control".
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() => null;
 }
 
 /// <summary>
