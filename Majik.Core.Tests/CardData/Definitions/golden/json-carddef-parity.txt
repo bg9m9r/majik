@@ -49382,3 +49382,51 @@
     "Black"
   ]
 }
+==== zof-consumption-zof-bloodbog ====
+{
+  "name": "Zof Consumption // Zof Bloodbog",
+  "manaCost": "{4}{B}{B}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
