@@ -65,6 +65,14 @@ namespace Majik.Core.CardData;
 ///     reach, menace, indestructible, hexproof) — a parameterised or unknown
 ///     keyword is skipped as unsound. Sound to re-home: the effect targets the
 ///     bearer, never the exiled card.</item>
+///   <item><b>Self-counter</b> —
+///     <c>"{cost}: Put a/N +1/+1 counter(s) on this creature."</c> Rebuilt as a
+///     no-target <see cref="ActivatedAbility"/> whose resolution adds the
+///     +1/+1 counter(s) to the BEARER's own
+///     <see cref="Majik.Core.Counters.CounterCollection"/> (CR 122.1 /
+///     613.1f). Sound to re-home: the counter is placed on the bearer, never the
+///     exiled card. (Especially apt for the Cauldron: the grown bearer is, by
+///     construction, a creature you control with a +1/+1 counter.)</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -160,6 +168,16 @@ public static class OracleActivatedAbilityBinder
             ["hexproof"] = "Hexproof",
         };
 
+    // "{cost}: Put a/N +1/+1 counter(s) on this creature."
+    // A self-source counter-placement ability (e.g. a creature with a
+    // {cost}: grow-itself ability). Sound to re-home: the counter is placed on
+    // the BEARER's own CounterCollection — the granted ability never touches the
+    // exiled card. "Put a +1/+1 counter" → N = 1; an explicit "Put 2 +1/+1
+    // counters" → N = the stated count.
+    private static readonly Regex SelfCounterRegex = new(
+        @"^(" + CostList + @")\s*:\s*Put (?:a|one|(\d+)) \+1/\+1 counters? on this creature\.$",
+        RegexOptions.IgnoreCase);
+
     // A single tap symbol inside a cost list.
     private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
 
@@ -225,6 +243,14 @@ public static class OracleActivatedAbilityBinder
             if (kwGrant.Success)
             {
                 var ability = TryBuildSelfKeywordGrant(kwGrant, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var selfCounter = SelfCounterRegex.Match(line);
+            if (selfCounter.Success)
+            {
+                var ability = TryBuildSelfCounter(selfCounter, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -305,6 +331,47 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { grantEffect });
+    }
+
+    /// <summary>
+    /// Build a self-counter ability: "{cost}: Put a/N +1/+1 counter(s) on this
+    /// creature." Re-homed so the counter is placed on the BEARER's own
+    /// <see cref="Creature.Counters"/> (CR 122.1 / 613.1f) — never on the exiled
+    /// imprinted card. A creature-only shape (a +1/+1 counter on a non-creature
+    /// is meaningless here), so a non-creature bearer returns null (skip). This
+    /// shape is doubly synergistic with Agatha's Soul Cauldron: the bearer it
+    /// grows is, by definition, a creature you control with a +1/+1 counter, so
+    /// staying in the grant's scope (CR 611.2c) is reinforced.
+    /// </summary>
+    private static ActivatedAbility? TryBuildSelfCounter(
+        Match match, Permanent bearer, Player controller)
+    {
+        if (bearer is not Creature creatureBearer) return null;
+
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        // Group 2 is the explicit count ("Put 2 +1/+1 counters …"); absent for
+        // the "Put a +1/+1 counter …" / "Put one …" forms ⇒ a single counter.
+        var count = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 1;
+
+        var counterEffect = new Effect(
+            $"Granted: put {count} +1/+1 counter(s) on this creature",
+            () =>
+            {
+                // CR 122.1 / 613.1f — place the counter directly on the BEARER's
+                // own counter collection. No effects-service dependency: a +1/+1
+                // counter is a persistent characteristic-defining object on the
+                // permanent, not an until-end-of-turn registration.
+                creatureBearer.Counters.Add(
+                    Counters.CounterType.PlusOnePlusOne, count);
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { counterEffect });
     }
 
     /// <summary>

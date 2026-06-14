@@ -937,6 +937,52 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_SelfCounter_RehomesCounterPlacementToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability puts a +1/+1 counter on itself:
+        // "{2}: Put a +1/+1 counter on this creature." (e.g. a card with a
+        // self-growth ability — a common self-source bespoke shape).
+        var grower = new Creature("Grower Stub", "1G", 1, 1);
+        grower.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(grower);
+        grower.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Grower Stub", "{2}: Put a +1/+1 counter on this creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), grower);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's self-counter ability");
+        var counterAbility = granted[0];
+        counterAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        counterAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("2"));
+        counterAbility.TargetRequests.Should().BeEmpty(
+            "\"put a +1/+1 counter on this creature\" targets nothing — the bearer is fixed");
+
+        // Activating it puts a +1/+1 counter on the BEARER (not the exiled card).
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        var growerCountersBefore = grower.Counters.Count(CounterType.PlusOnePlusOne);
+        foreach (var effect in counterAbility.Effects) effect.Execute();
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(bearerCountersBefore + 1,
+            "the re-homed self-counter ability puts the counter on the BEARER");
+        grower.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(growerCountersBefore,
+            "the exiled imprinted card never receives the counter");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);
