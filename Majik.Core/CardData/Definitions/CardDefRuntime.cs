@@ -954,6 +954,8 @@ public static class CardDefRuntime
                 BuildStateWhenCountersGeTrigger(threshold, card),
             WheneverAPlayerCastsSpellTriggerDef anyCast =>
                 BuildWheneverAPlayerCastsSpellTrigger(anyCast, card),
+            WheneverAnOpponentSacrificesPermanentTriggerDef oppSac =>
+                BuildWheneverAnOpponentSacrificesPermanentTrigger(oppSac, card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
@@ -1193,6 +1195,53 @@ public static class CardDefRuntime
                 && !ReferenceEquals(e.Player, controller)
                 && e.NewLife > e.PreviousLife;
         });
+
+    /// <summary>
+    /// CR 701.16 / CR 109.5 / CR 603.3 — "Whenever an opponent sacrifices a
+    /// [permanent], …". Fires on the dedicated
+    /// <see cref="Majik.Core.Events.PermanentSacrificedEvent"/> whose
+    /// <see cref="Majik.Core.Events.PermanentSacrificedEvent.SacrificingPlayer"/>
+    /// is a player OTHER than the trigger's controller (CR 102.2 — every other
+    /// player is an opponent; the controller is resolved live so a control change
+    /// carries the trigger, CR 109.5), optionally gated on the sacrificed
+    /// permanent's card type
+    /// (<see cref="WheneverAnOpponentSacrificesPermanentTriggerDef.PermanentType"/>,
+    /// CR 205.2 — Vengeful Tracker's "an artifact") and on excluding tokens
+    /// (<see cref="WheneverAnOpponentSacrificesPermanentTriggerDef.NontokenOnly"/>,
+    /// CR 111.7 — It That Betrays' "nontoken permanent"). As it matches it STAMPS
+    /// the sacrificing player onto the resolving ability
+    /// (<see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>) so
+    /// an untargeted <see cref="DealDamageToTriggeringPlayerEffectDef"/> reads it
+    /// back as "that player"/"them" at resolution (CR 603.3) — the declarative
+    /// analogue of the hand-rolled It That Betrays steal trigger over the SAME
+    /// event surface.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverAnOpponentSacrificesPermanentTrigger(
+        WheneverAnOpponentSacrificesPermanentTriggerDef def, ICard card)
+    {
+        var permanentType = string.IsNullOrWhiteSpace(def.PermanentType)
+            ? (CardType?)null
+            : ParseType(def.PermanentType);
+        var nontokenOnly = def.NontokenOnly;
+        return new EventTriggerCondition<Majik.Core.Events.PermanentSacrificedEvent>((e, ability) =>
+        {
+            var controller = card.Controller;
+            if (controller is null) return false;
+            // CR 102.2 — "an opponent" is any player that is not the controller.
+            if (ReferenceEquals(e.SacrificingPlayer, controller)) return false;
+            // CR 205.2 — card-type gate (e.g. "an artifact").
+            if (permanentType is CardType t && !e.SacrificedCard.HasType(t)) return false;
+            // CR 111.7 — a token in the graveyard ceases to exist.
+            if (nontokenOnly && e.WasToken) return false;
+            // CR 603.3 — stamp "that player" (the sacrificing opponent) for the
+            // untargeted resolve effect to read at resolution.
+            if (ability is Majik.Core.Abilities.TriggeredAbility ta)
+            {
+                ta.SetTriggeringPlayer(e.SacrificingPlayer);
+            }
+            return true;
+        });
+    }
 
     /// <summary>
     /// CR 510.2 / CR 603.1 — "Whenever this creature deals combat damage to a

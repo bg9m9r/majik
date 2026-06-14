@@ -1,0 +1,15 @@
+{
+  "name": "Vengeful Tracker",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Detective"],
+  "manaCost": "{1}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_an_opponent_sacrifices_permanent", "permanentType": "Artifact" },
+      "effects": [ { "type": "deal_damage_to_triggering_player", "amount": 2 } ]
+    }
+  ]
+}

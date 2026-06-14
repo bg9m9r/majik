@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(WheneverACreatureYouControlExploresTriggerDef), "whenever_a_creature_you_control_explores")]
 [JsonDerivedType(typeof(StateWhenCountersGeTriggerDef), "state_when_counters_ge")]
 [JsonDerivedType(typeof(WheneverAPlayerCastsSpellTriggerDef), "whenever_a_player_casts_spell")]
+[JsonDerivedType(typeof(WheneverAnOpponentSacrificesPermanentTriggerDef), "whenever_an_opponent_sacrifices_permanent")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -489,4 +490,57 @@ public sealed class WheneverAPlayerCastsSpellTriggerDef : TriggerDefinition
     /// <summary>Only a spell with mana value &lt;= this cap fires it (CR 202.3).
     /// Null (default) = no cap.</summary>
     public int? MaxManaValue { get; set; }
+}
+
+/// <summary>
+/// "Whenever an opponent sacrifices a [permanent], …" (CR 701.16 / CR 109.5 /
+/// CR 603.3) — the opponent-scoped <b>aristocrat payoff-consumer</b> trigger.
+/// Fires on the dedicated <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+/// (the sacrifice-detection surface published by the bus-aware
+/// <see cref="Majik.Core.Primitives.Fx.Sacrifice(Majik.Core.Cards.ICard, Player, Majik.Core.Events.IEventBus)"/>
+/// overload — CR 701.16a credits the cost-payer as the sacrificing player)
+/// whose <see cref="Majik.Core.Events.PermanentSacrificedEvent.SacrificingPlayer"/>
+/// is a player OTHER than the trigger's controller (every other player is an
+/// opponent — CR 102.2). The controller is resolved live (<c>card.Controller</c>)
+/// at fire time so a control change carries the trigger (CR 109.5).
+///
+/// <para>
+/// This is the declarative lift of the hand-rolled It That Betrays
+/// "Whenever an opponent sacrifices a nontoken permanent, …" steal trigger:
+/// it subscribes to the SAME <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+/// surface, scopes against the controller's opponents, and — as it matches —
+/// STAMPS the sacrificing player onto the resolving ability via
+/// <see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>
+/// (CR 603.3 — "that player"), so an untargeted
+/// <see cref="DealDamageToTriggeringPlayerEffectDef"/> in the same ability reads
+/// it back off <see cref="Majik.Core.Abilities.ResolutionContext.TriggeringPlayer"/>
+/// at resolution. Models the Vengeful Tracker "Whenever an opponent sacrifices an
+/// artifact, this creature deals 2 damage to them" family.
+/// </para>
+///
+/// <para>
+/// Two optional, composable filters (AND-combined):
+/// <list type="bullet">
+///   <item><see cref="PermanentType"/> — restrict to a sacrificed permanent
+///   whose card has this card type (CR 205.2 — e.g. "an <b>artifact</b>",
+///   Vengeful Tracker). <c>null</c>/empty = any permanent type. Parsed as
+///   <see cref="Majik.Core.Cards.Types.CardType"/>.</item>
+///   <item><see cref="NontokenOnly"/> — exclude token permanents (CR 111.7 — a
+///   token in the graveyard ceases to exist as an SBA, so a "put that card …"
+///   payoff has nothing to act on; the It That Betrays "nontoken permanent"
+///   shape). Default <c>false</c>.</item>
+/// </list>
+/// </para>
+/// </summary>
+public sealed class WheneverAnOpponentSacrificesPermanentTriggerDef : TriggerDefinition
+{
+    /// <summary>Optional card-type gate (CR 205.2) — only a sacrificed permanent
+    /// of this type fires it (e.g. <c>"Artifact"</c>). <c>null</c>/empty = no
+    /// type restriction. Parsed as
+    /// <see cref="Majik.Core.Cards.Types.CardType"/>.</summary>
+    public string? PermanentType { get; set; }
+
+    /// <summary>Exclude token permanents (CR 111.7). Default <c>false</c> = any
+    /// permanent (token or nontoken).</summary>
+    public bool NontokenOnly { get; set; }
 }
