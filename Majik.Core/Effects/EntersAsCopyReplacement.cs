@@ -193,15 +193,18 @@ public sealed class EntersAsCopyReplacement : IReplacementEffect<ZoneMoveIntent>
         {
             extraPlusOne += 1;
         }
-        if (_options.LoyaltyCounterIfCopiedPlaneswalker && source.HasType(CardType.Planeswalker))
+        // CR 706.9b — "an additional loyalty counter if it's a planeswalker".
+        // The source qualifies whether it is a real Planeswalker (HasType) OR an
+        // EFFECTIVE planeswalker — a creature-front DFC flipped to its
+        // planeswalker back (CR 712.4). For the effective-PW source the copy's
+        // loyalty lives on the Option-B transient surface that RegisterCopy
+        // stamped above, so the extra counter rides through AddTransientLoyalty;
+        // for a real-PW entering instance it adds to its own field via AddLoyalty.
+        if (_options.LoyaltyCounterIfCopiedPlaneswalker
+            && (source.HasType(CardType.Planeswalker) || source.IsEffectivePlaneswalker()))
         {
-            // The engine tracks loyalty on Planeswalker.Loyalty rather than the
-            // generic Counters collection; surfacing the extra loyalty counter
-            // through the copy-characteristics row is the manland-P/T-style gap
-            // documented on CopyCharacteristicsEffect. Add it directly when the
-            // entering instance is a Planeswalker (the common Spark Double case
-            // copies a creature, handled above).
             if (target is Planeswalker pw) pw.AddLoyalty(1);
+            else target.AddTransientLoyalty(1);
         }
 
         return intent with

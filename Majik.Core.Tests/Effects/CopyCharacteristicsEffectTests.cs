@@ -457,4 +457,150 @@ public class CopyCharacteristicsEffectTests
         chars.Types.Should().Contain(CardType.Land);
         chars.Types.Should().NotContain(CardType.Creature);
     }
+
+    // -----------------------------------------------------------------------
+    // Copy of an EFFECTIVE planeswalker (deferral pay-down:
+    // copy-of-effective-planeswalker-reclass) — CR 707.2 / 712.4 / 711.
+    //
+    // The copy SOURCE is a creature-front transform DFC currently FLIPPED to
+    // its planeswalker BACK face. Such a source is a Creature C# instance
+    // carrying a transient loyalty body (IsEffectivePlaneswalker() == true),
+    // NOT a Planeswalker instance. CR 712.4: the copiable values of a
+    // transformed permanent are derived from its currently-up (back) face, so
+    // a clone of it must become a copy of the planeswalker back — Planeswalker
+    // TYPE + back-face loyalty body + back-face loyalty abilities — without
+    // re-instancing the copy as a Planeswalker (Option-B parallel surface).
+    // -----------------------------------------------------------------------
+
+    /// <summary>Build a creature-front transform DFC FLIPPED to its
+    /// planeswalker back face, on the battlefield, as a deterministic copy
+    /// SOURCE. The back face carries a loyalty body + one [+1]/[−2]-style
+    /// loyalty ability (oracle text) so the copy machinery has both a loyalty
+    /// value and abilities to mirror.</summary>
+    private Creature FlippedEffectivePlaneswalkerSource(ContinuousEffectsService svc)
+    {
+        var src = new Creature("Hero Front", "{1}{U}", 2, 2)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        src.MdfcState = new Majik.Core.CardData.MDFCs.MdfcState(
+            "Hero Front",
+            "Hero Walker",
+            new Majik.Core.CardData.MDFCs.BackFaceCharacteristics(
+                name: "Hero Walker",
+                isCreature: false,
+                power: 0,
+                toughness: 0,
+                types: new[] { CardType.Planeswalker },
+                subtypes: new[] { CardSubtype.Ral },
+                supertypes: new[] { CardSupertype.Legendary },
+                keywords: null,
+                colors: new[] { ManaColor.Blue },
+                loyalty: 4,
+                oracleText: "+1: Draw a card."));
+        src.MdfcState.Transform(); // flip to the planeswalker back face
+        return src;
+    }
+
+    [Fact]
+    public void Copy_OfFlippedEffectivePlaneswalker_CopierBecomesEffectivePlaneswalker()
+    {
+        var svc = new ContinuousEffectsService();
+        var source = FlippedEffectivePlaneswalkerSource(svc);
+        source.IsEffectivePlaneswalker().Should().BeTrue("the source is flipped to its PW back");
+
+        // Copier (a Spark-Double-style 0/0 Illusion) is itself a Creature.
+        var copier = new Creature("Spark Double", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, copier, source,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        // CR 712.4 / 707.2 — copiable values come from the back (up) face: the
+        // copy takes the Planeswalker type, the Ral subtype, and the colour.
+        var chars = svc.Compute((Permanent)copier);
+        chars.Types.Should().Contain(CardType.Planeswalker,
+            "the copy of a flipped DFC takes the back face's PW type (CR 712.4)");
+        chars.Types.Should().NotContain(CardType.Creature,
+            "copiable values overwrite — the copy is no longer a creature");
+        chars.Subtypes.Should().Contain(CardSubtype.Ral);
+
+        // CR 711 / 306.5b — the copy gains a working loyalty body (Option-B
+        // transient surface) seeded from the back face's starting loyalty.
+        copier.IsEffectivePlaneswalker().Should().BeTrue(
+            "the copy of an effective planeswalker is itself an effective planeswalker");
+        copier.GetEffectiveLoyalty().Should().Be(4,
+            "the copy enters with the back face's starting loyalty (CR 712.4)");
+    }
+
+    [Fact]
+    public void Copy_OfFlippedEffectivePlaneswalker_MirrorsBackFaceLoyaltyAbilities()
+    {
+        var svc = new ContinuousEffectsService();
+        var source = FlippedEffectivePlaneswalkerSource(svc);
+
+        var copier = new Creature("Spark Double", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, copier, source,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        svc.Compute((Permanent)copier); // drives the GrantAbilityEffect sync
+
+        // CR 707.2 / 606 — the copy gets the back face's loyalty abilities,
+        // bound to the copy's own Permanent-typed loyalty surface (4A) so
+        // activating "[+1]" raises the COPY's loyalty, not the source's.
+        var loyaltyAbilities = copier.Abilities
+            .OfType<Majik.Core.Abilities.LoyaltyAbility>().ToList();
+        loyaltyAbilities.Should().ContainSingle(
+            "the back face's single [+1] ability is mirrored onto the copy");
+        loyaltyAbilities[0].Source.Should().BeSameAs(copier,
+            "the mirrored loyalty ability is bound to the copy, not the source");
+    }
+
+    [Fact]
+    public void Copy_OfRealPlaneswalkerSource_DoesNotStampTransientBody()
+    {
+        // A REAL Planeswalker instance already holds authoritative loyalty;
+        // the printed-type copy path covers it and the transient-body stamp
+        // must stay inert (Planeswalker overrides the transient accessors).
+        var svc = new ContinuousEffectsService();
+        var pw = new Planeswalker("Jace", "{2}{U}{U}", 5)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        var copier = new Creature("Spark Double", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, copier, pw,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        copier.GetEffectiveLoyalty().Should().BeNull(
+            "a real-PW source has no transient back-face body to stamp; the " +
+            "copy's loyalty body is the (separately-handled) printed-PW path");
+    }
 }

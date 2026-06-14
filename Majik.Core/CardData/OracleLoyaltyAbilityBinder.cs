@@ -62,10 +62,33 @@ public static class OracleLoyaltyAbilityBinder
         Permanent permanent, string oracleText, Player controller,
         IReadOnlyList<Player>? allPlayers = null)
     {
+        var built = RebindOracleText(permanent, oracleText, controller, allPlayers);
+        foreach (var ability in built) permanent.AddAbility(ability);
+        return built;
+    }
+
+    /// <summary>
+    /// CR 707.2 / 712.4 / 606 — BUILD (but do NOT attach) the loyalty abilities
+    /// parsed from <paramref name="oracleText"/>, each bound to
+    /// <paramref name="permanent"/>'s Permanent-typed loyalty surface (4A). The
+    /// caller is responsible for granting them (e.g. through
+    /// <see cref="Majik.Core.Effects.GrantAbilityEffect"/> so the grant carries a
+    /// continuous-effect lifetime). This is the copy-of-effective-planeswalker
+    /// entry point (Spark Double / Phyrexian Metamorph copying a creature-front
+    /// DFC flipped to its planeswalker back): the copy gets the back face's
+    /// loyalty abilities reproduced on its own transient loyalty body, so "[+1]"
+    /// raises the COPY's loyalty — without re-instancing the copy as a
+    /// <see cref="Planeswalker"/>. Mirrors <see cref="BindOracleText"/> but omits
+    /// the immediate <c>AddAbility</c>.
+    /// </summary>
+    public static IReadOnlyList<LoyaltyAbility> RebindOracleText(
+        Permanent permanent, string oracleText, Player controller,
+        IReadOnlyList<Player>? allPlayers = null)
+    {
         if (permanent == null) throw new ArgumentNullException(nameof(permanent));
         if (string.IsNullOrWhiteSpace(oracleText)) return Array.Empty<LoyaltyAbility>();
 
-        var attached = new List<LoyaltyAbility>();
+        var built = new List<LoyaltyAbility>();
         foreach (Match m in LoyaltyLine.Matches(oracleText))
         {
             var sign = m.Groups["sign"].Value;
@@ -81,11 +104,9 @@ public static class OracleLoyaltyAbilityBinder
             };
 
             Action effect = BuildEffect(body, controller, allPlayers);
-            var ability = new LoyaltyAbility(permanent, loyaltyChange, effect);
-            permanent.AddAbility(ability);
-            attached.Add(ability);
+            built.Add(new LoyaltyAbility(permanent, loyaltyChange, effect));
         }
-        return attached;
+        return built;
     }
 
     // --- effect pattern regexes ---
