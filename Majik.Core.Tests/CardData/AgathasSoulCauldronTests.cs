@@ -1130,6 +1130,89 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_GainLife_RehomesLifeGainToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability gains life:
+        // "{T}: You gain 1 life." (a common self-source lifegain shape — e.g.
+        // a cleric/soul-warden style {T}: gain payoff). Re-homing is sound: a
+        // lifegain references the BEARER-CONTROLLER's own life total
+        // (Fx.GainLife), never the exiled card — there is no "this creature" /
+        // source reference at all, so it is as sound a re-home as draw
+        // (CR 119.3 / 613.1f).
+        var cleric = new Creature("Cleric Stub", "1W", 1, 1);
+        cleric.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(cleric);
+        cleric.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Cleric Stub", "{T}: You gain 1 life.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), cleric);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's gain-life ability");
+        var gainAbility = granted[0];
+        gainAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        gainAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        gainAbility.TargetRequests.Should().BeEmpty(
+            "\"you gain N life\" targets nothing — the controller's life is fixed");
+
+        // Activating it gains life for the BEARER-CONTROLLER.
+        var lifeBefore = alice.LifeTotal;
+        foreach (var effect in gainAbility.Effects) effect.Execute();
+        alice.LifeTotal.Should().Be(lifeBefore + 1,
+            "the re-homed gain-life ability gains life for the bearer's controller");
+    }
+
+    [Fact]
+    public void Grant_NonMana_GainNLife_RehomesMultiLifeGainToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var altar = new Creature("Altar Stub", "2W", 0, 4);
+        altar.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(altar);
+        altar.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Altar Stub", "{2}, {T}: You gain 3 life.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), altar);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's gain-3-life ability");
+        var gainAbility = granted[0];
+        gainAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("2"));
+
+        var lifeBefore = alice.LifeTotal;
+        foreach (var effect in gainAbility.Effects) effect.Execute();
+        alice.LifeTotal.Should().Be(lifeBefore + 3,
+            "the re-homed \"you gain 3 life\" ability gains 3 for the bearer's controller");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);
