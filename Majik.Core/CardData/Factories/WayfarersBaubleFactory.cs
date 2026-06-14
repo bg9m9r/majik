@@ -2,8 +2,11 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Zones;
 
@@ -41,11 +44,6 @@ namespace Majik.Core.CardData.Factories;
 ///   basic.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Sacrifice payment side effects</b>: the engine's generic
-///   <see cref="AdditionalCost"/> sacrifice payment is currently a no-op
-///   stub. The effect closure performs the zone move directly so behaviour
-///   is observable — same posture as Expedition Map / Mind Stone /
-///   Pyrite Spellbomb.
 /// - <b>Reveal event</b>: the tutored basic moves Library → Battlefield
 ///   without publishing a reveal event. Same gap as every tutor factory.
 /// </summary>
@@ -57,11 +55,32 @@ public static class WayfarersBaubleFactory
 
     /// <summary>
     /// Construct Wayfarer's Bauble owned and controlled by
-    /// <paramref name="owner"/>. The single "{2}, {T}, Sac: tutor basic
-    /// land to battlefield tapped" activated ability is attached
-    /// structurally.
+    /// <paramref name="owner"/>. Shape-only — no event bus, so the
+    /// self-sacrifice cost publishes nothing (legacy posture; dispatcher /
+    /// structural tests).
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher / Expedition Map pattern; an artifact gets
+    /// the <c>[CardName]</c> factory instance-swap in production, so this IS
+    /// the prod path). Threads <c>effects.EventBus</c> into the self-sacrifice
+    /// cost so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a) crediting the cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -81,7 +100,7 @@ public static class WayfarersBaubleFactory
             async ctx =>
             {
                 var controller = bauble.Controller ?? owner;
-                SacrificeSelf(bauble, owner, controller);
+                SacrificeSelf(bauble, owner, eventBus);
                 await TutorBasicLandToBattlefieldTappedAsync(controller, ctx).ConfigureAwait(false);
             });
 
@@ -92,7 +111,11 @@ public static class WayfarersBaubleFactory
             {
                 new ManaCostCost("{2}"),
                 AdditionalCost.Tap(bauble),
-                AdditionalCost.Sacrifice(bauble),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment → cost.Pay) publishes PermanentSacrificedEvent;
+                // the closure's SacrificeSelf is the bus-aware fallback for the
+                // resolve-only dispatcher/test path.
+                AdditionalCost.Sacrifice(bauble, eventBus),
             },
             effects: new IEffect[] { tutorEffect });
 
@@ -103,12 +126,24 @@ public static class WayfarersBaubleFactory
 
     /// <summary>
     /// CR 701.16 — move <paramref name="bauble"/> from the battlefield to
-    /// its owner's graveyard. Idempotent. Mirrors the closure used by
-    /// Expedition Map / Mind Stone / Pyrite Spellbomb.
+    /// its owner's graveyard. Idempotent. When <paramref name="eventBus"/> is
+    /// supplied (prod effects-aware build) the move routes through
+    /// <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>, publishing a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null bus = bare
+    /// owner-routed move. In the live activation path the cost already moved
+    /// the bauble, so this closure no-ops (single publish either way).
     /// </summary>
-    private static void SacrificeSelf(Artifact bauble, Player owner, Player controller)
+    private static void SacrificeSelf(Artifact bauble, Player owner, IEventBus? eventBus)
     {
         if (bauble.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(bauble, bauble.Controller ?? owner, eventBus);
+            return;
+        }
+
+        var controller = bauble.Controller ?? owner;
         controller.Zones.Battlefield.RemoveCard(bauble);
         owner.Zones.Graveyard.AddCard(bauble);
         bauble.SetZone(ZoneType.Graveyard);
