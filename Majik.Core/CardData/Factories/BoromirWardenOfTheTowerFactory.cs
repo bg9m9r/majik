@@ -174,12 +174,26 @@ public static class BoromirWardenOfTheTowerFactory
         // Sacrifice ability — CR 602 / CR 701.16 / CR 701.54.
         //   "Sacrifice Boromir: Creatures you control gain indestructible
         //    until end of turn. The Ring tempts you."
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect reads the ability's controller off the live
+        // ResolutionContext.Controller (the activator — equivalently
+        // ResolutionContext.Source's controller) rather than capturing `owner`,
+        // and grants indestructible to THAT controller's creatures. The
+        // self-sacrifice cost (SacrificeSelfCost, now an IRebindableCost)
+        // re-homes via ActivatedAbility.RebindTo Stage 1, so when Agatha's Soul
+        // Cauldron's group-grant re-homes the REAL ability onto a counter-
+        // bearing bearer (CR 707.2 / 613.1f), the BEARER is sacrificed and the
+        // BEARER's controller's creatures gain indestructible — never the exiled
+        // Boromir. On the legacy context-less sync path (Effect.Execute() →
+        // ResolutionContext.Legacy, Controller null) it falls back to `owner`.
+        // Marked RebindSafe.
         // ----------------------------------------------------------------
         var sacEffect = new Effect(
             $"{CardName}: creatures you control gain indestructible until end of turn; the Ring tempts you",
-            () =>
+            ctx =>
             {
-                var controller = owner; // sacrifice resolves under the controller at activation
+                var controller = ctx.Controller ?? ctx.Source?.Controller ?? owner;
                 // CR 613.1f / 702.12 — indestructible until end of turn for
                 // every creature the controller controls (mirrors Boros Charm
                 // mode 1). Creatures-only scope.
@@ -225,13 +239,15 @@ public static class BoromirWardenOfTheTowerFactory
                         .OfType<Creature>()
                         .FirstOrDefault();
                 controller.TheRingTemptsYou(chosen, eventBus, triggers, allPlayersResolver);
+                return ValueTask.CompletedTask;
             });
 
         var sacAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new SacrificeSelfCost(card) },
-            effects: new IEffect[] { sacEffect });
+            effects: new IEffect[] { sacEffect },
+            rebindSafe: true);
 
         card.AddAbility(sacAbility);
 

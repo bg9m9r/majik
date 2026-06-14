@@ -4132,4 +4132,82 @@ public class AgathasSoulCauldronTests
         sorcery.Zone.Should().Be(ZoneType.Graveyard,
             "the countered spell goes to its owner's graveyard");
     }
+
+    // -----------------------------------------------------------------------
+    // Bespoke-factory migration batch (agatha-bespoke-migration-discard-self-
+    // impulse-and-free-counter-batch / item #5). Boromir's "Sacrifice Boromir:
+    // Creatures you control gain indestructible until end of turn." sac-self
+    // activated ability now reads ResolutionContext.Source / .Controller and
+    // marks the ability RebindSafe, so Agatha's group-grant re-homes the REAL
+    // ability — including its self-sacrifice cost (SacrificeSelfCost, now an
+    // IRebindableCost) — onto a counter-bearing bearer via RebindTo
+    // (CR 707.2 / 613.1f). The re-homed ability sacrifices the BEARER and grants
+    // the BEARER's controller's creatures indestructible — never the exiled
+    // Boromir.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Boromir_SacGrantToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // "Sacrifice Boromir: Creatures you control gain indestructible until
+        // end of turn. The Ring tempts you." ability is now RebindSafe (the
+        // self-sacrifice cost re-homes via IRebindableCost; the grant reads
+        // ResolutionContext.Source / .Controller).
+        var boromir = BoromirWardenOfTheTowerFactory.Create(alice);
+        boromir.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility
+                && a.Costs.OfType<Majik.Core.Costs.SacrificeSelfCost>().Any())
+            .RebindSafe.Should().BeTrue(
+                "the migrated Boromir sac ability reads ResolutionContext.Source/.Controller and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(boromir);
+        boromir.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), boromir);
+
+        var sac = GrantedActivated(bearer).Single(a =>
+            a.Costs.OfType<Majik.Core.Costs.SacrificeSelfCost>().Any());
+        sac.Source.Should().BeSameAs(bearer, "the ability is re-homed to the BEARER (CR 707.2)");
+        sac.RebindSafe.Should().BeTrue("RebindTo preserves the re-source-safe provenance");
+
+        // STAGE 1 — the SacrificeSelfCost re-homes to the BEARER (IRebindableCost).
+        sac.Costs.OfType<Majik.Core.Costs.SacrificeSelfCost>()
+            .Single().Self.Should().BeSameAs(bearer,
+                "the self-sacrifice cost re-homes to the bearer (IRebindableCost.RebindTo)");
+
+        // A second creature the BEARER's controller controls — should receive
+        // the indestructible grant when the re-homed ability resolves.
+        var other = new Creature("Other Soldier", "{W}", 1, 1);
+        other.SetOwner(alice);
+        other.ChangeController(alice);
+        other.SetZone(ZoneType.Battlefield);
+        other.ActiveEffects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        alice.Zones.Battlefield.AddCard(other);
+
+        // Resolve the re-homed ability through a live GameContext (Source = bearer).
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(bus));
+        await sac.ResolveAsync(agent: null, game: game);
+
+        // The grant affects the BEARER's controller's creatures (CR 613.1f).
+        Majik.Core.Combat.CombatAbilities.HasIndestructible(other).Should().BeTrue(
+            "the re-homed ability grants the BEARER's controller's creatures indestructible");
+        boromir.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted Boromir stays untouched in exile under the Cauldron");
+    }
 }

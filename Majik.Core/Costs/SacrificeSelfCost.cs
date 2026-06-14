@@ -21,7 +21,7 @@ namespace Majik.Core.Costs;
 /// the permanent is not currently on its controller's battlefield
 /// (CR 701.16a — a player may only sacrifice a permanent they control).
 /// </summary>
-public sealed class SacrificeSelfCost : ICost, IBusAwareCost
+public sealed class SacrificeSelfCost : ICost, IBusAwareCost, IRebindableCost
 {
     private readonly Permanent _self;
 
@@ -34,6 +34,21 @@ public sealed class SacrificeSelfCost : ICost, IBusAwareCost
     /// construction. Exposed for tests / effects that need to read the
     /// source after payment.</summary>
     public Permanent Self => _self;
+
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — re-home the captured "self"
+    /// permanent onto <paramref name="newSource"/> when this cost's source is
+    /// the ability's original source. Lets
+    /// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindTo"/> re-source a
+    /// "Sacrifice CARDNAME:" cost onto the BEARER under Agatha's Soul Cauldron's
+    /// group grant (CR 707.2 / 613.1f / 702.49) so the re-homed ability
+    /// sacrifices the bearer, never the exiled card. Pure — returns a new
+    /// instance, never mutates the original.
+    /// </summary>
+    public ICost RebindTo(object oldSource, object newSource) =>
+        ReferenceEquals(_self, oldSource) && newSource is Permanent p
+            ? new SacrificeSelfCost(p)
+            : this;
 
     /// <inheritdoc/>
     public string Description => $"sacrifice {_self.Name}";
