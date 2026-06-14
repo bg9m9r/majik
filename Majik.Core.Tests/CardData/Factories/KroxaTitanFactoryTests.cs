@@ -108,6 +108,38 @@ public class KroxaTitanFactoryTests
         alice.Zones.Battlefield.GetCards().Should().Contain(kroxa);
     }
 
+    [Fact]
+    public void SelfSac_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // class-(b) sac-bus pay-down: the routed prod overload threads
+        // effects.EventBus into the "sacrifice unless escaped" ETB closure so
+        // the CR 701.16 sacrifice publishes a PermanentSacrificedEvent (CR
+        // 701.16a). Drives the card EXACTLY as prod does.
+        var bus = new EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var captured = new System.Collections.Generic.List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(captured.Add);
+
+        var built = NamedCardFactory.Create("Kroxa, Titan of Death's Hunger", _alice, effects);
+        built.Should().BeOfType<Creature>();
+        var kroxa = (Creature)built;
+        _alice.Zones.Battlefield.AddCard(kroxa);
+        kroxa.SetZone(ZoneType.Battlefield);
+
+        var sacTrigger = kroxa.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Effects.Any(e => e.Description != null
+                && e.Description.Contains("sacrifice unless escaped")));
+        foreach (var effect in sacTrigger.Effects) effect.Execute();
+
+        captured.Should().ContainSingle(
+            "the prod effects-aware dispatch threads the bus so the self-sacrifice "
+            + "publishes PermanentSacrificedEvent (CR 701.16a)")
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        kroxa.Zone.Should().Be(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(kroxa);
+    }
+
     // -----------------------------------------------------------------------
     // Escape alt-cost shape — CR 702.138
     // -----------------------------------------------------------------------

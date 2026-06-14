@@ -163,4 +163,47 @@ public class VexingDevilFactoryTests
         _bob.LifeTotal.Should().Be(20);
         card.Zone.Should().Be(ZoneType.Battlefield);
     }
+
+    [Fact]
+    public void SelfSac_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // class-(b) sac-bus pay-down: the routed prod overload threads
+        // effects.EventBus into the "if a player does, sacrifice this creature"
+        // ETB closure so the CR 701.16 sacrifice publishes a
+        // PermanentSacrificedEvent (CR 701.16a). Drives the card EXACTLY as
+        // prod does (NamedCardFactory.Create(name, owner, effects)).
+        var bus = new EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var captured = new System.Collections.Generic.List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(captured.Add);
+
+        // Bob accepts the prompt → the Devil is sacrificed.
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueYesNo(true);
+        AgentRegistry.Set(_bob, bobAgent);
+
+        try
+        {
+            var built = NamedCardFactory.Create("Vexing Devil", _alice, effects);
+            built.Should().BeOfType<Creature>();
+            var card = (Creature)built;
+            _alice.Zones.Battlefield.AddCard(card);
+            card.SetZone(ZoneType.Battlefield);
+
+            var trigger = card.Abilities.OfType<TriggeredAbility>().Single();
+            Majik.Core.Tests.Helpers.ContextResolve.Resolve(trigger, _alice, _alice, _bob);
+
+            captured.Should().ContainSingle(
+                "the prod effects-aware dispatch threads the bus so the self-sacrifice "
+                + "publishes PermanentSacrificedEvent (CR 701.16a)")
+                .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+            card.Zone.Should().Be(ZoneType.Graveyard);
+            _alice.Zones.Graveyard.GetCards().Should().Contain(card);
+        }
+        finally
+        {
+            AgentRegistry.Remove(_bob);
+        }
+    }
 }

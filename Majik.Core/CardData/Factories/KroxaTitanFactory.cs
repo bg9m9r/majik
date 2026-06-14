@@ -4,6 +4,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -109,6 +110,21 @@ public static class KroxaTitanFactory
         Create(owner, triggers: null, opponentAgent: null);
 
     /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+    /// Kroxa registers no continuous effect, but its "sacrifice it unless it
+    /// escaped" ETB self-sacrifice (CR 701.16 / CR 702.138b) must publish a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// sacrifice payoffs see it — so this forwards the bus from
+    /// <c>effects.EventBus</c> into the sac closure. Without this overload the
+    /// routed build falls through to single-arg dispatch and the self-sacrifice
+    /// publishes nothing (the class-(b) sac-bus pay-down).
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, opponentAgent: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Kroxa with optional runtime services. "Each opponent" is read
     /// from the live resolution context at resolution
     /// (<see cref="ContextOpponents"/>), so the discard/drain is correct on the
@@ -121,10 +137,15 @@ public static class KroxaTitanFactory
     /// <param name="opponentAgent">Optional agent for each opponent's
     /// discard pick (CR 701.8 — the discarding player chooses). Null falls
     /// back to a deterministic first-card pick.</param>
+    /// <param name="eventBus">Bus the self-sacrifice publishes
+    /// <see cref="PermanentSacrificedEvent"/> on (CR 701.16a). When supplied the
+    /// sac routes through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>;
+    /// null falls back to the publish-nothing path.</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        IPlayerAgent? opponentAgent)
+        IPlayerAgent? opponentAgent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -147,7 +168,18 @@ public static class KroxaTitanFactory
                 if (card.Zone != ZoneType.Battlefield) return;
                 if (card.WasCastForEscape) return; // CR 702.138b — escaped gate.
                 // CR 701.16 — sacrifice bypasses Indestructible / regeneration.
-                Fx.Sacrifice(card);
+                // When a bus is supplied (the prod effects-aware build) route
+                // through Fx.Sacrifice(perm, player, bus) so a
+                // PermanentSacrificedEvent fires (CR 701.16a) crediting the
+                // controller as the sacrificing player.
+                if (eventBus != null)
+                {
+                    Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+                }
+                else
+                {
+                    Fx.Sacrifice(card);
+                }
             });
 
         var sacTrigger = new TriggeredAbility(
