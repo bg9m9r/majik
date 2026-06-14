@@ -164,14 +164,18 @@ public static class SeasonedPyromancerFactory
         // --------------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: exile self from graveyard, create two 1/1 red Elemental tokens",
-            () => ResolveGraveyardActivation(card, owner, zoneService));
+            ctx => ResolveGraveyardActivation(ctx, card, owner, zoneService));
 
         var activatedAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(GraveyardActivationCost) },
             effects: new IEffect[] { activatedEffect },
-            sorcerySpeed: true);
+            sorcerySpeed: true,
+            // Agatha's Soul Cauldron re-home soundness (agatha-bespoke
+            // migration) — the body reads the live ResolutionContext.Source
+            // ("this card" + its controller) rather than the captured card.
+            rebindSafe: true);
 
         card.AddAbility(activatedAbility);
 
@@ -267,24 +271,36 @@ public static class SeasonedPyromancerFactory
     }
 
     // --- Graveyard-activated body (CR 113.6 / 307.5) ----------------------
-    private static void ResolveGraveyardActivation(Creature card, Player owner, ZoneService? zoneService)
+    //
+    // RE-SOURCE-SAFE (agatha-bespoke migration): reads the live source off
+    // ResolutionContext.Source (= the ability's own source permanent, threaded
+    // by ActivatedAbility.ResolveAsync — Creature : Permanent, so the cast
+    // holds even from the graveyard) rather than the captured `card`. "This
+    // card" + its controller are resolved from the live source, so a RebindTo
+    // (Agatha's Soul Cauldron) re-homes the ability to the bearer. The static
+    // `card`/`owner` remain only as the legacy-sync (ctx-less) fallback for
+    // shape-test callers driving the effect via Execute().
+    private static ValueTask ResolveGraveyardActivation(ResolutionContext ctx, Creature card, Player owner, ZoneService? zoneService)
     {
-        // Zone guard — only payable from graveyard.
-        if (card.Zone != ZoneType.Graveyard) return;
-        if (card.Owner == null) return;
+        var self = (ctx.Source as ICard) ?? card;
 
-        var cardOwner = card.Owner;
+        // Zone guard — only payable from graveyard.
+        if (self.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask;
+
+        var cardOwner = self.Owner ?? owner;
 
         // Exile this card from the graveyard as part of the cost.
-        cardOwner.Zones.Graveyard.RemoveCard(card);
-        cardOwner.Zones.Exile.AddCard(card);
-        card.SetZone(ZoneType.Exile);
+        cardOwner.Zones.Graveyard.RemoveCard(self);
+        cardOwner.Zones.Exile.AddCard(self);
+        self.SetZone(ZoneType.Exile);
 
         // Create two 1/1 red Elemental creature tokens.
-        var controller = card.Controller ?? owner;
+        var controller = self.Controller ?? owner;
         for (var i = 0; i < GraveyardTokenCount; i++)
         {
             CreateElementalToken(controller, zoneService);
         }
+
+        return ValueTask.CompletedTask;
     }
 }

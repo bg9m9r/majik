@@ -174,9 +174,14 @@ public static class ColossalSkyturtleFactory
 
         var effect = new Effect(
             $"{CardName} (Channel 1): return target card from your graveyard to your hand",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
+                // RE-SOURCE-SAFE (agatha-bespoke migration): "your graveyard"
+                // is the channel-controller's, read from the live source off
+                // ResolutionContext.Source (the bearer after a RebindTo;
+                // otherwise this Skyturtle), never the captured card.
+                var controller = (ctx.Source as Permanent)?.Controller
+                    ?? card.Controller ?? owner;
 
                 // 1) Honour the agent-set target if present (production path).
                 ICard? picked = null;
@@ -192,12 +197,12 @@ public static class ColossalSkyturtleFactory
                 picked ??= controller.Zones.Graveyard.GetCards().FirstOrDefault();
 
                 // Empty graveyard → clean no-op.
-                if (picked == null) return;
+                if (picked == null) return ValueTask.CompletedTask;
 
                 // CR 608.2b — target must still be in the controller's
                 // graveyard at resolution.
-                if (picked.Zone != ZoneType.Graveyard) return;
-                if (!controller.Zones.Graveyard.GetCards().Contains(picked)) return;
+                if (picked.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask;
+                if (!controller.Zones.Graveyard.GetCards().Contains(picked)) return ValueTask.CompletedTask;
 
                 // Move Graveyard → Hand (direct zone mutation; ZoneService
                 // path omitted — same raw-zone posture as EternalWitness
@@ -205,6 +210,8 @@ public static class ColossalSkyturtleFactory
                 controller.Zones.Graveyard.RemoveCard(picked);
                 controller.Zones.Hand.AddCard(picked);
                 picked.SetZone(ZoneType.Hand);
+
+                return ValueTask.CompletedTask;
             });
 
         channel = new ActivatedAbility(
@@ -216,7 +223,10 @@ public static class ColossalSkyturtleFactory
                 new DiscardSelfCost(card),
             },
             effects: new IEffect[] { effect },
-            targetRequests: targetRequests);
+            targetRequests: targetRequests,
+            // Agatha's Soul Cauldron re-home soundness — the effect reads
+            // "your graveyard" off ResolutionContext.Source's controller.
+            rebindSafe: true);
 
         card.AddAbility(channel);
     }
@@ -281,7 +291,10 @@ public static class ColossalSkyturtleFactory
                 new DiscardSelfCost(card),
             },
             effects: new IEffect[] { effect },
-            targetRequests: targetRequests);
+            targetRequests: targetRequests,
+            // Agatha's Soul Cauldron re-home soundness — the bounce reads only
+            // the chosen target + its owner, never the captured source card.
+            rebindSafe: true);
 
         card.AddAbility(channel);
     }
