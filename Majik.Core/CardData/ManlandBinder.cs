@@ -72,8 +72,8 @@ namespace Majik.Core.CardData;
 /// </list>
 /// </para>
 ///
-/// <para><b>Exotic animate bodies (now bound).</b> Three non-standard body
-/// shapes that previously deferred now bind:
+/// <para><b>Exotic animate bodies (now bound).</b> Non-standard body shapes
+/// that previously deferred now bind:
 /// <list type="bullet">
 ///   <item><b>"all creature types"</b> (Mutavault, Faceless Haven, Soulstone
 ///     Sanctuary) — the body names no fixed subtype; every creature subtype the
@@ -83,10 +83,27 @@ namespace Majik.Core.CardData;
 ///     resolution from <see cref="ResolutionContext.ChosenX"/> (the GAP-2
 ///     per-activation X ledger), clamped to a minimum 1/1 ("X can't be 0",
 ///     CR 107.1b).</item>
-///   <item><b>Permanent animate</b> (Soulstone Sanctuary) — when the line omits
-///     "until end of turn" the registered continuous effects do NOT expire at
-///     cleanup (CR 613.1c — a no-duration continuous effect lasts as long as the
-///     land is on the battlefield).</item>
+///   <item><b>*/* characteristic-defining P/T</b> (Svogthos, the Restless Tomb)
+///     — the becomes-clause omits a printed P/T; the quoted CDA "power and
+///     toughness are each equal to the number of creature cards in your
+///     graveyard" registers a <see cref="CdaPowerToughnessEffect"/> (Layer 7a,
+///     CR 604.3 / 613.2) reading the live graveyard creature count. The body is
+///     a multi-subtype "Plant Zombie" (CR 205.3 — multiple creature types).</item>
+///   <item><b>Hybrid mana + non-mana activation cost</b> (Hostile Desert) — the
+///     activation cost "{2}, Exile a land card from your graveyard" carries a
+///     non-mana rider <see cref="ManaCostCost"/> can't capture; the binder wires
+///     an <see cref="ExileLandCardFromGraveyardCost"/> alongside the mana cost
+///     (CR 602.1).</item>
+///   <item><b>Conditional "If this land isn't a creature, it becomes …" + a
+///     granted cast-pump trigger</b> (Great Hall of the Biblioplex) — the
+///     "it becomes" wording binds; the resolution is a no-op when the land is
+///     already a creature (CR 613.1c); the quoted "Whenever you cast an instant
+///     or sorcery spell, this creature gets +1/+0 until end of turn" registers a
+///     Kiln-Fiend-shaped cast-pump trigger on the animated body (CR 603.1).</item>
+///   <item><b>Permanent animate</b> (Soulstone Sanctuary, Great Hall) — when the
+///     line omits "until end of turn" the registered continuous effects do NOT
+///     expire at cleanup (CR 613.1c — a no-duration continuous effect lasts as
+///     long as the land is on the battlefield).</item>
 /// </list>
 /// </para>
 ///
@@ -99,6 +116,13 @@ namespace Majik.Core.CardData;
 ///   <item>Restless Bones' "exile up to two target cards from graveyards, then
 ///     create that many tapped 2/2 Skeletons" attack trigger — the
 ///     count-linked token rider has no generic primitive yet; deferred.</item>
+///   <item><b>Earthbend</b> (Ba Sing Se) — "{2}{G}, {T}: Earthbend 2. Activate
+///     only as a sorcery." is a fundamentally different shape: it does NOT
+///     animate THIS land — it targets ANOTHER land you control (becomes a 0/0
+///     creature with haste, gets two +1/+1 counters, and a "when it dies or is
+///     exiled, return it tapped" delayed trigger). The AnimateLine regex keys on
+///     "this land becomes …", so Earthbend never matches here; it needs a
+///     target-a-land + counters + delayed-return primitive of its own. Deferred.</item>
 /// </list>
 /// </para>
 ///
@@ -138,13 +162,34 @@ public static class ManlandBinder
     // done on the captured fragments in code (see Bind). X/X bodies (Lair of
     // the Hydra) are deferred — the P/T group requires digits.
     private static readonly Regex AnimateLine = new(
-        @"(?<cost>(?:\{[^}]+\})+)\s*:\s*" +                       // {1}{U}{B}:
+        @"(?<cost>(?:\{[^}]+\})+)" +                              // {1}{U}{B}
+        @"(?<extracost>,\s*[^:{}]+?)?" +                          // optional non-mana cost rider ", Exile a land card from your graveyard"
+        @"\s*:\s*" +                                               // :
         @"(?:Until end of turn,\s*)?" +                            // optional leading EOT
-        @"this land becomes an?\s+" +                             // becomes a / an
-        @"(?<power>\d+|[Xx])/(?<toughness>\d+|[Xx])\s+" +        // N/N or X/X
-        @"(?<body>(?:(?!creature\b)[^.\s]+\s+)*?)creature\b" +    // <colors> [artifact] <Subtype>
+        @"(?:If this land isn't a creature,\s*)?" +               // Great Hall conditional gate (parsed in code)
+        @"(?:this land|it)\s+becomes an?\s+" +                    // "this land becomes" / "it becomes"
+        @"(?:(?<power>\d+|[Xx])/(?<toughness>\d+|[Xx])\s+)?" +    // OPTIONAL N/N or X/X (Svogthos omits it — CDA body)
+        @"(?<body>(?:(?!creature\b)[^.\s]+\s+)*?)creature\b" +    // <colors> [artifact] <Subtype…>
         @"(?<rest>.*)$",                                           // remainder (parsed in code)
         RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
+
+    // CR 604.3 / 613.2 Layer 7a — a quoted characteristic-defining P/T grant
+    // on the animated body: "This creature's power and toughness are each equal
+    // to the number of creature cards in your graveyard." (Svogthos). When
+    // present the body has no fixed digit P/T; the binder registers a
+    // CdaPowerToughnessEffect reading the live graveyard creature count.
+    private static readonly Regex QuotedGraveyardCreatureCda = new(
+        "\"[^\"]*power and toughness are each equal to the number of creature " +
+        "cards in your graveyard[^\"]*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // A quoted "Whenever you cast an instant or sorcery spell, this creature
+    // gets +N/+0 until end of turn." granted trigger (Great Hall of the
+    // Biblioplex). Kiln-Fiend-shaped cast pump on the animated body.
+    private static readonly Regex QuotedCastInstantSorceryPump = new(
+        "\"\\s*Whenever you cast an instant or sorcery spell, this creature " +
+        "gets \\+(?<p>\\d+)/\\+(?<t>\\d+) until end of turn\\.?\\s*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // The colour words that precede the creature subtype in the body group.
     // Stripped so the trailing token is the subtype.
@@ -272,23 +317,40 @@ public static class ManlandBinder
             return false;
         }
 
-        // Parse P/T. Two shapes:
+        // Parse P/T. Four shapes:
         //   - Fixed digits (the vast majority of manlands): "2/2", "4/4", …
         //   - X/X (Lair of the Hydra) — the body's base P/T equals the X paid
         //     for the activation. Both groups must be "X" (mixed N/X never
         //     occurs in the pool). When X/X, the P/T is read at resolution from
         //     ResolutionContext.ChosenX (GAP 2 — the per-activation X ledger).
+        //   - No printed P/T + a quoted CDA P/T (Svogthos) — the becomes-clause
+        //     names no digit P/T; the body's P/T is characteristic-defining
+        //     (CR 604.3 / 613.2 Layer 7a), read from the live graveyard creature
+        //     count. Detected below as isCdaBody.
         var powerText = m.Groups["power"].Value;
         var toughnessText = m.Groups["toughness"].Value;
+        var hasPrintedPT = powerText.Length > 0 && toughnessText.Length > 0;
         var isXBody =
+            hasPrintedPT &&
             powerText.Equals("x", StringComparison.OrdinalIgnoreCase) &&
             toughnessText.Equals("x", StringComparison.OrdinalIgnoreCase);
+
+        // CR 604.3 / 613.2 Layer 7a — quoted characteristic-defining P/T body
+        // (Svogthos: "power and toughness are each equal to the number of
+        // creature cards in your graveyard"). Only valid when the becomes-clause
+        // omits a printed P/T.
+        var isCdaBody = !hasPrintedPT && QuotedGraveyardCreatureCda.IsMatch(rest);
+
         int power = 0, toughness = 0;
-        if (!isXBody &&
+        if (hasPrintedPT && !isXBody &&
             (!int.TryParse(powerText, out power) ||
              !int.TryParse(toughnessText, out toughness)))
         {
             return false; // mixed N/X or unparseable → defer
+        }
+        if (!hasPrintedPT && !isCdaBody)
+        {
+            return false; // no P/T and no recognised CDA body → defer
         }
 
         // CR 514.2 — the animation expires at end of turn iff the line says
@@ -310,11 +372,11 @@ public static class ManlandBinder
         //     single source of truth.
         //   - X/X (Lair of the Hydra) — handled above; the body still names a
         //     fixed subtype ("green Hydra").
-        var (subtype, isArtifact, bodyColors) = ParseBody(m.Groups["body"].Value);
+        var (subtypes, isArtifact, bodyColors) = ParseBody(m.Groups["body"].Value);
         var isAllCreatureTypes =
-            subtype is null &&
+            subtypes.Count == 0 &&
             rest.Contains("all creature types", StringComparison.OrdinalIgnoreCase);
-        if (subtype is null && !isAllCreatureTypes)
+        if (subtypes.Count == 0 && !isAllCreatureTypes)
         {
             return false; // unknown / unmodelled subtype → defer
         }
@@ -351,7 +413,26 @@ public static class ManlandBinder
         // (CR 613.6e). Returns null when no such quoted activated rider exists.
         var grantedActivatedQuote = ParseQuotedActivatedAbility(rest, land, controller, effects);
 
+        // CR 603.1 — granted quoted "Whenever you cast an instant or sorcery
+        // spell, this creature gets +N/+0 until end of turn." cast-pump trigger
+        // (Great Hall of the Biblioplex). Kiln-Fiend-shaped; registered at
+        // animate-resolution and attached to the land.
+        var grantedCastPumpQuote = ParseQuotedCastPumpTrigger(
+            rest, land, controller, effects, triggers);
+
         var costText = m.Groups["cost"].Value;
+
+        // Non-mana additional cost rider in the activation cost
+        // (Hostile Desert: "{2}, Exile a land card from your graveyard:").
+        // The mana segment is the {…} prefix; the "extracost" group carries the
+        // ", <non-mana cost>" tail. ManaCostCost can't capture it, so we wire a
+        // dedicated ICost alongside the mana cost.
+        var extraCostText = m.Groups["extracost"].Value;
+        ICost? nonManaCost = ParseNonManaActivationCost(extraCostText);
+        if (extraCostText.Length > 0 && nonManaCost is null)
+        {
+            return false; // an activation cost rider we don't model → defer
+        }
 
         // The animate effect re-uses the cycle's shared continuous-effect
         // primitives (same as the per-card factories):
@@ -367,7 +448,7 @@ public static class ManlandBinder
         // models for an "all creature types" body (CR 205.3m).
         var capturedSubtypes = isAllCreatureTypes
             ? Majik.Core.CardData.Factories.MutavaultAnimateEffect.EveryCreatureType.ToArray()
-            : new[] { subtype!.Value };
+            : subtypes.ToArray();
         var extraTypes = isArtifact ? new[] { CardType.Artifact } : null;
         // CR 613.1e (Layer 5) — the animate line names the body's colour(s)
         // ("blue and black", "white and blue", …). Animated manlands are
@@ -377,16 +458,31 @@ public static class ManlandBinder
         var capturedColors = bodyColors;
         var capturedExpires = expiresAtEot;
         var capturedIsX = isXBody;
+        var capturedIsCda = isCdaBody;
         var fixedPower = power;
         var fixedToughness = toughness;
         var bodyLabel = isAllCreatureTypes ? "every-creature-type" : capturedSubtypes[0].ToString();
-        var ptLabel = capturedIsX ? "X/X" : $"{fixedPower}/{fixedToughness}";
+        var ptLabel = capturedIsCda ? "*/*" : capturedIsX ? "X/X" : $"{fixedPower}/{fixedToughness}";
+
+        // CR 613.1c — Great Hall's "If this land isn't a creature, it becomes …":
+        // a no-op when the land is already a creature. Captured for the
+        // resolution gate below.
+        var capturedConditionalNotCreature =
+            text.Contains("If this land isn't a creature", StringComparison.OrdinalIgnoreCase);
 
         // Resolution body. Context-aware: an X/X body (Lair of the Hydra) reads
         // the X paid from ResolutionContext.ChosenX (GAP 2). "X can't be 0"
         // (CR 107.1b) clamps the body to a minimum 1/1.
         Func<ResolutionContext, ValueTask> resolve = ctx =>
         {
+            // CR 613.1c — Great Hall's conditional: do nothing if the land is
+            // already a creature (avoids re-stacking the animation on itself).
+            if (capturedConditionalNotCreature &&
+                effects.Compute(land).Types.Contains(CardType.Creature))
+            {
+                return ValueTask.CompletedTask;
+            }
+
             var p = capturedIsX ? Math.Max(1, ctx.ChosenX ?? 0) : fixedPower;
             var t = capturedIsX ? Math.Max(1, ctx.ChosenX ?? 0) : fixedToughness;
 
@@ -396,8 +492,23 @@ public static class ManlandBinder
                 subtypes: capturedSubtypes,
                 extraTypes: extraTypes,
                 expiresAtEndOfTurn: capturedExpires));
-            effects.Register(new ManlandCycleBecomesPTEffect(
-                land, p, t, expiresAtEndOfTurn: capturedExpires));
+
+            if (capturedIsCda)
+            {
+                // CR 604.3 / 613.2 Layer 7a — characteristic-defining P/T from
+                // the live graveyard creature count (CR 305.1 — Land card type
+                // check). Recomputed every Compute. EOT-bounded with the animate.
+                effects.Register(new CdaPowerToughnessEffect(
+                    source: land,
+                    powerOf: GraveyardCreatureCount,
+                    toughnessOf: GraveyardCreatureCount,
+                    expiresAtEndOfTurn: capturedExpires));
+            }
+            else
+            {
+                effects.Register(new ManlandCycleBecomesPTEffect(
+                    land, p, t, expiresAtEndOfTurn: capturedExpires));
+            }
             if (capturedColors.Count > 0)
             {
                 effects.Register(new SetColorsEffect(
@@ -422,6 +533,12 @@ public static class ManlandBinder
             // GrantAbilityEffect attaches the parsed activated ability to the
             // animated body and revokes it when the animation lifts.
             grantedActivatedQuote?.Invoke();
+
+            // CR 603.1 — granted quoted "Whenever you cast an instant or sorcery
+            // spell, this creature gets +N/+0 until end of turn." cast-pump
+            // trigger (Great Hall). Registered at animate-resolution, attached to
+            // the land. Same posture as the granted attack triggers above.
+            grantedCastPumpQuote?.Invoke();
             return ValueTask.CompletedTask;
         };
 
@@ -432,10 +549,16 @@ public static class ManlandBinder
             $"{(capturedExpires ? " until EOT" : "")} (still a land)",
             resolve);
 
+        // CR 602.1 — the activation cost is the mana segment plus any non-mana
+        // rider (Hostile Desert's exile-a-land-card). Both go on the cost list.
+        var costs = nonManaCost is null
+            ? new ICost[] { new ManaCostCost(costText) }
+            : new ICost[] { new ManaCostCost(costText), nonManaCost };
+
         land.AddAbility(new ActivatedAbility(
             source: land,
             controller: controller,
-            costs: new ICost[] { new ManaCostCost(costText) },
+            costs: costs,
             effects: new IEffect[] { animateEffect }));
 
         // Restless cycle attack trigger (non-targeted subset only).
@@ -452,7 +575,7 @@ public static class ManlandBinder
     /// colour words + "artifact" yield the subtype. Returns
     /// <c>(null, _, _)</c> for an unknown / multi-word subtype (defer).
     /// </summary>
-    private static (CardSubtype? Subtype, bool IsArtifact, IReadOnlyList<Majik.Core.ValueObjects.ManaColor> Colors) ParseBody(string body)
+    private static (IReadOnlyList<CardSubtype> Subtypes, bool IsArtifact, IReadOnlyList<Majik.Core.ValueObjects.ManaColor> Colors) ParseBody(string body)
     {
         var rawTokens = body.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
@@ -470,7 +593,7 @@ public static class ManlandBinder
         var tokens = rawTokens
             .Where(t => !ColorWords.Contains(t))
             .ToList();
-        if (tokens.Count == 0) return (null, false, colors);
+        if (tokens.Count == 0) return (Array.Empty<CardSubtype>(), false, colors);
 
         var isArtifact = false;
         // "<Subtype> artifact" never happens; the printed order is
@@ -481,14 +604,24 @@ public static class ManlandBinder
         {
             isArtifact = true;
         }
-        if (tokens.Count == 0) return (null, isArtifact, colors);
+        if (tokens.Count == 0) return (Array.Empty<CardSubtype>(), isArtifact, colors);
 
-        // Normalise hyphenated subtypes to their PascalCase enum name
-        // ("Assembly-Worker" → "AssemblyWorker" — Mishra's Factory / Foundry).
-        var token = tokens[^1].Replace("-", "");
-        return Enum.TryParse<CardSubtype>(token, ignoreCase: true, out var st)
-            ? (st, isArtifact, colors)
-            : (null, isArtifact, colors);
+        // CR 205.3 — a body can name MULTIPLE creature subtypes ("Plant Zombie"
+        // — Svogthos). EVERY remaining token must parse to a CardSubtype; if any
+        // doesn't, the body is unmodelled and we defer (empty list). Normalise
+        // hyphenated subtypes to their PascalCase enum name ("Assembly-Worker" →
+        // "AssemblyWorker" — Mishra's Factory / Foundry).
+        var subtypes = new List<CardSubtype>();
+        foreach (var raw in tokens)
+        {
+            var token = raw.Replace("-", "");
+            if (!Enum.TryParse<CardSubtype>(token, ignoreCase: true, out var st))
+            {
+                return (Array.Empty<CardSubtype>(), isArtifact, colors);
+            }
+            if (!subtypes.Contains(st)) subtypes.Add(st);
+        }
+        return (subtypes, isArtifact, colors);
     }
 
     /// <summary>
@@ -1312,4 +1445,88 @@ public static class ManlandBinder
             "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
             _ => int.TryParse(s, out var n) ? n : 0,
         };
+
+    /// <summary>
+    /// CR 305.1 / Svogthos CDA — the number of creature cards in the animated
+    /// land's controller's graveyard (read live every Compute). Uses the
+    /// effective controller (falls back to owner when controller is unset).
+    /// </summary>
+    private static int GraveyardCreatureCount(Permanent land)
+    {
+        var ctrl = land.Controller ?? land.Owner;
+        if (ctrl == null) return 0;
+        return ctrl.Zones.Graveyard.GetCards().Count(c => c.HasType(CardType.Creature));
+    }
+
+    /// <summary>
+    /// Parse the optional non-mana activation-cost rider captured by the
+    /// AnimateLine "extracost" group (the ", &lt;cost&gt;" tail between the mana
+    /// segment and the colon) into an <see cref="ICost"/>. Returns null for an
+    /// empty rider (mana-only cost) or an unmodelled rider (caller defers).
+    /// Currently models: "Exile a land card from your graveyard" (Hostile
+    /// Desert — <see cref="ExileLandCardFromGraveyardCost"/>, CR 602.1).
+    /// </summary>
+    private static ICost? ParseNonManaActivationCost(string extraCostText)
+    {
+        if (string.IsNullOrWhiteSpace(extraCostText)) return null;
+        var t = extraCostText.TrimStart(',', ' ');
+        if (Regex.IsMatch(t,
+                @"exile a land card from your graveyard", RegexOptions.IgnoreCase))
+        {
+            return new ExileLandCardFromGraveyardCost();
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Recognise a quoted "Whenever you cast an instant or sorcery spell, this
+    /// creature gets +N/+0 until end of turn." granted trigger in the animate
+    /// remainder (Great Hall of the Biblioplex) and return an action that, when
+    /// invoked at animate-resolution, registers the corresponding
+    /// <see cref="TriggeredAbility"/> on <paramref name="land"/> (CR 603.1).
+    /// Returns null for an unrecognised body (deferred — body + keywords still
+    /// animate). Kiln-Fiend-shaped: a <see cref="Events.GameEvent"/> trigger
+    /// over <see cref="Majik.Core.Domain.DomainEvents.SpellCastEvent"/> gated to
+    /// the controller's own instant/sorcery casts, registering a Layer-7c +N/+0
+    /// end-of-turn pump on the animated land body.
+    /// </summary>
+    private static Action? ParseQuotedCastPumpTrigger(
+        string rest, Land land, Player controller,
+        ContinuousEffectsService effects, TriggerManager? triggers)
+    {
+        if (string.IsNullOrWhiteSpace(rest)) return null;
+        var qm = QuotedCastInstantSorceryPump.Match(rest);
+        if (!qm.Success) return null;
+        var p = int.Parse(qm.Groups["p"].Value);
+        var t = int.Parse(qm.Groups["t"].Value);
+
+        return () =>
+        {
+            var pump = new Effect(
+                $"{land.Name}: +{p}/+{t} until end of turn (cast instant or sorcery, CR 603.1)",
+                () => effects.Register(
+                    new Majik.Core.CardData.Factories.ManlandCyclePumpEffect(land, p, t)));
+
+            // CR 300.1 / 307.1 / 112.1 — match the controller's own cast of a
+            // spell whose card has the Instant or Sorcery type. Same predicate
+            // as Kiln Fiend / Young Pyromancer.
+            var condition = new Majik.Core.Abilities.EventTriggerCondition<
+                Majik.Core.Domain.DomainEvents.SpellCastEvent>((e, _) =>
+            {
+                var caster = land.Controller ?? controller;
+                return ReferenceEquals(e.Spell.Controller, caster)
+                    && (e.Spell.Card.HasType(CardType.Instant)
+                        || e.Spell.Card.HasType(CardType.Sorcery));
+            });
+
+            var trigger = new TriggeredAbility(
+                source: land,
+                controller: controller,
+                condition: condition,
+                effects: new IEffect[] { pump },
+                activeZones: new[] { ZoneType.Battlefield });
+            land.AddAbility(trigger);
+            triggers?.RegisterTriggeredAbility(trigger);
+        };
+    }
 }

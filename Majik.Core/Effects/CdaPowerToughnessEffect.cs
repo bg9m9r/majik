@@ -29,21 +29,41 @@ public sealed class CdaPowerToughnessEffect : ContinuousEffect
     private readonly Permanent _source;
     private readonly Func<Permanent, int> _powerOf;
     private readonly Func<Permanent, int> _toughnessOf;
+    private readonly bool _expiresAtEndOfTurn;
 
     public CdaPowerToughnessEffect(
         Permanent source,
         Func<Permanent, int> powerOf,
-        Func<Permanent, int> toughnessOf)
+        Func<Permanent, int> toughnessOf,
+        bool expiresAtEndOfTurn = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _powerOf = powerOf ?? throw new ArgumentNullException(nameof(powerOf));
         _toughnessOf = toughnessOf ?? throw new ArgumentNullException(nameof(toughnessOf));
+        _expiresAtEndOfTurn = expiresAtEndOfTurn;
     }
 
     public override Layer Layer => Layer.PT_Cda;
     public override Permanent? Source => _source;
     public override bool IsActive() => _source.Zone == Majik.Core.Zones.ZoneType.Battlefield;
+
+    /// <summary>
+    /// True when the CDA was granted by a duration-bounded animate ability
+    /// (CR 514.2 — Svogthos's <c>{3}{B}{G}: Until end of turn, this land
+    /// becomes a … Plant Zombie creature with "&lt;CDA&gt;"</c>). A printed CDA
+    /// on a real creature (Tarmogoyf) is intrinsic and never expires; that path
+    /// passes the default <c>false</c>.
+    /// </summary>
+    public override bool ExpiresAtEndOfTurn => _expiresAtEndOfTurn;
     public override bool AppliesTo(Creature creature) => ReferenceEquals(creature, _source);
+
+    // CR 613.1c — an animated NON-creature C# instance (a Land becoming a
+    // creature via Svogthos's animate ability) is upgraded to a creature row by
+    // ContinuousEffectsService.Compute, which dispatches via AppliesTo(Permanent).
+    // The base override gates on `permanent is Creature`, which a Land instance
+    // is NOT, so the CDA P/T would never surface on an animated land without
+    // this reference-equality override.
+    public override bool AppliesTo(Permanent permanent) => ReferenceEquals(permanent, _source);
 
     public override void Apply(CreatureCharacteristics chars)
     {

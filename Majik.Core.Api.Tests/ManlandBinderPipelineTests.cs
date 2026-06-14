@@ -1195,4 +1195,189 @@ public class ManlandBinderPipelineTests
         bob.Zones.Graveyard.GetCards().Count().Should().Be(bobGyBefore,
             "with no agent the targeted mill is a clean no-op");
     }
+
+    // -----------------------------------------------------------------------
+    // EXOTIC ANIMATE BODIES — Svogthos (*/* CDA), Hostile Desert (non-mana
+    // exile cost), Great Hall of the Biblioplex (conditional + quoted
+    // cast-pump trigger). Close manland-exotic-animate-shapes. Before this
+    // slice ManlandBinder's animate regex couldn't express any of these
+    // shapes, so all three were land-dead in real games.
+    // -----------------------------------------------------------------------
+
+    private const string SvogthosOracle =
+        "{T}: Add {C}.\n" +
+        "{3}{B}{G}: Until end of turn, this land becomes a black and green " +
+        "Plant Zombie creature with \"This creature's power and toughness are " +
+        "each equal to the number of creature cards in your graveyard.\" It's " +
+        "still a land.";
+
+    [Fact]
+    public void Prod_Svogthos_Animate_CdaPowerToughnessFromGraveyardCreatureCount()
+    {
+        // */* characteristic-defining P/T (CR 604.3 / 613.2 Layer 7a): the
+        // animated body's power and toughness EACH equal the number of creature
+        // cards in the controller's graveyard, recomputed every Compute. Body is
+        // a black and green Plant Zombie. Animate is "until end of turn".
+        var repo = new FakeCardRepo();
+        repo.Add("Svogthos, the Restless Tomb", "Land", oracleText: SvogthosOracle, colors: "B,G");
+        var land = new Land("Svogthos, the Restless Tomb", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Three creature cards + one non-creature in Alice's graveyard.
+        foreach (var c in new ICard[]
+                 {
+                     new Creature("Bear", "{1}{G}", 2, 2, null, new[] { CardSubtype.Bear }),
+                     new Creature("Goblin", "{R}", 1, 1, null, new[] { CardSubtype.Goblin }),
+                     new Creature("Elf", "{G}", 1, 1, null, new[] { CardSubtype.Elf }),
+                 })
+        {
+            c.SetOwner(alice);
+            alice.Zones.Graveyard.AddCard(c); c.SetZone(ZoneType.Graveyard);
+        }
+        var instant = new Majik.Core.Cards.Instant("Shock", "{R}");
+        instant.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(instant); instant.SetZone(ZoneType.Graveyard);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Should().ContainSingle("the {3}{B}{G} animate ability binds in prod").Subject;
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Types.Should().Contain(CardType.Land, "It's still a land");
+        cc.Subtypes.Should().Contain(CardSubtype.Plant);
+        cc.Subtypes.Should().Contain(CardSubtype.Zombie);
+        cc.Power.Should().Be(3, "P/T = number of creature cards in graveyard (3)");
+        cc.Toughness.Should().Be(3);
+        cc.Colors.Should().BeEquivalentTo(new[]
+        {
+            Majik.Core.ValueObjects.ManaColor.Black,
+            Majik.Core.ValueObjects.ManaColor.Green,
+        });
+
+        // CDA recomputes — add a fourth creature card → P/T becomes 4/4. In a
+        // real game a card reaching the graveyard rides a CardMovedEvent, which
+        // bumps the continuous-effects generation (invalidating the P/T cache);
+        // publish it here to mirror that (the test adds to the zone directly).
+        var wurm = new Creature("Wurm", "{4}{G}", 5, 5, null, new[] { CardSubtype.Wurm });
+        wurm.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(wurm); wurm.SetZone(ZoneType.Graveyard);
+        facade.EventBus.Publish(new Majik.Core.Events.CardMovedEvent(
+            wurm, ZoneType.Library, ZoneType.Graveyard));
+        facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject.Power.Should().Be(4,
+            "the CDA recomputes from the live graveyard creature count");
+
+        // "until end of turn" → the animation + CDA expire at cleanup.
+        facade.ContinuousEffects.ExpireEndOfTurn();
+        facade.ContinuousEffects.Compute((Permanent)land).Types
+            .Should().NotContain(CardType.Creature,
+                "the animate (and its CDA) expire at end of turn");
+    }
+
+    private const string HostileDesertOracle =
+        "{T}: Add {C}.\n" +
+        "{2}, Exile a land card from your graveyard: This land becomes a 3/4 " +
+        "Elemental creature until end of turn. It's still a land.";
+
+    [Fact]
+    public void Prod_HostileDesert_Animate_HasHybridManaPlusExileLandCost()
+    {
+        // The activation cost is {2} PLUS the non-mana "Exile a land card from
+        // your graveyard" — a cost ManaCostCost can't capture. The binder must
+        // wire an ExileLandCardFromGraveyardCost alongside the mana cost.
+        var repo = new FakeCardRepo();
+        repo.Add("Hostile Desert", "Land — Desert", oracleText: HostileDesertOracle);
+        var land = new Land("Hostile Desert", supertypes: null, subtypes: new[] { CardSubtype.Desert });
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Should().ContainSingle("the animate ability binds in prod").Subject;
+        animate.Costs.OfType<ManaCostCost>().Should().ContainSingle("the {2} mana cost binds");
+        animate.Costs.OfType<Majik.Core.Costs.ExileLandCardFromGraveyardCost>()
+            .Should().ContainSingle("the non-mana exile-a-land-card cost binds (CR 602.1)");
+
+        // The exile cost is payable iff a land card is in the graveyard.
+        var exileCost = animate.Costs.OfType<Majik.Core.Costs.ExileLandCardFromGraveyardCost>().Single();
+        exileCost.CanPay(alice).Should().BeFalse("no land card in graveyard yet");
+        var deadLand = new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest });
+        deadLand.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(deadLand); deadLand.SetZone(ZoneType.Graveyard);
+        exileCost.CanPay(alice).Should().BeTrue("a land card is now in the graveyard");
+
+        // Resolution animates to a 3/4 Elemental, still a land.
+        foreach (var e in animate.Effects) e.Execute();
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Types.Should().Contain(CardType.Land, "It's still a land");
+        cc.Power.Should().Be(3);
+        cc.Toughness.Should().Be(4);
+        cc.Subtypes.Should().Contain(CardSubtype.Elemental);
+    }
+
+    private const string GreatHallOracle =
+        "{T}: Add {C}.\n" +
+        "{T}, Pay 1 life: Add one mana of any color. Spend this mana only to " +
+        "cast an instant or sorcery spell.\n" +
+        "{5}: If this land isn't a creature, it becomes a 2/4 Wizard creature " +
+        "with \"Whenever you cast an instant or sorcery spell, this creature " +
+        "gets +1/+0 until end of turn.\" It's still a land.";
+
+    [Fact]
+    public void Prod_GreatHall_Animate_2_4_Wizard_GrantsCastPumpTrigger()
+    {
+        // "{5}: If this land isn't a creature, it becomes a 2/4 Wizard creature
+        // with \"Whenever you cast an instant or sorcery spell, this creature
+        // gets +1/+0 until end of turn.\" It's still a land." — the "it becomes"
+        // wording + the quoted cast-pump trigger both bind on animate. No "until
+        // end of turn" → permanent animate (CR 613.1c).
+        var repo = new FakeCardRepo();
+        repo.Add("Great Hall of the Biblioplex", "Land", oracleText: GreatHallOracle);
+        var land = new Land("Great Hall of the Biblioplex", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // No granted cast trigger before animating.
+        live.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "the quoted cast-pump trigger is granted only on animate");
+
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Should().ContainSingle("the {5} animate ability binds in prod").Subject;
+        foreach (var e in animate.Effects) e.Execute();
+
+        var cc = facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject;
+        cc.Types.Should().Contain(CardType.Land, "It's still a land");
+        cc.Power.Should().Be(2);
+        cc.Toughness.Should().Be(4);
+        cc.Subtypes.Should().Contain(CardSubtype.Wizard);
+
+        // The granted cast-pump trigger now exists; casting an instant pumps the
+        // land +1/+0 until end of turn (CR 603.1).
+        var trigger = live.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the granted cast-pump trigger is added on animate").Subject;
+
+        var bolt = new Majik.Core.Cards.Instant("Bolt", "{R}");
+        bolt.SetOwner(alice); bolt.SetController(alice);
+        var spell = new Majik.Core.Spells.Spell(bolt, alice);
+        var castEvent = new Majik.Core.Domain.DomainEvents.SpellCastEvent(spell);
+        trigger.Condition.Matches(castEvent, trigger).Should().BeTrue(
+            "casting your own instant matches the cast-pump trigger");
+        foreach (var e in trigger.Effects) e.Execute();
+
+        facade.ContinuousEffects.Compute((Permanent)land)
+            .Should().BeOfType<CreatureCharacteristics>().Subject.Power.Should().Be(3,
+            "the cast-pump grants +1/+0 until end of turn");
+    }
 }
