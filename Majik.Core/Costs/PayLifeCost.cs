@@ -1,4 +1,5 @@
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Events;
 using Majik.Core.Players;
 
 namespace Majik.Core.Costs;
@@ -18,7 +19,7 @@ namespace Majik.Core.Costs;
 /// gates on <c>LifeTotal &gt;= amount</c>; activation fails before the
 /// ability hits the stack when the payer is short on life.
 /// </summary>
-public sealed class PayLifeCost : ICost
+public sealed class PayLifeCost : ICost, IBusAwareCost
 {
     private readonly int _amount;
 
@@ -51,12 +52,33 @@ public sealed class PayLifeCost : ICost
     /// fire as expected. Throws if preconditions aren't met (mirrors
     /// <see cref="ManaCostCost"/> + <see cref="DiscardSelfCost"/>).
     /// </remarks>
-    public void Pay(Player player)
+    public void Pay(Player player) => PayCore(player, eventBus: null);
+
+    /// <summary>
+    /// CR 118.8 / CR 119.4 — central-seam payment. <see cref="CostPayment.PayCosts(Player, System.Collections.Generic.IEnumerable{ICost}, Mana.ManaSpendContext, IEventBus)"/>
+    /// routes this here when a bus is supplied so paying the life publishes a
+    /// <see cref="LifePaidEvent"/> on the central cost-payment path — exactly
+    /// mirroring how a sacrifice cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/>. State effects are identical to
+    /// <see cref="Pay(Player)"/>; the bus only adds the observable event.
+    /// </summary>
+    public void Pay(Player player, IEventBus eventBus)
+    {
+        if (eventBus == null) throw new ArgumentNullException(nameof(eventBus));
+        PayCore(player, eventBus);
+    }
+
+    private void PayCore(Player player, IEventBus? eventBus)
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
         if (!CanPay(player))
             throw new InvalidPlayerActionException(
                 $"Cannot {Description}: {player.Name} has {player.LifeTotal} life.");
-        if (_amount > 0) player.LoseLife(_amount);
+        if (_amount > 0)
+        {
+            player.LoseLife(_amount);
+            // CR 119.4 — paying 0 life is not "paying life" (guarded above).
+            eventBus?.Publish(new LifePaidEvent(player, _amount, wasCost: true));
+        }
     }
 }

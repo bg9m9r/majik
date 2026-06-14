@@ -248,6 +248,18 @@ public class AdditionalCost : ICost, IBusAwareCost
                 if (_costParameter is int amount)
                 {
                     player.LoseLife(amount);
+
+                    // CR 118.8 / CR 119.4 — paying life as a cost publishes a
+                    // LifePaidEvent (life PAYMENT provenance, distinct from a
+                    // LifeChangedEvent decrease) so a "whenever a player pays
+                    // life …" payoff fires. Paying 0 life is not "paying life"
+                    // (CR 119.4) — suppress the publish. The bus is the central
+                    // seam bus / the construction bus, exactly like the
+                    // sacrifice publish above.
+                    if (amount > 0)
+                    {
+                        eventBus?.Publish(new LifePaidEvent(player, amount, wasCost: true));
+                    }
                 }
                 break;
         }

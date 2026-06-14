@@ -85,6 +85,16 @@ public sealed class DiscardACardOrPayLifeAdditionalCost : IAdditionalCost
 
         caster.LoseLife(LifeAmount);
         PaidLife = true;
+
+        // CR 118.8 — the life is paid as the additional cost. Publish a
+        // LifePaidEvent (life-payment provenance), mirroring the DiscardedEvent
+        // the discard mode publishes above. Best-effort bus lookup — no
+        // IEventBus in scope here.
+        if (LifeAmount > 0)
+        {
+            Events.EventBusRegistry.Get(caster)?.Publish(
+                new Events.LifePaidEvent(caster, LifeAmount, wasCost: true));
+        }
         return true;
     }
 }

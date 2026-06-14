@@ -80,6 +80,13 @@ public sealed class PayLifeIfControlSwampAlternativeCost : IAlternativeCost
         if (LifeAmount > 0 && caster != null)
         {
             caster.LoseLife(LifeAmount);
+
+            // CR 118.8 — the life is paid as the spell's alternative cost.
+            // Publish a LifePaidEvent (life-payment provenance); best-effort
+            // bus lookup, no IEventBus in scope here (mirrors the shock-land
+            // ETB pay-life publish).
+            Events.EventBusRegistry.Get(caster)?.Publish(
+                new Events.LifePaidEvent(caster, LifeAmount, wasCost: true));
         }
     }
 }

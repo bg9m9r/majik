@@ -307,6 +307,33 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 118.8 / CR 119.4 — "Whenever you pay life, …" trigger. Fires on
+    /// <see cref="LifePaidEvent"/> where <paramref name="player"/> matches the
+    /// paying player (CR 109.5 — "you"). Distinct from a "whenever you lose
+    /// life" / "whenever you gain life" gate over <see cref="LifeChangedEvent"/>:
+    /// this fires ONLY on a life PAYMENT (a cost — CR 118.8), never on burn /
+    /// drain / an effect's "lose N life". The producer-side primitive a future
+    /// "whenever you pay life …" payoff consumes.
+    /// </summary>
+    public static ITriggerCondition OnLifePaid(Player player)
+    {
+        if (player == null) throw new ArgumentNullException(nameof(player));
+        return new EventTriggerCondition<LifePaidEvent>((e, _) =>
+            ReferenceEquals(e.Player, player));
+    }
+
+    /// <summary>
+    /// CR 118.8 / CR 119.4 — "Whenever a player pays life, …" trigger. The
+    /// any-player mirror of <see cref="OnLifePaid(Player)"/>: fires on every
+    /// <see cref="LifePaidEvent"/> regardless of who paid. The producer-side
+    /// primitive a symmetric "whenever a player pays life …" payoff consumes.
+    /// </summary>
+    public static ITriggerCondition OnAnyPlayerPaysLife()
+    {
+        return new EventTriggerCondition<LifePaidEvent>((_, _) => true);
+    }
+
+    /// <summary>
     /// CR 603.1 + CR 701.16 + CR 109.5 — "Whenever an opponent sacrifices
     /// a [type] permanent, …" trigger. Fires on the dedicated
     /// <see cref="PermanentSacrificedEvent"/> (published by the bus-aware
