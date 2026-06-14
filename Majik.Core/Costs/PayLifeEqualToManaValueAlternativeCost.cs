@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -83,6 +84,18 @@ public sealed class PayLifeEqualToManaValueAlternativeCost : IAlternativeCost
     {
         if (card == null || caster == null) return;
         var life = LifeAmountFor(card);
-        if (life > 0) caster.LoseLife(life);
+        if (life > 0)
+        {
+            caster.LoseLife(life);
+
+            // CR 118.8 — the life is paid as the spell's cost (life instead of
+            // mana). Publish a LifePaidEvent (life-payment provenance) so a
+            // "whenever a player pays life …" payoff fires. This alt cost has
+            // no IEventBus in scope (paid in OnResolved), so the bus is looked
+            // up best-effort via EventBusRegistry — no publish if none is
+            // registered, mirroring the shock-land ETB pay-life posture.
+            EventBusRegistry.Get(caster)?.Publish(
+                new LifePaidEvent(caster, life, wasCost: true));
+        }
     }
 }

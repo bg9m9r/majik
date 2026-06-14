@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
@@ -140,6 +141,17 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
         }
 
         controller.LoseLife(2);
+
+        // CR 118.8 — the 2 life is paid as a cost for the land to enter
+        // untapped. Publish a LifePaidEvent (life-payment provenance, distinct
+        // from a LifeChangedEvent decrease) so a "whenever a player pays life …"
+        // payoff fires. The bus is looked up best-effort via EventBusRegistry
+        // (this replacement has no IEventBus in scope) — no publish if none is
+        // registered (direct-construction unit tests), mirroring the
+        // Fx.DiscardCard / Fx.Sacrifice best-effort posture.
+        EventBusRegistry.Get(controller)?.Publish(
+            new LifePaidEvent(controller, 2, wasCost: true));
+
         return intent with { EntersTapped = false };
     }
 }

@@ -149,4 +149,18 @@ public enum EventType
     // over/under-fire footprint. Published by the central chokepoint
     // <c>Fx.DiscardCard</c> after the zone move completes.
     Discarded,
+
+    // CR 118.8 / CR 119.4 — a player PAID life as a cost (a "Pay N life" cost
+    // or additional cost — Bolas's Citadel's life-instead-of-mana cast, a
+    // shock-land's "as it enters, pay 2 life", a fetchland / Horizon Canopy 1
+    // life, Street Wraith cycling, Necropotence, Greed, Phyrexian Tower, …).
+    // Distinct from plain life LOSS (burn / drain / an effect's "lose N life"),
+    // which is NOT a payment and never publishes this: carries the paying
+    // player + the amount + WasCost=true so a "whenever a player pays life …"
+    // payoff (and any future life-payment provenance consumer) fires without
+    // the LifeChangedEvent over-fire footprint (which can't tell a payment from
+    // any other life decrease). Published by the central pay-life cost seam
+    // (the bus-aware <c>AdditionalCost</c> / <c>PayLifeCost</c> paid through
+    // <c>CostPayment.PayCosts</c>, and the shock-land ETB pay-life).
+    LifePaid,
 }
