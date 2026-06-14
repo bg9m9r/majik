@@ -64,6 +64,24 @@ namespace Majik.Core.CardData;
 /// </list>
 /// </para>
 ///
+/// <para><b>Exotic animate bodies (now bound).</b> Three non-standard body
+/// shapes that previously deferred now bind:
+/// <list type="bullet">
+///   <item><b>"all creature types"</b> (Mutavault, Faceless Haven, Soulstone
+///     Sanctuary) — the body names no fixed subtype; every creature subtype the
+///     engine models is granted (CR 205.3m), reusing
+///     <see cref="Majik.Core.CardData.Factories.MutavaultAnimateEffect.EveryCreatureType"/>.</item>
+///   <item><b>X/X</b> (Lair of the Hydra) — base P/T equals the X paid; read at
+///     resolution from <see cref="ResolutionContext.ChosenX"/> (the GAP-2
+///     per-activation X ledger), clamped to a minimum 1/1 ("X can't be 0",
+///     CR 107.1b).</item>
+///   <item><b>Permanent animate</b> (Soulstone Sanctuary) — when the line omits
+///     "until end of turn" the registered continuous effects do NOT expire at
+///     cleanup (CR 613.1c — a no-duration continuous effect lasts as long as the
+///     land is on the battlefield).</item>
+/// </list>
+/// </para>
+///
 /// <para><b>Deferred (per-card riders this generic binder does NOT bind).</b>
 /// See v1-deferrals + the per-pattern comments below:
 /// <list type="bullet">
@@ -71,8 +89,6 @@ namespace Majik.Core.CardData;
 ///     ("with \"{X}: …\"") — Lavaclaw Reaches, Wandering Fumarole (firebreathing
 ///     pump). The N/N body + simple keywords still bind; the granted activated
 ///     ability is dropped (no granted-activated-on-animate primitive).</item>
-///   <item>"becomes a … with all creature types" (Mutavault) and X/X bodies
-///     (Lair of the Hydra) — non-fixed subtype / non-fixed P/T.</item>
 ///   <item>A "Put counters … Then you may have it become …" preamble
 ///     (Crawling Barrens) — the animate is conditional on a prior counter
 ///     step.</item>
@@ -121,7 +137,7 @@ public static class ManlandBinder
         @"(?<cost>(?:\{[^}]+\})+)\s*:\s*" +                       // {1}{U}{B}:
         @"(?:Until end of turn,\s*)?" +                            // optional leading EOT
         @"this land becomes an?\s+" +                             // becomes a / an
-        @"(?<power>\d+)/(?<toughness>\d+)\s+" +                   // N/N (digits only)
+        @"(?<power>\d+|[Xx])/(?<toughness>\d+|[Xx])\s+" +        // N/N or X/X
         @"(?<body>(?:(?!creature\b)[^.\s]+\s+)*?)creature\b" +    // <colors> [artifact] <Subtype>
         @"(?<rest>.*)$",                                           // remainder (parsed in code)
         RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
@@ -243,13 +259,6 @@ public static class ManlandBinder
         var m = AnimateLine.Match(text);
         if (!m.Success) return false;
 
-        // Parse P/T (digits only — X/X bodies don't match the regex).
-        if (!int.TryParse(m.Groups["power"].Value, out var power) ||
-            !int.TryParse(m.Groups["toughness"].Value, out var toughness))
-        {
-            return false;
-        }
-
         // Gate on "It's still a land." appearing in the remainder. This is the
         // manland signature (CR 613.1c). Without it the matched line is some
         // other "this land becomes a … creature" wording we don't model.
@@ -259,15 +268,52 @@ public static class ManlandBinder
             return false;
         }
 
+        // Parse P/T. Two shapes:
+        //   - Fixed digits (the vast majority of manlands): "2/2", "4/4", …
+        //   - X/X (Lair of the Hydra) — the body's base P/T equals the X paid
+        //     for the activation. Both groups must be "X" (mixed N/X never
+        //     occurs in the pool). When X/X, the P/T is read at resolution from
+        //     ResolutionContext.ChosenX (GAP 2 — the per-activation X ledger).
+        var powerText = m.Groups["power"].Value;
+        var toughnessText = m.Groups["toughness"].Value;
+        var isXBody =
+            powerText.Equals("x", StringComparison.OrdinalIgnoreCase) &&
+            toughnessText.Equals("x", StringComparison.OrdinalIgnoreCase);
+        int power = 0, toughness = 0;
+        if (!isXBody &&
+            (!int.TryParse(powerText, out power) ||
+             !int.TryParse(toughnessText, out toughness)))
+        {
+            return false; // mixed N/X or unparseable → defer
+        }
+
+        // CR 514.2 — the animation expires at end of turn iff the line says
+        // "until end of turn" (either ordering). Soulstone Sanctuary OMITS it:
+        // its animate is permanent (it becomes a creature with no EOT clause).
+        var expiresAtEot = text.Contains("until end of turn", StringComparison.OrdinalIgnoreCase);
+
         // Body = "<colors> [artifact] <Subtype>". The subtype is the last
         // remaining token after stripping colour words; a trailing "artifact"
         // before it makes the animated body an artifact creature (Blinkmoth
         // Nexus, Mishra's Factory, Frostwalk Bastion — extra Artifact type).
-        // "becomes a … creature with all creature types" (Mutavault) and X/X
-        // (Lair of the Hydra) never reach here (no fixed subtype / no digit
-        // P/T) — they defer.
+        //
+        // Two exotic shapes now bind here:
+        //   - "all creature types" (Mutavault / Faceless Haven / Soulstone
+        //     Sanctuary) — the body has NO fixed subtype; the rest carries
+        //     "with [vigilance and] all creature types". We grant every creature
+        //     subtype the engine models (CR 205.3m), reusing Mutavault's
+        //     enumerated set (MutavaultAnimateEffect.EveryCreatureType) as the
+        //     single source of truth.
+        //   - X/X (Lair of the Hydra) — handled above; the body still names a
+        //     fixed subtype ("green Hydra").
         var (subtype, isArtifact, bodyColors) = ParseBody(m.Groups["body"].Value);
-        if (subtype is null) return false; // unknown / "all creature types" → defer
+        var isAllCreatureTypes =
+            subtype is null &&
+            rest.Contains("all creature types", StringComparison.OrdinalIgnoreCase);
+        if (subtype is null && !isAllCreatureTypes)
+        {
+            return false; // unknown / unmodelled subtype → defer
+        }
 
         // Keyword tail — the "with <kw…>" segment of the remainder, up to the
         // first sentence terminator OUTSIDE a quote. Simple keywords (CR 702)
@@ -299,11 +345,18 @@ public static class ManlandBinder
         // The animate effect re-uses the cycle's shared continuous-effect
         // primitives (same as the per-card factories):
         //   - ManlandCycleAnimateEffect (Layer 4): Creature [+ Artifact] type,
-        //     the parsed subtype, and the granted simple keywords. Printed Land
-        //     stays ("It's still a land", CR 613.1c).
+        //     the granted subtype(s), and the granted simple keywords. Printed
+        //     Land stays ("It's still a land", CR 613.1c).
         //   - ManlandCycleBecomesPTEffect (Layer 7b): set-base P/T.
-        // Both ExpiresAtEndOfTurn (CR 514.2 cleanup step lifts the animation).
-        var capturedSubtype = subtype.Value;
+        // Both carry the line's EOT flag (CR 514.2 cleanup lifts the animation
+        // only when the line said "until end of turn"; Soulstone Sanctuary is
+        // permanent).
+        //
+        // Subtypes: a fixed parsed subtype, OR every creature subtype the engine
+        // models for an "all creature types" body (CR 205.3m).
+        var capturedSubtypes = isAllCreatureTypes
+            ? Majik.Core.CardData.Factories.MutavaultAnimateEffect.EveryCreatureType.ToArray()
+            : new[] { subtype!.Value };
         var extraTypes = isArtifact ? new[] { CardType.Artifact } : null;
         // CR 613.1e (Layer 5) — the animate line names the body's colour(s)
         // ("blue and black", "white and blue", …). Animated manlands are
@@ -311,38 +364,56 @@ public static class ManlandBinder
         // animation's duration so it enters as its printed colour instead of
         // colourless. No colour word (or only "colorless") → no SET registered.
         var capturedColors = bodyColors;
-        var animateEffect = new Effect(
-            $"{land.Name}: becomes {power}/{toughness} " +
-            $"{string.Join(" and ", capturedColors)} {capturedSubtype} " +
-            $"{(isArtifact ? "artifact " : "")}creature until EOT (still a land)",
-            () =>
-            {
-                effects.Register(new ManlandCycleAnimateEffect(
-                    land,
-                    keywords: keywords,
-                    subtypes: new[] { capturedSubtype },
-                    extraTypes: extraTypes));
-                effects.Register(new ManlandCycleBecomesPTEffect(
-                    land, power, toughness));
-                if (capturedColors.Count > 0)
-                {
-                    effects.Register(new SetColorsEffect(
-                        source: land,
-                        scope: p => ReferenceEquals(p, land),
-                        colors: capturedColors,
-                        expiresAtEndOfTurn: true));
-                }
+        var capturedExpires = expiresAtEot;
+        var capturedIsX = isXBody;
+        var fixedPower = power;
+        var fixedToughness = toughness;
+        var bodyLabel = isAllCreatureTypes ? "every-creature-type" : capturedSubtypes[0].ToString();
+        var ptLabel = capturedIsX ? "X/X" : $"{fixedPower}/{fixedToughness}";
 
-                // CR 508.1f — granted quoted "Whenever this creature attacks,
-                // <effect>" trigger. Registered at animate-resolution and
-                // attached to the land (matches the per-card factories'
-                // animate-time grant). A land can only attack while it's the
-                // animated creature (CR 508.1a), so leaving it attached after
-                // the animation expires is observationally equivalent to an
-                // until-EOT grant (the land can't attack once it's no longer a
-                // creature). Mirrors RagingRavineFactory / DenOfTheBugbearFactory.
-                grantedAttackQuote?.Invoke();
-            });
+        // Resolution body. Context-aware: an X/X body (Lair of the Hydra) reads
+        // the X paid from ResolutionContext.ChosenX (GAP 2). "X can't be 0"
+        // (CR 107.1b) clamps the body to a minimum 1/1.
+        Func<ResolutionContext, ValueTask> resolve = ctx =>
+        {
+            var p = capturedIsX ? Math.Max(1, ctx.ChosenX ?? 0) : fixedPower;
+            var t = capturedIsX ? Math.Max(1, ctx.ChosenX ?? 0) : fixedToughness;
+
+            effects.Register(new ManlandCycleAnimateEffect(
+                land,
+                keywords: keywords,
+                subtypes: capturedSubtypes,
+                extraTypes: extraTypes,
+                expiresAtEndOfTurn: capturedExpires));
+            effects.Register(new ManlandCycleBecomesPTEffect(
+                land, p, t, expiresAtEndOfTurn: capturedExpires));
+            if (capturedColors.Count > 0)
+            {
+                effects.Register(new SetColorsEffect(
+                    source: land,
+                    scope: pm => ReferenceEquals(pm, land),
+                    colors: capturedColors,
+                    expiresAtEndOfTurn: capturedExpires));
+            }
+
+            // CR 508.1f — granted quoted "Whenever this creature attacks,
+            // <effect>" trigger. Registered at animate-resolution and
+            // attached to the land (matches the per-card factories'
+            // animate-time grant). A land can only attack while it's the
+            // animated creature (CR 508.1a), so leaving it attached after
+            // the animation expires is observationally equivalent to an
+            // until-EOT grant (the land can't attack once it's no longer a
+            // creature). Mirrors RagingRavineFactory / DenOfTheBugbearFactory.
+            grantedAttackQuote?.Invoke();
+            return ValueTask.CompletedTask;
+        };
+
+        var animateEffect = new Effect(
+            $"{land.Name}: becomes {ptLabel} " +
+            $"{string.Join(" and ", capturedColors)} {bodyLabel} " +
+            $"{(isArtifact ? "artifact " : "")}creature" +
+            $"{(capturedExpires ? " until EOT" : "")} (still a land)",
+            resolve);
 
         land.AddAbility(new ActivatedAbility(
             source: land,
