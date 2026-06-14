@@ -12,15 +12,15 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for Prismatic Ending (Modern Horizons 2, {W}, Sorcery).
+/// Tests for Prismatic Ending (Modern Horizons 2, {X}{W}, Sorcery, Converge).
 ///
 /// Covers:
-///   - Card identity (Sorcery, {W}, owner/controller).
+///   - Card identity (Sorcery, {X}{W}, owner/controller).
 ///   - NamedCardFactory dispatch.
 ///   - Exile gated by colours-spent cap (1 → mv ≤ 1, 3 → mv ≤ 3).
 ///   - Cap-too-low fizzle (mv 4 against 3 colours → no exile).
 ///   - Land target → no effect (CR 608.2b illegal target).
-///   - Default cap path (single-arg BuildSpellDefinition) = 1.
+///   - Default (single-arg) path reads the LIVE mana-provenance ledger.
 ///   - ColorCount helper.
 /// </summary>
 public class PrismaticEndingTests
@@ -33,12 +33,12 @@ public class PrismaticEndingTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void PrismaticEnding_IsSorcery_AtCostW()
+    public void PrismaticEnding_IsSorcery_AtCostXW()
     {
         var pe = PrismaticEndingFactory.Create(_alice);
 
         pe.Name.Should().Be("Prismatic Ending");
-        pe.ManaCost.Should().Be("{W}");
+        pe.ManaCost.Should().Be("{X}{W}");
         pe.HasType(CardType.Sorcery).Should().BeTrue();
         pe.Owner.Should().BeSameAs(_alice);
         pe.Controller.Should().BeSameAs(_alice);
@@ -124,22 +124,50 @@ public class PrismaticEndingTests
     }
 
     [Fact]
-    public void PrismaticEnding_DefaultProvider_CapsAtOne()
+    public void PrismaticEnding_DefaultPath_ReadsLiveLedger()
     {
-        // Single-arg BuildSpellDefinition path: no colorsSpentProvider →
-        // cap defaults to DefaultColorsSpent = 1.
+        // Single-arg BuildSpellDefinition path: no explicit provider → the
+        // colours-spent cap is read off the live mana-provenance ledger
+        // (Card.PendingCastColors) surfaced via ResolutionContext.SourceCard.
         var mv1 = NewControlledCreature(_bob, "Llanowar Elves", "{G}");
         var mv2 = NewControlledCreature(_bob, "Grizzly Bears", "{1}{G}");
 
-        // mv 1 exiles.
-        var defForMv1 = PrismaticEndingFactory.BuildSpellDefinition(t => t);
-        Resolve(defForMv1, mv1);
+        // Stamp a 1-colour cast (the {W} pip) → mv 1 exiles, mv 2 stays.
+        ResolveViaSpell(mv1, Majik.Core.ValueObjects.ManaColor.White);
         mv1.Zone.Should().Be(ZoneType.Exile);
 
-        // mv 2 stays put against the same default cap.
-        var defForMv2 = PrismaticEndingFactory.BuildSpellDefinition(t => t);
-        Resolve(defForMv2, mv2);
+        ResolveViaSpell(mv2, Majik.Core.ValueObjects.ManaColor.White);
         mv2.Zone.Should().Be(ZoneType.Battlefield);
+
+        // Stamp a 2-colour cast ({W} + the X poured into {U}) → mv 2 exiles.
+        var mv2b = NewControlledCreature(_bob, "Grizzly Bears", "{1}{G}");
+        ResolveViaSpell(mv2b, Majik.Core.ValueObjects.ManaColor.White, Majik.Core.ValueObjects.ManaColor.Blue);
+        mv2b.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    /// <summary>
+    /// Resolve the single-arg (live-ledger) Prismatic Ending against
+    /// <paramref name="target"/>, stamping the per-colour spent ledger on the
+    /// resolving card the way TurnDriver does at pay time, then resolving the
+    /// spell so ResolutionContext.SourceCard carries it.
+    /// </summary>
+    private void ResolveViaSpell(Permanent target, params Majik.Core.ValueObjects.ManaColor[] colors)
+    {
+        var def = PrismaticEndingFactory.BuildSpellDefinition(t => t);
+
+        var card = PrismaticEndingFactory.Create(_alice);
+        var counts = new Dictionary<Majik.Core.ValueObjects.ManaColor, int>();
+        foreach (var c in colors) counts[c] = counts.TryGetValue(c, out var n) ? n + 1 : 1;
+        card.SetPendingCastColorCounts(counts);
+
+        var chosen = new ChosenSpellParams(
+            ModeIndex: null,
+            X: null,
+            Targets: new IReadOnlyList<object>[] { new object[] { target } },
+            Mana: ManaPayment.Empty);
+
+        var spell = new Majik.Core.Spells.Spell(card, _alice, effects: def.EffectFactory(chosen));
+        spell.Resolve();
     }
 
     [Fact]

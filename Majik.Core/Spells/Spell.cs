@@ -354,7 +354,12 @@ public class Spell : ISpell
         var chosen = ChosenTargets.Count > 0
             ? new IReadOnlyList<object>[] { ChosenTargets.ToList() }
             : Array.Empty<IReadOnlyList<object>>();
-        var rc = ResolutionContext.For(Controller, agent, game, chosen, ct);
+        // CR 608 — surface the resolving spell's underlying card so resolution
+        // effects can read per-cast state stamped at payment time, most notably
+        // the mana-provenance colors-spent ledger (Card.PendingCastColors) that
+        // gates Converge (Prismatic Ending / Bring to Light, CR 202.2).
+        var rc = ResolutionContext.For(
+            Controller, agent, game, chosen, ct, sourceCard: Card);
 
         // Resolution logic (Rule 608) — await each effect in order.
         foreach (var effect in _effects)

@@ -162,6 +162,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Misc.PermanentsYouControlGainKeywordTemplate(),
             new SpellTemplates.Templates.Misc.CreaturesCantBlockTemplate(),
             new SpellTemplates.Templates.Misc.ReturnAllPermanentsTemplate(),
+            new SpellTemplates.Templates.Bespoke.ConvergeExileTemplate(),
             new SpellTemplates.Templates.Bespoke.DeflectingPalmFamilyTemplate(),
             new SpellTemplates.Templates.Bespoke.UntapUpToTwoAndPumpTemplate(),
             new SpellTemplates.Templates.Bespoke.MassDamageFromSourcePowerTemplate(),

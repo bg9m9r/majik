@@ -55,11 +55,15 @@ namespace Majik.Core.CardData.Factories;
 ///   alt-cast pipeline is a separate workstream — when it lands, the
 ///   resolve closure should branch on <c>colorsSpent &gt;= 5</c> and
 ///   invoke the same shape Bloodbraid Elf / Shardless Agent use.
-/// - <b>Mana provenance ledger</b>: matches Prismatic Ending's gap —
-///   real distinct-colors-spent provenance requires the cost flow to
-///   expose a per-spell ledger of paid pips. Until then callers
-///   supply <c>colorsSpentProvider</c> explicitly (tests do; the
-///   dispatcher path uses <see cref="DefaultColorsSpent"/>).
+/// - <b>Mana provenance ledger</b>: CLOSED — the Converge cap now reads
+///   the LIVE distinct-colors-spent ledger
+///   (<see cref="Card.PendingCastColors"/>) off
+///   <see cref="Majik.Core.Abilities.ResolutionContext.SourceCard"/> via
+///   <see cref="SpellTemplates.Templates.Bespoke.ConvergeColorsSpent"/>,
+///   exactly as Prismatic Ending does. An explicit
+///   <c>colorsSpentProvider</c> still overrides for shape tests; a resolve
+///   outside a live spell frame falls back to the printed-pip floor
+///   (<see cref="DefaultColorsSpent"/>).
 /// - <b>"You may" cast decline</b>: collapses with the free-cast gap —
 ///   when free-cast wires up, the picker also needs an opt-in prompt.
 /// </summary>
@@ -139,7 +143,14 @@ public static class BringToLightFactory
                 $"{CardName}: Converge tutor creature/instant/sorcery mv ≤ N, exile, shuffle.",
                 async ctx =>
                 {
-                    var cap = colorsSpentProvider?.Invoke() ?? DefaultColorsSpent;
+                    // CR 202.2 — colours of mana spent. Explicit provider wins
+                    // (test seam); otherwise read the LIVE mana-provenance
+                    // ledger off ResolutionContext.SourceCard. When neither is
+                    // available (no live spell frame, no provider) fall back to
+                    // the printed-pip floor so dispatcher/shape resolves still
+                    // tutor something.
+                    var cap = colorsSpentProvider?.Invoke()
+                              ?? LiveLedgerCap(ctx);
                     if (cap < 0) cap = 0;
 
                     // ---- 1. Pick a legal card -----------------------------
@@ -180,6 +191,25 @@ public static class BringToLightFactory
                     LibraryShuffle.ShuffleLibrary(caster, "bring-to-light");
                 }),
         };
+    }
+
+    /// <summary>
+    /// CR 202.2 — read the colours-of-mana-spent count off the LIVE
+    /// mana-provenance ledger (<see cref="Card.PendingCastColors"/>) surfaced
+    /// on <see cref="Majik.Core.Abilities.ResolutionContext.SourceCard"/>. When
+    /// the resolving context carries a card (the production / live-spell path),
+    /// its ledger is authoritative — including a 0 cap (no colored mana spent).
+    /// When NO card is surfaced (a dispatcher / shape resolve outside a live
+    /// spell frame), fall back to the printed-pip floor
+    /// (<see cref="DefaultColorsSpent"/> = 3) so those paths still tutor.
+    /// </summary>
+    private static int LiveLedgerCap(Majik.Core.Abilities.ResolutionContext ctx)
+    {
+        if (ctx?.SourceCard is Card)
+        {
+            return SpellTemplates.Templates.Bespoke.ConvergeColorsSpent.From(ctx);
+        }
+        return DefaultColorsSpent;
     }
 
     /// <summary>
