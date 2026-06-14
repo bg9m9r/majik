@@ -5,7 +5,8 @@ using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
-using Majik.Core.Services;
+using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Factories;
@@ -14,45 +15,45 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Crawling Barrens (Zendikar Rising).
 ///
 /// Land.
-/// Oracle text:
+/// Oracle text (exact, Scryfall):
 ///   "{T}: Add {C}.
-///    {2}{C}: Put two +1/+1 counters on Crawling Barrens.
-///    {3}{C}: Until end of turn, Crawling Barrens becomes a 0/0
-///    colorless Construct artifact creature with reach. It's still a land."
+///    {4}: Put two +1/+1 counters on this land. Then you may have it become a
+///    0/0 Elemental creature until end of turn. It's still a land."
 ///
 /// ## Implemented (v1)
 /// - Land identity (no printed subtypes).
 /// - <b>{T}: Add {C}</b> — vanilla <see cref="ManaAbility"/> (CR 605.1, no
 ///   stack).
-/// - <b>{2}{C}: Put two +1/+1 counters on Crawling Barrens</b> — wired as
-///   an <see cref="ActivatedAbility"/> with a single
-///   <see cref="ManaCostCost"/>. Resolution routes through
-///   <see cref="CountersService.Add"/> so Hardened Scales / Doubling
-///   Season replacements bump the count correctly (CR 614 + CR 121.2).
-/// - <b>{3}{C}: Until EOT becomes a 0/0 colorless Construct artifact
-///   creature with reach; still a land</b> — wired as an
-///   <see cref="ActivatedAbility"/> with a <see cref="ManaCostCost"/> of
-///   {3}{C}. Resolution registers a
-///   <see cref="ManlandCycleAnimateEffect"/> (Layer 4 — adds Creature +
-///   Artifact types, Construct subtype, Reach keyword) and a
-///   <see cref="ManlandCycleBecomesPTEffect"/> (Layer 7b — base 0/0).
-///   Both flagged <see cref="ContinuousEffect.ExpiresAtEndOfTurn"/> so
-///   cleanup (CR 514.2) lifts the animation.
+/// - <b>{4}: Put two +1/+1 counters on this land. Then you may have it become a
+///   0/0 Elemental creature until end of turn. It's still a land.</b> — wired as
+///   a SINGLE <see cref="ActivatedAbility"/> with a {4}
+///   <see cref="ManaCostCost"/> (no {T} cost). Resolution is a two-step compound
+///   effect:
+///   <list type="number">
+///     <item>Counter-accumulation (CR 122, mandatory): place two +1/+1 counters
+///       on the land. Counters are permanent objects (CR 121.5) — they
+///       accumulate across activations and survive cleanup.</item>
+///     <item>Conditional animate (CR 613.1c, "you may"): the controller chooses
+///       (<see cref="IPlayerAgent.ChooseYesNoAsync"/>) whether to animate. On
+///       "yes", register a <see cref="ManlandCycleAnimateEffect"/> (Layer 4 —
+///       adds Creature type + Elemental subtype; printed Land stays) and a
+///       <see cref="ManlandCycleBecomesPTEffect"/> (Layer 7b — base 0/0). The
+///       animated body's effective P/T is 0/0 base plus the accumulated +1/+1
+///       counters (CR 613.7b + CR 122). Both flagged
+///       <see cref="ContinuousEffect.ExpiresAtEndOfTurn"/> so cleanup
+///       (CR 514.2) lifts the animation while the counters persist.</item>
+///   </list>
+///
+/// <para><b>Prod path.</b> Lands are never routed through their [CardName]
+/// factory (the factory instance-swap is gated on
+/// <c>!shell.HasType(CardType.Land)</c>), so this factory is test-only dispatch.
+/// The live counter-accumulate conditional-animate body binds in prod via
+/// <see cref="LandActivatedAbilityBinder"/> (recognised by the compound "Put …
+/// counters on this land. Then you may have it become …" wording).</para>
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Colour identity</b>: "colorless" rider is recorded only in the
-///   factory effect name; Layer 5 colour-setting isn't yet in the pipe.
-///   Same posture as the rest of the manland cycle.
-/// - <b>Land-becomes-creature P/T pipeline</b>: same shim posture as
-///   <see cref="MutavaultFactory"/> / <see cref="InkmothNexusFactory"/> —
-///   <see cref="ContinuousEffectsService.Compute(Permanent)"/> seeds a
-///   plain <see cref="PermanentCharacteristics"/> for a Land runtime
-///   instance, so the 0/0 + counter math is inspectable on the effect
-///   but doesn't surface through Compute. SBA lethal-toughness checks
-///   on a 0/0 animated land are deferred until that upgrade lands —
-///   real games will rarely activate the animate at 0 counters anyway
-///   (the {2}{C} counter pump is the prerequisite).
-/// - <b>Summoning sickness</b>: see <see cref="MutavaultFactory"/> notes.
+/// - <b>Colour identity</b>: the "colorless" body is the engine default (a
+///   plain Elemental creature with no colour); no Layer-5 colour-set needed.
 /// </summary>
 [CardName("Crawling Barrens")]
 public static class CrawlingBarrensFactory
@@ -63,22 +64,18 @@ public static class CrawlingBarrensFactory
     public const int AnimatedToughness = 0;
 
     public static Land Create(Player owner) =>
-        Create(owner, effects: null, replacements: null);
+        Create(owner, effects: null);
 
     /// <summary>
     /// Construct a fully-wired Crawling Barrens.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="effects">ContinuousEffectsService for animate
-    /// registration. May be null — the animate ability still resolves
-    /// and pays its mana, but no continuous effect is recorded.</param>
-    /// <param name="replacements">ReplacementBus for CountersService.Add
-    /// routing of the +1/+1 counter pump. May be null — counters are
-    /// applied directly without replacement-bus interaction.</param>
+    /// registration. May be null — the ability still resolves and places the
+    /// counters, but no animate continuous effect is recorded.</param>
     public static Land Create(
         Player owner,
-        ContinuousEffectsService? effects,
-        ReplacementBus? replacements)
+        ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -93,42 +90,34 @@ public static class CrawlingBarrensFactory
         land.AddAbility(new ManaAbility(land, owner, ManaCost.Parse("{C}")));
 
         // ----------------------------------------------------------------
-        // {2}{C}: Put two +1/+1 counters on Crawling Barrens.
-        // CR 602 — ordinary activated ability. Routes through
-        // CountersService.Add so Hardened Scales / Doubling Season can
-        // rewrite the placement (CR 614 + CR 121.2).
+        // {4}: Put two +1/+1 counters on this land. Then you may have it
+        // become a 0/0 Elemental creature until end of turn. It's still a
+        // land. CR 122 counter step (mandatory) + CR 613.1c conditional
+        // animate ("you may"). The animated body's P/T = 0/0 base plus the
+        // accumulated counters.
         // ----------------------------------------------------------------
-        var counterEffect = new Effect(
-            $"{CardName}: put two +1/+1 counters on self",
-            () => CountersService.Add(
-                land, CounterType.PlusOnePlusOne, CounterPumpAmount, replacements));
-
-        land.AddAbility(new ActivatedAbility(
-            source: land,
-            controller: owner,
-            costs: new ICost[] { new ManaCostCost("{2}{C}") },
-            effects: new IEffect[] { counterEffect }));
-
-        // ----------------------------------------------------------------
-        // {3}{C}: Until EOT, becomes a 0/0 colorless Construct artifact
-        // creature with reach. It's still a land.
-        // Layer 4 adds Creature + Artifact types and Construct subtype
-        // (CR 613.1c); Layer 7b records base 0/0 (CR 613.7b). Counters
-        // applied by the prior pump survive and modify P/T via the
-        // standard CounterCollection bookkeeping.
-        // ----------------------------------------------------------------
-        var animateEffect = new Effect(
-            $"{CardName}: becomes 0/0 colorless Construct artifact creature with reach until EOT (still a land)",
-            () =>
+        var effect = new Effect(
+            $"{CardName}: put two +1/+1 counters on it, then you may have it become a " +
+            "0/0 Elemental creature until EOT (still a land)",
+            async ctx =>
             {
-                if (effects == null) return; // no service wired — shape-only path
+                Fx.PlaceCounter(land, CounterType.PlusOnePlusOne, CounterPumpAmount);
+
+                if (effects == null) return; // no service wired — counters-only path
+
+                var ctrl = land.Controller ?? owner;
+                var agent = ctx.Agent ?? AgentRegistry.Get(ctrl);
+                var animate = agent == null
+                    || await agent.ChooseYesNoAsync(
+                        $"Have {CardName} become a 0/0 Elemental creature until end of turn?",
+                        BotIntent.Buff).ConfigureAwait(false);
+                if (!animate) return;
 
                 effects.Register(new ManlandCycleAnimateEffect(
                     land,
-                    keywords: new[] { "Reach" },
-                    subtypes: new[] { CardSubtype.Construct },
-                    extraTypes: new[] { CardType.Artifact }));
-
+                    keywords: Array.Empty<string>(),
+                    subtypes: new[] { CardSubtype.Elemental },
+                    extraTypes: null));
                 effects.Register(new ManlandCycleBecomesPTEffect(
                     land, AnimatedPower, AnimatedToughness));
             });
@@ -136,8 +125,8 @@ public static class CrawlingBarrensFactory
         land.AddAbility(new ActivatedAbility(
             source: land,
             controller: owner,
-            costs: new ICost[] { new ManaCostCost("{3}{C}") },
-            effects: new IEffect[] { animateEffect }));
+            costs: new ICost[] { new ManaCostCost("{4}") },
+            effects: new IEffect[] { effect }));
 
         return land;
     }

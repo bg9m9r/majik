@@ -1,3 +1,4 @@
+using System.Threading;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
@@ -7,18 +8,34 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
+using Moq;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for <see cref="CrawlingBarrensFactory"/> — manland with a
-/// counter-pump ability and a Construct-artifact animate.
+/// Tests for <see cref="CrawlingBarrensFactory"/> — a manland whose single
+/// "{4}:" ability accumulates two +1/+1 counters and then conditionally
+/// animates ("you may have it become a 0/0 Elemental creature").
 /// </summary>
-public class CrawlingBarrensTests
+public class CrawlingBarrensTests : System.IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
+
+    public CrawlingBarrensTests() => AgentRegistry.Clear();
+
+    public void Dispose() => AgentRegistry.Clear();
+
+    private void SetAgentYesNo(bool yes)
+    {
+        var agent = new Mock<IPlayerAgent>();
+        agent.Setup(a => a.ChooseYesNoAsync(
+                It.IsAny<string>(), It.IsAny<BotIntent>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(yes);
+        AgentRegistry.Set(_alice, agent.Object);
+    }
 
     [Fact]
     public void CrawlingBarrens_IsLand_NoSubtypes_NoSupertypes()
@@ -57,7 +74,7 @@ public class CrawlingBarrensTests
     }
 
     [Fact]
-    public void CrawlingBarrens_HasTwoActivatedAbilities_Alongside_ManaAbility()
+    public void CrawlingBarrens_HasOneActivatedAbility_AlongsideManaAbility()
     {
         var land = CrawlingBarrensFactory.Create(_alice);
 
@@ -66,135 +83,106 @@ public class CrawlingBarrensTests
             .Cast<ActivatedAbility>()
             .ToList();
 
-        activated.Should().HaveCount(2,
-            "{2}{C} counter pump + {3}{C} animate");
-        activated.All(a => a.TargetRequests.Count == 0).Should().BeTrue();
+        activated.Should().HaveCount(1,
+            "the single {4} counter-accumulate conditional-animate ability");
+        activated[0].TargetRequests.Should().BeEmpty();
     }
 
     [Fact]
-    public void CounterPumpAbility_AddsTwoPlusOnePlusOneCounters_OnResolve()
+    public void Resolve_PlacesTwoCounters_ThenAnimatesElemental_OnYes()
     {
-        var land = CrawlingBarrensFactory.Create(_alice, effects: null, replacements: null);
+        var effects = new ContinuousEffectsService();
+        var land = CrawlingBarrensFactory.Create(_alice, effects);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
+        land.ActiveEffects = effects;
+        SetAgentYesNo(true);
 
-        // The first activated ability (index 0) is the {2}{C} counter
-        // pump per the factory wiring.
-        var activated = land.Abilities
+        var ability = land.Abilities
             .Where(a => a.GetType() == typeof(ActivatedAbility))
             .Cast<ActivatedAbility>()
-            .ToList();
-        var counterPump = activated[0];
-        counterPump.Resolve();
+            .Single();
+        ability.Resolve();
 
         land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2);
-
-        // Activate again — counters stack.
-        counterPump.Resolve();
-        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4);
-    }
-
-    [Fact]
-    public void AnimateAbility_RegistersLayer4AndLayer7b_EotExpiring_WithConstructArtifactReach()
-    {
-        var effects = new ContinuousEffectsService();
-        var land = CrawlingBarrensFactory.Create(_alice, effects, replacements: null);
-        _alice.Zones.Battlefield.AddCard(land);
-        land.SetZone(ZoneType.Battlefield);
-
-        var activated = land.Abilities
-            .Where(a => a.GetType() == typeof(ActivatedAbility))
-            .Cast<ActivatedAbility>()
-            .ToList();
-        var animate = activated[1]; // {3}{C} animate is index 1
-        animate.Resolve();
-
-        var registered = GetRegisteredEffects(effects).ToList();
-
-        var anim = registered.OfType<ManlandCycleAnimateEffect>()
-            .SingleOrDefault(e => ReferenceEquals(e.Target, land));
-        anim.Should().NotBeNull();
-        anim!.Layer.Should().Be(Layer.Type);
-        anim.ExpiresAtEndOfTurn.Should().BeTrue();
-        anim.Keywords.Should().BeEquivalentTo(new[] { "Reach" });
-        anim.Subtypes.Should().BeEquivalentTo(new[] { CardSubtype.Construct });
-        anim.ExtraTypes.Should().BeEquivalentTo(new[] { CardType.Artifact });
-
-        var pt = registered.OfType<ManlandCycleBecomesPTEffect>()
-            .SingleOrDefault(e => e.AppliesTo(land));
-        pt.Should().NotBeNull();
-        pt!.NewPower.Should().Be(0);
-        pt.NewToughness.Should().Be(0);
-        pt.Layer.Should().Be(Layer.PT_SetBase);
-        pt.ExpiresAtEndOfTurn.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Compute_AfterAnimate_GrantsCreature_Artifact_Construct_Reach_KeepsLand()
-    {
-        var effects = new ContinuousEffectsService();
-        var land = CrawlingBarrensFactory.Create(_alice, effects, replacements: null);
-        _alice.Zones.Battlefield.AddCard(land);
-        land.SetZone(ZoneType.Battlefield);
-
-        var animate = land.Abilities
-            .Where(a => a.GetType() == typeof(ActivatedAbility))
-            .Cast<ActivatedAbility>()
-            .ElementAt(1);
-        animate.Resolve();
 
         var chars = effects.Compute(land);
         chars.Types.Should().Contain(CardType.Creature);
-        chars.Types.Should().Contain(CardType.Artifact);
-        chars.Types.Should().Contain(CardType.Land,
-            "'It's still a land.' — CR 613.1c additive type grant");
-        chars.Subtypes.Should().Contain(CardSubtype.Construct);
-        chars.Subtypes.Should().NotContain(CardSubtype.Elemental,
-            "Construct override — Elemental is the cycle default, not Crawling Barrens'");
-        chars.Keywords.Should().Contain("Reach");
+        chars.Types.Should().Contain(CardType.Land, "'It's still a land.' (CR 613.1c)");
+        chars.Types.Should().NotContain(CardType.Artifact);
+        chars.Subtypes.Should().Contain(CardSubtype.Elemental);
+        ((CreatureCharacteristics)chars).Power.Should().Be(2, "0/0 base + two +1/+1 counters");
+        ((CreatureCharacteristics)chars).Toughness.Should().Be(2);
     }
 
     [Fact]
-    public void EndOfTurn_ExpiresAnimateAndPT_ButCountersPersist()
+    public void Resolve_PlacesCounters_ButDoesNotAnimate_OnNo()
     {
         var effects = new ContinuousEffectsService();
-        var land = CrawlingBarrensFactory.Create(_alice, effects, replacements: null);
+        var land = CrawlingBarrensFactory.Create(_alice, effects);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
+        land.ActiveEffects = effects;
+        SetAgentYesNo(false);
 
-        var activated = land.Abilities
+        var ability = land.Abilities
             .Where(a => a.GetType() == typeof(ActivatedAbility))
             .Cast<ActivatedAbility>()
-            .ToList();
+            .Single();
+        ability.Resolve();
 
-        activated[0].Resolve(); // counter pump
-        activated[1].Resolve(); // animate
+        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2,
+            "the counter step is mandatory");
+        effects.Compute(land).Types.Should().NotContain(CardType.Creature,
+            "the player declined the optional animate");
+    }
 
-        // CR 514.2 — cleanup lifts EOT-scoped effects. Counters are
-        // permanent objects (CR 121.5) so they persist past cleanup.
+    [Fact]
+    public void Resolve_CountersAccumulate_AcrossActivations()
+    {
+        var effects = new ContinuousEffectsService();
+        var land = CrawlingBarrensFactory.Create(_alice, effects);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        land.ActiveEffects = effects;
+        SetAgentYesNo(true);
+
+        var ability = land.Abilities
+            .Where(a => a.GetType() == typeof(ActivatedAbility))
+            .Cast<ActivatedAbility>()
+            .Single();
+        ability.Resolve();
+        ability.Resolve();
+
+        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4);
+        ((CreatureCharacteristics)effects.Compute(land)).Power.Should().Be(4);
+    }
+
+    [Fact]
+    public void EndOfTurn_ExpiresAnimate_ButCountersPersist()
+    {
+        var effects = new ContinuousEffectsService();
+        var land = CrawlingBarrensFactory.Create(_alice, effects);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        land.ActiveEffects = effects;
+        SetAgentYesNo(true);
+
+        var ability = land.Abilities
+            .Where(a => a.GetType() == typeof(ActivatedAbility))
+            .Cast<ActivatedAbility>()
+            .Single();
+        ability.Resolve();
+
+        // CR 514.2 — cleanup lifts EOT-scoped effects. Counters are permanent
+        // objects (CR 121.5) so they persist past cleanup.
         effects.ExpireEndOfTurn();
 
-        GetRegisteredEffects(effects).OfType<ManlandCycleAnimateEffect>()
-            .Where(e => ReferenceEquals(e.Target, land)).Should().BeEmpty();
-        GetRegisteredEffects(effects).OfType<ManlandCycleBecomesPTEffect>()
-            .Where(e => e.AppliesTo(land)).Should().BeEmpty();
-
-        // Counters survive.
-        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2);
-
-        // Compute reverts to plain Land.
         var chars = effects.Compute(land);
         chars.Types.Should().Contain(CardType.Land);
         chars.Types.Should().NotContain(CardType.Creature);
         chars.Types.Should().NotContain(CardType.Artifact);
-    }
 
-    private static IEnumerable<ContinuousEffect> GetRegisteredEffects(ContinuousEffectsService svc)
-    {
-        var field = typeof(ContinuousEffectsService).GetField(
-            "_effects",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var list = (System.Collections.IEnumerable)field!.GetValue(svc)!;
-        foreach (var e in list) yield return (ContinuousEffect)e;
+        land.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2);
     }
 }

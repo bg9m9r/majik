@@ -112,7 +112,9 @@ namespace Majik.Core.CardData;
 /// <list type="bullet">
 ///   <item>A "Put counters … Then you may have it become …" preamble
 ///     (Crawling Barrens) — the animate is conditional on a prior counter
-///     step.</item>
+///     step, so the AnimateLine ("this land becomes …") never matched it. NOW
+///     BOUND in <see cref="LandActivatedAbilityBinder"/> (its compound
+///     counter-accumulate conditional-animate recognizer) instead.</item>
 ///   <item>Restless Bones' "exile up to two target cards from graveyards, then
 ///     create that many tapped 2/2 Skeletons" attack trigger — the
 ///     count-linked token rider has no generic primitive yet; deferred.</item>
