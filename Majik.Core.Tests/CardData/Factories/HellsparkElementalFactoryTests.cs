@@ -219,4 +219,36 @@ public class HellsparkElementalFactoryTests
         card.Zone.Should().Be(ZoneType.Battlefield,
             "no graveyard source → nothing returns; the card is untouched");
     }
+
+    [Fact]
+    public void SelfSac_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // resolve-time-fx-sacrifice-bus pay-down: the routed prod overload
+        // (Create(Player, ContinuousEffectsService)) threads effects.EventBus
+        // into the end-step self-sac resolve closure so the CR 701.16
+        // sacrifice publishes a PermanentSacrificedEvent (CR 701.16a). Drives
+        // the card EXACTLY as the prod GameFacade build does.
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+
+        var captured = new System.Collections.Generic.List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(captured.Add);
+
+        var built = NamedCardFactory.Create("Hellspark Elemental", _alice, effects);
+        built.Should().BeOfType<Creature>();
+        var card = (Creature)built;
+        _alice.Zones.Battlefield.AddCard(card);
+        card.SetZone(ZoneType.Battlefield);
+
+        var trigger = card.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<StepStartedEvent>);
+        foreach (var e in trigger.Effects) e.Execute();
+
+        captured.Should().ContainSingle(
+            "the prod effects-aware dispatch threads the bus so the end-step "
+            + "self-sacrifice publishes PermanentSacrificedEvent (CR 701.16a)")
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        card.Zone.Should().Be(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(card);
+    }
 }
