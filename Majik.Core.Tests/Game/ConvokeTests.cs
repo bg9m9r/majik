@@ -46,8 +46,8 @@ public class ConvokeTests
         public Task<int> ChooseXAsync(GameContext c, ICard s, CancellationToken ct = default) => _inner.ChooseXAsync(c, s, ct);
         public Task<int> ChooseModeAsync(GameContext c, IReadOnlyList<string> m, IReadOnlyList<BotIntent>? mi = null, CancellationToken ct = default) => _inner.ChooseModeAsync(c, m, mi, ct);
         public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext c, IReadOnlyList<ITriggeredAbility> m, CancellationToken ct = default) => _inner.OrderTriggersAsync(c, m, ct);
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext c, IReadOnlyList<Creature> e, CancellationToken ct = default) => _inner.DeclareAttackersAsync(c, e, ct);
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext c, IReadOnlyList<Creature> a, IReadOnlyList<Creature> e, CancellationToken ct = default) => _inner.DeclareBlockersAsync(c, a, e, ct);
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext c, IReadOnlyList<Permanent> e, CancellationToken ct = default) => _inner.DeclareAttackersAsync(c, e, ct);
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext c, IReadOnlyList<Permanent> a, IReadOnlyList<Permanent> e, CancellationToken ct = default) => _inner.DeclareBlockersAsync(c, a, e, ct);
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? c, IReadOnlyList<ICard> p, CancellationToken ct = default) => _inner.ChooseScryDecisionAsync(c, p, ct);
         public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? c, IReadOnlyList<ICard> p, CancellationToken ct = default) => _inner.ChooseSurveilDecisionAsync(c, p, ct);
         public Task<ICard?> ChooseLibraryPickAsync(GameContext? c, IReadOnlyList<ICard> cs, string label, CancellationToken ct = default) => _inner.ChooseLibraryPickAsync(c, cs, label, ct);

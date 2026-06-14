@@ -301,16 +301,24 @@ public interface IPlayerAgent
         GameContext ctx, ManaCost cost, CancellationToken ct = default);
 
     /// <summary>
-    /// Declare attackers (Rule 508). Empty plan = attack with nothing.
+    /// Declare attackers (Rule 508). Empty plan = attack with nothing. The
+    /// eligible list is typed <see cref="Permanent"/> so an animated NON-creature
+    /// combatant (a manland — deferral
+    /// <c>animated-noncreature-as-combatant</c>, 4B) is offered as an attacker;
+    /// a real <see cref="Creature"/> is a <see cref="Permanent"/>, so agents
+    /// that pattern-match <c>is Creature</c> are unaffected.
     /// </summary>
     Task<CombatPlan> DeclareAttackersAsync(
-        GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default);
+        GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default);
 
     /// <summary>
-    /// Declare blockers (Rule 509). Each blocker assigned to one attacker.
+    /// Declare blockers (Rule 509). Each blocker assigned to one attacker. Both
+    /// lists are typed <see cref="Permanent"/> so an animated manland can be
+    /// offered as a blocker and an animated land can be among the attackers
+    /// (deferral <c>animated-noncreature-as-combatant</c>, 4B).
     /// </summary>
     Task<BlockPlan> DeclareBlockersAsync(
-        GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default);
+        GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default);
 
     /// <summary>
     /// CR 701.20 — Scry N: decide which of the peeked cards go to the bottom

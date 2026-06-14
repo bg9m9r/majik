@@ -115,7 +115,7 @@ public class FerventChampionFactoryTests : IDisposable
             eventBus: eventBus,
             triggers: triggers,
             attackingCreaturesSource: () => combat.CurrentCombat?.Attackers
-                .Select(a => a.Creature).ToList() ?? new List<Creature>());
+                .Select(a => a.Creature).OfType<Creature>().ToList() ?? new List<Creature>());
         champ.ActiveEffects = effects;
         _alice.Zones.Battlefield.AddCard(champ);
         champ.SetZone(ZoneType.Battlefield);

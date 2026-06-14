@@ -11,9 +11,12 @@ public class Blocker
     private int _assignedDamage;
 
     /// <summary>
-    /// The creature that is blocking.
+    /// The permanent that is blocking. Typed <see cref="Permanent"/> so an
+    /// animated NON-creature permanent (a manland) can block too (deferral
+    /// <c>animated-noncreature-as-combatant</c>, 4B). A real
+    /// <see cref="Cards.Creature"/> assigns here unchanged.
     /// </summary>
-    public Creature Creature { get; }
+    public Permanent Creature { get; }
 
     /// <summary>
     /// The attacker being blocked.
@@ -51,7 +54,7 @@ public class Blocker
     /// </summary>
     public bool HasDeathtouch { get; }
 
-    public Blocker(Creature creature, Attacker blockedAttacker, 
+    public Blocker(Permanent creature, Attacker blockedAttacker, 
         bool hasFirstStrike = false, bool hasDoubleStrike = false, bool hasDeathtouch = false)
     {
         if (creature == null)
@@ -98,7 +101,7 @@ public class Blocker
     /// </summary>
     public int GetPower()
     {
-        return Creature.Power;
+        return Creature.GetEffectivePower();
     }
 
     /// <summary>

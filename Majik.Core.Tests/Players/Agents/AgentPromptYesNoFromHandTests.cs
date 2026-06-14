@@ -82,13 +82,13 @@ public class AgentPromptYesNoFromHandTests
             => Task.FromResult(ManaPayment.Empty);
 
         public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(
-            Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> eligibleAttackers,
+            Majik.Core.Game.GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers,
             CancellationToken ct = default)
             => Task.FromResult(Majik.Core.Players.Agents.CombatPlan.None);
 
         public Task<BlockPlan> DeclareBlockersAsync(
-            Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> attackers,
-            IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+            Majik.Core.Game.GameContext ctx, IReadOnlyList<Permanent> attackers,
+            IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
             => Task.FromResult(BlockPlan.None);
 
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(
@@ -661,12 +661,12 @@ public class AgentPromptYesNoFromHandTests
             CancellationToken ct = default)
             => Task.FromResult(ManaPayment.Empty);
         public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(
-            Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> eligibleAttackers,
+            Majik.Core.Game.GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers,
             CancellationToken ct = default)
             => Task.FromResult(Majik.Core.Players.Agents.CombatPlan.None);
         public Task<BlockPlan> DeclareBlockersAsync(
-            Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> attackers,
-            IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+            Majik.Core.Game.GameContext ctx, IReadOnlyList<Permanent> attackers,
+            IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
             => Task.FromResult(BlockPlan.None);
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(
             Majik.Core.Game.GameContext? ctx, IReadOnlyList<ICard> peeked,

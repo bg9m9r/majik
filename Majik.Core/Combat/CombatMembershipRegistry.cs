@@ -34,12 +34,12 @@ namespace Majik.Core.Combat;
 public sealed class CombatMembershipRegistry
 {
     private readonly object _lock = new();
-    private readonly HashSet<Creature> _attacking = new(ReferenceEqualityComparer.Instance);
-    private readonly HashSet<Creature> _blocking = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<Permanent> _attacking = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<Permanent> _blocking = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Mark <paramref name="creature"/> as a declared attacker
     /// (CR 508.1) in the current combat.</summary>
-    public void RecordAttacker(Creature creature)
+    public void RecordAttacker(Permanent creature)
     {
         if (creature == null) return;
         lock (_lock) { _attacking.Add(creature); }
@@ -47,7 +47,7 @@ public sealed class CombatMembershipRegistry
 
     /// <summary>Mark <paramref name="creature"/> as a declared blocker
     /// (CR 509.1) in the current combat.</summary>
-    public void RecordBlocker(Creature creature)
+    public void RecordBlocker(Permanent creature)
     {
         if (creature == null) return;
         lock (_lock) { _blocking.Add(creature); }
@@ -68,7 +68,7 @@ public sealed class CombatMembershipRegistry
     /// <summary>True iff <paramref name="creature"/> is a declared attacker in
     /// the current combat (CR 508.4 — "attacking" until removed from combat /
     /// combat ends).</summary>
-    public bool IsAttacking(Creature creature)
+    public bool IsAttacking(Permanent creature)
     {
         if (creature == null) return false;
         lock (_lock) { return _attacking.Contains(creature); }
@@ -77,7 +77,7 @@ public sealed class CombatMembershipRegistry
     /// <summary>True iff <paramref name="creature"/> is a declared blocker in
     /// the current combat (CR 509.1 — "blocking" until removed from combat /
     /// combat ends).</summary>
-    public bool IsBlocking(Creature creature)
+    public bool IsBlocking(Permanent creature)
     {
         if (creature == null) return false;
         lock (_lock) { return _blocking.Contains(creature); }
@@ -85,17 +85,17 @@ public sealed class CombatMembershipRegistry
 
     /// <summary>True iff <paramref name="creature"/> is attacking OR blocking in
     /// the current combat — the Eiganjo / Desert combat-state target gate.</summary>
-    public bool IsAttackingOrBlocking(Creature creature)
+    public bool IsAttackingOrBlocking(Permanent creature)
         => IsAttacking(creature) || IsBlocking(creature);
 
     /// <summary>Snapshot of the creatures currently attacking or blocking
     /// (de-duplicated by reference). Used by candidate gatherers to offer only
     /// legal targets (CR 601.2c).</summary>
-    public IReadOnlyList<Creature> AttackingOrBlocking()
+    public IReadOnlyList<Permanent> AttackingOrBlocking()
     {
         lock (_lock)
         {
-            var result = new List<Creature>(_attacking.Count + _blocking.Count);
+            var result = new List<Permanent>(_attacking.Count + _blocking.Count);
             foreach (var c in _attacking) result.Add(c);
             foreach (var c in _blocking)
             {

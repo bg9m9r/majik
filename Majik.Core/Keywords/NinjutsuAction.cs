@@ -117,7 +117,11 @@ public static class NinjutsuAction
         {
             if (attacker.Blockers.Count > 0) continue; // blocked
             if (!ReferenceEquals(attacker.Creature.Controller, caster)) continue;
-            return attacker.Creature;
+            // CR 702.49 — ninjutsu returns an unblocked ATTACKING CREATURE to
+            // hand. An animated manland attacker (deferral
+            // animated-noncreature-as-combatant) is a Land instance, not a real
+            // Creature card to bounce, so it is skipped (returns null for it).
+            if (attacker.Creature is Creature c) return c;
         }
         return null;
     }

@@ -184,7 +184,7 @@ public class TurnDriverCombatSkipTests
         private readonly DeterministicBotAgent _inner = new();
         public int DeclareAttackersCalls { get; private set; }
 
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
         {
             DeclareAttackersCalls++;
             return _inner.DeclareAttackersAsync(ctx, eligibleAttackers, ct);
@@ -206,7 +206,7 @@ public class TurnDriverCombatSkipTests
             => _inner.OrderTriggersAsync(ctx, mine, ct);
         public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default)
             => _inner.ChooseManaSourcesAsync(ctx, cost, ct);
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
             => _inner.DeclareBlockersAsync(ctx, attackers, eligibleBlockers, ct);
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
             => _inner.ChooseScryDecisionAsync(ctx, peeked, ct);

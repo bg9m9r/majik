@@ -171,7 +171,7 @@ public static class WeddingAnnouncementFactory
         // Champion's Raid tracking, but counting distinct attackers rather
         // than a single boolean flag.
         // ----------------------------------------------------------------
-        var attackersThisTurn = new HashSet<Creature>();
+        var attackersThisTurn = new HashSet<Permanent>();
         if (eventBus != null)
         {
             eventBus.Subscribe<CreatureAttacksEvent>(e =>

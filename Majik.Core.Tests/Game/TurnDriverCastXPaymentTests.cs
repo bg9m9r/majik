@@ -181,9 +181,9 @@ public class TurnDriverCastXPaymentTests
             => _inner.ChooseModeAsync(ctx, modes, modeIntents, ct);
         public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> abilities, CancellationToken ct = default)
             => _inner.OrderTriggersAsync(ctx, abilities, ct);
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligible, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligible, CancellationToken ct = default)
             => _inner.DeclareAttackersAsync(ctx, eligible, ct);
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligible, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligible, CancellationToken ct = default)
             => _inner.DeclareBlockersAsync(ctx, attackers, eligible, ct);
         public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
             => _inner.ChooseScryDecisionAsync(ctx, peeked, ct);

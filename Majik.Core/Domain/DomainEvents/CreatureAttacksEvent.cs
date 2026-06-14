@@ -12,10 +12,19 @@ namespace Majik.Core.Domain.DomainEvents;
 /// </summary>
 public class CreatureAttacksEvent : GameEvent
 {
-    public Creature Attacker { get; }
+    /// <summary>
+    /// The attacking permanent. Typed <see cref="Permanent"/> (not
+    /// <see cref="Creature"/>) so an animated NON-creature combatant — a manland
+    /// (CR 613.1c) — names ITSELF here when it attacks, letting Restless-land
+    /// "whenever ~ attacks" triggers finally observe their own land (deferral
+    /// <c>animated-noncreature-as-combatant</c>, 4B). A real <see cref="Creature"/>
+    /// is a <see cref="Permanent"/>, so existing trigger binders that read
+    /// <c>.Controller</c> / <c>ReferenceEquals</c> are unaffected.
+    /// </summary>
+    public Permanent Attacker { get; }
     public object DefendingPlayerOrPlaneswalker { get; }
 
-    public CreatureAttacksEvent(Creature attacker, object defendingPlayerOrPlaneswalker)
+    public CreatureAttacksEvent(Permanent attacker, object defendingPlayerOrPlaneswalker)
         : base(EventType.PhaseEnded)
     {
         Attacker = attacker ?? throw new ArgumentNullException(nameof(attacker));

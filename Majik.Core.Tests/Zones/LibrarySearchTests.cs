@@ -76,8 +76,8 @@ public class LibrarySearchTests : IDisposable
         public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<BotIntent>? modeIntents = null, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<Majik.Core.Abilities.ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Abilities.ITriggeredAbility> mine, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Cards.Creature> eligibleAttackers, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Cards.Creature> attackers, IReadOnlyList<Majik.Core.Cards.Creature> eligibleBlockers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Cards.Permanent> eligibleAttackers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Cards.Permanent> attackers, IReadOnlyList<Majik.Core.Cards.Permanent> eligibleBlockers, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotImplementedException();
     }

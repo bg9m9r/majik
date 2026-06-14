@@ -64,8 +64,8 @@ public sealed class CombatFlow
         Player defender,
         IPlayerAgent attackerAgent,
         IPlayerAgent defenderAgent,
-        IReadOnlyList<Creature> attackers,
-        IReadOnlyList<Creature> blockers,
+        IReadOnlyList<Permanent> attackers,
+        IReadOnlyList<Permanent> blockers,
         GameContext ctx,
         CancellationToken ct = default,
         Func<Majik.Core.StateMachine.StepStateType, CancellationToken, Task>? grantStepPriority = null)
@@ -158,7 +158,7 @@ public sealed class CombatFlow
         Player defender,
         IPlayerAgent defenderAgent,
         CombatPlan attackPlan,
-        IReadOnlyList<Creature> blockers,
+        IReadOnlyList<Permanent> blockers,
         GameContext ctx,
         CancellationToken ct = default,
         Func<Majik.Core.StateMachine.StepStateType, CancellationToken, Task>? grantStepPriority = null)
@@ -345,7 +345,7 @@ public sealed class CombatFlow
 
     private void AssignAndDealDamage(
         CombatPlan attackPlan,
-        Dictionary<Creature, List<Majik.Core.Players.Agents.BlockerDeclaration>> blockersByAttacker,
+        Dictionary<Permanent, List<Majik.Core.Players.Agents.BlockerDeclaration>> blockersByAttacker,
         Player defender,
         DamageStep step)
     {
@@ -361,11 +361,11 @@ public sealed class CombatFlow
             }
             else if (decl.DefendingPlayerOrPlaneswalker is Player p)
             {
-                DealDamageToPlayer(attacker, p, attacker.Power);
+                DealDamageToPlayer(attacker, p, attacker.GetEffectivePower());
             }
             else if (decl.DefendingPlayerOrPlaneswalker is Permanent pw && pw.IsEffectivePlaneswalker())
             {
-                DealDamageToPlaneswalker(attacker, pw, attacker.Power);
+                DealDamageToPlaneswalker(attacker, pw, attacker.GetEffectivePower());
             }
         }
 
@@ -378,12 +378,12 @@ public sealed class CombatFlow
                 if (b.Blocker.Zone != ZoneType.Battlefield) continue;
                 if (attacker.Zone != ZoneType.Battlefield) continue;
 
-                DealDamageToCreature(b.Blocker, attacker, b.Blocker.Power);
+                DealDamageToCreature(b.Blocker, attacker, b.Blocker.GetEffectivePower());
             }
         }
     }
 
-    private static bool CreatureDealsDamageThisStep(Creature c, DamageStep step) => step switch
+    private static bool CreatureDealsDamageThisStep(Permanent c, DamageStep step) => step switch
     {
         DamageStep.SingleStep => true,
         DamageStep.FirstStrike => CombatAbilities.HasFirstStrike(c) || CombatAbilities.HasDoubleStrike(c),
@@ -391,9 +391,9 @@ public sealed class CombatFlow
         _ => true,
     };
 
-    private void DealBlockedDamage(Creature attacker, List<Majik.Core.Players.Agents.BlockerDeclaration> blocks, Player defender)
+    private void DealBlockedDamage(Permanent attacker, List<Majik.Core.Players.Agents.BlockerDeclaration> blocks, Player defender)
     {
-        var remaining = attacker.Power;
+        var remaining = attacker.GetEffectivePower();
         var deathtouch = CombatAbilities.HasDeathtouch(attacker);
         var trample = CombatAbilities.HasTrample(attacker);
 
@@ -405,7 +405,7 @@ public sealed class CombatFlow
 
             var lethal = deathtouch
                 ? 1
-                : Math.Max(1, b.Blocker.Toughness - b.Blocker.Damage);
+                : Math.Max(1, b.Blocker.GetEffectiveToughness() - b.Blocker.MarkedDamage);
 
             if (remaining < lethal)
             {
@@ -420,7 +420,7 @@ public sealed class CombatFlow
                 // deals 3 — marked, or as -1/-1 counters under wither). Detect
                 // that case: nothing has been assigned yet (remaining ==
                 // attacker.Power) and there is no later battlefield blocker.
-                var nothingAssignedYet = remaining == attacker.Power;
+                var nothingAssignedYet = remaining == attacker.GetEffectivePower();
                 var hasLaterBlocker = false;
                 for (var j = idx + 1; j < blocks.Count; j++)
                 {
@@ -450,14 +450,21 @@ public sealed class CombatFlow
         }
     }
 
-    private void DealDamageToCreature(Creature source, Creature target, int amount)
+    private void DealDamageToCreature(Permanent source, Permanent target, int amount)
     {
         // CR 702.16e — protection-from-X prevents damage from any source
         // matching the quality. Check colour-quality before mutating state.
         if (HasProtectionFromSource(target, source)) return;
 
+        // CR 614/615 — the replacement pipeline keys creature-damage replacements
+        // off a real Creature target. An animated NON-creature combatant (a
+        // manland) carries no Creature instance, so it is passed null here and
+        // takes the raw amount (creature-targeted replacements — e.g. "prevent
+        // all combat damage to creatures you control" — are a rare edge over an
+        // animated land in v1; the deathtouch / lethal SBA below still apply
+        // through the lifted Permanent surface).
         var intent = new Majik.Core.Effects.DamageIntent(
-            source, amount, TargetCreature: target)
+            source, amount, TargetCreature: target as Creature)
         { IsCombatDamage = true };
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
@@ -472,13 +479,17 @@ public sealed class CombatFlow
         {
             // CR 702.90b — wither changes the FORM (counters, not marked
             // damage), but the creature WAS still dealt damage this turn
-            // (CR 120.3). TakeDamage's stamp is bypassed here, so record it.
+            // (CR 120.3). MarkDamage's stamp is bypassed here, so record it.
             target.RecordDamageDealt(intent.Amount);
             target.Counters.Add(Majik.Core.Counters.CounterType.MinusOneMinusOne, intent.Amount);
         }
         else
         {
-            target.TakeDamage(intent.Amount);
+            // CR 119.3 — mark damage through the Permanent-level surface so an
+            // animated land (no Creature.Damage field) accumulates marked damage;
+            // a real Creature's MarkDamage override routes to its authoritative
+            // Damage field (single source of truth).
+            target.MarkDamage(intent.Amount);
         }
         if (CombatAbilities.HasDeathtouch(source))
         {
@@ -491,7 +502,7 @@ public sealed class CombatFlow
         _bus.Publish(new CombatDamageDealtEvent(source, target, intent.Amount));
     }
 
-    private void DealDamageToPlaneswalker(Creature source, Permanent target, int amount)
+    private void DealDamageToPlaneswalker(Permanent source, Permanent target, int amount)
     {
         var intent = new Majik.Core.Effects.DamageIntent(
             source, amount, TargetPlaneswalker: target)
@@ -514,7 +525,7 @@ public sealed class CombatFlow
         _bus.Publish(new CombatDamageDealtEvent(source, target, intent.Amount));
     }
 
-    private void DealDamageToPlayer(Creature source, Player target, int amount)
+    private void DealDamageToPlayer(Permanent source, Player target, int amount)
     {
         if (target.HasLost) return; // CR 104.2 — game over for this player
 
@@ -567,7 +578,7 @@ public sealed class CombatFlow
         // at the damage site. Eagerly setting HasLost here was inconsistent
         // with that deferred model (the accumulated total is converted to the
         // loss on the next SBA sweep).
-        if (source.IsCommander && target.Commander != null)
+        if (source is Creature { IsCommander: true } && target.Commander != null)
         {
             target.Commander.TakeCommanderDamage(source, intent.Amount);
         }

@@ -19,11 +19,24 @@ public class CombatValidator
     }
 
     /// <summary>
-    /// Check if a creature can attack.
+    /// Check if a permanent can attack. Typed <see cref="Permanent"/> (not
+    /// <see cref="Creature"/>) so an animated NON-creature C# instance — a
+    /// manland (a <see cref="Land"/> effectively a creature via a Layer-4 grant,
+    /// CR 613.1c) — can be declared as an attacker (deferral
+    /// <c>animated-noncreature-as-combatant</c>, 4B). A real
+    /// <see cref="Creature"/> is a <see cref="Permanent"/> and routes unchanged.
     /// </summary>
-    public bool CanAttack(Creature creature, Player activePlayer)
+    public bool CanAttack(Permanent creature, Player activePlayer)
     {
         if (creature == null || activePlayer == null)
+        {
+            return false;
+        }
+
+        // CR 508.1a — only creatures attack. An animated land qualifies via its
+        // EFFECTIVE type (CR 613.1c); a plain land / non-creature permanent does
+        // not. A real Creature is always effectively a creature.
+        if (!creature.IsEffectivelyCreature())
         {
             return false;
         }
@@ -57,7 +70,7 @@ public class CombatValidator
         // (CR 508.1a relaxation — Nivix Cyclops). The grant is a per-turn
         // permission flag, not a keyword removal.
         if (CombatAbilities.HasDefender(creature)
-            && !creature.CanAttackAsThoughItDidntHaveDefenderThisTurn)
+            && !(creature is Creature c && c.CanAttackAsThoughItDidntHaveDefenderThisTurn))
         {
             return false;
         }
@@ -73,11 +86,21 @@ public class CombatValidator
     }
 
     /// <summary>
-    /// Check if a creature can block an attacker.
+    /// Check if a permanent can block an attacker. Typed <see cref="Permanent"/>
+    /// so an animated manland can block (deferral
+    /// <c>animated-noncreature-as-combatant</c>, 4B); a real <see cref="Creature"/>
+    /// routes unchanged.
     /// </summary>
-    public bool CanBlock(Creature creature, Attacker attacker, Player defendingPlayer)
+    public bool CanBlock(Permanent creature, Attacker attacker, Player defendingPlayer)
     {
         if (creature == null || attacker == null || defendingPlayer == null)
+        {
+            return false;
+        }
+
+        // CR 509.1a — only creatures block; an animated land qualifies via its
+        // effective type (CR 613.1c), a plain land does not.
+        if (!creature.IsEffectivelyCreature())
         {
             return false;
         }
@@ -145,7 +168,7 @@ public class CombatValidator
         return true;
     }
 
-    private static bool AttackerProtectedFromBlocker(Creature attacker, Creature blocker)
+    private static bool AttackerProtectedFromBlocker(Permanent attacker, Permanent blocker)
     {
         // CR 105.3 / 702.16e — use the blocker's EFFECTIVE colour so a
         // Layer-5 colour-changing effect (e.g. "is all colors") is honoured.
@@ -237,7 +260,7 @@ public class CombatValidator
     /// <summary>
     /// Validate a collection of attacker declarations.
     /// </summary>
-    public bool IsValidAttackDeclaration(IEnumerable<Creature> attackers, Player activePlayer, Player? targetPlayer, Permanent? targetPlaneswalker)
+    public bool IsValidAttackDeclaration(IEnumerable<Permanent> attackers, Player activePlayer, Player? targetPlayer, Permanent? targetPlaneswalker)
     {
         if (attackers == null || activePlayer == null)
         {
@@ -278,7 +301,7 @@ public class CombatValidator
     /// <summary>
     /// Validate a collection of blocker declarations.
     /// </summary>
-    public bool IsValidBlockDeclaration(IEnumerable<(Creature blocker, Attacker attacker)> blocks, Player defendingPlayer)
+    public bool IsValidBlockDeclaration(IEnumerable<(Permanent blocker, Attacker attacker)> blocks, Player defendingPlayer)
     {
         if (blocks == null || defendingPlayer == null)
         {
@@ -286,7 +309,7 @@ public class CombatValidator
         }
 
         var blockList = blocks.ToList();
-        var blockersUsed = new HashSet<Creature>();
+        var blockersUsed = new HashSet<Permanent>();
 
         foreach (var (blocker, attacker) in blockList)
         {
@@ -330,10 +353,10 @@ public class CombatValidator
     /// exempt (CR 509.1c "able to block").
     /// </summary>
     public bool IsValidBlockDeclaration(
-        IEnumerable<(Creature blocker, Attacker attacker)> blocks,
+        IEnumerable<(Permanent blocker, Attacker attacker)> blocks,
         Player defendingPlayer,
         IEnumerable<Attacker> attackers,
-        IEnumerable<Creature> availableBlockers)
+        IEnumerable<Permanent> availableBlockers)
     {
         // Per-block legality first (also null-guards blocks / defendingPlayer).
         if (!IsValidBlockDeclaration(blocks, defendingPlayer))
@@ -390,4 +413,33 @@ public class CombatValidator
 
         return true;
     }
+
+    // -----------------------------------------------------------------------
+    // Creature-tuple forwarding overloads. ValueTuple element types are
+    // INVARIANT (a List<(Creature, Attacker)> does NOT convert to an
+    // IEnumerable<(Permanent, Attacker)>), so callers that build creature
+    // tuples — the bulk of the engine + tests — need an overload that accepts
+    // (Creature, Attacker) and projects up to the Permanent core. A real
+    // Creature is a Permanent, so the projection is allocation-light and
+    // behaviour-identical. (Deferral animated-noncreature-as-combatant, 4B.)
+    // -----------------------------------------------------------------------
+
+    /// <summary>Creature-tuple overload of
+    /// <see cref="IsValidBlockDeclaration(IEnumerable{ValueTuple{Permanent, Attacker}}, Player)"/>.</summary>
+    public bool IsValidBlockDeclaration(IEnumerable<(Creature blocker, Attacker attacker)> blocks, Player defendingPlayer)
+        => IsValidBlockDeclaration(
+            blocks?.Select(b => ((Permanent)b.blocker, b.attacker))!, defendingPlayer);
+
+    /// <summary>Creature-tuple overload of the must-block-aware
+    /// <see cref="IsValidBlockDeclaration(IEnumerable{ValueTuple{Permanent, Attacker}}, Player, IEnumerable{Attacker}, IEnumerable{Permanent})"/>.</summary>
+    public bool IsValidBlockDeclaration(
+        IEnumerable<(Creature blocker, Attacker attacker)> blocks,
+        Player defendingPlayer,
+        IEnumerable<Attacker> attackers,
+        IEnumerable<Creature> availableBlockers)
+        => IsValidBlockDeclaration(
+            blocks?.Select(b => ((Permanent)b.blocker, b.attacker))!,
+            defendingPlayer,
+            attackers,
+            availableBlockers);
 }

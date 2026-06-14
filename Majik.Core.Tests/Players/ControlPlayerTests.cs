@@ -321,12 +321,12 @@ public class ControlPlayerTests
             => Inner.ChooseManaSourcesAsync(ctx, cost, ct);
 
         public Task<CombatPlan> DeclareAttackersAsync(
-            GameContext ctx, IReadOnlyList<Majik.Core.Cards.Creature> eligibleAttackers, CancellationToken ct = default)
+            GameContext ctx, IReadOnlyList<Majik.Core.Cards.Permanent> eligibleAttackers, CancellationToken ct = default)
             => Inner.DeclareAttackersAsync(ctx, eligibleAttackers, ct);
 
         public Task<BlockPlan> DeclareBlockersAsync(
-            GameContext ctx, IReadOnlyList<Majik.Core.Cards.Creature> attackers,
-            IReadOnlyList<Majik.Core.Cards.Creature> eligibleBlockers, CancellationToken ct = default)
+            GameContext ctx, IReadOnlyList<Majik.Core.Cards.Permanent> attackers,
+            IReadOnlyList<Majik.Core.Cards.Permanent> eligibleBlockers, CancellationToken ct = default)
             => Inner.DeclareBlockersAsync(ctx, attackers, eligibleBlockers, ct);
 
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(

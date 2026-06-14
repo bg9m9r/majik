@@ -130,13 +130,13 @@ public sealed class ScriptedPlayerAgent : IPlayerAgent
             : _continuation!.ChooseManaSourcesAsync(ctx, cost, ct);
 
     public Task<CombatPlan> DeclareAttackersAsync(
-        GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
         => Next(BotDecisionKind.Attackers) is { } p
             ? Task.FromResult(BotDecisionCodec.DecodeAttackers(p, ctx, eligibleAttackers))
             : _continuation!.DeclareAttackersAsync(ctx, eligibleAttackers, ct);
 
     public Task<BlockPlan> DeclareBlockersAsync(
-        GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers,
+        GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers,
         CancellationToken ct = default)
         => Next(BotDecisionKind.Blockers) is { } p
             ? Task.FromResult(BotDecisionCodec.DecodeBlockers(p, attackers, eligibleBlockers))

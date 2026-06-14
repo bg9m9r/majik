@@ -38,7 +38,7 @@ public class RecordingScriptedAgentTests
         inner.Setup(a => a.ChooseYesNoAsync(ctx, "pay?", "Shockland", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         inner.Setup(a => a.DeclareBlockersAsync(
-                ctx, It.IsAny<IReadOnlyList<Creature>>(), It.IsAny<IReadOnlyList<Creature>>(),
+                ctx, It.IsAny<IReadOnlyList<Permanent>>(), It.IsAny<IReadOnlyList<Creature>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedPlan);
 

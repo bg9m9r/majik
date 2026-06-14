@@ -350,9 +350,9 @@ public class TurnDriverCastManaRefundTests
             => Task.FromResult(ManaPayment.Empty);
         public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> abilities, CancellationToken ct = default)
             => Task.FromResult(abilities);
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligible, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligible, CancellationToken ct = default)
             => Task.FromResult(new CombatPlan(Array.Empty<Majik.Core.Players.Agents.AttackerDeclaration>()));
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligible, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligible, CancellationToken ct = default)
             => Task.FromResult(new BlockPlan(Array.Empty<Majik.Core.Players.Agents.BlockerDeclaration>()));
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
             => Task.FromResult(new Majik.Core.Keywords.ScryAction.ScryDecision(peeked, Array.Empty<ICard>()));
@@ -418,9 +418,9 @@ public class TurnDriverCastManaRefundTests
             => _innerCastAgent.ChooseManaSourcesAsync(ctx, cost, ct);
         public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> abilities, CancellationToken ct = default)
             => _innerCastAgent.OrderTriggersAsync(ctx, abilities, ct);
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligible, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligible, CancellationToken ct = default)
             => _innerCastAgent.DeclareAttackersAsync(ctx, eligible, ct);
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligible, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligible, CancellationToken ct = default)
             => _innerCastAgent.DeclareBlockersAsync(ctx, attackers, eligible, ct);
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
             => _innerCastAgent.ChooseScryDecisionAsync(ctx, peeked, ct);

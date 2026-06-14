@@ -197,7 +197,7 @@ internal static class BlockCombatEval
             }
 
             // Sum blocker power to check if attacker dies.
-            int totalBlockerPower = stackedBlockers.Sum(b => b.Power);
+            int totalBlockerPower = stackedBlockers.Sum(b => b.GetEffectivePower());
             bool attackerDies = totalBlockerPower >= att.Toughness;
             if (attackerDies)
                 attackersKilledPower += att.Power + att.Toughness;
@@ -205,12 +205,12 @@ internal static class BlockCombatEval
             // Attacker's power is distributed across blockers (optimal for
             // attacker = maximise kills). Use ascending toughness ordering.
             int remaining = att.Power;
-            foreach (var blk in stackedBlockers.OrderBy(b => b.Toughness))
+            foreach (var blk in stackedBlockers.OrderBy(b => b.GetEffectiveToughness()))
             {
-                if (remaining >= blk.Toughness)
+                if (remaining >= blk.GetEffectiveToughness())
                 {
-                    blockersKilledPower += blk.Power + blk.Toughness;
-                    remaining -= blk.Toughness;
+                    blockersKilledPower += blk.GetEffectivePower() + blk.GetEffectiveToughness();
+                    remaining -= blk.GetEffectiveToughness();
                 }
             }
         }

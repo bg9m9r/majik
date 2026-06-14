@@ -83,9 +83,9 @@ public class SpellCastFlowCostIncreaseRiderTests
             CapturedManaCost = cost;
             return _inner.ChooseManaSourcesAsync(ctx, cost, ct);
         }
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
             => _inner.DeclareAttackersAsync(ctx, eligibleAttackers, ct);
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
             => _inner.DeclareBlockersAsync(ctx, attackers, eligibleBlockers, ct);
         public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
             => _inner.ChooseScryDecisionAsync(ctx, peeked, ct);

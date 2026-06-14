@@ -928,8 +928,19 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         return Task.FromResult(new ManaPayment(sources));
     }
 
-    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackersAll, CancellationToken ct = default)
     {
+        // Deferral animated-noncreature-as-combatant (4B) — the eligible list is
+        // now Permanent-typed (animated manlands may attack). The creature-tuned
+        // heuristic below runs on the real Creature subset; animated NON-creature
+        // combatants (a manland computing as a creature) are handled by the
+        // simple aggressive tail at the end (they have no ManaCost/CMC the
+        // trade-math keys off, so they swing when the board is profitable to
+        // swing — when we have lethal reach or aren't holding back).
+        var eligibleAttackers = eligibleAttackersAll.OfType<Creature>().ToList();
+        var animatedNonCreatureAttackers = eligibleAttackersAll
+            .Where(p => p is not Creature && p.IsEffectivelyCreature())
+            .ToList();
         var defender = ctx.AllPlayers.First(p => !ReferenceEquals(p, ctx.Self));
         var defenderCreatures = defender.Zones.Battlefield.GetCards()
             .OfType<Creature>().Where(c => !c.IsTapped).ToList();
@@ -939,7 +950,8 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         // 1) Lethal this turn? Total attack power vs defender life. If we
         //    can kill them now (assuming worst-case blocks absorb just
         //    enough to keep them alive), swing with everything — race won.
-        var totalAttackPower = eligibleAttackers.Sum(c => EffectivePower(c));
+        var totalAttackPower = eligibleAttackers.Sum(c => EffectivePower(c))
+            + animatedNonCreatureAttackers.Sum(p => p.GetEffectivePower());
         var reach = totalAttackPower >= defender.LifeTotal;
 
         // 2) Are we under threat of lethal next turn? Sum opp's untapped
@@ -1002,6 +1014,21 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
             attacks.Add(new AttackerDeclaration(atk, defender));
         }
+
+        // Deferral animated-noncreature-as-combatant (4B) — swing animated
+        // manlands. They cost no card to lose (a tapped land), so attack with
+        // them when we have lethal reach OR we're not defensively holding back
+        // (not threatened next turn). A conservative posture that avoids
+        // throwing a manland into a strictly-losing block when we need to keep
+        // mana up — but it still pressures the opponent on open boards.
+        if (reach || !threatenedNextTurn || raceWonLookahead)
+        {
+            foreach (var land in animatedNonCreatureAttackers)
+            {
+                attacks.Add(new AttackerDeclaration(land, defender));
+            }
+        }
+
         return Task.FromResult(new CombatPlan(attacks));
     }
 
@@ -1041,10 +1068,18 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         return blockerKillsAtk && !atkKillsBlocker;
     }
 
-    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackersAll, IReadOnlyList<Permanent> eligibleBlockersAll, CancellationToken ct = default)
     {
+        // Deferral animated-noncreature-as-combatant (4B) — the lists are now
+        // Permanent-typed. The creature-tuned block heuristic runs on the real
+        // Creature subset; an animated manland among the ATTACKERS is simply not
+        // separately blocked (a v1 heuristic degradation, not a correctness bug:
+        // its combat damage is handled by the engine regardless), and a manland
+        // is not chosen as a BLOCKER by this heuristic. The full block solver in
+        // the search bot handles animated combatants on both sides.
+        var attackers = attackersAll.OfType<Creature>().ToList();
         var assignments = new List<BlockerDeclaration>();
-        var available = eligibleBlockers.ToList();
+        var available = eligibleBlockersAll.OfType<Creature>().ToList();
 
         // Sort attackers biggest-threat-first so best blockers get used on
         // the most dangerous creatures. Trample + lifelink + raw power

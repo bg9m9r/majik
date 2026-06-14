@@ -1401,7 +1401,13 @@ public sealed class TurnDriver
     private async Task RunCombat(Player attacker, Player defender, CancellationToken ct)
     {
         var eligibleAttackers = attacker.Zones.Battlefield.GetCards()
-            .OfType<Creature>()
+            .OfType<Permanent>()
+            // CR 508.1a / 613.1c — only (effectively) creatures attack. A real
+            // Creature qualifies; an animated NON-creature C# instance (a manland
+            // — a Land effectively a creature via a Layer-4 grant) does too
+            // (deferral animated-noncreature-as-combatant, 4B). A plain land /
+            // non-creature permanent is filtered out here.
+            .Where(c => c.IsEffectivelyCreature())
             // CR 508.1c / 302.6 — eligible iff untapped AND (no summoning
             // sickness OR has haste). Without the haste check, freshly
             // hasted creatures (Lightning Greaves, Hexdrinker, etc.) would
@@ -1413,11 +1419,11 @@ public sealed class TurnDriver
             // have defender" (CR 508.1a relaxation — Nivix Cyclops). Without
             // this filter a Wall would be offered as an attacker.
             .Where(c => !Majik.Core.Combat.CombatAbilities.HasDefender(c)
-                || c.CanAttackAsThoughItDidntHaveDefenderThisTurn)
+                || (c is Creature cr && cr.CanAttackAsThoughItDidntHaveDefenderThisTurn))
             .ToList();
         var eligibleBlockers = defender.Zones.Battlefield.GetCards()
-            .OfType<Creature>()
-            .Where(c => !c.IsTapped)
+            .OfType<Permanent>()
+            .Where(c => c.IsEffectivelyCreature() && !c.IsTapped)
             .ToList();
 
         // UX fast-path: if the active player has zero eligible attackers,

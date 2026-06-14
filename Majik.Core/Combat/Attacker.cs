@@ -13,9 +13,17 @@ public class Attacker
     private int _assignedDamage;
 
     /// <summary>
-    /// The creature that is attacking.
+    /// The permanent that is attacking. Typed <see cref="Permanent"/> (not
+    /// <see cref="Cards.Creature"/>) so an animated NON-creature C# instance —
+    /// a manland (a <see cref="Land"/> computing as a creature via a Layer-4
+    /// type grant, CR 613.1c) or a Karn-animated artifact — can attack too
+    /// (deferral <c>animated-noncreature-as-combatant</c>, 4B). A real
+    /// <see cref="Cards.Creature"/> assigns here unchanged. Combat reads its
+    /// power through the Permanent-level <see cref="Permanent.GetEffectivePower"/>
+    /// surface, which a real creature overrides to return its authoritative
+    /// <see cref="Cards.Creature.Power"/>.
     /// </summary>
-    public Creature Creature { get; }
+    public Permanent Creature { get; }
 
     /// <summary>
     /// The player being attacked (if attacking player).
@@ -77,7 +85,7 @@ public class Attacker
     /// </summary>
     public bool HasVigilance { get; }
 
-    public Attacker(Creature creature, Player? targetPlayer = null, Permanent? targetPlaneswalker = null,
+    public Attacker(Permanent creature, Player? targetPlayer = null, Permanent? targetPlaneswalker = null,
         bool hasFirstStrike = false, bool hasDoubleStrike = false, bool hasTrample = false,
         bool hasDeathtouch = false, bool hasVigilance = false)
     {
@@ -156,7 +164,10 @@ public class Attacker
     /// </summary>
     public int GetPower()
     {
-        return Creature.Power;
+        // CR 613 — read the EFFECTIVE power so an animated Land (no Creature.Power
+        // field) reports its Layer-7b body; a real Creature overrides
+        // GetEffectivePower to return its authoritative Power.
+        return Creature.GetEffectivePower();
     }
 
     /// <summary>

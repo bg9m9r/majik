@@ -14,7 +14,7 @@ public static class BlockLegality
     /// CR 508.1a — a creature can attack unless it has defender or
     /// summoning sickness (without haste) or is tapped.
     /// </summary>
-    public static bool CanAttack(Creature creature, out string reason)
+    public static bool CanAttack(Permanent creature, out string reason)
     {
         // CR 702.3b — defender forbids attacking, UNLESS an effect lets this
         // creature attack "as though it didn't have defender" this turn
@@ -22,7 +22,7 @@ public static class BlockLegality
         // permission grant; the creature still has the defender keyword, it is
         // merely permitted to be declared as an attacker.
         if (CombatAbilities.HasDefender(creature)
-            && !creature.CanAttackAsThoughItDidntHaveDefenderThisTurn)
+            && !(creature is Creature cr && cr.CanAttackAsThoughItDidntHaveDefenderThisTurn))
         {
             reason = "creature has defender";
             return false;
@@ -46,7 +46,7 @@ public static class BlockLegality
     /// "can't be blocked by" / "can only be blocked by" restrictions on
     /// the attacker are satisfied. Currently handled: Flying.
     /// </summary>
-    public static bool CanBlock(Creature blocker, Creature attacker, out string reason)
+    public static bool CanBlock(Permanent blocker, Permanent attacker, out string reason)
     {
         if (blocker.IsTapped)
         {
@@ -82,7 +82,7 @@ public static class BlockLegality
     /// restrictions intersect — any single one rejecting the blocker forbids
     /// the block.
     /// </summary>
-    public static bool CantBeBlockedExceptBySatisfied(Creature attacker, Creature blocker)
+    public static bool CantBeBlockedExceptBySatisfied(Permanent attacker, Permanent blocker)
     {
         var svc = attacker.ActiveEffects;
         if (svc == null) return true;
@@ -94,7 +94,7 @@ public static class BlockLegality
     /// Returns true iff this attacker's menace restriction is satisfied by
     /// the declared blocker count (or it has no menace).
     /// </summary>
-    public static bool MenaceSatisfied(Creature attacker, int blockerCount)
+    public static bool MenaceSatisfied(Permanent attacker, int blockerCount)
     {
         if (!CombatAbilities.HasMenace(attacker)) return true;
         if (blockerCount == 0) return true; // unblocked is fine; menace only restricts who CAN block
@@ -109,7 +109,7 @@ public static class BlockLegality
     /// legal — the restriction only governs who may participate in a block),
     /// or <paramref name="blockerCount"/> ≥ N.
     /// </summary>
-    public static bool MinBlockersSatisfied(Creature attacker, int blockerCount)
+    public static bool MinBlockersSatisfied(Permanent attacker, int blockerCount)
     {
         var n = CombatAbilities.GetMinBlockerRestriction(attacker);
         if (n == null) return true;

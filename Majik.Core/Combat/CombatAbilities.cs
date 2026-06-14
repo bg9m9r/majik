@@ -10,18 +10,18 @@ namespace Majik.Core.Combat;
 /// </summary>
 public static class CombatAbilities
 {
-    public static bool HasFirstStrike(Creature c) => Has(c, "First strike");
-    public static bool HasDoubleStrike(Creature c) => Has(c, "Double strike");
-    public static bool HasTrample(Creature c) => Has(c, "Trample");
-    public static bool HasDeathtouch(Creature c) => Has(c, "Deathtouch");
-    public static bool HasVigilance(Creature c) => Has(c, "Vigilance");
-    public static bool HasHaste(Creature c) => Has(c, "Haste");
-    public static bool HasReach(Creature c) => Has(c, "Reach");
-    public static bool HasFlying(Creature c) => Has(c, "Flying");
-    public static bool HasLifelink(Creature c) => Has(c, "Lifelink");
-    public static bool HasIndestructible(Creature c) => Has(c, "Indestructible");
-    public static bool HasMenace(Creature c) => Has(c, "Menace");
-    public static bool HasDefender(Creature c) => Has(c, "Defender");
+    public static bool HasFirstStrike(Permanent c) => Has(c, "First strike");
+    public static bool HasDoubleStrike(Permanent c) => Has(c, "Double strike");
+    public static bool HasTrample(Permanent c) => Has(c, "Trample");
+    public static bool HasDeathtouch(Permanent c) => Has(c, "Deathtouch");
+    public static bool HasVigilance(Permanent c) => Has(c, "Vigilance");
+    public static bool HasHaste(Permanent c) => Has(c, "Haste");
+    public static bool HasReach(Permanent c) => Has(c, "Reach");
+    public static bool HasFlying(Permanent c) => Has(c, "Flying");
+    public static bool HasLifelink(Permanent c) => Has(c, "Lifelink");
+    public static bool HasIndestructible(Permanent c) => Has(c, "Indestructible");
+    public static bool HasMenace(Permanent c) => Has(c, "Menace");
+    public static bool HasDefender(Permanent c) => Has(c, "Defender");
 
     /// <summary>
     /// CR 509.1a — true when <paramref name="c"/> has an intrinsic "can't block"
@@ -32,7 +32,7 @@ public static class CombatAbilities
     /// CombatValidator checks separately — this is the printed/granted static.
     /// A creature with this restriction can't be declared as a blocker.
     /// </summary>
-    public static bool HasCantBlock(Creature c) => Has(c, "CantBlock");
+    public static bool HasCantBlock(Permanent c) => Has(c, "CantBlock");
 
     /// <summary>
     /// CR 702.90a — Wither. A source with wither deals damage to creatures
@@ -40,7 +40,7 @@ public static class CombatAbilities
     /// creature-damage application site so the -1/-1-counter form is applied
     /// consistently across combat and noncombat (fight / ability) damage.
     /// </summary>
-    public static bool HasWither(Creature c) => Has(c, "Wither");
+    public static bool HasWither(Permanent c) => Has(c, "Wither");
 
     /// <summary>
     /// CR 702.90c — Infect. A source with infect deals damage to creatures
@@ -50,7 +50,7 @@ public static class CombatAbilities
     /// <see cref="DealsCreatureDamageAsMinusCounters"/>; the player → poison
     /// form is handled separately (see <see cref="InfectDamageReplacement"/>).
     /// </summary>
-    public static bool HasInfect(Creature c) => Has(c, "Infect");
+    public static bool HasInfect(Permanent c) => Has(c, "Infect");
 
     /// <summary>
     /// CR 702.90b / 702.90c — true when <paramref name="source"/> deals
@@ -58,7 +58,7 @@ public static class CombatAbilities
     /// it has wither or infect. Centralized so combat and noncombat
     /// (fight / ability) creature-damage paths agree on the counter form.
     /// </summary>
-    public static bool DealsCreatureDamageAsMinusCounters(Creature? source) =>
+    public static bool DealsCreatureDamageAsMinusCounters(Permanent? source) =>
         source != null && (HasWither(source) || HasInfect(source));
 
     /// <summary>
@@ -68,7 +68,7 @@ public static class CombatAbilities
     /// creatures). Centralized so combat and noncombat player-damage paths
     /// agree on the poison-counter form.
     /// </summary>
-    public static bool DealsPlayerDamageAsPoison(Creature? source) =>
+    public static bool DealsPlayerDamageAsPoison(Permanent? source) =>
         source != null && HasInfect(source);
 
     /// <summary>
@@ -83,7 +83,7 @@ public static class CombatAbilities
     /// normal life loss. Read at the combat-damage-to-player site so the Mite
     /// (Mirrex), Pile of Rags, and the whole ONE toxic family give poison.
     /// </summary>
-    public static int GetToxic(Creature? source)
+    public static int GetToxic(Permanent? source)
     {
         if (source == null) return 0;
         var total = 0;
@@ -107,7 +107,7 @@ public static class CombatAbilities
     /// restriction exists. Menace is NOT counted here — use
     /// <see cref="HasMenace"/> for the two-or-more check.
     /// </summary>
-    public static int? GetMinBlockerRestriction(Creature? c)
+    public static int? GetMinBlockerRestriction(Permanent? c)
     {
         if (c == null) return null;
         var marker = c.Abilities
@@ -119,7 +119,7 @@ public static class CombatAbilities
         return marker?.Arg;
     }
 
-    public static bool CanBlockFlying(Creature c) => HasFlying(c) || HasReach(c);
+    public static bool CanBlockFlying(Permanent c) => HasFlying(c) || HasReach(c);
 
     /// <summary>
     /// CR 509.1c / 509.1g — the "all creatures able to block this creature
@@ -131,10 +131,10 @@ public static class CombatAbilities
     /// at declare-blockers to force every creature able to block this
     /// attacker (and not otherwise required elsewhere) to do so.
     /// </summary>
-    public static bool MustBeBlockedByAllAble(Creature? c) =>
+    public static bool MustBeBlockedByAllAble(Permanent? c) =>
         c != null && Has(c, "MustBeBlockedByAllAble");
 
-    private static bool Has(Creature? creature, string keyword)
+    private static bool Has(Permanent? creature, string keyword)
     {
         if (creature == null) return false;
 
@@ -147,7 +147,7 @@ public static class CombatAbilities
         // for both shapes.
         if (creature.ActiveEffects != null)
         {
-            return creature.ActiveEffects.Compute((Permanent)creature).Keywords
+            return creature.ActiveEffects.Compute(creature).Keywords
                 .Contains(keyword);
         }
 

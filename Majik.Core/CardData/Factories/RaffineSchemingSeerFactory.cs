@@ -194,8 +194,9 @@ public static class RaffineSchemingSeerFactory
         if (combat == null) return null;
         foreach (var atk in combat.Attackers)
         {
-            var creature = atk?.Creature;
-            if (creature == null) continue;
+            // CR 508 — Attacker.Creature is now Permanent-typed; connive targets
+            // a real attacking CREATURE card, so skip an animated land attacker.
+            if (atk?.Creature is not Creature creature) continue;
             if (ReferenceEquals(creature.Controller, controller)) return creature;
         }
         return null;

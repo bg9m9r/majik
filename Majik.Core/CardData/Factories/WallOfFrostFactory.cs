@@ -194,7 +194,7 @@ public static class WallOfFrostFactory
     }
 
     private static void ScheduleSkipUntapCleanup(
-        Creature attacked,
+        Permanent attacked,
         object skipToken,
         IEventBus? eventBus)
     {

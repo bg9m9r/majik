@@ -171,13 +171,13 @@ public class DeclareAttackersPriorityTriggerTests
         private readonly Player _defender;
         public AttackAllAgent(Player defender) => _defender = defender;
 
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
             => Task.FromResult(new CombatPlan(
                 eligibleAttackers
                     .Select(a => new Majik.Core.Players.Agents.AttackerDeclaration(a, _defender))
                     .ToList()));
 
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
             => Task.FromResult(BlockPlan.None);
 
         public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)

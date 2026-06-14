@@ -154,7 +154,7 @@ public static class BrimazKingOfOreskosFactory
         // token blocks (mirrors OracleTriggeredAbilityBinder's captured-event
         // pattern).
         // ----------------------------------------------------------------
-        Creature? capturedBlockedAttacker = null;
+        Permanent? capturedBlockedAttacker = null;
 
         var blockEffect = new Effect(
             $"{CardName}: create a 1/1 white Cat Soldier (vigilance) blocking that creature",
