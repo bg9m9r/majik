@@ -126,6 +126,19 @@ public sealed class CombatFlow
             }
         }
 
+        // CR 508 — record the finalized attacker set (after tax pruning and
+        // left-battlefield narrowing) into the live combat-membership registry
+        // BEFORE the declare-blockers half runs, so an ability activated in a
+        // combat priority window reads a faithful "is attacking" membership
+        // (Eiganjo's "target attacking or blocking creature" gate). Recorded
+        // here rather than in the declare loop above so an un-declared (unpaid
+        // tax) or removed attacker is never counted.
+        var membership = CombatMembershipRegistryProvider.Current;
+        foreach (var decl in attackPlan.Attackers)
+        {
+            membership.RecordAttacker(decl.Attacker);
+        }
+
         await RunCombatFromBlocksAsync(
             attacker, defender, defenderAgent, attackPlan, blockers, ctx, ct, grantStepPriority);
     }
@@ -150,8 +163,27 @@ public sealed class CombatFlow
         CancellationToken ct = default,
         Func<Majik.Core.StateMachine.StepStateType, CancellationToken, Task>? grantStepPriority = null)
     {
+        // CR 508 — the sim-resume entry calls this method directly with an
+        // attack plan whose declaration already happened live; (re)record the
+        // attackers so the membership registry is populated on BOTH entry paths
+        // (idempotent — the registry is a set).
+        var membership = CombatMembershipRegistryProvider.Current;
+        foreach (var decl in attackPlan.Attackers)
+        {
+            membership.RecordAttacker(decl.Attacker);
+        }
+
         var blockPlan = await defenderAgent.DeclareBlockersAsync(
             ctx, attackPlan.Attackers.Select(a => a.Attacker).ToList(), blockers, ct);
+
+        // CR 509 — record declared blockers into the live combat-membership
+        // registry BEFORE the declare-blockers priority window runs, so an
+        // ability activated in response reads a faithful "is blocking"
+        // membership (Eiganjo's "target attacking or blocking creature" gate).
+        foreach (var b in blockPlan.Blockers)
+        {
+            membership.RecordBlocker(b.Blocker);
+        }
 
         // CR 509.1h — per-blocker "blocks" event so "Whenever ~ blocks a
         // creature, …" triggers (Brimaz, King of Oreskos) can fire on
@@ -194,6 +226,11 @@ public sealed class CombatFlow
             AssignAndDealDamage(attackPlan, blockersByAttacker, defender, DamageStep.SingleStep);
             CleanupAfterDamage(attacker, defender);
         }
+
+        // CR 511.3 — combat is over: drop the combat-state membership so a
+        // creature that was attacking / blocking this combat is no longer
+        // reported as such in the post-combat main phase (or a later combat).
+        membership.Clear();
     }
 
     /// <summary>

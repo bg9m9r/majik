@@ -68,6 +68,7 @@ public static class GameRegistryScope
             ControlPlayerRegistryProvider.PushScope(),
             TriggerManagerRegistry.PushScope(),
             Majik.Core.Combat.AttackRestrictionRegistryProvider.PushScope(),
+            Majik.Core.Combat.CombatMembershipRegistryProvider.PushScope(),
             AdditionalCombatRegistryProvider.PushScope(),
         };
         return new CompositeScope(scopes);

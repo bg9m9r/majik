@@ -4,6 +4,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Combat;
 using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
@@ -166,6 +167,11 @@ public class ChannelLandCycleTests
         attacker.SetController(_bob);
         _bob.Zones.Battlefield.AddCard(attacker);
 
+        // CR 508 — Eiganjo targets only an attacking/blocking creature; mark it
+        // as a live combat attacker so it is a legal target.
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+
         var channel = eiganjo.Abilities.OfType<ActivatedAbility>().Single();
         channel.SetChosenTargets(new[] { new object[] { attacker } });
 
@@ -174,6 +180,29 @@ public class ChannelLandCycleTests
         _bob.Zones.Graveyard.GetCards().Should().Contain(attacker,
             "destroyed creature moves to its owner's graveyard (CR 701.7)");
         _bob.Zones.Battlefield.GetCards().Should().NotContain(attacker);
+    }
+
+    [Fact]
+    public void Eiganjo_Channel_TargetingNonCombatCreature_IsNoOp()
+    {
+        // CR 608.2b — a creature that is neither attacking nor blocking is an
+        // illegal Eiganjo target; the effect does nothing to it.
+        var eiganjo = (Land)NamedCardFactory.Create("Eiganjo, Seat of the Empire", _alice);
+        var idle = new Creature("Hill Giant", "3R", 3, 3);
+        idle.SetOwner(_bob);
+        idle.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(idle);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        // no RecordAttacker / RecordBlocker — the creature is at home
+
+        var channel = eiganjo.Abilities.OfType<ActivatedAbility>().Single();
+        channel.SetChosenTargets(new[] { new object[] { idle } });
+
+        channel.Resolve();
+
+        _bob.Zones.Battlefield.GetCards().Should().Contain(idle,
+            "an off-combat creature is not a legal Eiganjo target (CR 508/509)");
     }
 
     // -----------------------------------------------------------------------

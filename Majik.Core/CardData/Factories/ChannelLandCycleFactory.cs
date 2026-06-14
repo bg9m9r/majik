@@ -66,8 +66,10 @@ namespace Majik.Core.CardData.Factories;
 /// - Eiganjo — 1..1 <c>target attacking or blocking creature</c>
 ///   TargetRequest; resolves to <see cref="Primitives.Fx.MoveToGraveyard"/>
 ///   with <see cref="ZoneMoveReason.Destroy"/>. The "attacking or blocking"
-///   gate is structural on the request — combat-state predicate gating
-///   is checked at resolve.
+///   gate is now LIVE — the candidate gatherer reads the per-game
+///   <see cref="Majik.Core.Combat.CombatMembershipRegistry"/> (the set
+///   CombatFlow populates at declare-attackers/blockers) and resolution
+///   re-checks that membership (CR 608.2b).
 /// - Takenuma — no targets; on resolve, looks at top 4 of controller's
 ///   library and consults the registered agent (via
 ///   <see cref="IPlayerAgent.ChooseLibraryPickAsync"/>) to move one
@@ -83,10 +85,11 @@ namespace Majik.Core.CardData.Factories;
 ///   (mirrors Takenuma's raw-zone resolve body).
 ///
 /// ## Deferred (v1 gaps)
-/// - Eiganjo combat-state target gate: live "attacking or blocking" set
-///   filtering at resolve is permissive (any creature passed in
-///   <see cref="ChosenTargets"/> is destroyed). Combat-state predicates
-///   land alongside the targeting-system upgrade.
+/// - Eiganjo effect verb: this factory's resolve still uses destroy
+///   (<see cref="ZoneMoveReason.Destroy"/>); the live binder path
+///   (<see cref="Majik.Core.CardData.LandActivatedAbilityBinder"/>, which is
+///   what runs in production for lands) deals the printed 4 damage. The
+///   combat-state TARGET gate is now live on both paths.
 /// - Takenuma — this TEST-ONLY factory still models the original Kamigawa
 ///   "look at the top four, put one creature/planeswalker into your hand"
 ///   wording. The PRODUCTION binder-chain path
@@ -245,7 +248,11 @@ public static class ChannelLandCycleFactory
                 MinTargets: 1,
                 MaxTargets: 1,
                 LegalCandidates: Array.Empty<object>(),
-                Intent: BotIntent.Removal),
+                Intent: BotIntent.Removal,
+                // CR 508 / 509 — offer only creatures the live combat-membership
+                // registry reports as attacking or blocking right now.
+                CandidateGatherer: _ => Majik.Core.Combat.CombatMembershipRegistryProvider.Current
+                    .AttackingOrBlocking().Cast<object>().ToList()),
         };
 
         var effect = new Effect(
@@ -255,6 +262,10 @@ public static class ChannelLandCycleFactory
                 var ability = abilityAccessor();
                 if (ability.ChosenTargets.Count == 0 || ability.ChosenTargets[0].Count == 0) return;
                 if (ability.ChosenTargets[0][0] is not Creature creature) return;
+                // CR 608.2b — re-check that the target is still attacking or
+                // blocking at resolution; otherwise the target is illegal.
+                if (!Majik.Core.Combat.CombatMembershipRegistryProvider.Current
+                        .IsAttackingOrBlocking(creature)) return;
                 Primitives.Fx.MoveToGraveyard(creature, ZoneMoveReason.Destroy);
             });
 

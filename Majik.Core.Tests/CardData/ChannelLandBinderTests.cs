@@ -3,11 +3,14 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Combat;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Moq;
 using Xunit;
@@ -446,5 +449,113 @@ public class ChannelLandBinderTests
         {
             AgentRegistry.Clear();
         }
+    }
+
+    // -------------------------------------------------------------------
+    // Eiganjo, Seat of the Empire (Channel) — "It deals 4 damage to target
+    // attacking or blocking creature" (CR 702.74). The candidate gatherer must
+    // offer ONLY creatures the live combat-membership registry reports as
+    // attacking / blocking (CR 508 / 509), and resolution re-checks that
+    // membership (CR 608.2b). Previously the gatherer offered every creature on
+    // the battlefield regardless of combat state.
+    // -------------------------------------------------------------------
+
+    private const string EiganjoOracle =
+        "{T}: Add {W}.\nChannel — {2}{W}, Discard this card: It deals 4 damage to target attacking or blocking creature.";
+
+    private ActivatedAbility BindEiganjo()
+    {
+        var land = new Land("Eiganjo, Seat of the Empire") { Owner = _alice, Controller = _alice };
+        LandActivatedAbilityBinder.Bind(land, Entity("Eiganjo, Seat of the Empire", EiganjoOracle), _alice, _effects);
+        return land.Abilities.OfType<ActivatedAbility>().Single();
+    }
+
+    private Creature Bears(string name, Player owner)
+    {
+        var c = new Creature(name, "{1}{G}", 2, 2) { Owner = owner, Controller = owner };
+        owner.Zones.Battlefield.AddCard(c);
+        c.SetZone(ZoneType.Battlefield);
+        return c;
+    }
+
+    private GameContext Ctx(Player bob)
+        => new(_alice, new[] { _alice, bob }, _alice, 1, StepStateType.DeclareBlockers,
+            new Majik.Core.Stack.Stack());
+
+    [Fact]
+    public void Eiganjo_Gatherer_OffersOnlyAttackingOrBlockingCreatures()
+    {
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var request = ability.TargetRequests.Single();
+
+        // Three creatures on the battlefield; only one is attacking, one
+        // blocking — the third sits at home.
+        var attacker = Bears("Attacker", _alice);
+        var blocker = Bears("Blocker", bob);
+        var idle = Bears("Idle", bob);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+        CombatMembershipRegistryProvider.Current.RecordBlocker(blocker);
+
+        var candidates = request.ResolveCandidates(Ctx(bob));
+
+        candidates.Should().Contain(new object[] { attacker, blocker });
+        candidates.Should().NotContain(idle,
+            "a creature that is neither attacking nor blocking is not a legal Eiganjo target (CR 508/509)");
+    }
+
+    [Fact]
+    public void Eiganjo_Gatherer_OutsideCombat_OffersNothing()
+    {
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var request = ability.TargetRequests.Single();
+        Bears("Idle", bob); // a creature exists, but no combat is happening
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+
+        request.ResolveCandidates(Ctx(bob)).Should().BeEmpty(
+            "with no live combat there is no attacking/blocking creature to target");
+    }
+
+    [Fact]
+    public void Eiganjo_Resolve_DealsDamageToAttackingCreature()
+    {
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var attacker = Bears("Attacker", bob);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { attacker } });
+        ability.Resolve();
+
+        attacker.Damage.Should().Be(4, "Eiganjo deals 4 damage to the chosen attacking creature");
+    }
+
+    [Fact]
+    public void Eiganjo_Resolve_NoDamageIfTargetLeftCombat()
+    {
+        // CR 608.2b — the chosen creature was attacking when the ability went on
+        // the stack but was removed from combat before resolution; the target is
+        // now illegal and takes no damage.
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var attacker = Bears("Attacker", bob);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { attacker } });
+
+        // It is removed from combat (combat ends / fog) before resolution.
+        CombatMembershipRegistryProvider.Current.Clear();
+
+        ability.Resolve();
+
+        attacker.Damage.Should().Be(0,
+            "a target that is no longer attacking or blocking at resolution takes no damage (CR 608.2b)");
     }
 }
