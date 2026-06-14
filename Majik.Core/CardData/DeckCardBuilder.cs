@@ -319,6 +319,15 @@ public static class DeckCardBuilder
         }
         EntersWithCountersBinder.Bind(card, entity, replacements);
         EntersAsCopyBinder.Bind(card, entity, replacements, effects);
+
+        // CR 614.12 — "as this enters, choose a color" for the NON-LAND members
+        // of the family (Coldsteel Heart's artifact, Utopia Sprawl's Aura). Their
+        // [CardName] factory stashed a ColorChoice holder in ColorChoiceRegistry;
+        // register the agent-prompting ChooseColorReplacement so the controller
+        // picks a colour as the permanent enters and the dynamic mana ability /
+        // trigger reads that pick (the land members use ChooseColorLandBinder from
+        // the binder chain). No-op when no holder was stashed.
+        ChooseColorPermanentBinder.Bind(card, replacements);
     }
 
     /// <summary>
