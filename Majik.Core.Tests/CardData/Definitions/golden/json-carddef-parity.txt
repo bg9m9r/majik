@@ -28058,6 +28058,58 @@
     "Red"
   ]
 }
+==== patchwork-banner ====
+{
+  "name": "Patchwork Banner",
+  "manaCost": "{3}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 5,
+      "list": [
+        "mana:B",
+        "mana:G",
+        "mana:R",
+        "mana:U",
+        "mana:W"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== peer-through-depths ====
 {
   "name": "Peer Through Depths",
