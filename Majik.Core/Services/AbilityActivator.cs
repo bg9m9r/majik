@@ -97,7 +97,12 @@ public class AbilityActivator
         var costList = costs?.ToList() ?? new List<ICost>();
         var spendContext = Majik.Core.Mana.ManaSpendContext.ForAbilityCost(
             ability.Source as Majik.Core.Cards.ICard);
-        _costPayment.PayCosts(player, costList, spendContext);
+        // CR 701.16 — supply the bus so a "Sacrifice CARDNAME:" activation
+        // cost (an IBusAwareCost) publishes a PermanentSacrificedEvent on the
+        // central cost-payment path; "whenever a/an [player] sacrifices …"
+        // aristocrat triggers then fire on the cost, not only on a sacrifice
+        // effect.
+        _costPayment.PayCosts(player, costList, spendContext, _eventBus);
 
         // Create activated ability with targets and costs. CR 602.4 — the
         // ability that goes on the stack must carry the SAME effects /

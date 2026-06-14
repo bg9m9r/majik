@@ -1,4 +1,5 @@
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Events;
 using Majik.Core.Mana;
 using Majik.Core.Players;
 
@@ -25,7 +26,27 @@ public class CostPayment
     /// <see cref="ICost"/> surface. Atomic: all costs are validated before any
     /// is paid.
     /// </summary>
-    public void PayCosts(Player player, IEnumerable<ICost> costs, ManaSpendContext context)
+    public void PayCosts(Player player, IEnumerable<ICost> costs, ManaSpendContext context) =>
+        PayCosts(player, costs, context, eventBus: null);
+
+    /// <summary>
+    /// CR 106.4 + CR 701.16 — pay all costs in order under
+    /// <paramref name="context"/>, publishing cost-payment events on
+    /// <paramref name="eventBus"/> when supplied. Routing precedence per cost:
+    /// <list type="bullet">
+    ///   <item><see cref="ISpendContextCost"/> (mana costs) → the
+    ///     context-aware overload so spend-restricted floating mana is
+    ///     honoured.</item>
+    ///   <item><see cref="IBusAwareCost"/> (e.g. a "Sacrifice CARDNAME:"
+    ///     cost) → the bus-aware overload so a
+    ///     <see cref="PermanentSacrificedEvent"/> fires on the central
+    ///     cost-payment path; falls back to the plain <see cref="ICost.Pay(Player)"/>
+    ///     when no bus is supplied (legacy behaviour, no event).</item>
+    ///   <item>everything else → the plain <see cref="ICost.Pay(Player)"/>.</item>
+    /// </list>
+    /// Atomic: all costs are validated before any is paid.
+    /// </summary>
+    public void PayCosts(Player player, IEnumerable<ICost> costs, ManaSpendContext context, IEventBus? eventBus)
     {
         if (player == null)
         {
@@ -57,6 +78,10 @@ public class CostPayment
             if (cost is ISpendContextCost ctxCost)
             {
                 ctxCost.Pay(player, context);
+            }
+            else if (eventBus != null && cost is IBusAwareCost busCost)
+            {
+                busCost.Pay(player, eventBus);
             }
             else
             {

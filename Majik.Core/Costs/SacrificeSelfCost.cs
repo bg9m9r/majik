@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -20,7 +21,7 @@ namespace Majik.Core.Costs;
 /// the permanent is not currently on its controller's battlefield
 /// (CR 701.16a — a player may only sacrifice a permanent they control).
 /// </summary>
-public sealed class SacrificeSelfCost : ICost
+public sealed class SacrificeSelfCost : ICost, IBusAwareCost
 {
     private readonly Permanent _self;
 
@@ -60,7 +61,29 @@ public sealed class SacrificeSelfCost : ICost
     /// ownership differ (stolen permanents go to their OWNER's
     /// graveyard, CR 701.16a / CR 614 zone-change ordering).
     /// </remarks>
-    public void Pay(Player player)
+    public void Pay(Player player) => PayCore(player, eventBus: null);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// CR 701.16 — a sacrifice paid as a cost is still a sacrifice. Pays
+    /// identically to <see cref="Pay(Player)"/> and additionally publishes a
+    /// <see cref="PermanentSacrificedEvent"/> on <paramref name="eventBus"/>
+    /// so "whenever a/an [player] sacrifices …" aristocrat triggers fire when
+    /// this cost is the activation cost of a "Sacrifice CARDNAME:" ability —
+    /// the central cost-payment seam the bare <see cref="Pay(Player)"/> never
+    /// had. The token-ness snapshot is taken BEFORE the move (CR 111.7 — a
+    /// token ceases to exist as an SBA the instant it hits the graveyard) and
+    /// the event publishes AFTER the move (so a steal-on-sacrifice payoff
+    /// reads the card from the graveyard), exactly as
+    /// <see cref="Primitives.Fx.Sacrifice(ICard, Player, IEventBus)"/> does.
+    /// </remarks>
+    public void Pay(Player player, IEventBus eventBus)
+    {
+        if (eventBus == null) throw new ArgumentNullException(nameof(eventBus));
+        PayCore(player, eventBus);
+    }
+
+    private void PayCore(Player player, IEventBus? eventBus)
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
@@ -68,6 +91,11 @@ public sealed class SacrificeSelfCost : ICost
             throw new InvalidPlayerActionException(
                 $"Cannot pay {Description}: {_self.Name} is not on " +
                 $"{player.Name}'s battlefield.");
+
+        // CR 111.7 — snapshot token-ness BEFORE the move: once the permanent
+        // reaches the graveyard it may be cleaned up as a state-based action,
+        // so any "nontoken" filtering downstream must read the live object.
+        var wasToken = _self is Permanent p && p.IsToken;
 
         // CR 701.16a — sacrificed permanents go to their OWNER's graveyard,
         // not the activating player's. Route through the owner so this
@@ -79,5 +107,11 @@ public sealed class SacrificeSelfCost : ICost
         owner.Zones.Graveyard.AddCard(_self);
         // Zone.AddCard internally calls card.SetZone — no manual SetZone
         // needed.
+
+        // CR 701.16 — publish AFTER the zone move so the sacrificed card is
+        // already in the graveyard for a steal-on-sacrifice payoff. The
+        // sacrificing player is the controller at sacrifice time (the
+        // activating player), per CR 701.16a.
+        eventBus?.Publish(new PermanentSacrificedEvent(_self, player, wasToken));
     }
 }
