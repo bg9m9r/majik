@@ -11,7 +11,7 @@ namespace Majik.Core.Costs;
 /// for a different counter type. Implements <see cref="ICost"/> so it can
 /// be attached directly to an <see cref="Majik.Core.Abilities.ActivatedAbility"/>.
 /// </summary>
-public sealed class RemoveChargeCounterCost : ICost
+public sealed class RemoveChargeCounterCost : ICost, IRebindableCost
 {
     private readonly Permanent _source;
 
@@ -23,6 +23,17 @@ public sealed class RemoveChargeCounterCost : ICost
         if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount), "Amount must be positive.");
         Amount = amount;
     }
+
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — re-home this charge-counter cost onto
+    /// a new source when the owning ability is re-sourced (CR 707.2). Swaps the
+    /// captured source only when it is reference-equal to
+    /// <paramref name="oldSource"/>; otherwise returns this instance unchanged.
+    /// </summary>
+    public ICost RebindTo(object oldSource, object newSource) =>
+        ReferenceEquals(_source, oldSource) && newSource is Permanent p
+            ? new RemoveChargeCounterCost(p, Amount)
+            : this;
 
     public string Description =>
         Amount == 1

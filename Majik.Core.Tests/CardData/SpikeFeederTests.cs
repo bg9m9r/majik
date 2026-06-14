@@ -131,7 +131,10 @@ public class SpikeFeederTests
         counterCost.CanPay(alice).Should().BeTrue();
         counterCost.Pay(alice);
 
-        foreach (var effect in ability.Effects) effect.Execute();
+        // Resolve through the ability so ResolutionContext.Controller is
+        // populated (the re-sourceable gain-life effect reads its controller
+        // off the context rather than a captured closure).
+        ability.Resolve();
 
         alice.LifeTotal.Should().Be(lifeBefore + 2, "Spike Feeder grants 2 life on activation (CR 119.1)");
         feeder.Counters.Count(CounterType.PlusOnePlusOne)
@@ -183,9 +186,10 @@ public class SpikeFeederTests
         counterCost.CanPay(alice).Should().BeTrue();
         counterCost.Pay(alice);
 
-        // Choose the bear as the target, then resolve.
+        // Choose the bear as the target, then resolve through the ability so
+        // the re-sourceable pump effect reads ChosenTargets off the context.
         pump.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bear } });
-        foreach (var effect in pump.Effects) effect.Execute();
+        pump.Resolve();
 
         bear.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
             "the pump puts one +1/+1 counter on the chosen target creature");

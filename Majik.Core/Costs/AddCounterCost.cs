@@ -27,7 +27,7 @@ namespace Majik.Core.Costs;
 /// <see cref="Majik.Core.Abilities.ActivatedAbility"/> alongside mana /
 /// tap / sacrifice components.
 /// </summary>
-public sealed class AddCounterCost : ICost
+public sealed class AddCounterCost : ICost, IRebindableCost
 {
     private readonly Permanent _source;
     private readonly ReplacementBus? _replacements;
@@ -47,6 +47,18 @@ public sealed class AddCounterCost : ICost
         Amount = amount;
         _replacements = replacements;
     }
+
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — re-home this counter-placement cost
+    /// onto a new source when the owning ability is re-sourced (CR 707.2). Swaps
+    /// the captured source only when it is reference-equal to
+    /// <paramref name="oldSource"/>; otherwise returns this instance unchanged.
+    /// The replacement bus (CR 614.1 — Vizier of Remedies routing) is preserved.
+    /// </summary>
+    public ICost RebindTo(object oldSource, object newSource) =>
+        ReferenceEquals(_source, oldSource) && newSource is Permanent p
+            ? new AddCounterCost(p, CounterType, Amount, _replacements)
+            : this;
 
     public string Description =>
         Amount == 1
