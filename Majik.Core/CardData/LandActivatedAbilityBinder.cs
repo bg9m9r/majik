@@ -211,6 +211,17 @@ public static class LandActivatedAbilityBinder
         @"Sacrifice\s+them\s+at\s+the\s+beginning\s+of\s+the\s+next\s+end\s+step",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // "Earthbend N." (CR 701.59; Ba Sing Se "{2}{G}, {T}: Earthbend 2. Activate
+    // only as a sorcery."). The keyword-action reminder text ("Target land you
+    // control becomes a 0/0 creature with haste that's still a land. Put N +1/+1
+    // counters on it. When it dies or is exiled, return it to the battlefield
+    // tapped.") trails in parentheses; the recognizer keys only on the keyword +
+    // count. Earthbend targets ANOTHER land you control (not the source land),
+    // so it binds with a "target land you control" TargetRequest and routes to
+    // the shared EarthbendAction primitive on resolution.
+    private static readonly Regex EarthbendEffect = new(
+        @"^Earthbend\s+(?<n>\d+)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // "This land deals N damage to each opponent."
     private static readonly Regex DamageEachOpponent = new(
         @"deals?\s+(?<n>\d+)\s+damage\s+to\s+each\s+opponent",
@@ -685,6 +696,14 @@ public static class LandActivatedAbilityBinder
             return true;
         }
 
+        // --- Earthbend N (Ba Sing Se) — animate TARGET land you control ----
+        if (EarthbendEffect.Match(effectText) is { Success: true } eb)
+        {
+            var n = int.Parse(eb.Groups["n"].Value);
+            BindEarthbend(land, controller, effects, triggers, cost, n, effectText);
+            return true;
+        }
+
         // --- +1/+1 counter(s) on TARGET creature (Cave of Temptation) ------
         if (CounterOnTargetCreature.Match(effectText) is { Success: true } cm)
         {
@@ -1001,6 +1020,90 @@ public static class LandActivatedAbilityBinder
                     Intent: BotIntent.Buff,
                     CandidateGatherer: ctx => GatherAllCreatures(ctx)),
             });
+
+        land.AddAbility(ability);
+    }
+
+    // ----------------------------------------------------------------------
+    // Earthbend N — Ba Sing Se "{2}{G}, {T}: Earthbend 2. Activate only as a
+    // sorcery." (CR 701.59). Pays down the v1 deferral
+    // ba-sing-se-earthbend-target-land-animate.
+    //
+    // Earthbend is the one land-animate shape ManlandBinder cannot reach: its
+    // AnimateLine keys on "this land becomes …", but Earthbend targets ANOTHER
+    // land you control. The Earthbend KEYWORD action is already a built primitive
+    // (Majik.Core.Keywords.EarthbendAction — used by Badgermole Cub + Dai Li
+    // Indoctrination): it animates the target land to a 0/0 creature with haste
+    // that's still a land (no creature subtype), puts N +1/+1 counters on it (so
+    // an N/N), and attaches the one-shot "when it dies or is exiled, return it
+    // tapped" DelayedTriggeredAbility (CR 603.7a). This binder wires Ba Sing Se's
+    // activated ability to it.
+    //
+    //   - Cost: {2}{G} + {T} (BuildCosts; no self-sacrifice).
+    //   - Sorcery-speed (CR 117.1a / 307.5) — the activated ability carries the
+    //     IsSorcerySpeed rider; the priority/timing layer gates activation.
+    //   - Target: "target land you control" — a 1..1 TargetRequest over the
+    //     controller's battlefield lands (Ba Sing Se itself is a legal target).
+    //   - Resolution: CR 608.2b legality recheck (the chosen land must STILL be a
+    //     battlefield land the controller controls), then EarthbendAction.Apply
+    //     against the live per-game CES. The return-tapped DelayedTriggeredAbility
+    //     EarthbendAction attaches to the target is registered with the live
+    //     TriggerManager so it fires in a real match (when threaded; off-harness
+    //     builds rely on TriggerManager.SyncCardRegistration on the next zone
+    //     change). The animate continuous effect has NO duration (CR 701.59 —
+    //     persists while the land is on the battlefield; self-prunes on leave).
+    // ----------------------------------------------------------------------
+    private static void BindEarthbend(
+        Land land, Player controller, ContinuousEffectsService effects,
+        TriggerManager? triggers, string cost, int n, string effectText)
+    {
+        var costs = BuildCosts(land, cost, out _);
+        var sorcerySpeed = Regex.IsMatch(
+            effectText, @"Activate\s+only\s+as\s+a\s+sorcery", RegexOptions.IgnoreCase);
+
+        ActivatedAbility? ability = null;
+        var effect = new Effect(
+            $"{land.Name}: Earthbend {n} (animate target land you control)",
+            () =>
+            {
+                if (FirstChosen(ability) is not Land target) return;
+                // CR 608.2b — resolve-time legality recheck: the chosen land must
+                // still be on the battlefield and still controlled by the
+                // activator ("target land you control").
+                if (target.Zone != ZoneType.Battlefield) return;
+                if (!target.HasType(CardType.Land)) return;
+                var you = land.Controller ?? controller;
+                if (!ReferenceEquals(target.Controller, you)) return;
+
+                // Snapshot the target's abilities so we can register ONLY the
+                // return-tapped delayed trigger EarthbendAction newly attaches.
+                var before = target.Abilities.OfType<TriggeredAbility>().ToHashSet();
+                Majik.Core.Keywords.EarthbendAction.Apply(target, you, n, effects);
+                if (triggers != null)
+                {
+                    foreach (var trig in target.Abilities.OfType<TriggeredAbility>())
+                    {
+                        if (!before.Contains(trig))
+                        {
+                            triggers.RegisterTriggeredAbility(trig);
+                        }
+                    }
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: land, controller: controller, costs: costs,
+            effects: new IEffect[] { effect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target land you control",
+                    MinTargets: 1, MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff,
+                    CandidateGatherer: _ => GatherControllerLands(land, controller)),
+            },
+            sorcerySpeed: sorcerySpeed);
 
         land.AddAbility(ability);
     }
@@ -1761,6 +1864,18 @@ public static class LandActivatedAbilityBinder
             .AttackingOrBlocking()
             .Cast<object>()
             .ToList();
+
+    /// <summary>CR 701.59 / 601.2c — the lands <paramref name="controller"/>
+    /// controls on the battlefield ("target land you control"). The source land
+    /// (Ba Sing Se) is itself a legal Earthbend target, so it is NOT excluded.</summary>
+    private static IReadOnlyList<object> GatherControllerLands(Land land, Player controller)
+    {
+        var ctrl = land.Controller ?? controller;
+        return ctrl.Zones.Battlefield.GetCards()
+            .OfType<Land>()
+            .Cast<object>()
+            .ToList();
+    }
 
     private static IReadOnlyList<object> GatherAnyDamageTargets(GameContext ctx)
     {
