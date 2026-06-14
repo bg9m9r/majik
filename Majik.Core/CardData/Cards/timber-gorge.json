@@ -1,0 +1,8 @@
+{
+  "name": "Timber Gorge",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
