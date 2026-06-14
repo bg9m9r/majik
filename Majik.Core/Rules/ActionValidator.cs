@@ -4,6 +4,7 @@ using Majik.Core.Combat;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Targeting;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Rules;
@@ -53,6 +54,7 @@ public class ActionValidator
             ?? CheckCastZoneGates(action)
             ?? CheckCastRestrictionGates(action)
             ?? CheckPlayerTargetGate(action.Player, action.Targets, action.Card)
+            ?? CheckDeclaredTargetGate(action.Player, action.Targets, action.TargetSpec)
             ?? ValidationResult.Valid();
     }
 
@@ -338,6 +340,47 @@ public class ActionValidator
         return null;
     }
 
+    /// <summary>CR 601.2c / 602.1b — declared-target-type legality gate.
+    /// Reject the action at DECLARATION time when a chosen object is not a
+    /// legal target for the declared <see cref="TargetSpec"/> — i.e. it fails
+    /// the spec's type / zone / controller predicate (e.g. "target creature"
+    /// pointed at a land, or at a creature not on the battlefield) OR it is
+    /// rendered untargetable by an untargetability keyword (hexproof, shroud,
+    /// protection — CR 702). Previously the engine relied on the
+    /// resolution-time recheck (CR 608.2b) to fizzle an illegal target; this
+    /// gate moves the check forward to declaration so an illegal target makes
+    /// the action illegal up front (CR 601.2c), the same posture the Comp Rules
+    /// require for choosing targets.
+    ///
+    /// <para>Builds on the existing <see cref="TargetLegality.IsLegal"/>
+    /// predicate (already used for the resolution-time CR 608.2b recheck), so
+    /// the validation-time and resolution-time legality definitions are one and
+    /// the same. <paramref name="spec"/> is null for the (many) callers that
+    /// don't yet stamp a declared spec — those keep the legacy
+    /// resolution-only posture and are unaffected. Player-target
+    /// untargetability is still independently covered by
+    /// <see cref="CheckPlayerTargetGate"/>; this gate additionally type-filters
+    /// every chosen object against the declared spec.</para></summary>
+    private static ValidationResult? CheckDeclaredTargetGate(
+        Player? caster, IReadOnlyList<object>? targets, TargetSpec? spec)
+    {
+        if (spec == null || targets == null || caster == null) return null;
+        foreach (var target in targets)
+        {
+            if (!Majik.Core.Targeting.TargetLegality.IsLegal(spec, target, caster))
+            {
+                var label = (target as Cards.ICard)?.Name
+                    ?? (target as Player)?.Name
+                    ?? target?.GetType().Name
+                    ?? "<null>";
+                return ValidationResult.Invalid(
+                    $"{label} is not a legal target for \"{spec.Description}\"",
+                    new RuleViolation("601.2c", "illegal target at declaration"));
+            }
+        }
+        return null;
+    }
+
     /// <summary>
     /// Validate activating an ability.
     /// </summary>
@@ -396,6 +439,9 @@ public class ActionValidator
         // protection-from-card-type arm.
         return CheckPlayerTargetGate(
                 action.Player, action.Targets, action.Ability.Source as Cards.ICard)
+            // CR 602.1b / 601.2c — declared-target-type legality (shared with
+            // cast path); reject an illegal target at activation declaration.
+            ?? CheckDeclaredTargetGate(action.Player, action.Targets, action.TargetSpec)
             ?? ValidationResult.Valid();
     }
 
@@ -497,13 +543,30 @@ public class CastSpellAction : PlayerAction
     /// gate (CR 702.11) to reject opponent-controlled spells naming a
     /// hexproof player. Null = unspecified (no target-axis validation —
     /// matches the legacy posture for the many callers that don't
-    /// stamp targets). The validator only inspects entries that are
-    /// <see cref="Player"/> instances; permanent / creature targets are
-    /// still routed through
-    /// <see cref="Majik.Core.Targeting.TargetLegality"/> at cast and at
-    /// resolution time.
+    /// stamp targets). <see cref="CheckPlayerTargetGate"/> inspects only the
+    /// <see cref="Player"/> entries (hexproof / shroud / protection); when a
+    /// declared <see cref="TargetSpec"/> is also supplied,
+    /// <see cref="ActionValidator.CheckDeclaredTargetGate"/> additionally
+    /// type-filters EVERY chosen object (permanent / creature targets included)
+    /// against the spec through
+    /// <see cref="Majik.Core.Targeting.TargetLegality"/> at declaration
+    /// (CR 601.2c) — the same predicate the resolution-time CR 608.2b recheck
+    /// uses.
     /// </summary>
     public IReadOnlyList<object>? Targets { get; }
+
+    /// <summary>
+    /// CR 601.2c — the declared target specification for this spell (the
+    /// type / zone / controller predicate the chosen <see cref="Targets"/>
+    /// must satisfy, e.g. "target creature" / "any target"). When supplied,
+    /// the <see cref="ActionValidator"/> rejects the cast at DECLARATION if a
+    /// chosen target fails the spec or is rendered untargetable
+    /// (<see cref="Majik.Core.Targeting.TargetLegality"/>), rather than only
+    /// fizzling at resolution (CR 608.2b). Null = unspecified — the validator
+    /// keeps the legacy resolution-only posture for the many callers that
+    /// don't yet stamp a declared spec.
+    /// </summary>
+    public Majik.Core.Targeting.TargetSpec? TargetSpec { get; }
 
     public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable = true)
         : this(card, player, sorcerySpeedAvailable, fromZone: null, targets: null)
@@ -521,12 +584,24 @@ public class CastSpellAction : PlayerAction
         bool sorcerySpeedAvailable,
         ZoneType? fromZone,
         IReadOnlyList<object>? targets)
+        : this(card, player, sorcerySpeedAvailable, fromZone, targets, targetSpec: null)
+    {
+    }
+
+    public CastSpellAction(
+        ICard card,
+        Player player,
+        bool sorcerySpeedAvailable,
+        ZoneType? fromZone,
+        IReadOnlyList<object>? targets,
+        Majik.Core.Targeting.TargetSpec? targetSpec)
     {
         Card = card;
         Player = player;
         SorcerySpeedAvailable = sorcerySpeedAvailable;
         FromZone = fromZone;
         Targets = targets;
+        TargetSpec = targetSpec;
     }
 }
 
@@ -560,6 +635,15 @@ public class ActivateAbilityAction : PlayerAction
     /// </summary>
     public IReadOnlyList<object>? Targets { get; }
 
+    /// <summary>
+    /// CR 601.2c / 602.1b — the declared target specification for this
+    /// activated ability. When supplied, the <see cref="ActionValidator"/>
+    /// rejects the activation at DECLARATION if a chosen target fails the
+    /// spec or is rendered untargetable, mirroring
+    /// <see cref="CastSpellAction.TargetSpec"/>. Null = unspecified.
+    /// </summary>
+    public Majik.Core.Targeting.TargetSpec? TargetSpec { get; }
+
     public ActivateAbilityAction(IActivatedAbility ability, Player player)
         : this(ability, player, sorcerySpeedAvailable: true, targets: null)
     {
@@ -575,11 +659,22 @@ public class ActivateAbilityAction : PlayerAction
         Player player,
         bool sorcerySpeedAvailable,
         IReadOnlyList<object>? targets)
+        : this(ability, player, sorcerySpeedAvailable, targets, targetSpec: null)
+    {
+    }
+
+    public ActivateAbilityAction(
+        IActivatedAbility ability,
+        Player player,
+        bool sorcerySpeedAvailable,
+        IReadOnlyList<object>? targets,
+        Majik.Core.Targeting.TargetSpec? targetSpec)
     {
         Ability = ability;
         Player = player;
         SorcerySpeedAvailable = sorcerySpeedAvailable;
         Targets = targets;
+        TargetSpec = targetSpec;
     }
 }
 
