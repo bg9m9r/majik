@@ -7,71 +7,75 @@ using Majik.Core.Zones;
 namespace Majik.Core.Effects;
 
 /// <summary>
-/// Lifecycle binder for Archon of Emeria's printed static (CR 604.3 /
-/// CR 601.3):
+/// Lifecycle binder for the printed static shared by Archon of Emeria and
+/// Eidolon of Rhetoric (CR 601.3 / 611):
 ///   "Each player can't cast more than one spell each turn."
 ///
-/// While the source permanent (Archon of Emeria) is on the battlefield, every
-/// player's turn-scoped additional-spell cap is set to <c>1</c> via
-/// <see cref="CastingRestrictions.SetMaxAdditionalSpellsThisTurn"/>. That rail
-/// is the same one Irencrag Feat uses for "you can cast only one more spell
-/// this turn": <see cref="Majik.Core.Game.SpellCastFlow"/> decrements each
-/// player's counter after every successful cast via
-/// <see cref="CastingRestrictions.ConsumeAdditionalSpellAllowance"/>, and
-/// <see cref="ActionValidator.ValidateCastSpell"/> rejects the cast once the
-/// counter reaches zero. So with the cap seeded at 1, the first spell a player
-/// casts in a turn is allowed and every subsequent one is blocked (CR 601.3).
+/// While the source permanent is on the battlefield, every player gets a
+/// token-scoped spells-per-turn cap entry of <c>1</c> on the
+/// <see cref="CastingRestrictions"/> static-cap rail
+/// (<see cref="CastingRestrictions.AddSpellsPerTurnCap"/>). The cap is a TRUE
+/// static (CR 611): it reads an explicit per-player spells-cast-this-turn
+/// counter (<see cref="CastingRestrictions.SpellsCastThisTurn"/>, incremented by
+/// <see cref="Majik.Core.Game.SpellCastFlow"/> on every cast) and is never
+/// consumed. <see cref="ActionValidator.ValidateCastSpell"/> rejects a cast once
+/// <see cref="CastingRestrictions.IsAtSpellsPerTurnCap"/> reports the player has
+/// reached the cap.
 ///
-/// ## Per-turn reset (CR 514.2)
-/// The cap is "each turn", so it must be re-seeded at the start of every turn.
-/// This binder subscribes to <see cref="TurnStartedEvent"/> and, on each turn
-/// start, clears the consumed counters and re-seeds every player to 1.
+/// ## Why a dedicated rail (deferral pay-down)
+/// This static used to ride the SAME consumable
+/// <c>MaxAdditionalSpells</c> ledger that Irencrag Feat ("you can cast only one
+/// more spell this turn") uses, and re-seeded it by CLEARING the whole shared
+/// dictionary at every turn start. That coupling created the
+/// <c>eidolon-archon-shared-cap-turn-start-reseed</c> race: the static-cap
+/// turn-start reseed could wipe a same-turn Irencrag-Feat allowance (and vice
+/// versa). The two effects now live on SEPARATE ledgers — the static cap reads
+/// its own explicit spells-cast counter and never touches the Feat's consumable
+/// allowance — so the reset point and the extra-cast grant can no longer race.
 ///
-/// Reset uses <see cref="CastingRestrictions.ClearMaxAdditionalSpellsThisTurn"/>
-/// before re-seeding because the underlying rail keeps the TIGHTER of an
-/// existing and an incoming cap (the <c>Math.Min</c> in
-/// <see cref="CastingRestrictions.SetMaxAdditionalSpellsThisTurn"/>) — without
-/// a clear, a counter consumed to 0 on the previous turn would stay pinned at 0
-/// and Archon would lock the player out entirely. Clearing at the very start of
-/// the turn is safe: no other source (e.g. Irencrag Feat, which resolves later
-/// in the turn) has registered a cap yet at that instant. The first re-seed
-/// also happens immediately on <see cref="Attach"/> so the static is live the
-/// moment Archon enters mid-turn.
+/// ## Per-turn reset (CR 514/500 turn boundary)
+/// Because the cap is a true static reading the spells-cast counter, the ONLY
+/// turn-boundary action needed is clearing that counter — done here on
+/// <see cref="TurnStartedEvent"/>. The cap entries themselves persist while the
+/// source stays on the battlefield; there is no entry re-seed and, critically,
+/// no clear of any shared field that another effect might own.
 ///
 /// ## Symmetry (CR 109.5 — "Each player")
-/// The static is symmetric: it applies to Archon's controller as well as their
-/// opponents. The all-players resolver supplies the full player list.
+/// The static is symmetric: it applies to the source's controller as well as
+/// their opponents. The all-players resolver supplies the full player list.
 ///
 /// ## Lifecycle (ETB / LTB)
-/// Mirrors <see cref="ThaliaHereticCatharEntersTappedEffect"/> /
-/// Narset's draw-restriction lifecycle: register on Attach, re-sync on every
-/// zone move of the source, tear the caps down when Archon leaves the
-/// battlefield so the restriction lifts automatically.
+/// Mirrors <see cref="EtherswornCanonistNonartifactRestrictionEffect"/>:
+/// register an entry per player on Attach / on every zone move of the source
+/// while it is on the battlefield, and tear this source's entries down (scoped
+/// by token) when it leaves so the restriction lifts automatically.
 /// </summary>
 public sealed class ArchonOfEmeriaOneSpellPerTurnEffect
 {
     /// <summary>
     /// "Each player can't cast more than ONE spell each turn." The cap is the
-    /// number of spells a player may still cast this turn (CR 601.3).
+    /// maximum number of spells a player may cast this turn (CR 601.3).
     /// </summary>
     public const int SpellsPerTurnCap = 1;
 
     private readonly ICard _source;
     private readonly IEventBus? _eventBus;
     private readonly Func<IReadOnlyList<Player>> _allPlayersResolver;
+    private readonly object _token = new();
     private readonly Action<TurnStartedEvent> _onTurnStarted;
     private readonly Action<CardMovedEvent> _onCardMoved;
     private bool _attached;
     private bool _active;
 
-    /// <param name="source">The Archon permanent gating the static. The cap
-    /// is only enforced while the source is on the battlefield.</param>
+    /// <param name="source">The permanent gating the static (Archon of Emeria /
+    /// Eidolon of Rhetoric). The cap is only enforced while the source is on the
+    /// battlefield.</param>
     /// <param name="eventBus">Event bus for per-turn reset
     /// (<see cref="TurnStartedEvent"/>) and ETB/LTB tracking
     /// (<see cref="CardMovedEvent"/>). May be null — Attach still seeds the cap
-    /// once, but the per-turn reset relies on the bus.</param>
+    /// once, but the per-turn counter reset relies on the bus.</param>
     /// <param name="allPlayersResolver">Returns every player in the game
-    /// (Archon's controller included — the static is symmetric, CR 109.5).
+    /// (the source's controller included — the static is symmetric, CR 109.5).
     /// May not be null.</param>
     public ArchonOfEmeriaOneSpellPerTurnEffect(
         ICard source,
@@ -116,10 +120,12 @@ public sealed class ArchonOfEmeriaOneSpellPerTurnEffect
 
     private void OnTurnStarted(TurnStartedEvent _)
     {
-        // Re-seed every player's cap at turn start (CR 514.2 — the "each turn"
-        // allowance refreshes). Only while Archon is out.
+        // CR 514/500 — the per-turn spells-cast tally refreshes each turn. The
+        // static cap (a true static reading this counter) needs nothing else:
+        // its entries persist while the source is out. Only clear while the
+        // source is on the battlefield (when none is out the counter is inert).
         if (_source.Zone != ZoneType.Battlefield) return;
-        ReseedCaps();
+        CastingRestrictions.ClearSpellsCastThisTurn();
     }
 
     private void Sync()
@@ -129,32 +135,27 @@ public sealed class ArchonOfEmeriaOneSpellPerTurnEffect
         if (shouldBeActive && !_active)
         {
             _active = true;
-            ReseedCaps();
+            RegisterForAllPlayers();
         }
         else if (!shouldBeActive && _active)
         {
             _active = false;
-            // Archon left the battlefield — lift the restriction (CR 614 /
-            // 611.2g static stops applying). Clearing the rail removes the
-            // per-player caps this source installed.
-            CastingRestrictions.ClearMaxAdditionalSpellsThisTurn();
+            // Source left the battlefield — lift the restriction (CR 611.2g —
+            // the static stops applying). Remove only this source's entries so a
+            // second cap source (another Archon / an Eidolon) is untouched.
+            CastingRestrictions.RemoveSpellsPerTurnCap(_token);
         }
     }
 
-    private void ReseedCaps()
+    private void RegisterForAllPlayers()
     {
-        // Clear first so a counter consumed to 0 on a prior turn can be raised
-        // back to the cap — SetMaxAdditionalSpellsThisTurn keeps the tighter
-        // (Math.Min) value, so a bare Set could not lift a 0 back to 1.
-        CastingRestrictions.ClearMaxAdditionalSpellsThisTurn();
-
         var players = _allPlayersResolver();
         if (players is null) return;
 
         foreach (var player in players)
         {
             if (player is null) continue;
-            CastingRestrictions.SetMaxAdditionalSpellsThisTurn(player, SpellsPerTurnCap);
+            CastingRestrictions.AddSpellsPerTurnCap(_token, player, SpellsPerTurnCap);
         }
     }
 }
