@@ -29568,7 +29568,10 @@
     "Land"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Mountain",
+    "Swamp"
+  ],
   "power": null,
   "toughness": null,
   "loyalty": null,
