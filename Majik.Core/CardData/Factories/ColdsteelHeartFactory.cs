@@ -29,12 +29,27 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// <para>
 /// ## Choose a color (CR 614.12 — "as this enters" replacement)
-/// "As this artifact enters, choose a color." is resolved up front: the chosen
-/// <see cref="ManaColor"/> is supplied to the full overload. A live agent
-/// prompt for the choice is deferred engine-wide (same posture as
-/// <see cref="TempleOfTheDragonQueenFactory"/> / <see cref="UtopiaSprawlFactory"/>);
-/// callers / tests pass the already-chosen color. The {T} mana ability then
-/// produces exactly that color (CR 605.1a — mana abilities don't use the stack).
+/// The production single-arg <see cref="Create(Player)"/> path is AGENT-GATED:
+/// it attaches a dynamic-output <see cref="ManaAbility"/> that reads a shared
+/// <see cref="ColorChoice"/> holder and stashes the holder in
+/// <see cref="ColorChoiceRegistry"/>, so the routed-build overlay
+/// (<see cref="ChooseColorPermanentBinder"/>) registers an agent-prompting
+/// <see cref="ChooseColorReplacement"/> that stamps the controller's pick onto
+/// the holder as the artifact enters (the same machinery the land members of the
+/// family — Sunken Citadel, Temple of the Dragon Queen — use via
+/// <see cref="ChooseColorLandBinder"/>). Until the choice resolves the holder
+/// sits at its seeded default (White), so exactly ONE colour is producible —
+/// strictly narrower than the old over-permissive five-WUBRG modelling and never
+/// the wrong quantity.
+/// </para>
+///
+/// <para>
+/// The explicit-color full overload
+/// (<see cref="Create(Player, ManaColor, ReplacementBus?)"/>) is the
+/// up-front-resolved test path: callers pass an already-chosen color and the
+/// {T} ability produces exactly that color (CR 605.1a — mana abilities don't use
+/// the stack), with the unconditional ETB-tapped registered directly when a bus
+/// is supplied.
 /// </para>
 ///
 /// <para>
@@ -48,12 +63,6 @@ namespace Majik.Core.CardData.Factories;
 /// behaviour is exercisable in isolation (mirrors the ETB-tapped wiring in
 /// <see cref="TempleOfTheDragonQueenFactory"/>, minus the conditional predicate).
 /// </para>
-///
-/// <para>
-/// The shape-only single-arg dispatcher path constructs identity only: no color
-/// is known, so no mana ability is attached and no ETB-tapped replacement is
-/// wired (matching every other ETB-replacement factory's single-arg posture).
-/// </para>
 /// </summary>
 [CardName("Coldsteel Heart")]
 public static class ColdsteelHeartFactory
@@ -61,13 +70,44 @@ public static class ColdsteelHeartFactory
     private static readonly CardDefinition Definition =
         CardDefinitionLoader.FromEmbeddedResource("coldsteel-heart");
 
-    /// <summary>Construct Coldsteel Heart owned and controlled by
-    /// <paramref name="owner"/> (shape-only path — no chosen color, no mana
-    /// ability, no ETB-tapped replacement wired).</summary>
+    /// <summary>
+    /// Production single-arg path (the overload the routed factory build
+    /// invokes — <see cref="FactoryRouting"/>). Attaches a DYNAMIC-output
+    /// <see cref="ManaAbility"/> reading a shared <see cref="ColorChoice"/>
+    /// holder (seeded White) and stashes the holder in
+    /// <see cref="ColorChoiceRegistry"/> so the routed-build overlay
+    /// (<see cref="ChooseColorPermanentBinder"/>) can register an agent-prompting
+    /// <see cref="ChooseColorReplacement"/> — "as this artifact enters, choose a
+    /// color" (CR 614.12). The unconditional ETB-tapped clause is wired in prod
+    /// by <see cref="Majik.Core.CardData.EntersTappedBinder"/> via the same
+    /// overlay, so it is NOT registered here (no bus is available on this path).
+    /// </summary>
     public static Artifact Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
-        return (Artifact)CardDefinitionFactory.Build(Definition, owner);
+        var artifact = (Artifact)CardDefinitionFactory.Build(Definition, owner);
+
+        // CR 614.12 — one shared per-card choice holder seeded to a
+        // deterministic default (White), so a pre-ETB / no-agent activation
+        // produces exactly ONE colour. The overlay ChooseColorReplacement
+        // stamps the agent's real pick as the artifact enters.
+        var choice = new ColorChoice(ManaColor.White);
+        ColorChoiceRegistry.Set(artifact, choice);
+
+        // "{T}: Add one mana of the chosen color." — a single dynamic-output
+        // ManaAbility reading the holder (CR 605.1a). The printed seed (the
+        // current chosen colour's pip) lets pre-activation inspectors see a real
+        // colour; livePreview keeps ManaGenerated tracking the live choice.
+        artifact.AddAbility(new ManaAbility(
+            source: artifact,
+            controller: owner,
+            manaGenerator: () => choice.SinglePip(),
+            canActivateCheck: () => !artifact.IsTapped,
+            printedManaGenerated: choice.SinglePip(),
+            spendRestriction: null,
+            livePreview: () => choice.SinglePip()));
+
+        return artifact;
     }
 
     /// <summary>
@@ -87,13 +127,22 @@ public static class ColdsteelHeartFactory
         ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        // Validate the colour up front (throws for colourless / generic) so the
+        // explicit-color overload's contract is unchanged.
+        if (chosenColor is not (ManaColor.White or ManaColor.Blue or ManaColor.Black
+            or ManaColor.Red or ManaColor.Green))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(chosenColor), chosenColor,
+                "Coldsteel Heart's chosen color must be one of W/U/B/R/G (CR 105.1).");
+        }
 
+        // Build the dynamic-mana shape, then stamp the already-chosen colour onto
+        // the shared holder it reads (CR 614.12 — the choice resolves up front on
+        // this test path). The single dynamic ManaAbility then produces exactly
+        // that colour; no second static ability is added.
         var artifact = Create(owner);
-
-        // {T}: Add one mana of the chosen color (CR 605.1a). One pip of the
-        // up-front-chosen color; throws for a non-W/U/B/R/G choice.
-        var produced = ManaCostForColor(chosenColor);
-        artifact.AddAbility(new ManaAbility(artifact, owner, produced));
+        ColorChoiceRegistry.Get(artifact)!.Choose(chosenColor);
 
         // "This artifact enters tapped." — unconditional ETB-tapped (CR 614.1c).
         if (replacements != null)
@@ -103,17 +152,4 @@ public static class ColdsteelHeartFactory
 
         return artifact;
     }
-
-    /// <summary>Single-pip <see cref="ManaCost"/> for a chosen color.</summary>
-    private static ManaCost ManaCostForColor(ManaColor color) => color switch
-    {
-        ManaColor.White => ManaCost.Parse("W"),
-        ManaColor.Blue => ManaCost.Parse("U"),
-        ManaColor.Black => ManaCost.Parse("B"),
-        ManaColor.Red => ManaCost.Parse("R"),
-        ManaColor.Green => ManaCost.Parse("G"),
-        _ => throw new ArgumentOutOfRangeException(
-            nameof(color), color,
-            "Coldsteel Heart's chosen color must be one of W/U/B/R/G (CR 105.1)."),
-    };
 }

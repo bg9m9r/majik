@@ -3,9 +3,11 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
+using System.Linq;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -50,15 +52,36 @@ public class ColdsteelHeartFactoryTests
     }
 
     [Fact]
-    public void ColdsteelHeart_SingleArgPath_HasNoManaAbilityYet_AndNoOtherAbilities()
+    public void ColdsteelHeart_SingleArgPath_HasOneDynamicManaAbility_SeededToDefault()
     {
-        // No color chosen yet => no {T}: Add ability; nothing else either.
+        // CR 614.12 — the prod single-arg path is agent-gated: it attaches ONE
+        // dynamic {T} mana ability reading a ColorChoice holder (seeded White
+        // until the ETB ChooseColorReplacement stamps the agent's pick), and no
+        // other abilities. Strictly ONE producible colour — never the old
+        // five-WUBRG over-permissiveness.
         var artifact = ColdsteelHeartFactory.Create(_alice);
 
-        artifact.Abilities.OfType<ManaAbility>().Should().BeEmpty(
-            "the chosen color isn't known on the shape-only path");
-        artifact.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
+        var mana = artifact.Abilities.OfType<ManaAbility>().ToList();
+        mana.Should().HaveCount(1, "one dynamic {T}: Add one mana of the chosen color");
+        mana[0].ManaGenerated.White.Should().Be(1, "the holder is seeded to the White default");
         artifact.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ColdsteelHeart_SingleArgPath_StashesColorChoiceForOverlayBinder()
+    {
+        var artifact = ColdsteelHeartFactory.Create(_alice);
+        ColorChoiceRegistry.Get(artifact).Should().NotBeNull(
+            "the factory stashes the holder for ChooseColorPermanentBinder");
+    }
+
+    [Fact]
+    public void ColdsteelHeart_OverlayBinder_RegistersAgentPromptingReplacement()
+    {
+        var artifact = ColdsteelHeartFactory.Create(_alice);
+        var bus = new ReplacementBus();
+        ChooseColorPermanentBinder.Bind(artifact, bus).Should().BeTrue(
+            "Coldsteel Heart stashed a ColorChoice holder");
     }
 
     // -----------------------------------------------------------------------
@@ -86,6 +109,46 @@ public class ColdsteelHeartFactoryTests
         produced.Black.Should().Be(expected.Black);
         produced.Red.Should().Be(expected.Red);
         produced.Green.Should().Be(expected.Green);
+    }
+
+    // -----------------------------------------------------------------------
+    // Agent-gated choose-a-color (CR 614.12) — end to end
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ColdsteelHeart_AgentChoice_DrivesManaProduction_EndToEnd()
+    {
+        AgentRegistry.Clear();
+        try
+        {
+            // Prod single-arg build + the overlay ChooseColorPermanentBinder
+            // (what DeckCardBuilder's OverlayAdditiveBinders runs), then the ETB
+            // replacement prompts the agent and stamps the pick onto the holder
+            // the dynamic mana ability reads.
+            var artifact = ColdsteelHeartFactory.Create(_alice);
+            var bus = new ReplacementBus();
+            ChooseColorPermanentBinder.Bind(artifact, bus).Should().BeTrue();
+
+            var agent = new ScriptedAgent();
+            agent.QueueChoice(cands => new[]
+            {
+                cands.First(c => (ManaColor)c == ManaColor.Black),
+            });
+            var ctx = ResolutionContext.For(_alice, agent, game: null, chosenTargets: null);
+
+            var intent = new ZoneMoveIntent(
+                Card: artifact, FromZone: ZoneType.Hand,
+                ToZone: ZoneType.Battlefield, Controller: _alice);
+            await bus.ApplyAsync(intent, ctx);
+
+            var mana = artifact.Abilities.OfType<ManaAbility>().Single();
+            mana.Activate().Black.Should().Be(1,
+                "the agent chose Black, so {T} adds one black mana (CR 614.12 / 605.1a)");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
     }
 
     // -----------------------------------------------------------------------

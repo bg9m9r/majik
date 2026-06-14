@@ -96,16 +96,19 @@ public static class UtopiaSprawlFactory
 
     /// <summary>
     /// Single-arg dispatch — the overload the routed production build
-    /// (<see cref="FactoryRouting"/>) invokes. Attaches the triggered mana
-    /// ability with the default color (<see cref="LotusCobraFactory.DefaultColor"/>)
-    /// and registers it with the live per-game
+    /// (<see cref="FactoryRouting"/>) invokes. AGENT-GATED (CR 614.12): attaches
+    /// the triggered mana ability reading a shared <see cref="ColorChoice"/>
+    /// holder (seeded to <see cref="LotusCobraFactory.DefaultColor"/> — Green,
+    /// Utopia Sprawl's own colour) and stashes the holder in
+    /// <see cref="ColorChoiceRegistry"/> so the routed-build overlay
+    /// (<see cref="ChooseColorPermanentBinder"/>) registers an agent-prompting
+    /// <see cref="ChooseColorReplacement"/> that stamps the controller's pick as
+    /// the Aura enters. Registers the trigger with the live per-game
     /// <see cref="TriggerManager"/> resolved from
     /// <see cref="TriggerManagerRegistry"/>, so the bonus actually fires in a
     /// real match (the routed build runs no triggered-ability binder — the
-    /// factory owns the trigger). Outside any game scope (pure shape /
-    /// dispatcher tests) the registry yields <c>null</c> and the trigger is
-    /// merely attached, not registered — identical to the prior shape-only
-    /// posture.
+    /// factory owns the trigger). Outside any game scope the registry yields
+    /// <c>null</c> and the trigger is merely attached, not registered.
     /// </summary>
     public static Enchantment Create(Player owner) =>
         Create(owner, LotusCobraFactory.DefaultColor, TriggerManagerRegistry.Get());
@@ -115,10 +118,13 @@ public static class UtopiaSprawlFactory
     /// attached to the card's <see cref="Card.Abilities"/> collection; when
     /// <paramref name="triggers"/> is supplied it is also registered with the
     /// <see cref="TriggerManager"/> so it surfaces as pending end-to-end.
+    /// The bonus colour is read live from the card's <see cref="ColorChoice"/>
+    /// holder; <paramref name="chosenColor"/> seeds that holder (the prod path
+    /// later overwrites the seed with the agent's "as this enters" pick).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="chosenColor">The color chosen "as this Aura enters"
-    /// (CR 614.12). Must be one of W/U/B/R/G.</param>
+    /// <param name="chosenColor">The seed color for the choice "as this Aura
+    /// enters" (CR 614.12). Must be one of W/U/B/R/G.</param>
     /// <param name="triggers">Optional live trigger manager for end-to-end
     /// firing.</param>
     public static Enchantment Create(Player owner, ManaColor chosenColor, TriggerManager? triggers)
@@ -127,6 +133,13 @@ public static class UtopiaSprawlFactory
 
         // Identity only (no recursion into the trigger-wiring overload).
         var card = (Enchantment)CardDefinitionFactory.Build(Definition, owner);
+
+        // CR 614.12 — one shared per-card choice holder seeded to the supplied
+        // colour. The dynamic trigger reads it at trigger time, and the overlay
+        // ChooseColorReplacement stamps the agent's pick onto it as the Aura
+        // enters. Stashed so ChooseColorPermanentBinder can find it.
+        var choice = new ColorChoice(chosenColor);
+        ColorChoiceRegistry.Set(card, choice);
 
         // "Whenever enchanted Forest is tapped for mana, its controller adds
         // an additional one mana of the chosen color." (CR 605.1b / 603.2.)
@@ -145,15 +158,16 @@ public static class UtopiaSprawlFactory
             return true;
         });
 
-        var bonusMana = ManaCostForColor(chosenColor);
-
         var addManaEffect = new Effect(
-            $"Utopia Sprawl — add {bonusMana} to the controller of the enchanted Forest",
+            "Utopia Sprawl — add one mana of the chosen color to the controller " +
+            "of the enchanted Forest",
             () =>
             {
                 var controller = pendingController;
                 pendingController = null;
-                controller?.AddManaToPool(bonusMana);
+                // Read the chosen colour LIVE (CR 614.12) — the agent's ETB pick
+                // may have overwritten the seed.
+                controller?.AddManaToPool(choice.SinglePip());
             });
 
         var trigger = new TriggeredAbility(
@@ -198,17 +212,4 @@ public static class UtopiaSprawlFactory
             predicate: p => p.HasType(CardType.Land) && p.HasSubtype(CardSubtype.Forest),
             intent: BotIntent.None);
     }
-
-    /// <summary>Single-pip <see cref="ManaCost"/> for a chosen color.</summary>
-    private static ManaCost ManaCostForColor(ManaColor color) => color switch
-    {
-        ManaColor.White => ManaCost.Parse("W"),
-        ManaColor.Blue => ManaCost.Parse("U"),
-        ManaColor.Black => ManaCost.Parse("B"),
-        ManaColor.Red => ManaCost.Parse("R"),
-        ManaColor.Green => ManaCost.Parse("G"),
-        _ => throw new ArgumentOutOfRangeException(
-            nameof(color), color,
-            "Utopia Sprawl's chosen color must be one of W/U/B/R/G (CR 105.1)."),
-    };
 }

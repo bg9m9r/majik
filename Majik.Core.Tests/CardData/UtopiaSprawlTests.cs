@@ -134,6 +134,71 @@ public class UtopiaSprawlTests
             "the Forest's own {G} plus Utopia Sprawl's default-Green bonus");
     }
 
+    /// <summary>
+    /// CR 614.12 — the agent-gated "as this Aura enters, choose a color" path:
+    /// the routed build stashes a <see cref="ColorChoice"/> holder, the overlay
+    /// <see cref="ChooseColorPermanentBinder"/> registers an
+    /// <see cref="Majik.Core.Effects.ChooseColorReplacement"/>, the ETB prompt
+    /// stamps the agent's pick, and the mana-bonus trigger then produces THAT
+    /// colour — not the seeded Green default.
+    /// </summary>
+    [Fact]
+    public async Task RoutedBuild_AgentChoosesColor_BonusIsThatColor_EndToEnd()
+    {
+        Majik.Core.Players.Agents.AgentRegistry.Clear();
+        try
+        {
+            var bus = new EventBus();
+            var stack = new Majik.Core.Stack.Stack(bus);
+            var triggers = new TriggerManager(stack, bus);
+            var activator = new ManaAbilityActivator(bus);
+
+            using var scope = TriggerManagerRegistry.PushScope();
+            TriggerManagerRegistry.Set(triggers);
+
+            var forest = (Land)NamedCardFactory.Create("Forest", _alice);
+            forest.SetController(_alice);
+            forest.SetZone(ZoneType.Battlefield);
+            _alice.Zones.Battlefield.AddCard(forest);
+
+            var sprawl = (Enchantment)NamedCardFactory.Create("Utopia Sprawl", _alice);
+
+            // Overlay binder + ETB agent prompt (what DeckCardBuilder runs).
+            var replacements = new Majik.Core.Effects.ReplacementBus();
+            ChooseColorPermanentBinder.Bind(sprawl, replacements).Should().BeTrue();
+
+            var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+            agent.QueueChoice(cands => new[]
+            {
+                cands.First(c => (ManaColor)c == ManaColor.Red),
+            });
+            var ctx = Majik.Core.Abilities.ResolutionContext.For(
+                _alice, agent, game: null, chosenTargets: null);
+            await replacements.ApplyAsync(
+                new Majik.Core.Effects.ZoneMoveIntent(
+                    sprawl, ZoneType.Hand, ZoneType.Battlefield, Controller: _alice),
+                ctx);
+
+            sprawl.AttachTo(forest);
+            sprawl.SetZone(ZoneType.Battlefield);
+            _alice.Zones.Battlefield.AddCard(sprawl);
+
+            var manaAbility = forest.Abilities.OfType<IManaAbility>().Single();
+            activator.ActivateManaAbility(manaAbility, _alice);
+
+            triggers.PutPendingTriggersOnStack(_alice);
+            stack.Pop()!.Resolve();
+
+            _alice.ManaPool.Red.Should().Be(1,
+                "the agent chose Red, so the bonus is one red mana (CR 614.12)");
+            _alice.ManaPool.Green.Should().Be(1, "the Forest's own {G} is unchanged");
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Mana-doubling trigger
     // -----------------------------------------------------------------------
