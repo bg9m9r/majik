@@ -28654,6 +28654,61 @@
   "mdfc": null,
   "colors": []
 }
+==== prime-speaker-vannifar ====
+{
+  "name": "Prime Speaker Vannifar",
+  "manaCost": "{2}{G}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Elf",
+    "Ooze",
+    "Wizard"
+  ],
+  "power": 2,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green"
+  ]
+}
 ==== prismatic-lens ====
 {
   "name": "Prismatic Lens",
