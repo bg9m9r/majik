@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -87,7 +89,28 @@ public static class CodexShredderFactory
     /// (no <see cref="ZoneService"/> wired in this shape posture — same as
     /// <see cref="TheUnderworldCookbookFactory"/>).
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> on the
+    /// graveyard-return ability so the cost-payment path publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -97,7 +120,7 @@ public static class CodexShredderFactory
         card.SetController(owner);
 
         AttachMillAbility(card, owner);
-        AttachGraveyardReturnAbility(card, owner);
+        AttachGraveyardReturnAbility(card, owner, eventBus);
 
         return card;
     }
@@ -164,7 +187,7 @@ public static class CodexShredderFactory
     /// time (CR 602.2b). Unlike The Underworld Cookbook, ANY card type is a
     /// legal target.
     /// </summary>
-    private static void AttachGraveyardReturnAbility(Artifact card, Player owner)
+    private static void AttachGraveyardReturnAbility(Artifact card, Player owner, IEventBus? eventBus)
     {
         ActivatedAbility? ability = null;
 
@@ -188,7 +211,9 @@ public static class CodexShredderFactory
             {
                 new ManaCostCost(ManaCost.Parse(GraveyardReturnManaCost)),
                 AdditionalCost.Tap(card),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — thread the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { returnEffect },
             targetRequests: new[]
