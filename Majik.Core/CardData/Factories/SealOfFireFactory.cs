@@ -43,14 +43,20 @@ namespace Majik.Core.CardData.Factories;
 ///   Lightning Bolt. Illegal-on-resolution targets fail silently
 ///   (CR 608.2b) — the sacrifice still resolves because the cost was paid.
 ///
-/// ## Deferred (v1 gaps)
+/// ## Sacrifice payment (no longer deferred)
 ///
-/// - <b>Sacrifice payment side effects</b>: the engine's generic
-///   <see cref="AdditionalCost"/> sacrifice payment is currently a no-op
-///   stub, so the effect closure performs the move-to-graveyard itself
-///   (mirrors <see cref="PyriteSpellbombFactory"/> / Aether / Nihil
-///   Spellbomb). Remove the explicit move once
-///   <see cref="AdditionalCost.Sacrifice"/> performs the sacrifice itself.
+/// - <see cref="AdditionalCost.Sacrifice(Cards.Permanent, IEventBus?)"/> now
+///   performs the move-to-graveyard itself (via <c>ZoneService</c> when a
+///   per-player service is registered, raw zones otherwise) AND — when a bus
+///   is supplied OR routed through the central <see cref="IBusAwareCost"/>
+///   seam at <c>CostPayment.PayCosts</c> — publishes a
+///   <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+///   cost-payer. The effects-aware <c>Create(Player, ContinuousEffectsService)</c>
+///   overload threads <c>effects.EventBus</c> so the production
+///   <c>GameFacade</c> build wires it. The resolve closure's
+///   <see cref="SacrificeSelf"/> is now a harmless idempotent fallback — in
+///   the live activation path the cost already moved the Seal, so it no-ops
+///   (single publish either way). Regression: <c>ArtifactEnchantmentSacrificeBusTests</c>.
 /// </summary>
 [CardName("Seal of Fire")]
 public static class SealOfFireFactory

@@ -196,10 +196,14 @@ public static class AuraOfSilenceFactory
 
     /// <summary>
     /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent. Mirrors the closure used by Caustic
-    /// Caterpillar / Aether Spellbomb / Mind Stone — the generic
-    /// <see cref="AdditionalCost.Pay"/> sacrifice path is a no-op stub, so
-    /// the effect closure performs the zone move directly.
+    /// owner's graveyard. Idempotent. Harmless fallback only: the self-sac is
+    /// now paid as the activation cost via
+    /// <see cref="AdditionalCost.Sacrifice(Cards.Permanent, IEventBus?)"/>,
+    /// which performs the zone move AND publishes
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) when the bus is
+    /// threaded (the effects-aware <c>Create</c> overload / the central
+    /// <see cref="IBusAwareCost"/> cost-payment seam). In the live path the
+    /// cost already moved the card, so this closure no-ops.
     /// </summary>
     private static void SacrificeSelf(Enchantment card, Player owner)
     {
