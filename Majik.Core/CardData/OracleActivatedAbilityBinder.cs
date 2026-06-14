@@ -106,6 +106,19 @@ namespace Majik.Core.CardData;
 ///     reach, menace, indestructible, hexproof) — a parameterised or unknown
 ///     keyword is skipped as unsound. Sound to re-home: the effect targets the
 ///     bearer, never the exiled card.</item>
+///   <item><b>Targeted keyword grant</b> —
+///     <c>"{cost}: (Another) target creature gains &lt;keyword&gt; until end of
+///     turn."</c> (the grant-OTHER sibling of the self-keyword grant — Heliod,
+///     Sun-Crowned's "{1}{W}: Another target creature gains lifelink until end of
+///     turn."). Rebuilt with a 1..1 <see cref="TargetRequest"/> whose resolution
+///     registers a <see cref="GrantKeywordUntilEndOfTurnEffect"/> for the named
+///     keyword against the CHOSEN TARGET creature's own
+///     <see cref="Creature.ActiveEffects"/> (CR 613.1f Layer 6; CR 514.2 expiry).
+///     The optional printed "Another" (CR 601.2c) is re-checked at resolve to
+///     exclude the bearer. ONLY the closed <see cref="GrantableKeywords"/> set is
+///     reconstructed; a parameterised / unknown keyword is skipped as unsound.
+///     Sound to re-home onto any permanent bearer (the keyword lands on the chosen
+///     creature, never the exiled card or the bearer).</item>
 ///   <item><b>Self-counter</b> —
 ///     <c>"{cost}: Put a/N +1/+1 counter(s) on this creature."</c> Rebuilt as a
 ///     no-target <see cref="ActivatedAbility"/> whose resolution adds the
@@ -312,6 +325,29 @@ public static class OracleActivatedAbilityBinder
     // "{cost}: This creature gains <keyword> until end of turn."
     private static readonly Regex SelfKeywordGrantRegex = new(
         @"^(" + CostList + @")\s*:\s*This creature gains (.+?) until end of turn\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: (Another) target creature gains <keyword> until end of turn."
+    // A TARGETED keyword grant (grant-OTHER) — the keyword sibling of the
+    // targeted-pump shape (PumpOtherRegex) where the keyword lands on a CHOSEN
+    // creature rather than the source itself. Heliod, Sun-Crowned's activated
+    // half ("{1}{W}: Another target creature gains lifelink until end of turn.")
+    // is the canonical case, but the bare "Target creature gains <keyword> …"
+    // form is the same shape (a self-source on-demand keyword payoff is a common
+    // activated ability on real creature cards). Sound to re-home: the BEARER is
+    // only the source / cost-payer; the GrantKeywordUntilEndOfTurnEffect
+    // (CR 613.1f Layer 6; CR 514.2 expiry) registers against the CHOSEN TARGET
+    // creature's own ActiveEffects, never the exiled imprinted card and never the
+    // bearer. The optional printed "Another" (CR 601.2c "another" = "different
+    // from the source") is matched and recorded so the rebuilt target request can
+    // exclude the bearer at resolve — same posture as the rest of the engine's
+    // printed-"another" predicates that gate at resolve. Only the closed
+    // GrantableKeywords set is reconstructed; an unknown or parameterised keyword
+    // is skipped as unsound (CR 613.1f — a granted ability must be modelled
+    // exactly), consistent with the self-keyword-grant soundness boundary. Group 2
+    // = the optional "Another " prefix, group 3 = the keyword.
+    private static readonly Regex KeywordGrantOtherRegex = new(
+        @"^(" + CostList + @")\s*:\s*(Another )?target creature gains (.+?) until end of turn\.$",
         RegexOptions.IgnoreCase);
 
     // The closed set of simple, parameter-free keywords this binder will grant
@@ -557,6 +593,14 @@ public static class OracleActivatedAbilityBinder
                 continue;
             }
 
+            var kwGrantOther = KeywordGrantOtherRegex.Match(line);
+            if (kwGrantOther.Success)
+            {
+                var ability = TryBuildKeywordGrantOther(kwGrantOther, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
             var selfCounter = SelfCounterRegex.Match(line);
             if (selfCounter.Success)
             {
@@ -724,6 +768,77 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { grantEffect });
+    }
+
+    /// <summary>
+    /// Build a targeted keyword grant: "{cost}: (Another) target creature gains
+    /// &lt;keyword&gt; until end of turn." (the grant-OTHER sibling of the
+    /// self-keyword grant — Heliod, Sun-Crowned's "{1}{W}: Another target creature
+    /// gains lifelink until end of turn."). Re-homed so the BEARER is only the
+    /// source / cost-payer; the <see cref="GrantKeywordUntilEndOfTurnEffect"/>
+    /// (CR 613.1f Layer 6; CR 514.2 expiry) registers against the CHOSEN target
+    /// creature's own <see cref="Creature.ActiveEffects"/> — never the exiled
+    /// imprinted card and never the bearer. The bearer need NOT be a creature (a
+    /// non-creature bearer can still pay to grant a keyword to a chosen creature),
+    /// so this does not gate on <see cref="Creature"/> the way self-keyword-grant
+    /// does. Only the closed <see cref="GrantableKeywords"/> set is reconstructed;
+    /// an unknown or parameterised keyword is skipped (returns null). When the
+    /// printed "Another" prefix is present, the chosen target is re-checked at
+    /// resolve to exclude the bearer (CR 601.2c — "another" = different from the
+    /// source). Mirrors <see cref="TryBuildPumpOther"/>'s 1..1 single-creature
+    /// target request.
+    /// </summary>
+    private static ActivatedAbility? TryBuildKeywordGrantOther(
+        Match match, Permanent bearer, Player controller)
+    {
+        var another = match.Groups[2].Success
+            && match.Groups[2].Value.Trim().Length > 0;
+        var rawKeyword = match.Groups[3].Value.Trim();
+        if (!GrantableKeywords.TryGetValue(rawKeyword, out var keyword)) return null;
+
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        ActivatedAbility? ability = null;
+        var grantEffect = new Effect(
+            $"Granted: target creature gains {keyword} until end of turn",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                if (ability.ChosenTargets[0][0] is not Creature chosen) return;
+                // CR 608.2b — target must still be a battlefield creature.
+                if (chosen.Zone != ZoneType.Battlefield) return;
+                // CR 601.2c — printed "Another" excludes the source at resolve.
+                if (another && ReferenceEquals(chosen, bearer)) return;
+
+                // CR 613.1f Layer 6 / CR 514.2 — register against the CHOSEN
+                // target creature's OWN effects service. A target with no
+                // ActiveEffects (shape-only path) silently no-ops — same posture
+                // as the self-keyword-grant rebuild. The bearer is untouched;
+                // only the chosen creature gains the keyword.
+                chosen.ActiveEffects?.Register(
+                    new GrantKeywordUntilEndOfTurnEffect(chosen, keyword));
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { grantEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: another ? "another target creature" : "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff),
+            });
+
+        return ability;
     }
 
     /// <summary>

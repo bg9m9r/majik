@@ -960,6 +960,71 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_KeywordGrantOther_RehomesKeywordToChosenCreature()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability grants a keyword to ANOTHER
+        // creature: "{1}{W}: Another target creature gains lifelink until end of
+        // turn." (Heliod, Sun-Crowned's activated half — the keyword sibling of
+        // the targeted-pump shape.) Re-homing is sound: the SOURCE / cost-payer
+        // is the BEARER, and the GrantKeywordUntilEndOfTurnEffect lands on the
+        // CHOSEN target creature's own ActiveEffects, never the exiled imprinted
+        // card (CR 613.1f Layer 6).
+        var heliodStub = new Creature("Heliod Stub", "2W", 5, 5);
+        heliodStub.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(heliodStub);
+        heliodStub.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A separate creature on the battlefield to receive the keyword grant.
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Heliod Stub",
+                "{1}{W}: Another target creature gains lifelink until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), heliodStub);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's targeted keyword grant");
+        var grant = granted[0];
+        grant.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        grant.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("W"));
+        grant.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"),
+            "a targeted keyword grant requires a 1..1 target-creature request");
+
+        // The ally has no lifelink yet.
+        effects.Compute(ally).Keywords.Should().NotContain("Lifelink");
+
+        // Resolving with the ALLY chosen grants the ALLY lifelink (CR 613.1f
+        // Layer 6), not the bearer and not the exiled card.
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        foreach (var effect in grant.Effects) effect.Execute();
+        effects.Compute(ally).Keywords.Should().Contain("Lifelink",
+            "the re-homed targeted keyword grant gives the CHOSEN creature the keyword");
+        effects.Compute(bearer).Keywords.Should().NotContain("Lifelink",
+            "the bearer (mere source) does not gain the keyword — only the chosen target");
+
+        // CR 514.2 — the granted keyword expires at cleanup.
+        effects.ExpireEndOfTurn();
+        effects.Compute(ally).Keywords.Should().NotContain("Lifelink",
+            "the granted keyword expires at end of turn");
+    }
+
+    [Fact]
     public void Grant_NonMana_Pinger_RehomesTapAndDamageToBearer()
     {
         var alice = new Player("Alice", 20);
