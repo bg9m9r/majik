@@ -188,6 +188,40 @@ public class BonecrusherGiantTests
     }
 
     [Fact]
+    public void Stomp_CandidateGatherer_OffersEffectivePlaneswalkerBackFace()
+    {
+        // CR 115.4 / 711 — the targeting-OFFERING half: Stomp's "any target"
+        // candidate gatherer must surface a creature-front DFC flipped to its
+        // planeswalker back face, classified by its EFFECTIVE types (the
+        // printed Creature flag still reads true on a flipped DFC). Pairs with
+        // the application half above (loyalty removal on resolution).
+        var ces = new ContinuousEffectsService();
+        var ral = RalMonsoonMageFactory.Create(_bob);
+        ral.ActiveEffects = ces;
+        ral.SetController(_bob);
+        ral.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(ral);
+        ral.MdfcState!.Transform(); // → effective planeswalker back
+
+        var stompDef = BonecrusherGiantFactory.BuildAdventureSpell(_alice, raw => raw);
+        var gatherer = stompDef.TargetRequests[0].CandidateGatherer;
+        gatherer.Should().NotBeNull("Stomp's any-target request carries a live candidate gatherer");
+
+        var stack = new Majik.Core.Stack.Stack();
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, _bob },
+            activePlayer: _alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: stack);
+
+        var candidates = gatherer!(ctx);
+        candidates.Should().Contain(ral,
+            "an effective planeswalker is a legal 'any target' damage target (CR 115.4)");
+    }
+
+    [Fact]
     public void Stomp_DealsDamageToEffectivePlaneswalkerBackFace_AsLoyaltyRemoval()
     {
         // CR 711 / 306.7 — Stomp's "any target" can be a creature-front

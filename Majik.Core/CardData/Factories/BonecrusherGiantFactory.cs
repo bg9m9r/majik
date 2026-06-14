@@ -219,8 +219,11 @@ public static class BonecrusherGiantFactory
                             pool.Add(p);
                             foreach (var c in p.Zones.Battlefield.GetCards())
                             {
-                                if (c.HasType(CardType.Creature)
-                                    || c.HasType(CardType.Planeswalker))
+                                // CR 115.4 / 711 — classify by EFFECTIVE types:
+                                // a creature-front DFC flipped to its planeswalker
+                                // back is offered (as a planeswalker), the printed
+                                // Creature flag notwithstanding.
+                                if (Majik.Core.Targeting.DamageTargeting.IsAnyDamageTarget(c))
                                 {
                                     pool.Add(c);
                                 }
