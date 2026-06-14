@@ -1,0 +1,7 @@
+{
+  "name": "Crux of Fate",
+  "types": ["Sorcery"],
+  "manaCost": "{3}{B}{B}",
+  "colors": ["B"],
+  "abilities": []
+}
