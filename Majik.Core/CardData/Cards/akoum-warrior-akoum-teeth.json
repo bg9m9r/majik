@@ -1,0 +1,8 @@
+{
+  "name": "Akoum Warrior // Akoum Teeth",
+  "types": ["Creature"],
+  "subtypes": ["Minotaur", "Warrior"],
+  "manaCost": "{5}{R}",
+  "power": 4,
+  "toughness": 5
+}
