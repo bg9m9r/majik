@@ -32,6 +32,7 @@ public sealed class GameDriver
     private readonly Majik.Core.Events.IEventBus? _eventBus;
     private readonly ZoneService _zoneService;
     private readonly TriggerManager _triggerManager;
+    private readonly Majik.Core.Effects.ContinuousEffectsService? _continuousEffects;
     private readonly ExtraTurnQueue _extraTurns = new();
 
     // Determinism (PLAN 08 prerequisite): the per-game monotonic logical clock
@@ -122,6 +123,7 @@ public sealed class GameDriver
         _eventBus = eventBus;
         _zoneService = zoneService ?? throw new ArgumentNullException(nameof(zoneService));
         _triggerManager = triggerManager ?? throw new ArgumentNullException(nameof(triggerManager));
+        _continuousEffects = continuousEffects;
 
         // CR 720 — register the live ControlPlayerRegistry so take-control
         // effect closures (Mindslaver's activated ability, Emrakul's cast
@@ -195,6 +197,16 @@ public sealed class GameDriver
                 Majik.Core.Events.EventBusRegistry.Set(p, _eventBus);
             }
             Majik.Core.Services.ZoneServiceRegistry.Set(p, _zoneService);
+            // CR 613.2 — register the live ContinuousEffectsService so effect
+            // closures that install a continuous effect at resolution time
+            // (Emrakul, the World Anew's cast trigger gaining control of the
+            // target player's creatures) can resolve it without a parameter
+            // seam. Keyed per resolving player, same posture as the registries
+            // above. Null when no CES is wired (older single-round paths).
+            if (_continuousEffects is not null)
+            {
+                Majik.Core.Effects.ContinuousEffectsServiceProvider.Set(p, _continuousEffects);
+            }
         }
 
         // CR 102.4 — register the live seated players so mana-ability riders
@@ -228,6 +240,10 @@ public sealed class GameDriver
         if (_eventBus is not null)
         {
             Majik.Core.Events.EventBusRegistry.SetDefault(_eventBus);
+        }
+        if (_continuousEffects is not null)
+        {
+            Majik.Core.Effects.ContinuousEffectsServiceProvider.SetDefault(_continuousEffects);
         }
         // NB: deliberately no ZoneServiceRegistry.SetDefault() — per-player
         // registration above is sufficient for tutor closures (they look up by

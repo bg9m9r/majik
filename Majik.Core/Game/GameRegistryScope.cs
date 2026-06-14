@@ -66,6 +66,7 @@ public static class GameRegistryScope
             LibraryTopPlayPermissions.PushScope(),
             ActivatedAbilityRestrictions.PushScope(),
             ControlPlayerRegistryProvider.PushScope(),
+            Majik.Core.Effects.ContinuousEffectsServiceProvider.PushScope(),
             TriggerManagerRegistry.PushScope(),
             Majik.Core.Combat.AttackRestrictionRegistryProvider.PushScope(),
             Majik.Core.Combat.CombatMembershipRegistryProvider.PushScope(),

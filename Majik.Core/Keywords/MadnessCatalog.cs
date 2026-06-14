@@ -39,9 +39,16 @@ public static class MadnessCatalog
     /// <summary>
     /// Card name → printed madness cost (short-form, parseable by
     /// <see cref="ManaCost.Parse"/>). Derived from the embedded Modern pool's
-    /// oracle text (every "Madness {cost}" line). Emrakul, the World Anew is
-    /// intentionally omitted — its madness has a non-mana ({special}) rider
-    /// that needs more than the shared mechanic (deferred).
+    /// oracle text (every "Madness {cost}" line).
+    ///
+    /// <para>
+    /// Emrakul, the World Anew's printed madness is "Madness—Pay six {C}."
+    /// That had been read as a non-mana {special} rider and excluded, but six
+    /// {C} is a pure <em>colorless</em> mana cost (CR 107.4c) — fully
+    /// expressible as <c>{C}{C}{C}{C}{C}{C}</c> by <see cref="ManaCost.Parse"/>
+    /// (six colorless pips, mana value six). So it rides the same name → mana
+    /// cost shape as every other entry; no special rider exists.
+    /// </para>
     /// </summary>
     private static readonly IReadOnlyDictionary<string, string> Costs =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -62,6 +69,9 @@ public static class MadnessCatalog
             ["Chilling Grasp"] = "{3}{U}",
             ["Dark Withering"] = "{B}",
             ["Distemper of the Blood"] = "{R}",
+            // "Madness—Pay six {C}." — six colorless pips (CR 107.4c), mana
+            // value 6. A pure mana cost; the name → mana-cost shape carries it.
+            ["Emrakul, the World Anew"] = "{C}{C}{C}{C}{C}{C}",
             ["Fiery Temper"] = "{R}",
             ["From Under the Floorboards"] = "{X}{B}{B}",
             ["Gibbering Descent"] = "{2}{B}{B}",
