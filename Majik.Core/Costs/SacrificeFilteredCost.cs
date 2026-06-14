@@ -33,8 +33,19 @@ namespace Majik.Core.Costs;
 /// <para>The source permanent IS eligible to pay itself when it matches the
 /// filter (CR 701.16 — Scavenger Grounds is itself a Desert, so it can
 /// sacrifice itself to its own ability when it is the only Desert).</para>
+///
+/// <para><b>Prompted choice.</b> Implements
+/// <see cref="IChoosePermanentToSacrificeCost"/> so the live activation dispatch
+/// (<c>SacrificeCostPrompt.ChooseSacrificesAsync</c>) prompts the controller to
+/// choose WHICH eligible permanent to sacrifice (CR 700.6) when more than one
+/// qualifies — e.g. a Ramunap Ruins controller with several Deserts picks the
+/// one to sacrifice rather than the engine silently taking the first. The pick
+/// is stamped onto <see cref="Target"/> before <see cref="Pay"/> runs; a null /
+/// declined choice falls back to the first eligible permanent (the legacy
+/// deterministic posture, used by factory-direct tests / bot convenience
+/// wiring).</para>
 /// </summary>
-public sealed class SacrificeFilteredCost : ICost
+public sealed class SacrificeFilteredCost : ICost, IChoosePermanentToSacrificeCost
 {
     private readonly Func<Permanent, bool> _filter;
     private readonly IEventBus? _eventBus;
@@ -85,6 +96,19 @@ public sealed class SacrificeFilteredCost : ICost
 
     private bool IsEligible(Permanent p) =>
         p.Zone == ZoneType.Battlefield && _filter(p);
+
+    /// <inheritdoc/>
+    public IReadOnlyList<Permanent> EligiblePermanents(Player player)
+    {
+        if (player == null) return Array.Empty<Permanent>();
+        return player.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(IsEligible)
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public void ChoosePermanent(Permanent? permanent) => Target = permanent;
 
     /// <inheritdoc/>
     public bool CanPay(Player player)
