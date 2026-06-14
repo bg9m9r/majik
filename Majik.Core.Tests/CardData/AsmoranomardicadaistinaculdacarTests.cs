@@ -124,24 +124,49 @@ public class AsmoranomardicadaistinaculdacarTests
     // ----------------------------------------------------------------
 
     [Fact]
-    public void SacFoods_Ability_HasTwoSacrificeCosts_AndTargetsACreature_WhenTwoFoods()
+    public void SacFoods_Ability_HasSacrificeTwoFoodsCost_AndTargetsACreature()
     {
+        // The cost is a single payment-time SacrificeTwoFoodsCost — it is
+        // present on the ability regardless of how many Foods exist at
+        // construction time (it evaluates the live battlefield at activation).
         var card = AsmoranomardicadaistinaculdacarFactory.Create(_alice);
-        SeatOnBattlefield(card);
-        SeatFood(); SeatFood();
-
-        // Re-create now that two Foods are on the battlefield so the cost
-        // builder picks them up.
-        card = AsmoranomardicadaistinaculdacarFactory.Create(_alice);
         SeatOnBattlefield(card);
 
         var ability = card.Abilities.OfType<ActivatedAbility>().Single();
-        ability.Costs.OfType<AdditionalCost>()
-            .Count(c => c.CostType == AdditionalCostType.Sacrifice)
-            .Should().Be(2, "the cost is sacrificing two Foods");
+        ability.Costs.OfType<SacrificeTwoFoodsCost>()
+            .Should().ContainSingle("the cost is the payment-time sacrifice-two-Foods cost");
         ability.TargetRequests.Should().ContainSingle();
         ability.TargetRequests[0].MinTargets.Should().Be(1);
         ability.TargetRequests[0].MaxTargets.Should().Be(1);
+    }
+
+    [Fact]
+    public void SacFoods_CostPayableForFoodsThatEnteredAfterAsmoran_AndSacrificesTwoDistinctFoods()
+    {
+        // Regression: the cost must read the LIVE battlefield, not a snapshot
+        // taken at Create time. Create Asmoran with ZERO Foods, then seat two.
+        var card = AsmoranomardicadaistinaculdacarFactory.Create(_alice);
+        SeatOnBattlefield(card);
+
+        var ability = card.Abilities.OfType<ActivatedAbility>().Single();
+        var cost = ability.Costs.OfType<SacrificeTwoFoodsCost>().Single();
+
+        cost.CanPay(_alice).Should().BeFalse("no Foods yet");
+
+        var foodA = SeatFood();
+        cost.CanPay(_alice).Should().BeFalse("only one Food");
+
+        var foodB = SeatFood();
+        cost.CanPay(_alice).Should().BeTrue(
+            "two Foods now on the battlefield, even though they entered after Asmoran");
+
+        cost.Pay(_alice);
+
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(foodA)
+            .And.NotContain(foodB, "both Foods were sacrificed");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(foodA).And.Contain(foodB);
+        cost.Targets.Should().HaveCount(2)
+            .And.OnlyHaveUniqueItems("two DISTINCT Foods are sacrificed");
     }
 
     [Fact]
@@ -175,9 +200,9 @@ public class AsmoranomardicadaistinaculdacarTests
             .Should().BeFalse();
 
         var ability = card.Abilities.OfType<ActivatedAbility>().Single();
-        ability.Costs.OfType<AdditionalCost>()
-            .Count(c => c.CostType == AdditionalCostType.Sacrifice)
-            .Should().Be(0, "the activation cannot be paid with fewer than two Foods");
+        var cost = ability.Costs.OfType<SacrificeTwoFoodsCost>().Single();
+        cost.CanPay(_alice)
+            .Should().BeFalse("the activation cannot be paid with fewer than two Foods");
     }
 
     // ----------------------------------------------------------------
@@ -219,7 +244,7 @@ public class AsmoranomardicadaistinaculdacarTests
         card.SetZone(ZoneType.Battlefield);
     }
 
-    private void SeatFood()
+    private Artifact SeatFood()
     {
         var food = new Artifact("Food", "", subtypes: new[] { CardSubtype.Food })
         {
@@ -228,5 +253,6 @@ public class AsmoranomardicadaistinaculdacarTests
         food.SetController(_alice);
         _alice.Zones.Battlefield.AddCard(food);
         food.SetZone(ZoneType.Battlefield);
+        return food;
     }
 }
