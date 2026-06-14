@@ -786,15 +786,57 @@ public class LandActivatedAbilityBinderPipelineTests
             w.GetEffectiveColors().Contains(Majik.Core.ValueObjects.ManaColor.Red));
     }
 
-    [Fact(Skip = "Channel is a discard-this-card-from-HAND activation, not a {T} battlefield activation. " +
-                 "No binder-reachable 'discard this card to activate' cost seam exists, so the whole " +
-                 "Channel family (Boseiju Who Endures, Otawara, Takenuma, Eiganjo, Sokenzan) is deferred " +
-                 "rather than modelled wrong — v1-deferrals #12.")]
-    public void Prod_BoseijuWhoEndures_ChannelAbility_Deferred()
+    // ======================================================================
+    // CHANNEL cost-reduction rider — Boseiju, Who Endures (CR 118.9)
+    // "This ability costs {1} less to activate for each legendary creature you
+    // control." Channel binds in prod (BindChannel: ManaCostCost +
+    // DiscardSelfCost); the rider makes the mana cost a self-reducing
+    // DynamicGenericReductionManaCost. This is the deferral being paid down.
+    // ======================================================================
+
+    private const string BoseijuWhoEnduresOracle =
+        "{T}: Add {G}.\n" +
+        "Channel — {1}{G}, Discard this card: Destroy target artifact, enchantment, " +
+        "or nonbasic land an opponent controls. That player may search their library " +
+        "for a land card with a basic land type, put it onto the battlefield, then shuffle. " +
+        "This ability costs {1} less to activate for each legendary creature you control.";
+
+    [Fact]
+    public void Prod_BoseijuWhoEndures_ChannelBindsDynamicCostReduction()
     {
-        // Documenting test: when a discard-from-hand activated-ability cost
-        // seam lands, Boseiju's Channel ("{1}{G}, Discard this card: Destroy
-        // target artifact, enchantment, or nonbasic land an opponent controls")
-        // should bind here. Until then it is intentionally unbound.
+        var repo = new FakeCardRepo();
+        repo.Add("Boseiju, Who Endures", "Legendary Land",
+            oracleText: BoseijuWhoEnduresOracle, colors: "G");
+        var land = new Land("Boseiju, Who Endures", new[] { CardSupertype.Legendary }, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+
+        // The Channel ability binds in prod with a discard-self cost AND a
+        // self-reducing mana cost (the rider seam).
+        var channel = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<DiscardSelfCost>().Any());
+        var dyn = channel.Costs.OfType<DynamicGenericReductionManaCost>().Single();
+        dyn.BaseCost.Generic.Should().Be(1);
+        dyn.BaseCost.Green.Should().Be(1);
+
+        // No legendary creatures → full {1}{G}.
+        dyn.EffectiveCost(alice).Generic.Should().Be(1);
+
+        // Two legendary creatures Alice controls → {1}{G} reduced to {G}
+        // (clamps the generic at 0, never touches the colored pip).
+        for (var i = 0; i < 2; i++)
+        {
+            var legend = new Creature($"Legend{i}", "{G}", 1, 1,
+                supertypes: new[] { CardSupertype.Legendary }) { Owner = alice, Controller = alice };
+            alice.Zones.Battlefield.AddCard(legend);
+        }
+        var effective = dyn.EffectiveCost(alice);
+        effective.Generic.Should().Be(0, "{1}{G} reduced by 2 legendary creatures, clamped at 0");
+        effective.Green.Should().Be(1, "the colored {G} pip is never reduced (CR 118.9)");
+
+        // CanPay reflects the reduction: floating just {G} suffices now.
+        alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("G"));
+        dyn.CanPay(alice).Should().BeTrue("cost reduced to {G}, covered by the floated green");
     }
 }

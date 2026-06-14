@@ -154,6 +154,143 @@ public class ChannelLandBinderTests
     }
 
     // -------------------------------------------------------------------
+    // CR 118.9 — "This ability costs {1} less to activate for each legendary
+    // creature you control" cost-reduction rider. The Channel mana cost binds
+    // as a DynamicGenericReductionManaCost whose effective generic component
+    // drops by the count of legendary creatures the controller controls,
+    // never reducing the colored pips and never below zero.
+    // -------------------------------------------------------------------
+
+    private const string BoseijuOracleWithRider =
+        "{T}: Add {G}.\nChannel — {1}{G}, Discard this card: Destroy target artifact, enchantment, or nonbasic land an opponent controls. That player may search their library for a land card with a basic land type, put it onto the battlefield, then shuffle. This ability costs {1} less to activate for each legendary creature you control.";
+
+    private static Land BindBoseiju(Player owner, ContinuousEffectsService effects)
+    {
+        var land = new Land("Boseiju, Who Endures") { Owner = owner, Controller = owner };
+        LandActivatedAbilityBinder.Bind(
+            land, Entity("Boseiju, Who Endures", BoseijuOracleWithRider), owner, effects);
+        return land;
+    }
+
+    private static DynamicGenericReductionManaCost ChannelDynamicCost(Land land) =>
+        land.Abilities.OfType<ActivatedAbility>().Single()
+            .Costs.OfType<DynamicGenericReductionManaCost>().Single();
+
+    private static Creature LegendaryCreature(string name, Player owner)
+    {
+        var c = new Creature(name, "{G}", 1, 1, supertypes: new[] { CardSupertype.Legendary })
+        { Owner = owner, Controller = owner };
+        owner.Zones.Battlefield.AddCard(c);
+        return c;
+    }
+
+    [Fact]
+    public void Bind_ChannelRider_AttachesDynamicReductionManaCost()
+    {
+        var land = BindBoseiju(_alice, _effects);
+
+        // The reduction rider makes the Channel mana cost a dynamic cost rather
+        // than a plain fixed ManaCostCost.
+        var dyn = ChannelDynamicCost(land);
+        dyn.BaseCost.Generic.Should().Be(1);
+        dyn.BaseCost.Green.Should().Be(1);
+    }
+
+    [Fact]
+    public void ChannelRider_NoLegendaryCreatures_PaysFullCost()
+    {
+        var land = BindBoseiju(_alice, _effects);
+        var dyn = ChannelDynamicCost(land);
+
+        var effective = dyn.EffectiveCost(_alice);
+        effective.Generic.Should().Be(1, "no legendary creatures → no reduction");
+        effective.Green.Should().Be(1);
+    }
+
+    [Fact]
+    public void ChannelRider_OneLegendaryCreature_ReducesGenericByOne()
+    {
+        var land = BindBoseiju(_alice, _effects);
+        LegendaryCreature("Tameshi, Reality Architect", _alice);
+
+        var effective = ChannelDynamicCost(land).EffectiveCost(_alice);
+        effective.Generic.Should().Be(0, "{1}{G} reduced by 1 legendary creature → {G}");
+        effective.Green.Should().Be(1, "colored pips are never reduced (CR 118.9)");
+    }
+
+    [Fact]
+    public void ChannelRider_ManyLegendaryCreatures_ClampsGenericAtZero()
+    {
+        var land = BindBoseiju(_alice, _effects);
+        LegendaryCreature("Tameshi", _alice);
+        LegendaryCreature("Kotori", _alice);
+        LegendaryCreature("Satoru", _alice);
+
+        var effective = ChannelDynamicCost(land).EffectiveCost(_alice);
+        effective.Generic.Should().Be(0, "the generic reduction never drops below zero (CR 118.9)");
+        effective.Green.Should().Be(1, "the colored {G} pip is never reduced away");
+    }
+
+    [Fact]
+    public void ChannelRider_NonLegendaryCreatures_DoNotReduce()
+    {
+        var land = BindBoseiju(_alice, _effects);
+        var nonLegend = new Creature("Grizzly Bears", "{1}{G}", 2, 2)
+        { Owner = _alice, Controller = _alice };
+        _alice.Zones.Battlefield.AddCard(nonLegend);
+        // A legendary NON-creature (e.g. the land itself) must not count either.
+
+        var effective = ChannelDynamicCost(land).EffectiveCost(_alice);
+        effective.Generic.Should().Be(1, "only legendary CREATURES reduce the cost");
+    }
+
+    [Fact]
+    public void ChannelRider_CanPay_ReflectsReducedCost()
+    {
+        var land = BindBoseiju(_alice, _effects);
+        var dyn = ChannelDynamicCost(land);
+
+        // Float exactly {G}: not enough for the full {1}{G} cost...
+        _alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("G"));
+        dyn.CanPay(_alice).Should().BeFalse("only {G} floated, full cost is {1}{G}");
+
+        // ...but with one legendary creature out, the cost reduces to {G}.
+        LegendaryCreature("Tameshi", _alice);
+        dyn.CanPay(_alice).Should().BeTrue("cost reduced to {G}, which the floated {G} covers");
+    }
+
+    [Fact]
+    public void ChannelRider_Pay_DrainsReducedCost()
+    {
+        var land = BindBoseiju(_alice, _effects);
+        LegendaryCreature("Tameshi", _alice);
+        var dyn = ChannelDynamicCost(land);
+
+        _alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("G"));
+        dyn.Pay(_alice);
+
+        _alice.ManaPool.Total.Should().Be(0, "the reduced {G} cost drained the floated green");
+    }
+
+    [Fact]
+    public void Bind_ChannelWithoutRider_UsesPlainManaCostCost()
+    {
+        // The same Boseiju body WITHOUT the reduction sentence binds the plain
+        // fixed cost, not the dynamic one (the seam keys strictly off the rider).
+        var land = new Land("Boseiju, Who Endures") { Owner = _alice, Controller = _alice };
+        LandActivatedAbilityBinder.Bind(
+            land,
+            Entity("Boseiju, Who Endures",
+                "{T}: Add {G}.\nChannel — {1}{G}, Discard this card: Destroy target artifact, enchantment, or nonbasic land an opponent controls."),
+            _alice, _effects);
+
+        var channel = land.Abilities.OfType<ActivatedAbility>().Single();
+        channel.Costs.OfType<DynamicGenericReductionManaCost>().Should().BeEmpty(
+            "no reduction rider → plain fixed mana cost");
+        channel.Costs.OfType<ManaCostCost>().Should().ContainSingle();
+    }
+
+    // -------------------------------------------------------------------
     // Non-Channel lands and the bare mana line are unaffected.
     // -------------------------------------------------------------------
 
