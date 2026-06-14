@@ -38,6 +38,17 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
     /// </summary>
     public Creature? Target { get; set; }
 
+    /// <summary>
+    /// The creature that was actually sacrificed once <see cref="Pay"/>
+    /// succeeded. Null before payment. Effect closures that reference "the
+    /// sacrificed creature's mana value" (Prime Speaker Vannifar — CR 202.3)
+    /// read this; it captures BOTH the prompted <see cref="Target"/> and the
+    /// deterministic first-eligible fallback, mirroring
+    /// <see cref="SacrificeCreatureCost.Sacrificed"/> /
+    /// <see cref="SacrificeACreatureAdditionalCost.Sacrificed"/>.
+    /// </summary>
+    public Creature? Sacrificed { get; private set; }
+
     /// <inheritdoc/>
     public IReadOnlyList<Creature> EligibleSacrifices(Player player)
     {
@@ -86,6 +97,10 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
             throw new InvalidOperationException(
                 $"Cannot pay {Description}: no eligible creature to sacrifice.");
 
+        // Capture the sacrificed creature BEFORE the zone move so downstream
+        // effects (Prime Speaker Vannifar — "1 plus the sacrificed creature's
+        // mana value", CR 202.3) can read its mana value after payment.
+        Sacrificed = pick;
         SacrificeCostHelper.Sacrifice(player, pick, _eventBus);
     }
 }
