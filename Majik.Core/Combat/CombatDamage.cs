@@ -80,16 +80,35 @@ public class CombatDamage : IEquatable<CombatDamage>
     }
 
     /// <summary>
-    /// Create combat damage to a planeswalker.
+    /// Create combat damage to a planeswalker. CR 711 Option B: the defender is
+    /// any permanent that is EFFECTIVELY a planeswalker — a real
+    /// <see cref="Planeswalker"/> OR a non-planeswalker permanent carrying a
+    /// transient loyalty body (an animated / flipped-DFC planeswalker back). The
+    /// signature is widened from <see cref="Planeswalker"/> to
+    /// <see cref="Permanent"/> to match the live damage path's
+    /// <c>DamageIntent.TargetPlaneswalker</c> / <c>CombatManager.AttackerDeclaration</c>
+    /// widenings, both of which already gate on
+    /// <see cref="Permanent.IsEffectivePlaneswalker"/> and route lethality
+    /// through <see cref="Permanent.GetEffectiveLoyalty"/> /
+    /// <see cref="Permanent.RemoveTransientLoyalty"/>.
     /// </summary>
-    public static CombatDamage ToPlaneswalker(Creature source, Planeswalker target, int amount)
+    public static CombatDamage ToPlaneswalker(Creature source, Permanent target, int amount)
     {
         if (target == null)
         {
             throw new ArgumentNullException(nameof(target));
         }
 
-        var isLethal = amount >= target.Loyalty;
+        if (!target.IsEffectivePlaneswalker())
+        {
+            throw new ArgumentException(
+                "Target is not an effective planeswalker (no loyalty body)", nameof(target));
+        }
+
+        // CR 306.5b / 120.3 — lethal when combat damage meets the EFFECTIVE
+        // loyalty (transient body for a flipped/animated back, authoritative
+        // loyalty for a real planeswalker via the GetEffectiveLoyalty override).
+        var isLethal = amount >= target.GetEffectiveLoyalty()!.Value;
         return new CombatDamage(source, target, amount, isCombatDamage: true, isLethal);
     }
 

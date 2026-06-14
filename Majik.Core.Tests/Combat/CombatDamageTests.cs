@@ -115,6 +115,91 @@ public class CombatDamageTests
     }
 
     [Fact]
+    public void ToPlaneswalker_NullTarget_ThrowsException()
+    {
+        // Arrange
+        var source = new Creature("Grizzly Bears", "1G", 2, 2);
+
+        // Act & Assert
+        new Action(() => CombatDamage.ToPlaneswalker(source, null!, 1))
+            .Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ToPlaneswalker_NonLethalAmount_NotLethal()
+    {
+        // Arrange — 2 damage to a 3-loyalty planeswalker is not lethal.
+        var source = new Creature("Grizzly Bears", "1G", 2, 2);
+        var target = new Planeswalker("Jace", "2UU", 3);
+
+        // Act
+        var damage = CombatDamage.ToPlaneswalker(source, target, 2);
+
+        // Assert
+        damage.IsLethal.Should().BeFalse(); // 2 < 3 loyalty
+    }
+
+    // ---------------------------------------------------------------------
+    // CR 711 Option B — combat damage to an EFFECTIVE planeswalker: a
+    // non-Planeswalker permanent carrying a transient loyalty body (animated /
+    // flipped-DFC planeswalker back). ToPlaneswalker is widened from
+    // Planeswalker to Permanent and gates on IsEffectivePlaneswalker(), routing
+    // lethality through GetEffectiveLoyalty() — matching the live damage path.
+    // ---------------------------------------------------------------------
+
+    /// <summary>Build a creature-front DFC already flipped to a planeswalker
+    /// back: a Creature instance carrying a transient loyalty body.</summary>
+    private static Creature MakeFlippedPlaneswalkerDfc(int loyalty)
+    {
+        var card = new Creature("Ral, Monsoon Mage", "1", power: 1, toughness: 3);
+        card.SetTransientLoyalty(loyalty);
+        return card;
+    }
+
+    [Fact]
+    public void ToPlaneswalker_EffectivePlaneswalker_CreatesDamage()
+    {
+        // Arrange — flipped-DFC planeswalker back with 5 loyalty.
+        var source = new Creature("Grizzly Bears", "1G", 2, 2);
+        var target = MakeFlippedPlaneswalkerDfc(5);
+
+        // Act
+        var damage = CombatDamage.ToPlaneswalker(source, target, 3);
+
+        // Assert
+        damage.Source.Should().Be(source);
+        damage.Target.Should().Be(target);
+        damage.Amount.Should().Be(3);
+        damage.IsLethal.Should().BeFalse(); // 3 < 5 effective loyalty
+    }
+
+    [Fact]
+    public void ToPlaneswalker_EffectivePlaneswalker_LethalAtEffectiveLoyalty()
+    {
+        // Arrange — flipped-DFC planeswalker back with 4 loyalty.
+        var source = new Creature("Grizzly Bears", "1G", 2, 2);
+        var target = MakeFlippedPlaneswalkerDfc(4);
+
+        // Act
+        var damage = CombatDamage.ToPlaneswalker(source, target, 4);
+
+        // Assert
+        damage.IsLethal.Should().BeTrue(); // 4 >= 4 effective loyalty
+    }
+
+    [Fact]
+    public void ToPlaneswalker_NonEffectivePlaneswalker_ThrowsException()
+    {
+        // Arrange — a plain creature with no loyalty body is not a legal target.
+        var source = new Creature("Grizzly Bears", "1G", 2, 2);
+        var notAPlaneswalker = new Creature("Llanowar Elves", "G", 1, 1);
+
+        // Act & Assert
+        new Action(() => CombatDamage.ToPlaneswalker(source, notAPlaneswalker, 3))
+            .Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Equals_SameValues_ReturnsTrue()
     {
         // Arrange
