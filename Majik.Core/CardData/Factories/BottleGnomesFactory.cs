@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -60,9 +62,28 @@ public static class BottleGnomesFactory
     /// Construct Bottle Gnomes owned and controlled by <paramref name="owner"/>.
     /// The single "Sacrifice this creature: You gain 3 life" activated ability
     /// is attached structurally. Single-arg dispatcher path — suitable for
-    /// shape, dispatcher, and unit-test usage.
+    /// shape, dispatcher, and unit-test usage. No bus ⇒ the self-sacrifice cost
+    /// publishes nothing (legacy posture).
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to. Forwards <c>effects.EventBus</c> so paying the
+    /// self-sacrifice cost publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a) for aristocrat payoffs (Mayhem Devil / Blood Artist /
+    /// Zulaport Cutthroat). Mirrors the Festival-Crasher / Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Construct Bottle Gnomes. When <paramref name="eventBus"/> is supplied the
+    /// self-sacrifice activation cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a); when null the move
+    /// still happens but nothing is published.
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -93,7 +114,7 @@ public static class BottleGnomesFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { effect });
 
