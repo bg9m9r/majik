@@ -48,19 +48,23 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="LilianaOfTheVeilFactory"/> (−2 "target player").
 ///
 /// - <b>+1: Draw a card; at the beginning of the next end step, untap up to two
-///   lands (CR 606 + CR 121 + CR 603.7)</b>: draws one card for the controller
-///   (<see cref="Fx.DrawCards"/>). The "up to two lands" choice is a real
-///   <see cref="TargetRequest"/> (MinTargets 0, MaxTargets 2, gatherer = lands
-///   the controller controls) collected by the loyalty-target path at +1
-///   resolution. The chosen lands are captured and untapped by a one-shot
-///   <see cref="DelayedTriggeredAbility"/> on the next End-step
+///   lands (CR 606 + CR 121 + CR 603.7 + CR 603.3)</b>: draws one card for the
+///   controller (<see cref="Fx.DrawCards"/>) and unconditionally schedules a
+///   one-shot <see cref="DelayedTriggeredAbility"/> on the next End-step
 ///   <see cref="StepStartedEvent"/> (CR 603.7 — "at the beginning of the next
 ///   end step"); the TriggerManager auto-unregisters the delayed ability after
-///   it fires (CR 603.7c). v1 timing note: the LAND CHOICE is locked in at +1
-///   resolution (when the agent is already being prompted) rather than at the
-///   end step — the untap itself still happens at the end step. Without the
-///   <paramref name="triggers"/> service the draw still happens and the untap
-///   clause is a legal no-op.
+///   it fires (CR 603.7c). The "up to two lands" choice is a real
+///   <see cref="TargetRequest"/> (MinTargets 0, MaxTargets 2, gatherer = lands
+///   the controller controls) carried by the DELAYED TRIGGER itself — so the
+///   activating player picks the lands AT THE END STEP, when the trigger is put
+///   on the stack (CR 603.3), matching the printed timing, rather than locking
+///   them in at +1 resolution. The async trigger-drain
+///   (<c>TriggerManager.PutPendingTriggersOnStackAsync</c>, wired by
+///   <c>TurnDriver</c> via <c>PriorityLoop.asyncTriggerDrain</c>) prompts the
+///   agent for the request before the trigger resolves; the untap effect then
+///   reads the CHOSEN lands off the live <see cref="ResolutionContext"/>.
+///   Without the <paramref name="triggers"/> service the draw still happens and
+///   the untap clause never schedules (a legal no-op).
 /// - <b>−3: Put target nonland permanent into its owner's library third from
 ///   the top (CR 606 + CR 701 + CR 401 + CR 110.4a)</b>: a real
 ///   <see cref="TargetRequest"/> "target nonland permanent" (gatherer = every
@@ -139,37 +143,25 @@ public static class TeferiHeroOfDominariaFactory
 
     // -- +1: Draw a card. At the beginning of the next end step, untap up to
     //    two lands. -------------------------------------------------------------
-    // CR 606 (loyalty) + CR 121 (draw) + CR 603.7 (delayed trigger). The "up to
-    // two lands" choice is a real TargetRequest collected by the loyalty path;
-    // the untap is a one-shot delayed trigger on the next End step (auto-
-    // unregistered after firing, CR 603.7c).
+    // CR 606 (loyalty) + CR 121 (draw) + CR 603.7 (delayed trigger) + CR 603.3
+    // (a triggered ability's targets are chosen as it is put on the stack). The
+    // "up to two lands" choice is a real TargetRequest carried by the DELAYED
+    // end-step trigger itself, NOT by the +1 loyalty ability — so the activating
+    // player picks the lands at the moment the untap fires (the end step),
+    // matching the printed timing, rather than locking them in at +1 resolution.
+    // The async trigger-drain (TriggerManager.PutPendingTriggersOnStackAsync,
+    // wired by TurnDriver via PriorityLoop.asyncTriggerDrain) prompts the agent
+    // for the delayed trigger's TargetRequest before it goes on the stack, then
+    // the untap effect reads the CHOSEN lands off the live ResolutionContext.
     private static void AddPlus1(Planeswalker teferi, Player owner, TriggerManager? triggers)
     {
-        // "untap up to two lands" — the activating player chooses which lands
-        // (CR 606.3). MinTargets 0 ("up to"), MaxTargets 2. The gatherer offers
-        // the lands the controller controls at +1 resolution.
-        var landRequest = new TargetRequest(
-            Description: "Untap up to two lands you control",
-            MinTargets: 0,
-            MaxTargets: Plus1MaxUntap,
-            LegalCandidates: Array.Empty<object>(),
-            Intent: BotIntent.Ramp,
-            CandidateGatherer: gameCtx =>
-            {
-                var controller = teferi.Controller ?? owner;
-                return controller.Zones.Battlefield.GetCards()
-                    .OfType<Land>()
-                    .Cast<object>()
-                    .ToList();
-            });
-
         teferi.AddAbility(new LoyaltyAbility(
             teferi,
             +1,
             new[]
             {
                 Fx.Inline(
-                    $"{CardName} +1: draw a card; schedule next-end-step untap of up to two chosen lands",
+                    $"{CardName} +1: draw a card; schedule next-end-step untap of up to two lands",
                     rc =>
                     {
                         var controller = teferi.Controller ?? owner;
@@ -177,44 +169,68 @@ public static class TeferiHeroOfDominariaFactory
 
                         if (triggers == null) return default;
 
-                        // The lands the agent chose (CR 606.3). Captured now and
-                        // untapped at the next end step (CR 603.7). "Up to two".
-                        var chosenLands = (rc.ChosenTargets.Count > 0
-                                ? rc.ChosenTargets[0]
-                                : (IReadOnlyList<object>)Array.Empty<object>())
-                            .OfType<Land>()
-                            .Take(Plus1MaxUntap)
-                            .ToList();
-                        if (chosenLands.Count == 0) return default;
-
-                        var untapEffect = Fx.Inline(
-                            $"{CardName}: untap up to two lands (CR 603.7)",
-                            () =>
+                        // "untap up to two lands" — the activating player chooses
+                        // which lands AT THE END STEP, when the delayed trigger is
+                        // put on the stack (CR 603.3 + CR 603.7). MinTargets 0
+                        // ("up to"), MaxTargets 2. The gatherer offers the lands
+                        // the controller controls at that moment, so lands that
+                        // entered after the +1 resolved are eligible and lands
+                        // that left are not — printed timing.
+                        var landRequest = new TargetRequest(
+                            Description: "Untap up to two lands you control",
+                            MinTargets: 0,
+                            MaxTargets: Plus1MaxUntap,
+                            LegalCandidates: Array.Empty<object>(),
+                            Intent: BotIntent.Ramp,
+                            CandidateGatherer: _ =>
                             {
+                                var ctrl = teferi.Controller ?? owner;
+                                return ctrl.Zones.Battlefield.GetCards()
+                                    .OfType<Land>()
+                                    .Cast<object>()
+                                    .ToList();
+                            });
+
+                        // The lands the agent chose at the end step (CR 603.3),
+                        // read off the live ResolutionContext that the async
+                        // trigger-drain populates via SetChosenTargets. "Up to two".
+                        var untapEffect = Fx.Inline(
+                            $"{CardName}: untap up to two chosen lands (CR 603.7)",
+                            untapRc =>
+                            {
+                                var chosenLands = (untapRc.ChosenTargets.Count > 0
+                                        ? untapRc.ChosenTargets[0]
+                                        : (IReadOnlyList<object>)Array.Empty<object>())
+                                    .OfType<Land>()
+                                    .Take(Plus1MaxUntap)
+                                    .ToList();
                                 foreach (var land in chosenLands)
                                 {
                                     if (land.Zone != ZoneType.Battlefield) continue;
                                     if (land.IsTapped) land.Untap();
                                 }
+                                return default;
                             });
 
                         // CR 603.7 — "at the beginning of the next end step".
                         // Fires once on the next End-step StepStartedEvent
                         // regardless of whose turn it is (the clause is
-                        // unqualified — "the next end step").
+                        // unqualified — "the next end step"). Carries the land
+                        // TargetRequest so the agent is prompted as the trigger
+                        // is put on the stack (CR 603.3).
                         var delayed = new DelayedTriggeredAbility(
                             source: teferi,
                             controller: controller,
                             condition: new EventTriggerCondition<StepStartedEvent>(
                                 (e, _) => e.StepType == StepStateType.End),
-                            effects: new[] { untapEffect });
+                            effects: new[] { untapEffect },
+                            targetRequests: new[] { landRequest });
 
                         teferi.AddAbility(delayed);
                         triggers.RegisterDelayed(delayed);
                         return default;
                     }),
-            },
-            targetRequests: new[] { landRequest }));
+            }));
     }
 
     // -- −3: Put target nonland permanent into its owner's library third from

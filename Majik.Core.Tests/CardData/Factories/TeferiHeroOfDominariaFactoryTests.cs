@@ -85,15 +85,18 @@ public class TeferiHeroOfDominariaFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Plus1_DeclaresUpToTwoLandsTargetRequest()
+    public void Plus1_DeclaresNoLoyaltyTargetRequest_TheLandChoiceRidesTheDelayedTrigger()
     {
+        // The "up to two lands" choice is deferred to the END STEP (CR 603.3 +
+        // CR 603.7) — it is NOT collected at +1 resolution, so the +1 loyalty
+        // ability carries no TargetRequest. The request lives on the delayed
+        // end-step trigger (asserted in
+        // Plus1_SchedulesDelayedTrigger_CarryingUpToTwoLandsTargetRequest).
         var teferi = TeferiHeroOfDominariaFactory.Create(_alice);
         var plus1 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1);
 
-        plus1.TargetRequests.Should().HaveCount(1);
-        var req = plus1.TargetRequests[0];
-        req.MinTargets.Should().Be(0, "\"up to\" two lands");
-        req.MaxTargets.Should().Be(2);
+        plus1.TargetRequests.Should().BeEmpty(
+            "the land choice is deferred to the end step and rides the delayed trigger");
     }
 
     [Fact]
@@ -115,7 +118,7 @@ public class TeferiHeroOfDominariaFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public async Task Plus1_DrawsACard_AndSchedulesNextEndStepUntap_OfChosenLands()
+    public async Task Plus1_DrawsACard_AndSchedulesDelayedTrigger_ThatUntapsLandsChosenAtTheEndStep()
     {
         var top = new Card("Top", "{1}") { Owner = _alice };
         _alice.Zones.Library.AddCard(top);
@@ -135,11 +138,12 @@ public class TeferiHeroOfDominariaFactoryTests
         var teferi = TeferiHeroOfDominariaFactory.Create(_alice, triggers);
         var plus1 = teferi.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +1);
 
-        // Resolve the +1 with the two lands chosen (what DispatchLoyalty supplies).
+        // Resolve the +1. The land choice is NOT supplied here — it is deferred
+        // to the end step. The +1 unconditionally schedules the delayed trigger.
         plus1.PayLoyaltyCost();
         var rc = ResolutionContext.For(
             _alice, agent: null, game: null,
-            chosenTargets: new[] { new object[] { land1, land2 } },
+            chosenTargets: System.Array.Empty<IReadOnlyList<object>>(),
             ct: default);
         foreach (var e in plus1.Effects) await e.ExecuteAsync(rc);
 
@@ -147,27 +151,36 @@ public class TeferiHeroOfDominariaFactoryTests
         _alice.Zones.Hand.GetCards().Should().Contain(top);
         teferi.Loyalty.Should().Be(5); // 4 + 1
 
-        // A delayed end-step trigger is now registered.
+        // A delayed end-step trigger is now registered, carrying the land request.
         var delayed = teferi.Abilities.OfType<DelayedTriggeredAbility>().Last();
         triggers.IsRegistered(delayed).Should().BeTrue();
+        delayed.TargetRequests.Should().HaveCount(1, "the land choice rides the delayed trigger");
+        delayed.TargetRequests[0].MinTargets.Should().Be(0, "\"up to\" two lands");
+        delayed.TargetRequests[0].MaxTargets.Should().Be(2);
 
         // Lands still tapped until the trigger resolves.
         land1.IsTapped.Should().BeTrue();
         land2.IsTapped.Should().BeTrue();
 
-        // Resolve the delayed trigger's effect (the untap clause).
-        foreach (var e in delayed.Effects) e.Execute();
+        // The end-step async drain prompts the agent and stores the chosen lands
+        // on the delayed trigger; then it resolves.
+        delayed.SetChosenTargets(new[] { new object[] { land1, land2 } });
+        await delayed.ResolveAsync(agent: null, game: null);
 
         land1.IsTapped.Should().BeFalse();
         land2.IsTapped.Should().BeFalse();
     }
 
     [Fact]
-    public async Task Plus1_NoChosenLands_DrawsButSchedulesNoUntap()
+    public async Task Plus1_AlwaysSchedulesTheDelayedTrigger_ChoosingZeroLandsAtEndStepUntapsNothing()
     {
         var top = new Card("Top", "{1}") { Owner = _alice };
         _alice.Zones.Library.AddCard(top);
         top.SetZone(ZoneType.Library);
+
+        var tapped = new Land("Island", new[] { CardSupertype.Basic }, new[] { CardSubtype.Island });
+        tapped.SetOwner(_alice); _alice.Zones.Battlefield.AddCard(tapped);
+        tapped.SetZone(ZoneType.Battlefield); tapped.SetController(_alice); tapped.Tap();
 
         var bus = new EventBus();
         var triggers = new TriggerManager(new MajikStack(bus), bus);
@@ -183,8 +196,14 @@ public class TeferiHeroOfDominariaFactoryTests
 
         _alice.Zones.Hand.GetCards().Should().Contain(top, "the draw always happens");
         teferi.Loyalty.Should().Be(5);
-        teferi.Abilities.OfType<DelayedTriggeredAbility>().Should()
-            .BeEmpty("\"up to two\" — choosing zero lands schedules no untap");
+
+        // The delayed trigger ALWAYS schedules now (the "up to two" choice is made
+        // at the end step, not at +1). Choosing zero lands there untaps nothing.
+        var delayed = teferi.Abilities.OfType<DelayedTriggeredAbility>().Single();
+        delayed.SetChosenTargets(System.Array.Empty<IReadOnlyList<object>>());
+        await delayed.ResolveAsync(agent: null, game: null);
+
+        tapped.IsTapped.Should().BeTrue("\"up to two\" — choosing zero lands untaps nothing");
     }
 
     // -----------------------------------------------------------------------

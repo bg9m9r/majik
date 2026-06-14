@@ -327,11 +327,44 @@ public class LoyaltyAbilityDispatchTests
 
         teferi.Loyalty.Should().Be(5, "+1 raises loyalty 4 -> 5");
         teferi.Abilities.OfType<DelayedTriggeredAbility>().Should()
-            .ContainSingle("the +1 scheduled a delayed untap trigger for the chosen lands");
+            .ContainSingle("the +1 scheduled a delayed untap trigger");
         // The end step has passed inside the turn; the delayed trigger resolved.
         land1.IsTapped.Should().BeFalse("the first CHOSEN land untapped at the end step");
         land2.IsTapped.Should().BeFalse("the second CHOSEN land untapped at the end step");
         land3.IsTapped.Should().BeTrue("the non-chosen land stayed tapped");
+    }
+
+    [Fact]
+    public async Task TeferiPlus1_LandChoiceIsDeferredToTheEndStep_LandPlayedAfterPlus1IsEligible()
+    {
+        // The deferral pay-down: the "up to two lands" choice locks in AT THE
+        // END STEP (CR 603.3 + CR 603.7), not at +1 resolution. A land that
+        // enters AFTER the +1 resolves but before the end step must therefore be
+        // a legal choice for the untap — proving the choice is not captured early.
+        SeedLibrary(_alice, 5);
+        SeedLibrary(_bob, 5);
+
+        var teferi = TeferiHeroOfDominariaFactory.Create(_alice, _triggers);
+        teferi.ChangeOwner(_alice);
+        teferi.ChangeController(_alice);
+        _alice.Zones.Battlefield.AddCard(teferi);
+        teferi.SetZone(ZoneType.Battlefield);
+
+        // A land that exists only AFTER the +1 — it is added to the battlefield
+        // (tapped) by a side-effect that runs once the +1 ability has resolved.
+        var lateLand = (Land)NamedCardFactory.Create("Island", _alice);
+        lateLand.ChangeController(_alice);
+
+        var alice = new EndStepChoosesLateLandAgent(teferi, lateLand, _alice);
+        var driver = NewDriver(alice, new PassAgent());
+
+        await driver.RunTurnAsync(_alice, turnNumber: 2);
+
+        teferi.Loyalty.Should().Be(5, "+1 raises loyalty 4 -> 5");
+        lateLand.Zone.Should().Be(ZoneType.Battlefield,
+            "the land entered after the +1 resolved");
+        lateLand.IsTapped.Should().BeFalse(
+            "a land that entered after +1 resolution was a legal end-step choice and untapped");
     }
 
     // -----------------------------------------------------------------------
@@ -390,6 +423,72 @@ public class LoyaltyAbilityDispatchTests
                 return Task.FromResult<IReadOnlyList<object>>(TargetChoices);
             if (TargetChoice != null)
                 return Task.FromResult<IReadOnlyList<object>>(new[] { TargetChoice });
+            return Task.FromResult<IReadOnlyList<object>>(System.Array.Empty<object>());
+        }
+    }
+
+    /// <summary>Agent for the deferred-timing test: activates Teferi's +1 in the
+    /// main phase; once the +1 has RESOLVED (the loyalty rose), drops a fresh
+    /// tapped land onto the battlefield; then at the end-step target prompt picks
+    /// that late land. Proves the land choice is made at the end step, not at +1
+    /// resolution.</summary>
+    private sealed class EndStepChoosesLateLandAgent : PassAgent
+    {
+        private readonly Planeswalker _teferi;
+        private readonly Land _lateLand;
+        private readonly Player _controller;
+        private bool _activated;
+        private bool _landDropped;
+
+        public EndStepChoosesLateLandAgent(Planeswalker teferi, Land lateLand, Player controller)
+        {
+            _teferi = teferi;
+            _lateLand = lateLand;
+            _controller = controller;
+        }
+
+        public override Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
+        {
+            if (!_activated
+                && ReferenceEquals(ctx.ActivePlayer, _teferi.Controller)
+                && ctx.CurrentPhase is { } phase && phase.IsMain()
+                && ctx.Stack.Count == 0)
+            {
+                var ability = _teferi.Abilities.OfType<LoyaltyAbility>()
+                    .FirstOrDefault(a => a.LoyaltyChange == +1 && a.CanActivate());
+                if (ability != null)
+                {
+                    _activated = true;
+                    return Task.FromResult<PriorityAction>(
+                        new PriorityAction.ActivateLoyaltyAbility(ability, System.Array.Empty<object>()));
+                }
+            }
+
+            // After the +1 has resolved (loyalty rose, stack empty), introduce a
+            // brand-new tapped land that did NOT exist at +1 resolution time.
+            if (_activated && !_landDropped && _teferi.Loyalty == 5 && ctx.Stack.Count == 0
+                && _lateLand.Zone != ZoneType.Battlefield)
+            {
+                _landDropped = true;
+                _controller.Zones.Battlefield.AddCard(_lateLand);
+                _lateLand.SetZone(ZoneType.Battlefield);
+                _lateLand.Tap();
+            }
+
+            return Task.FromResult(PriorityAction.Pass);
+        }
+
+        public override Task<IReadOnlyList<object>> ChooseTargetsAsync(
+            GameContext ctx, TargetRequest request, CancellationToken ct = default)
+        {
+            // The end-step delayed trigger's land prompt: choose the late land if
+            // it is among the offered candidates (it only exists post-+1).
+            if (request.CandidateGatherer != null)
+            {
+                var candidates = request.CandidateGatherer(ctx);
+                if (candidates.Contains(_lateLand))
+                    return Task.FromResult<IReadOnlyList<object>>(new object[] { _lateLand });
+            }
             return Task.FromResult<IReadOnlyList<object>>(System.Array.Empty<object>());
         }
     }
