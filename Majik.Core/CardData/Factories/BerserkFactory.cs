@@ -49,13 +49,18 @@ namespace Majik.Core.CardData.Factories;
 /// - CR 608.2b — illegal target / non-Creature resolver / missing
 ///   continuous-effects service → no-op (no throw).
 ///
+/// - <b>Cast-restriction "only before the combat damage step" (CR 601.3)</b>:
+///   wired via the <see cref="Card.CastTimingRestriction"/> primitive — the
+///   factory stamps a predicate that returns true for every step strictly
+///   before <see cref="StepStateType.CombatDamage"/> in turn order (the enum
+///   is declared in CR 500-series turn order, so the comparison is exact).
+///   The live cast path (<see cref="Majik.Core.Game.SpellCastFlow"/>) consults
+///   it off the live <see cref="Majik.Core.Game.GameContext.CurrentPhase"/>;
+///   <see cref="Majik.Core.Rules.ActionValidator"/> honours the same predicate
+///   when a caller stamps the step on the
+///   <see cref="Majik.Core.Rules.CastSpellAction"/>.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Cast-restriction "only before the combat damage step"</b>: not
-///   modelled. The engine currently lacks a generic
-///   <c>TimingRestriction</c> hook on instant cast-flow; once present this
-///   factory should opt in. For now the restriction is documented only
-///   (mirrors the per-factory gap on other timing-restricted spells such as
-///   Lightning Helix's instant timing — fine for any phase).
 /// - <b>"if it attacked this turn"</b>: handled via the live event-bus
 ///   listener wired at resolve time. The listener targets this specific
 ///   creature reference, so a flicker that returns a new game object
@@ -71,13 +76,36 @@ public static class BerserkFactory
     /// <summary>Granted keyword — CR 702.19 Trample.</summary>
     public const string GrantedTrample = "Trample";
 
+    /// <summary>
+    /// CR 601.3 — "Cast this spell only before the combat damage step." The
+    /// predicate returns true when the live step is strictly earlier than
+    /// <see cref="StepStateType.CombatDamage"/> in turn order. The
+    /// <see cref="StepStateType"/> enum is declared in CR 500-series turn order
+    /// (Untap … CombatDamage … Cleanup), so the ordinal comparison is exactly
+    /// "before the combat damage step" — every step of the combat damage step
+    /// onward (CombatDamage, EndOfCombat, both main phases on a later step,
+    /// End, Cleanup) is rejected.
+    /// </summary>
+    public static bool MayCastBeforeCombatDamage(StepStateType step) =>
+        step < StepStateType.CombatDamage;
+
     /// <summary>CardDef DSL — card shape only. The pump + delayed-destroy
     /// body lives in <see cref="BuildSpellDefinition"/>.</summary>
     public static CardDef Define() => CardDef
         .Instant(CardName, PrintedManaCost);
 
-    public static Instant Create(Player owner) =>
-        (Instant)CardDefRuntime.Build(Define(), owner);
+    public static Instant Create(Player owner)
+    {
+        var card = (Instant)CardDefRuntime.Build(Define(), owner);
+
+        // CR 601.3 — "Cast this spell only before the combat damage step."
+        // Baked onto the card via the self cast-timing rail; the cast-legality
+        // gate (SpellCastFlow + ActionValidator) rejects a cast attempted on
+        // the combat damage step or any later step.
+        card.SetCastTimingRestriction(MayCastBeforeCombatDamage);
+
+        return card;
+    }
 
     /// <summary>
     /// Build the resolve-time SpellDefinition. Single 1..1 "target

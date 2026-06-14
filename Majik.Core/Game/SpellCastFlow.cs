@@ -484,6 +484,24 @@ public sealed class SpellCastFlow
             throw new InvalidOperationException($"Cannot cast {card.Name}: {reason}");
         }
 
+        // CR 601.3 — SELF-imposed cast-timing restriction baked onto the card
+        // ("Cast this spell only before the combat damage step." — Berserk).
+        // The predicate is consulted against the live step regardless of the
+        // alt-cost path (a self-timing clause restricts EVERY way the card is
+        // cast, CR 601.3 — it is part of the card, not the cost). A context with
+        // no known step (CurrentPhase null — some test / mulligan harnesses)
+        // leaves the gate unenforced, matching the sorcery-speed gate's
+        // HasValue guard above.
+        if (card is Card cardWithTiming
+            && cardWithTiming.CastTimingRestriction is { } timingAllows
+            && ctx.CurrentPhase.HasValue
+            && !timingAllows(ctx.CurrentPhase.Value))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: its cast-timing restriction does not "
+                + $"allow casting during the {ctx.CurrentPhase.Value} step (CR 601.3).");
+        }
+
         // CR 601.3e — cast-from-top-of-library authorization. A spell is being
         // cast from the library ONLY because a continuous effect granted that
         // permission (Mystic Forge, Bolas's Citadel, Conspicuous Snoop, the

@@ -83,6 +83,22 @@ public class ActionValidator
                 new RuleViolation("117.1a", "external sorcery-speed restriction"));
         }
 
+        // CR 601.3 — SELF-imposed cast-timing restriction baked onto the card
+        // ("Cast this spell only before the combat damage step." — Berserk).
+        // Honoured only when the caller stamped the live step (CurrentStep);
+        // legacy callers that don't supply one keep the prior no-self-gate
+        // posture. The live cast path (SpellCastFlow) enforces the same
+        // predicate off GameContext.CurrentPhase independently.
+        if (action.CurrentStep is { } step
+            && action.Card is Majik.Core.Cards.Card cardWithTiming
+            && cardWithTiming.CastTimingRestriction is { } timingAllows
+            && !timingAllows(step))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Card.Name} can't be cast during the {step} step",
+                new RuleViolation("601.3", "self-imposed cast-timing restriction"));
+        }
+
         return null;
     }
 
@@ -568,6 +584,20 @@ public class CastSpellAction : PlayerAction
     /// </summary>
     public Majik.Core.Targeting.TargetSpec? TargetSpec { get; }
 
+    /// <summary>
+    /// CR 601.3 — the live turn step at cast time, supplied so the validator can
+    /// honour a card's SELF-imposed cast-timing restriction
+    /// (<see cref="Majik.Core.Cards.Card.CastTimingRestriction"/> — Berserk's
+    /// "Cast this spell only before the combat damage step."). Null = unspecified
+    /// — the validator keeps the legacy posture (no self-timing gate) for the
+    /// many callers that don't stamp a step. Mirrors the optional
+    /// <see cref="FromZone"/> / <see cref="Targets"/> posture: the live cast path
+    /// (<see cref="Majik.Core.Game.SpellCastFlow"/>) enforces the same gate off
+    /// the live <see cref="Majik.Core.Game.GameContext.CurrentPhase"/>
+    /// independently.
+    /// </summary>
+    public Majik.Core.StateMachine.StepStateType? CurrentStep { get; }
+
     public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable = true)
         : this(card, player, sorcerySpeedAvailable, fromZone: null, targets: null)
     {
@@ -595,6 +625,18 @@ public class CastSpellAction : PlayerAction
         ZoneType? fromZone,
         IReadOnlyList<object>? targets,
         Majik.Core.Targeting.TargetSpec? targetSpec)
+        : this(card, player, sorcerySpeedAvailable, fromZone, targets, targetSpec, currentStep: null)
+    {
+    }
+
+    public CastSpellAction(
+        ICard card,
+        Player player,
+        bool sorcerySpeedAvailable,
+        ZoneType? fromZone,
+        IReadOnlyList<object>? targets,
+        Majik.Core.Targeting.TargetSpec? targetSpec,
+        Majik.Core.StateMachine.StepStateType? currentStep)
     {
         Card = card;
         Player = player;
@@ -602,6 +644,7 @@ public class CastSpellAction : PlayerAction
         FromZone = fromZone;
         Targets = targets;
         TargetSpec = targetSpec;
+        CurrentStep = currentStep;
     }
 }
 

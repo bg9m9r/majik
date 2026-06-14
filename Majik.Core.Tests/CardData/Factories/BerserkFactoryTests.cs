@@ -242,6 +242,152 @@ public class BerserkFactoryTests
             "Only the Berserk-targeted creature's own attacks count");
     }
 
+    // ── CR 601.3 self cast-timing restriction ──────────────────────────────────
+
+    [Fact]
+    public void Create_StampsCastTimingRestriction_AllowingOnlyBeforeCombatDamage()
+    {
+        var b = BerserkFactory.Create(_alice);
+
+        b.CastTimingRestriction.Should().NotBeNull(
+            "CR 601.3 — Berserk bakes a self cast-timing restriction onto the card");
+
+        // Every step strictly before the combat damage step is legal.
+        foreach (var step in new[]
+        {
+            StepStateType.Untap, StepStateType.Upkeep, StepStateType.Draw,
+            StepStateType.PreCombatMain, StepStateType.BeginningOfCombat,
+            StepStateType.DeclareAttackers, StepStateType.DeclareBlockers,
+        })
+        {
+            b.CastTimingRestriction!(step).Should().BeTrue(
+                $"casting Berserk is legal during the {step} step (before combat damage)");
+        }
+
+        // The combat damage step and every later step are illegal.
+        foreach (var step in new[]
+        {
+            StepStateType.CombatDamage, StepStateType.EndOfCombat,
+            StepStateType.PostCombatMain, StepStateType.End, StepStateType.Cleanup,
+        })
+        {
+            b.CastTimingRestriction!(step).Should().BeFalse(
+                $"casting Berserk is illegal during the {step} step (combat damage or later)");
+        }
+    }
+
+    [Fact]
+    public async Task CastFlow_BeforeCombatDamage_PutsBerserkOnStack()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var zones = new ZoneService(_bus);
+        var flow = new SpellCastFlow(stack, zones, _bus);
+
+        var berserk = BerserkFactory.Create(_alice);
+        berserk.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(berserk);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob },
+            activePlayer: _alice, 1, StepStateType.DeclareBlockers, stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        await flow.CastAsync(_alice, berserk,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        stack.Count.Should().Be(1,
+            "CR 601.3 — Berserk may be cast on any step before the combat damage step");
+    }
+
+    [Fact]
+    public async Task CastFlow_OnCombatDamageStep_RejectsBerserk()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var zones = new ZoneService(_bus);
+        var flow = new SpellCastFlow(stack, zones, _bus);
+
+        var berserk = BerserkFactory.Create(_alice);
+        berserk.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(berserk);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob },
+            activePlayer: _alice, 1, StepStateType.CombatDamage, stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var act = async () => await flow.CastAsync(_alice, berserk,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*cast-timing restriction*");
+        stack.Count.Should().Be(0,
+            "CR 601.3 — Berserk can't be cast during the combat damage step");
+        berserk.Zone.Should().Be(ZoneType.Hand,
+            "CR 731.1 — a rejected hand cast is rewound off the stack");
+    }
+
+    [Fact]
+    public async Task CastFlow_AfterCombatDamage_RejectsBerserk()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var zones = new ZoneService(_bus);
+        var flow = new SpellCastFlow(stack, zones, _bus);
+
+        var berserk = BerserkFactory.Create(_alice);
+        berserk.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(berserk);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob },
+            activePlayer: _alice, 1, StepStateType.PostCombatMain, stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var act = async () => await flow.CastAsync(_alice, berserk,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*cast-timing restriction*");
+        stack.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Validator_HonoursSelfCastTimingRestriction_WhenStepStamped()
+    {
+        var validator = new Majik.Core.Rules.ActionValidator();
+        var berserk = BerserkFactory.Create(_alice);
+
+        // Before combat damage — legal.
+        var early = new Majik.Core.Rules.CastSpellAction(
+            berserk, _alice, sorcerySpeedAvailable: true, fromZone: null, targets: null,
+            targetSpec: null, currentStep: StepStateType.DeclareAttackers);
+        validator.ValidateAction(early).IsValid.Should().BeTrue();
+
+        // Combat damage step — illegal.
+        var late = new Majik.Core.Rules.CastSpellAction(
+            berserk, _alice, sorcerySpeedAvailable: true, fromZone: null, targets: null,
+            targetSpec: null, currentStep: StepStateType.CombatDamage);
+        var result = validator.ValidateAction(late);
+        result.IsValid.Should().BeFalse(
+            "CR 601.3 — the validator honours the self cast-timing restriction when the step is stamped");
+        result.ErrorMessage.Should().Contain("CombatDamage");
+    }
+
+    [Fact]
+    public void Validator_NoStepStamped_LeavesSelfTimingGateUnenforced()
+    {
+        // Legacy callers that don't stamp CurrentStep keep the prior posture —
+        // the self-timing gate is skipped (no false rejections).
+        var validator = new Majik.Core.Rules.ActionValidator();
+        var berserk = BerserkFactory.Create(_alice);
+
+        var action = new Majik.Core.Rules.CastSpellAction(
+            berserk, _alice, sorcerySpeedAvailable: true);
+        validator.ValidateAction(action).IsValid.Should().BeTrue();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static void ExecuteResolve(
