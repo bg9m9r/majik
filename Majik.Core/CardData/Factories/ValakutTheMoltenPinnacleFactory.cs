@@ -61,13 +61,23 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="Create(Player, ReplacementBus?, TriggerManager?)"/>
 /// overload to wire runtime services for end-to-end behaviour.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"You may" prompt</b> — auto-accepts when a target is pre-supplied
-///   (same posture as Tireless Tracker / Sword of Fire and Ice). Awaits
-///   the agent yes/no prompt surface.
-/// - <b>"Any target" agent prompt</b> — v1 honours pre-supplied targets
-///   via <see cref="TriggeredAbility.SetChosenTargets"/>; no target →
-///   damage no-ops.
+/// ## Prod path (CLOSED — was the valakut-may-targeted-landfall deferral)
+/// In real games Valakut is a LAND, so it is bound from oracle text by
+/// <see cref="OracleTriggeredAbilityBinder"/> (the only prod path — lands
+/// never route through this [CardName] factory). That bound trigger carries
+/// the "any target" <see cref="Majik.Core.Players.Agents.TargetRequest"/>
+/// with a live <c>CandidateGatherer</c> (every player / creature /
+/// planeswalker) and <c>MinTargets: 0</c> modelling the "you may"
+/// optionality. The live priority loop drains that trigger on the
+/// agent-aware async path
+/// (<see cref="TriggerManager.PutPendingTriggersOnStackAsync"/>), so the
+/// controller's agent IS prompted for the "any target" and may decline the
+/// optional damage by choosing no target. End-to-end prod-path coverage:
+/// <c>Majik.Core.Tests/Game/ValakutLandfallDrainTests.cs</c>.
+///
+/// This named factory keeps the auto-accept / pre-supplied-target shape for
+/// the dispatcher-/shape-test posture (no live trigger drain in those
+/// harnesses); the prod binding is fully agent-prompted.
 /// </summary>
 [CardName("Valakut, the Molten Pinnacle")]
 public static class ValakutTheMoltenPinnacleFactory
