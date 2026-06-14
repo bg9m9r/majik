@@ -53,6 +53,15 @@ namespace Majik.Core.CardData;
 ///     <c>"Sacrifice this creature: It deals N damage to &lt;…&gt;."</c> Same as
 ///     above but the cost is <see cref="AdditionalCost.Sacrifice"/>(bearer)
 ///     instead of a mana/tap cost — exactly Mogg Fanatic.</item>
+///   <item><b>Fight</b> —
+///     <c>"{cost}: This creature fights target creature."</c> Rebuilt with a
+///     1..1 <see cref="TargetRequest"/> and resolution through
+///     <see cref="Fx.Fight"/> (CR 701.12). Sound to re-home: the BEARER is the
+///     fight source — it deals its power to, and takes the power of, the chosen
+///     creature, never the exiled card. Only the OPEN "target creature" filter is
+///     reconstructed (a restricted filter like "target creature you don't
+///     control" is skipped, consistent with the pinger's restricted-target
+///     boundary). Creature-only (only a creature can fight).</item>
 ///   <item><b>Self-keyword grant</b> —
 ///     <c>"{cost}: This creature gains &lt;keyword&gt; until end of turn."</c>
 ///     (the keyword sibling of firebreathing). Rebuilt as a no-target
@@ -169,6 +178,18 @@ public static class OracleActivatedAbilityBinder
     // "Sacrifice this creature: It deals N damage to <target form>."
     private static readonly Regex SacPingerRegex = new(
         @"^Sacrifice this creature:\s*It deals (\d+) damage to (any target|target creature|target player)\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: This creature fights target creature." (CR 701.12.)
+    // A self-source fight is a common activated payoff on real creature cards
+    // (a {cost}: ~ fights target creature ability). Sound to re-home: the SOURCE
+    // of the fight is the BEARER — it both deals its power to, and takes the
+    // power of, the chosen creature (Fx.Fight), never the exiled imprinted card.
+    // Only the OPEN "target creature" filter is reconstructed (no restricted
+    // candidate filter like "target creature you don't control"), consistent
+    // with the restricted-target soundness boundary of the pinger shape.
+    private static readonly Regex FightRegex = new(
+        @"^(" + CostList + @")\s*:\s*This creature fights target creature\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: This creature gains <keyword> until end of turn."
@@ -351,6 +372,16 @@ public static class OracleActivatedAbilityBinder
                 var amount = int.Parse(sacPing.Groups[1].Value);
                 var costs = new List<ICost> { AdditionalCost.Sacrifice(bearer) };
                 result.Add(BuildPinger(costs, amount, sacPing.Groups[2].Value, bearer, controller));
+                continue;
+            }
+
+            var fight = FightRegex.Match(line);
+            if (fight.Success)
+            {
+                var costs = TryBuildCostList(fight.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                var ability = BuildFight(costs, bearer, controller);
+                if (ability != null) result.Add(ability);
                 continue;
             }
 
@@ -671,6 +702,56 @@ public static class OracleActivatedAbilityBinder
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: intent),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Build a fight ability: "{cost}: This creature fights target creature."
+    /// Re-homed so the SOURCE of the fight is the bearer (CR 701.12) — the bearer
+    /// deals its power to, and takes the power of, the chosen creature; the exiled
+    /// imprinted card never participates. A fight is creature-only (only a
+    /// creature can fight), so a non-creature bearer returns null (skip, don't
+    /// emit broken). Resolution funnels through <see cref="Fx.Fight"/>; the cost
+    /// (mana/tap) already taps the bearer. Mirrors <see cref="BuildPinger"/>'s
+    /// 1..1 single-creature target request.
+    /// </summary>
+    private static ActivatedAbility? BuildFight(
+        List<ICost> costs,
+        Permanent bearer,
+        Player controller)
+    {
+        if (bearer is not Creature creatureBearer) return null;
+
+        ActivatedAbility? ability = null;
+        var fightEffect = new Effect(
+            "Granted: this creature fights target creature",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 701.12 — the BEARER is the fight source (it both deals and
+                // takes the fight damage). A non-creature chosen target no-ops.
+                var target = ability.ChosenTargets[0][0] as Creature;
+                Fx.Fight(creatureBearer, target);
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { fightEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal),
             });
 
         return ability;
