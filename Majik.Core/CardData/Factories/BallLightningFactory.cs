@@ -73,6 +73,23 @@ public static class BallLightningFactory
         Create(owner, triggers: null, zoneService: null);
 
     /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+    /// Ball Lightning registers no continuous effect, but its end-step
+    /// self-sacrifice (CR 701.16) must publish a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// "whenever a creature you control is sacrificed / whenever an opponent
+    /// sacrifices…" payoffs (Mayhem Devil, It That Betrays) see it — so this
+    /// forwards the bus from <c>effects.EventBus</c> into the sac closure.
+    /// Without this overload the routed build falls through to single-arg
+    /// dispatch and the self-sacrifice would publish nothing (the class-(b)
+    /// sac-bus pay-down — same fix as Sakura-Tribe Elder).
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, zoneService: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Ball Lightning with full runtime wiring.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
@@ -80,10 +97,15 @@ public static class BallLightningFactory
     /// null — the trigger is attached structurally but not enrolled.</param>
     /// <param name="zoneService">Zone service the sacrifice routes through so
     /// LTB / zone-change events fire. May be null — raw-zone sacrifice path.</param>
+    /// <param name="eventBus">Bus the self-sacrifice publishes
+    /// <see cref="PermanentSacrificedEvent"/> on (CR 701.16a). When supplied the
+    /// sac routes through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>;
+    /// null falls back to the publish-nothing path (shape / direct-call).</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ZoneService? zoneService)
+        ZoneService? zoneService,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -108,10 +130,20 @@ public static class BallLightningFactory
             $"{CardName}: sacrifice this creature at the beginning of the end step",
             () =>
             {
+                if (card.Zone != ZoneType.Battlefield) return;
+
                 // CR 701.16 — sacrifice (battlefield → owner's graveyard,
-                // Sacrifice reason). Route through the zone service when
-                // supplied so LTB / zone-change events fire.
-                if (zoneService != null)
+                // Sacrifice reason so Indestructible / regeneration gates don't
+                // apply). When a bus is supplied (the prod effects-aware build)
+                // route through Fx.Sacrifice(perm, player, bus) so a
+                // PermanentSacrificedEvent fires (CR 701.16a) crediting the
+                // controller as the sacrificing player — the seam aristocrat
+                // payoffs read.
+                if (eventBus != null)
+                {
+                    Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+                }
+                else if (zoneService != null)
                 {
                     zoneService.MoveCard(
                         card, ZoneType.Battlefield, ZoneType.Graveyard, owner);

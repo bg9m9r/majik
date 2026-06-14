@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -105,6 +106,21 @@ public static class VexingDevilFactory
         Create(owner, triggers: null, zoneService: null);
 
     /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+    /// Vexing Devil registers no continuous effect, but its "if a player does,
+    /// sacrifice this creature" self-sacrifice (CR 701.16) must publish a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// sacrifice payoffs see it — so this forwards the bus from
+    /// <c>effects.EventBus</c> into the ETB sac closure. Without this overload
+    /// the routed build falls through to single-arg dispatch and the
+    /// self-sacrifice publishes nothing (the class-(b) sac-bus pay-down).
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, zoneService: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Vexing Devil with full runtime wiring. The ETB "any opponent
     /// may have it deal 4 damage to them" reads "each opponent" from the live
     /// resolution context at resolution (<see cref="ContextOpponents"/>), so it
@@ -115,10 +131,15 @@ public static class VexingDevilFactory
     /// null — the trigger is attached structurally but not enrolled.</param>
     /// <param name="zoneService">Zone service the sacrifice routes through so
     /// LTB / zone-change events fire. May be null — raw-zone sacrifice path.</param>
+    /// <param name="eventBus">Bus the self-sacrifice publishes
+    /// <see cref="PermanentSacrificedEvent"/> on (CR 701.16a). When supplied the
+    /// sac routes through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>;
+    /// null falls back to the publish-nothing path.</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ZoneService? zoneService)
+        ZoneService? zoneService,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -165,8 +186,16 @@ public static class VexingDevilFactory
                     // — sacrifice (battlefield → graveyard, Sacrifice reason).
                     // A single acceptance triggers a single sacrifice; once
                     // sacrificed the Devil has left the battlefield, so stop
-                    // walking the remaining opponents.
-                    if (zoneService != null)
+                    // walking the remaining opponents. When a bus is supplied
+                    // (the prod effects-aware build) route through Fx.Sacrifice(
+                    // perm, player, bus) so a PermanentSacrificedEvent fires
+                    // (CR 701.16a) crediting the controller as the sacrificing
+                    // player.
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(card, controller, eventBus);
+                    }
+                    else if (zoneService != null)
                     {
                         zoneService.MoveCard(
                             card, ZoneType.Battlefield, ZoneType.Graveyard, owner);
