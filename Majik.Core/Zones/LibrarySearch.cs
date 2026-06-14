@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -75,7 +76,8 @@ public static class LibrarySearch
     public static ICard? PromptOnly(
         Player searcher,
         IReadOnlyList<ICard> candidates,
-        string kindLabel)
+        string kindLabel,
+        string? revealReason = null)
     {
         ArgumentNullException.ThrowIfNull(searcher);
         ArgumentNullException.ThrowIfNull(candidates);
@@ -83,7 +85,7 @@ public static class LibrarySearch
         return PromptOnlyAsync(
                 ResolutionContext.For(
                     searcher, AgentRegistry.Get(searcher), game: null, chosenTargets: null),
-                searcher, candidates, kindLabel)
+                searcher, candidates, kindLabel, revealReason)
             .GetAwaiter().GetResult();
     }
 
@@ -101,25 +103,65 @@ public static class LibrarySearch
         ResolutionContext ctx,
         Player searcher,
         IReadOnlyList<ICard> candidates,
-        string kindLabel)
+        string kindLabel,
+        string? revealReason = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
         ArgumentNullException.ThrowIfNull(searcher);
         ArgumentNullException.ThrowIfNull(candidates);
 
+        ICard? pick;
         var agent = ctx.Agent ?? AgentRegistry.Get(searcher);
         if (agent != null)
         {
             // Prompt the agent even when candidates is empty — remote-agent
             // UIs render the full library with all cards muted and a single
             // Acknowledge button so the player SEES the failed search.
-            // CR 701.19a — declining (returning null) is always legal.
-            return await agent.ChooseLibraryPickAsync(ctx.Game, candidates, kindLabel, ctx.Ct)
+            // CR 701.18a — declining (returning null) is always legal.
+            pick = await agent.ChooseLibraryPickAsync(ctx.Game, candidates, kindLabel, ctx.Ct)
                 .ConfigureAwait(false);
         }
-        // No agent available (shape / dispatcher test path) — deterministic
-        // first-candidate behaviour matches the historical short-circuit.
-        return candidates.Count > 0 ? candidates[0] : null;
+        else
+        {
+            // No agent available (shape / dispatcher test path) — deterministic
+            // first-candidate behaviour matches the historical short-circuit.
+            pick = candidates.Count > 0 ? candidates[0] : null;
+        }
+
+        // CR 701.18 — most tutors print "search …, reveal it, put it into your
+        // hand". When the caller supplied a reveal reason AND a card was
+        // actually found, make it public: publish one CardRevealedEvent tagged
+        // ZoneType.Library so "whenever you reveal a card" payoffs + the
+        // portal's reveal-flash UI observe the tutor reveal. The reveal fires
+        // while the card is still in the library (before the caller moves it),
+        // mirroring the printed sequence. Best-effort: no-op when no reason is
+        // given (tutors that don't reveal — Wood Elves), nothing was found, or
+        // no bus is registered. Same EventBusRegistry seam LibraryShuffle uses.
+        PublishRevealIfRequested(searcher, pick, revealReason);
+        return pick;
+    }
+
+    /// <summary>
+    /// CR 701.18 — publish a single <see cref="CardRevealedEvent"/> for a
+    /// tutored-and-revealed card. No-op when <paramref name="revealReason"/> is
+    /// null (the tutor doesn't reveal), <paramref name="found"/> is null
+    /// (nothing was found — finding nothing is legal under CR 701.18a), or no
+    /// <see cref="IEventBus"/> is registered for <paramref name="searcher"/>.
+    /// The card is still in the library at this point, so the event is tagged
+    /// <see cref="ZoneType.Library"/>.
+    ///
+    /// <para>Public so hand-rolled tutor closures that don't route their pick
+    /// through <see cref="PromptOnlyAsync"/> (Fierce Empath, Civic Wayfinder,
+    /// Recruiter of the Guard, Worldly Tutor's top-of-library closure, …) can
+    /// surface the printed "reveal it" step with the same shape + the same
+    /// <see cref="EventBusRegistry"/> seam.</para>
+    /// </summary>
+    public static void PublishRevealIfRequested(Player searcher, ICard? found, string? revealReason)
+    {
+        ArgumentNullException.ThrowIfNull(searcher);
+        if (revealReason is null || found is null) return;
+        var bus = EventBusRegistry.Get(searcher);
+        bus?.Publish(new CardRevealedEvent(found, searcher, ZoneType.Library, revealReason));
     }
 
     /// <summary>
@@ -135,9 +177,10 @@ public static class LibrarySearch
         Player searcher,
         IReadOnlyList<ICard> candidates,
         string kindLabel,
-        string shuffleReason)
+        string shuffleReason,
+        string? revealReason = null)
     {
-        var pick = PromptOnly(searcher, candidates, kindLabel);
+        var pick = PromptOnly(searcher, candidates, kindLabel, revealReason);
         // CR 701.20a — shuffle whether or not a card was found.
         LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);
         return pick;
@@ -153,9 +196,10 @@ public static class LibrarySearch
         Player searcher,
         IReadOnlyList<ICard> candidates,
         string kindLabel,
-        string shuffleReason)
+        string shuffleReason,
+        string? revealReason = null)
     {
-        var pick = await PromptOnlyAsync(ctx, searcher, candidates, kindLabel)
+        var pick = await PromptOnlyAsync(ctx, searcher, candidates, kindLabel, revealReason)
             .ConfigureAwait(false);
         // CR 701.20a — shuffle whether or not a card was found.
         LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);

@@ -75,6 +75,7 @@ public static class EladamrisCallFactory
     public static SpellDefinition BuildSpellDefinition(Player caster)
     {
         ArgumentNullException.ThrowIfNull(caster);
-        return SearchSpellFactory.SearchLibrarySpell(caster, "creature");
+        // CR 701.18 — "reveal that card": surface the found creature publicly.
+        return SearchSpellFactory.SearchLibrarySpell(caster, "creature", revealReason: CardName);
     }
 }

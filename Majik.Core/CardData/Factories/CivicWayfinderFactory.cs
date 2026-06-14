@@ -122,7 +122,9 @@ public static class CivicWayfinderFactory
                         c.HasType(CardType.Land)
                         && c.HasSupertype(CardSupertype.Basic),
                     kindLabel: "basic land card",
-                    shuffleReason: "civic-wayfinder").ConfigureAwait(false);
+                    shuffleReason: "civic-wayfinder",
+                    // CR 701.18 — "reveal it": surface the found basic land.
+                    revealReason: CardName).ConfigureAwait(false);
             });
 
         var etbTrigger = new TriggeredAbility(

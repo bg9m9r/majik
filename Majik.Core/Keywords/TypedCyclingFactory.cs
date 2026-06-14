@@ -176,7 +176,10 @@ public static class TypedCyclingFactory
                 // PLAN 01 (Slice D) — genuinely prompt the controller off
                 // the live ResolutionContext rather than auto-picking the
                 // first match.
-                await TutorTypedCardAsync(ctx, owner, predicate, label, source.Name)
+                await TutorTypedCardAsync(
+                        ctx, owner, predicate, label, source.Name,
+                        // CR 702.32d — typecycling prints "reveal it".
+                        revealReason: source.Name)
                     .ConfigureAwait(false);
 
                 // CR 702.32d — publish the "cycled" event after the
@@ -254,12 +257,20 @@ public static class TypedCyclingFactory
     /// Falls back to <see cref="AgentRegistry"/> (then the deterministic
     /// first candidate) only when no agent is available.
     /// </summary>
+    /// <param name="revealReason">CR 701.18 / CR 702.29 — typed-cycling and
+    /// the typed ETB tutors that share this body print "reveal it". When
+    /// non-null AND a card is found, publish a
+    /// <see cref="Majik.Core.Events.CardRevealedEvent"/> (via
+    /// <see cref="LibrarySearch.PublishRevealIfRequested"/>) for the found
+    /// card so the reveal is observable. Defaults to null so any caller that
+    /// does NOT reveal stays unchanged.</param>
     public static async ValueTask<ICard?> TutorTypedCardAsync(
         ResolutionContext ctx,
         Player owner,
         Func<ICard, bool> predicate,
         string kindLabel,
-        string shuffleReason)
+        string shuffleReason,
+        string? revealReason = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
         ArgumentNullException.ThrowIfNull(owner);
@@ -289,6 +300,10 @@ public static class TypedCyclingFactory
 
         if (pick != null)
         {
+            // CR 701.18 / 702.29 — "reveal it" before the card leaves the
+            // library. No-op when revealReason is null (non-revealing caller).
+            LibrarySearch.PublishRevealIfRequested(owner, pick, revealReason);
+
             owner.Zones.Library.RemoveCard(pick);
             owner.Zones.Hand.AddCard(pick);
             pick.SetZone(ZoneType.Hand);

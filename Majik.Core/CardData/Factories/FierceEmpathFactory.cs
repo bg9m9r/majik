@@ -141,6 +141,10 @@ public static class FierceEmpathFactory
 
         if (pick != null)
         {
+            // CR 701.18 — "reveal it": surface the found creature publicly
+            // BEFORE it leaves the library, mirroring the printed sequence.
+            LibrarySearch.PublishRevealIfRequested(player, pick, CardName);
+
             var zones = ZoneServiceRegistry.Get(player);
             if (zones != null)
             {

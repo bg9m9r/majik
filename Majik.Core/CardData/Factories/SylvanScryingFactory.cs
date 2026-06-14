@@ -36,9 +36,12 @@ namespace Majik.Core.CardData.Factories;
 ///   Empty candidate list or null pick = no-op (CR 701.19a permits
 ///   declining to find).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Reveal event</b>. The picked land moves Library → Hand without
-///   publishing a reveal event; same gap as Stoneforge Mystic's ETB tutor.
+/// ## Reveal (CR 701.18)
+/// - The printed "reveal it" step IS surfaced: the shared
+///   <see cref="SearchSpellFactory.SearchLibrarySpell"/> publishes a
+///   <see cref="Majik.Core.Events.CardRevealedEvent"/> (tagged
+///   <see cref="ZoneType.Library"/>) for the found land, so "whenever you
+///   reveal a card" payoffs + the portal reveal-flash UI observe it.
 /// </summary>
 [CardName("Sylvan Scrying")]
 public static class SylvanScryingFactory
@@ -63,6 +66,7 @@ public static class SylvanScryingFactory
     public static SpellDefinition BuildSpellDefinition(Player caster)
     {
         ArgumentNullException.ThrowIfNull(caster);
-        return SearchSpellFactory.SearchLibrarySpell(caster, "land");
+        // CR 701.18 — "reveal it": surface the found land as a public reveal.
+        return SearchSpellFactory.SearchLibrarySpell(caster, "land", revealReason: CardName);
     }
 }
