@@ -558,4 +558,36 @@ public class ChannelLandBinderTests
         attacker.Damage.Should().Be(0,
             "a target that is no longer attacking or blocking at resolution takes no damage (CR 608.2b)");
     }
+
+    [Fact]
+    public void Eiganjo_Resolve_NoDamageIfTargetRemovedFromCombatButCombatContinues()
+    {
+        // CR 506.4 / 608.2b — the chosen creature was attacking when Eiganjo's
+        // ability was put on the stack, but it was REMOVED from combat (e.g. it
+        // regenerated, CR 701.15c) before resolution while combat continued for
+        // the rest of the attackers. It is no longer a legal "attacking or
+        // blocking creature", so it takes no damage — even though it is still on
+        // the battlefield and combat has not ended (a per-creature removal, not
+        // a full Clear()).
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var attacker = Bears("Attacker", bob);
+        var stillAttacking = Bears("StillAttacking", bob);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+        CombatMembershipRegistryProvider.Current.RecordAttacker(stillAttacking);
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { attacker } });
+
+        // The chosen attacker is removed from combat (regenerated); combat is
+        // NOT over — stillAttacking remains.
+        CombatMembershipRegistryProvider.Current.RemoveFromCombat(attacker);
+
+        ability.Resolve();
+
+        attacker.Damage.Should().Be(0,
+            "a target removed from combat mid-combat is no longer attacking or blocking (CR 506.4 / 608.2b)");
+        CombatMembershipRegistryProvider.Current.IsAttacking(stillAttacking).Should().BeTrue(
+            "the rest of the combat is unaffected by one creature leaving combat");
+    }
 }

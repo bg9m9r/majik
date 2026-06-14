@@ -146,4 +146,25 @@ public class PermanentTests
 
         artifact.ImprintedCards.Should().BeEmpty();
     }
+
+    [Fact]
+    public void ConsumeRegenerationShield_RemovesPermanentFromCombat()
+    {
+        // CR 701.15c — consuming a regeneration shield taps the permanent,
+        // removes all damage, AND removes it from combat. The live
+        // combat-membership surface (CombatMembershipRegistry) must reflect that
+        // removal so an in-combat target gate (Eiganjo, Seat of the Empire's
+        // channel) no longer treats a regenerated attacker as a legal target.
+        var creature = new Majik.Core.Cards.Creature("Regenerator", "{1}{G}", 2, 2);
+        creature.AddRegenerationShield();
+
+        using var scope = Majik.Core.Combat.CombatMembershipRegistryProvider.PushScope();
+        Majik.Core.Combat.CombatMembershipRegistryProvider.Current.RecordAttacker(creature);
+
+        creature.ConsumeRegenerationShield().Should().BeTrue();
+
+        Majik.Core.Combat.CombatMembershipRegistryProvider.Current
+            .IsAttackingOrBlocking(creature).Should().BeFalse(
+                "consuming a regeneration shield removes the permanent from combat (CR 701.15c)");
+    }
 }
