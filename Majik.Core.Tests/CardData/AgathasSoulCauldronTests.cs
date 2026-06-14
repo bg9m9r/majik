@@ -2136,4 +2136,108 @@ public class AgathasSoulCauldronTests
         alice.Zones.Hand.GetCards().Should().Contain(libCreature,
             "resolving the un-rebound tutor searches its own source's controller's library");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-grant-next-bespoke-closure-resourcecontext-migration — Arcbound
+    // Ravager is a bespoke [CardName]-factory creature whose sole non-mana
+    // activated ability ("Sacrifice an artifact: Put a +1/+1 counter on this
+    // creature.") is OUTSIDE the OracleActivatedAbilityBinder reconstructable
+    // set. The binder's "self-counter" shape ("{cost}: Put a +1/+1 counter on
+    // this creature.") only recognises a MANA / {T} / "Sacrifice this creature"
+    // cost (CR 602.1); Arcbound Ravager's cost is "Sacrifice AN ARTIFACT" — a
+    // different, non-self sacrifice the cost grammar does not match — so the
+    // oracle-rebuild fallback SKIPS the clause entirely (the Skithiryx-class
+    // case). The migration retargets the effect to put the +1/+1 counter on
+    // ResolutionContext.Source (rather than capturing `card`) and marks the
+    // ability RebindSafe, so Agatha's group-grant re-homes the REAL ability
+    // onto a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+    // 613.1f) — the BEARER receives the +1/+1 counter, never the exiled
+    // Arcbound Ravager. The "Sacrifice an artifact" cost passes through
+    // unchanged (it does not capture the source — it sacrifices any artifact
+    // the activating player controls), paid by the bearer's controller.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_ArcboundRavager_SelfCounterToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the "Sacrifice an artifact: +1/+1
+        // counter on self") is now RebindSafe (counters ResolutionContext.Source).
+        // The "Sacrifice an artifact" cost is outside the oracle binder's cost
+        // grammar, so the RebindTo of the real ability is the only sound re-home.
+        var ravager = ArcboundRavagerFactory.Create(alice);
+        var realAbilities = ravager.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Arcbound Ravager has exactly one non-mana activated ability — the self-counter");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Arcbound Ravager ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(ravager);
+        ravager.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Arcbound Ravager so the
+        // only way the ability is granted is via RebindTo of the real ability —
+        // the oracle-rebuild fallback cannot reconstruct a "Sacrifice an
+        // artifact" cost, so if the grant still depended on it nothing would be
+        // emitted and this test would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), ravager);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Arcbound Ravager's real self-counter ability is re-homed via RebindTo");
+        var selfCounter = granted[0];
+        selfCounter.Source.Should().BeSameAs(bearer,
+            "the re-homed self-counter ability is sourced on the BEARER (CR 707.2)");
+        selfCounter.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Resolving the re-homed ability puts a +1/+1 counter on the BEARER,
+        // never the exiled Arcbound Ravager —
+        // ResolutionContext.Source = bearer.
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        var ravagerCountersBefore = ravager.Counters.Count(CounterType.PlusOnePlusOne);
+
+        await selfCounter.ResolveAsync(agent: null, game: null);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(bearerCountersBefore + 1,
+            "the re-homed self-counter ability adds a +1/+1 counter to the BEARER");
+        ravager.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(ravagerCountersBefore,
+            "the exiled imprinted Arcbound Ravager never receives the counter");
+    }
+
+    [Fact]
+    public async Task BespokeSelfCounter_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still puts the +1/+1 counter on its OWN
+        // source on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var ravager = ArcboundRavagerFactory.Create(alice);
+        alice.Zones.Library.AddCard(ravager);
+        zones.MoveCard(ravager, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var selfCounter = ravager.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var before = ravager.Counters.Count(CounterType.PlusOnePlusOne);
+
+        await selfCounter.ResolveAsync(agent: null, game: null);
+
+        ravager.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(before + 1,
+            "resolving the un-rebound self-counter ability adds the counter to its own source");
+    }
 }
