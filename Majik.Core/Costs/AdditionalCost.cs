@@ -11,7 +11,7 @@ namespace Majik.Core.Costs;
 /// Additional costs beyond mana (sacrifice, tap, pay life).
 /// Discard-as-cost lives in <see cref="DiscardXCardsAdditionalCost"/>.
 /// </summary>
-public class AdditionalCost : ICost
+public class AdditionalCost : ICost, IBusAwareCost
 {
     private readonly AdditionalCostType _costType;
     private readonly object? _costParameter;
@@ -153,7 +153,35 @@ public class AdditionalCost : ICost
         };
     }
 
-    public void Pay(Player player)
+    /// <inheritdoc/>
+    /// <remarks>The legacy / bus-less drive path. Honours a bus threaded at
+    /// construction (<see cref="_eventBus"/>) so a factory that explicitly
+    /// wired its own bus keeps publishing on the direct <see cref="ICost.Pay(Player)"/>
+    /// path; null construction bus = publish-nothing posture.</remarks>
+    public void Pay(Player player) => PayCore(player, _eventBus);
+
+    /// <summary>
+    /// CR 701.16a — central-seam payment. <see cref="Costs.CostPayment.PayCosts(Player, System.Collections.Generic.IEnumerable{ICost}, Mana.ManaSpendContext, IEventBus)"/>
+    /// routes any cost implementing <see cref="IBusAwareCost"/> here when a bus
+    /// is supplied, so a "Sacrifice CARDNAME:" activated-ability cost publishes
+    /// a <see cref="PermanentSacrificedEvent"/> on the central cost-payment path
+    /// WITHOUT each factory needing a bespoke bus-bearing Create overload (the
+    /// per-factory Festival-Crasher thread is now obsolete for the class-(b)
+    /// sac-cost tail). A bus threaded at construction (<see cref="_eventBus"/>)
+    /// takes precedence and publishes exactly once — so a factory that already
+    /// wired its own bus keeps identical behaviour and never double-fires; only
+    /// when no construction bus was set does the seam bus carry the publish.
+    /// State effects are identical to <see cref="Pay(Player)"/>; the bus only
+    /// adds the observable event.
+    /// </summary>
+    public void Pay(Player player, IEventBus eventBus)
+    {
+        if (eventBus == null) throw new ArgumentNullException(nameof(eventBus));
+        // Construction bus wins (back-compat); otherwise use the seam bus.
+        PayCore(player, _eventBus ?? eventBus);
+    }
+
+    private void PayCore(Player player, IEventBus? eventBus)
     {
         if (player == null)
         {
@@ -212,7 +240,7 @@ public class AdditionalCost : ICost
                     // is the sacrificing player. Publish AFTER the move so a
                     // payoff that reads the sacrificed card finds it in the
                     // graveyard (mirrors Fx.Sacrifice's bus-aware overload).
-                    _eventBus?.Publish(new PermanentSacrificedEvent(sac, player, wasToken));
+                    eventBus?.Publish(new PermanentSacrificedEvent(sac, player, wasToken));
                 }
                 break;
 

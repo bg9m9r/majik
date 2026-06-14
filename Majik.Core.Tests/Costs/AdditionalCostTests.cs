@@ -206,6 +206,107 @@ public class AdditionalCostTests
                 && !ev.WasToken);
     }
 
+    // -----------------------------------------------------------------------
+    // CENTRAL SEAM — pays down icost-pay-central-bus-seam. A bus-less
+    // AdditionalCost.Sacrifice(...) still publishes a PermanentSacrificedEvent
+    // when paid through the central cost-payment path (CostPayment.PayCosts
+    // with a bus) because AdditionalCost is IBusAwareCost. This obsoletes the
+    // per-factory "thread eventBus into the cost at construction"
+    // (Festival-Crasher) pattern for the broad class-(b) sac-cost tail
+    // (Goblin Cratermaker, Cathar Commando, Mind Stone, …): the central Pay
+    // drive site hands the live bus to any IBusAwareCost (CR 701.16a).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void IBusAwareCost_BuslessSacrifice_PaidThroughCentralSeam_Publishes()
+    {
+        // Arrange — a sacrifice cost constructed WITHOUT a bus (the way the
+        // class-(b) tail factories build it once the seam lands).
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Grizzly Bears", "1G", 2, 2);
+        permanent.SetOwner(player);
+        permanent.SetController(player);
+        player.Zones.Battlefield.AddCard(permanent);
+        permanent.SetZone(ZoneType.Battlefield);
+
+        var bus = new EventBus();
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        var cost = AdditionalCost.Sacrifice(permanent); // NO bus at construction
+
+        // Act — pay through the central cost-payment seam WITH a bus.
+        new CostPayment().PayCosts(
+            player,
+            new ICost[] { cost },
+            Majik.Core.Mana.ManaSpendContext.None,
+            bus);
+
+        // Assert — the sacrifice happened AND the event fired off the central
+        // seam, crediting the cost-payer (CR 701.16a).
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
+        sacrificed.Should().ContainSingle()
+            .Which.Should().Match<PermanentSacrificedEvent>(ev =>
+                ev.SacrificedCard == permanent
+                && ev.SacrificingPlayer == player
+                && !ev.WasToken);
+    }
+
+    [Fact]
+    public void IBusAwareCost_BuslessSacrifice_PaidThroughCentralSeam_NoBus_NoPublish()
+    {
+        // Arrange — bus-less cost, central seam called WITHOUT a bus: legacy
+        // publish-nothing posture, but the sacrifice still resolves.
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Grizzly Bears", "1G", 2, 2);
+        permanent.SetOwner(player);
+        permanent.SetController(player);
+        player.Zones.Battlefield.AddCard(permanent);
+        permanent.SetZone(ZoneType.Battlefield);
+
+        var cost = AdditionalCost.Sacrifice(permanent);
+
+        // Act
+        new CostPayment().PayCosts(player, new ICost[] { cost });
+
+        // Assert
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void IBusAwareCost_ConstructionBus_TakesPrecedence_OverSeamBus_NoDoublePublish()
+    {
+        // Arrange — a cost built WITH a construction bus, then ALSO paid via
+        // the central seam with a DIFFERENT bus. The cost must publish exactly
+        // once (no double-fire). The construction bus wins (back-compat: a
+        // factory that explicitly threaded a bus keeps that exact behaviour).
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Grizzly Bears", "1G", 2, 2);
+        permanent.SetOwner(player);
+        permanent.SetController(player);
+        player.Zones.Battlefield.AddCard(permanent);
+        permanent.SetZone(ZoneType.Battlefield);
+
+        var ctorBus = new EventBus();
+        var ctorSeen = new List<PermanentSacrificedEvent>();
+        ctorBus.Subscribe<PermanentSacrificedEvent>(ctorSeen.Add);
+
+        var seamBus = new EventBus();
+        var seamSeen = new List<PermanentSacrificedEvent>();
+        seamBus.Subscribe<PermanentSacrificedEvent>(seamSeen.Add);
+
+        var cost = AdditionalCost.Sacrifice(permanent, ctorBus);
+
+        // Act
+        new CostPayment().PayCosts(
+            player, new ICost[] { cost }, Majik.Core.Mana.ManaSpendContext.None, seamBus);
+
+        // Assert — exactly one publish, on the construction bus only.
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
+        ctorSeen.Should().ContainSingle();
+        seamSeen.Should().BeEmpty();
+    }
+
     [Fact]
     public void Pay_SacrificeCost_NoEventBus_PublishesNothing_StillSacrifices()
     {
