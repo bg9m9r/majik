@@ -300,6 +300,19 @@ public sealed class SpellCastFlow
         var collectedTargets = await CollectTargetsAsync(
             definition, card, ctx, agent, modeChoice, ct);
 
+        // CR 601.2d — divide-damage announcement. A spell that deals a fixed
+        // total of damage "divided as you choose among" its chosen targets
+        // (Forked Bolt, Fire, Electrolyze, Arc Lightning, …) announces the
+        // division NOW, immediately after targets are chosen (CR 601.2c) and
+        // before payment. Prompt the caster's agent for the per-target split,
+        // defensively normalise it to a legal division (CR 119.4 — each ≥ 1,
+        // sum = printed total), and record it on ChosenSpellParams.DamageDivision
+        // so the deal-damage EffectFactory reads the announced amounts instead of
+        // an even-split fallback. No-op for every spell that didn't declare a
+        // DamageDivisionSpec.
+        var damageDivision = await DivideDamageAsync(
+            definition, card, collectedTargets, agent, ctx, ct);
+
         // CR 601.2f — compute the post-reduction total cost (printed cost OR
         // alt cost; + X; − cost reductions; − Delve, Improvise, Convoke
         // reductions). Delve pays its exile portion here per CR 702.66b.
@@ -325,7 +338,8 @@ public sealed class SpellCastFlow
         var chosen = new ChosenSpellParams(
             mode, xValue, collectedTargets, mana, ctx.AllPlayers,
             ModeIndexes: modeIndexes,
-            AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
+            AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null,
+            DamageDivision: damageDivision);
         var effects = definition.EffectFactory(chosen);
 
         // CR 702.46 — Splice onto Arcane: fold each spliced rider's effects
@@ -748,6 +762,46 @@ public sealed class SpellCastFlow
     /// targeted mode with no legal target makes the whole cast illegal and
     /// rewinds, instead of silently no-opping on resolution.
     /// </para></summary>
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — prompt the caster for the damage division of a
+    /// "deals N damage divided as you choose among …" spell, immediately after
+    /// targets are chosen (CR 601.2c). Returns null when the spell declares no
+    /// <see cref="DamageDivisionSpec"/> or the divided target slot is empty
+    /// (nothing to divide among) — in which case the EffectFactory falls back to
+    /// its own default. Otherwise returns one <see cref="DamageAllocation"/> per
+    /// chosen target, defensively normalised to a legal division (each ≥ 1,
+    /// summing to the printed total).
+    /// </summary>
+    private static async Task<IReadOnlyList<DamageAllocation>?> DivideDamageAsync(
+        SpellDefinition definition,
+        ICard card,
+        IReadOnlyList<IReadOnlyList<object>> collectedTargets,
+        IPlayerAgent agent,
+        GameContext ctx,
+        CancellationToken ct)
+    {
+        if (definition.DamageDivision is not { } spec) return null;
+
+        var slot = spec.TargetSlotIndex;
+        if (slot < 0 || slot >= collectedTargets.Count) return null;
+
+        var targets = collectedTargets[slot];
+        if (targets.Count == 0) return null;
+
+        var proposed = await agent.ChooseDamageDivisionAsync(
+            ctx, card, spec.TotalDamage, targets, ct);
+
+        var normalized = Players.Agents.DamageDivisionDefaults.Normalize(
+            proposed, spec.TotalDamage, targets.Count);
+
+        var allocations = new List<DamageAllocation>(targets.Count);
+        for (var i = 0; i < targets.Count; i++)
+        {
+            allocations.Add(new DamageAllocation(targets[i], i, normalized[i]));
+        }
+        return allocations;
+    }
+
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
         SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent,
         IReadOnlyList<int> chosenModes, CancellationToken ct)

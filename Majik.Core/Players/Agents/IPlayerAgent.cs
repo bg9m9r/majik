@@ -112,6 +112,50 @@ public interface IPlayerAgent
         GameContext ctx, ICard source, CancellationToken ct = default);
 
     /// <summary>
+    /// CR 601.2d / CR 119.4 — divide a fixed amount of damage among the
+    /// already-chosen targets of a "~ deals N damage divided as you choose
+    /// among …" spell or ability. The division is announced at cast/activation
+    /// time (CR 601.2d), recorded alongside the chosen targets, and read by the
+    /// deal-damage effect at resolution.
+    /// <para>
+    /// <paramref name="targets"/> is the ordered list of chosen target tokens
+    /// (each non-empty). The result is a per-target amount list, index-aligned
+    /// with <paramref name="targets"/>, that MUST:
+    /// <list type="bullet">
+    /// <item>contain exactly <c>targets.Count</c> entries,</item>
+    /// <item>assign each chosen target AT LEAST 1 (CR 119.4 — you must divide
+    /// the damage so each target gets at least 1; you can't choose a target and
+    /// assign it 0), and</item>
+    /// <item>sum to exactly <paramref name="totalDamage"/> (CR 119.4).</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Default implementation: an even split with the remainder front-loaded
+    /// onto the earliest targets (e.g. 3 damage among two targets → [2, 1]).
+    /// This is the deterministic pre-agent posture every divided-damage card
+    /// shipped with (the old captured <c>distribute</c> Func / template
+    /// even-split). Smart bots / remote agents override to route through their
+    /// decision policy / wire channel. The engine still defensively normalises
+    /// the returned split (clamps each to ≥1, reconciles the total) so a
+    /// misbehaving agent can never deal the wrong amount (CR 119.4).
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect /
+    /// dispatch closures that don't have a <see cref="GameContext"/> handy
+    /// (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<int>> ChooseDamageDivisionAsync(
+        GameContext? ctx,
+        ICard source,
+        int totalDamage,
+        IReadOnlyList<object> targets,
+        CancellationToken ct = default)
+    {
+        return Task.FromResult(DamageDivisionDefaults.EvenSplit(totalDamage, targets.Count));
+    }
+
+    /// <summary>
     /// CR 614.12 / CR 601.2c — "as this enters / as you cast this, choose a
     /// color" (Sunken Citadel, Temple of the Dragon Queen, Coldsteel Heart,
     /// Utopia Sprawl, …). Picks one of the five mana colours — colourless is
