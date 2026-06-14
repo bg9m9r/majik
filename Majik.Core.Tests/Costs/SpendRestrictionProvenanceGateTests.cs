@@ -222,4 +222,81 @@ public class SpendRestrictionProvenanceGateTests
         bear.PendingCastUncounterable.Should().BeFalse(
             "the rider only triggers for instant/sorcery spells");
     }
+
+    // -----------------------------------------------------------------------
+    // Cavern of Souls — "{T}: Add one mana of any color. Spend this mana only
+    // to cast a creature spell of the chosen type, and that spell can't be
+    // countered." The any-color mana both (a) gates on a chosen-type creature
+    // spell (the SpendRestriction, already enforced) AND (b) marks that spell
+    // uncounterable (CR 701.5b — the same provenance-reaction seam Boseiju uses).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Cavern_ManaSpentOnChosenTypeCreature_FlagsCardUncounterable()
+    {
+        // Choose "Goblin"; pay a Goblin creature's cost from Cavern's any-color
+        // mana → it pays (restriction satisfied) AND is marked uncounterable.
+        var cavern = CavernOfSoulsFactory.Create(_alice, _ => CardSubtype.Goblin);
+        cavern.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var goblin = new Creature("Goblin Guide", manaCost: "R", power: 2, toughness: 2,
+            supertypes: null, subtypes: new[] { CardSubtype.Goblin });
+        goblin.PendingCastUncounterable.Should().BeFalse("clean before the spend");
+
+        var success = resolver.Pay(
+            _alice, ManaCost.Parse("R"),
+            new ManaPayment(new ICard[] { cavern }),
+            spentOn: goblin, out _, out _);
+
+        success.Should().BeTrue("Cavern's any-color mana pays a chosen-type creature spell");
+        goblin.PendingCastUncounterable.Should().BeTrue(
+            "Cavern mana spent on a chosen-type creature spell marks it uncounterable (CR 701.5b)");
+    }
+
+    [Fact]
+    public void Cavern_NoChosenType_ManaSpentOnAnyCreature_FlagsCardUncounterable()
+    {
+        // With no ETB type resolved the restriction stays "creature spell"; the
+        // uncounterable rider still applies to ANY creature spell the mana pays
+        // (the rider keys off the chosen-type-creature spend the same predicate
+        // gates — here the broader "creature spell" stand-in).
+        var cavern = CavernOfSoulsFactory.Create(_alice);
+        cavern.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var bear = new Creature("Grizzly Bears", manaCost: "G", power: 2, toughness: 2);
+
+        var success = resolver.Pay(
+            _alice, ManaCost.Parse("G"),
+            new ManaPayment(new ICard[] { cavern }),
+            spentOn: bear, out _, out _);
+
+        success.Should().BeTrue();
+        bear.PendingCastUncounterable.Should().BeTrue(
+            "Cavern mana spent on a creature spell marks it uncounterable");
+    }
+
+    [Fact]
+    public void Cavern_ColorlessMana_DoesNotFlagUncounterable()
+    {
+        // The {T}: Add {C} ability is UNRESTRICTED and carries no uncounterable
+        // rider (printed oracle: the rider is on the any-color ability only).
+        // The {C} pays a generic pip on a creature spell but never marks it.
+        var cavern = CavernOfSoulsFactory.Create(_alice, _ => CardSubtype.Goblin);
+        cavern.SetZone(ZoneType.Battlefield);
+        var resolver = new ManaPaymentResolver();
+
+        var goblin = new Creature("Goblin Piledriver", manaCost: "1", power: 1, toughness: 2,
+            supertypes: null, subtypes: new[] { CardSubtype.Goblin });
+
+        var success = resolver.Pay(
+            _alice, ManaCost.Parse("1"),
+            new ManaPayment(new ICard[] { cavern }),
+            spentOn: goblin, out _, out _);
+
+        success.Should().BeTrue("the unrestricted {C} pays a {1} generic pip");
+        goblin.PendingCastUncounterable.Should().BeFalse(
+            "the {T}: Add {C} ability carries no uncounterable rider");
+    }
 }
