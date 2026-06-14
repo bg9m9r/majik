@@ -170,6 +170,21 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*This creature gets ([+-]\d+)/([+-]\d+) until end of turn\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Target creature gets ±X/±Y until end of turn."
+    // A TARGETED pump (pump-OTHER) — the activated sibling of firebreathing where
+    // the buff lands on a CHOSEN creature rather than the source itself. A common
+    // self-source combat-trick / on-demand-lord payoff on real creature cards.
+    // Sound to re-home: the BEARER is only the source / cost-payer; the
+    // PumpUntilEndOfTurnEffect (CR 613.1f Layer 7c) registers against the CHOSEN
+    // TARGET creature's own ActiveEffects, never the exiled imprinted card. Like
+    // the self-pump shape each delta carries its OWN sign, so a signed targeted
+    // pump ("+2/-2") is reconstructed too. Only the OPEN "target creature" filter
+    // is reconstructed (no restricted candidate filter like "target creature you
+    // control"), consistent with the pinger / fight restricted-target boundary.
+    private static readonly Regex PumpOtherRegex = new(
+        @"^(" + CostList + @")\s*:\s*Target creature gets ([+-]\d+)/([+-]\d+) until end of turn\.$",
+        RegexOptions.IgnoreCase);
+
     // "{cost}: This creature deals N damage to <target form>."
     private static readonly Regex PingerRegex = new(
         @"^(" + CostList + @")\s*:\s*This creature deals (\d+) damage to (any target|target creature|target player)\.$",
@@ -356,6 +371,14 @@ public static class OracleActivatedAbilityBinder
                 continue;
             }
 
+            var pumpOther = PumpOtherRegex.Match(line);
+            if (pumpOther.Success)
+            {
+                var ability = TryBuildPumpOther(pumpOther, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
             var ping = PingerRegex.Match(line);
             if (ping.Success)
             {
@@ -462,6 +485,65 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { pumpEffect });
+    }
+
+    /// <summary>
+    /// Build a targeted pump: "{cost}: Target creature gets ±X/±Y until end of
+    /// turn." (the pump-OTHER sibling of firebreathing). Re-homed so the BEARER is
+    /// only the source / cost-payer; the <see cref="PumpUntilEndOfTurnEffect"/>
+    /// (CR 613.1f Layer 7c) registers against the CHOSEN target creature's own
+    /// <see cref="Creature.ActiveEffects"/> — never the exiled imprinted card. The
+    /// bearer need NOT be a creature (a non-creature bearer can still tap/pay to
+    /// pump a chosen creature), so this does not gate on <see cref="Creature"/>
+    /// the way self-pump does. Mirrors <see cref="BuildPinger"/>'s 1..1
+    /// single-creature target request.
+    /// </summary>
+    private static ActivatedAbility? TryBuildPumpOther(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var p = int.Parse(match.Groups[2].Value);
+        var t = int.Parse(match.Groups[3].Value);
+
+        ActivatedAbility? ability = null;
+        var pumpEffect = new Effect(
+            $"Granted: target creature gets +{p}/+{t} until end of turn",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 613.1f Layer 7c — register against the CHOSEN target
+                // creature's OWN effects service. A non-creature chosen target,
+                // or one with no ActiveEffects (shape-only path), silently
+                // no-ops — same posture as the self-pump rebuild. The bearer is
+                // untouched; only the chosen creature is pumped.
+                if (ability.ChosenTargets[0][0] is Creature chosen)
+                {
+                    chosen.ActiveEffects?.Register(
+                        new PumpUntilEndOfTurnEffect(chosen, p, t));
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { pumpEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff | BotIntent.CombatTrick),
+            });
+
+        return ability;
     }
 
     /// <summary>

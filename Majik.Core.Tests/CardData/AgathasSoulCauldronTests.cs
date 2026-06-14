@@ -731,6 +731,74 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_PumpOther_RehomesTargetedPumpToChosenCreature()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability pumps ANOTHER creature:
+        // "{G}: Target creature gets +1/+1 until end of turn." (a self-source
+        // "lord-on-demand" / combat-trick payoff — a common targeted-pump shape,
+        // e.g. an Overrun-style activated buff). Re-homing is sound: the SOURCE /
+        // cost-payer is the BEARER, and the pump applies to the CHOSEN target
+        // creature (PumpUntilEndOfTurnEffect against the target's own
+        // ActiveEffects), never the exiled imprinted card (CR 613.1f Layer 7c).
+        var lord = new Creature("Lord Stub", "1G", 2, 2);
+        lord.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(lord);
+        lord.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A separate creature on the battlefield to receive the targeted pump.
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Lord Stub", "{G}: Target creature gets +1/+1 until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), lord);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's targeted pump");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        pump.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("G"));
+        pump.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"),
+            "a targeted pump requires a 1..1 target-creature request");
+
+        // Resolving with the ALLY chosen pumps the ALLY (+1/+1), not the bearer
+        // and not the exiled card.
+        pump.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        var allyPowerBefore = ally.GetPower();
+        var allyToughnessBefore = ally.GetToughness();
+        var bearerPowerBefore = bearer.GetPower();
+        foreach (var effect in pump.Effects) effect.Execute();
+        ally.GetPower().Should().Be(allyPowerBefore + 1,
+            "the re-homed targeted pump raises the CHOSEN creature's power");
+        ally.GetToughness().Should().Be(allyToughnessBefore + 1,
+            "the re-homed targeted pump raises the CHOSEN creature's toughness");
+        bearer.GetPower().Should().Be(bearerPowerBefore,
+            "the bearer (mere source) is not pumped — only the chosen target");
+        lord.GetPower().Should().Be(2,
+            "the exiled imprinted card is untouched");
+
+        // CR 514.2 — the targeted pump expires at cleanup.
+        effects.ExpireEndOfTurn();
+        ally.GetPower().Should().Be(allyPowerBefore,
+            "the granted targeted pump expires at end of turn");
+    }
+
+    [Fact]
     public void Grant_NonMana_SignedPump_RehomesNegativeDeltaSelfPumpToBearer()
     {
         var alice = new Player("Alice", 20);
