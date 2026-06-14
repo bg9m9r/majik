@@ -59,11 +59,23 @@ public static class CursecatcherFactory
     /// <summary>
     /// Construct Cursecatcher. The activated ability is attached with its
     /// cost (Sacrifice) + target request (1..1 spell) + counter-unless-pay
-    /// effect. A live <see cref="Majik.Core.Stack.Stack"/> is required for
-    /// the counter effect to operate; pass <see langword="null"/> for
-    /// shape-only tests.
+    /// effect. No bus ⇒ the resolve-closure sacrifice publishes nothing (legacy
+    /// shape-only posture). This is the overload <see cref="NamedCardFactory"/>
+    /// dispatches to.
     /// </summary>
-    public static Creature Create(Player owner) => Create(owner, stack: null);
+    public static Creature Create(Player owner) => Create(owner, stack: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload). Forwards <c>effects.EventBus</c> into the resolve closure so
+    /// the self-sacrifice publishes a
+    /// <see cref="Majik.Core.Events.PermanentSacrificedEvent"/> (CR 701.16a) for
+    /// aristocrat payoffs. Mirrors the Festival-Crasher / Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, Majik.Core.Effects.ContinuousEffectsService? effects) =>
+        Create(owner, stack: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Cursecatcher with an optional live stack. When
@@ -72,7 +84,17 @@ public static class CursecatcherFactory
     /// <see cref="OracleSpellBinder.RemoveFromStack"/> (CR 701.5). When
     /// <see langword="null"/>, the counter is a no-op (shape-only use).
     /// </summary>
-    public static Creature Create(Player owner, Majik.Core.Stack.Stack? stack)
+    public static Creature Create(Player owner, Majik.Core.Stack.Stack? stack) =>
+        Create(owner, stack, eventBus: null);
+
+    /// <summary>
+    /// Construct Cursecatcher with an optional live stack + event bus. When
+    /// <paramref name="eventBus"/> is supplied the resolve-closure self-sacrifice
+    /// publishes a <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+    /// (CR 701.16a) crediting the controller; when null the move still happens
+    /// but nothing is published.
+    /// </summary>
+    public static Creature Create(Player owner, Majik.Core.Stack.Stack? stack, Majik.Core.Events.IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -108,16 +130,15 @@ public static class CursecatcherFactory
             () =>
             {
                 // ---- Sacrifice Cursecatcher (self-zone-move) ----
-                // Because AdditionalCost.Sacrifice.Pay() is a no-op stub,
-                // the effect body performs the zone-move directly.
-                // CR 701.16 — sacrificing moves the permanent from the
-                // battlefield to its owner's graveyard.
+                // CR 701.16a — the resolve closure performs the sacrifice.
+                // Route through the bus-aware Fx.Sacrifice overload when a bus is
+                // wired so PermanentSacrificedEvent fires crediting the
+                // controller; bus-less = move only.
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    var sacOwner = card.Owner ?? owner;
-                    sacOwner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    var controller = card.Controller ?? owner;
+                    if (eventBus != null) Majik.Core.Primitives.Fx.Sacrifice(card, controller, eventBus);
+                    else Majik.Core.Primitives.Fx.Sacrifice(card);
                 }
 
                 // ---- Counter unless pay {1} ----
@@ -149,7 +170,7 @@ public static class CursecatcherFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { counterEffect },
             targetRequests: new[]

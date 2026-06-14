@@ -122,12 +122,14 @@ public static class InsolentNeonateFactory
             () =>
             {
                 // Sacrifice payment — battlefield → owner's graveyard.
-                // CR 701.16 — idempotent guard against stale activations.
+                // CR 701.16a — route through the bus-aware Fx.Sacrifice overload
+                // when a bus is wired so PermanentSacrificedEvent fires; bus-less
+                // = move only. Idempotent guard against stale activations.
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    owner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    var controller = card.Controller ?? owner;
+                    if (eventBus != null) Primitives.Fx.Sacrifice(card, controller, eventBus);
+                    else Primitives.Fx.Sacrifice(card);
                 }
 
                 // CR 121.1 — draw one card from the top of the controller's

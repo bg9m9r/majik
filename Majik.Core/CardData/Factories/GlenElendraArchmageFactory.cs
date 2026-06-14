@@ -125,12 +125,14 @@ public static class GlenElendraArchmageFactory
             () =>
             {
                 // ---- Sacrifice self ----
+                // CR 701.16a — route through the bus-aware Fx.Sacrifice overload
+                // when a bus is wired so PermanentSacrificedEvent fires; bus-less
+                // = move only. Idempotent guard against stale activations.
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    var sacOwner = card.Owner ?? owner;
-                    sacOwner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    var controller = card.Controller ?? owner;
+                    if (eventBus != null) Fx.Sacrifice(card, controller, eventBus);
+                    else Fx.Sacrifice(card);
                 }
 
                 // ---- Counter target noncreature spell ----

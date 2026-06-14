@@ -85,7 +85,19 @@ public static class YavimayaElderFactory
     /// Suitable for shape / dispatcher tests. This is the overload
     /// <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
-    public static Creature Create(Player owner) => Create(owner, triggers: null);
+    public static Creature Create(Player owner) => Create(owner, triggers: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload). Forwards <c>effects.EventBus</c> into the sac-draw resolve
+    /// closure so the self-sacrifice publishes a
+    /// <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a) for aristocrat
+    /// payoffs. Mirrors the Festival-Crasher / Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Yavimaya Elder with optional <see cref="TriggerManager"/>
@@ -93,7 +105,17 @@ public static class YavimayaElderFactory
     /// is registered so a Battlefield → Graveyard move places it on the stack
     /// automatically.
     /// </summary>
-    public static Creature Create(Player owner, TriggerManager? triggers)
+    public static Creature Create(Player owner, TriggerManager? triggers) =>
+        Create(owner, triggers, eventBus: null);
+
+    /// <summary>
+    /// Construct Yavimaya Elder with optional trigger-manager + event-bus
+    /// wiring. When <paramref name="eventBus"/> is supplied the sac-draw
+    /// activated ability's resolve-closure self-sacrifice publishes a
+    /// <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// controller; when null the move still happens but nothing is published.
+    /// </summary>
+    public static Creature Create(Player owner, TriggerManager? triggers, Events.IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -139,7 +161,7 @@ public static class YavimayaElderFactory
             $"{CardName}: sac self + draw a card",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
                 Fx.DrawCards(owner, 1);
             });
 
@@ -149,7 +171,7 @@ public static class YavimayaElderFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{2}"),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { drawEffect });
 
@@ -159,16 +181,21 @@ public static class YavimayaElderFactory
     }
 
     /// <summary>
-    /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent.
+    /// CR 701.16 — sacrifice <paramref name="card"/> from the RESOLVE closure.
+    /// When <paramref name="eventBus"/> is supplied the sacrifice routes through
+    /// the bus-aware <see cref="Fx.Sacrifice(Cards.ICard, Player, Events.IEventBus)"/>
+    /// overload so a <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a)
+    /// fires crediting the controller (and, when registered with a
+    /// TriggerManager, the elder's own dies trigger still fires off the
+    /// CardMovedEvent the move publishes); when null the bare overload moves it
+    /// without publishing. Idempotent.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, Events.IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
         var controller = card.Controller ?? owner;
-        controller.Zones.Battlefield.RemoveCard(card);
-        owner.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
+        if (eventBus != null) Fx.Sacrifice(card, controller, eventBus);
+        else Fx.Sacrifice(card);
     }
 
     /// <summary>

@@ -145,9 +145,12 @@ public static class FanaticalFirebrandFactory
                 // information on a card that's left the battlefield).
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    owner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    // CR 701.16a — route the resolve-closure sacrifice through
+                    // the bus-aware Fx.Sacrifice overload when a bus is wired so
+                    // PermanentSacrificedEvent fires; bus-less = move only.
+                    var controller = card.Controller ?? owner;
+                    if (eventBus != null) Fx.Sacrifice(card, controller, eventBus);
+                    else Fx.Sacrifice(card);
                 }
 
                 if (pingAbility != null
