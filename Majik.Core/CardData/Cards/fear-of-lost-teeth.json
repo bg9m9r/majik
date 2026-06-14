@@ -1,0 +1,18 @@
+{
+  "name": "Fear of Lost Teeth",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Nightmare"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "dies_self" },
+      "effects": [
+        { "type": "deal_damage", "amount": 1, "target": "any" },
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
