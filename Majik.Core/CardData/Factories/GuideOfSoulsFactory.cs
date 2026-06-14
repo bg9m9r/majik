@@ -179,20 +179,33 @@ public static class GuideOfSoulsFactory
         // target, validates it's still on the battlefield (CR 608.2b),
         // and registers two EOT-scoped continuous effects against the
         // target's ActiveEffects — Flying (Layer 6) + +1/+1 (Layer 7c).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect captures NO source permanent — it reads its
+        // chosen target off the live ResolutionContext.ChosenTargets (rather
+        // than the captured authoring ability handle) and grants the keyword /
+        // pump entirely to that chosen creature. Nothing is sourced from
+        // `card` / the exiled Guide of Souls, so the ability is marked
+        // RebindSafe and Agatha's Soul Cauldron's group-grant re-homes the
+        // REAL "{E}{E}: target creature gains flying and +1/+1" ability —
+        // including its bespoke PayEnergyCost, which the oracle-rebuild
+        // fallback cannot reconstruct — onto a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f). The grant still
+        // affects the AGENT-chosen target, never the re-homed source.
         // ----------------------------------------------------------------
-        ActivatedAbility? pumpAbility = null;
         var pumpEffect = new Effect(
             "Guide of Souls — target creature gains Flying and +1/+1 until end of turn",
-            () =>
+            ctx =>
             {
-                if (pumpAbility == null) return;
-                var chosen = pumpAbility.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (ctx.ChosenTargets.Count == 0 || ctx.ChosenTargets[0].Count == 0)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
-                var raw = chosen[0][0];
-                if (raw is not Creature target) return;
-                if (target.Zone != ZoneType.Battlefield) return; // CR 608.2b
-                if (target.ActiveEffects == null) return; // shape-only no-op
+                var raw = ctx.ChosenTargets[0][0];
+                if (raw is not Creature target) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask; // CR 608.2b
+                if (target.ActiveEffects == null) return ValueTask.CompletedTask; // shape-only no-op
 
                 // CR 613.1c Layer 6 — keyword grant (Flying).
                 target.ActiveEffects.Register(
@@ -201,9 +214,10 @@ public static class GuideOfSoulsFactory
                 // CR 613.7c Layer 7c — +P/+T modification (+1/+1).
                 target.ActiveEffects.Register(
                     new PumpUntilEndOfTurnEffect(target, 1, 1));
+                return ValueTask.CompletedTask;
             });
 
-        pumpAbility = new ActivatedAbility(
+        var pumpAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new PayEnergyCost(PumpEnergyCost) },
@@ -216,7 +230,8 @@ public static class GuideOfSoulsFactory
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Buff),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(pumpAbility);
 

@@ -11,6 +11,7 @@ using Majik.Core.Players;
 using Majik.Core.Spells;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
+using System.Threading.Tasks;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
 
@@ -42,6 +43,18 @@ public class MausoleumWandererTests
         c.SetController(owner);
         return c;
     }
+
+    /// <summary>A live GameContext carrying the supplied stack so the activated
+    /// ability resolves through the production ResolveAsync path
+    /// (ResolutionContext.Source + Game.Stack threaded).</summary>
+    private Majik.Core.Game.GameContext MakeGame(EventBus bus, Majik.Core.Stack.Stack stack)
+        => new(
+            self: _alice,
+            allPlayers: new[] { _alice, _bob },
+            activePlayer: _alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: stack);
 
     private static Creature MakeNonSpirit(Player owner, string name = "Grizzly Bears")
     {
@@ -167,7 +180,7 @@ public class MausoleumWandererTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Activated_CountersTargetSpell_WhenControllerCannotPayX()
+    public async Task Activated_CountersTargetSpell_WhenControllerCannotPayX()
     {
         var bus = new EventBus();
         var stack = new Majik.Core.Stack.Stack(bus);
@@ -191,7 +204,11 @@ public class MausoleumWandererTests
             new object[] { boltSpell },
         });
 
-        foreach (var e in ability.Effects) e.Execute();
+        // Resolve through the production ability path so ResolutionContext.Source
+        // (= the Wanderer) + ChosenTargets + the live stack are threaded — the
+        // re-sourceable migration reads X off the source's power and the chosen
+        // spell + stack off the live context.
+        await ability.ResolveAsync(agent: null, game: MakeGame(bus, stack));
 
         // Wanderer was sacrificed — graveyard, not battlefield.
         w.Zone.Should().Be(ZoneType.Graveyard,
@@ -205,7 +222,7 @@ public class MausoleumWandererTests
     }
 
     [Fact]
-    public void Activated_DoesNotCounter_WhenControllerPaysX()
+    public async Task Activated_DoesNotCounter_WhenControllerPaysX()
     {
         var bus = new EventBus();
         var stack = new Majik.Core.Stack.Stack(bus);
@@ -231,7 +248,7 @@ public class MausoleumWandererTests
             new object[] { stackSpell },
         });
 
-        foreach (var e in ability.Effects) e.Execute();
+        await ability.ResolveAsync(agent: null, game: MakeGame(bus, stack));
 
         // Wanderer still sacrificed (cost paid regardless).
         w.Zone.Should().Be(ZoneType.Graveyard);
@@ -243,7 +260,7 @@ public class MausoleumWandererTests
     }
 
     [Fact]
-    public void Activated_XScalesWithPumpedPower()
+    public async Task Activated_XScalesWithPumpedPower()
     {
         // After a Spirit-ETB pump, Wanderer's power is 2 — so {X} = {2}.
         var bus = new EventBus();
@@ -280,7 +297,7 @@ public class MausoleumWandererTests
             new object[] { stackSpell },
         });
 
-        foreach (var e in ability.Effects) e.Execute();
+        await ability.ResolveAsync(agent: null, game: MakeGame(bus, stack));
 
         // Bob couldn't pay {2} (only had {1}) — spell countered.
         spell.Zone.Should().Be(ZoneType.Graveyard,

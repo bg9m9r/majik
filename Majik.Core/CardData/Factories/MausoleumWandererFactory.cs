@@ -207,20 +207,35 @@ public static class MausoleumWandererFactory
         // - Cost: AdditionalCost.Sacrifice(self) — TODO-stub Pay; effect
         //   body performs the zone move (mirrors CursecatcherFactory).
         // - Target: 1..1 TargetRequest "target instant or sorcery spell".
-        // - X: card.GetPower() captured at activation (CR 202.3b /
+        // - X: source's power captured at activation (CR 202.3b /
         //   class xmldoc — captured BEFORE the sac so any prior pumps
         //   still apply).
         // - v1 auto-pay: if the target spell's controller can pay {X},
         //   payment is deducted and the spell is NOT countered. Otherwise
         //   the spell is removed from the stack and moved to graveyard.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect sacrifices the live ResolutionContext.Source
+        // permanent and reads X off THAT source's power (so X = the BEARER's
+        // power when re-homed), reading the chosen spell + live stack off the
+        // context, falling back to `card` / the captured stack only on the
+        // context-less legacy sync path (ResolutionContext.Legacy). The
+        // sacrifice cost re-homes via AdditionalCost.RebindSource (Stage 1).
+        // Marked RebindSafe so Agatha's Soul Cauldron's group-grant re-homes
+        // the REAL "Sacrifice ~: counter unless pay X" ability — which the
+        // oracle-rebuild fallback cannot reconstruct — onto a counter-bearing
+        // bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the BEARER
+        // is sacrificed and X reads the BEARER's power.
         // ----------------------------------------------------------------
-        ActivatedAbility? ability = null;
-
         var counterEffect = new Effect(
             "Mausoleum Wanderer — sac self, then counter target instant or sorcery unless its controller pays {X}",
-            () => ResolveCounterActivation(ability, card, owner, stack, eventBus));
+            ctx =>
+            {
+                ResolveCounterActivation(ctx, card, owner, stack, eventBus);
+                return ValueTask.CompletedTask;
+            });
 
-        ability = new ActivatedAbility(
+        var ability = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -228,6 +243,7 @@ public static class MausoleumWandererFactory
                 AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { counterEffect },
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(
@@ -257,20 +273,27 @@ public static class MausoleumWandererFactory
     // --- Sac + counter-unless-pay-X (CR 113.3b / 701.5 / 202.3b) ---------
 
     private static void ResolveCounterActivation(
-        ActivatedAbility? ability,
+        ResolutionContext ctx,
         Creature card,
         Player owner,
         Majik.Core.Stack.Stack? stack,
         IEventBus? eventBus)
     {
-        // CR 202.3b — capture X = Wanderer's power BEFORE the sac fires so
+        // RE-SOURCE: the live source permanent at resolution (the BEARER when
+        // re-homed by Agatha), falling back to `card` on the legacy sync path.
+        var subject = (ctx.Source as Permanent) ?? card;
+
+        // CR 202.3b — capture X = the source's power BEFORE the sac fires so
         // any prior Spirit-ETB pumps still apply.
-        int x = card.GetPower();
+        int x = subject is Creature creature ? creature.GetPower() : 0;
 
-        SacrificeSelf(card, owner, eventBus);
+        SacrificeSelf(subject, owner, eventBus);
 
-        if (ability == null || stack == null) return;
-        var spell = ResolveTargetSpell(ability);
+        // Game-global stack: prefer the live context's stack, fall back to the
+        // captured stack on the legacy sync path.
+        var liveStack = ctx.Game?.Stack ?? stack;
+        if (liveStack == null) return;
+        var spell = ResolveTargetSpell(ctx);
         if (spell == null) return;
 
         if (ControllerPaidX(spell, x))
@@ -280,11 +303,11 @@ public static class MausoleumWandererFactory
         }
 
         // CR 701.5 — counter: remove from stack + send to graveyard.
-        OracleSpellBinder.RemoveFromStack(stack, spell);
+        OracleSpellBinder.RemoveFromStack(liveStack, spell);
         spell.Card.SetZone(ZoneType.Graveyard);
     }
 
-    private static void SacrificeSelf(Creature card, Player owner, IEventBus? eventBus)
+    private static void SacrificeSelf(Permanent card, Player owner, IEventBus? eventBus)
     {
         // CR 701.16a — route the resolve-closure sacrifice through the bus-aware
         // Fx.Sacrifice overload when a bus is wired so PermanentSacrificedEvent
@@ -295,9 +318,9 @@ public static class MausoleumWandererFactory
         else Majik.Core.Primitives.Fx.Sacrifice(card);
     }
 
-    private static ISpell? ResolveTargetSpell(ActivatedAbility ability)
+    private static ISpell? ResolveTargetSpell(ResolutionContext ctx)
     {
-        var chosen = ability.ChosenTargets;
+        var chosen = ctx.ChosenTargets;
         if (chosen.Count == 0 || chosen[0].Count == 0) return null;
         if (chosen[0][0] is not ISpell spell) return null;
 

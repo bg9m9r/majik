@@ -3842,4 +3842,199 @@ public class AgathasSoulCauldronTests
         alice.Zones.Hand.GetCards().Should().Contain(top,
             "the un-rebound draw draws for its own source's controller");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-factory-resolutioncontext-source-migration-utility-batch
+    // — three more bespoke [CardName]-factory activated abilities migrated to
+    // read ResolutionContext.Source / .Controller / .ChosenTargets + marked
+    // RebindSafe so Agatha's group-grant re-homes the REAL ability (incl. its
+    // bespoke cost the oracle-rebuild fallback cannot reconstruct) onto a
+    // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2).
+    //   - Vexing Shusher: "{R/G}: Target spell can't be countered."
+    //   - Insolent Neonate: "Discard a card, Sacrifice this creature: Draw."
+    //   - Mausoleum Wanderer: "Sacrifice ~: Counter target instant/sorcery
+    //     unless its controller pays {X}, where X is THIS CREATURE's power."
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_VexingShusher_ToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // "{R/G}: target spell can't be countered" ability is now RebindSafe.
+        var shusher = VexingShusherFactory.Create(alice);
+        shusher.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility)
+            .RebindSafe.Should().BeTrue(
+                "the migrated Vexing Shusher grant reads ResolutionContext targets and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(shusher);
+        shusher.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), shusher);
+
+        var grant = GrantedActivated(bearer).Single(a =>
+            a.TargetRequests.Any(t => t.Description.Contains("target spell")));
+        grant.Source.Should().BeSameAs(bearer, "the grant is re-homed to the BEARER (CR 707.2)");
+        grant.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Bob casts a counterable instant. The re-homed grant stamps it
+        // uncounterable (the grant targets a spell, not the source — re-home
+        // affects the chosen spell regardless of which permanent is the source).
+        var bolt = new Majik.Core.Cards.Instant("Lightning Bolt", "{R}");
+        bolt.SetOwner(bob);
+        bolt.SetController(bob);
+        bolt.SetZone(ZoneType.Stack);
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var boltSpell = new Majik.Core.Spells.Spell(bolt, bob);
+        stack.Push(boltSpell);
+        boltSpell.CannotBeCountered.Should().BeFalse("counterable before the grant resolves");
+
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { boltSpell } });
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: stack);
+        await grant.ResolveAsync(agent: null, game: game);
+
+        boltSpell.CannotBeCountered.Should().BeTrue(
+            "the re-homed grant stamps the chosen spell uncounterable (CR 701.5b)");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_InsolentNeonate_ToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // "Discard a card, Sacrifice this creature: Draw a card" ability is now
+        // RebindSafe (its bespoke DiscardACardCost is reused verbatim by
+        // RebindTo; the sacrifice cost re-homes via AdditionalCost.RebindSource).
+        var neonate = InsolentNeonateFactory.Create(alice);
+        neonate.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility)
+            .RebindSafe.Should().BeTrue(
+                "the migrated Insolent Neonate ability reads ResolutionContext.Source/.Controller and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(neonate);
+        neonate.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), neonate);
+
+        var draw = GrantedActivated(bearer).Single(a =>
+            a.Costs.OfType<Majik.Core.Costs.DiscardACardCost>().Any());
+        draw.Source.Should().BeSameAs(bearer, "the ability is re-homed to the BEARER (CR 707.2)");
+        draw.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // STAGE 1 — the Sacrifice cost re-homes to the BEARER.
+        draw.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Single(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Sacrifice)
+            .Description.Should().Contain(bearer.Name,
+                "the sacrifice cost re-homes to the bearer (AdditionalCost.RebindSource)");
+
+        // Resolving the re-homed ability sacrifices the BEARER and draws for the
+        // bearer's controller — never the exiled Insolent Neonate.
+        var top = new Card("Plains", "");
+        top.SetOwner(alice);
+        alice.Zones.Library.AddCard(top);
+
+        bearer.Zone.Should().Be(ZoneType.Battlefield, "the bearer is alive before resolution");
+        await draw.ResolveAsync(agent: null, game: null);
+
+        bearer.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed ability sacrifices the BEARER (ResolutionContext.Source), not the exiled Neonate");
+        neonate.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted Neonate stays in exile under the Cauldron, untouched by the re-homed sac");
+        alice.Zones.Hand.GetCards().Should().Contain(top,
+            "the re-homed draw draws for the BEARER's controller (ResolutionContext.Controller)");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_MausoleumWanderer_ToBearer_XReadsBearerPower()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // "Sacrifice ~: counter unless pay X" ability is now RebindSafe (the
+        // sacrifice cost re-homes via RebindSource; X reads the source's power).
+        var wanderer = MausoleumWandererFactory.Create(alice);
+        wanderer.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility)
+            .RebindSafe.Should().BeTrue(
+                "the migrated Mausoleum Wanderer ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(wanderer);
+        wanderer.SetZone(ZoneType.Graveyard);
+
+        // Bearer is a 4/4 base (+1/+1 counter = 5/5) — so X reads the BEARER's
+        // power (5), NOT the exiled Wanderer's printed power (1).
+        var bearer = SeatedBearer(alice, effects, zones, power: 4, toughness: 4);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), wanderer);
+
+        var counter = GrantedActivated(bearer).Single(a =>
+            a.TargetRequests.Any(t => t.Description.Contains("instant or sorcery")));
+        counter.Source.Should().BeSameAs(bearer, "the ability is re-homed to the BEARER (CR 707.2)");
+
+        // Bob casts a sorcery; he has only {2} — LESS than the BEARER's power
+        // (5), so he cannot pay X and the spell is countered. (If X read the
+        // exiled Wanderer's printed power 1, Bob's {2} would cover it and the
+        // spell would survive — this asserts X = the BEARER's power.)
+        bob.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Zero.AddGenericCost(2));
+        var sorcery = new Majik.Core.Cards.Sorcery("Big Spell", "{4}{B}");
+        sorcery.SetOwner(bob);
+        sorcery.SetController(bob);
+        sorcery.SetZone(ZoneType.Stack);
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var stackSpell = new Majik.Core.Spells.Spell(sorcery, bob);
+        stack.Push(stackSpell);
+
+        counter.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { stackSpell } });
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: stack);
+        await counter.ResolveAsync(agent: null, game: game);
+
+        // The BEARER is sacrificed (ResolutionContext.Source), not the Wanderer.
+        bearer.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed ability sacrifices the BEARER (CR 701.16)");
+
+        // X = the BEARER's power (5) > Bob's {2}, so the spell is countered.
+        stack.GetAll().Should().NotContain(stackSpell,
+            "X reads the BEARER's power (5), which Bob's {2} cannot pay → countered (CR 701.5)");
+        sorcery.Zone.Should().Be(ZoneType.Graveyard,
+            "the countered spell goes to its owner's graveyard");
+    }
 }

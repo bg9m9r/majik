@@ -116,35 +116,54 @@ public static class InsolentNeonateFactory
         // performed inside the effect closure because the generic
         // AdditionalCost.Sacrifice payment is a no-op stub (mirrors
         // Caustic Caterpillar / Aether Spellbomb / Mind Stone).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect sacrifices the live ResolutionContext.Source
+        // permanent (the ability's own source at resolution) and draws for
+        // ResolutionContext.Controller (the activator), falling back to `card`
+        // / `owner` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, where Source / Controller are null). The
+        // sacrifice cost (AdditionalCost.Sacrifice(card, …)) re-homes via
+        // AdditionalCost.RebindSource (Stage 1), so when Agatha's Soul
+        // Cauldron's group-grant re-homes the REAL ability — including its
+        // bespoke DiscardACardCost, which the oracle-rebuild fallback cannot
+        // reconstruct — onto a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f), the BEARER is
+        // sacrificed and the BEARER's controller draws, never the exiled
+        // Insolent Neonate. Marked RebindSafe.
         // ----------------------------------------------------------------
         var drawEffect = new Effect(
             $"{CardName}: sacrifice self + draw a card",
-            () =>
+            ctx =>
             {
+                var subject = (ctx.Source as Permanent) ?? card;
+                var drawer = ctx.Controller ?? subject.Controller ?? owner;
+
                 // Sacrifice payment — battlefield → owner's graveyard.
                 // CR 701.16a — route through the bus-aware Fx.Sacrifice overload
                 // when a bus is wired so PermanentSacrificedEvent fires; bus-less
                 // = move only. Idempotent guard against stale activations.
-                if (card.Zone == ZoneType.Battlefield)
+                if (subject.Zone == ZoneType.Battlefield)
                 {
-                    var controller = card.Controller ?? owner;
-                    if (eventBus != null) Primitives.Fx.Sacrifice(card, controller, eventBus);
-                    else Primitives.Fx.Sacrifice(card);
+                    var sacrificer = subject.Controller ?? drawer;
+                    if (eventBus != null) Primitives.Fx.Sacrifice(subject, sacrificer, eventBus);
+                    else Primitives.Fx.Sacrifice(subject);
                 }
 
-                // CR 121.1 — draw one card from the top of the controller's
+                // CR 121.1 — draw one card from the top of the drawer's
                 // library. Empty library flags the CR 704.5b SBA loss via
                 // MarkTriedToDrawFromEmptyLibrary (same handling as
                 // Faithless Looting / Faithless Salvaging / Psychic Frog).
-                var top = owner.Zones.Library.GetCards().FirstOrDefault();
+                var top = drawer.Zones.Library.GetCards().FirstOrDefault();
                 if (top == null)
                 {
-                    owner.MarkTriedToDrawFromEmptyLibrary();
-                    return;
+                    drawer.MarkTriedToDrawFromEmptyLibrary();
+                    return ValueTask.CompletedTask;
                 }
-                owner.Zones.Library.RemoveCard(top);
-                owner.Zones.Hand.AddCard(top);
+                drawer.Zones.Library.RemoveCard(top);
+                drawer.Zones.Hand.AddCard(top);
                 top.SetZone(ZoneType.Hand);
+                return ValueTask.CompletedTask;
             });
 
         var drawAbility = new ActivatedAbility(
@@ -155,7 +174,8 @@ public static class InsolentNeonateFactory
                 new DiscardACardCost(),
                 AdditionalCost.Sacrifice(card, eventBus),
             },
-            effects: new IEffect[] { drawEffect });
+            effects: new IEffect[] { drawEffect },
+            rebindSafe: true);
 
         card.AddAbility(drawAbility);
 

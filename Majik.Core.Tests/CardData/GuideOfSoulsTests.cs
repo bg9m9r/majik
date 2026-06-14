@@ -8,6 +8,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData;
@@ -275,9 +276,11 @@ public class GuideOfSoulsTests
     }
 
     [Fact]
-    public void GuideOfSouls_ActivatedAbility_GrantsFlyingAndPlusOnePlusOneEot()
+    public async Task GuideOfSouls_ActivatedAbility_GrantsFlyingAndPlusOnePlusOneEot()
     {
         var g = GuideOfSoulsFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(g);
+        g.SetZone(ZoneType.Battlefield);
         var pump = g.Abilities.OfType<ActivatedAbility>().Single();
 
         var target = new Creature("Bear", "{1}{G}", 2, 2);
@@ -297,7 +300,10 @@ public class GuideOfSoulsTests
         target.GetToughness().Should().Be(2);
         svc.Compute(target).Keywords.Should().NotContain("Flying");
 
-        foreach (var effect in pump.Effects) effect.Execute();
+        // Resolve through the production ability path so ResolutionContext.Source
+        // + ChosenTargets are threaded (the re-sourceable migration reads the
+        // chosen target off the live context, not the captured ability handle).
+        await pump.ResolveAsync(agent: null, game: null);
 
         target.GetPower().Should().Be(3, "+1/+1 EOT registered (Layer 7c)");
         target.GetToughness().Should().Be(3);
@@ -306,9 +312,11 @@ public class GuideOfSoulsTests
     }
 
     [Fact]
-    public void GuideOfSouls_ActivatedAbility_GrantsExpireAtEndOfTurn()
+    public async Task GuideOfSouls_ActivatedAbility_GrantsExpireAtEndOfTurn()
     {
         var g = GuideOfSoulsFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(g);
+        g.SetZone(ZoneType.Battlefield);
         var pump = g.Abilities.OfType<ActivatedAbility>().Single();
 
         var target = new Creature("Bear", "{1}{G}", 2, 2);
@@ -323,7 +331,7 @@ public class GuideOfSoulsTests
             new object[] { target },
         });
 
-        foreach (var effect in pump.Effects) effect.Execute();
+        await pump.ResolveAsync(agent: null, game: null);
 
         target.GetPower().Should().Be(3);
         svc.Compute(target).Keywords.Should().Contain("Flying");
