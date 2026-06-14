@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
@@ -387,6 +388,168 @@ public class TokenFactoryTests
         {
             opt.CanActivate().Should().BeFalse(
                 "Treasure was sacrificed on its first use — no further activations");
+        }
+    }
+
+    // ── Sacrifice-cost bus thread (CR 701.16a) ───────────────────────────────
+    // Tokens sacrificed to their OWN activated cost must publish a
+    // PermanentSacrificedEvent crediting the cost-payer (the token's
+    // controller), so aristocrat "whenever you sacrifice …" payoffs (Mayhem
+    // Devil etc.) fire on the token-sac-cost activation path. The token-builder
+    // seam carries no IEventBus ctor arg, so the builders read the ambient bus
+    // the controller already carries (EventBusRegistry.Get) and thread it into
+    // the bus-aware AdditionalCost.Sacrifice / Fx-style publish.
+
+    private List<PermanentSacrificedEvent> SubscribeSacEvents()
+    {
+        var seen = new List<PermanentSacrificedEvent>();
+        _bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+        Majik.Core.Events.EventBusRegistry.Set(_alice, _bus);
+        return seen;
+    }
+
+    [Fact]
+    public void CreateTreasure_SacrificeCost_PublishesPermanentSacrificedEvent()
+    {
+        var seen = SubscribeSacEvents();
+        try
+        {
+            var treasure = TokenFactory.CreateTreasure(_alice, _zones);
+            var redOption = treasure.Abilities.OfType<ManaAbility>()
+                .Single(m => m.ManaGenerated.Red == 1);
+
+            redOption.Activate();
+
+            seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+                ev => ev.SacrificedCard == treasure
+                    && ev.SacrificingPlayer == _alice
+                    && ev.WasToken);
+        }
+        finally { Majik.Core.Events.EventBusRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void CreateEldraziSpawn_SacrificeCost_PublishesPermanentSacrificedEvent()
+    {
+        var seen = SubscribeSacEvents();
+        try
+        {
+            var spawn = TokenFactory.CreateEldraziSpawn(_alice, _zones);
+            var mana = spawn.Abilities.OfType<ManaAbility>().Single();
+
+            mana.Activate();
+
+            seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+                ev => ev.SacrificedCard == spawn
+                    && ev.SacrificingPlayer == _alice
+                    && ev.WasToken);
+        }
+        finally { Majik.Core.Events.EventBusRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void CreateClue_SacrificeCost_PublishesPermanentSacrificedEvent()
+    {
+        var seen = SubscribeSacEvents();
+        try
+        {
+            var clue = TokenFactory.CreateClue(_alice, _zones);
+            var sac = clue.Abilities.OfType<ActivatedAbility>().Single()
+                .Costs.OfType<AdditionalCost>()
+                .Single(c => c.CostType == AdditionalCostType.Sacrifice);
+
+            sac.Pay(_alice);
+
+            clue.Zone.Should().Be(ZoneType.Graveyard);
+            seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+                ev => ev.SacrificedCard == clue
+                    && ev.SacrificingPlayer == _alice
+                    && ev.WasToken);
+        }
+        finally { Majik.Core.Events.EventBusRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void CreateFood_SacrificeCost_PublishesPermanentSacrificedEvent()
+    {
+        var seen = SubscribeSacEvents();
+        try
+        {
+            var food = TokenFactory.CreateFood(_alice, _zones);
+            var sac = food.Abilities.OfType<ActivatedAbility>().Single()
+                .Costs.OfType<AdditionalCost>()
+                .Single(c => c.CostType == AdditionalCostType.Sacrifice);
+
+            sac.Pay(_alice);
+
+            food.Zone.Should().Be(ZoneType.Graveyard);
+            seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+                ev => ev.SacrificedCard == food
+                    && ev.SacrificingPlayer == _alice
+                    && ev.WasToken);
+        }
+        finally { Majik.Core.Events.EventBusRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void CreateBlood_SacrificeEffect_PublishesPermanentSacrificedEvent()
+    {
+        var seen = SubscribeSacEvents();
+        try
+        {
+            // Stock the library so the draw tail does not flag empty-library SBA.
+            var top = new Creature("Topdeck", "{G}", 1, 1) { Owner = _alice };
+            _alice.Zones.Library.AddCard(top);
+            top.SetZone(ZoneType.Library);
+
+            var blood = TokenFactory.CreateBlood(_alice, _zones);
+            var ability = blood.Abilities.OfType<ActivatedAbility>().Single();
+
+            ability.Resolve();
+
+            blood.Zone.Should().Be(ZoneType.Graveyard);
+            seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+                ev => ev.SacrificedCard == blood
+                    && ev.SacrificingPlayer == _alice
+                    && ev.WasToken);
+        }
+        finally { Majik.Core.Events.EventBusRegistry.Clear(); }
+    }
+
+    [Fact]
+    public void CreateMap_SacrificeEffect_PublishesPermanentSacrificedEvent()
+    {
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueExploreKeepOnTop(true);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        Majik.Core.Services.ZoneServiceRegistry.Set(_alice, _zones);
+        var seen = SubscribeSacEvents();
+        try
+        {
+            var spell = new Creature("Big", "{G}", 3, 3);
+            _alice.Zones.Library.AddCard(spell);
+            spell.SetZone(ZoneType.Library);
+
+            var target = new Creature("Scout", "{G}", 1, 1) { Owner = _alice, Controller = _alice };
+            _zones.MoveCardTo(target, ZoneType.Battlefield, _alice);
+
+            var map = TokenFactory.CreateMap(_alice, _zones);
+            var ability = map.Abilities.OfType<ActivatedAbility>().Single();
+            ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+
+            ability.Resolve();
+
+            map.Zone.Should().Be(ZoneType.Graveyard);
+            seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+                ev => ev.SacrificedCard == map
+                    && ev.SacrificingPlayer == _alice
+                    && ev.WasToken);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+            Majik.Core.Services.ZoneServiceRegistry.Clear();
+            Majik.Core.Events.EventBusRegistry.Clear();
         }
     }
 }

@@ -495,9 +495,27 @@ public static class TokenFactory
         var owner = permanent.Owner;
         if (controller == null || owner == null) return;
 
+        // CR 111.7 — snapshot token-ness BEFORE the move; a token ceases to
+        // exist as an SBA the instant it reaches the graveyard, so the flag
+        // must be read while it is still the live battlefield object.
+        var wasToken = permanent.IsToken;
+
         controller.Zones.Battlefield.RemoveCard(permanent);
         owner.Zones.Graveyard.AddCard(permanent);
         permanent.SetZone(ZoneType.Graveyard);
+
+        // CR 701.16a — the cost-payer (the permanent's controller) is the
+        // sacrificing player. The token-builder seam carries no IEventBus
+        // ctor arg, so read the ambient bus the controller already carries
+        // (registered at game start, EventBusRegistry.Get) and publish a
+        // PermanentSacrificedEvent so "whenever you sacrifice …" aristocrat
+        // payoffs (Mayhem Devil etc.) fire on the Treasure / Eldrazi Spawn
+        // sac-cost activation path. Best-effort — no publish if no bus is
+        // registered (direct-construction shape tests). Published AFTER the
+        // move so a payoff that reads the sacrificed card finds it in the
+        // graveyard (mirrors Fx.Sacrifice / AdditionalCost.Sacrifice).
+        Majik.Core.Events.EventBusRegistry.Get(controller)
+            ?.Publish(new Majik.Core.Events.PermanentSacrificedEvent(permanent, controller, wasToken));
     }
 
     private static ActivatedAbility BuildClueDrawAbility(Artifact source, Player controller)
@@ -505,7 +523,10 @@ public static class TokenFactory
         var costs = new ICost[]
         {
             new ManaCostCost(ValueObjects.ManaCost.Parse("2")),
-            AdditionalCost.Sacrifice(source),
+            // CR 701.16a — thread the controller's ambient bus into the
+            // bus-aware Sacrifice overload so paying the self-sacrifice cost
+            // publishes a PermanentSacrificedEvent crediting the cost-payer.
+            AdditionalCost.Sacrifice(source, Majik.Core.Events.EventBusRegistry.Get(controller)),
         };
         var effects = new IEffect[]
         {
@@ -521,7 +542,9 @@ public static class TokenFactory
         {
             new ManaCostCost(ValueObjects.ManaCost.Parse("2")),
             AdditionalCost.Tap(source),
-            AdditionalCost.Sacrifice(source),
+            // CR 701.16a — bus-aware Sacrifice so the cost publishes a
+            // PermanentSacrificedEvent crediting the cost-payer.
+            AdditionalCost.Sacrifice(source, Majik.Core.Events.EventBusRegistry.Get(controller)),
         };
         var effects = new IEffect[]
         {
@@ -559,9 +582,16 @@ public static class TokenFactory
                 // here. CR 701.16 — idempotent re-entry guard.
                 if (source.Zone == ZoneType.Battlefield)
                 {
+                    var wasToken = source.IsToken; // CR 111.7 — snapshot pre-move.
                     controller.Zones.Battlefield.RemoveCard(source);
                     controller.Zones.Graveyard.AddCard(source);
                     source.SetZone(ZoneType.Graveyard);
+
+                    // CR 701.16a — credit the cost-payer (the controller) as the
+                    // sacrificing player on the ambient bus so "whenever you
+                    // sacrifice …" payoffs fire. Best-effort (no bus → no publish).
+                    Majik.Core.Events.EventBusRegistry.Get(controller)
+                        ?.Publish(new Majik.Core.Events.PermanentSacrificedEvent(source, controller, wasToken));
                 }
 
                 // CR 121.1 — draw one card from top of library. Empty
@@ -619,9 +649,15 @@ public static class TokenFactory
                 // re-entry guard.
                 if (source.Zone == ZoneType.Battlefield)
                 {
+                    var wasToken = source.IsToken; // CR 111.7 — snapshot pre-move.
                     controller.Zones.Battlefield.RemoveCard(source);
                     controller.Zones.Graveyard.AddCard(source);
                     source.SetZone(ZoneType.Graveyard);
+
+                    // CR 701.16a — credit the cost-payer on the ambient bus so
+                    // "whenever you sacrifice …" payoffs fire (best-effort).
+                    Majik.Core.Events.EventBusRegistry.Get(controller)
+                        ?.Publish(new Majik.Core.Events.PermanentSacrificedEvent(source, controller, wasToken));
                 }
 
                 // CR 608.2b — read the chosen target; an illegal / absent target
