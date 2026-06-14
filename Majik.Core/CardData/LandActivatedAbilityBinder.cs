@@ -45,11 +45,15 @@ namespace Majik.Core.CardData;
 /// A <see cref="AdditionalCost.Tap(Permanent)"/> is always added; a
 /// <see cref="ManaCostCost"/> is added when the cost carries mana symbols (the
 /// bare <c>{T}: Add …</c> mana line is left to OracleManaBinder); an
-/// <see cref="AdditionalCost.Sacrifice(Permanent)"/> is added only for a
-/// "Sacrifice this land / &lt;self&gt;" clause. Non-self typed-sacrifice costs
-/// ("Sacrifice an artifact" / "Sacrifice a Desert") have no binder-reachable
-/// typed-sacrifice-chooser primitive yet; the mana + tap cost + effect still
-/// bind and the typed-sac rider is deferred (xmldoc per branch).</para>
+/// <see cref="AdditionalCost.Sacrifice(Permanent)"/> is added for a
+/// "Sacrifice this land / &lt;self&gt;" clause; a NON-self typed-sacrifice
+/// clause ("Sacrifice a Desert", "Sacrifice an artifact", "Sacrifice a land")
+/// now binds a real <see cref="SacrificeFilteredCost"/> (CR 701.16) whose
+/// predicate matches the controller's permanents of that type/subtype, threaded
+/// with the prod event bus so payment publishes a
+/// <see cref="PermanentSacrificedEvent"/> for aristocrat payoffs — see
+/// <c>TryBuildTypedSacrificeCost</c>. The source land itself qualifies when it
+/// has the named type/subtype (Ramunap Ruins is a Desert).</para>
 ///
 /// <para><b>Targeted variants</b> (Cave of Temptation, Buried Ruin, Riptide
 /// Laboratory, Barbarian Ring, the destroy-target-land cycle) ride the
@@ -138,6 +142,20 @@ public static class LandActivatedAbilityBinder
     // "Sacrifice this land" / "Sacrifice <SelfName>" — a SELF sacrifice cost.
     private static readonly Regex SacrificeSelf = new(
         @"Sacrifice\s+(?:this\s+land|this\s+permanent)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Sacrifice a/an <thing>" — a NON-self typed sacrifice cost (CR 701.16):
+    // Ramunap Ruins / Scavenger Grounds "Sacrifice a Desert", Phyrexia's Core
+    // "Sacrifice an artifact", a generic "Sacrifice a land". The controller
+    // sacrifices ONE permanent they control that matches the named type/subtype
+    // (the source land itself qualifies when it has that type/subtype, CR
+    // 701.16 — it is not the only legal choice). The captured <thing> is the
+    // type/subtype word ("Desert", "artifact", "creature", "land", "token").
+    // "this land"/"this permanent" is excluded by the SacrificeSelf branch
+    // taking precedence in BuildCosts, but the negative lookahead here also
+    // keeps the self-sac wording from matching this typed shape.
+    private static readonly Regex SacrificeTyped = new(
+        @"Sacrifice\s+an?\s+(?!other\b)(?<thing>[A-Za-z]+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Channel (CR 702.74). "Channel — {cost}, Discard this card: <effect>".
@@ -434,8 +452,10 @@ public static class LandActivatedAbilityBinder
 
     /// <summary>Build the cost list for an activation line: always Tap, plus a
     /// ManaCostCost when mana symbols are present, plus a self-Sacrifice when
-    /// the cost says "Sacrifice this land". Returns the parsed mana text (or
-    /// null) so callers can include it in effect descriptions.</summary>
+    /// the cost says "Sacrifice this land", OR a typed non-self
+    /// <see cref="SacrificeFilteredCost"/> when it says "Sacrifice a
+    /// &lt;type/subtype&gt;" (CR 701.16). <paramref name="sacrificesSelf"/>
+    /// reports only the self-sac case.</summary>
     private static List<ICost> BuildCosts(Land land, string cost, out bool sacrificesSelf, IEventBus? eventBus = null)
     {
         var costs = new List<ICost> { AdditionalCost.Tap(land) };
@@ -459,8 +479,77 @@ public static class LandActivatedAbilityBinder
             // binder chain, not their [CardName] factory). Null = legacy posture.
             costs.Add(AdditionalCost.Sacrifice(land, eventBus));
         }
+        // NON-self typed sacrifice (CR 701.16): "Sacrifice a Desert" (Ramunap
+        // Ruins / Scavenger Grounds), "Sacrifice an artifact" (Phyrexia's Core),
+        // "Sacrifice a land". The SELF-sac branch above takes precedence ("this
+        // land"/"this permanent" never reach here); for a typed clause we bind a
+        // real SacrificeFilteredCost (the same primitive the bespoke factories
+        // use) whose predicate matches the controller's permanents of that
+        // type/subtype. The source land itself qualifies when it has the named
+        // type/subtype. The prod event bus is threaded so payment publishes a
+        // PermanentSacrificedEvent (CR 701.16a) for aristocrat payoffs. This is
+        // the binder seam for typed non-self land sacrifice (v1-deferrals:
+        // non-self-typed-land-sacrifice-cost).
+        else if (TryBuildTypedSacrificeCost(cost, eventBus, out var typedSac))
+        {
+            costs.Add(typedSac!);
+        }
 
         return costs;
+    }
+
+    /// <summary>
+    /// CR 701.16 — when <paramref name="cost"/> carries a non-self typed
+    /// sacrifice clause ("Sacrifice a Desert" / "Sacrifice an artifact" /
+    /// "Sacrifice a land"), build the matching
+    /// <see cref="SacrificeFilteredCost"/> and return <c>true</c>. The captured
+    /// word is resolved to a predicate over the controller's permanents:
+    /// a <see cref="CardSubtype"/> match (Desert, Cave, …) or a
+    /// <see cref="CardType"/> match (artifact, creature, enchantment, land,
+    /// planeswalker), or the special "token" filter. An unrecognised word
+    /// (one the binder can't map to a type/subtype) returns <c>false</c> so the
+    /// caller leaves the typed-sac rider unbound rather than mis-binding.
+    /// </summary>
+    private static bool TryBuildTypedSacrificeCost(
+        string cost, IEventBus? eventBus, out SacrificeFilteredCost? typedSac)
+    {
+        typedSac = null;
+        if (SacrificeTyped.Match(cost) is not { Success: true } m) return false;
+
+        var thing = m.Groups["thing"].Value;
+
+        // "Sacrifice a token" (CR 111.8 / 701.16).
+        if (thing.Equals("token", StringComparison.OrdinalIgnoreCase))
+        {
+            typedSac = SacrificeFilteredCost.ForToken(eventBus);
+            return true;
+        }
+
+        // A subtype word (Desert, Cave, Elf, …) — match by the permanent's
+        // printed/effective subtype set (CR 701.16). Checked before the broad
+        // card-type words so a subtype never falls through to a type filter.
+        if (Enum.TryParse<CardSubtype>(thing, ignoreCase: true, out var subtype))
+        {
+            typedSac = SacrificeFilteredCost.ForSubtype(subtype, eventBus);
+            return true;
+        }
+
+        // A card-type word (artifact, creature, enchantment, land, planeswalker)
+        // — match by the permanent's card-type set (CR 305/300).
+        if (Enum.TryParse<CardType>(thing, ignoreCase: true, out var cardType)
+            && cardType is CardType.Artifact or CardType.Creature or CardType.Enchantment
+                or CardType.Land or CardType.Planeswalker)
+        {
+            typedSac = new SacrificeFilteredCost(
+                p => p.HasType(cardType),
+                $"sacrifice a {cardType.ToString().ToLowerInvariant()}",
+                eventBus);
+            return true;
+        }
+
+        // Unrecognised filter word — leave the typed-sac rider unbound (the mana
+        // + tap cost + effect still bind; same posture as before this seam).
+        return false;
     }
 
     // ======================================================================
@@ -1305,9 +1394,9 @@ public static class LandActivatedAbilityBinder
     // Damage to each opponent (+ optional gain N life) — Ramunap Ruins.
     // (CR 119). Reads opponents off the LIVE resolution context (never a
     // captured resolver — resolver-null inert-on-prod bug class). The typed
-    // "Sacrifice a Desert" non-self sacrifice cost is deferred (no
-    // typed-sacrifice-chooser primitive); the {2}{R}{R} + {T} cost + damage
-    // effect bind.
+    // "Sacrifice a Desert" non-self sacrifice cost is NOW BOUND by BuildCosts
+    // as a real SacrificeFilteredCost (CR 701.16) — the {2}{R}{R} + {T} + the
+    // typed non-self sacrifice cost + the damage effect all bind.
     // ----------------------------------------------------------------------
     private static void BindDamageEachOpponent(Land land, Player controller, string cost, int n, int gain, IEventBus? eventBus = null)
     {
@@ -1369,8 +1458,8 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     // You gain N life — Phyrexia's Core "{1}, {T}, Sacrifice an artifact: You
     // gain 1 life." (CR 119.3). The "Sacrifice an artifact" non-self typed
-    // sacrifice cost is deferred (no typed-sacrifice-chooser primitive); the
-    // {1} + {T} cost + gain-life effect bind.
+    // sacrifice cost is NOW BOUND by BuildCosts as a real SacrificeFilteredCost
+    // (CR 701.16); the {1} + {T} + typed-sac cost + gain-life effect all bind.
     // ----------------------------------------------------------------------
     private static void BindGainLife(Land land, Player controller, string cost, int n, IEventBus? eventBus = null)
     {
