@@ -170,18 +170,39 @@ public static class JoragaTreespeakerFactory
         // ----------------------------------------------------------------
         // 1. Level up {1}{G} — CR 702.87. Sorcery-speed activated ability;
         //    resolution places one level counter on this creature.
+        //
+        // RE-SOURCE-SAFE (seasoned-pyromancer-resolutioncontext-source-
+        // migration): "Put a level counter on this" places the counter on the
+        // live ResolutionContext.Source (the ability's own Source at
+        // resolution — Creature : Permanent so the cast holds) rather than
+        // capturing `card`, falling back to `card` only on the context-less
+        // legacy sync path (Effect.Execute()). Marked RebindSafe below so
+        // Agatha's Soul Cauldron re-homes the REAL Level up ability (Level up
+        // IS an activated ability — CR 702.87a) to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the BEARER receives
+        // the level counter, never the exiled Joraga Treespeaker. "Put a level
+        // counter on this" is outside OracleActivatedAbilityBinder's
+        // reconstructable set (its self-counter shape is +1/+1 only), so the
+        // RebindTo of the real ability is the sole sound re-home (the
+        // Skithiryx-class case).
         // ----------------------------------------------------------------
         var levelUpEffect = new Effect(
             $"{CardName}: put a level counter on self",
-            () => Majik.Core.Services.CountersService.Add(
-                card, CounterType.Level, 1, replacements, eventBus));
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                Majik.Core.Services.CountersService.Add(
+                    subject, CounterType.Level, 1, replacements, eventBus);
+                return ValueTask.CompletedTask;
+            });
 
         var levelUp = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(LevelUpCost) },
             effects: new IEffect[] { levelUpEffect },
-            sorcerySpeed: true);
+            sorcerySpeed: true,
+            rebindSafe: true);
         card.AddAbility(levelUp);
 
         if (continuousEffects == null)
