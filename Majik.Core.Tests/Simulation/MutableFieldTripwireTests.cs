@@ -37,7 +37,7 @@ public sealed class MutableFieldTripwireTests
             "_cardTypesView",                       // DERIVED-CACHE: lazy AsReadOnly wrapper over _cardTypes; not copied — clone re-creates lazily
             "_supertypesView",                      // DERIVED-CACHE: lazy AsReadOnly wrapper over _supertypes; not copied — clone re-creates lazily
             "_subtypesView",                        // DERIVED-CACHE: lazy AsReadOnly wrapper over _subtypes; not copied — clone re-creates lazily
-            "_backFaceLoyaltyAbilities",            // SKIPPED-DEFER: derived from _mdfcState (itself SKIPPED-DEFER); back-face loyalty abilities are sub-refs of _abilities (AddRange-copied), re-synced on transform
+            "_backFaceLoyaltyAbilities",            // COPIED (AddRange — back-face loyalty DETACH LEDGER; sub-refs of _abilities, shared refs so a flip-back in sim detaches exactly these). Pairs with _mdfcState SKIPPED-DEFER.
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)
             "_mdfcState",                           // SKIPPED-DEFER: complex, has lambda callbacks — see Task 8 concern

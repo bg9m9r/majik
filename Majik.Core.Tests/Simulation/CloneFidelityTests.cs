@@ -1,5 +1,8 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
+using Majik.Core.CardData.MDFCs;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -205,6 +208,61 @@ public sealed class CloneFidelityTests
         // Companion fields must be preserved.
         cBolt.RuntimeExileCastCost.Should().Be(cost);
         cBolt.RuntimeExileCastSpendAsAnyColor.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Clone_PreservesBackFaceLoyaltyAbilities_OnFlippedToPlaneswalkerBack()
+    {
+        // CR 711 / 606 — a creature-front transform DFC whose BACK face is a
+        // planeswalker (Ral, Monsoon Mage // Ral, Leyline Prodigy) is a Creature
+        // C# instance, NOT a Planeswalker. Flipping to the back attaches the
+        // back face's loyalty abilities through the Permanent-typed loyalty
+        // surface and records them in the detach ledger so a flip-BACK detaches
+        // exactly those. The sim clone (CloneForSim) must carry that ledger
+        // across the clone boundary, or a flip-back inside the MCTS sandbox
+        // would fail to detach them. (Pairs with the _mdfcState sim deferral —
+        // same clone-omission class.)
+        var alice = new Player("Alice", 20);
+        var ral = new Creature("Ral, Monsoon Mage", "{1}{R}", 1, 3);
+        ral.ChangeOwner(alice);
+        ral.ChangeController(alice);
+        alice.Zones.Battlefield.AddCard(ral);
+
+        // Attach the planeswalker back face with loyalty + oracle text so the
+        // transform path binds + records the loyalty abilities.
+        ral.MdfcState = new MdfcState(
+            "Ral, Monsoon Mage",
+            "Ral, Leyline Prodigy",
+            new BackFaceCharacteristics(
+                name: "Ral, Leyline Prodigy",
+                isCreature: false,
+                power: 0,
+                toughness: 0,
+                types: new[] { CardType.Planeswalker },
+                subtypes: new[] { CardSubtype.Ral },
+                supertypes: new[] { CardSupertype.Legendary },
+                colors: new[] { ManaColor.Blue, ManaColor.Red },
+                loyalty: 2,
+                oracleText: "+1: Draw a card.\n-3: You gain 3 life."));
+
+        ral.MdfcState!.Transform(); // → back face: ledger populated
+
+        ral.BackFaceLoyaltyAbilities.Should().HaveCount(2,
+            "the back face has two loyalty-cost lines (sanity: ledger populated pre-clone)");
+
+        // Act: clone for sim.
+        var cClone = (Creature)ral.CloneForSim();
+
+        // Assert: the detach ledger survives the clone boundary (shared refs,
+        // same posture as _abilities).
+        cClone.BackFaceLoyaltyAbilities.Should().HaveCount(2,
+            "CloneForSim must copy the back-face loyalty-ability detach ledger");
+        cClone.BackFaceLoyaltyAbilities.Should().BeEquivalentTo(
+            ral.BackFaceLoyaltyAbilities,
+            "the ledger shares the same LoyaltyAbility refs as the source (definition-data posture)");
+
+        // And those same abilities are reachable through the clone's ability list.
+        cClone.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(2);
     }
 
     [Fact]

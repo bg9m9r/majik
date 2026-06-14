@@ -1452,6 +1452,15 @@ public class Card : ICard
     /// abilities flip attached — see <see cref="SyncBackFaceLoyaltyAbilities"/>.</summary>
     private readonly List<Majik.Core.Abilities.LoyaltyAbility> _backFaceLoyaltyAbilities = new();
 
+    /// <summary>CR 711 / 606 — the back-face loyalty-ability detach ledger,
+    /// surfaced read-only for the sim-clone fidelity check
+    /// (<see cref="CloneForSim"/>): a creature-front DFC flipped to its
+    /// planeswalker back must carry this list across the clone boundary so a
+    /// subsequent flip-back in the sandbox detaches exactly the abilities the
+    /// flip attached. Empty on every non-flipped permanent.</summary>
+    internal IReadOnlyList<Majik.Core.Abilities.LoyaltyAbility> BackFaceLoyaltyAbilities
+        => _backFaceLoyaltyAbilities;
+
     /// <summary>
     /// CR 711 / 606 — attach the back face's loyalty abilities ([+1]/[−2]/…)
     /// when a creature-front DFC transforms to its planeswalker back, and
@@ -1670,6 +1679,17 @@ public class Card : ICard
         TokenColorsOverride = src.TokenColorsOverride; // immutable list ref
         AdventureSpec = src.AdventureSpec;             // definition ref
         // MdfcState is complex (has callbacks); skip for sim — Task N.
+        // CR 711 / 606 — back-face loyalty-ability DETACH LEDGER. _abilities is
+        // shared by reference above, so the back face's LoyaltyAbility refs are
+        // already present in the clone's ability list; this ledger must travel
+        // with them so a flip-BACK inside the MCTS sandbox detaches exactly the
+        // abilities the flip attached (an empty ledger would leave them stuck
+        // on). Share the same refs (same posture as _abilities) — the ledger is
+        // a subset of the shared ability list, never a separately-mutated copy.
+        // Pairs with the _mdfcState sim-skip above (same clone-omission class:
+        // v1-deferrals backface-loyalty-not-copied-on-cloneforsim).
+        // preserves: _backFaceLoyaltyAbilities (back-face loyalty detach ledger).
+        _backFaceLoyaltyAbilities.AddRange(src._backFaceLoyaltyAbilities);
 
         // cast sentinels
         WasCast = src.WasCast;
