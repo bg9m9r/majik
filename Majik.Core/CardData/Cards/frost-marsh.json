@@ -1,0 +1,9 @@
+{
+  "name": "Frost Marsh",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
