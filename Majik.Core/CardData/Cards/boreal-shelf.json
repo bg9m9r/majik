@@ -1,0 +1,9 @@
+{
+  "name": "Boreal Shelf",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
