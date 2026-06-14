@@ -1,0 +1,6 @@
+{
+  "name": "Fracture",
+  "types": ["Instant"],
+  "manaCost": "{W}{B}",
+  "colors": ["W", "B"]
+}

@@ -203,6 +203,16 @@ public static class TargetFilters
                 ($"target artifact or enchantment to {verb}",
                     o => o is Permanent p && OnBattlefield(p)
                          && (p.HasType(CardType.Artifact) || p.HasType(CardType.Enchantment))),
+            // CR 109.5 — Fracture's "artifact, enchantment, or planeswalker"
+            // (any one of the three types). Both the candidate gatherer and the
+            // CR 608.2b resolution re-check apply the OR predicate, so an
+            // off-type raw target fizzles cleanly.
+            "artifact_enchantment_or_planeswalker" =>
+                ($"target artifact, enchantment, or planeswalker to {verb}",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && (p.HasType(CardType.Artifact)
+                             || p.HasType(CardType.Enchantment)
+                             || p.HasType(CardType.Planeswalker))),
             // CR 109.5 — Haywire Mite's "noncreature artifact or noncreature
             // enchantment": an artifact OR enchantment that is NOT also a
             // creature (an artifact creature / enchantment creature is
