@@ -1974,6 +1974,75 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public async Task Grant_NonMana_SameNameSpillover_RehomesPingAndSweepToBearer()
+    {
+        // izzet-staticaster-pinger-spillover-oracle-shape: the
+        // OracleActivatedAbilityBinder now reconstructs Izzet Staticaster's
+        // spillover oracle shape "{cost}: This creature deals N damage to target
+        // creature and each other creature with the same name as that creature."
+        // (CR 109.2 / 707.2). Re-homing is sound: the BEARER is only the source /
+        // cost-payer; the damage lands on the chosen creature + each OTHER
+        // battlefield creature whose EFFECTIVE name matches, read off rc.Game —
+        // never the exiled imprinted card.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: a 0/3 with Izzet Staticaster's printed line.
+        var staticaster = new Creature("Staticaster Stub", "1UR", 0, 3);
+        staticaster.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(staticaster);
+        staticaster.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Staticaster Stub",
+                "{T}: This creature deals 1 damage to target creature and each "
+                + "other creature with the same name as that creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), staticaster);
+
+        var ping = GrantedActivated(bearer).Single(a =>
+            a.TargetRequests.Any(t => t.Description.Contains("target creature")));
+        ping.Source.Should().BeSameAs(bearer, "the spillover ping is re-homed to the BEARER");
+
+        // Battlefield: the chosen target + a name-twin (both hit) + an unrelated
+        // creature (not hit). Twins split across both players' battlefields.
+        Creature OnBf(string name, Player p)
+        {
+            var c = new Creature(name, "1G", 2, 2);
+            c.SetOwner(p);
+            c.SetController(p);
+            c.SetZone(ZoneType.Battlefield);
+            p.Zones.Battlefield.AddCard(c);
+            return c;
+        }
+        var targetBear = OnBf("Grizzly Bears", bob);
+        var twinBear = OnBf("Grizzly Bears", alice);
+        var giant = OnBf("Hill Giant", bob);
+
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { targetBear } });
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(bus));
+        await ping.ResolveAsync(agent: null, game: game);
+
+        targetBear.Damage.Should().Be(1, "the chosen target takes the ping");
+        twinBear.Damage.Should().Be(1, "each OTHER creature with the same name takes the ping");
+        giant.Damage.Should().Be(0, "an unrelated creature is untouched");
+        staticaster.Damage.Should().Be(0, "the exiled imprinted card is never affected");
+    }
+
+    [Fact]
     public async Task Grant_RebindsRealAbility_ResolvesThroughAbilityPath_AffectingBearer()
     {
         var alice = new Player("Alice", 20);
