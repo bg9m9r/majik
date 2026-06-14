@@ -12,13 +12,12 @@ namespace Majik.Core.Costs;
 /// <see cref="DiscardACardAdditionalCost"/>:
 ///
 /// <list type="bullet">
-/// <item><b>Excludes the spell being cast.</b> This engine's
-/// <see cref="Majik.Core.Game.SpellCastFlow"/> pays additional costs while the
-/// spell card is still in the caster's hand (the Hand → Stack move happens
-/// after cost payment). The escalate discard must therefore never pick the
-/// very card whose escalate it is paying — Collective Brutality can't discard
-/// itself to pay its own escalate. <see cref="_excluded"/> is filtered out of
-/// the discardable pool.</item>
+/// <item><b>Excludes the spell being cast.</b> CR 702.121 — a spell can't be
+/// discarded to pay its own escalate. CR 601.2a moves a hand cast to the stack
+/// before cost payment, so the cast card is normally already off-hand; this
+/// filter is retained defensively (and for the rarer non-hand escalate path) so
+/// Collective Brutality can never discard itself. <see cref="_excluded"/> is
+/// filtered out of the discardable pool.</item>
 /// <item><b>Agent-driven pick.</b> When an <see cref="IPlayerAgent"/> is
 /// supplied, the caster chooses which card to discard via
 /// <see cref="IPlayerAgent.ChooseFromHandAsync"/> (intent

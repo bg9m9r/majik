@@ -147,18 +147,21 @@ public static class CollectiveBrutalityFactory
             MaxModes: TotalModes,
             // CR 702.121 — Escalate—Discard a card. One fresh discard cost per
             // extra mode (agent-driven pick, excluding Collective Brutality
-            // itself — which is still in hand when costs are paid in this
-            // flow). The aggregate probe rejects a cast whose extra-mode count
+            // itself). The aggregate probe rejects a cast whose extra-mode count
             // exceeds the OTHER cards available to discard (CR 601.2g).
             Escalate: new EscalateSpec(
                 Description: "Discard a card",
                 BuildPerModeCost: castCard => new EscalateDiscardAdditionalCost(castCard, agent),
-                // Collective Brutality itself is still in hand when the cost is
-                // paid (this flow moves the spell to the stack AFTER cost
-                // payment), so the caster needs `extra` cards BESIDES it: hand
-                // size must be at least extra + 1.
+                // CR 601.2a — the spell has already moved Hand → Stack (the
+                // engine performs the strict-601.2a move for a hand cast before
+                // cost determination), so the cast card is NO LONGER in hand and
+                // every remaining hand card is a legal escalate discard. The
+                // caster therefore needs `extra` cards in hand. (EscalateDiscard-
+                // AdditionalCost also filters the cast card defensively, so this
+                // stays correct even for a non-hand cast where the spell never
+                // sat in hand.)
                 CanPayExtra: (player, extra) =>
-                    player.Zones.Hand.GetCards().Count() >= extra + 1),
+                    player.Zones.Hand.GetCards().Count() >= extra),
             EffectFactory: p =>
             {
                 // CR 700.2d — resolve the chosen modes in PRINTED order

@@ -17,6 +17,10 @@ namespace Majik.Core.Game;
 /// <summary>
 /// Orchestrates Rule 601 spell-casting steps via async agent prompts:
 ///   0. casting permission check (CR 117.1, sorcery vs instant speed)
+///   0a. CR 601.2a — move the spell to the stack (done first for a HAND cast;
+///       deferred to step 6 for non-hand origins whose gates/riders read the
+///       origin zone live — see the move sites below). A hand cast that later
+///       proves illegal is rewound off the stack (CR 731.1).
 ///   1. announce spell; pay any additional costs (CR 601.2f)
 ///   2. choose modes
 ///   3. choose X (variable costs); X is added to the mana cost
@@ -157,6 +161,86 @@ public sealed class SpellCastFlow
         // is paid as part of the alt-cost itself, before other zone mutations.
         PayEscapeRiderIfAny(card, caster, alternativeCost);
 
+        // CR 601.2 / CR 113.5 — capture the origin zone BEFORE any move so the
+        // per-source-zone sentinels (cast-from-hand / -library / -graveyard) can
+        // branch on it, AND so the Hand→Stack move below can be gated on it.
+        var sourceZoneAtCast = card.Zone;
+
+        // CR 601.2a — "the player moves the spell from where it is to the
+        // stack" is the FIRST proposal step. For a HAND-sourced cast we honour
+        // that ordering literally: the card is placed on the stack here, before
+        // cost determination (CR 601.2f) and target collection (CR 601.2c), so a
+        // cast-time observer (a "whenever you cast" watcher or a self-
+        // referential cost/target predicate) sees the card on the stack rather
+        // than still in hand.
+        //
+        // The move is gated to the Hand source ON PURPOSE — the late move below
+        // is retained for every OTHER origin zone (Library / Graveyard / Exile),
+        // where deferring is REQUIRED, not cosmetic:
+        //   * the Library-top-cast permission (CR 601.3e) and an alt-cost's
+        //     CanCastFor zone restriction (CR 118.9) read card.Zone live in
+        //     ValidateCastingPermissionAndAltCost above; a hand card trips
+        //     neither gate (Library auth is skipped when Zone != Library, and a
+        //     hand cast carries no zone-restricted alt cost path through here);
+        //   * the from-graveyard riders (Delve's CR 702.66b exile, Escape's
+        //     CR 702.138a exile, already paid above) move OTHER graveyard cards
+        //     while the cast card is itself still in the graveyard — moving it
+        //     early would corrupt the "N OTHER cards" count. A hand card is in
+        //     none of those riders' source zones.
+        // Because nothing between here and Push observes the card on the stack
+        // in a way that differs for a hand card, and CR 731.1 makes the whole
+        // proposal atomic anyway, the early hand move is behaviourally safe.
+        if (sourceZoneAtCast == ZoneType.Hand)
+        {
+            _zoneService.MoveCard(card, ZoneType.Hand, ZoneType.Stack, controller: caster);
+        }
+
+        try
+        {
+            return await ProposeAndPushAsync(
+                caster, card, definition, agent, ctx, ct,
+                additionalCosts, alternativeCost, preChosenMana, delveCost,
+                payManaCost, preChosenX, sourceZoneAtCast);
+        }
+        catch when (sourceZoneAtCast == ZoneType.Hand && card.Zone == ZoneType.Stack)
+        {
+            // CR 731.1 / CR 728.x — the proposal became illegal AFTER the
+            // CR 601.2a Hand→Stack move (insufficient targets, unpayable
+            // additional cost, failed mana payment). "The entire action is
+            // reversed and any payments already made are canceled" — so the
+            // card is rewound off the stack back to its origin hand before the
+            // exception propagates. (Non-hand origins never entered the early
+            // move, so they have nothing to rewind.) The card has not been
+            // Pushed onto the stack object yet, so this is a pure zone rewind.
+            _zoneService.MoveCard(card, ZoneType.Stack, ZoneType.Hand, controller: caster);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// CR 601.2b–h — the remaining spell-proposal steps once the card is (for a
+    /// hand cast) already on the stack: additional-cost merge, mode / X / target
+    /// choice, total-cost determination, the non-mana + mana payments, effect
+    /// construction, the (non-hand) late zone move, sentinel stamping, and the
+    /// final <see cref="Majik.Core.Stack.Stack.Push"/> + SpellCastEvent publish.
+    /// Extracted so <see cref="CastAsync"/> can wrap it in the CR 731.1 rewind
+    /// guard that returns a hand-cast card to hand if any step throws.
+    /// </summary>
+    private async Task<Spells.Spell> ProposeAndPushAsync(
+        Player caster,
+        ICard card,
+        SpellDefinition definition,
+        IPlayerAgent agent,
+        GameContext ctx,
+        CancellationToken ct,
+        IReadOnlyList<IAdditionalCost>? additionalCosts,
+        IAlternativeCost? alternativeCost,
+        Majik.Core.Players.Agents.ManaPayment? preChosenMana,
+        DelveCost? delveCost,
+        Func<ManaCost, bool>? payManaCost,
+        int? preChosenX,
+        ZoneType sourceZoneAtCast)
+    {
         // CR 601.2f — merge caller-supplied additional costs with the ones the
         // SpellDefinition itself declares and pre-check legality (CR 601.2g —
         // no partial payment). The actual PAYMENT is deferred to the
@@ -266,30 +350,28 @@ public sealed class SpellCastFlow
                 $"Cannot cast {card.Name}: mana payment failed (CR 601.2h).");
         }
 
-        // CR 601.2 / CR 113.5 — capture source zone BEFORE the Hand → Stack
-        // move so the "cast from hand" sentinel can branch on it.
-        //
-        // CR 601.2a says the card moves to the stack as the FIRST proposal
-        // step, ahead of cost determination and target collection. The engine
-        // deliberately defers the physical move to HERE (after every step that
-        // can make the cast illegal has run) for two interlocking reasons, both
-        // of which depend on the card still residing in its ORIGIN zone above:
-        //   * the source-zone gates read card.Zone live —
-        //     ValidateCastingPermissionAndAltCost checks the Library-top-cast
-        //     permission (CR 601.3e) and the alt-cost's CanCastFor zone
-        //     restriction (CR 118.9); CostReduction.GetEffectiveCost and the
+        // CR 601.2a — for a hand-sourced cast the card is ALREADY on the stack
+        // (moved at the top of this method, honouring the strict CR 601.2a "move
+        // to the stack first" ordering). For every OTHER origin zone the move is
+        // deferred to HERE — after every step that can make the cast illegal has
+        // run — because those zones' gates and riders read card.Zone live:
+        //   * the source-zone gates — ValidateCastingPermissionAndAltCost checks
+        //     the Library-top-cast permission (CR 601.3e) and the alt-cost's
+        //     CanCastFor zone restriction (CR 118.9); CostReduction and the
         //     targeting candidate pools also resolve against the origin zone;
         //   * the from-graveyard riders (Delve's CR 702.66b exile, Escape's
         //     CR 702.138a exile) move OTHER graveyard cards while the cast card
         //     is itself still in the graveyard — exiling it early would corrupt
         //     the "N OTHER cards" count.
         // Because nothing observes the card on the stack until Push below, the
-        // late move is behaviourally identical to the rules-order move (CR 731.1
-        // makes the whole proposal atomic anyway). This is the deliberate
-        // residual of the mana-payment-over-select deferral, item (d): kept late
-        // ON PURPOSE — the strict-601.2a reorder is NOT a safe change.
-        var sourceZoneAtCast = card.Zone;
-        _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
+        // deferred move is behaviourally identical to the rules-order move
+        // (CR 731.1 makes the whole proposal atomic anyway). sourceZoneAtCast was
+        // captured at the top, before any move, so the per-source-zone sentinels
+        // below still see the true origin.
+        if (sourceZoneAtCast != ZoneType.Hand)
+        {
+            _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
+        }
 
         // CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature cleanup
         // effects (alt-cost OnResolved, Kicker/Surge/Gift sentinel-clear).

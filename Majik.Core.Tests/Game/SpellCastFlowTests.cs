@@ -55,6 +55,35 @@ public class SpellCastFlowTests
     }
 
     [Fact]
+    public async Task HandCast_CardIsOnStack_WhenEffectFactoryObservesIt_CR601_2a()
+    {
+        // CR 601.2a — "the player moves the spell from where it is to the
+        // stack" is the FIRST proposal step. For a hand-sourced cast the card
+        // must therefore already reside in the Stack zone by the time later
+        // proposal steps run (mode/X/target choice, cost determination,
+        // EffectFactory). A cast-time observer (a "whenever you cast" watcher
+        // or a self-referential effect) must see the card on the stack, not
+        // still in hand.
+        var bolt = new Instant("Bolt", "R") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(bolt);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        ZoneType? zoneSeenByEffectFactory = null;
+        var def = SpellDefinition.Vanilla(_ =>
+        {
+            zoneSeenByEffectFactory = bolt.Zone;
+            return Array.Empty<IEffect>();
+        });
+
+        await _flow.CastAsync(_alice, bolt, def, agent, NewContext());
+
+        zoneSeenByEffectFactory.Should().Be(ZoneType.Stack,
+            "CR 601.2a — the card moves to the stack as the FIRST step, so a "
+            + "cast-time observer must see it on the stack, not in hand");
+    }
+
+    [Fact]
     public async Task TargetedSpell_PromptsForTargets_InOrder_AttachesTargets()
     {
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
