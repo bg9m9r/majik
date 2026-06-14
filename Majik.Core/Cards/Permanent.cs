@@ -598,6 +598,15 @@ public class Permanent : Card
     internal void ResetOnLeaveBattlefield()
     {
         _isTapped = false;
+        // CR 506.4a — a permanent that leaves the battlefield (bounced,
+        // destroyed, exiled, sacrificed, …) is removed from combat. Drop it from
+        // the live combat-membership surface so an in-combat target gate (Eiganjo,
+        // Seat of the Empire's channel — "target attacking or blocking creature")
+        // never sees it as a stale attacker/blocker at gather or resolution time.
+        // The whole-combat Clear() only fires at combat END (CR 511.3); this is
+        // the per-creature mid-combat removal route the Zone setter funnels every
+        // battlefield exit through. Mirrors ConsumeRegenerationShield (CR 701.15c).
+        Majik.Core.Combat.CombatMembershipRegistryProvider.Current.RemoveFromCombat(this);
     }
 
     /// <summary>

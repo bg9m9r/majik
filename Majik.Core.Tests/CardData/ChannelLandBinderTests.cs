@@ -590,4 +590,61 @@ public class ChannelLandBinderTests
         CombatMembershipRegistryProvider.Current.IsAttacking(stillAttacking).Should().BeTrue(
             "the rest of the combat is unaffected by one creature leaving combat");
     }
+
+    [Fact]
+    public void Eiganjo_Gatherer_DoesNotOfferAttackerThatLeftTheBattlefield()
+    {
+        // CR 506.4a / 601.2c — a creature that was attacking but has since left
+        // the battlefield (bounced / destroyed) is removed from combat and is no
+        // longer a legal "attacking or blocking creature". The candidate gatherer
+        // must not offer it even though it was recorded as an attacker.
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var request = ability.TargetRequests.Single();
+
+        var attacker = Bears("Attacker", bob);
+        var stillAttacking = Bears("StillAttacking", bob);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+        CombatMembershipRegistryProvider.Current.RecordAttacker(stillAttacking);
+
+        // The first attacker leaves the battlefield (e.g. bounced to hand) — the
+        // Zone setter routes through ResetOnLeaveBattlefield, which removes it
+        // from the ambient combat-membership registry (CR 506.4a).
+        attacker.SetZone(ZoneType.Hand);
+
+        var candidates = request.ResolveCandidates(Ctx(bob));
+
+        candidates.Should().NotContain(attacker,
+            "a creature that left the battlefield is no longer attacking (CR 506.4a)");
+        candidates.Should().Contain(stillAttacking,
+            "the rest of the attackers remain legal Eiganjo targets");
+    }
+
+    [Fact]
+    public void Eiganjo_Resolve_NoDamageIfTargetLeftBattlefieldMidCombat()
+    {
+        // CR 506.4a / 608.2b — the chosen creature was attacking when Eiganjo's
+        // ability went on the stack, but it left the battlefield (bounced) before
+        // resolution while combat continued. It is no longer a legal target and
+        // takes no damage; leaving the battlefield also drops it from the live
+        // combat-membership registry so it never lingers as a stale member.
+        var bob = new Player("Bob", 20);
+        var ability = BindEiganjo();
+        var attacker = Bears("Attacker", bob);
+
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        CombatMembershipRegistryProvider.Current.RecordAttacker(attacker);
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { attacker } });
+
+        attacker.SetZone(ZoneType.Hand); // bounced before Eiganjo resolves
+
+        ability.Resolve();
+
+        CombatMembershipRegistryProvider.Current.IsAttackingOrBlocking(attacker)
+            .Should().BeFalse("a creature that left the battlefield is removed from combat (CR 506.4a)");
+        attacker.Damage.Should().Be(0,
+            "a target no longer on the battlefield is illegal at resolution (CR 608.2b)");
+    }
 }

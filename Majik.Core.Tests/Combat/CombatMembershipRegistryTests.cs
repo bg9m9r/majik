@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Combat;
 using Majik.Core.Players;
+using Majik.Core.Zones;
 using Xunit;
 
 namespace Majik.Core.Tests.Combat;
@@ -127,5 +128,34 @@ public class CombatMembershipRegistryTests
         reg.RecordBlocker(c);
 
         reg.AttackingOrBlocking().Should().ContainSingle().Which.Should().BeSameAs(c);
+    }
+
+    [Fact]
+    public void LeavingTheBattlefield_RemovesACreatureFromTheLiveCombatRegistry()
+    {
+        // CR 506.4a — a permanent that leaves the battlefield is removed from
+        // combat. Permanent.ResetOnLeaveBattlefield (fired by the Zone setter on
+        // every battlefield exit — bounce / destroy / exile / sacrifice) drops
+        // the creature from the ambient combat-membership registry so an
+        // in-combat target gate never sees it as a stale attacker/blocker. The
+        // rest of the combat is unaffected.
+        using var scope = CombatMembershipRegistryProvider.PushScope();
+        var reg = CombatMembershipRegistryProvider.Current;
+
+        var atk = Creature("Attacker");
+        var stillAttacking = Creature("StillAttacking");
+        atk.SetZone(ZoneType.Battlefield);
+        stillAttacking.SetZone(ZoneType.Battlefield);
+        reg.RecordAttacker(atk);
+        reg.RecordAttacker(stillAttacking);
+
+        // The first attacker leaves the battlefield (e.g. bounced to hand).
+        atk.SetZone(ZoneType.Hand);
+
+        reg.IsAttacking(atk).Should().BeFalse(
+            "a creature that left the battlefield is no longer attacking (CR 506.4a)");
+        reg.IsAttackingOrBlocking(atk).Should().BeFalse();
+        reg.AttackingOrBlocking().Should().ContainSingle().Which.Should().BeSameAs(stillAttacking,
+            "only the creature still on the battlefield remains a live combat member");
     }
 }
