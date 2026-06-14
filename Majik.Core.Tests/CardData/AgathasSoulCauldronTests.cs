@@ -3026,6 +3026,102 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // seasoned-pyromancer-resolutioncontext-source-migration — Joraga
+    // Treespeaker is a bespoke [CardName]-factory creature whose sole non-mana
+    // activated ability is its Level up (CR 702.87a — "Level up {1}{G}:
+    // {1}{G}: Put a level counter on this. Level up only as a sorcery."). Level
+    // up IS an activated ability, so Agatha's Soul Cauldron grants it to a
+    // counter-bearing bearer. "Put a level counter on THIS" must place the
+    // counter on the BEARER, not the exiled Joraga. The migration retargets the
+    // level-counter placement onto ResolutionContext.Source (falling back to the
+    // card on the legacy sync path) and marks the ability RebindSafe, so the
+    // group-grant re-homes the REAL Level up ability via ActivatedAbility.
+    // RebindTo (CR 707.2 / 613.1f). "Put a level counter on this" is outside the
+    // OracleActivatedAbilityBinder reconstructable set (its self-counter shape
+    // is +1/+1 only), so the RebindTo of the real ability is the sole sound
+    // re-home (the Skithiryx-class case).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_JoragaTreespeaker_LevelCounterToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var joraga = JoragaTreespeakerFactory.Create(alice);
+        var realAbilities = joraga.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Joraga Treespeaker has exactly one non-mana activated ability — its Level up");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Joraga Level up ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(joraga);
+        joraga.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Joraga so the only way the
+        // ability is granted is via RebindTo of the real ability — the oracle-
+        // rebuild fallback cannot reconstruct "Put a level counter on this", so
+        // if the grant still depended on it nothing would be emitted and this
+        // test would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), joraga);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Joraga Treespeaker's real Level up ability is re-homed via RebindTo");
+        var levelUp = granted[0];
+        levelUp.Source.Should().BeSameAs(bearer,
+            "the re-homed Level up ability is sourced on the BEARER (CR 707.2)");
+        levelUp.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Resolving the re-homed ability puts a level counter on the BEARER,
+        // never the exiled Joraga Treespeaker — ResolutionContext.Source =
+        // bearer.
+        var bearerLevelsBefore = bearer.Counters.Count(CounterType.Level);
+        var joragaLevelsBefore = joraga.Counters.Count(CounterType.Level);
+
+        await levelUp.ResolveAsync(agent: null, game: null);
+
+        bearer.Counters.Count(CounterType.Level).Should().Be(bearerLevelsBefore + 1,
+            "the re-homed Level up ability adds a level counter to the BEARER");
+        joraga.Counters.Count(CounterType.Level).Should().Be(joragaLevelsBefore,
+            "the exiled imprinted Joraga Treespeaker never receives the level counter");
+    }
+
+    [Fact]
+    public async Task BespokeLevelUp_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still puts the level counter on its OWN
+        // source on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var joraga = JoragaTreespeakerFactory.Create(alice);
+        alice.Zones.Library.AddCard(joraga);
+        zones.MoveCard(joraga, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var levelUp = joraga.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var before = joraga.Counters.Count(CounterType.Level);
+
+        await levelUp.ResolveAsync(agent: null, game: null);
+
+        joraga.Counters.Count(CounterType.Level).Should().Be(before + 1,
+            "resolving the un-rebound Level up ability adds the counter to its own source");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-oracle-shape-scavenging-ooze-exile-gy-pump-gain — Mother of Runes
     // is a bespoke [CardName]-factory creature whose sole activated ability
     // ("{T}: Target creature you control gains protection from the color of
