@@ -52,14 +52,22 @@ public static class OracleManaBinder
         return _chosenColors.TryGetValue(land, out var choice) ? choice : null;
     }
 
-    // A double-quoted run — the text of an ability a card GRANTS to OTHER
-    // objects, e.g. Joraga Treespeaker's LEVEL 5+ anthem
-    // ("Elves you control have \"{T}: Add {G}{G}.\""). Such a granted ability is
-    // NOT the card's own activated ability (CR 613.1f / 702.49), so its
-    // "{T}: Add …" mana clause must not be re-homed by ParseTapManaCosts.
-    // Non-greedy so two distinct quoted runs on one card are each stripped.
-    private static readonly Regex QuotedGrantRegex = new(
-        "\"[^\"]*\"", RegexOptions.Singleline);
+    // A quoted ability a card GRANTS to OTHER objects via an anthem: the
+    // grammar is "<other objects> have \"…\"" (CR 613.1f / 702.49), e.g. Joraga
+    // Treespeaker's LEVEL 5+ "Elves you control have \"{T}: Add {G}{G}.\"". The
+    // anthem verb "have" (plural — granted to MANY other objects) is the
+    // distinguisher: it precedes the quoted run. A SINGULAR "has" describes the
+    // card's OWN ability — Dryad Arbor's reminder text "(This land … has
+    // \"{T}: Add {G}.\")" is the card's own intrinsic mana ability, NOT a grant
+    // — so "has"-quoted runs are deliberately NOT stripped. Anchoring on the
+    // " have " anthem verb keeps a card's own quoted reminder-text ability (the
+    // mana ability we DO want to re-home) intact while excising only abilities
+    // conferred on other permanents. The captured group is the quoted run +
+    // anything after it on the line (the grant clause is the line tail), so the
+    // whole granted ability is removed; the leading "have " is preserved.
+    private static readonly Regex QuotedAnthemGrantRegex = new(
+        "\\bhave\\s+\"[^\"]*\"",
+        RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // {T}: Add {R}.  or  {T}: Add {R}{R}.  or  {T}: Add one {G}.
     private static readonly Regex TapForManaRegex = new(
@@ -249,13 +257,14 @@ public static class OracleManaBinder
 
         // CR 613.1f / 702.49 — re-homing (Agatha's Soul Cauldron) grants the
         // imprinted creature's OWN activated abilities, NOT abilities it GRANTS
-        // to OTHER objects via a quoted ability. A "{T}: Add …" clause inside a
-        // double-quoted run is such a grant ("Elves you control have '{T}: Add
-        // {G}{G}.'" — Joraga Treespeaker's LEVEL 5+ anthem), so strip every
-        // quoted run before scanning — otherwise the anthem's quoted mana ability
-        // would be wrongly re-homed onto the bearer (double-grant). Real cards
-        // use straight ASCII double quotes around granted abilities; this leaves
-        // the card's own (unquoted) "{T}: Add …" clauses intact.
+        // to OTHER objects via an anthem ("<others> have \"…\""). A "{T}: Add …"
+        // clause inside such an anthem-granted quoted ability ("Elves you control
+        // have '{T}: Add {G}{G}.'" — Joraga Treespeaker's LEVEL 5+ anthem) is not
+        // the card's own ability, so strip it before scanning — otherwise the
+        // anthem's quoted mana ability would be wrongly re-homed onto the bearer
+        // (double-grant). Only the " have \"…\"" anthem grammar is stripped: a
+        // card's OWN quoted reminder-text ability ("(This land … has
+        // \"{T}: Add {G}.\")" — Dryad Arbor) uses singular "has" and is KEPT.
         oracleText = StripQuotedGrants(oracleText);
 
         // Any-colour mana sources (Mox Opal, City of Brass, command tower).
@@ -705,7 +714,7 @@ public static class OracleManaBinder
     /// "{T}: Add …" clause is never accidentally spliced across the removal.
     /// </summary>
     private static string StripQuotedGrants(string oracleText) =>
-        QuotedGrantRegex.Replace(oracleText, " ");
+        QuotedAnthemGrantRegex.Replace(oracleText, " have ");
 
     private static int WordToInt(string s) =>
         s.ToLowerInvariant() switch

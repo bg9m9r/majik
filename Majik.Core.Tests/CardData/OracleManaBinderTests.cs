@@ -453,6 +453,26 @@ public class OracleManaBinderTests
     }
 
     [Fact]
+    public void ParseTapManaCosts_KeepsOwnQuotedReminderTextAbility_DryadArbor()
+    {
+        // Dryad Arbor's OWN mana ability is written in quoted REMINDER text with
+        // the singular "has" ("(This land … has \"{T}: Add {G}.\")") — that is
+        // the card's own intrinsic ability, NOT an anthem grant to others, so it
+        // MUST still be re-homable. Only the plural " have \"…\"" anthem grammar
+        // is stripped; a quoted-reminder own ability is kept.
+        const string dryadArbor =
+            "(This land isn't a spell, it's affected by summoning sickness, "
+            + "and it has \"{T}: Add {G}.\")";
+
+        var costs = OracleManaBinder.ParseTapManaCosts(dryadArbor);
+
+        costs.Should().ContainSingle(
+            "Dryad Arbor's quoted-reminder \"{T}: Add {G}\" is its OWN ability "
+            + "(singular \"has\"), not an anthem grant, so it is kept")
+            .Which.ToString().Should().Be(ManaCost.Parse("G").ToString());
+    }
+
+    [Fact]
     public void ParseTapManaCosts_IgnoresQuotedGrant_KeepsSeparateOwnAbility()
     {
         // A card whose own ability is "{T}: Add {C}." but which also grants a
