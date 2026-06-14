@@ -916,10 +916,14 @@ public class Permanent : Card
         _regenerationShields--;
         if (!IsTapped) Tap();
         OnRegenerationShieldConsumed();
-        // CR 701.15c also removes the permanent from combat; the combat
-        // manager owns per-turn attacker/blocker plans and doesn't expose
-        // a per-creature removal hook yet (same gap as
-        // RegenerationShieldEffect). Followup when CombatFlow surfaces it.
+        // CR 701.15c — consuming a regeneration shield also removes the
+        // permanent from combat. The live combat-membership surface
+        // (CombatMembershipRegistry) is the queryable "who is attacking /
+        // blocking right now" set an in-combat target gate (Eiganjo, Seat of
+        // the Empire's channel) reads; drop this permanent from it so a
+        // regenerated attacker/blocker stops being a legal "attacking or
+        // blocking creature" without ending the rest of the combat.
+        Majik.Core.Combat.CombatMembershipRegistryProvider.Current.RemoveFromCombat(this);
         return true;
     }
 

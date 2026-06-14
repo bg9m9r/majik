@@ -78,6 +78,45 @@ public class CombatMembershipRegistryTests
     }
 
     [Fact]
+    public void RemoveFromCombat_DropsASingleCreatureWithoutAffectingOthers()
+    {
+        // CR 506.4 / CR 701.15c — a creature removed from combat (e.g. by
+        // consuming a regeneration shield) is no longer attacking/blocking even
+        // though combat continues for the rest. The registry must drop just
+        // that creature, not the whole combat (which is what Clear() does).
+        var reg = new CombatMembershipRegistry();
+        var atk = Creature("Attacker");
+        var blk = Creature("Blocker");
+        var other = Creature("OtherAttacker");
+        reg.RecordAttacker(atk);
+        reg.RecordBlocker(blk);
+        reg.RecordAttacker(other);
+
+        reg.RemoveFromCombat(atk);
+        reg.RemoveFromCombat(blk);
+
+        reg.IsAttackingOrBlocking(atk).Should().BeFalse(
+            "a creature removed from combat is no longer attacking (CR 506.4)");
+        reg.IsAttackingOrBlocking(blk).Should().BeFalse(
+            "a creature removed from combat is no longer blocking (CR 506.4)");
+        reg.IsAttacking(other).Should().BeTrue(
+            "removing one creature must not disturb the rest of the combat");
+        reg.AttackingOrBlocking().Should().ContainSingle().Which.Should().BeSameAs(other);
+    }
+
+    [Fact]
+    public void RemoveFromCombat_UnknownCreature_IsANoOp()
+    {
+        var reg = new CombatMembershipRegistry();
+        var atk = Creature("Attacker");
+        reg.RecordAttacker(atk);
+
+        reg.RemoveFromCombat(Creature("NeverInCombat"));
+
+        reg.IsAttacking(atk).Should().BeTrue("removing a non-member leaves members untouched");
+    }
+
+    [Fact]
     public void AttackingOrBlocking_DeduplicatesACreatureThatIsBoth()
     {
         // A creature can't really attack AND block the same combat, but the

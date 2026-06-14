@@ -53,6 +53,22 @@ public sealed class CombatMembershipRegistry
         lock (_lock) { _blocking.Add(creature); }
     }
 
+    /// <summary>Remove <paramref name="creature"/> from combat — it is no longer
+    /// an attacker or a blocker (CR 506.4). Unlike <see cref="Clear"/> (which
+    /// ends the whole combat), this drops a SINGLE creature while the rest of
+    /// combat continues: e.g. a creature that regenerated (CR 701.15c), was made
+    /// to stop attacking/blocking, or otherwise left combat without combat
+    /// ending. A non-member is a no-op.</summary>
+    public void RemoveFromCombat(Permanent creature)
+    {
+        if (creature == null) return;
+        lock (_lock)
+        {
+            _attacking.Remove(creature);
+            _blocking.Remove(creature);
+        }
+    }
+
     /// <summary>Drop all membership — called when a combat ends (CR 511.3) so
     /// the set never leaks an attacker/blocker into a later combat or the
     /// post-combat main phase.</summary>
