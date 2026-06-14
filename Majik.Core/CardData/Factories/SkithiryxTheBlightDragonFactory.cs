@@ -11,40 +11,48 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Skithiryx, the Blight Dragon (Mirrodin Besieged,
 /// {3}{B}{B}).
 ///
-/// Legendary Creature — Skeleton Dragon 4/4. Oracle text:
+/// Legendary Creature — Phyrexian Dragon Skeleton 4/4. Current oracle text
+/// (verified against Scryfall — supersedes the original printing's static
+/// Haste + {B}-regenerate):
 ///   "Flying.
-///    Haste.
 ///    Infect (This creature deals damage to creatures in the form of
 ///    -1/-1 counters and to players in the form of poison counters.)
-///    {B}: Regenerate Skithiryx, the Blight Dragon."
+///    {B}: Skithiryx, the Blight Dragon gains haste until end of turn.
+///    {B}{B}: Regenerate Skithiryx, the Blight Dragon."
 ///
 /// ## Implemented (v1)
 ///
 /// - 4/4 Legendary <see cref="Creature"/> at {3}{B}{B} with subtypes
-///   Skeleton, Dragon.
+///   Phyrexian, Skeleton, Dragon.
 /// - <b>Flying (CR 702.9)</b>: <see cref="KeywordAbility"/> marker
 ///   "Flying". The combat block-restriction is read by the combat system
 ///   through the keyword catalog.
-/// - <b>Haste (CR 702.10)</b>: <see cref="KeywordAbility"/> marker
-///   "Haste". Summoning-sickness gate (CR 302.1) consults this marker
-///   so the creature can attack / tap-activate the turn it enters
-///   (same wiring as <see cref="BloodbraidElfFactory"/> /
-///   <see cref="GoblinChieftainFactory"/>).
 /// - <b>Infect (CR 702.90)</b>: <see cref="KeywordAbility"/> marker
 ///   "Infect". The combat-damage replacement is deferred at the
 ///   primitive level; the marker surfaces the keyword so a downstream
 ///   Infect primitive picks Skithiryx up without re-touching the
 ///   factory (same posture as <see cref="PhyrexianCrusaderFactory"/> /
 ///   <see cref="BlightedAgentFactory"/> / <see cref="PlagueMyrFactory"/>).
-/// - <b>{B}: Regenerate self (CR 701.18 / 701.15a)</b>: wired as an
+/// - <b>{B}: gains Haste until end of turn (CR 702.10 / 613.1f)</b>: wired
+///   as an <see cref="ActivatedAbility"/> with a single
+///   <see cref="ManaCostCost"/> <c>{B}</c>. Resolution registers a
+///   <see cref="GrantKeywordUntilEndOfTurnEffect"/> "Haste" on Skithiryx's
+///   own <see cref="Creature.ActiveEffects"/> (Layer 6 keyword grant,
+///   expires at cleanup per CR 514.2). The summoning-sickness gate
+///   (CR 302.1) reads the post-Layer-6 effective keyword set, so the
+///   granted Haste lets it attack / tap-activate the turn it enters once
+///   the ability resolves. Mirrors the
+///   <see cref="OracleActivatedAbilityBinder"/> self-keyword-grant shape
+///   (the printed line names the creature, which the binder's
+///   "this creature" form can't reconstruct from text).
+/// - <b>{B}{B}: Regenerate self (CR 701.18 / 701.15a)</b>: wired as an
 ///   <see cref="ActivatedAbility"/> with a single
-///   <see cref="ManaCostCost"/> <c>{B}</c>. Resolution calls
+///   <see cref="ManaCostCost"/> <c>{B}{B}</c>. Resolution calls
 ///   <see cref="Permanent.AddRegenerationShield"/> on Skithiryx — the
 ///   next time it would be destroyed this turn the shield consumes
 ///   the destroy, taps Skithiryx, and clears damage (CR 701.15c).
 ///   Shields stack across multiple activations and clear during
-///   cleanup (CR 514.2). Mirrors <see cref="MortivoreFactory"/>'s
-///   {B}-regenerate wiring exactly.
+///   cleanup (CR 514.2).
 ///
 /// ## Deferred (v1 gaps)
 ///
@@ -84,20 +92,57 @@ public static class SkithiryxTheBlightDragonFactory
         // CR 702.9 — Flying. Keyword marker.
         card.AddAbility(new KeywordAbility("Flying", card, owner));
 
-        // CR 702.10 — Haste. Keyword marker; summoning-sickness gate
-        // (CR 302.1) consults this for attacks + tap-activations.
-        card.AddAbility(new KeywordAbility("Haste", card, owner));
-
         // CR 702.90 — Infect. Keyword marker; combat-damage replacement
         // is deferred (see class xmldoc).
         card.AddAbility(new KeywordAbility("Infect", card, owner));
 
         // ----------------------------------------------------------------
-        // {B}: Regenerate Skithiryx, the Blight Dragon.
+        // {B}: Skithiryx, the Blight Dragon gains haste until end of turn.
+        // CR 702.10 — Haste; CR 613.1f Layer 6 keyword grant; CR 514.2 EOT
+        // expiry. Activated ability, regular speed, any number of times per
+        // turn. Resolution registers a GrantKeywordUntilEndOfTurnEffect on the
+        // creature's own ActiveEffects so the summoning-sickness gate (CR 302.1,
+        // which reads the post-Layer-6 effective keyword set) sees Haste once
+        // it resolves. The current printing has NO static Haste — it is bought
+        // each turn with {B}.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the grant targets the live ResolutionContext.Source (the
+        // ability's own Source at resolution) rather than capturing `card`,
+        // falling back to `card` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, where Source is null). Marked RebindSafe so
+        // Agatha's Soul Cauldron's group-grant re-homes this ability to each
+        // counter-bearing creature via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f) — necessary here because the printed line names the creature
+        // ("Skithiryx ... gains haste"), which the OracleActivatedAbilityBinder
+        // self-grant's "this creature" form cannot reconstruct from text. The
+        // null-ActiveEffects shape-only path silently no-ops, the same posture
+        // as the binder's self-keyword grant.
+        // ----------------------------------------------------------------
+        var gainHasteEffect = new Effect(
+            $"{CardName}: gains haste until end of turn (CR 702.10 / 613.1f)",
+            ctx =>
+            {
+                var subject = (ctx.Source as Creature) ?? card;
+                subject.ActiveEffects?.Register(
+                    new GrantKeywordUntilEndOfTurnEffect(subject, "Haste"));
+                return ValueTask.CompletedTask;
+            });
+
+        card.AddAbility(new ActivatedAbility(
+            source: card,
+            controller: owner,
+            costs: new ICost[] { new ManaCostCost("{B}") },
+            effects: new IEffect[] { gainHasteEffect },
+            rebindSafe: true));
+
+        // ----------------------------------------------------------------
+        // {B}{B}: Regenerate Skithiryx, the Blight Dragon.
         // CR 701.18 — "Regenerate [self]" = create a regeneration shield
         // on the target (CR 701.15a). Activated ability, regular speed,
         // any number of times per turn (shields stack and clear at EOT).
-        // Mirrors MortivoreFactory's {B}-regenerate wiring.
+        // The current printing costs {B}{B} (the original printing's {B}
+        // was errata'd to {B}{B}).
         //
         // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
         // migration): the effect shields the live ResolutionContext.Source
@@ -123,7 +168,7 @@ public static class SkithiryxTheBlightDragonFactory
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
-            costs: new ICost[] { new ManaCostCost("{B}") },
+            costs: new ICost[] { new ManaCostCost("{B}{B}") },
             effects: new IEffect[] { regenerateEffect },
             rebindSafe: true));
 
