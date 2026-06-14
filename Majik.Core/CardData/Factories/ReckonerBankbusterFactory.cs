@@ -190,21 +190,37 @@ public static class ReckonerBankbusterFactory
         // game state at resolution), create a Powerstone token under the
         // activating controller.
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect reads its source (whose charge counters
+        // the "then if" tail-clause inspects) off the live
+        // ResolutionContext.Source and the drawing/minting player off that
+        // source's controller (falling back to ctx.Controller, then the
+        // captured `card` / `owner` only on the context-less legacy sync
+        // path, ResolutionContext.Legacy). Marked RebindSafe so Agatha's
+        // Soul Cauldron's group-grant re-homes the REAL "draw a card" onto a
+        // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f); the {T} taps the BEARER and the RemoveChargeCounterCost
+        // is re-homed via IRebindableCost (Stage-1), so both the cost and
+        // the tail-clause counter check read the BEARER, never the exiled
+        // Bankbuster.
         var activatedEffect = new Effect(
             $"{CardName}: draw a card; if no charge counters remain, create a Powerstone",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
+                var source = (ctx.Source as Permanent) ?? card;
+                var controller = source.Controller ?? ctx.Controller ?? owner;
                 Fx.DrawCards(controller, 1);
 
                 // "Then if there are no charge counters on ~, create a
                 // Powerstone token." (CR 605 conditional tail-clause —
                 // check game state at resolution, after the cost has
                 // been paid AND the draw has resolved.)
-                if (card.Counters.Count(CounterType.Charge) == 0)
+                if (source.Counters.Count(CounterType.Charge) == 0)
                 {
                     TokenFactory.CreatePowerstone(controller, zoneService);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var activated = new ActivatedAbility(
@@ -215,7 +231,8 @@ public static class ReckonerBankbusterFactory
                 AdditionalCost.Tap(card),
                 new RemoveChargeCounterCost(card),
             },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            rebindSafe: true);
 
         card.AddAbility(activated);
 

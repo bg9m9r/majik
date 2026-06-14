@@ -125,7 +125,7 @@ public class EndbringerFactoryTests
     }
 
     [Fact]
-    public void Endbringer_TapDamage_DealsOneToCreatureTarget()
+    public async Task Endbringer_TapDamage_DealsOneToCreatureTarget()
     {
         var endbringer = EndbringerFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(endbringer);
@@ -142,14 +142,17 @@ public class EndbringerFactoryTests
 
         damage.SetChosenTargets(new[] { new object[] { grizzly } });
 
-        foreach (var effect in damage.Effects) effect.Execute();
+        // The migrated effect reads ChosenTargets off the live
+        // ResolutionContext, so resolve through the ability (the live path)
+        // rather than calling effect.Execute() with the empty legacy context.
+        await damage.ResolveAsync(agent: null, game: null);
 
         grizzly.Damage.Should().Be(1,
             "Fx.DealDamageAny routes creature targets through Creature.TakeDamage");
     }
 
     [Fact]
-    public void Endbringer_TapDamage_DealsOneToPlayerTarget()
+    public async Task Endbringer_TapDamage_DealsOneToPlayerTarget()
     {
         var endbringer = EndbringerFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(endbringer);
@@ -161,14 +164,14 @@ public class EndbringerFactoryTests
         damage.SetChosenTargets(new[] { new object[] { _bob } });
 
         var lifeBefore = _bob.LifeTotal;
-        foreach (var effect in damage.Effects) effect.Execute();
+        await damage.ResolveAsync(agent: null, game: null);
 
         _bob.LifeTotal.Should().Be(lifeBefore - 1,
             "Fx.DealDamageAny routes player targets through Player.TakeDamage");
     }
 
     [Fact]
-    public void Endbringer_DrawAbility_TargetPlayerDrawsTopCard()
+    public async Task Endbringer_DrawAbility_TargetPlayerDrawsTopCard()
     {
         var endbringer = EndbringerFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(endbringer);
@@ -186,7 +189,7 @@ public class EndbringerFactoryTests
         draw.SetChosenTargets(new[] { new object[] { _bob } });
 
         var handBefore = _bob.Zones.Hand.GetCards().Count();
-        foreach (var effect in draw.Effects) effect.Execute();
+        await draw.ResolveAsync(agent: null, game: null);
 
         _bob.Zones.Hand.GetCards().Should().HaveCount(handBefore + 1);
         _bob.Zones.Hand.GetCards().Should().Contain(topCard);
@@ -194,7 +197,7 @@ public class EndbringerFactoryTests
     }
 
     [Fact]
-    public void Endbringer_TapAbility_TapsChosenCreature()
+    public async Task Endbringer_TapAbility_TapsChosenCreature()
     {
         var endbringer = EndbringerFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(endbringer);
@@ -212,13 +215,13 @@ public class EndbringerFactoryTests
         tap.SetChosenTargets(new[] { new object[] { grizzly } });
 
         grizzly.IsTapped.Should().BeFalse();
-        foreach (var effect in tap.Effects) effect.Execute();
+        await tap.ResolveAsync(agent: null, game: null);
         grizzly.IsTapped.Should().BeTrue(
             "Fx.Tap delegates to Permanent.Tap, taps idempotently");
     }
 
     [Fact]
-    public void Endbringer_TapAbility_NoOpOnNonBattlefieldTarget()
+    public async Task Endbringer_TapAbility_NoOpOnNonBattlefieldTarget()
     {
         var endbringer = EndbringerFactory.Create(_alice);
         var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
@@ -232,7 +235,7 @@ public class EndbringerFactoryTests
 
         tap.SetChosenTargets(new[] { new object[] { grizzly } });
 
-        foreach (var effect in tap.Effects) effect.Execute();
+        await tap.ResolveAsync(agent: null, game: null);
         grizzly.IsTapped.Should().BeFalse(
             "CR 608.2b — target no longer on battlefield: effect fails silently");
     }

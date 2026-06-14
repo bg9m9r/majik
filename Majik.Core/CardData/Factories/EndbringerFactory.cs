@@ -102,21 +102,35 @@ public static class EndbringerFactory
         // pip. 1..1 "any target" TargetRequest. Resolution funnels through
         // Fx.DealDamageAny (Player / Creature / Planeswalker — CR 119.3,
         // CR 306.7 loyalty conversion).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect reads its chosen target off the live
+        // ResolutionContext.ChosenTargets and attributes the damage to the
+        // ability's own ResolutionContext.Source (the bearer at resolution)
+        // rather than capturing the authoring ability handle / `card`,
+        // falling back to `card` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy). Marked RebindSafe so Agatha's Soul
+        // Cauldron's group-grant re-homes the REAL ping onto a counter-
+        // bearing bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f):
+        // the {T} taps the BEARER (Stage-1 cost re-home) and the damage is
+        // sourced from the BEARER, never the exiled Endbringer.
         // ----------------------------------------------------------------
-        ActivatedAbility? damageAbility = null;
         var damageEffect = new Effect(
             $"{CardName}: 1 damage to any target",
-            () =>
+            ctx =>
             {
-                if (damageAbility == null) return;
-                if (damageAbility.ChosenTargets.Count == 0) return;
-                if (damageAbility.ChosenTargets[0].Count == 0) return;
+                if (ctx.ChosenTargets.Count == 0
+                    || ctx.ChosenTargets[0].Count == 0)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
-                var target = damageAbility.ChosenTargets[0][0];
-                Fx.DealDamageAny(target, 1);
+                var target = ctx.ChosenTargets[0][0];
+                Fx.DealDamageAny(target, 1, (ctx.Source as Creature) ?? card);
+                return ValueTask.CompletedTask;
             });
 
-        damageAbility = new ActivatedAbility(
+        card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -132,9 +146,8 @@ public static class EndbringerFactory
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Burn),
-            });
-
-        card.AddAbility(damageAbility);
+            },
+            rebindSafe: true));
 
         // ----------------------------------------------------------------
         // {C}, {T}: Target player draws a card.
@@ -143,31 +156,34 @@ public static class EndbringerFactory
         // Resolution reads ChosenTargets[0][0] as a Player and routes the
         // draw through Fx.DrawCards so DrawCardIntent replacement
         // subscribers (Dredge / future replacement primitives) participate.
-        // Falls back to the controller (Nihil Spellbomb posture) when no
-        // target is supplied — the v1 deterministic path.
+        // Falls back to the ability's controller (Nihil Spellbomb posture)
+        // when no target is supplied — the v1 deterministic path.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect reads its chosen player off the live
+        // ResolutionContext.ChosenTargets and the no-target fallback off
+        // ResolutionContext.Controller (the activator) rather than capturing
+        // `owner`. Marked RebindSafe so Agatha's Soul Cauldron's group-grant
+        // re-homes the REAL draw onto a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f); the {T} taps the
+        // BEARER (Stage-1 cost re-home), never the exiled Endbringer.
         // ----------------------------------------------------------------
-        ActivatedAbility? drawAbility = null;
         var drawEffect = new Effect(
             $"{CardName}: target player draws a card",
-            () =>
+            ctx =>
             {
-                Player? targetPlayer = null;
-                if (drawAbility != null
-                    && drawAbility.ChosenTargets.Count > 0
-                    && drawAbility.ChosenTargets[0].Count > 0
-                    && drawAbility.ChosenTargets[0][0] is Player chosen)
-                {
-                    targetPlayer = chosen;
-                }
-                else
-                {
-                    targetPlayer = owner;
-                }
+                Player targetPlayer =
+                    ctx.ChosenTargets.Count > 0
+                    && ctx.ChosenTargets[0].Count > 0
+                    && ctx.ChosenTargets[0][0] is Player chosen
+                        ? chosen
+                        : (ctx.Controller ?? owner);
 
                 Fx.DrawCards(targetPlayer, 1);
+                return ValueTask.CompletedTask;
             });
 
-        drawAbility = new ActivatedAbility(
+        card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -184,9 +200,8 @@ public static class EndbringerFactory
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Draw),
-            });
-
-        card.AddAbility(drawAbility);
+            },
+            rebindSafe: true));
 
         // ----------------------------------------------------------------
         // {C}, {T}: Tap target creature.
@@ -196,26 +211,36 @@ public static class EndbringerFactory
         // the battlefield (CR 608.2b — illegal-on-resolution fails
         // silently) and taps via Fx.Tap. Tapping an already-tapped
         // permanent is a no-op (Permanent.Tap is idempotent).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect reads its chosen target off the live
+        // ResolutionContext.ChosenTargets rather than capturing the
+        // authoring ability handle. Marked RebindSafe so Agatha's Soul
+        // Cauldron's group-grant re-homes the REAL tap onto a counter-
+        // bearing bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f);
+        // the {T} taps the BEARER (Stage-1 cost re-home), never the exiled
+        // Endbringer.
         // ----------------------------------------------------------------
-        ActivatedAbility? tapAbility = null;
         var tapEffect = new Effect(
             $"{CardName}: tap target creature",
-            () =>
+            ctx =>
             {
-                if (tapAbility == null) return;
-                if (tapAbility.ChosenTargets.Count == 0) return;
-                if (tapAbility.ChosenTargets[0].Count == 0) return;
-
-                if (tapAbility.ChosenTargets[0][0] is not Permanent target) return;
+                if (ctx.ChosenTargets.Count == 0
+                    || ctx.ChosenTargets[0].Count == 0
+                    || ctx.ChosenTargets[0][0] is not Permanent target)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
                 // CR 608.2b — recheck legality at resolution.
-                if (!target.HasType(CardType.Creature)) return;
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (!target.HasType(CardType.Creature)) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
                 Fx.Tap(target);
+                return ValueTask.CompletedTask;
             });
 
-        tapAbility = new ActivatedAbility(
+        card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -232,9 +257,8 @@ public static class EndbringerFactory
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal),
-            });
-
-        card.AddAbility(tapAbility);
+            },
+            rebindSafe: true));
 
         return card;
     }
