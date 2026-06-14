@@ -370,11 +370,13 @@ public class SemanticImplementationAuditTests
             // The N/N animate body binds via ManlandBinder; the QUOTED attack
             // trigger (token / counter / exile) is a granted-on-animate ability
             // with no generic primitive (same posture ManlandBinder defers).
-            // Crawling Barrens is a conditional animate (counter step first). --
+            // Crawling Barrens NOW BINDS in LandActivatedAbilityBinder (the
+            // compound "Put two +1/+1 counters on this land. Then you may have it
+            // become a 0/0 Elemental creature …" counter-accumulate
+            // conditional-animate ability) — removed from this allowlist. --
             "Den of the Bugbear",            // quoted "create a Goblin token" attack trigger on the animated body
             "Raging Ravine",                 // quoted "+1/+1 counter on it" attack trigger on the animated body
             "Hive of the Eye Tyrant",        // quoted "exile target card from defending player's GY" attack trigger
-            "Crawling Barrens",              // counters-then-conditional-animate (no fixed-subtype animate)
 
             // -- Token riders — ALL NOW BIND in prod, removed from this allowlist. --
             // Treasure Vault ("{X}{X}, {T}, Sacrifice this land: Create X

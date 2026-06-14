@@ -76,10 +76,17 @@ namespace Majik.Core.CardData;
 ///
 /// <para><b>Deferred families / riders.</b>
 /// <list type="bullet">
-///   <item><b>Crawling Barrens</b> — "Put two +1/+1 counters on this land.
-///     Then you may have it become a 0/0 Elemental creature" — the animate is
-///     conditional on a prior counter step (same posture
-///     <see cref="ManlandBinder"/> defers).</item>
+///   <item><b>Crawling Barrens</b> — "{4}: Put two +1/+1 counters on this land.
+///     Then you may have it become a 0/0 Elemental creature until end of turn.
+///     It's still a land." — NOW BOUND via
+///     <see cref="BindCounterThenConditionalAnimate"/>. The single {4} ability
+///     (no {T}) resolves as a mandatory counter-accumulation step (CR 122) on
+///     THIS land followed by a CONDITIONAL "you may" animate (CR 613.1c, the
+///     controller's <see cref="IPlayerAgent.ChooseYesNoAsync"/> choice). The
+///     animated body's P/T is the 0/0 base plus the accumulated counters. The
+///     compound "Put … counters on this land. Then you may have it become …"
+///     wording (counter preamble + the "may") is why the
+///     <see cref="ManlandBinder"/> AnimateLine never matched it.</item>
 ///   <item><b>Count-linked / attack-rider / richer-shape token riders — ALL NOW
 ///     BIND here.</b> Treasure Vault's "{X}{X}, {T}, Sacrifice this land: Create
 ///     X Treasure tokens" binds via <see cref="BindCreateXTreasures"/> — the
@@ -210,6 +217,26 @@ public static class LandActivatedAbilityBinder
     private static readonly Regex SacrificeThemNextEndStep = new(
         @"Sacrifice\s+them\s+at\s+the\s+beginning\s+of\s+the\s+next\s+end\s+step",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Put two +1/+1 counters on this land. Then you may have it become a 0/0
+    // Elemental creature until end of turn. It's still a land." — Crawling
+    // Barrens' single "{4}:" ability (CR 122 + CR 613.1c). Unlike every other
+    // line this binder handles AND unlike the ManlandBinder AnimateLine, this is
+    // a COMPOUND effect with NO {T} cost: a mandatory counter-accumulation step
+    // on THIS land, then a CONDITIONAL "you may have it become" animate whose
+    // body's P/T is the printed base (0/0) plus the accumulated counters. The
+    // ManlandBinder AnimateLine keys on "this land becomes …" and never sees the
+    // "Then you may have it become …" wording (the counter preamble + the "may"),
+    // so Crawling Barrens was previously unbound (v1-deferrals). Recognised here
+    // by its full compound shape; the count word, P/T, and creature subtype are
+    // captured.
+    private static readonly Regex CounterThenConditionalAnimate = new(
+        @"^Put\s+(?<count>a|one|two|three)\s+\+1/\+1\s+counters?\s+on\s+this\s+land\.\s*" +
+        @"Then\s+you\s+may\s+have\s+it\s+become\s+an?\s+" +
+        @"(?<power>\d+)/(?<toughness>\d+)\s+" +
+        @"(?<body>(?:(?!creature\b)[A-Za-z]+\s+)*?)creature\b" +
+        @"(?<rest>.*)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
 
     // "Earthbend N." (CR 701.59; Ba Sing Se "{2}{G}, {T}: Earthbend 2. Activate
     // only as a sorcery."). The keyword-action reminder text ("Target land you
@@ -343,6 +370,25 @@ public static class LandActivatedAbilityBinder
                     land, controller,
                     channelMatch.Groups["cost"].Value,
                     channelMatch.Groups["effect"].Value.Trim()))
+            {
+                boundAny = true;
+            }
+        }
+
+        // --- Crawling Barrens — "{cost}: Put two +1/+1 counters on this land.
+        //     Then you may have it become a 0/0 Elemental creature until end of
+        //     turn. It's still a land." The cost has NO {T}, so the {T} gate in
+        //     the main ActivationLine loop below would skip it. Recognised here
+        //     by its own scan (same posture as the Channel line). ---
+        foreach (Match line in ActivationLine.Matches(text))
+        {
+            var cost = line.Groups["cost"].Value;
+            var effectText = line.Groups["effect"].Value.Trim();
+            if (line.Groups["keyword"].Value.Trim()
+                    .Equals("Channel", StringComparison.OrdinalIgnoreCase)) continue;
+            if (CounterThenConditionalAnimate.Match(effectText) is { Success: true } cba &&
+                effectText.Contains("still a land", StringComparison.OrdinalIgnoreCase) &&
+                BindCounterThenConditionalAnimate(land, controller, effects, cost, cba))
             {
                 boundAny = true;
             }
@@ -1107,6 +1153,109 @@ public static class LandActivatedAbilityBinder
 
         land.AddAbility(ability);
     }
+
+    // ----------------------------------------------------------------------
+    // Crawling Barrens — "{4}: Put two +1/+1 counters on this land. Then you
+    // may have it become a 0/0 Elemental creature until end of turn. It's still
+    // a land." (Zendikar Rising). A single activated ability (NO {T} cost) whose
+    // resolution is a two-step compound effect:
+    //
+    //   1. Counter-accumulation (CR 122, mandatory): place N +1/+1 counters on
+    //      THIS land via Fx.PlaceCounter. Counters are permanent objects
+    //      (CR 121.5) — they accumulate across activations and survive cleanup.
+    //   2. Conditional animate (CR 613.1c, "you may"): the controller chooses
+    //      whether to animate (IPlayerAgent.ChooseYesNoAsync). On "yes",
+    //      register the manland-cycle Layer-4 type/subtype grant
+    //      (Creature + Elemental, printed Land kept) and the Layer-7b set-base
+    //      P/T (0/0). The animated body's effective P/T is the 0/0 base plus the
+    //      accumulated +1/+1 counters (CR 613.7b + CR 122 — counters apply after
+    //      the set-base in layer 7), so a Barrens with 2 counters animates to a
+    //      2/2. Both continuous effects are flagged ExpiresAtEndOfTurn
+    //      (CR 514.2 cleanup lifts the animation; the counters stay).
+    //
+    // This is the prod-only path for Crawling Barrens: lands are never routed
+    // through their [CardName] factory (FactoryRouting gate), so the factory's
+    // wiring is dead in real matches — this binding makes the counter-accumulate
+    // conditional-animate body live (v1-deferrals
+    // crawling-barrens-counter-accumulate-conditional-animate).
+    //
+    // Reuses the shared ManlandCycleAnimateEffect / ManlandCycleBecomesPTEffect
+    // primitives (the same the manland factories + ManlandBinder register).
+    // ----------------------------------------------------------------------
+    private static bool BindCounterThenConditionalAnimate(
+        Land land, Player controller, ContinuousEffectsService effects,
+        string cost, Match m)
+    {
+        // CR 205.3 — the animated body's subtype ("Elemental"). Defer if the
+        // printed subtype isn't one the engine models.
+        var bodyTokens = m.Groups["body"].Value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(t => !ColorWord(t))
+            .ToList();
+        if (bodyTokens.Count != 1 ||
+            !Enum.TryParse<CardSubtype>(bodyTokens[0], ignoreCase: true, out var subtype))
+        {
+            return false;
+        }
+
+        var counterCount = WordToInt(m.Groups["count"].Value);
+        var basePower = int.Parse(m.Groups["power"].Value);
+        var baseToughness = int.Parse(m.Groups["toughness"].Value);
+        if (counterCount <= 0) return false;
+
+        // The cost is the mana segment only (no {T}, no sacrifice). Build a
+        // ManaCostCost when mana symbols are present (Crawling Barrens: {4}).
+        var costs = new List<ICost>();
+        var manaMatches = ManaSymbol.Matches(cost);
+        if (manaMatches.Count > 0)
+        {
+            costs.Add(new ManaCostCost(string.Concat(manaMatches.Select(mm => mm.Value))));
+        }
+
+        var effect = new Effect(
+            $"{land.Name}: put {counterCount} +1/+1 counter(s) on it, then you may have it " +
+            $"become a {basePower}/{baseToughness} {subtype} creature until EOT (still a land)",
+            async ctx =>
+            {
+                // Step 1 (mandatory, CR 122) — accumulate the +1/+1 counters.
+                Fx.PlaceCounter(land, CounterType.PlusOnePlusOne, counterCount);
+
+                // Step 2 (optional, CR 613.1c "you may") — the controller chooses
+                // whether to animate.
+                var ctrl = land.Controller ?? controller;
+                var agent = ctx.Agent ?? AgentRegistry.Get(ctrl);
+                var animate = agent == null
+                    || await agent.ChooseYesNoAsync(
+                        $"Have {land.Name} become a {basePower}/{baseToughness} {subtype} creature until end of turn?",
+                        BotIntent.Buff).ConfigureAwait(false);
+                if (!animate) return;
+
+                // CR 613.1c — additive Creature + Elemental on top of the printed
+                // Land ("It's still a land"); CR 613.7b — set-base P/T. Both lift
+                // at end of turn (CR 514.2). The counters bump the body's P/T via
+                // the standard CounterCollection bookkeeping after the set-base.
+                effects.Register(new ManlandCycleAnimateEffect(
+                    land,
+                    keywords: Array.Empty<string>(),
+                    subtypes: new[] { subtype },
+                    extraTypes: null));
+                effects.Register(new ManlandCycleBecomesPTEffect(
+                    land, basePower, baseToughness));
+            });
+
+        land.AddAbility(new ActivatedAbility(
+            source: land, controller: controller, costs: costs,
+            effects: new IEffect[] { effect }));
+        return true;
+    }
+
+    /// <summary>True if <paramref name="token"/> is a printed colour word
+    /// ("colorless"/"white"/… ) preceding a creature subtype.</summary>
+    private static bool ColorWord(string token) => token.ToLowerInvariant() switch
+    {
+        "white" or "blue" or "black" or "red" or "green" or "colorless" or "and" => true,
+        _ => false,
+    };
 
     // ----------------------------------------------------------------------
     // Damage to each opponent (+ optional gain N life) — Ramunap Ruins.
