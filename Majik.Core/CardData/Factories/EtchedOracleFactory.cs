@@ -6,6 +6,7 @@ using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Services;
 
@@ -14,13 +15,13 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Etched Oracle (Fifth Dawn, {4}).
 ///
-/// Artifact Creature — Wizard 0/0. Oracle text:
-///   "Sunburst (This enters with a +1/+1 counter on it for each color of
-///    mana spent to cast it.)"
-///   "{2}, Remove three +1/+1 counters from Etched Oracle: Each player
+/// Artifact Creature — Wizard 0/0. Oracle text (errata):
+///   "Sunburst (This creature enters with a +1/+1 counter on it for each
+///    color of mana spent to cast it.)"
+///   "{1}, Remove four +1/+1 counters from this creature: Target player
 ///    draws three cards."
 ///
-/// ## Implemented (v1)
+/// ## Implemented
 /// - Artifact Creature {4} 0/0 with owner/controller wired + Wizard
 ///   subtypes.
 /// - <b>Sunburst (CR 702.44)</b> wired via the shared
@@ -31,44 +32,44 @@ namespace Majik.Core.CardData.Factories;
 ///   resolver computes "colors of mana spent" from the cross-spend pool
 ///   diff. When wired against the supplied <paramref name="replacements"/>
 ///   bus, Hardened Scales / Doubling Season bumps apply.
-/// - <b>Activated ability (CR 602.1)</b>: {2}, remove three +1/+1
-///   counters: each player draws three cards. Mana cost wired as
-///   <see cref="ManaCostCost"/>; the +1/+1-counter-removal cost is
-///   performed by the resolve closure (no
-///   <see cref="AdditionalCost.RemoveCounters"/> primitive yet — same
-///   posture Engineered Explosives takes for its sacrifice cost). On
-///   resolve the effect iterates every player in
-///   <paramref name="allPlayersResolver"/> (or just the controller when
-///   no resolver supplied, single-arg dispatcher path) and routes each
-///   through <see cref="Fx.DrawCards"/>.
+/// - <b>Activated ability (CR 602.1)</b>: {1}, remove four +1/+1
+///   counters: target player draws three cards.
+///   - Mana cost wired as <see cref="ManaCostCost"/>.
+///   - <b>Counter-removal cost (CR 118.3)</b> declared via
+///     <see cref="AdditionalCost.RemoveCounters"/> — hoisted out of the
+///     resolve closure into the declared cost list so cost-validation
+///     (CR 602.2) and activation-legality scans see it. The cost is
+///     re-source-safe: <see cref="ActivatedAbility.RebindTo"/> re-homes it
+///     onto the new bearer via <see cref="AdditionalCost.RebindSource"/>
+///     (CR 707.2 / 613.1f — Agatha's Soul Cauldron grant).
+///   - One 1..1 "target player" <see cref="TargetRequest"/>; on resolve
+///     the chosen player draws three (CR 608.2b — no legal target =
+///     the ability does nothing). With no live target chosen (single-arg
+///     dispatcher / shape tests) the controller draws as the fallback.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Counter-removal additional cost</b>: same gap shape as the
-///   sacrifice / discard cost family. Today the resolve closure
-///   removes the three +1/+1 counters inline; a future
-///   <c>AdditionalCost.RemoveCounters(card, type, n)</c> primitive
-///   should hoist it to the declared cost list so cost-validation /
-///   activation-legality scans see it.
-/// - <b>Each-player draw ordering / APNAP</b>: CR 101.4 (each player
-///   in APNAP order draws). v1 iterates the resolver's player list as
-///   given; production callers should pass APNAP-ordered players.
+/// - <b>Live agent target prompt</b>: production callers wire the chosen
+///   target through <see cref="ActivatedAbility.SetChosenTargets"/> before
+///   resolution; the no-target fallback (controller draws) keeps the
+///   shape-test surface drivable.
 /// </summary>
 [CardName("Etched Oracle")]
 public static class EtchedOracleFactory
 {
     public const string CardName = "Etched Oracle";
     public const string PrintedManaCost = "{4}";
+    public const string AbilityManaCost = "{1}";
     public const int Power = 0;
     public const int Toughness = 0;
-    public const int CountersToRemove = 3;
+    public const int CountersToRemove = 4;
     public const int CardsDrawn = 3;
 
     /// <summary>
     /// Construct Etched Oracle with no live runtime wiring. Sunburst's
     /// ETB counters arrive via the +1/+1 branch when
     /// <see cref="Card.PendingCastColors"/> is set; the activated
-    /// ability targets only the controller (single-arg dispatcher path).
-    /// Suitable for shape / dispatcher tests.
+    /// ability draws for the controller when no target is chosen
+    /// (single-arg dispatcher path).
     /// </summary>
     public static Creature Create(Player owner) =>
         Create(owner, replacements: null);
@@ -77,11 +78,9 @@ public static class EtchedOracleFactory
     /// Construct Etched Oracle. When <paramref name="replacements"/> is
     /// supplied, Sunburst's counter placement routes through
     /// <see cref="CountersService.Add"/> so Hardened Scales / Doubling
-    /// Season bumps apply. The activated ability draws three cards for every
-    /// player read from the LIVE resolution context (<c>ctx.Game.AllPlayers</c>)
-    /// at resolution — no captured player resolver, so it is correct on the
-    /// production routed build (mirrors #2551); with no live game context only
-    /// the controller draws.
+    /// Season bumps apply. The activated ability's draw reads the chosen
+    /// "target player" (or the controller when no target was chosen — the
+    /// shape-test / dispatcher path).
     /// </summary>
     public static Creature Create(
         Player owner,
@@ -111,55 +110,47 @@ public static class EtchedOracleFactory
         SunburstFactory.Build(card, replacements);
 
         // ----------------------------------------------------------------
-        // Activated ability (CR 602.1): {2}, remove three +1/+1 counters:
-        // each player draws three cards.
-        // - Mana cost: {2} → ManaCostCost.
-        // - Counter-removal cost: inline in the resolve closure (no
-        //   AdditionalCost.RemoveCounters primitive yet — same stub
-        //   posture Engineered Explosives takes for sacrifice).
-        // - Effect: iterate every player (resolver-supplied; falls back
-        //   to controller-only when no resolver) and route each through
-        //   Fx.DrawCards(player, 3).
+        // Activated ability (CR 602.1): {1}, Remove four +1/+1 counters
+        // from this creature: Target player draws three cards.
+        // - Mana cost: {1} → ManaCostCost.
+        // - Counter-removal cost: DECLARED via AdditionalCost.RemoveCounters
+        //   (CR 118.3) — hoisted out of the resolve closure into the cost
+        //   list so CostValidator / activation-legality scans see it. The
+        //   cost is re-source-safe (rebinds onto the new bearer).
+        // - Effect: the chosen target player draws three (CR 608.2b — no
+        //   legal target = does nothing; controller draws as the no-target
+        //   shape-test fallback).
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (rebindSafe: true): the draw reads its target/controller
+        // off the live ResolutionContext (ctx.ChosenTargets / ctx.Controller) —
+        // NOT a captured ability instance — so ActivatedAbility.RebindTo (CR 707.2)
+        // re-homes it correctly when Agatha's Soul Cauldron grants the ability.
+        // The counter-removal half is a DECLARED cost that rebinds via
+        // AdditionalCost.RebindSource, so the whole ability is sound under rebind.
         var drawEffect = new Effect(
-            $"{CardName}: each player draws {CardsDrawn} cards",
+            $"{CardName}: target player draws {CardsDrawn} cards",
             ctx =>
             {
-                // RE-SOURCE-SAFE (agatha-stale-body-rewrite-then-migrate): the
-                // counter-removal half ("Remove three +1/+1 counters from Etched
-                // Oracle") reads/mutates the counters off the live
-                // ResolutionContext.Source (the ability's own Source at
-                // resolution) rather than the captured `card`, falling back to
-                // `card` only on the context-less legacy sync path. This makes
-                // the whole ability re-source-safe — the inline counter-removal
-                // is NOT a separate ICost (so RebindTo Stage 1 doesn't touch a
-                // cost), but reading ctx.Source makes the counters come off the
-                // BEARER when Agatha's Soul Cauldron re-homes the ability via
-                // ActivatedAbility.RebindTo (CR 707.2 / 613.1f). The draw half
-                // already reads ctx.Game.AllPlayers (source-independent), so the
-                // ability is marked RebindSafe below.
-                var subject = (ctx.Source as Permanent) ?? card;
-
-                // Counter-removal payment is a no-op stub at the engine
-                // level — perform it inline so visible state matches.
-                if (subject.Counters.Count(CounterType.PlusOnePlusOne) < CountersToRemove)
+                // Resolve the chosen target. CR 608.2b — if a target was
+                // declared but is no longer legal (empty inner list) the
+                // ability does nothing. With NO target chosen at all (the
+                // single-arg dispatcher / shape-test path), fall back to the
+                // controller so the surface stays drivable.
+                var chosen = ctx.ChosenTargets;
+                Player? target;
+                if (chosen is { Count: > 0 })
                 {
-                    // CR 602.1 — illegal activation. Bail out cleanly;
-                    // the test surface checks the counter total before
-                    // activating, but future runtime gates should reject
-                    // earlier via CostValidator.
-                    return ValueTask.CompletedTask;
+                    if (chosen[0].Count == 0) return ValueTask.CompletedTask; // CR 608.2b.
+                    target = chosen[0][0] as Player;
                 }
-                subject.Counters.Remove(CounterType.PlusOnePlusOne, CountersToRemove);
-
-                // "Each player draws" — read every player from the LIVE game at
-                // resolution (ctx.Game.AllPlayers). No captured resolver.
-                var players = ctx.Game?.AllPlayers
-                    ?? (IReadOnlyList<Player>)new[] { owner };
-
-                foreach (var p in players)
+                else
                 {
-                    Fx.DrawCards(p, CardsDrawn);
+                    target = ctx.Controller ?? owner;
+                }
+
+                if (target != null)
+                {
+                    Fx.DrawCards(target, CardsDrawn);
                 }
 
                 return ValueTask.CompletedTask;
@@ -170,9 +161,21 @@ public static class EtchedOracleFactory
             controller: owner,
             costs: new ICost[]
             {
-                new ManaCostCost("{2}"),
+                new ManaCostCost(AbilityManaCost),
+                // CR 118.3 — declared counter-removal cost (re-source-safe).
+                AdditionalCost.RemoveCounters(card, CounterType.PlusOnePlusOne, CountersToRemove),
             },
             effects: new IEffect[] { drawEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target player",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Draw,
+                    CandidateGatherer: ctx => ctx.AllPlayers.Cast<object>().ToList()),
+            },
             rebindSafe: true);
 
         card.AddAbility(ability);

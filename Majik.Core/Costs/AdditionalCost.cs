@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Counters;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -8,7 +9,7 @@ using Majik.Core.Zones;
 namespace Majik.Core.Costs;
 
 /// <summary>
-/// Additional costs beyond mana (sacrifice, tap, pay life).
+/// Additional costs beyond mana (sacrifice, tap, pay life, remove counters).
 /// Discard-as-cost lives in <see cref="DiscardXCardsAdditionalCost"/>.
 /// </summary>
 public class AdditionalCost : ICost, IBusAwareCost
@@ -17,8 +18,29 @@ public class AdditionalCost : ICost, IBusAwareCost
     private readonly object? _costParameter;
     private readonly IEventBus? _eventBus;
 
+    // RemoveCounters payload. Only meaningful when _costType ==
+    // AdditionalCostType.RemoveCounters (then _costParameter is the bearer
+    // Permanent). Null / 0 otherwise.
+    private readonly CounterType? _counterType;
+    private readonly int _counterAmount;
+
     public string Description { get; }
     public AdditionalCostType CostType => _costType;
+
+    /// <summary>
+    /// CR 118.3 / CR 122.5 — for a <see cref="AdditionalCostType.RemoveCounters"/>
+    /// cost, the type of counter removed from the bearer (<see cref="Permanent"/>).
+    /// Null for every other cost type. Lets cost-analysis scans (CR 602.2) see the
+    /// counter-removal as a declared cost rather than buried in a resolve closure.
+    /// </summary>
+    public CounterType? CounterType => _counterType;
+
+    /// <summary>
+    /// For a <see cref="AdditionalCostType.RemoveCounters"/> cost, how many
+    /// counters of <see cref="CounterType"/> the bearer must remove. 0 for every
+    /// other cost type.
+    /// </summary>
+    public int CounterAmount => _counterAmount;
 
     /// <summary>
     /// The permanent this cost taps or sacrifices, when the parameter is a
@@ -30,12 +52,20 @@ public class AdditionalCost : ICost, IBusAwareCost
     /// </summary>
     public Cards.Permanent? Permanent => _costParameter as Cards.Permanent;
 
-    private AdditionalCost(AdditionalCostType costType, string description, object? costParameter = null, IEventBus? eventBus = null)
+    private AdditionalCost(
+        AdditionalCostType costType,
+        string description,
+        object? costParameter = null,
+        IEventBus? eventBus = null,
+        CounterType? counterType = null,
+        int counterAmount = 0)
     {
         _costType = costType;
         Description = description;
         _costParameter = costParameter;
         _eventBus = eventBus;
+        _counterType = counterType;
+        _counterAmount = counterAmount;
     }
 
     /// <summary>
@@ -85,6 +115,44 @@ public class AdditionalCost : ICost, IBusAwareCost
     }
 
     /// <summary>
+    /// CR 118.3 / CR 602.1 — create a counter-removal additional cost ("Remove
+    /// N &lt;type&gt; counters from &lt;bearer&gt;"). Mirrors
+    /// <see cref="Sacrifice(Cards.Permanent,IEventBus?)"/>: the cost is hoisted
+    /// out of the resolve closure into the declared cost list so cost-analysis
+    /// (CR 602.2) and activation-legality scans (priority-kinds, bot policies)
+    /// see it as a declared cost rather than buried inline. <see cref="CanPay"/>
+    /// gates on the bearer holding at least <paramref name="amount"/> counters of
+    /// <paramref name="counterType"/>; <see cref="Pay"/> removes them (CR 122.5 —
+    /// removal does not trigger replacement effects, so no <see cref="ReplacementBus"/>
+    /// routing is needed on the remove side, unlike <see cref="AddCounterCost"/>).
+    /// </summary>
+    /// <param name="bearer">The permanent the counters are removed from (the
+    /// ability's source for "Remove … from this creature").</param>
+    /// <param name="counterType">The counter type to remove (e.g.
+    /// <see cref="Majik.Core.Counters.CounterType.PlusOnePlusOne"/>).</param>
+    /// <param name="amount">How many counters to remove. Must be positive.</param>
+    public static AdditionalCost RemoveCounters(Cards.Permanent bearer, CounterType counterType, int amount)
+    {
+        ArgumentNullException.ThrowIfNull(bearer);
+        ArgumentNullException.ThrowIfNull(counterType);
+        if (amount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), "Counter amount must be positive.");
+        }
+
+        var description = amount == 1
+            ? $"Remove a {counterType.Name} counter from {bearer.Name}"
+            : $"Remove {amount} {counterType.Name} counters from {bearer.Name}";
+
+        return new AdditionalCost(
+            AdditionalCostType.RemoveCounters,
+            description,
+            costParameter: bearer,
+            counterType: counterType,
+            counterAmount: amount);
+    }
+
+    /// <summary>
     /// STAGE 1 (re-sourceable abilities) — return a NEW <see cref="AdditionalCost"/>
     /// identical to this one EXCEPT that, for <see cref="AdditionalCostType.Tap"/>
     /// / <see cref="AdditionalCostType.Sacrifice"/> costs whose captured permanent
@@ -107,17 +175,27 @@ public class AdditionalCost : ICost, IBusAwareCost
     {
         // Only the source-capturing cost types reference a permanent; mana /
         // pay-life carry an int or nothing, so there is nothing to rebind.
-        if (_costType is not (AdditionalCostType.Tap or AdditionalCostType.Sacrifice))
+        if (_costType is not (AdditionalCostType.Tap or AdditionalCostType.Sacrifice
+            or AdditionalCostType.RemoveCounters))
         {
             return this;
         }
 
         // Swap only when this cost's captured permanent IS the old source
-        // (reference equality — CR 707.2 re-home of the ability's own {T}/sac).
+        // (reference equality — CR 707.2 re-home of the ability's own
+        // {T} / sacrifice / counter-removal cost).
         if (!ReferenceEquals(_costParameter, oldSource)
             || newSource is not Cards.Permanent newPermanent)
         {
             return this;
+        }
+
+        // CR 707.2 / 613.1f — re-home a "Remove N counters from this creature"
+        // cost onto the new bearer so an Agatha-granted ability removes the
+        // counters off the BEARER rather than the original source.
+        if (_costType == AdditionalCostType.RemoveCounters && _counterType != null)
+        {
+            return RemoveCounters(newPermanent, _counterType, _counterAmount);
         }
 
         var description = _costType == AdditionalCostType.Tap
@@ -149,6 +227,14 @@ public class AdditionalCost : ICost, IBusAwareCost
                 && Abilities.SummoningSicknessTapGate.CanTapForAbility(permanent),
             AdditionalCostType.Sacrifice => _costParameter is Cards.Permanent permanent && permanent.Controller == player,
             AdditionalCostType.PayLife => _costParameter is int amount && player.LifeTotal > amount,
+
+            // CR 118.3 / CR 602.2 — the bearer must hold at least the required
+            // number of counters of the named type for the cost to be payable.
+            AdditionalCostType.RemoveCounters =>
+                _costParameter is Cards.Permanent bearer
+                && _counterType != null
+                && bearer.Counters.Count(_counterType) >= _counterAmount,
+
             _ => false
         };
     }
@@ -262,6 +348,17 @@ public class AdditionalCost : ICost, IBusAwareCost
                     }
                 }
                 break;
+
+            case AdditionalCostType.RemoveCounters:
+                // CR 118.3 / CR 122.5 — remove the declared counters from the
+                // bearer. Removal does not trigger a "would be put" replacement,
+                // so a direct CounterCollection.Remove suffices (no ReplacementBus
+                // routing, unlike the placement side in AddCounterCost).
+                if (_costParameter is Cards.Permanent bearer && _counterType != null)
+                {
+                    bearer.Counters.Remove(_counterType, _counterAmount);
+                }
+                break;
         }
     }
 }
@@ -273,5 +370,12 @@ public enum AdditionalCostType
 {
     Tap,
     Sacrifice,
-    PayLife
+    PayLife,
+
+    /// <summary>
+    /// CR 118.3 — "Remove N &lt;type&gt; counters from &lt;bearer&gt;" as an
+    /// activation / casting cost (Etched Oracle, Spike Feeder, …). Built via
+    /// <see cref="AdditionalCost.RemoveCounters"/>.
+    /// </summary>
+    RemoveCounters
 }
