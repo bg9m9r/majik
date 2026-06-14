@@ -2,8 +2,11 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -63,18 +66,33 @@ public static class MindslaverFactory
     /// control primitive runs.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, mindControlSink: null);
+        Create(owner, mindControlSink: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an artifact gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the self-sacrifice cost
+    /// so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a).
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, mindControlSink: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Mindslaver. When <paramref name="mindControlSink"/> is
     /// supplied, the activated ability's resolution closure invokes it
     /// with the chosen target player (after Mindslaver has been
     /// sacrificed). The sink is typically a test hook or a future
-    /// ControlPlayer service shim — see the class xmldoc gap note.
+    /// ControlPlayer service shim — see the class xmldoc gap note. When
+    /// <paramref name="eventBus"/> is supplied the self-sacrifice activation
+    /// cost publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
     /// </summary>
     public static Artifact Create(
         Player owner,
-        Action<Player>? mindControlSink)
+        Action<Player>? mindControlSink,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -96,12 +114,23 @@ public static class MindslaverFactory
             {
                 // Self-sac stub — perform the zone move so visible state
                 // matches CR 701.16. Done first so the target-player
-                // record is independent of Mindslaver's zone.
+                // record is independent of Mindslaver's zone. CR 701.16a —
+                // when a bus is supplied (prod effects-aware build) route
+                // through Fx.Sacrifice so a PermanentSacrificedEvent is
+                // published; in the live activation path the cost already
+                // moved the slaver, so this no-ops (single publish either way).
                 if (slaver.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(slaver);
-                    owner.Zones.Graveyard.AddCard(slaver);
-                    slaver.SetZone(ZoneType.Graveyard);
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(slaver, slaver.Controller ?? owner, eventBus);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(slaver);
+                        owner.Zones.Graveyard.AddCard(slaver);
+                        slaver.SetZone(ZoneType.Graveyard);
+                    }
                 }
 
                 // Resolve target.
@@ -131,7 +160,9 @@ public static class MindslaverFactory
             {
                 new ManaCostCost("{4}"),
                 AdditionalCost.Tap(slaver),
-                AdditionalCost.Sacrifice(slaver),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent.
+                AdditionalCost.Sacrifice(slaver, eventBus),
             },
             effects: new IEffect[] { mindControlEffect },
             targetRequests: new[]

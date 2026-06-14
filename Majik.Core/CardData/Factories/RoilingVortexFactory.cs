@@ -110,6 +110,20 @@ public static class RoilingVortexFactory
         Create(owner, triggers: null, replacements: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an enchantment gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the self-sacrifice cost
+    /// so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). The <see cref="TriggerManager"/> / <see cref="ReplacementBus"/>
+    /// are not reachable through <see cref="ContinuousEffectsService"/>, so they
+    /// stay null here (unchanged from the prior single-arg prod posture).
+    /// </summary>
+    public static Enchantment Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, replacements: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Roiling Vortex with optional runtime services. The upkeep
     /// "deals 1 damage to each player" effect reads every player from the LIVE
     /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution — no
@@ -129,7 +143,8 @@ public static class RoilingVortexFactory
     public static Enchantment Create(
         Player owner,
         TriggerManager? triggers,
-        ReplacementBus? replacements)
+        ReplacementBus? replacements,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -247,7 +262,9 @@ public static class RoilingVortexFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{1}{R}"),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]

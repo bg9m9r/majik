@@ -3,6 +3,8 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -93,13 +95,29 @@ public static class CindervinesFactory
     public static Enchantment Create(Player owner) => Create(owner, triggers: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an enchantment gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the self-sacrifice cost
+    /// so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). The cast-trigger <see cref="TriggerManager"/> is not
+    /// reachable through <see cref="ContinuousEffectsService"/>, so it stays
+    /// null here (unchanged from the prior single-arg prod posture).
+    /// </summary>
+    public static Enchantment Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Cindervines with optional <see cref="TriggerManager"/>
     /// wiring. When <paramref name="triggers"/> is supplied, the
     /// opponent-noncreature-cast trigger is registered so any qualifying
     /// <see cref="SpellCastEvent"/> automatically queues the 1-damage
-    /// effect.
+    /// effect. When <paramref name="eventBus"/> is supplied the self-sacrifice
+    /// activation cost publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a).
     /// </summary>
-    public static Enchantment Create(Player owner, TriggerManager? triggers)
+    public static Enchantment Create(Player owner, TriggerManager? triggers, IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -164,7 +182,7 @@ public static class CindervinesFactory
             $"{CardName}: sacrifice self + destroy target artifact/enchantment + 2 to its controller",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
 
                 if (sacAbility == null
                     || sacAbility.ChosenTargets.Count == 0
@@ -205,7 +223,9 @@ public static class CindervinesFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{1}"),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]
@@ -230,9 +250,20 @@ public static class CindervinesFactory
     /// <see cref="AdditionalCost.Pay"/> sacrifice path is a no-op stub, so
     /// the effect closure performs the zone move directly.
     /// </summary>
-    private static void SacrificeSelf(Enchantment card, Player owner)
+    private static void SacrificeSelf(Enchantment card, Player owner, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.16a — when a bus is supplied (prod effects-aware build), route
+        // through Fx.Sacrifice so a PermanentSacrificedEvent is published. In
+        // the live activation path the cost already moved the card, so this
+        // closure no-ops (single publish either way).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);

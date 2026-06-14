@@ -2,8 +2,10 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Zones;
 
@@ -76,6 +78,22 @@ public static class GoblinEngineerFactory
     /// </summary>
     public static Creature Create(Player owner) =>
         Create(owner, zoneService: null, eventBus: null, triggers: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; a creature gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> so the activated ability's
+    /// "Sacrifice an artifact" cost (a chosen artifact, NOT the source) publishes
+    /// a <see cref="PermanentSacrificedEvent"/> (CR 701.16a) when the
+    /// sacrificed artifact moves to the graveyard at resolution. The ETB
+    /// <see cref="TriggerManager"/> / <see cref="ZoneService"/> are not reachable
+    /// through <see cref="ContinuousEffectsService"/>, so they stay null here
+    /// (unchanged from the prior single-arg prod posture).
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, zoneService: null, eventBus: effects?.EventBus, triggers: null);
 
     /// <summary>
     /// Construct Goblin Engineer with optional runtime services. When
@@ -185,7 +203,16 @@ public static class GoblinEngineerFactory
                 if (graveyardArtifact == null) return; // CR 117.x — no-op.
 
                 var sacOwner = sacArtifact.Owner ?? owner;
-                if (zoneService != null)
+                if (eventBus != null)
+                {
+                    // CR 701.16a — "Sacrifice an artifact" cost; the cost-payer
+                    // (Goblin Engineer's controller) is the sacrificing player.
+                    // Fx.Sacrifice routes the battlefield -> graveyard move AND
+                    // publishes a PermanentSacrificedEvent so aristocrat payoffs
+                    // observe the cost sacrifice.
+                    Fx.Sacrifice(sacArtifact, sacArtifact.Controller ?? owner, eventBus);
+                }
+                else if (zoneService != null)
                 {
                     zoneService.MoveCard(
                         sacArtifact,

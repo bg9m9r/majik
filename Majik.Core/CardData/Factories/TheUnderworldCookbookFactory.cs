@@ -3,8 +3,11 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -96,7 +99,28 @@ public static class TheUnderworldCookbookFactory
     /// direct-zone mutation (no <see cref="ZoneService"/> wired in this
     /// shape-test posture).
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an artifact gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the graveyard-return
+    /// ability's self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the graveyard-return self-sacrifice
+    /// <see cref="AdditionalCost"/> so the cost-payment path publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -106,7 +130,7 @@ public static class TheUnderworldCookbookFactory
         card.SetController(owner);
 
         AttachFoodCreationAbility(card, owner);
-        AttachGraveyardReturnAbility(card, owner);
+        AttachGraveyardReturnAbility(card, owner, eventBus);
 
         return card;
     }
@@ -149,7 +173,7 @@ public static class TheUnderworldCookbookFactory
     /// hand return that honours the ability's <see cref="TargetRequest"/>
     /// chosen at activation time (CR 602.2b).
     /// </summary>
-    private static void AttachGraveyardReturnAbility(Artifact card, Player owner)
+    private static void AttachGraveyardReturnAbility(Artifact card, Player owner, IEventBus? eventBus)
     {
         ActivatedAbility? ability = null;
 
@@ -162,7 +186,7 @@ public static class TheUnderworldCookbookFactory
                 // behaviour is observable even when the generic
                 // AdditionalCost.Sacrifice payment is a no-op stub (same
                 // posture as RenegadeMapFactory / ExpeditionMapFactory).
-                SacrificeSelf(card, owner, controller);
+                SacrificeSelf(card, owner, controller, eventBus);
                 ResolveGraveyardReturn(controller, ability);
             });
 
@@ -173,7 +197,9 @@ public static class TheUnderworldCookbookFactory
             {
                 new ManaCostCost(ManaCost.Parse(GraveyardReturnManaCost)),
                 AdditionalCost.Tap(card),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { returnEffect },
             targetRequests: new[]
@@ -196,9 +222,20 @@ public static class TheUnderworldCookbookFactory
     /// owner's graveyard. Idempotent. Mirrors the closure used by
     /// <see cref="RenegadeMapFactory"/>.
     /// </summary>
-    private static void SacrificeSelf(Artifact card, Player owner, Player controller)
+    private static void SacrificeSelf(Artifact card, Player owner, Player controller, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.16a — when a bus is supplied (prod effects-aware build), route
+        // through Fx.Sacrifice so a PermanentSacrificedEvent is published. In
+        // the live activation path the cost already moved the card, so this
+        // closure no-ops (single publish either way).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, controller, eventBus);
+            return;
+        }
+
         controller.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);
