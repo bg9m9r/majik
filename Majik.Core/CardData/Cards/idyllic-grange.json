@@ -1,0 +1,8 @@
+{
+  "name": "Idyllic Grange",
+  "types": ["Land"],
+  "subtypes": ["Plains"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
