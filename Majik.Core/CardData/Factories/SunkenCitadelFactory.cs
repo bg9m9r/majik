@@ -60,19 +60,22 @@ namespace Majik.Core.CardData.Factories;
 /// analogue of Eldrazi Temple's "{T}: Add {C}{C}. Spend this mana only to cast
 /// Eldrazi spells or activate abilities of Eldrazi" rider (see
 /// <see cref="EldraziTempleFactory"/>): the restriction's
-/// <see cref="Majik.Core.Mana.SpendRestriction.Predicate"/> is spell-side only
-/// (<c>Func&lt;ISpell, bool&gt;</c>), and Sunken Citadel's restriction permits
-/// <i>no</i> spell — the mana may only pay activation costs of land sources'
-/// abilities — so the predicate returns <c>false</c> for every spell.
+/// <see cref="Majik.Core.Mana.SpendRestriction.Predicate"/> denies every spell
+/// (<c>_ => false</c>), and its
+/// <see cref="Majik.Core.Mana.SpendRestriction.AbilityPredicate"/> permits an
+/// activation whose source is a Land (<c>ctx => ctx.SourceHasType(Land)</c>) —
+/// the mana may only pay activation costs of land sources' abilities.
 ///
-/// <b>Payment-gate enforcement</b> is now live: the resolver consumes the
-/// per-slot <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> ledger and
-/// withholds any restricted unit the cast spell doesn't satisfy from the
-/// bucketed spend (CR 106.4). Since this restriction's predicate denies every
-/// spell, the double-mana can never pay a spell pip — only a land source's
-/// activation cost (a non-spell context the gate leaves spendable). Same gate
-/// as Eldrazi Temple / Cavern of Souls / Ancient Ziggurat (see
-/// SpendRestrictionProvenanceGateTests).
+/// <b>Payment-gate enforcement</b> is now live on BOTH spend paths (CR 106.4).
+/// The spell-cast path (<see cref="Majik.Core.Costs.ManaPaymentResolver"/>)
+/// withholds the double-mana from any spell (the predicate denies all spells).
+/// The ability-cost path (<see cref="Majik.Core.Costs.ManaCostCost"/> /
+/// <see cref="Majik.Core.Costs.CostPayment"/> via the
+/// <see cref="Majik.Core.Mana.ManaSpendContext"/>) lets the double-mana pay a
+/// LAND source's activated ability cost but withholds it from a non-land
+/// source's ability. Same gate as Eldrazi Temple / Cavern of Souls / Ancient
+/// Ziggurat (see SpendRestrictionProvenanceGateTests +
+/// AbilityCostSpendRestrictionGateTests).
 /// </para>
 ///
 /// <para>
@@ -92,8 +95,15 @@ public static class SunkenCitadelFactory
     // a spell pip, only an activation cost of a land source's ability — so the
     // predicate denies every spell. Shared static instance keeps the rider
     // structurally stable (SpendRestriction delegate equality is by-reference).
+    // The spell predicate denies every spell (this mana can never pay a spell
+    // pip); the ability predicate PERMITS an activation whose source is a Land
+    // (CR 106.4 — "abilities of land sources"). Both halves are now enforced:
+    // the spell half rides ManaPaymentResolver, the ability half rides the
+    // ability-cost spend context (ManaCostCost / CostPayment).
     private static readonly SpendRestriction LandAbilitiesOnly =
-        new("land source ability", _ => false);
+        new("land source ability",
+            _ => false,
+            ctx => ctx.SourceHasType(Cards.Types.CardType.Land));
 
     /// <summary>Construct Sunken Citadel owned and controlled by
     /// <paramref name="owner"/> (shape-only path — no chosen color, no mana

@@ -1101,7 +1101,15 @@ public sealed class TurnDriver
             // InvalidPlayerActionException("Cannot pay cost: R") through the
             // priority pump — that crashed live matches. The bot's per-turn
             // failed-proposal memo prevents a re-propose spin.
-            if (!new Majik.Core.Costs.CostPayment().CanPayCosts(actor, activate.Ability.Costs))
+            // CR 106.4 — re-validate under the ability-cost spend context so
+            // spend-restricted floating mana (Sunken Citadel / Eldrazi Temple)
+            // the ability's source doesn't satisfy is treated as unavailable
+            // here exactly as it will be at payment (AbilityActivator passes the
+            // same context). Matches the spell-cast gate's posture.
+            var activateSpendContext = Majik.Core.Mana.ManaSpendContext.ForAbilityCost(
+                activate.Ability.Source as Majik.Core.Cards.ICard);
+            if (!new Majik.Core.Costs.CostPayment().CanPayCosts(
+                    actor, activate.Ability.Costs, activateSpendContext))
             {
                 return;
             }

@@ -105,4 +105,15 @@ public sealed class ManaProvenanceSlot
         if (Restriction is null) return true;
         return Restriction.SatisfiedBy(spentOn);
     }
+
+    /// <summary>
+    /// CR 106.4 — whether this slot's mana may be spent under
+    /// <paramref name="context"/> (a spell-cast, ability-cost, or "none" spend).
+    /// Unrestricted slots return <c>true</c> unconditionally; restricted slots
+    /// defer to <see cref="ManaSpendContext.Permits(SpendRestriction?)"/>, which
+    /// evaluates the right half of the restriction (spell predicate for a spell
+    /// spend, ability predicate for an ability-cost spend) and denies a
+    /// <see cref="ManaSpendContext.None"/> spend.
+    /// </summary>
+    public bool CanSpendOn(ManaSpendContext context) => context.Permits(Restriction);
 }

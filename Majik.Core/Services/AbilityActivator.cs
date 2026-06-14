@@ -87,9 +87,17 @@ public class AbilityActivator
         // Step 602.2c: Choose targets - TODO: Validate targets against specification
         var targetList = targets?.ToList() ?? new List<ITarget>();
 
-        // Step 602.2d: Determine total cost and pay costs
+        // Step 602.2d: Determine total cost and pay costs.
+        // CR 106.4 — supply an ability-cost spend context built from the
+        // ability's source so spend-restricted floating mana (Sunken Citadel
+        // "abilities of land sources", Eldrazi Temple "or activate abilities of
+        // Eldrazi") is honoured: restricted mana the source doesn't satisfy is
+        // withheld from this payment, and a matching restriction is positively
+        // satisfied by the source's types/subtypes.
         var costList = costs?.ToList() ?? new List<ICost>();
-        _costPayment.PayCosts(player, costList);
+        var spendContext = Majik.Core.Mana.ManaSpendContext.ForAbilityCost(
+            ability.Source as Majik.Core.Cards.ICard);
+        _costPayment.PayCosts(player, costList, spendContext);
 
         // Create activated ability with targets and costs. CR 602.4 — the
         // ability that goes on the stack must carry the SAME effects /

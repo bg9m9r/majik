@@ -783,6 +783,143 @@ public class Player
     }
 
     /// <summary>
+    /// CR 106.4 — count the floating provenance slots of <paramref name="color"/>
+    /// whose spend-restriction the <paramref name="context"/> does NOT permit
+    /// (so they are unavailable for this payment). Unrestricted slots never
+    /// count. Pure read.
+    /// </summary>
+    private int CountBlockedSlots(ValueObjects.ManaColor color, Mana.ManaSpendContext context)
+    {
+        var blocked = 0;
+        foreach (var slot in _manaProvenance)
+        {
+            if (slot.Color == color && slot.Restriction != null && !slot.CanSpendOn(context))
+            {
+                blocked++;
+            }
+        }
+        return blocked;
+    }
+
+    /// <summary>
+    /// CR 106.4 — whether <paramref name="cost"/> can be paid from this player's
+    /// pool with spend-restricted floating mana the <paramref name="context"/>
+    /// does NOT permit treated as UNAVAILABLE. The bucketed
+    /// <see cref="ValueObjects.ManaPool"/> has no per-slot view, so we withhold
+    /// the blocked colored/colorless restricted units (computed from the
+    /// provenance ledger) and check payability against only the spendable
+    /// remainder. Mirrors the spell-cast gate in
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/>.
+    /// </summary>
+    public bool CanPayManaUnderSpendContext(ValueObjects.ManaCost cost, Mana.ManaSpendContext context)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        if (_hasLost) return false;
+
+        var blockedW = CountBlockedSlots(ValueObjects.ManaColor.White, context);
+        var blockedU = CountBlockedSlots(ValueObjects.ManaColor.Blue, context);
+        var blockedB = CountBlockedSlots(ValueObjects.ManaColor.Black, context);
+        var blockedR = CountBlockedSlots(ValueObjects.ManaColor.Red, context);
+        var blockedG = CountBlockedSlots(ValueObjects.ManaColor.Green, context);
+        var blockedC = CountBlockedSlots(ValueObjects.ManaColor.Colorless, context);
+
+        var spendable = _manaPool.RemoveColored(
+            white: blockedW, blue: blockedU, black: blockedB,
+            red: blockedR, green: blockedG, colorless: blockedC);
+        return spendable.CanPay(cost);
+    }
+
+    /// <summary>
+    /// CR 106.4 — pay <paramref name="cost"/> honouring spend restrictions under
+    /// <paramref name="context"/>: floating restricted mana the context doesn't
+    /// permit is withheld across the bucketed spend so it can't pay a
+    /// non-matching pip, then restored (still floating, slots intact). After a
+    /// successful spend the satisfying provenance slots are consumed FIFO,
+    /// firing their <see cref="Mana.ManaProvenanceSlot.OnSpent"/> reactions.
+    /// Returns <c>false</c> (and pays nothing) when the spendable remainder
+    /// can't cover the cost. This is the ability-cost analogue of the
+    /// resolver's spell-cast gate.
+    /// </summary>
+    public bool PayManaUnderSpendContext(ValueObjects.ManaCost cost, Mana.ManaSpendContext context)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        if (_hasLost) return false;
+
+        var blockedW = CountBlockedSlots(ValueObjects.ManaColor.White, context);
+        var blockedU = CountBlockedSlots(ValueObjects.ManaColor.Blue, context);
+        var blockedB = CountBlockedSlots(ValueObjects.ManaColor.Black, context);
+        var blockedR = CountBlockedSlots(ValueObjects.ManaColor.Red, context);
+        var blockedG = CountBlockedSlots(ValueObjects.ManaColor.Green, context);
+        var blockedC = CountBlockedSlots(ValueObjects.ManaColor.Colorless, context);
+        var hasBlocked = blockedW + blockedU + blockedB + blockedR + blockedG + blockedC > 0;
+
+        // Snapshot the pre-spend pool so we can derive per-color spent counts
+        // (the multiplicity of each color consumed) to consume matching slots.
+        var poolBefore = _manaPool;
+
+        if (hasBlocked)
+        {
+            WithholdColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG, colorless: blockedC);
+        }
+        var (newPool, success) = _manaPool.Pay(cost);
+        if (success)
+        {
+            _manaPool = newPool;
+        }
+        if (hasBlocked)
+        {
+            RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG, colorless: blockedC);
+        }
+        if (!success)
+        {
+            return false;
+        }
+
+        // CR 106.4 — consume the satisfying provenance slots by the per-color
+        // delta (colored pips + colored mana spent on generic). The withheld
+        // restricted mana was held back across the spend, so the delta only ever
+        // covers spendable mana; a satisfying restricted slot whose unit paid the
+        // cost fires its OnSpent reaction here.
+        ConsumeSlotsForSpend(ValueObjects.ManaColor.White, poolBefore.White - _manaPool.White, context);
+        ConsumeSlotsForSpend(ValueObjects.ManaColor.Blue, poolBefore.Blue - _manaPool.Blue, context);
+        ConsumeSlotsForSpend(ValueObjects.ManaColor.Black, poolBefore.Black - _manaPool.Black, context);
+        ConsumeSlotsForSpend(ValueObjects.ManaColor.Red, poolBefore.Red - _manaPool.Red, context);
+        ConsumeSlotsForSpend(ValueObjects.ManaColor.Green, poolBefore.Green - _manaPool.Green, context);
+        ConsumeSlotsForSpend(ValueObjects.ManaColor.Colorless, poolBefore.Colorless - _manaPool.Colorless, context);
+
+        return true;
+    }
+
+    /// <summary>
+    /// CR 106.4 — consume up to <paramref name="count"/> provenance slots of
+    /// <paramref name="color"/> (FIFO) that the <paramref name="context"/>
+    /// permits, firing each slot's <see cref="Mana.ManaProvenanceSlot.OnSpent"/>
+    /// reaction with the spent-on card (the ability source for an ability spend,
+    /// the cast card for a spell spend). Restricted slots the context doesn't
+    /// permit are skipped (they stay floating). No-op for a non-positive count.
+    /// </summary>
+    private void ConsumeSlotsForSpend(ValueObjects.ManaColor color, int count, Mana.ManaSpendContext context)
+    {
+        if (count <= 0) return;
+        var spentOn = context.IsAbilitySpend ? context.AbilitySource : context.Spell?.Card;
+        var consumed = 0;
+        for (var i = 0; i < _manaProvenance.Count && consumed < count;)
+        {
+            var slot = _manaProvenance[i];
+            if (slot.Color == color && slot.CanSpendOn(context))
+            {
+                _manaProvenance.RemoveAt(i);
+                slot.OnSpent?.Invoke(spentOn);
+                consumed++;
+            }
+            else
+            {
+                i++;
+            }
+        }
+    }
+
+    /// <summary>
     /// CR 106.4 — temporarily remove the given colored mana from the pool
     /// WITHOUT touching the provenance ledger, so the
     /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> can hold back
