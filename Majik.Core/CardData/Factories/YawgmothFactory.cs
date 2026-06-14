@@ -64,6 +64,22 @@ namespace Majik.Core.CardData.Factories;
 ///   the named factory explicitly keeps the prod path on the same overload the
 ///   audit / other cards use.
 ///
+/// ## Re-source-safe (agatha-oracle-shape-yawgmoth-pay-life-counter-pump-loop)
+/// The activated ability is marked <see cref="ActivatedAbility.RebindSafe"/>:
+/// the counter half reads its target off the live
+/// <see cref="Abilities.ResolutionContext.ChosenTargets"/> and the draw half
+/// reads the resolving ability's <see cref="Abilities.ResolutionContext.Controller"/>
+/// (not the captured <c>owner</c>), so a re-sourced copy affects the new
+/// source's controller. The multi-leg cost (pay 1 life + sacrifice another
+/// creature) re-homes too: <see cref="AdditionalCost.PayLife"/> captures no
+/// permanent, and <see cref="SacrificeAnotherCreatureCost"/> implements
+/// <see cref="Costs.IRebindableCost"/> so
+/// <see cref="ActivatedAbility.RebindTo"/> swaps its captured "another creature"
+/// exclusion from the original Yawgmoth to the new source. This unblocks
+/// Agatha's Soul Cauldron re-homing the REAL ability (the oracle-rebuild
+/// fallback cannot reconstruct a multi-leg pay-life + sacrifice cost) to a
+/// counter-bearing creature (CR 707.2 / 613.1f).
+///
 /// ## Deferred (v1 gaps)
 /// - <b>Protection from Humans (CR 702.16)</b>: no protection-from-subtype
 ///   infrastructure exists yet. The keyword does not affect gameplay.
@@ -111,51 +127,69 @@ public static class YawgmothFactory
 
         var sacrificeCost = new SacrificeAnotherCreatureCost(card);
 
-        // Forward-declared so the resolution closure can read the ability's
-        // ChosenTargets[0] (the optional "-1/-1 on up to one target creature")
-        // — same pattern as Izzet Staticaster / Grasping Dunes.
-        ActivatedAbility? ability = null;
+        // Holds the constructed ability so it can be attached at the end. The
+        // effects read their chosen targets / controller off the live
+        // ResolutionContext (not this captured reference), which is what makes
+        // the ability re-source-safe (see rebindSafe below).
+        ActivatedAbility ability;
 
         // Effect 1: put a -1/-1 counter on UP TO ONE target creature (CR 115.1b
         // — an optional target; the controller may choose ZERO or ONE). Reads
-        // the chosen target; no-ops cleanly when the player declined or the
-        // target became illegal (CR 608.2b).
+        // the chosen target off the live ResolutionContext (so a re-homed copy
+        // reads the rebound ability's own targets); no-ops cleanly when the
+        // player declined or the target became illegal (CR 608.2b).
+        //
+        // RE-SOURCE-SAFE (STAGE 2/3, agatha-oracle-shape-yawgmoth-pay-life-
+        // counter-pump-loop): the counter half targets a CHOSEN creature (not
+        // Yawgmoth's source), so it is already source-agnostic. We read
+        // ctx.ChosenTargets rather than the captured `ability` so a RebindTo
+        // copy resolves against ITS chosen targets, not the original ability's.
         var counterEffect = new Effect(
             $"{CardName}: put a -1/-1 counter on up to one target creature",
-            () =>
+            ctx =>
             {
-                if (ability == null) return;
-                if (ability.ChosenTargets.Count == 0) return;
-                if (ability.ChosenTargets[0].Count == 0) return; // declined the optional target
+                if (ctx.ChosenTargets.Count == 0) return ValueTask.CompletedTask;
+                if (ctx.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask; // declined the optional target
 
-                if (ability.ChosenTargets[0][0] is not Creature target) return;
-                if (!target.HasType(CardType.Creature)) return;
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (ctx.ChosenTargets[0][0] is not Creature target) return ValueTask.CompletedTask;
+                if (!target.HasType(CardType.Creature)) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
                 // CR 122 — put one -1/-1 counter on the chosen creature. Any
                 // creature (Yawgmoth's or an opponent's) is a legal target.
                 // Subsequent SBAs (CR 704.5q — toughness 0 → graveyard) are the
                 // engine's responsibility once the counter lands.
                 Fx.PlaceCounter(target, CounterType.MinusOneMinusOne, 1);
+                return ValueTask.CompletedTask;
             });
 
         // Effect 2: controller draws a card (CR 120.1) — happens whether or not
         // a counter target was chosen ("then draw a card").
+        //
+        // RE-SOURCE-SAFE: the drawer is the resolving ability's CONTROLLER, read
+        // off the live ResolutionContext (ctx.Controller) rather than the
+        // captured `owner`. On a RebindTo copy ctx.Controller is the BEARER's
+        // controller, so the re-homed Yawgmoth ability draws for the bearer's
+        // controller — never the exiled Yawgmoth's owner. Falls back to `owner`
+        // only on the context-less legacy sync path (ResolutionContext.Legacy,
+        // where Controller is null).
         var drawEffect = new Effect(
             $"{CardName}: you draw a card",
-            () =>
+            ctx =>
             {
-                var top = owner.Zones.Library.GetCards().FirstOrDefault();
+                var drawer = ctx.Controller ?? owner;
+                var top = drawer.Zones.Library.GetCards().FirstOrDefault();
                 if (top == null)
                 {
                     // CR 120.3: drawing from an empty library is noted;
                     // SBA will handle loss at next opportunity.
-                    owner.MarkTriedToDrawFromEmptyLibrary();
-                    return;
+                    drawer.MarkTriedToDrawFromEmptyLibrary();
+                    return ValueTask.CompletedTask;
                 }
-                owner.Zones.Library.RemoveCard(top);
-                owner.Zones.Hand.AddCard(top);
+                drawer.Zones.Library.RemoveCard(top);
+                drawer.Zones.Hand.AddCard(top);
                 top.SetZone(ZoneType.Hand);
+                return ValueTask.CompletedTask;
             });
 
         ability = new ActivatedAbility(
@@ -167,6 +201,13 @@ public static class YawgmothFactory
                 sacrificeCost,
             },
             effects: new IEffect[] { counterEffect, drawEffect },
+            // RE-SOURCE-SAFE: every effect reads its subject/controller off the
+            // live ResolutionContext (chosen targets + controller) and the
+            // SacrificeAnotherCreatureCost re-homes its captured source via
+            // IRebindableCost, so the whole ability is sound to re-home via
+            // ActivatedAbility.RebindTo (CR 707.2). Lets Agatha's Soul Cauldron
+            // grant the REAL multi-leg-cost ability to a bearer.
+            rebindSafe: true,
             targetRequests: new[]
             {
                 // CR 115.1b — "up to one target creature": MinTargets 0 (the

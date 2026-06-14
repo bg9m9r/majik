@@ -3071,4 +3071,79 @@ public class AgathasSoulCauldronTests
         alice.Zones.Hand.GetCards().Count().Should().Be(3,
             "the controller drew three cards");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-oracle-shape-yawgmoth-pay-life-counter-pump-loop — Yawgmoth, Thran
+    // Physician is a bespoke [CardName]-factory creature whose activated ability
+    // ("Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one
+    // target creature and draw a card") has a TWO-leg non-tap cost (pay 1 life +
+    // sacrifice another creature) and a "draw a card" rider that previously
+    // captured the original owner. Migrated to read ResolutionContext.Controller
+    // for the draw + marked RebindSafe; the SacrificeAnotherCreatureCost now
+    // implements IRebindableCost so RebindTo re-homes its captured source. The
+    // oracle-rebuild fallback CANNOT reconstruct this multi-leg cost shape, so
+    // the PRIMARY RebindTo path of the REAL ability is the only sound re-home.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Yawgmoth_DrawToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // activated ability is now RebindSafe (reads ResolutionContext.Source /
+        // Controller) and carries the multi-leg pay-life + sacrifice-another cost
+        // the oracle-rebuild fallback cannot reconstruct.
+        var yawg = YawgmothFactory.Create(alice);
+        var realAbility = yawg.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        realAbility.RebindSafe.Should().BeTrue(
+            "the migrated Yawgmoth ability reads ResolutionContext.Source / Controller and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(yawg);
+        yawg.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Yawgmoth so the only way the
+        // ability is granted is via RebindTo of the real ability — if the grant
+        // depended on the oracle fallback, nothing would be emitted for this
+        // multi-leg-cost ability and this test would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), yawg);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().HaveCount(1,
+            "Yawgmoth's real activated ability is re-homed via RebindTo");
+        var rehomed = granted[0];
+        rehomed.Source.Should().BeSameAs(bearer,
+            "the re-homed ability is sourced on the BEARER (CR 707.2)");
+        rehomed.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // The sacrifice-another cost was re-homed: it now excludes the BEARER
+        // (the new source), not the exiled Yawgmoth.
+        var sac = rehomed.Costs.OfType<Majik.Core.Costs.SacrificeAnotherCreatureCost>().Single();
+        sac.EligibleSacrifices(alice).Should().NotContain(bearer,
+            "the re-homed sacrifice-another cost excludes the BEARER (its new source)");
+
+        // The pay-life leg survives.
+        rehomed.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().Contain(c => c.Description.Contains("1 life"),
+                "the pay-1-life leg survives the rebind");
+
+        // Resolving the re-homed ability draws a card for the BEARER's controller
+        // (ResolutionContext.Controller = bearer's controller), never the exiled
+        // Yawgmoth's owner via a captured closure.
+        var top = new Card("Swamp", "");
+        top.SetOwner(alice);
+        alice.Zones.Library.AddCard(top);
+        await rehomed.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Should().Contain(top,
+            "the re-homed draw reads ResolutionContext.Controller (the bearer's controller)");
+    }
 }

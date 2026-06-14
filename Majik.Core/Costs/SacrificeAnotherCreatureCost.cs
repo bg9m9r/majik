@@ -22,8 +22,21 @@ namespace Majik.Core.Costs;
 /// null (paths that don't prompt — bot convenience wiring / factory-direct
 /// tests) <see cref="Pay"/> falls back to the first eligible creature
 /// deterministically.
+///
+/// ## Re-homable (STAGE 1)
+/// Implements <see cref="IRebindableCost"/> so
+/// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindTo"/> can re-home the
+/// captured <see cref="_self"/> when the owning ability is re-sourced onto a new
+/// permanent (CR 707.2 copy machinery / Agatha's Soul Cauldron granted abilities
+/// — CR 613.1f / 702.49). Without this seam a re-homed "Pay 1 life, Sacrifice
+/// another creature" ability (Yawgmoth, Thran Physician) would still exclude the
+/// ORIGINAL Yawgmoth from the picker rather than the BEARER, letting the bearer
+/// sacrifice itself. <see cref="RebindTo"/> returns an equivalent cost whose
+/// <see cref="_self"/> is the new source (carrying the same event bus); the
+/// per-activation <see cref="Target"/> / <see cref="Sacrificed"/> state is reset
+/// on the fresh copy (it is per-activation, not structural).
 /// </summary>
-public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacrificeCost
+public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacrificeCost, IRebindableCost
 {
     private readonly Permanent _self;
     private readonly IEventBus? _eventBus;
@@ -61,6 +74,21 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
 
     /// <inheritdoc/>
     public void ChooseSacrifice(Creature? creature) => Target = creature;
+
+    /// <inheritdoc/>
+    public ICost RebindTo(object oldSource, object newSource)
+    {
+        // Pure: only re-home when our captured source IS the rebound ability's
+        // original source; otherwise pass through unchanged (CR 707.2). A fresh
+        // copy is returned so per-activation Target/Sacrificed state never leaks
+        // into the source ability's cost.
+        if (!ReferenceEquals(_self, oldSource)) return this;
+        if (newSource is not Permanent newPermanent)
+            throw new ArgumentException(
+                "SacrificeAnotherCreatureCost can only be re-homed onto a Permanent.",
+                nameof(newSource));
+        return new SacrificeAnotherCreatureCost(newPermanent, _eventBus);
+    }
 
     /// <param name="self">The ability's source — excluded from the picker.</param>
     /// <param name="eventBus">Optional event bus — publishes a
