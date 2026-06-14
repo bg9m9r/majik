@@ -1,0 +1,8 @@
+{
+  "name": "Witch Enchanter // Witch-Blessed Meadow",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warlock"],
+  "manaCost": "{3}{W}",
+  "power": 2,
+  "toughness": 2
+}
