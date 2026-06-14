@@ -1213,6 +1213,70 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_Fight_RehomesFightToBearerAndChosenTarget()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability fights another creature:
+        // "{2}{G}, {T}: This creature fights target creature." (a self-source
+        // fight payoff — a common bespoke shape on green creatures). Re-homing is
+        // sound: the SOURCE of the fight is the BEARER (it deals + takes the fight
+        // damage), never the exiled card; only an open "target creature" filter is
+        // reconstructed (CR 701.12 / 613.1f).
+        var fighter = new Creature("Fighter Stub", "2G", 3, 3);
+        fighter.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(fighter);
+        fighter.SetZone(ZoneType.Graveyard);
+
+        // SeatedBearer is a base-2/2 Counter Bear with a +1/+1 counter ⇒ 3/3.
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // An opposing creature for the bearer to fight.
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2);
+        enemy.SetOwner(bob);
+        enemy.ChangeController(bob);
+        bob.Zones.Library.AddCard(enemy);
+        zones.MoveCard(enemy, ZoneType.Library, ZoneType.Battlefield, bob);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Fighter Stub", "{2}{G}, {T}: This creature fights target creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), fighter);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's fight ability");
+        var fight = granted[0];
+        fight.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        fight.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("G"));
+        fight.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        fight.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"));
+
+        // Resolving the fight: the BEARER (3/3) and the chosen enemy (2/2) each
+        // deal their power to the other (CR 701.12a). The exiled imprinted card is
+        // untouched.
+        fight.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { enemy } });
+        foreach (var effect in fight.Effects) effect.Execute();
+
+        enemy.Damage.Should().Be(3,
+            "the BEARER deals its power (3) to the chosen creature in the fight");
+        bearer.Damage.Should().Be(2,
+            "the chosen creature deals its power (2) back to the BEARER (CR 701.12a)");
+        fighter.Damage.Should().Be(0,
+            "the exiled imprinted card never participates in the fight");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);
