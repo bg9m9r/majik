@@ -104,19 +104,43 @@ public static class IzzetStaticasterFactory
         // CR 602 — activated ability. Tap cost expressed via AdditionalCost.Tap.
         // CR 602.2b — TargetRequest declares the target at activation time.
         // Resolution reads ChosenTargets[0][0] for the primary target.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-migration-remaining-audit-grep-tail):
+        // the effect reads its chosen target off the live
+        // ResolutionContext.ChosenTargets rather than capturing the authoring
+        // ActivatedAbility instance, falling back to the ability's own
+        // ChosenTargets only on the context-less legacy sync path
+        // (ResolutionContext.Legacy). The {T} tap cost re-homes via
+        // AdditionalCost.RebindSource (Stage 1). The same-name sweep is a
+        // game-global resolver — independent of the ability's source — so the
+        // damage is correct whether the original Staticaster or a rebound
+        // bearer (Agatha's Soul Cauldron group-grant; CR 707.2 / 613.1f) is
+        // dealing it. The damage's source per CR 119.3 is the live
+        // ResolutionContext.Source (the new bearer after a RebindTo). Marked
+        // RebindSafe so Agatha may RebindTo it.
         // ----------------------------------------------------------------
         ActivatedAbility? pingAbility = null;
 
         var pingEffect = new Effect(
             "Izzet Staticaster: 1 damage to target creature and each other creature with the same name",
-            () =>
+            ctx =>
             {
-                if (pingAbility == null) return;
-                if (pingAbility.ChosenTargets.Count == 0) return;
-                if (pingAbility.ChosenTargets[0].Count == 0) return;
+                // Prefer the live context's chosen targets; fall back to the
+                // ability's own captured targets on the legacy sync path.
+                var chosenTargets = ctx.ChosenTargets.Count > 0
+                    ? ctx.ChosenTargets
+                    : pingAbility?.ChosenTargets;
+                if (chosenTargets == null
+                    || chosenTargets.Count == 0
+                    || chosenTargets[0].Count == 0)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
-                var chosen = pingAbility.ChosenTargets[0][0];
-                if (chosen is not Creature targetCreature) return;
+                if (chosenTargets[0][0] is not Creature targetCreature)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
                 // Deal 1 damage to the primary target.
                 targetCreature.TakeDamage(1);
@@ -124,7 +148,7 @@ public static class IzzetStaticasterFactory
                 // CR 608.2b — "each other creature with the same name":
                 // iterate every reachable creature; skip the primary target
                 // (already damaged) and any creature whose name doesn't match.
-                if (allCreaturesResolver == null) return;
+                if (allCreaturesResolver == null) return ValueTask.CompletedTask;
 
                 // CR 707.2 — "same name" reads the EFFECTIVE name so a clone of
                 // the target (copy effect overwrites the Layer-1 name slot) is
@@ -137,6 +161,8 @@ public static class IzzetStaticasterFactory
                     if (other.GetEffectiveName() != targetName) continue;
                     other.TakeDamage(1);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         pingAbility = new ActivatedAbility(
@@ -144,6 +170,7 @@ public static class IzzetStaticasterFactory
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
             effects: new IEffect[] { pingEffect },
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(

@@ -64,4 +64,63 @@ public class IzzetStaticasterFactoryTests
         clone.Damage.Should().Be(1, "the clone's effective name is Grizzly Bears (CR 707.2)");
         giant.Damage.Should().Be(0);
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source-safe (agatha-bespoke-migration-remaining-audit-grep-tail) —
+    // the {T}: ping ability re-homes onto a new bearer via
+    // ActivatedAbility.RebindTo (Agatha's Soul Cauldron group-grant; CR 707.2
+    // / 613.1f). The effect reads ChosenTargets / source off the live
+    // ResolutionContext rather than capturing the authoring permanent, so the
+    // re-sourced copy taps the NEW bearer (Stage-1 cost re-home) and still
+    // damages its own chosen target + the same-name sweep.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Staticaster_PingAbility_IsRebindSafe()
+    {
+        var staticaster = IzzetStaticasterFactory.Create(_alice);
+        var ability = staticaster.Abilities.OfType<ActivatedAbility>().Single();
+
+        ability.RebindSafe.Should().BeTrue(
+            "the ping reads its target off ResolutionContext.ChosenTargets and "
+            + "its tap cost re-homes, so Agatha's group-grant may RebindTo it");
+    }
+
+    [Fact]
+    public void RebindTo_PingAbility_TapsNewBearer_AndDamagesChosenTarget()
+    {
+        // Arrange — Staticaster (the printed source) plus a DIFFERENT creature
+        // (the counter-bearer Agatha re-homes the ability to).
+        var staticaster = IzzetStaticasterFactory.Create(_alice);
+        OnBattlefield(staticaster, _alice);
+
+        var bearer = OnBattlefield(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _alice);
+        // CR 302.6 — the bearer has been under control since before this turn,
+        // so the {T} tap cost is legal (mirrors a real Agatha-grant scenario).
+        bearer.ClearSummoningSickness();
+
+        var victim = OnBattlefield(new Creature("Hill Giant", "{3}{R}", 3, 3), _alice);
+
+        var ability = staticaster.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Act — re-home the ENTIRE ability onto the bearer (CR 707.2 / 613.1f).
+        var rebound = ability.RebindTo(bearer, _alice);
+
+        // STAGE 1 — pay the re-homed tap cost: it must tap the bearer, not the
+        // original Staticaster.
+        foreach (var cost in rebound.Costs)
+        {
+            cost.Pay(_alice);
+        }
+
+        rebound.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+        rebound.Resolve();
+
+        // Tap re-homed: the bearer is tapped; the original Staticaster is not.
+        bearer.IsTapped.Should().BeTrue("the rebound tap cost hits the bearer");
+        staticaster.IsTapped.Should().BeFalse("the original Staticaster is untouched");
+
+        // Damage re-homed: the rebound ability still deals 1 to its own target.
+        victim.Damage.Should().Be(1, "the rebound ability damages its chosen target");
+    }
 }
