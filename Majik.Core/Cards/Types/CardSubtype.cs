@@ -596,4 +596,9 @@ public enum CardSubtype
     /// inherent rules meaning of its own (referenced by other cards' "another
     /// Villain you control" triggers).</summary>
     Villain,
+
+    /// <summary>Hero creature subtype — Superior Spider-Man (Marvel's
+    /// Spider-Man) is a "Spider Human Hero"; the broader Hero lineage. CR
+    /// 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
+    Hero,
 }
