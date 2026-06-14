@@ -1,0 +1,9 @@
+{
+  "name": "Wicked Wolf",
+  "types": ["Creature"],
+  "subtypes": ["Wolf"],
+  "manaCost": "{2}{G}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
