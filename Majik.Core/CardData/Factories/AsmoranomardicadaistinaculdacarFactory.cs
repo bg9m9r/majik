@@ -58,12 +58,16 @@ namespace Majik.Core.CardData.Factories;
 ///   deals 6 damage to itself (CR 119.3 — the source of the damage is the
 ///   target creature, not Asmoran — relevant for lifelink / "damage dealt
 ///   by" triggers on the target). Routed through
-///   <see cref="Fx.DealDamage"/>. The cost requires the controller to
-///   actually control two Foods — <see cref="CanSacrificeTwoFoods"/> /
-///   <see cref="BuildSacrificeTwoFoodsCosts"/> return the two
-///   <see cref="AdditionalCost.Sacrifice"/> costs only when two Foods are
-///   available; with fewer than two, the ability cannot be activated
-///   (CR 602.5e / 601.2g — unpayable cost ⇒ activation illegal).
+///   <see cref="Fx.DealDamage"/>. The cost is a single payment-time
+///   <see cref="SacrificeTwoFoodsCost"/> — it reads the LIVE battlefield at
+///   activation (NOT a construction-time snapshot), so Foods that enter after
+///   Asmoran was created are sacrificeable, and the activation is illegal
+///   whenever the controller controls fewer than two Foods
+///   (CR 602.5e / 601.2g — unpayable cost ⇒ activation illegal). The cost
+///   sacrifices two DISTINCT Foods (CR 701.16a) and, on the bus-aware payment
+///   path, publishes a <see cref="Events.PermanentSacrificedEvent"/> per
+///   sacrifice (it implements <see cref="IBusAwareCost"/>) so aristocrat
+///   payoffs fire.
 ///
 /// - <b>Alternative cast cost (CR 118.9)</b>: "As long as you've discarded
 ///   a card this turn, you may pay {B/R} to cast this spell." Modelled by
@@ -187,7 +191,7 @@ public static class AsmoranomardicadaistinaculdacarFactory
         sacAbility = new ActivatedAbility(
             source: card,
             controller: owner,
-            costs: BuildSacrificeTwoFoodsCosts(owner),
+            costs: new ICost[] { new SacrificeTwoFoodsCost() },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]
             {
@@ -239,27 +243,12 @@ public static class AsmoranomardicadaistinaculdacarFactory
     }
 
     /// <summary>True when <paramref name="controller"/> controls at least
-    /// two Foods (the "Sacrifice two Foods" cost is payable).</summary>
+    /// two Foods (the "Sacrifice two Foods" cost is payable). Delegates to the
+    /// live cost primitive so this answer always matches what the engine will
+    /// charge at activation time (CR 602.5e — fewer than two Foods ⇒ the
+    /// activation is illegal).</summary>
     public static bool CanSacrificeTwoFoods(Player controller) =>
-        FindTwoFoods(controller).Count == 2;
-
-    /// <summary>
-    /// Build the sacrifice costs for the activated ability: two
-    /// <see cref="AdditionalCost.Sacrifice"/> costs over the controller's
-    /// first two Foods. Returns an empty array when fewer than two Foods
-    /// are available — the resulting ability is uncostable, so it can't be
-    /// activated (CR 602.5e).
-    /// </summary>
-    private static ICost[] BuildSacrificeTwoFoodsCosts(Player controller)
-    {
-        var foods = FindTwoFoods(controller);
-        if (foods.Count < 2) return Array.Empty<ICost>();
-        return new ICost[]
-        {
-            AdditionalCost.Sacrifice(foods[0]),
-            AdditionalCost.Sacrifice(foods[1]),
-        };
-    }
+        new SacrificeTwoFoodsCost().CanPay(controller);
 
     /// <summary>
     /// Search <paramref name="player"/>'s library for a card named
