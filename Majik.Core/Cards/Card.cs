@@ -1678,7 +1678,6 @@ public class Card : ICard
         ColorIndicator = src.ColorIndicator;           // immutable list ref
         TokenColorsOverride = src.TokenColorsOverride; // immutable list ref
         AdventureSpec = src.AdventureSpec;             // definition ref
-        // MdfcState is complex (has callbacks); skip for sim — Task N.
         // CR 711 / 606 — back-face loyalty-ability DETACH LEDGER. _abilities is
         // shared by reference above, so the back face's LoyaltyAbility refs are
         // already present in the clone's ability list; this ledger must travel
@@ -1686,10 +1685,31 @@ public class Card : ICard
         // abilities the flip attached (an empty ledger would leave them stuck
         // on). Share the same refs (same posture as _abilities) — the ledger is
         // a subset of the shared ability list, never a separately-mutated copy.
-        // Pairs with the _mdfcState sim-skip above (same clone-omission class:
+        // Pairs with the _mdfcState clone below (same clone class:
         // v1-deferrals backface-loyalty-not-copied-on-cloneforsim).
         // preserves: _backFaceLoyaltyAbilities (back-face loyalty detach ledger).
         _backFaceLoyaltyAbilities.AddRange(src._backFaceLoyaltyAbilities);
+
+        // CR 711 — transform/MDFC face tracker. Thread the face STATE across the
+        // clone boundary so a sim clone (the MCTS determinized search) can model
+        // a transform: the clone carries the same active face (IsBackFace) and a
+        // working Transform() that flips it. We reconstruct a FRESH MdfcState
+        // (shared immutable face definition data; same IsBackFace) and assign it
+        // THROUGH the property setter below — not the backing field — so the
+        // setter re-wires OnTransformed to THIS clone's ContinuousEffectsService
+        // + transient-loyalty surface (the source state's callback closes over
+        // the ORIGINAL permanent and must not leak into the clone).
+        //
+        // The setter also re-syncs the back-face loyalty body + abilities. The
+        // detach ledger (_backFaceLoyaltyAbilities) is already populated by the
+        // copy above, so SyncBackFaceLoyaltyAbilities's idempotency guard
+        // (shouldHave == has) short-circuits — no double-attach, no Controller
+        // needed (Controller is re-linked in a later pass). SetTransientLoyalty
+        // is re-applied to the same value Permanent's ctor already copied.
+        if (src._mdfcState is { } srcMdfc)
+        {
+            MdfcState = srcMdfc.CloneForSim();
+        }
 
         // cast sentinels
         WasCast = src.WasCast;
