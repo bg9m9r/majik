@@ -227,7 +227,7 @@ public static class TargetFilters
             "permanent_mana_value_ge_4" =>
                 ("target permanent with mana value 4 or greater",
                     o => o is Permanent p && OnBattlefield(p)
-                         && p is Card mv && mv.ManaCostValue.TotalValue >= 4),
+                         && ManaValueOf(p) >= 4),
             "creature_toughness_ge_4" =>
                 ("target creature with toughness 4 or greater",
                     o => o is Creature c && OnBattlefield(c) && c.Toughness >= 4),
@@ -419,7 +419,7 @@ public static class TargetFilters
                 return false;
             }
             if (maxManaValue is int cap && o is Card mv
-                && mv.ManaCostValue.TotalValue > cap)
+                && ManaValueOf(mv) > cap)
             {
                 return false;
             }
@@ -428,6 +428,19 @@ public static class TargetFilters
     }
 
     private static bool OnBattlefield(ICard card) => card.Zone == ZoneType.Battlefield;
+
+    /// <summary>
+    /// CR 202.3b / 707.2 — the mana value to compare a card against. For a
+    /// battlefield <see cref="Permanent"/> this routes through
+    /// <see cref="Permanent.GetEffectiveManaValue"/> so a clone is measured by
+    /// its COPIED identity (a Spark Double of a 6-mana creature reads mana value
+    /// 6, not its printed {3}{U}); off the battlefield no copy effect can be
+    /// active, so the printed <see cref="Card.ManaCostValue"/> total is used.
+    /// </summary>
+    private static int ManaValueOf(Card card) =>
+        card is Permanent p && p.Zone == ZoneType.Battlefield
+            ? p.GetEffectiveManaValue()
+            : card.ManaCostValue.TotalValue;
 
     private static bool InGraveyard(ICard card) => card.Zone == ZoneType.Graveyard;
 

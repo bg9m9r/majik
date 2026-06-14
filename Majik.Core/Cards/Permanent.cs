@@ -136,6 +136,37 @@ public class Permanent : Card
         return ActiveEffects.EffectiveManaCost(this);
     }
 
+    /// <summary>
+    /// CR 202.3b / 707.2 — this permanent's <em>effective</em> mana value,
+    /// derived from the (possibly copied) <see cref="GetEffectiveManaCost"/>
+    /// string. When a <see cref="Majik.Core.Effects.CopyCharacteristicsEffect"/>
+    /// is active the value reflects the copied source's mana cost (a clone of a
+    /// 6-mana creature has mana value 6, not its printed cost); when no copy is
+    /// active it equals the printed <see cref="Card.ManaCostValue"/> total.
+    /// Game-logic mana-value reads on a battlefield permanent ("permanent with
+    /// mana value N or greater", a max-mana-value gate) route through this so a
+    /// clone is measured by its copied identity. Mirrors how
+    /// <see cref="GetEffectiveName"/> / <see cref="GetEffectiveManaCost"/> route
+    /// reads through the effective surface instead of the immutable base field.
+    /// </summary>
+    public int GetEffectiveManaValue()
+    {
+        if (ActiveEffects == null)
+        {
+            return ManaCostValue.TotalValue;
+        }
+        // The effective mana-cost string is parsed back into a mana value (the
+        // same Parse the printed cost went through). A copy overwrites the
+        // Layer-1 mana-cost slot, so this picks up the copied source's value.
+        var effective = ActiveEffects.EffectiveManaCost(this);
+        if (string.Equals(effective, ManaCost, StringComparison.Ordinal))
+        {
+            // No copy changed the cost — avoid a re-parse, reuse the printed VO.
+            return ManaCostValue.TotalValue;
+        }
+        return ValueObjects.ManaCost.Parse(effective).TotalValue;
+    }
+
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
     /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
     public bool IsToken { get; internal set; }
