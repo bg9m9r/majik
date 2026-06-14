@@ -180,14 +180,33 @@ public static class PashalikMonsFactory
         // tokens (CR 602 — activated ability; CR 701.16 — sacrifice cost).
         // Mana portion ({3}{R}) is a ManaCostCost; the sacrifice is a
         // SacrificeAGoblinCost (Mons itself is eligible — no "another").
+        //
+        // RE-SOURCE-SAFE (pashalik-mons-sac-cost-token-maker-rebind): the
+        // effect reads the token controller off the live
+        // ResolutionContext.Source (the ability's own source at resolution,
+        // CR 113.7) and ITS controller, rather than capturing `card`, falling
+        // back to `card` / `owner` only on the context-less legacy sync path.
+        // The {3}{R} ManaCostCost has no captured source and the
+        // SacrificeAGoblinCost is re-homed to the new source by RebindTo
+        // (Stage 1), so the whole ability is marked RebindSafe: Agatha's Soul
+        // Cauldron re-homes this REAL token-maker to a counter-bearing bearer
+        // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — minting tokens
+        // under the BEARER's controller, never re-reading the exiled Mons.
+        // Token creation is NOT in the OracleActivatedAbilityBinder
+        // reconstructable set (self-pump / pinger / keyword-grant / counter /
+        // draw / gain-life / regenerate), so RebindTo of the real ability is
+        // the only sound re-home. Mirrors the migrated Krenko, Mob Boss
+        // token-maker (#2750).
         // ----------------------------------------------------------------
         var tokenEffect = new Effect(
             $"{CardName}: create two 1/1 red Goblin creature tokens",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
+                var subject = (ctx.Source as Permanent) ?? card;
+                var controller = subject.Controller ?? card.Controller ?? owner;
                 CreateGoblinToken(controller, zoneService);
                 CreateGoblinToken(controller, zoneService);
+                return ValueTask.CompletedTask;
             });
 
         var tokenAbility = new ActivatedAbility(
@@ -198,7 +217,8 @@ public static class PashalikMonsFactory
                 new ManaCostCost(ActivatedManaCost),
                 new SacrificeAGoblinCost(card, owner),
             },
-            effects: new IEffect[] { tokenEffect });
+            effects: new IEffect[] { tokenEffect },
+            rebindSafe: true);
 
         card.AddAbility(tokenAbility);
 
