@@ -3639,4 +3639,207 @@ public class AgathasSoulCauldronTests
         alice.Zones.Hand.GetCards().Should().Contain(top,
             "the re-homed draw reads ResolutionContext.Controller (the bearer's controller)");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-factory-resolutioncontext-source-migration-endbringer-
+    // reckoner — Endbringer is a bespoke [CardName]-factory creature whose
+    // three activated abilities ({T}: 1 damage to any target / {C},{T}: target
+    // player draws / {C},{T}: tap target creature) are OUTSIDE the
+    // OracleActivatedAbilityBinder reconstructable set. The migration retargets
+    // each effect to read its chosen target off ResolutionContext.ChosenTargets
+    // (and the damage source / draw fallback off ctx.Source / ctx.Controller)
+    // and marks all three RebindSafe, so Agatha's group-grant re-homes the REAL
+    // abilities (and their {T} costs, auto-re-homed by RebindTo Stage 1) onto a
+    // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) —
+    // the {T} taps the BEARER, never the exiled Endbringer.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Endbringer_AllThreeAbilitiesToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var endbringer = EndbringerFactory.Create(alice);
+        var realAbilities = endbringer.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().HaveCount(3,
+            "Endbringer has three activated abilities: ping, target-player-draw, tap-target");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "all migrated Endbringer abilities read ResolutionContext.Source/ChosenTargets and are RebindSafe");
+        alice.Zones.Graveyard.AddCard(endbringer);
+        endbringer.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub returns NOTHING for Endbringer so the only re-home path is
+        // RebindTo of the real abilities — the binder fallback cannot
+        // reconstruct a "1 damage to any target" pinger / tap-target form.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), endbringer);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().HaveCount(3,
+            "all three of Endbringer's real abilities are re-homed via RebindTo");
+        granted.Should().OnlyContain(a => ReferenceEquals(a.Source, bearer),
+            "every re-homed ability is sourced on the BEARER (CR 707.2)");
+        granted.Should().OnlyContain(a => a.RebindSafe,
+            "RebindTo preserves the re-source provenance");
+
+        // Resolve the re-homed PING against a victim — the damage is sourced
+        // from the BEARER (ctx.Source), never the exiled Endbringer.
+        var ping = granted.Single(a => a.Effects.Any(e =>
+            e.Description.Contains("damage", StringComparison.OrdinalIgnoreCase)));
+        var victim = new Creature("Victim", "1G", 5, 5);
+        victim.SetOwner(alice);
+        alice.Zones.Library.AddCard(victim);
+        zones.MoveCard(victim, ZoneType.Library, ZoneType.Battlefield, alice);
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+        await ping.ResolveAsync(agent: null, game: null);
+        victim.Damage.Should().Be(1, "the re-homed ping deals 1 damage to its chosen target");
+
+        // Resolve the re-homed TAP-TARGET against an untapped creature.
+        var tapAbility = granted.Single(a => a.Effects.Any(e =>
+            e.Description.Contains("tap target", StringComparison.OrdinalIgnoreCase)));
+        var tapVictim = new Creature("Tapped", "1G", 2, 2);
+        tapVictim.SetOwner(alice);
+        alice.Zones.Library.AddCard(tapVictim);
+        zones.MoveCard(tapVictim, ZoneType.Library, ZoneType.Battlefield, alice);
+        tapVictim.IsTapped.Should().BeFalse();
+        tapAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { tapVictim } });
+        await tapAbility.ResolveAsync(agent: null, game: null);
+        tapVictim.IsTapped.Should().BeTrue("the re-homed tap-target taps its chosen creature");
+
+        // Resolve the re-homed DRAW with no chosen target — falls back to the
+        // BEARER's controller (ResolutionContext.Controller), never the exiled
+        // Endbringer's owner via a captured closure.
+        var draw = granted.Single(a => a.Effects.Any(e =>
+            e.Description.Contains("draws a card", StringComparison.OrdinalIgnoreCase)));
+        var top = new Card("Mountain", "");
+        top.SetOwner(alice);
+        alice.Zones.Library.AddCard(top);
+        await draw.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Should().Contain(top,
+            "the re-homed draw falls back to ResolutionContext.Controller (the bearer's controller)");
+    }
+
+    [Fact]
+    public async Task BespokeEndbringerPing_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated ping still deals damage to its chosen target on
+        // the normal (un-rebound) resolution path.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var endbringer = EndbringerFactory.Create(alice);
+        alice.Zones.Library.AddCard(endbringer);
+        zones.MoveCard(endbringer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var ping = endbringer.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Effects.Any(e =>
+                e.Description.Contains("damage", StringComparison.OrdinalIgnoreCase)));
+
+        var lifeBefore = alice.LifeTotal;
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { alice } });
+        await ping.ResolveAsync(agent: null, game: null);
+        alice.LifeTotal.Should().Be(lifeBefore - 1,
+            "the un-rebound ping deals 1 damage to the chosen target (a player)");
+    }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-factory-resolutioncontext-source-migration-endbringer-
+    // reckoner — Reckoner Bankbuster is a bespoke [CardName]-factory
+    // Artifact-Vehicle (Creature shell) whose activated ability ({T}, remove a
+    // charge counter: draw a card; then if no charge counters remain, create a
+    // Powerstone) is OUTSIDE the OracleActivatedAbilityBinder reconstructable
+    // set. The migration reads the source whose charge-counter tail-clause it
+    // inspects off ResolutionContext.Source and the drawing player off that
+    // source's controller (then ctx.Controller), and marks the ability
+    // RebindSafe — so Agatha's group-grant re-homes the REAL "draw a card" onto
+    // a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+    // 613.1f); the {T} taps the BEARER and the RemoveChargeCounterCost is
+    // re-homed via IRebindableCost (Stage 1), so the tail-clause counter check
+    // reads the BEARER, never the exiled Bankbuster.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_ReckonerBankbuster_DrawToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var bankbuster = ReckonerBankbusterFactory.Create(alice);
+        var realAbilities = bankbuster.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Reckoner Bankbuster has exactly one non-mana activated ability — the {T}, remove-counter draw");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Bankbuster ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(bankbuster);
+        bankbuster.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+        // Give the bearer a charge counter so the re-homed cost can remove one
+        // and the tail-clause "no charge counters remain" branch is exercised.
+        bearer.Counters.Add(CounterType.Charge, 1);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), bankbuster);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Bankbuster's real draw ability is re-homed via RebindTo");
+        var draw = granted[0];
+        draw.Source.Should().BeSameAs(bearer,
+            "the re-homed draw is sourced on the BEARER (CR 707.2)");
+        draw.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        draw.Costs.OfType<RemoveChargeCounterCost>().Should().ContainSingle(
+            "the remove-charge-counter cost is re-homed to the bearer via IRebindableCost (Stage 1)");
+
+        // Resolving the re-homed draw draws for the BEARER's controller, never
+        // the exiled Bankbuster's owner via a captured closure.
+        var top = new Card("Island", "");
+        top.SetOwner(alice);
+        alice.Zones.Library.AddCard(top);
+        await draw.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Should().Contain(top,
+            "the re-homed draw reads the source's controller (the bearer's controller)");
+    }
+
+    [Fact]
+    public async Task BespokeBankbusterDraw_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated draw still draws for its own source's controller
+        // on the normal (un-rebound) resolution path.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var bankbuster = ReckonerBankbusterFactory.Create(alice);
+        alice.Zones.Library.AddCard(bankbuster);
+        zones.MoveCard(bankbuster, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var draw = bankbuster.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var top = new Card("Plains", "");
+        top.SetOwner(alice);
+        alice.Zones.Library.AddCard(top);
+        await draw.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Should().Contain(top,
+            "the un-rebound draw draws for its own source's controller");
+    }
 }
