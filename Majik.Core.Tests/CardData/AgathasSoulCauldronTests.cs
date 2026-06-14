@@ -1369,6 +1369,79 @@ public class AgathasSoulCauldronTests
             "the exiled imprinted card is untouched");
     }
 
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-resourcecontext-source-migration — a real BESPOKE
+    // [CardName]-factory creature (Lotleth Troll) whose activated abilities
+    // were migrated to read ResolutionContext.Source + marked RebindSafe now
+    // flows through the PRIMARY RebindTo path. This adds coverage the
+    // oracle-rebuild fallback CANNOT: Lotleth Troll's "Discard a creature
+    // card: Put a +1/+1 counter on this creature" carries a bespoke
+    // DiscardACreatureCardCost the binder cannot reconstruct from text, so the
+    // RebindTo of the REAL ability (reusing the real cost) is the only sound
+    // way to re-home it.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_LotlethTroll_ToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its two
+        // activated abilities (discard-pump + {B} regenerate) are now RebindSafe.
+        var troll = LotlethTrollFactory.Create(alice);
+        troll.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .Should().OnlyContain(a => a.RebindSafe,
+                "the migrated Lotleth Troll abilities read ResolutionContext.Source and are RebindSafe");
+        alice.Zones.Graveyard.AddCard(troll);
+        troll.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // No oracle lookup needed — the grant uses the REAL abilities, not text.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), troll);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().HaveCount(2,
+            "BOTH of Lotleth Troll's real activated abilities are re-homed via RebindTo");
+        granted.Should().OnlyContain(a => ReferenceEquals(a.Source, bearer),
+            "every re-homed ability is sourced on the BEARER (CR 707.2)");
+
+        // The discard-pump ability — its bespoke DiscardACreatureCardCost is
+        // reused verbatim by RebindTo (the oracle binder cannot rebuild it).
+        var pump = granted.Single(a =>
+            a.Costs.OfType<Majik.Core.Costs.DiscardACreatureCardCost>().Any());
+        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Resolving the re-homed discard-pump through the ability path puts the
+        // +1/+1 counter on the BEARER (ResolutionContext.Source = bearer), never
+        // the exiled Troll.
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        var trollCountersBefore = troll.Counters.Count(CounterType.PlusOnePlusOne);
+        await pump.ResolveAsync(agent: null, game: null);
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(bearerCountersBefore + 1,
+            "the re-homed discard-pump puts the counter on the BEARER");
+        troll.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(trollCountersBefore,
+            "the exiled imprinted Troll never receives the counter");
+
+        // The regenerate ability — re-homed shield protects the BEARER.
+        var regen = granted.Single(a =>
+            a.Costs.OfType<Majik.Core.Costs.ManaCostCost>().Any());
+        var bearerShieldsBefore = bearer.RegenerationShieldCount;
+        await regen.ResolveAsync(agent: null, game: null);
+        bearer.RegenerationShieldCount.Should().Be(bearerShieldsBefore + 1,
+            "the re-homed regenerate shields the BEARER (CR 701.18)");
+        troll.RegenerationShieldCount.Should().Be(0,
+            "the exiled imprinted Troll never receives the shield");
+    }
+
     [Fact]
     public async Task Grant_RebindsRealAbility_ResolvesThroughAbilityPath_AffectingBearer()
     {
