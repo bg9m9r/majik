@@ -97,7 +97,7 @@ public static class HedronArchiveFactory
             "Hedron Archive: draw two cards + sac self",
             () =>
             {
-                SacrificeSelf(archive, owner);
+                SacrificeSelf(archive, owner, eventBus);
                 Fx.DrawCards(owner, 2);
             });
 
@@ -120,13 +120,27 @@ public static class HedronArchiveFactory
     }
 
     /// <summary>
-    /// Move <paramref name="archive"/> from the battlefield to its owner's
-    /// graveyard. Idempotent — no-op if already off the battlefield.
-    /// Mirrors the closure used by Mind Stone / Pyrite Spellbomb.
+    /// CR 701.16 — move <paramref name="archive"/> from the battlefield to its
+    /// owner's graveyard. Idempotent — no-op if already off the battlefield.
+    /// When <paramref name="eventBus"/> is supplied (prod effects-aware build)
+    /// the move routes through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>,
+    /// publishing a <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting
+    /// the cost-payer so aristocrat payoffs read the resolve-time sacrifice. Null
+    /// bus = bare owner-routed move (legacy publish-nothing posture). In the live
+    /// activation path the central cost seam already moved the archive, so this
+    /// closure no-ops (single publish either way). Mirrors Traveler's Amulet /
+    /// Wayfarer's Bauble / Renegade Map.
     /// </summary>
-    private static void SacrificeSelf(Artifact archive, Player owner)
+    private static void SacrificeSelf(Artifact archive, Player owner, IEventBus? eventBus)
     {
         if (archive.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(archive, archive.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(archive);
         owner.Zones.Graveyard.AddCard(archive);
         archive.SetZone(ZoneType.Graveyard);

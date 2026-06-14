@@ -6,6 +6,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Zones;
 
@@ -156,7 +157,7 @@ public static class SojournersCompanionFactory
             $"{CardName}: tutor a basic land -> battlefield tapped + sac self",
             async ctx =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
 
                 var candidates = owner.Zones.Library.GetCards()
                     .Where(c => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name))
@@ -224,14 +225,26 @@ public static class SojournersCompanionFactory
 
     /// <summary>
     /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent. Mirrors
-    /// <see cref="ExpeditionMapFactory"/>'s SacrificeSelf shape (the
-    /// engine's generic <see cref="AdditionalCost"/> sacrifice payment is
-    /// currently a no-op stub).
+    /// owner's graveyard. Idempotent. When <paramref name="eventBus"/> is
+    /// supplied (prod effects-aware build) the move routes through
+    /// <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>, publishing a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer so aristocrat payoffs read the resolve-time sacrifice. Null
+    /// bus = bare owner-routed move (legacy publish-nothing posture). In the
+    /// live activation path the central cost seam already moved the Companion,
+    /// so this closure no-ops (single publish either way). Mirrors Traveler's
+    /// Amulet / Wayfarer's Bauble / Renegade Map.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);
