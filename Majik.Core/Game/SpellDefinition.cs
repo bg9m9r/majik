@@ -32,7 +32,8 @@ public sealed record SpellDefinition(
     IReadOnlyList<IAdditionalCost>? AdditionalCosts = null,
     int MinModes = 1,
     int MaxModes = 1,
-    EscalateSpec? Escalate = null)
+    EscalateSpec? Escalate = null,
+    DamageDivisionSpec? DamageDivision = null)
 {
     /// <summary>
     /// CR 700.2d / CR 700.2e — true when the caster may pick MORE than one
@@ -84,8 +85,22 @@ public sealed record ChosenSpellParams(
     ManaPayment Mana,
     IReadOnlyList<Player>? AllPlayers = null,
     IReadOnlyList<int>? ModeIndexes = null,
-    IReadOnlyList<IAdditionalCost>? AdditionalCostPayments = null)
+    IReadOnlyList<IAdditionalCost>? AdditionalCostPayments = null,
+    IReadOnlyList<DamageAllocation>? DamageDivision = null)
 {
+    /// <summary>
+    /// Non-null view of <see cref="DamageDivision"/> — empty when the spell
+    /// declared no <see cref="SpellDefinition.DamageDivision"/>. CR 601.2d:
+    /// the caster's chosen split of the printed damage across the chosen
+    /// targets, recorded at cast time alongside the targets. Each entry pairs
+    /// a chosen target token (index into the divided target slot) with the
+    /// amount of damage assigned to it. EffectFactory closures read this
+    /// instead of an even-split fallback so the dealt amounts honour the
+    /// caster's announced division.
+    /// </summary>
+    public IReadOnlyList<DamageAllocation> DamageDivisionOrEmpty =>
+        DamageDivision ?? Array.Empty<DamageAllocation>();
+
     /// <summary>
     /// Non-null view of <see cref="AdditionalCostPayments"/> — empty when
     /// no additional cost was paid for this spell. EffectFactory closures
@@ -95,6 +110,43 @@ public sealed record ChosenSpellParams(
     public IReadOnlyList<IAdditionalCost> AdditionalCostPaymentsOrEmpty =>
         AdditionalCostPayments ?? Array.Empty<IAdditionalCost>();
 }
+
+/// <summary>
+/// CR 601.2d / CR 119.4 — declares that a spell deals a fixed total amount of
+/// damage that the caster DIVIDES at cast time among the targets it chose for
+/// one of its target-request slots ("~ deals N damage divided as you choose
+/// among one, two, or three targets"). <see cref="SpellCastFlow"/> spots this
+/// on the bound <see cref="SpellDefinition"/>, prompts the caster's agent at
+/// the CR 601.2d announcement point (right after target collection,
+/// CR 601.2c), and records the chosen split on
+/// <see cref="ChosenSpellParams.DamageDivision"/>.
+/// </summary>
+/// <param name="TotalDamage">CR 119.4 — the printed damage that MUST be
+/// divided so each chosen target gets at least 1 and the assignments sum to
+/// exactly this value.</param>
+/// <param name="TargetSlotIndex">Index into
+/// <see cref="ChosenSpellParams.Targets"/> identifying which target-request
+/// slot holds the recipients the damage is divided among (almost always 0 —
+/// the single divided-damage request).</param>
+public sealed record DamageDivisionSpec(
+    int TotalDamage,
+    int TargetSlotIndex = 0);
+
+/// <summary>
+/// CR 601.2d — one entry of a damage division: the chosen target the caster
+/// assigned <see cref="Amount"/> damage to. <see cref="TargetSlotPosition"/>
+/// is the index of the target within the divided target slot
+/// (<see cref="SpellDefinition.DamageDivision"/>'s
+/// <see cref="DamageDivisionSpec.TargetSlotIndex"/>), so a resolution-time
+/// EffectFactory can correlate the amount with the live (re-resolved) target
+/// even after illegal-at-resolution targets are filtered (CR 608.2b). The raw
+/// chosen <see cref="Target"/> token is also carried for closures that resolve
+/// it directly.
+/// </summary>
+public sealed record DamageAllocation(
+    object Target,
+    int TargetSlotPosition,
+    int Amount);
 
 /// <summary>
 /// CR 702.121 — Escalate. The additional cost a modal ("choose one or more")

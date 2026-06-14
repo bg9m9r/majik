@@ -288,22 +288,49 @@ internal static class DamageSpellFactory
         ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("any target", 1, maxTargets, Array.Empty<object>()) },
+        // CR 601.2d — declare the divide-damage announcement so SpellCastFlow
+        // prompts the caster for the per-target split at cast time and records
+        // it on ChosenSpellParams.DamageDivision. The EffectFactory below reads
+        // that split (falling back to an even split only when no division was
+        // announced, e.g. a single legal target or a non-prompting call site).
+        DamageDivision: new DamageDivisionSpec(n, TargetSlotIndex: 0),
         EffectFactory: p =>
         {
             var slots = p.Targets.Count > 0 ? p.Targets[0] : Array.Empty<object>();
-            var targets = slots.Select(s => resolver(s)).Where(t => t is not null).ToList();
-            return new IEffect[] { new Effect($"deal {n} divided among {targets.Count}", () =>
+            // CR 601.2d — map the caster's announced split (keyed by the chosen
+            // target's position in the divided slot, CR 119.4) onto each slot
+            // position, so a slot that became an illegal target at resolution is
+            // simply skipped without shifting the others' amounts. Falls back to
+            // an even split when no division was announced.
+            var announced = p.DamageDivisionOrEmpty;
+            var perSlot = new int[slots.Count];
+            if (announced.Count > 0)
             {
-                if (targets.Count == 0 || n <= 0) return;
-                // Even split (remainder front-loaded). With one target this
-                // degenerates to full N — same as the single-target variant.
-                var baseShare = n / targets.Count;
-                var remainder = n % targets.Count;
-                for (int i = 0; i < targets.Count; i++)
+                foreach (var alloc in announced)
                 {
-                    var share = baseShare + (i < remainder ? 1 : 0);
+                    if (alloc.TargetSlotPosition >= 0 && alloc.TargetSlotPosition < perSlot.Length)
+                    {
+                        perSlot[alloc.TargetSlotPosition] = alloc.Amount;
+                    }
+                }
+            }
+            else
+            {
+                // No division announced — degenerate to the historical even
+                // split (remainder front-loaded) over the chosen slots.
+                var fallback = Players.Agents.DamageDivisionDefaults.EvenSplit(n, slots.Count);
+                for (var i = 0; i < perSlot.Length; i++) perSlot[i] = fallback[i];
+            }
+
+            return new IEffect[] { new Effect($"deal {n} divided among {slots.Count}", () =>
+            {
+                if (slots.Count == 0 || n <= 0) return;
+                for (int i = 0; i < slots.Count; i++)
+                {
+                    var share = perSlot[i];
                     if (share <= 0) continue;
-                    var target = targets[i]!;
+                    var target = resolver(slots[i]);
+                    if (target is null) continue; // illegal at resolution (CR 608.2b)
                     var amount = Filter(replacements, (object?)caster ?? target, target, share);
                     if (amount <= 0) continue;
                     OracleSpellBinder.DealDamage(target, amount);

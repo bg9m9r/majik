@@ -35,6 +35,7 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromPileChoices = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>, ICard?>> _fromRevealedChoices = new();
     private readonly Queue<Func<IReadOnlyList<object>, IReadOnlyList<object>>> _choiceSelectors = new();
+    private readonly Queue<Func<int, IReadOnlyList<object>, IReadOnlyList<int>>> _damageDivisions = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
@@ -152,6 +153,36 @@ public sealed class ScriptedAgent : IPlayerAgent
 
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Task.FromResult(Pop(_xValues, "X"));
+
+    /// <summary>
+    /// Pre-queue a damage-division split for the next
+    /// <see cref="IPlayerAgent.ChooseDamageDivisionAsync"/> call (CR 601.2d).
+    /// The chooser receives the total damage + the chosen target tokens and
+    /// returns the per-target amount list (index-aligned with the targets). When
+    /// no chooser is queued the agent falls back to the even-split default
+    /// (matching the <see cref="IPlayerAgent"/> shim) so existing tests that
+    /// don't care about the split keep passing.
+    /// </summary>
+    public void QueueDamageDivision(Func<int, IReadOnlyList<object>, IReadOnlyList<int>> chooser)
+        => _damageDivisions.Enqueue(chooser);
+
+    /// <summary>Convenience: pre-queue a fixed per-target split.</summary>
+    public void QueueDamageDivision(params int[] amounts)
+        => _damageDivisions.Enqueue((_, _) => amounts.ToList());
+
+    public Task<IReadOnlyList<int>> ChooseDamageDivisionAsync(
+        GameContext? ctx, ICard source, int totalDamage,
+        IReadOnlyList<object> targets, CancellationToken ct = default)
+    {
+        if (_damageDivisions.Count > 0)
+        {
+            var chooser = _damageDivisions.Dequeue();
+            return Task.FromResult(chooser(totalDamage, targets));
+        }
+        // No script entry — even split (remainder front-loaded), matching the
+        // IPlayerAgent default + the historical even-split behaviour.
+        return Task.FromResult(DamageDivisionDefaults.EvenSplit(totalDamage, targets.Count));
+    }
 
     public Task<int> ChooseModeAsync(
         GameContext ctx,
