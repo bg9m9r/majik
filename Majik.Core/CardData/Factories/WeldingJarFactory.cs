@@ -116,11 +116,28 @@ public static class WeldingJarFactory
                 // Self-sacrifice: Battlefield → Graveyard. Idempotent if
                 // somehow already off the battlefield (mirrors
                 // TormodsCryptFactory.SacrificeSelf shape).
+                //
+                // CR 701.16a — when a bus is supplied (the prod effects-aware
+                // build), route the resolve-time self-sacrifice through the
+                // bus-aware Fx.Sacrifice so a PermanentSacrificedEvent is
+                // published for aristocrat payoffs (Mayhem Devil, Blood Artist).
+                // In the live activation path the SAC COST already moved the jar
+                // off the battlefield, so the on-battlefield guard makes this
+                // resolve-leg sacrifice a no-op (single publish either way).
+                // Bus-less builds keep the publish-nothing direct-zone-move.
                 if (jar.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(jar);
-                    owner.Zones.Graveyard.AddCard(jar);
-                    jar.SetZone(ZoneType.Graveyard);
+                    var controller = jar.Controller ?? owner;
+                    if (eventBus != null)
+                    {
+                        Majik.Core.Primitives.Fx.Sacrifice(jar, controller, eventBus);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(jar);
+                        owner.Zones.Graveyard.AddCard(jar);
+                        jar.SetZone(ZoneType.Graveyard);
+                    }
                 }
 
                 if (regenerateAbility == null) return;

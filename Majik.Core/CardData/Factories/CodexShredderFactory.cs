@@ -200,7 +200,7 @@ public static class CodexShredderFactory
                 // behaviour is observable even when the generic
                 // AdditionalCost.Sacrifice payment is a no-op stub (same
                 // posture as RenegadeMapFactory / TheUnderworldCookbookFactory).
-                SacrificeSelf(card, owner, controller);
+                SacrificeSelf(card, owner, controller, eventBus);
                 ResolveGraveyardReturn(controller, ability);
             });
 
@@ -234,10 +234,29 @@ public static class CodexShredderFactory
     /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
     /// owner's graveyard. Idempotent. Mirrors the closure used by
     /// <see cref="RenegadeMapFactory"/> / <see cref="TheUnderworldCookbookFactory"/>.
+    ///
+    /// <para>
+    /// CR 701.16a — when an <paramref name="eventBus"/> is supplied (the prod
+    /// effects-aware build), route the resolve-time self-sacrifice through
+    /// <see cref="Majik.Core.Primitives.Fx.Sacrifice(ICard, Player, IEventBus)"/>
+    /// so a <see cref="PermanentSacrificedEvent"/> is published for aristocrat
+    /// payoffs (Mayhem Devil, Blood Artist, It That Betrays). In the live
+    /// activation path the SAC COST already moved the card off the battlefield,
+    /// so the on-battlefield guard makes this resolve-leg sacrifice a no-op
+    /// (single publish either way). Bus-less builds keep the publish-nothing
+    /// direct-zone-move posture.
+    /// </para>
     /// </summary>
-    private static void SacrificeSelf(Artifact card, Player owner, Player controller)
+    private static void SacrificeSelf(Artifact card, Player owner, Player controller, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Majik.Core.Primitives.Fx.Sacrifice(card, controller, eventBus);
+            return;
+        }
+
         controller.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);
