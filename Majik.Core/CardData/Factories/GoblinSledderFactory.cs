@@ -128,7 +128,7 @@ public static class GoblinSledderFactory
 /// the only candidate. Mirrors the deterministic v1 picker used by
 /// <see cref="SkirkProspectorFactory"/>'s mana-ability cost.
 /// </summary>
-public sealed class SacrificeAGoblinCost : ICost
+public sealed class SacrificeAGoblinCost : ICost, IRebindableCost
 {
     private readonly Creature _self;
     private readonly Player _controller;
@@ -190,5 +190,25 @@ public sealed class SacrificeAGoblinCost : ICost
         ctrl.Zones.Graveyard.AddCard(pick);
         pick.SetZone(ZoneType.Graveyard);
         Sacrificed = pick;
+    }
+
+    /// <summary>
+    /// CR 707.2 / 613.1f — re-home this "Sacrifice a Goblin" cost onto a new
+    /// source permanent (e.g. Agatha's Soul Cauldron granting a re-sourced
+    /// activated ability via <see cref="ActivatedAbility.RebindTo"/>). When
+    /// the captured source matches <paramref name="oldSource"/>, return an
+    /// equivalent cost rooted at <paramref name="newSource"/> (the bearer) and
+    /// the bearer's controller, so the rebound ability sacrifices a Goblin the
+    /// BEARER's controller controls — never the original card's controller.
+    /// Self-eligibility ("no 'another' qualifier") follows because the new
+    /// <c>_self</c> is the bearer. Pure — the original instance is unchanged.
+    /// </summary>
+    public ICost RebindTo(object oldSource, object newSource)
+    {
+        if (!ReferenceEquals(oldSource, _self)) return this;
+        if (newSource is not Creature newSelf) return this;
+
+        var newController = newSelf.Controller ?? _controller;
+        return new SacrificeAGoblinCost(newSelf, newController);
     }
 }

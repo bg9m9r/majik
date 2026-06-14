@@ -290,4 +290,87 @@ public class PashalikMonsTests
             t.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         });
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source safety (pashalik-mons-sac-cost-token-maker-rebind deferral)
+    //
+    // The token-maker activated ability must read its controller off the live
+    // ResolutionContext.Source (CR 113.7) and be marked RebindSafe so Agatha's
+    // Soul Cauldron (CR 707.2 / 613.1f) can re-home the REAL ability to a
+    // bearer — token creation is OUTSIDE the OracleActivatedAbilityBinder
+    // reconstructable set, so RebindTo of the real ability is the only sound
+    // re-home. Mirrors the migrated Krenko, Mob Boss token-maker (#2750).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PashalikMons_TokenMakerAbility_IsRebindSafe()
+    {
+        var mons = PashalikMonsFactory.Create(_alice);
+
+        var ability = mons.Abilities.OfType<ActivatedAbility>().Single();
+        ability.RebindSafe.Should().BeTrue(
+            "the token-maker reads ResolutionContext.Source's controller so it is sound to RebindTo");
+    }
+
+    [Fact]
+    public async Task PashalikMons_TokenMaker_ReboundToBearer_MintsUnderBearersController()
+    {
+        // RebindTo re-homes the real token-maker onto a different permanent.
+        // The tokens must be created under the NEW source's controller, never
+        // re-reading the original Pashalik Mons (which may be in exile).
+        var bus = new EventBus();
+        var zones = new ZoneService(bus);
+
+        var mons = PashalikMonsFactory.Create(_alice, zones);
+        // Mons sits in the graveyard — must NOT be read for the controller.
+        _alice.Zones.Graveyard.AddCard(mons);
+        mons.SetZone(ZoneType.Graveyard);
+
+        var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+        bearer.SetOwner(_bob);
+        bearer.ChangeController(_bob);
+        _bob.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var ability = mons.Abilities.OfType<ActivatedAbility>().Single();
+        var rehomed = ability.RebindTo(bearer, _bob);
+        rehomed.Source.Should().BeSameAs(bearer, "RebindTo re-homes the source (CR 707.2)");
+        rehomed.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        await rehomed.ResolveAsync(agent: null, game: null);
+
+        // Two 1/1 red Goblin tokens land under the BEARER's controller (Bob),
+        // not Pashalik Mons' owner (Alice).
+        _bob.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Count(c => !ReferenceEquals(c, bearer) && c.HasSubtype(CardSubtype.Goblin))
+            .Should().Be(2, "the re-homed token-maker mints two Goblins under the bearer's controller");
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin))
+            .Should().Be(0, "no tokens leak to the original card's controller");
+    }
+
+    [Fact]
+    public async Task PashalikMons_TokenMaker_OnOwnSource_MintsUnderOwnController()
+    {
+        // Sanity: the migrated effect still reads its OWN source's controller
+        // on the normal (un-rebound) resolution path — ResolutionContext.Source
+        // = the card.
+        var bus = new EventBus();
+        var zones = new ZoneService(bus);
+
+        var mons = PashalikMonsFactory.Create(_alice, zones);
+        _alice.Zones.Battlefield.AddCard(mons);
+        mons.SetZone(ZoneType.Battlefield);
+
+        var ability = mons.Abilities.OfType<ActivatedAbility>().Single();
+        await ability.ResolveAsync(agent: null, game: null);
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Count(c => !ReferenceEquals(c, mons) && c.HasSubtype(CardSubtype.Goblin))
+            .Should().Be(2, "resolving the un-rebound token-maker mints two Goblins under Alice");
+    }
 }
