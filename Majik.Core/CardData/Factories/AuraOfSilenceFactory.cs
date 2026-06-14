@@ -6,6 +6,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -147,7 +148,7 @@ public static class AuraOfSilenceFactory
             $"{CardName}: sacrifice self + destroy target artifact/enchantment",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
 
                 if (sacAbility == null
                     || sacAbility.ChosenTargets.Count == 0
@@ -204,10 +205,23 @@ public static class AuraOfSilenceFactory
     /// threaded (the effects-aware <c>Create</c> overload / the central
     /// <see cref="IBusAwareCost"/> cost-payment seam). In the live path the
     /// cost already moved the card, so this closure no-ops.
+    ///
+    /// <para>CR 701.16a — when a bus is supplied (prod effects-aware build),
+    /// route through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/> so a
+    /// <see cref="PermanentSacrificedEvent"/> is published crediting the
+    /// cost-payer even when the resolve closure (not the cost) performs the
+    /// move. Mirrors <see cref="SealOfCleansingFactory"/>.</para>
     /// </summary>
-    private static void SacrificeSelf(Enchantment card, Player owner)
+    private static void SacrificeSelf(Enchantment card, Player owner, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);
