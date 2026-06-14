@@ -1,0 +1,5 @@
+{
+  "name": "Flare of Faith",
+  "types": ["Instant"],
+  "manaCost": "{1}{W}"
+}
