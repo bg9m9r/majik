@@ -147,6 +147,18 @@ namespace Majik.Core.CardData;
 ///     1, plus the spelled-out "two"/"three" and a bare digit; an unrecognised
 ///     count word is skipped. Sound on any permanent bearer, not just
 ///     creatures.</item>
+///   <item><b>Target-player draw</b> —
+///     <c>"{cost}: Target player draws a card."</c> / <c>"… draws N cards."</c>
+///     The TARGETED-player sibling of draw-a-card (Endbringer's
+///     <c>"{C}, {T}: Target player draws a card."</c>; Reckoner Bankbuster's
+///     charge-counter draw). Rebuilt with a 1..1 target-player
+///     <see cref="TargetRequest"/>; resolution reads the chosen player off
+///     <see cref="ActivatedAbility.ChosenTargets"/> and draws via
+///     <see cref="Majik.Core.Primitives.Fx.DrawCards"/> (CR 121 / 613.1f) — the
+///     chosen player draws from THEIR OWN library, so the BEARER is only the
+///     source / cost-payer, exactly the way the pinger's "target player" leg
+///     routes a chosen-player effect. Count parsed like draw-a-card; an
+///     unrecognised count is skipped. Sound on any permanent bearer.</item>
 ///   <item><b>Gain-life</b> —
 ///     <c>"{cost}: You gain N life."</c> Rebuilt as a no-target
 ///     <see cref="ActivatedAbility"/> whose resolution gains life for the
@@ -398,6 +410,24 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Draw (a|one|two|three|\d+) cards?\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Target player draws a card." / "Target player draws N cards."
+    // (CR 121 / 115.) The TARGETED-player sibling of the self-source draw shape
+    // (DrawCardsRegex): instead of the controller drawing, a CHOSEN player draws.
+    // Endbringer's "{C}, {T}: Target player draws a card." is the canonical case;
+    // Reckoner Bankbuster's charge-counter mode draws this way too. Sound to
+    // re-home: a draw has NO "this creature" / source reference — the chosen
+    // player draws from THEIR OWN library, never the exiled imprinted card — so
+    // the BEARER is only the source / cost-payer (its own {T}/mana cost). Rebuilt
+    // with a 1..1 target-player TargetRequest and resolution through
+    // Fx.DrawCards on the CHOSEN player (read off ChosenTargets), exactly the way
+    // PingerRegex's "target player" leg routes a chosen-player effect. The count
+    // is "a"/"one" ⇒ 1, a spelled-out "two"/"three", or a bare digit (reusing
+    // DrawCountWords); an unrecognised count word is skipped as unsound. Group 1 =
+    // cost, group 2 = count token.
+    private static readonly Regex TargetPlayerDrawRegex = new(
+        @"^(" + CostList + @")\s*:\s*Target player draws (a|one|two|three|\d+) cards?\.$",
+        RegexOptions.IgnoreCase);
+
     // Spelled-out small counts that appear on real "Draw N cards" activated
     // abilities. "a"/"one" ⇒ 1. Larger counts on activated draw abilities are
     // always written as a word in this range (no real card says "draw 9 cards"
@@ -613,6 +643,14 @@ public static class OracleActivatedAbilityBinder
             if (regenerate.Success)
             {
                 var ability = TryBuildRegenerateSelf(regenerate, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var targetPlayerDraw = TargetPlayerDrawRegex.Match(line);
+            if (targetPlayerDraw.Success)
+            {
+                var ability = TryBuildTargetPlayerDraw(targetPlayerDraw, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -951,6 +989,72 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { drawEffect });
+    }
+
+    /// <summary>
+    /// Build a target-player-draw ability: "{cost}: Target player draws a/N
+    /// card(s)." (Endbringer's "{C}, {T}: Target player draws a card."; Reckoner
+    /// Bankbuster's charge-counter draw.) The TARGETED-player sibling of
+    /// <see cref="TryBuildDrawCards"/>: a CHOSEN player draws rather than the
+    /// controller. Re-homed so the BEARER is ONLY the source / cost-payer (its own
+    /// {T}/mana cost); the draw resolves on the CHOSEN player (read off
+    /// <see cref="ActivatedAbility.ChosenTargets"/>) via <see cref="Fx.DrawCards"/>
+    /// — the chosen player draws from THEIR OWN library (CR 121 / 613.1f), never
+    /// the exiled imprinted card. Does NOT gate on <see cref="Creature"/> (a draw
+    /// is sound on any permanent bearer). Mirrors <see cref="BuildPinger"/>'s 1..1
+    /// "target player" request. The count is "a"/"one" ⇒ 1, a spelled-out
+    /// "two"/"three", or a bare digit; an unrecognised count word is skipped
+    /// (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildTargetPlayerDraw(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int count;
+        if (!DrawCountWords.TryGetValue(countToken, out count)
+            && !int.TryParse(countToken, out count))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (count <= 0) return null;
+
+        ActivatedAbility? ability = null;
+        var drawEffect = new Effect(
+            $"Granted: target player draws {count} card(s)",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 121 / 613.1f — the CHOSEN player draws from THEIR OWN
+                // library. No source-card reference, so re-homing is trivially
+                // sound. A non-player chosen target (shape-only path) no-ops.
+                if (ability.ChosenTargets[0][0] is Player chosen)
+                {
+                    Fx.DrawCards(chosen, count);
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { drawEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target player",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Draw),
+            });
+
+        return ability;
     }
 
     /// <summary>

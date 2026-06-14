@@ -1389,6 +1389,115 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_TargetPlayerDraw_RehomesDrawToChosenPlayer()
+    {
+        // oracle-activated-shape-target-player-draws-card: the
+        // OracleActivatedAbilityBinder now reconstructs the TARGETED-player draw
+        // shape "{cost}: Target player draws a card." (Endbringer's
+        // "{C}, {T}: Target player draws a card."). Unlike self-draw the CHOSEN
+        // player draws — re-homing is sound because a draw references the chosen
+        // player's OWN library (Fx.DrawCards on ChosenTargets), never the exiled
+        // card (CR 121 / 613.1f). The BEARER is only the source / cost-payer.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{T}: Target player draws a card."
+        var sage = new Creature("Sage Stub", "2U", 1, 1);
+        sage.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(sage);
+        sage.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // Put a card on top of BOB's library — the chosen player draws from
+        // their OWN library, not the controller's.
+        var bobsTop = new Card("Bob's Top", "");
+        bobsTop.SetOwner(bob);
+        bob.Zones.Library.AddCard(bobsTop);
+        bobsTop.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Sage Stub", "{T}: Target player draws a card.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sage);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's target-player-draw ability");
+        var drawAbility = granted[0];
+        drawAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        drawAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        drawAbility.TargetRequests.Should().ContainSingle(
+            t => t.Description.Contains("target player"),
+            "\"target player draws a card\" requests a single target player");
+
+        // Choosing BOB and resolving draws into BOB's hand, not Alice's.
+        drawAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+        var bobHandBefore = bob.Zones.Hand.GetCards().Count();
+        var aliceHandBefore = alice.Zones.Hand.GetCards().Count();
+        foreach (var effect in drawAbility.Effects) effect.Execute();
+        bob.Zones.Hand.GetCards().Count().Should().Be(bobHandBefore + 1,
+            "the re-homed target-player draw draws for the CHOSEN player");
+        bob.Zones.Hand.GetCards().Should().Contain(bobsTop,
+            "the chosen player draws from their OWN library");
+        alice.Zones.Hand.GetCards().Count().Should().Be(aliceHandBefore,
+            "the controller does not draw — only the chosen target player does");
+    }
+
+    [Fact]
+    public void Grant_NonMana_TargetPlayerDrawN_RehomesMultiDrawToChosenPlayer()
+    {
+        // The N-card variant: "{cost}: Target player draws N cards."
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var sage = new Creature("Sage Stub", "3U", 1, 1);
+        sage.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(sage);
+        sage.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var c = new Card($"Bob Lib {i}", "");
+            c.SetOwner(bob);
+            bob.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Sage Stub", "{2}, {T}: Target player draws two cards.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sage);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's target-player-draw-two ability");
+        var drawAbility = granted[0];
+        drawAbility.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("2"));
+
+        drawAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+        var bobHandBefore = bob.Zones.Hand.GetCards().Count();
+        foreach (var effect in drawAbility.Effects) effect.Execute();
+        bob.Zones.Hand.GetCards().Count().Should().Be(bobHandBefore + 2,
+            "the re-homed \"target player draws two cards\" ability draws two for the chosen player");
+    }
+
+    [Fact]
     public void Grant_NonMana_GainLife_RehomesLifeGainToBearerController()
     {
         var alice = new Player("Alice", 20);
