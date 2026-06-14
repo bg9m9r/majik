@@ -32,11 +32,13 @@ namespace Majik.Core.CardData.Factories;
 ///   block-restriction path reads the marker — same shape as
 ///   <see cref="AirElementalFactory"/>.
 ///
-/// - <b>Ward {2} (CR 702.21)</b>: <see cref="KeywordAbility"/> marker plus a
-///   public <see cref="BuildWardEffect"/> builder. Same posture as
-///   <see cref="TolarianTerrorFactory"/> — marker keeps keyword-scan surface
-///   uniform; <see cref="WardEffect.ResolvesWard"/> is the spell-resolve hook.
-///   Battlefield-attached triggered ability is deferred (v1 gap).
+/// - <b>Ward {2} (CR 702.21e/f)</b>: <see cref="KeywordAbility"/> marker plus
+///   a real <see cref="TriggeredAbility"/> built off the shared
+///   <see cref="WardTriggerFactory"/> primitive. Fires on a
+///   <see cref="Majik.Core.Domain.DomainEvents.TargetsChosenEvent"/> when an
+///   opponent's spell/ability targets the Skyturtle and counters it unless
+///   its controller pays {2} on resolution
+///   (<see cref="WardEffect.Resolve(Player, bool)"/>).
 ///
 /// - <b>Channel 1 — {2}{G}, Discard this card (CR 702.74)</b>: activated
 ///   ability gated to the hand by <see cref="DiscardSelfCost"/> (CR 702.74a).
@@ -53,9 +55,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Ward {2} trigger wiring</b>: marker + BuildWardEffect exposed; the
-///   battlefield-attached triggered-ability surface is deferred — same gap as
-///   Tolarian Terror / Kappa Cannoneer.
 /// - <b>Agent-driven target prompt for Channel 1</b>: auto-picks the first
 ///   graveyard card when no agent target is set (same posture as Eternal
 ///   Witness / Wishclaw Talisman first-card fallback).
@@ -113,12 +112,15 @@ public static class ColossalSkyturtleFactory
         card.AddAbility(new KeywordAbility("Flying", card, owner));
 
         // ----------------------------------------------------------------
-        // Ward {2} (CR 702.21) — marker keyword. WardEffect builder exposed
-        // via BuildWardEffect for the spell-resolution opt-in path.
-        // Battlefield-attached trigger deferred (v1 gap — same as Tolarian
-        // Terror / Kappa Cannoneer).
+        // Ward {2} (CR 702.21e/f) — marker keyword PLUS a real triggered
+        // ability built off the shared WardTriggerFactory primitive. Fires on
+        // a TargetsChosenEvent when an opponent's spell/ability targets the
+        // Skyturtle and, on resolution, counters it unless its controller
+        // pays {2}. TriggerManager auto-registers it on the prod path when the
+        // card enters the battlefield (CR 603.6a).
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        card.AddAbility(WardTriggerFactory.Build(BuildWardEffect(card)));
 
         // ----------------------------------------------------------------
         // Channel 1 — {2}{G}, Discard this card (CR 702.74):

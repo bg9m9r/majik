@@ -44,15 +44,15 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Players.Agents.ImproviseAltCostProbe"/>
 ///   surfaces this on the bot-discovery rail.
 ///
-/// - <b>Ward {4} (CR 702.21)</b>: wired as a
-///   <see cref="KeywordAbility"/> marker. The
-///   <see cref="WardEffect"/> trigger helper exists as a stand-alone
-///   check (callers invoke <c>ResolvesWard</c> from the spell-resolution
-///   path) but there is no battlefield-attached Ward trigger primitive
-///   yet, so the marker is structural-only — same posture as the
-///   Improvise marker. <see cref="BuildWardEffect"/> returns a
-///   <see cref="WardEffect"/> instance bound to the live card so the
-///   spell-resolve path can opt-in once the wiring lands.
+/// - <b>Ward {4} (CR 702.21e/f)</b>: a <see cref="KeywordAbility"/> marker
+///   PLUS a real <see cref="TriggeredAbility"/> built off the shared
+///   <see cref="WardTriggerFactory"/> primitive. The trigger fires on a
+///   <see cref="Majik.Core.Domain.DomainEvents.TargetsChosenEvent"/> when
+///   an opponent's spell/ability targets Kappa, and on resolution counters
+///   it unless its controller pays {4} (charged via
+///   <see cref="WardEffect.Resolve(Player, bool)"/>, countering through the
+///   live stack). <see cref="BuildWardEffect"/> binds the
+///   <see cref="WardEffect"/> to the live card.
 ///
 /// - <b>ETB / artifact-ETB trigger (CR 603.1 / 603.6a)</b>: wired via
 ///   <see cref="EventTriggerCondition{T}"/> over
@@ -71,14 +71,6 @@ namespace Majik.Core.CardData.Factories;
 ///   (CR 702.x / CR 509.1c) when a
 ///   <see cref="ContinuousEffectsService"/> is supplied (the
 ///   restriction silently no-ops on the shape-only path).
-///
-/// ## Deferred (v1 gaps)
-///
-/// - <b>Ward {4} trigger wiring</b>: <see cref="WardEffect"/> is a
-///   standalone check helper, not yet plumbed onto a
-///   battlefield-attached triggered ability. v1 ships the marker +
-///   <see cref="BuildWardEffect"/> builder; the spell-resolution path
-///   gains the Ward consultation in a separate PR.
 ///
 /// ## Wiring overloads
 ///
@@ -193,12 +185,18 @@ public static class KappaCannoneerFactory
         card.AddAbility(new KeywordAbility("Improvise", card, owner));
 
         // ----------------------------------------------------------------
-        // Ward {4} (CR 702.21) — marker keyword. WardEffect exists as a
-        // standalone helper (BuildWardEffect bounds an instance to the
-        // live card) but the battlefield-attached triggered-ability
-        // surface is deferred — see class xmldoc.
+        // Ward {4} (CR 702.21e/f) — marker keyword PLUS a real triggered
+        // ability built off the shared WardTriggerFactory primitive. The
+        // marker keeps the keyword-scan surface uniform (bot probes,
+        // dispatcher tests); the trigger fires on a TargetsChosenEvent when
+        // an opponent's spell/ability targets Kappa and, on resolution,
+        // counters it unless its controller pays {4}.
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+
+        var wardTrigger = WardTriggerFactory.Build(BuildWardEffect(card));
+        card.AddAbility(wardTrigger);
+        triggers?.RegisterTriggeredAbility(wardTrigger);
 
         // ----------------------------------------------------------------
         // Artifact-ETB trigger — CR 603.1 / CR 603.6a.

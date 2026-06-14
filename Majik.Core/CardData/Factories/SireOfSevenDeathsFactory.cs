@@ -29,15 +29,16 @@ namespace Majik.Core.CardData.Factories;
 ///   markers consumed by CombatValidator / CombatAbilities:
 ///     First Strike (CR 702.7), Vigilance (CR 702.20), Menace (CR 702.111),
 ///     Trample (CR 702.19), Reach (CR 702.17), Lifelink (CR 702.15).
-/// - <b>Printed "Pay 7 life" Ward variant (CR 702.21)</b>: shipped as a
-///   <see cref="KeywordAbility"/>("Ward") marker so the discovery surface
-///   stays uniform with Reality Smasher / Kappa Cannoneer / other Ward
-///   carriers, plus a bound <see cref="WardEffect"/> via
-///   <see cref="BuildWardEffect"/> whose payment is a real
-///   <see cref="PayLifeCost"/>(7) (non-mana ward, CR 702.21c).
-///   <see cref="WardEffect.Resolve"/> counters an opponent's targeting
-///   spell/ability unless they pay 7 life — the life rider is now
-///   functional, not structural-only.
+/// - <b>Printed "Pay 7 life" Ward variant (CR 702.21e/f)</b>: a
+///   <see cref="KeywordAbility"/>("Ward") marker PLUS a real
+///   <see cref="TriggeredAbility"/> built off the shared
+///   <see cref="Majik.Core.Keywords.WardTriggerFactory"/> primitive. Fires on
+///   a <see cref="Majik.Core.Domain.DomainEvents.TargetsChosenEvent"/> when an
+///   opponent's spell/ability targets Sire and, on resolution, counters it
+///   unless its controller pays 7 life — the bound <see cref="WardEffect"/>
+///   (<see cref="BuildWardEffect"/>) charges a real <see cref="PayLifeCost"/>(7)
+///   (non-mana ward, CR 702.21c) via
+///   <see cref="WardEffect.Resolve(Player, bool)"/>.
 /// </summary>
 [CardName("Sire of Seven Deaths")]
 public static class SireOfSevenDeathsFactory
@@ -47,9 +48,7 @@ public static class SireOfSevenDeathsFactory
     public const int Power = 7;
     public const int Toughness = 7;
 
-    /// <summary>Printed Ward cost — non-mana (Pay 7 life). Carried as a
-    /// documentation constant; see class xmldoc for the deferred wiring
-    /// gap.</summary>
+    /// <summary>Printed Ward cost — non-mana (Pay 7 life).</summary>
     public const string WardLifeCost = "Pay 7 life";
 
     /// <summary>The amount of life an opponent pays for Sire's Ward.</summary>
@@ -69,8 +68,8 @@ public static class SireOfSevenDeathsFactory
 
     /// <summary>
     /// Construct Sire of Seven Deaths. All six combat keyword markers plus
-    /// the Ward marker attached; the Ward trigger / non-mana life-payment
-    /// rider is structural-only (see class xmldoc).
+    /// the Ward marker and the real Ward—Pay 7 life triggered ability are
+    /// attached (CR 702.21e/f — see class xmldoc).
     /// </summary>
     public static Creature Create(Player owner)
     {
@@ -100,6 +99,14 @@ public static class SireOfSevenDeathsFactory
         card.AddAbility(new KeywordAbility("Reach", card, owner));
         card.AddAbility(new KeywordAbility("Lifelink", card, owner));
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+
+        // CR 702.21e/f — Ward—Pay 7 life, as a real triggered ability off the
+        // shared WardTriggerFactory primitive. Fires on a TargetsChosenEvent
+        // when an opponent's spell/ability targets Sire and, on resolution,
+        // counters it unless its controller pays 7 life (PayLifeCost charged
+        // via WardEffect.Resolve). TriggerManager auto-registers it on the
+        // prod path when the card enters the battlefield (CR 603.6a).
+        card.AddAbility(Majik.Core.Keywords.WardTriggerFactory.Build(BuildWardEffect(card)));
 
         return card;
     }

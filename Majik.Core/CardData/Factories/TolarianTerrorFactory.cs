@@ -39,26 +39,15 @@ namespace Majik.Core.CardData.Factories;
 ///     - 6 in graveyard → pays {U}{U}
 ///     - 10 in graveyard → still pays {U}{U} (floor at the two blue pips)
 ///   Mirrors <see cref="DemilichFactory"/>'s graveyard-count reducer.
-/// - <b>Ward {3} (CR 702.21)</b>: wired as a
-///   <see cref="KeywordAbility"/> marker plus a <see cref="WardEffect"/>
-///   builder (<see cref="BuildWardEffect"/>) bound to the live card. Same
-///   posture as <see cref="KappaCannoneerFactory"/> — the marker keeps the
-///   keyword-scan surface uniform (bot probes, dispatcher tests, oracle
-///   reflection); the working <see cref="WardEffect"/> primitive is
-///   exposed for the spell-resolution path to opt-in via
-///   <see cref="WardEffect.ResolvesWard"/>. The
-///   battlefield-attached triggered-ability surface is deferred (same
-///   ship-gap as Kappa Cannoneer); cost-paying-or-countering on
-///   opponent-controlled targeting is the spell-resolve hook.
-///
-/// ## Deferred (v1 gaps)
-///
-/// - <b>Ward {3} trigger wiring</b>: <see cref="WardEffect"/> is a stand-
-///   alone check helper, not yet plumbed onto a battlefield-attached
-///   triggered ability. v1 ships the marker + <see cref="BuildWardEffect"/>
-///   builder; the spell-resolution path gains the Ward consultation in a
-///   separate PR (matches the deferred surface on Kappa Cannoneer +
-///   Reality Smasher).
+/// - <b>Ward {3} (CR 702.21e/f)</b>: a <see cref="KeywordAbility"/> marker
+///   plus a real <see cref="TriggeredAbility"/> built off the shared
+///   <see cref="Majik.Core.Keywords.WardTriggerFactory"/> primitive. The
+///   trigger fires on a
+///   <see cref="Majik.Core.Domain.DomainEvents.TargetsChosenEvent"/> when an
+///   opponent's spell/ability targets Tolarian Terror and, on resolution,
+///   counters it unless its controller pays {3}
+///   (<see cref="WardEffect.Resolve(Player, bool)"/>). Same wiring as Kappa
+///   Cannoneer / Colossal Skyturtle / Sire of Seven Deaths.
 /// </summary>
 [CardName("Tolarian Terror")]
 public static class TolarianTerrorFactory
@@ -129,13 +118,17 @@ public static class TolarianTerrorFactory
                 "sorcery card in your graveyard."));
 
         // ----------------------------------------------------------------
-        // Ward {3} (CR 702.21) — marker keyword. WardEffect exists as a
-        // standalone helper (BuildWardEffect bounds an instance to the
-        // live card) but the battlefield-attached triggered-ability
-        // surface is deferred — see class xmldoc. Same posture as Kappa
-        // Cannoneer / Reality Smasher.
+        // Ward {3} (CR 702.21e/f) — marker keyword PLUS a real triggered
+        // ability built off the shared WardTriggerFactory primitive. The
+        // trigger fires on a TargetsChosenEvent when an opponent's
+        // spell/ability targets Tolarian Terror and, on resolution, counters
+        // it unless its controller pays {3}. TriggerManager auto-registers
+        // the trigger when the card crosses onto the battlefield (CR 603.6a —
+        // CardMovedEvent → SyncCardRegistration), so it fires on the prod
+        // build path with no explicit registration call.
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        card.AddAbility(Majik.Core.Keywords.WardTriggerFactory.Build(BuildWardEffect(card)));
 
         return card;
     }
