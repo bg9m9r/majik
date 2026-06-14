@@ -899,4 +899,119 @@ public class LandActivatedAbilityBinderPipelineTests
         alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("G"));
         dyn.CanPay(alice).Should().BeTrue("cost reduced to {G}, covered by the floated green");
     }
+
+    // ======================================================================
+    // 13b. CHANNEL "may search" follow-up — Boseiju, Who Endures
+    // "Destroy target … nonbasic land an opponent controls. THAT PLAYER may
+    // search their library for a land card with a basic land type, put it onto
+    // the battlefield, then shuffle." (CR 701.19a / 701.20a). The optional
+    // search is a binder-bound resolution-time "you may" — the destroyed
+    // land's controller is OFFERED the search (decline = no fetch), exactly
+    // the seam pinned by the binder-bound-optional-you-may deferral.
+    // ======================================================================
+
+    [Fact]
+    public async Task Prod_BoseijuWhoEndures_Channel_DestroyedControllerMaySearchBasicLandType_Accept()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Boseiju, Who Endures", "Legendary Land",
+            oracleText: BoseijuWhoEnduresOracle, colors: "G");
+        var land = new Land("Boseiju, Who Endures", new[] { CardSupertype.Legendary }, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+        var bob = facade.Bob;
+
+        // Bob (the destroyed land's controller) controls a nonbasic land to be
+        // the destroy target, and has a basic-land-TYPE card in his library
+        // (a basic Swamp) he may fetch onto the battlefield.
+        var bobNonbasic = new Land("Steam Vents", null, new[] { CardSubtype.Island, CardSubtype.Mountain });
+        bobNonbasic.SetOwner(bob); bobNonbasic.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bobNonbasic); bobNonbasic.SetZone(ZoneType.Battlefield);
+
+        var bobSwamp = new Land("Swamp", new[] { CardSupertype.Basic }, new[] { CardSubtype.Swamp });
+        bobSwamp.SetOwner(bob);
+        bob.Zones.Library.AddCard(bobSwamp); bobSwamp.SetZone(ZoneType.Library);
+
+        var channel = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<DiscardSelfCost>().Any());
+
+        var bobBasicsBefore = bob.Zones.Battlefield.GetCards().OfType<Land>()
+            .Count(l => l.HasSupertype(CardSupertype.Basic));
+
+        // Bob's agent accepts the optional search and picks the basic Swamp
+        // (ScriptedAgent.ChooseLibraryPickAsync returns candidates[0]).
+        AgentRegistry.Set(bob, new ScriptedAgent());
+
+        try
+        {
+            // Alice's agent chooses the target (Bob's nonbasic land).
+            var aliceAgent = new ScriptedAgent();
+            aliceAgent.QueueTargets(new object[] { bobNonbasic });
+            CollectAndExecute(channel, Ctx(facade), aliceAgent);
+        }
+        finally
+        {
+            AgentRegistry.Remove(bob);
+        }
+
+        bob.Zones.Graveyard.GetCards().Should().Contain(bobNonbasic,
+            "the targeted nonbasic land is destroyed");
+        bob.Zones.Battlefield.GetCards().OfType<Land>()
+            .Count(l => l.HasSupertype(CardSupertype.Basic)).Should().Be(bobBasicsBefore + 1,
+            "Bob accepted the optional 'may search' and put a basic-land-type card onto the battlefield");
+        bob.Zones.Battlefield.GetCards().Should().Contain(bobSwamp,
+            "the fetched Swamp entered Bob's battlefield");
+    }
+
+    [Fact]
+    public async Task Prod_BoseijuWhoEndures_Channel_DestroyedControllerDeclinesSearch_NoFetch()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Boseiju, Who Endures", "Legendary Land",
+            oracleText: BoseijuWhoEnduresOracle, colors: "G");
+        var land = new Land("Boseiju, Who Endures", new[] { CardSupertype.Legendary }, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var bob = facade.Bob;
+
+        var bobNonbasic = new Land("Steam Vents", null, new[] { CardSubtype.Island, CardSubtype.Mountain });
+        bobNonbasic.SetOwner(bob); bobNonbasic.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bobNonbasic); bobNonbasic.SetZone(ZoneType.Battlefield);
+
+        // Bob's library has NO basic-land-TYPE card to find — the search reveals
+        // no eligible candidate, so nothing is fetched (CR 701.20a — declining /
+        // finding nothing is legal, the library still shuffles). This exercises
+        // the optional half's no-fetch branch without a crash.
+        var channel = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<DiscardSelfCost>().Any());
+
+        var bobBattlefieldBefore = bob.Zones.Battlefield.GetCards().Count();
+        var libBefore = bob.Zones.Library.GetCards().Count();
+
+        AgentRegistry.Set(bob, new ScriptedAgent());
+        try
+        {
+            var aliceAgent = new ScriptedAgent();
+            aliceAgent.QueueTargets(new object[] { bobNonbasic });
+            CollectAndExecute(channel, Ctx(facade), aliceAgent);
+        }
+        finally
+        {
+            AgentRegistry.Remove(bob);
+        }
+
+        bob.Zones.Graveyard.GetCards().Should().Contain(bobNonbasic,
+            "the targeted nonbasic land is still destroyed");
+        // Bob's battlefield gained nothing (the destroyed land left, nothing
+        // fetched) — net effect: no basic-land-type card entered.
+        bob.Zones.Battlefield.GetCards().OfType<Land>()
+            .Count(l => l.HasSupertype(CardSupertype.Basic)).Should().Be(0,
+            "no basic-land-type card was available to fetch");
+        // The library is still shuffled (CR 701.20a) but the count is unchanged
+        // when nothing is fetched.
+        bob.Zones.Library.GetCards().Count().Should().Be(libBefore);
+    }
 }
