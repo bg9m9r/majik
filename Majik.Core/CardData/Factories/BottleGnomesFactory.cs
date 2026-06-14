@@ -101,7 +101,7 @@ public static class BottleGnomesFactory
             () =>
             {
                 var controller = card.Controller ?? owner;
-                SacrificeSelf(card, owner, controller);
+                SacrificeSelf(card, controller, eventBus);
 
                 // CR 119.3 — lifegain fired unconditionally per the printed
                 // "You gain 3 life". The gnomes is already gone (sacrifice
@@ -124,15 +124,18 @@ public static class BottleGnomesFactory
     }
 
     /// <summary>
-    /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent / defensive against the gnomes already
-    /// having left the battlefield.
+    /// CR 701.16 — sacrifice <paramref name="card"/> from the RESOLVE closure.
+    /// When <paramref name="eventBus"/> is supplied the sacrifice routes through
+    /// the bus-aware <see cref="Primitives.Fx.Sacrifice(ICard, Player, IEventBus)"/>
+    /// overload so a <see cref="PermanentSacrificedEvent"/> (CR 701.16a) fires;
+    /// when null the bare overload moves it without publishing. Idempotent —
+    /// guarded so a cost-already-paid re-entry is a no-op (the cost-seam publish
+    /// and this resolve publish never both fire).
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner, Player controller)
+    private static void SacrificeSelf(Creature card, Player controller, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
-        controller.Zones.Battlefield.RemoveCard(card);
-        owner.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
+        if (eventBus != null) Primitives.Fx.Sacrifice(card, controller, eventBus);
+        else Primitives.Fx.Sacrifice(card);
     }
 }

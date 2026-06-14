@@ -96,6 +96,19 @@ public static class MagesAttendantFactory
         Create(owner, zones: null, triggers: null, stack: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload). Forwards <c>effects.EventBus</c> so the minted Wizard token's
+    /// "Sacrifice this token:" activation cost carries the bus on the
+    /// construction path and publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a) for aristocrat payoffs. Mirrors the Festival-Crasher /
+    /// Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, zones: null, triggers: null, stack: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Mage's Attendant with optional runtime services.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
@@ -113,7 +126,21 @@ public static class MagesAttendantFactory
         Player owner,
         ZoneService? zones,
         TriggerManager? triggers,
-        Majik.Core.Stack.Stack? stack)
+        Majik.Core.Stack.Stack? stack) =>
+        Create(owner, zones, triggers, stack, eventBus: null);
+
+    /// <summary>
+    /// Construct Mage's Attendant with optional runtime services + an event bus.
+    /// When <paramref name="eventBus"/> is supplied it is threaded into the
+    /// minted Wizard token's "Sacrifice this token:" activation cost so paying
+    /// that cost publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
+    /// </summary>
+    public static Creature Create(
+        Player owner,
+        ZoneService? zones,
+        TriggerManager? triggers,
+        Majik.Core.Stack.Stack? stack,
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -138,7 +165,7 @@ public static class MagesAttendantFactory
             () =>
             {
                 var controller = card.Controller ?? owner;
-                CreateWizardToken(controller, zones, stack);
+                CreateWizardToken(controller, zones, stack, eventBus);
             });
 
         var etb = new TriggeredAbility(
@@ -162,7 +189,8 @@ public static class MagesAttendantFactory
     public static Creature CreateWizardToken(
         Player controller,
         ZoneService? zones = null,
-        Majik.Core.Stack.Stack? stack = null)
+        Majik.Core.Stack.Stack? stack = null,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(controller);
 
@@ -176,7 +204,7 @@ public static class MagesAttendantFactory
 
         var token = TokenFactory.CreateOnBattlefield(spec, controller, zones);
 
-        AttachCounterAbility(token, controller, stack);
+        AttachCounterAbility(token, controller, stack, eventBus);
 
         return token;
     }
@@ -190,7 +218,8 @@ public static class MagesAttendantFactory
     private static void AttachCounterAbility(
         Creature token,
         Player controller,
-        Majik.Core.Stack.Stack? stack)
+        Majik.Core.Stack.Stack? stack,
+        IEventBus? eventBus = null)
     {
         ActivatedAbility? ability = null;
 
@@ -204,7 +233,7 @@ public static class MagesAttendantFactory
             costs: new ICost[]
             {
                 new ManaCostCost(TokenActivationManaCost),
-                AdditionalCost.Sacrifice(token),
+                AdditionalCost.Sacrifice(token, eventBus),
             },
             effects: new IEffect[] { counterEffect },
             targetRequests: new[]

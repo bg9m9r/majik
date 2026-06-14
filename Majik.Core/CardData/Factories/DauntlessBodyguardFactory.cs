@@ -96,6 +96,21 @@ public static class DauntlessBodyguardFactory
         => Create(owner, continuousEffects: null, creatureChooser: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload). Forwards <c>continuousEffects</c> so the sacrifice ability
+    /// can register the indestructible grant AND its <c>EventBus</c> is threaded
+    /// into the resolve closure so the self-sacrifice publishes a
+    /// <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a) for aristocrat
+    /// payoffs. No as-enters creature chooser on this path (the chosen-creature
+    /// slot stays unset — same posture as the single-arg overload). Mirrors the
+    /// Festival-Crasher / Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? continuousEffects)
+        => Create(owner, continuousEffects, creatureChooser: null);
+
+    /// <summary>
     /// Construct a fully-wired Dauntless Bodyguard. When
     /// <paramref name="creatureChooser"/> is supplied the as-enters "choose
     /// another creature you control" choice is resolved eagerly and stored.
@@ -148,7 +163,7 @@ public static class DauntlessBodyguardFactory
             $"{CardName}: sacrifice self + grant chosen creature indestructible EOT",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, continuousEffects?.EventBus);
 
                 if (continuousEffects == null) return;
                 if (!_chosen.TryGetValue(card, out var box) || box.Value == null) return;
@@ -183,17 +198,18 @@ public static class DauntlessBodyguardFactory
     }
 
     /// <summary>
-    /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent. Mirrors the closure used by
-    /// <see cref="SelflessSpiritFactory"/> — the generic
-    /// <see cref="AdditionalCost.Pay"/> sacrifice path is a no-op stub, so the
-    /// effect closure performs the zone move directly.
+    /// CR 701.16 — sacrifice <paramref name="card"/> from the RESOLVE closure.
+    /// When <paramref name="eventBus"/> is supplied the sacrifice routes through
+    /// the bus-aware <see cref="Primitives.Fx.Sacrifice(Cards.ICard, Player, Events.IEventBus)"/>
+    /// overload so a <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a)
+    /// fires crediting the controller; when null the bare overload moves it
+    /// without publishing. Idempotent.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, Events.IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
-        owner.Zones.Battlefield.RemoveCard(card);
-        owner.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
+        var controller = card.Controller ?? owner;
+        if (eventBus != null) Primitives.Fx.Sacrifice(card, controller, eventBus);
+        else Primitives.Fx.Sacrifice(card);
     }
 }

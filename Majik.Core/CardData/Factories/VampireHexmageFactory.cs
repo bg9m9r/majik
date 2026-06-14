@@ -73,9 +73,31 @@ public static class VampireHexmageFactory
     /// Construct Vampire Hexmage owned and controlled by
     /// <paramref name="owner"/>. The First strike keyword marker + the
     /// sacrifice-to-remove-counters activated ability are attached to the
-    /// card. The ability is self-contained — no service wiring required.
+    /// card. No bus ⇒ the resolve-closure sacrifice publishes nothing (legacy
+    /// shape-only posture). This is the overload <see cref="NamedCardFactory"/>
+    /// dispatches to.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload). Forwards <c>effects.EventBus</c> into the resolve closure so
+    /// the self-sacrifice publishes a <see cref="Events.PermanentSacrificedEvent"/>
+    /// (CR 701.16a) for aristocrat payoffs. Mirrors the Festival-Crasher /
+    /// Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, Effects.ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Construct Vampire Hexmage. When <paramref name="eventBus"/> is supplied
+    /// the resolve-closure self-sacrifice publishes a
+    /// <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// controller; when null the move still happens but nothing is published.
+    /// </summary>
+    public static Creature Create(Player owner, Events.IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -104,12 +126,14 @@ public static class VampireHexmageFactory
             () =>
             {
                 // Sacrifice payment — battlefield → owner's graveyard.
-                // CR 701.16 — idempotent guard against stale activations.
+                // CR 701.16a — route through the bus-aware Fx.Sacrifice overload
+                // when a bus is wired so PermanentSacrificedEvent fires; bus-less
+                // = move only. Idempotent guard against stale activations.
                 if (card.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    owner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
+                    var controller = card.Controller ?? owner;
+                    if (eventBus != null) Primitives.Fx.Sacrifice(card, controller, eventBus);
+                    else Primitives.Fx.Sacrifice(card);
                 }
 
                 if (removeAbility == null) return;
@@ -141,7 +165,7 @@ public static class VampireHexmageFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { removeEffect },
             targetRequests: new[]

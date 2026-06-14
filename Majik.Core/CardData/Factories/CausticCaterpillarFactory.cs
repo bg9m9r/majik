@@ -6,6 +6,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -119,7 +120,7 @@ public static class CausticCaterpillarFactory
             $"{CardName}: sacrifice self + destroy target artifact/enchantment",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
 
                 if (sacAbility == null
                     || sacAbility.ChosenTargets.Count == 0
@@ -167,17 +168,23 @@ public static class CausticCaterpillarFactory
     }
 
     /// <summary>
-    /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent. Mirrors the closure used by Aether
-    /// Spellbomb / Mind Stone / Expedition Map — the generic
-    /// <see cref="AdditionalCost.Pay"/> sacrifice path is a no-op stub, so
-    /// the effect closure performs the zone move directly.
+    /// CR 701.16 — sacrifice <paramref name="card"/> (battlefield → owner's
+    /// graveyard) from inside the RESOLVE closure. When
+    /// <paramref name="eventBus"/> is supplied the sacrifice routes through the
+    /// bus-aware <see cref="Fx.Sacrifice(Cards.ICard, Player, Events.IEventBus)"/>
+    /// overload so a <see cref="PermanentSacrificedEvent"/> (CR 701.16a) fires
+    /// crediting the controller (aristocrat payoffs — Mayhem Devil, Blood
+    /// Artist, It That Betrays). When null the bare
+    /// <see cref="Fx.Sacrifice(Cards.ICard)"/> overload moves it without
+    /// publishing (legacy shape-only posture). Idempotent — the on-battlefield
+    /// guard means a stale resolve re-entry (cost already paid the sac) is a
+    /// no-op, so the cost-seam publish and this resolve publish never both fire.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, Events.IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
-        owner.Zones.Battlefield.RemoveCard(card);
-        owner.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
+        var controller = card.Controller ?? owner;
+        if (eventBus != null) Fx.Sacrifice(card, controller, eventBus);
+        else Fx.Sacrifice(card);
     }
 }

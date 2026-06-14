@@ -106,7 +106,7 @@ public static class SelflessSpiritFactory
             $"{CardName}: sacrifice self + grant team indestructible EOT",
             () =>
             {
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, continuousEffects?.EventBus);
 
                 if (continuousEffects == null) return;
 
@@ -138,17 +138,18 @@ public static class SelflessSpiritFactory
     }
 
     /// <summary>
-    /// CR 701.16 — move <paramref name="card"/> from the battlefield to its
-    /// owner's graveyard. Idempotent. Mirrors the closure used by Caustic
-    /// Caterpillar / Cursecatcher — the generic
-    /// <see cref="AdditionalCost.Pay"/> sacrifice path is a no-op stub, so
-    /// the effect closure performs the zone move directly.
+    /// CR 701.16 — sacrifice <paramref name="card"/> from the RESOLVE closure.
+    /// When <paramref name="eventBus"/> is supplied the sacrifice routes through
+    /// the bus-aware <see cref="Primitives.Fx.Sacrifice(ICard, Player, Events.IEventBus)"/>
+    /// overload so a <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a)
+    /// fires crediting the controller; when null the bare overload moves it
+    /// without publishing. Idempotent.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, Events.IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
-        owner.Zones.Battlefield.RemoveCard(card);
-        owner.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
+        var controller = card.Controller ?? owner;
+        if (eventBus != null) Primitives.Fx.Sacrifice(card, controller, eventBus);
+        else Primitives.Fx.Sacrifice(card);
     }
 }

@@ -218,7 +218,7 @@ public static class MausoleumWandererFactory
 
         var counterEffect = new Effect(
             "Mausoleum Wanderer — sac self, then counter target instant or sorcery unless its controller pays {X}",
-            () => ResolveCounterActivation(ability, card, owner, stack));
+            () => ResolveCounterActivation(ability, card, owner, stack, eventBus));
 
         ability = new ActivatedAbility(
             source: card,
@@ -260,13 +260,14 @@ public static class MausoleumWandererFactory
         ActivatedAbility? ability,
         Creature card,
         Player owner,
-        Majik.Core.Stack.Stack? stack)
+        Majik.Core.Stack.Stack? stack,
+        IEventBus? eventBus)
     {
         // CR 202.3b — capture X = Wanderer's power BEFORE the sac fires so
         // any prior Spirit-ETB pumps still apply.
         int x = card.GetPower();
 
-        SacrificeSelf(card, owner);
+        SacrificeSelf(card, owner, eventBus);
 
         if (ability == null || stack == null) return;
         var spell = ResolveTargetSpell(ability);
@@ -283,14 +284,15 @@ public static class MausoleumWandererFactory
         spell.Card.SetZone(ZoneType.Graveyard);
     }
 
-    private static void SacrificeSelf(Creature card, Player owner)
+    private static void SacrificeSelf(Creature card, Player owner, IEventBus? eventBus)
     {
-        // Sacrifice (zone-move stub — see class xmldoc).
+        // CR 701.16a — route the resolve-closure sacrifice through the bus-aware
+        // Fx.Sacrifice overload when a bus is wired so PermanentSacrificedEvent
+        // fires crediting the controller; bus-less = move only.
         if (card.Zone != ZoneType.Battlefield) return;
-        owner.Zones.Battlefield.RemoveCard(card);
-        var sacOwner = card.Owner ?? owner;
-        sacOwner.Zones.Graveyard.AddCard(card);
-        card.SetZone(ZoneType.Graveyard);
+        var controller = card.Controller ?? owner;
+        if (eventBus != null) Majik.Core.Primitives.Fx.Sacrifice(card, controller, eventBus);
+        else Majik.Core.Primitives.Fx.Sacrifice(card);
     }
 
     private static ISpell? ResolveTargetSpell(ActivatedAbility ability)
