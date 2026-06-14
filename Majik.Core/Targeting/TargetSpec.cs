@@ -60,9 +60,26 @@ public sealed class TargetSpec
 
         if (candidate is not ICard card) return false;
 
+        // CR 115.4 / 613.1c / 711 — classify the creature / planeswalker
+        // type slots by the EFFECTIVE (layer-computed) characteristics, not the
+        // lingering printed C# instance type. A creature-front transform DFC
+        // flipped to its planeswalker BACK face (Ral, Monsoon Mage // Ral,
+        // Leyline Prodigy) is still a Creature instance whose printed
+        // HasType(Creature) reads true and HasType(Planeswalker) reads false,
+        // yet it is EFFECTIVELY a planeswalker (carries a transient loyalty
+        // body, CR 306.5b) and NOT a creature. Without this widening a "target
+        // planeswalker" / "any target" removal spell could never OFFER such a
+        // permanent (the candidate-gather half of the v1-deferral), while a
+        // "target creature"-only spell would wrongly offer it. An animated
+        // non-creature (a manland computing as a creature via a Layer-4 grant)
+        // is symmetrically offered as a creature. Non-Permanent cards (and the
+        // artifact / enchantment / land slots) keep the printed-type check.
+        var matchesCreature = AcceptsCreatures && IsEffectivelyCreature(card);
+        var matchesPlaneswalker = AcceptsPlaneswalkers && IsEffectivelyPlaneswalker(card);
+
         var typeOk =
-            (AcceptsCreatures && card.HasType(CardType.Creature)) ||
-            (AcceptsPlaneswalkers && card.HasType(CardType.Planeswalker)) ||
+            matchesCreature ||
+            matchesPlaneswalker ||
             (AcceptsArtifacts && card.HasType(CardType.Artifact)) ||
             (AcceptsEnchantments && card.HasType(CardType.Enchantment)) ||
             (AcceptsLands && card.HasType(CardType.Land));
@@ -78,4 +95,26 @@ public sealed class TargetSpec
 
     private bool AdditionalPredicateOk(object c) =>
         AdditionalPredicate == null || AdditionalPredicate(c);
+
+    /// <summary>
+    /// CR 613.1c / 711 — effective creature classification. A
+    /// <see cref="Permanent"/> defers to
+    /// <see cref="Permanent.IsEffectivelyCreature"/> (layer-computed, so a
+    /// flipped planeswalker-back DFC is NOT a creature and an animated land
+    /// IS); any other card (stack object, off-battlefield card) falls back to
+    /// the printed <see cref="Card.HasType"/> flag.
+    /// </summary>
+    private static bool IsEffectivelyCreature(ICard card) =>
+        card is Permanent p ? p.IsEffectivelyCreature() : card.HasType(CardType.Creature);
+
+    /// <summary>
+    /// CR 306.5b / 711 — effective planeswalker classification. A
+    /// <see cref="Permanent"/> defers to
+    /// <see cref="Permanent.IsEffectivePlaneswalker"/> (true for a real
+    /// planeswalker OR a creature-front DFC flipped to its planeswalker back
+    /// carrying a transient loyalty body); any other card falls back to the
+    /// printed <see cref="Card.HasType"/> flag.
+    /// </summary>
+    private static bool IsEffectivelyPlaneswalker(ICard card) =>
+        card is Permanent p ? p.IsEffectivePlaneswalker() : card.HasType(CardType.Planeswalker);
 }
