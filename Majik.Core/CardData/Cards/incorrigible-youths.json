@@ -1,0 +1,9 @@
+{
+  "name": "Incorrigible Youths",
+  "types": ["Creature"],
+  "subtypes": ["Vampire"],
+  "manaCost": "{3}{R}{R}",
+  "power": 4,
+  "toughness": 3,
+  "keywords": ["Haste"]
+}

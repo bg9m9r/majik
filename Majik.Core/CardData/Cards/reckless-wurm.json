@@ -1,0 +1,9 @@
+{
+  "name": "Reckless Wurm",
+  "types": ["Creature"],
+  "subtypes": ["Wurm"],
+  "manaCost": "{3}{R}{R}",
+  "power": 4,
+  "toughness": 4,
+  "keywords": ["Trample"]
+}
