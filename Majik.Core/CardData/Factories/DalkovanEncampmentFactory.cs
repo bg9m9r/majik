@@ -51,6 +51,12 @@ namespace Majik.Core.CardData.Factories;
 ///        that fires at the start of the next end step and unregisters
 ///        the attack-trigger so it doesn't persist beyond this turn.
 ///        This models the "this turn" duration of the granted trigger.
+///     4. For each batch of tokens minted by an attack, registers a
+///        second <see cref="DelayedTriggeredAbility"/> (CR 603.7) that
+///        sacrifices exactly those tokens at the start of the next end
+///        step ("Sacrifice them at the beginning of the next end step")
+///        — moves them to the owner's graveyard (CR 701.16), then SBA
+///        704.5d / CR 111.7 ceases them.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>"Tapped and attacking" token state</b>: the printed tokens enter
@@ -62,7 +68,8 @@ namespace Majik.Core.CardData.Factories;
 ///   battlefield (not tapped, not in an attacker slot) and don't deal
 ///   combat damage this turn. The "tapped and attacking" fidelity is
 ///   deferred to a future CombatManager extension (see
-///   GeistOfSaintTraftFactory xmldoc deferred section).
+///   GeistOfSaintTraftFactory xmldoc deferred section). The
+///   "sacrifice them at the next end step" rider is NOW wired (CR 603.7).
 /// - <b>Sorcery-speed gate</b>: the activation is not restricted to
 ///   sorcery-speed in v1 (the oracle doesn't specify timing). The engine's
 ///   priority / timing checks enforce the standard
@@ -187,7 +194,11 @@ public static class DalkovanEncampmentFactory
             () =>
             {
                 var ctrl = land.Controller ?? owner;
-                CreateWarriorTokens(ctrl);
+                var minted = CreateWarriorTokens(ctrl);
+
+                // CR 603.7 — "Sacrifice them at the beginning of the next end
+                // step." Schedule a delayed sacrifice of exactly THIS batch.
+                ScheduleEndStepSacrifice(land, ctrl, triggers, minted);
             });
 
         // Condition: any CreatureAttacksEvent for a creature controlled
@@ -223,10 +234,11 @@ public static class DalkovanEncampmentFactory
 
     /// <summary>
     /// CR 111 / CR 111.4 — create <see cref="TokenCount"/> 1/1 red Warrior
-    /// creature tokens under <paramref name="controller"/>'s control.
+    /// creature tokens under <paramref name="controller"/>'s control, returning
+    /// the minted batch (so the caller can schedule the next-end-step sacrifice).
     /// v1: "tapped and attacking" token state deferred — see class xmldoc.
     /// </summary>
-    private static void CreateWarriorTokens(Player controller)
+    private static List<Creature> CreateWarriorTokens(Player controller)
     {
         ArgumentNullException.ThrowIfNull(controller);
 
@@ -245,10 +257,50 @@ public static class DalkovanEncampmentFactory
         // mana + trigger wiring); raw zone move mirrors the existing
         // CardFactory precedent for factories that don't expose a
         // ZoneService parameter (GeistOfSaintTraftFactory, etc.).
+        var minted = new List<Creature>(TokenCount);
         for (int i = 0; i < TokenCount; i++)
         {
-            TokenFactory.CreateOnBattlefield(spec, controller);
+            minted.Add(TokenFactory.CreateOnBattlefield(spec, controller));
         }
+        return minted;
+    }
+
+    /// <summary>
+    /// CR 603.7 — register a <see cref="DelayedTriggeredAbility"/> that, at the
+    /// start of the next end step, sacrifices exactly <paramref name="tokens"/>
+    /// (the batch minted by one attack). Sacrifice = move each token to its
+    /// owner's graveyard (CR 701.16); SBA 704.5d / CR 111.7 then ceases them.
+    /// </summary>
+    private static void ScheduleEndStepSacrifice(
+        Land land, Player controller, TriggerManager triggers, List<Creature> tokens)
+    {
+        if (tokens.Count == 0) return;
+
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
+        var sacrifice = new DelayedTriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: new EventTriggerCondition<StepStartedEvent>(
+                (e, _) => e.StepType == Majik.Core.StateMachine.StepStateType.End
+                          && e.Timestamp > resolvedAt),
+            effects: new IEffect[]
+            {
+                new Effect(
+                    $"{CardName}: sacrifice {tokens.Count} Warrior token(s) (next end step)",
+                    () =>
+                    {
+                        foreach (var token in tokens)
+                        {
+                            var owner = token.Owner ?? controller;
+                            if (token.Zone != ZoneType.Battlefield) continue;
+                            var holder = token.Controller ?? owner;
+                            holder.Zones.Battlefield.RemoveCard(token);
+                            owner.Zones.Graveyard.AddCard(token);
+                            token.SetZone(ZoneType.Graveyard);
+                        }
+                    }),
+            });
+        triggers.RegisterDelayed(sacrifice);
     }
 
     /// <summary>

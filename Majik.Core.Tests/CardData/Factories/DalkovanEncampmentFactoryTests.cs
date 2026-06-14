@@ -335,4 +335,62 @@ public class DalkovanEncampmentFactoryTests
         warriors.Should().BeEmpty(
             "the trigger condition is gated on the attacker being controlled by Alice");
     }
+
+    // -----------------------------------------------------------------------
+    // Delayed sacrifice rider (CR 603.7): "Sacrifice them at the beginning of
+    // the next end step."
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AttackTokens_AreSacrificed_AtNextEndStep()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var eventBus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(eventBus);
+        var triggers = new TriggerManager(stack, eventBus);
+
+        var land = DalkovanEncampmentFactory.Create(alice, replacements: null, triggers: triggers);
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        // Activate ⇒ install the this-turn attack rider.
+        var activatedAbility = land.Abilities.OfType<ActivatedAbility>().First();
+        foreach (var effect in activatedAbility.Effects)
+            effect.Execute();
+
+        // One attacker Alice controls ⇒ mint two Warriors + schedule their EOT
+        // sacrifice.
+        var attacker = new Creature("Soldier", "{W}", 1, 1);
+        attacker.SetOwner(alice);
+        attacker.SetController(alice);
+        alice.Zones.Battlefield.AddCard(attacker);
+        attacker.SetZone(ZoneType.Battlefield);
+
+        eventBus.Publish(new CreatureAttacksEvent(attacker, bob));
+        triggers.PutPendingTriggersOnStack(alice);
+        while (stack.Count > 0)
+        {
+            if (stack.Pop() is TriggeredAbility ta)
+                foreach (var eff in ta.Effects) eff.Execute();
+        }
+
+        alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Count(c => c.IsToken && c.HasSubtype(CardSubtype.Warrior))
+            .Should().Be(2, "two Warriors minted before the end step");
+
+        // CR 603.7 — the End-step StepStartedEvent drains the delayed sacrifice
+        // trigger; resolving it moves the tokens to the graveyard.
+        eventBus.Publish(new StepStartedEvent(Majik.Core.StateMachine.StepStateType.End, alice));
+        triggers.PutPendingTriggersOnStack(alice);
+        while (stack.Count > 0)
+        {
+            if (stack.Pop() is TriggeredAbility ta)
+                foreach (var eff in ta.Effects) eff.Execute();
+        }
+
+        alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Where(c => c.IsToken && c.HasSubtype(CardSubtype.Warrior))
+            .Should().BeEmpty("the Warrior tokens are sacrificed at the next end step (CR 603.7)");
+    }
 }
