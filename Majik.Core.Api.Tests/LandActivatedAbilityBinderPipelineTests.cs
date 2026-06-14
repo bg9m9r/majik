@@ -347,6 +347,68 @@ public class LandActivatedAbilityBinderPipelineTests
     }
 
     // ======================================================================
+    // 5a-bis. NON-SELF TYPED SACRIFICE COST — Ramunap Ruins "Sacrifice a Desert"
+    //
+    // Ramunap Ruins' damage ability's printed cost is "{2}{R}{R}, {T},
+    // Sacrifice a Desert" (NOT "Sacrifice this land"). The Desert it sacrifices
+    // may be ANY Desert the controller controls (CR 701.16) — the source land
+    // itself qualifies (it is a Desert) but is not the only legal choice. This
+    // is the non-self typed-sacrifice cost: it must bind a real
+    // SacrificeFilteredCost on the PRODUCTION binder path (lands route via the
+    // binder chain, never their [CardName] factory), gathering the controller's
+    // matching Deserts and publishing a PermanentSacrificedEvent (CR 701.16a)
+    // on payment so aristocrat payoffs fire.
+    // ======================================================================
+
+    [Fact]
+    public void Prod_RamunapRuins_BindsNonSelfSacrificeADesertFilteredCost()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Ramunap Ruins", "Land — Desert", oracleText: RamunapRuinsOracle, colors: "");
+        var land = new Land("Ramunap Ruins", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        ((Permanent)live).SetOwner(facade.Alice);
+        ((Permanent)live).SetController(facade.Alice);
+        OnBattlefield(facade, land);
+
+        // A SECOND Desert under Alice's control — the cost should be payable by
+        // sacrificing it (it is a Desert) rather than only the source land.
+        var otherDesert = new Land("Desert Outpost",
+            null, new[] { CardSubtype.Desert });
+        otherDesert.SetOwner(facade.Alice);
+        otherDesert.SetController(facade.Alice);
+        facade.Alice.Zones.Battlefield.AddCard(otherDesert);
+        otherDesert.SetZone(ZoneType.Battlefield);
+
+        var damageAbility = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+
+        // The non-self typed-sacrifice cost binds as a real SacrificeFilteredCost
+        // (NOT the AdditionalCost.Sacrifice self-sac leg).
+        var sacCost = damageAbility.Costs.OfType<SacrificeFilteredCost>().Single();
+        damageAbility.Costs.OfType<AdditionalCost>()
+            .Should().NotContain(c => c.CostType == AdditionalCostType.Sacrifice,
+                "the printed cost is 'Sacrifice a Desert' (non-self), not 'Sacrifice this land'");
+
+        // The cost is payable, and paying it (agent pre-picking the OTHER Desert)
+        // sacrifices that Desert and publishes the aristocrat event.
+        var seen = new List<PermanentSacrificedEvent>();
+        facade.EventBus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+
+        sacCost.CanPay(facade.Alice).Should().BeTrue();
+        sacCost.Target = otherDesert;
+        sacCost.Pay(facade.Alice);
+
+        otherDesert.Zone.Should().Be(ZoneType.Graveyard,
+            "the chosen Desert is sacrificed — a non-self typed sacrifice");
+        live.Zone.Should().Be(ZoneType.Battlefield,
+            "the source land is NOT sacrificed when another Desert pays the cost");
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == otherDesert && ev.SacrificingPlayer == facade.Alice);
+    }
+
+    // ======================================================================
     // 5b. GAIN LIFE — Phyrexia's Core (typed-sac rider deferred)
     // ======================================================================
 
