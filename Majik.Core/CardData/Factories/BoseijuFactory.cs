@@ -41,11 +41,28 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Primitives.Fx.MoveToGraveyard(Majik.Core.Cards.ICard, Majik.Core.Zones.ZoneMoveReason)"/>
 ///   (CR 701.7 / 608.2b — Indestructible / regeneration gated).
 ///
+/// ## Implemented (deferral pay-down: boseiju-channel-opponent-land-search)
+/// - <b>Channel effect — "that player may search" follow-up</b>: after the
+///   destroy resolves, the destroyed permanent's controller (the OTHER
+///   player) "may search their library for a land card with a basic land
+///   type, put it onto the battlefield, then shuffle" (CR 701.19a /
+///   CR 701.20a / CR 205.4a). Expressed declaratively as the
+///   <c>thenControllerMaySearch</c> rider on the JSON
+///   <see cref="Majik.Core.CardData.Definitions.DestroyTargetEffectDef"/>,
+///   which nests the shared <c>search_library</c> tutor verb. The runtime
+///   binds the search prompt to the affected player's OWN agent
+///   (<see cref="Majik.Core.Players.Agents.AgentRegistry"/>) — the Path to
+///   Exile per-affected-player pattern — so they search their own library.
+///   The subtype filter (the five basic land types) keys on the basic land
+///   TYPE, so a nonbasic dual with a basic land type qualifies (CR 205.4a);
+///   the destination is the battlefield UNTAPPED (no "tapped" rider in the
+///   current oracle).
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Channel effect — basic-land-search follow-up</b>: when the
-///   destroyed permanent was a land, the opponent may search their
-///   library for a basic land. Deferred entirely (requires
-///   library-search + optional prompt).
+/// - <b>Channel cost reduction</b>: "This ability costs {1} less to activate
+///   for each legendary creature you control" is NOT yet modelled — the JSON
+///   fixes the activation cost at {1}{G}. Out of scope for this deferral
+///   (the named gap is the opponent land-search follow-up).
 /// </summary>
 [CardName("Boseiju, Who Endures")]
 public static class BoseijuFactory

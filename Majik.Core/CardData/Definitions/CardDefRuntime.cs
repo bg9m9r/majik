@@ -1527,34 +1527,61 @@ public static class CardDefRuntime
                 // already in the graveyard, so we lean on the controller capture.
                 var searcher = (card as Permanent)?.Controller ?? controller;
 
-                bool Matches(ICard c)
-                {
-                    if (requireBasic && !c.HasSupertype(CardSupertype.Basic)) return false;
-                    if (cardType is { } ct && !c.HasType(ct)) return false;
-                    if (subtypes.Length > 0 && !subtypes.Any(c.HasSubtype)) return false;
-                    return true;
-                }
-
-                var candidates = searcher.Zones.Library.GetCards()
-                    .Where(Matches)
-                    .ToList();
-
-                // CR 701.19a — prompt even on zero candidates so a human searcher
-                // sees the failed search; deterministic first-match otherwise.
-                var pick = await LibrarySearch.PromptOnlyAsync(ctx, searcher, candidates, label)
+                await RunLibrarySearchAsync(
+                        ctx, searcher, subtypes, requireBasic, cardType,
+                        destination, shuffle, label, shuffleReason)
                     .ConfigureAwait(false);
-
-                if (pick != null)
-                {
-                    MoveTutoredCard(pick, searcher, destination);
-                }
-
-                // CR 701.20a — shuffle whether or not a card was found.
-                if (shuffle)
-                {
-                    LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);
-                }
             });
+    }
+
+    /// <summary>
+    /// Shared body of the <c>search_library</c> tutor verb (CR 701.19a /
+    /// CR 701.20a): gather the <paramref name="searcher"/>'s matching library
+    /// cards, prompt <em>that</em> player's agent (via <paramref name="ctx"/>,
+    /// whose Agent must already be bound to <paramref name="searcher"/>), move
+    /// the pick to <paramref name="destination"/>, then shuffle. Factored out so
+    /// the Boseiju "that player may search" destroy-rider can drive the SAME
+    /// verb against the destroyed permanent's controller rather than the
+    /// ability's controller.
+    /// </summary>
+    private static async ValueTask RunLibrarySearchAsync(
+        ResolutionContext ctx,
+        Player searcher,
+        CardSubtype[] subtypes,
+        bool requireBasic,
+        CardType? cardType,
+        string destination,
+        bool shuffle,
+        string label,
+        string shuffleReason)
+    {
+        bool Matches(ICard c)
+        {
+            if (requireBasic && !c.HasSupertype(CardSupertype.Basic)) return false;
+            if (cardType is { } ct && !c.HasType(ct)) return false;
+            if (subtypes.Length > 0 && !subtypes.Any(c.HasSubtype)) return false;
+            return true;
+        }
+
+        var candidates = searcher.Zones.Library.GetCards()
+            .Where(Matches)
+            .ToList();
+
+        // CR 701.19a — prompt even on zero candidates so a human searcher
+        // sees the failed search; deterministic first-match otherwise.
+        var pick = await LibrarySearch.PromptOnlyAsync(ctx, searcher, candidates, label)
+            .ConfigureAwait(false);
+
+        if (pick != null)
+        {
+            MoveTutoredCard(pick, searcher, destination);
+        }
+
+        // CR 701.20a — shuffle whether or not a card was found.
+        if (shuffle)
+        {
+            LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);
+        }
     }
 
     /// <summary>
@@ -1809,18 +1836,59 @@ public static class CardDefRuntime
         // of BuildExileTargetEffect's re-check). Fx.MoveToGraveyard(…, Destroy)
         // honours Indestructible (CR 702.12) / regeneration (CR 701.15).
         var filter = def.TargetFilter;
+        var rider = def.ThenControllerMaySearch;
+
+        // Pre-bake the rider's tutor parameters once (mirrors
+        // BuildSearchLibraryEffect) so the per-resolution closure only runs the
+        // search against the captured affected player.
+        var riderSubtypes = rider?.Subtypes.Select(ParseSubtype).ToArray() ?? System.Array.Empty<CardSubtype>();
+        var riderBasic = rider?.BasicLand ?? false;
+        var riderCardType = ParseOptionalType(rider?.CardType);
+        var riderDestination = rider?.Destination ?? "hand";
+        var riderShuffle = rider?.Shuffle ?? true;
+        var riderLabel = rider is null
+            ? string.Empty
+            : BuildSearchLabel(riderSubtypes, rider.Subtypes, riderBasic, rider.CardType);
+        var riderShuffleReason = $"search:{card.Name}";
+
         return new Effect(
             $"{card.Name}: destroy target {filter}",
-            ctx =>
+            async ctx =>
             {
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
                 if (live is Permanent permanent
                     && permanent.Zone == ZoneType.Battlefield
                     && TargetFilters.Matches(filter, permanent))
                 {
+                    // CR 701.19a — capture the destroyed permanent's controller
+                    // BEFORE it leaves the battlefield; the "that player may
+                    // search" rider (Boseiju, Who Endures) is offered to that
+                    // player, who is the OTHER player when an opponent's
+                    // permanent is destroyed.
+                    var affected = permanent.Controller;
+
                     Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
+
+                    if (rider != null && affected != null)
+                    {
+                        // Bind the search prompt to the affected player's OWN
+                        // agent (not ctx.Agent — the ability's controller), so
+                        // they search their own library. Mirrors PathToExile's
+                        // per-affected-player ResolutionContext.For(...).
+                        var searchCtx = ResolutionContext.For(
+                            affected,
+                            AgentRegistry.Get(affected),
+                            ctx.Game,
+                            chosenTargets: null,
+                            ctx.Ct);
+
+                        await RunLibrarySearchAsync(
+                                searchCtx, affected, riderSubtypes, riderBasic,
+                                riderCardType, riderDestination, riderShuffle,
+                                riderLabel, riderShuffleReason)
+                            .ConfigureAwait(false);
+                    }
                 }
-                return ValueTask.CompletedTask;
             });
     }
 

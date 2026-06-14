@@ -211,6 +211,107 @@ public class JsonTargetingEffectsTests
     }
 
     // ------------------------------------------------------------------
+    // Boseiju — "That player may search their library for a land card with a
+    // basic land type, put it onto the battlefield, then shuffle" rider
+    // (CR 701.19a). The SEARCHER is the destroyed permanent's controller (the
+    // OTHER player), so the rider tutors into BOB's library/battlefield.
+    // ------------------------------------------------------------------
+
+    private static Land BasicInLibrary(string name, CardSubtype subtype, Player owner)
+    {
+        var land = new Land(name, new[] { CardSupertype.Basic }, new[] { subtype })
+        {
+            Owner = owner,
+        };
+        land.SetZone(ZoneType.Library);
+        owner.Zones.Library.AddCard(land);
+        return land;
+    }
+
+    [Fact]
+    public async Task Boseiju_AfterDestroyingNonbasicLand_AffectedPlayerFetchesBasic_Untapped()
+    {
+        var boseiju = BoseijuFactory.Create(_alice);
+        var destroy = boseiju.Abilities.OfType<ActivatedAbility>().Single();
+
+        var nonbasic = OnBattlefield(new Land("Mishra's Factory", null, null), _bob);
+        // Bob has a basic Forest he can fetch (no agent registered for Bob →
+        // deterministic first-candidate pick).
+        var forest = BasicInLibrary("Forest", CardSubtype.Forest, _bob);
+
+        await ActivateAndResolve(destroy, nonbasic);
+
+        nonbasic.Zone.Should().Be(ZoneType.Graveyard, "the chosen nonbasic land is destroyed");
+        _bob.Zones.Battlefield.GetCards().Should().Contain(forest,
+            "CR 701.19a — that player searched their library and put the basic onto the battlefield");
+        _bob.Zones.Library.GetCards().Should().NotContain(forest);
+        forest.IsTapped.Should().BeFalse(
+            "Boseiju puts the land onto the battlefield UNTAPPED (no 'tapped' rider in the oracle)");
+    }
+
+    [Fact]
+    public async Task Boseiju_AfterDestroyingArtifact_AffectedPlayerStillFetchesBasic()
+    {
+        // The printed wording offers the search to "that player" regardless of
+        // which legal target type was destroyed — destroying an opponent's
+        // ARTIFACT still lets THAT opponent search.
+        var boseiju = BoseijuFactory.Create(_alice);
+        var destroy = boseiju.Abilities.OfType<ActivatedAbility>().Single();
+
+        var relic = OnBattlefield(new Artifact("Doomed Relic", "{2}"), _bob);
+        var island = BasicInLibrary("Island", CardSubtype.Island, _bob);
+
+        await ActivateAndResolve(destroy, relic);
+
+        relic.Zone.Should().Be(ZoneType.Graveyard);
+        _bob.Zones.Battlefield.GetCards().Should().Contain(island,
+            "the affected player searches even when the destroyed permanent was the artifact");
+    }
+
+    [Fact]
+    public async Task Boseiju_DualLandWithBasicLandType_IsAValidFind()
+    {
+        // CR 205.4a — "a land card with a basic land type" includes a NONBASIC
+        // dual land that has a basic land type (e.g. a Forest/Plains Karoo). The
+        // filter keys on the basic land-type SUBTYPE, not the Basic supertype.
+        var boseiju = BoseijuFactory.Create(_alice);
+        var destroy = boseiju.Abilities.OfType<ActivatedAbility>().Single();
+
+        var nonbasic = OnBattlefield(new Land("Mishra's Factory", null, null), _bob);
+        var dual = new Land("Forest Plains Dual", null, new[] { CardSubtype.Forest, CardSubtype.Plains })
+        {
+            Owner = _bob,
+        };
+        dual.SetZone(ZoneType.Library);
+        _bob.Zones.Library.AddCard(dual);
+
+        await ActivateAndResolve(destroy, nonbasic);
+
+        _bob.Zones.Battlefield.GetCards().Should().Contain(dual,
+            "a nonbasic land WITH a basic land type qualifies for the 'basic land type' filter (CR 205.4a)");
+    }
+
+    [Fact]
+    public async Task Boseiju_AffectedPlayerWithNoBasicInLibrary_DestroyStillHappens()
+    {
+        var boseiju = BoseijuFactory.Create(_alice);
+        var destroy = boseiju.Abilities.OfType<ActivatedAbility>().Single();
+
+        var nonbasic = OnBattlefield(new Land("Mishra's Factory", null, null), _bob);
+        // Bob's library holds only a non-matching card — the search finds
+        // nothing, but the destroy already happened (CR 701.19a — searching is
+        // optional / may find nothing; the destroy is unconditional).
+        var spell = new Instant("Lightning Bolt", "{R}") { Owner = _bob };
+        spell.SetZone(ZoneType.Library);
+        _bob.Zones.Library.AddCard(spell);
+
+        await ActivateAndResolve(destroy, nonbasic);
+
+        nonbasic.Zone.Should().Be(ZoneType.Graveyard, "destroy is unconditional even when no basic is found");
+        _bob.Zones.Library.GetCards().Should().Contain(spell, "no legal land-type find, so nothing is fetched");
+    }
+
+    // ------------------------------------------------------------------
     // fight (CR 701.12) — source: "self".
     // ------------------------------------------------------------------
 

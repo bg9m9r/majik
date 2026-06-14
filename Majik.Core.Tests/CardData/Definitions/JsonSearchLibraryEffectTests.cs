@@ -79,6 +79,32 @@ public class JsonSearchLibraryEffectTests : IDisposable
     }
 
     [Fact]
+    public void DestroyTarget_ThenControllerMaySearch_RoundTripsThroughJsonUnion()
+    {
+        // Boseiju, Who Endures — the destroy verb's nested "that player may
+        // search" rider binds as a concrete SearchLibraryEffectDef property (no
+        // own "type" discriminator — it is a typed child, not a union member).
+        const string json = """
+            { "type": "destroy_target",
+              "targetFilter": "artifact_enchantment_nonbasic_land",
+              "thenControllerMaySearch": {
+                "subtypes": ["Plains", "Island", "Swamp", "Mountain", "Forest"],
+                "destination": "battlefield" } }
+            """;
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var def = JsonSerializer.Deserialize<EffectDefinition>(json, opts);
+        def.Should().BeOfType<DestroyTargetEffectDef>();
+        var destroy = (DestroyTargetEffectDef)def!;
+        destroy.TargetFilter.Should().Be("artifact_enchantment_nonbasic_land");
+        destroy.ThenControllerMaySearch.Should().NotBeNull();
+        destroy.ThenControllerMaySearch!.Subtypes.Should().BeEquivalentTo(
+            new[] { "Plains", "Island", "Swamp", "Mountain", "Forest" });
+        destroy.ThenControllerMaySearch.Destination.Should().Be("battlefield");
+        destroy.ThenControllerMaySearch.BasicLand.Should().BeFalse(
+            "a land card WITH a basic land type need not have the Basic supertype (CR 205.4a)");
+    }
+
+    [Fact]
     public async Task SearchLibrary_BasicSubtype_ToBattlefieldTapped_EntersTapped()
     {
         var forest = BasicLand("Forest", CardSubtype.Forest);

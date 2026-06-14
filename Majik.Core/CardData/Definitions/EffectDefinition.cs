@@ -292,6 +292,37 @@ public sealed class DestroyTargetEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
 
+    /// <summary>
+    /// Optional follow-on rider: after the destroy resolves, the destroyed
+    /// permanent's CONTROLLER (not the ability's controller) "may search their
+    /// library for [the rider's filter], put it [destination], then shuffle"
+    /// (CR 701.19a / CR 701.20a). Null = no rider (the common case).
+    ///
+    /// <para>
+    /// The canonical case is <b>Boseiju, Who Endures</b> — "Destroy target
+    /// artifact, enchantment, or nonbasic land an opponent controls. <i>That
+    /// player</i> may search their library for a land card with a basic land
+    /// type, put it onto the battlefield, then shuffle." The searcher is the
+    /// OTHER player (the one who controlled the destroyed permanent), so the
+    /// runtime binds the search prompt to THAT player's agent — exactly the
+    /// Path to Exile per-affected-player pattern (CR 701.19a — they search
+    /// their OWN library). The search nests a full
+    /// <see cref="SearchLibraryEffectDef"/> so it reuses the shared tutor verb
+    /// (subtype / basic-supertype / card-type filter + destination + shuffle).
+    /// </para>
+    ///
+    /// <para>
+    /// The "may" optionality is the search verb's own (declining a pick is
+    /// always legal, CR 701.19a). The follow-on runs whenever the destroy's
+    /// chosen target was a battlefield permanent with a known controller —
+    /// Boseiju's printed wording offers the search to "that player" regardless
+    /// of whether the destroyed permanent was the artifact, the enchantment, or
+    /// the land. If the destroy fizzled (no legal target at resolution, CR
+    /// 608.2b) there is no "that player", so the rider does not run.
+    /// </para>
+    /// </summary>
+    public SearchLibraryEffectDef? ThenControllerMaySearch { get; set; }
+
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(TargetFilter, "destroy");
