@@ -175,15 +175,13 @@ public static class RestlessFortressFactory
             () =>
             {
                 var victim = capturedDefender;
-                // CR 119.3 — life loss happens even with no Player defender
-                // resolves to a no-op (a planeswalker defender has no life
-                // total to lose); the controller's gain is keyed on the
-                // "loses 2 ... and you gain 2" being a single triggered
-                // effect, but the gain clause applies regardless. Restless
-                // Fortress only ever attacks a player (lands attack the
-                // defending player or a planeswalker; the drain text reads
-                // "defending player"), so a null capture (PW defender) leaves
-                // the loss as a no-op while the controller still gains.
+                // CR 506.2 / 508.4d — "defending player" is the attacked player
+                // OR the CONTROLLER of the attacked planeswalker (real OR an
+                // effective planeswalker — a flipped creature-front DFC, CR 711).
+                // The defender capture (below) resolves the planeswalker's
+                // controller, so the drain hits the right player even when the
+                // animated land attacks a planeswalker. CR 119.3 — the
+                // controller's gain applies regardless.
                 victim?.LoseLife(DrainAmount);
 
                 var controller = land.Controller ?? owner;
@@ -196,10 +194,12 @@ public static class RestlessFortressFactory
             condition: new EventTriggerCondition<CreatureAttacksEvent>(
                 (e, _) =>
                 {
-                    // CR 506.2 — capture the defender for the resolved effect.
-                    // Captured whenever the condition is evaluated so the
-                    // drain effect can resolve against the right player.
-                    capturedDefender = e.DefendingPlayerOrPlaneswalker as Player;
+                    // CR 506.2 / 508.4d — capture the defending player for the
+                    // resolved effect: the attacked player OR the controller of
+                    // the attacked planeswalker (DefendingPlayer consults
+                    // IsEffectivePlaneswalker(), so an effective-planeswalker
+                    // defender resolves to its controller rather than null).
+                    capturedDefender = e.DefendingPlayer;
                     // CR 508.1f — fires when THIS land is the attacker. The
                     // event's Attacker is typed Creature and a Restless
                     // Fortress instance is always a Land, so this is the

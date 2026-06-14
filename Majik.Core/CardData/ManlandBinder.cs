@@ -1085,7 +1085,13 @@ public static class ManlandBinder
             condition: new Majik.Core.Abilities.EventTriggerCondition<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(
                 (e, _) =>
                 {
-                    capturedDefender = e.DefendingPlayerOrPlaneswalker as Player;
+                    // CR 506.2 / 508.4d — the defending player is the attacked
+                    // player OR the CONTROLLER of the attacked planeswalker.
+                    // DefendingPlayerOf consults IsEffectivePlaneswalker() so an
+                    // effective-planeswalker defender (a flipped creature-front
+                    // DFC, CR 711) drains its controller instead of silently
+                    // no-opping — the residual coupling this binds closes.
+                    capturedDefender = e.DefendingPlayer;
                     return ReferenceEquals(e.Attacker, land);
                 }),
             effects: new IEffect[] { effect },

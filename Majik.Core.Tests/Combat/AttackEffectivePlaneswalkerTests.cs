@@ -67,6 +67,28 @@ public class AttackEffectivePlaneswalkerTests
     }
 
     [Fact]
+    public void DefendingPlayerOf_ResolvesEffectivePlaneswalkerController()
+    {
+        // CR 506.2 / 508.4d — the defending player when attacking a planeswalker
+        // is its controller. This must hold for an EFFECTIVE planeswalker (a
+        // flipped creature-front DFC) just as for a real one or a player.
+        var dfc = MakeFlippedPlaneswalkerDfc(5, _bob);
+
+        Majik.Core.Domain.DomainEvents.CreatureAttacksEvent
+            .DefendingPlayerOf(_alice).Should().BeSameAs(_alice,
+                "a player defender IS the defending player");
+        Majik.Core.Domain.DomainEvents.CreatureAttacksEvent
+            .DefendingPlayerOf(dfc).Should().BeSameAs(_bob,
+                "an effective-planeswalker defender resolves to its controller");
+
+        var pw = new Planeswalker("Jace", "2UU", startingLoyalty: 4)
+        { Owner = _bob, Controller = _bob };
+        Majik.Core.Domain.DomainEvents.CreatureAttacksEvent
+            .DefendingPlayerOf(pw).Should().BeSameAs(_bob,
+                "a real-planeswalker defender resolves identically to its controller");
+    }
+
+    [Fact]
     public void FlippedDfc_IsEffectivePlaneswalker_WithBackFaceLoyalty()
     {
         var dfc = MakeFlippedPlaneswalkerDfc(5, _bob);
