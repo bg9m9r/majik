@@ -18267,6 +18267,59 @@
   "mdfc": null,
   "colors": []
 }
+==== hydroid-krasis ====
+{
+  "name": "Hydroid Krasis",
+  "manaCost": "{X}{G}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Beast",
+    "Hydra",
+    "Jellyfish"
+  ],
+  "power": 0,
+  "toughness": 0,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green"
+  ]
+}
 ==== ice ====
 {
   "name": "Ice",

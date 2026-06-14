@@ -1,0 +1,9 @@
+{
+  "name": "Hydroid Krasis",
+  "types": ["Creature"],
+  "subtypes": ["Jellyfish", "Hydra", "Beast"],
+  "manaCost": "{X}{G}{U}",
+  "power": 0,
+  "toughness": 0,
+  "abilities": []
+}
