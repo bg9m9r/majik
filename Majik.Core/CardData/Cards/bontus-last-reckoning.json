@@ -1,0 +1,7 @@
+{
+  "name": "Bontu's Last Reckoning",
+  "types": ["Sorcery"],
+  "manaCost": "{1}{B}{B}",
+  "colors": ["B"],
+  "abilities": []
+}
