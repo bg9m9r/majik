@@ -155,7 +155,13 @@ public static class PteramanderFactory
             source: card,
             controller: owner,
             costs: new ICost[] { reducedCost }.Concat(nonManaCosts),
-            effects: baseAdapt.Effects);
+            effects: baseAdapt.Effects,
+            // agatha-adapt-rebind — the Adapt effect reads ResolutionContext.Source
+            // (re-source-safe), so the re-wrapped ability stays RebindSafe and
+            // Agatha's group-grant re-homes it to a counter-bearing bearer. The
+            // GraveyardReducedManaCost reads the source's controller live, so it
+            // tracks the new controller after RebindTo as well.
+            rebindSafe: baseAdapt.RebindSafe);
 
         card.AddAbility(adaptAbility);
 

@@ -108,26 +108,45 @@ public static class AdaptFactory
         // an Adapt activation that would otherwise add counters fizzles
         // if the creature already has +1/+1 counters when the ability
         // resolves.
+        //
+        // RE-SOURCE-SAFE (agatha-adapt-rebind): both the "no +1/+1 counters"
+        // gate (CR 702.116b) and the counter placement (CR 702.116a) read the
+        // live ResolutionContext.Source (the ability's own Source at
+        // resolution) rather than capturing `source` in the closure, falling
+        // back to `source` only on the context-less legacy path. Marked
+        // RebindSafe so Agatha's Soul Cauldron re-homes the REAL Adapt ability
+        // to a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f) — the gate then reads the BEARER's own counters and the
+        // placement targets the BEARER, never the exiled imprinted card. (A
+        // bearer that already carries +1/+1 counters — the precondition for
+        // Agatha's grant to apply — correctly fizzles the placement per CR
+        // 702.116b; the rebind makes the gate read the RIGHT permanent.)
         var effect = new Effect(
             $"Adapt {amount} (CR 702.116) — put {amount} +1/+1 counters on " +
             $"{source.Name} if it has no +1/+1 counters",
-            () =>
+            ctx =>
             {
-                if (source.Zone != Majik.Core.Zones.ZoneType.Battlefield) return;
+                var subject = (ctx.Source as Permanent) ?? source;
+                if (subject.Zone != Majik.Core.Zones.ZoneType.Battlefield)
+                    return ValueTask.CompletedTask;
 
                 // CR 702.116b — "If this creature has no +1/+1 counters
-                // on it." Resolution-time intervening-if check.
-                if (source.Counters.Count(CounterType.PlusOnePlusOne) > 0) return;
+                // on it." Resolution-time intervening-if check, read off the
+                // live resolution source.
+                if (subject.Counters.Count(CounterType.PlusOnePlusOne) > 0)
+                    return ValueTask.CompletedTask;
 
                 CountersService.Add(
-                    source, CounterType.PlusOnePlusOne, amount,
+                    subject, CounterType.PlusOnePlusOne, amount,
                     replacements, eventBus);
+                return ValueTask.CompletedTask;
             });
 
         return new ActivatedAbility(
             source: source,
             controller: controller,
             costs: new ICost[] { new ManaCostCost(cost) },
-            effects: new IEffect[] { effect });
+            effects: new IEffect[] { effect },
+            rebindSafe: true);
     }
 }

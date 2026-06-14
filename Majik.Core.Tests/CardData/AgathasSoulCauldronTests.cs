@@ -2563,4 +2563,124 @@ public class AgathasSoulCauldronTests
             .Which.Description.Should().Contain("Tap",
                 "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-adapt-rebind — Pteramander's "{7}{U}: Adapt 4" (CR 702.116) is a
+    // bespoke [CardName]-factory activated ability whose effect previously
+    // captured the source card in its closure for BOTH the "no +1/+1 counters"
+    // gate (CR 702.116b) and the counter placement (CR 702.116a). Migrated to
+    // read ResolutionContext.Source for both, marked RebindSafe, so Agatha's
+    // group-grant re-homes the REAL Adapt ability to a counter-bearing bearer
+    // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f). Adapt is OUTSIDE the
+    // OracleActivatedAbilityBinder reconstructable set, so the RebindTo of the
+    // real ability is the only sound re-home.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_Pteramander_AdaptToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {7}{U} Adapt 4) is now RebindSafe
+        // (reads ResolutionContext.Source). Adapt is not reconstructable from
+        // oracle text, so the RebindTo of the real ability is the only sound
+        // re-home.
+        var pteramander = PteramanderFactory.Create(alice);
+        pteramander.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .Should().OnlyContain(a => a.RebindSafe,
+                "the migrated Pteramander Adapt ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(pteramander);
+        pteramander.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), pteramander);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Pteramander's real Adapt ability is re-homed via RebindTo");
+        var adapt = granted[0];
+        adapt.Source.Should().BeSameAs(bearer,
+            "the re-homed Adapt ability is sourced on the BEARER (CR 707.2)");
+        adapt.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+    }
+
+    [Fact]
+    public async Task AdaptRebind_PlacesCountersOnBearer_NotExiledCard()
+    {
+        // The gate + placement read ResolutionContext.Source. Re-home the real
+        // Adapt ability onto a COUNTER-LESS permanent and resolve it: the four
+        // +1/+1 counters land on the BEARER, never the exiled Pteramander.
+        var alice = new Player("Alice", 20);
+        var pteramander = PteramanderFactory.Create(alice);
+        var adapt = pteramander.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var bearer = new Creature("Adapt Bearer", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(bearer);
+
+        var rebound = adapt.RebindTo(bearer, alice);
+        await rebound.ResolveAsync(agent: null, game: null);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(PteramanderFactory.AdaptAmount,
+            "Adapt 4 (CR 702.116a) places four +1/+1 counters on the BEARER (ResolutionContext.Source)");
+        pteramander.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the exiled imprinted Pteramander never receives the counters");
+    }
+
+    [Fact]
+    public async Task AdaptRebind_FizzlesReadingBearerCounters_NotExiledCard()
+    {
+        // CR 702.116b — the "no +1/+1 counters" gate reads the BEARER (the
+        // rebound source), not the exiled card. A bearer that already carries a
+        // +1/+1 counter fizzles, even though the exiled Pteramander has none.
+        var alice = new Player("Alice", 20);
+        var pteramander = PteramanderFactory.Create(alice);
+        var adapt = pteramander.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var bearer = new Creature("Counterful Bearer", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(bearer);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+
+        var rebound = adapt.RebindTo(bearer, alice);
+        await rebound.ResolveAsync(agent: null, game: null);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the gate read the BEARER's existing counter and fizzled (CR 702.116b)");
+    }
+
+    [Fact]
+    public async Task Adapt_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still places counters on its OWN source on
+        // the normal (un-rebound) resolution path — ResolutionContext.Source =
+        // the card.
+        var alice = new Player("Alice", 20);
+        var pteramander = PteramanderFactory.Create(alice);
+        pteramander.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(pteramander);
+        var adapt = pteramander.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        await adapt.ResolveAsync(agent: null, game: null);
+
+        pteramander.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(PteramanderFactory.AdaptAmount,
+            "resolving the un-rebound Adapt places counters on its own source");
+    }
 }
