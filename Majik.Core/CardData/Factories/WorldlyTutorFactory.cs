@@ -39,10 +39,12 @@ namespace Majik.Core.CardData.Factories;
 ///   ends up on top of an otherwise-randomized library (same sequencing
 ///   Mystical Tutor / Vampiric Tutor use).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Reveal event</b>. The picked card moves Library → top-of-Library
-///   without publishing a reveal event; same gap as
-///   <see cref="MysticalTutorFactory"/> and the other search factories.
+/// ## Reveal (CR 701.18)
+/// - The printed "reveal that card" step IS surfaced: a
+///   <see cref="Majik.Core.Events.CardRevealedEvent"/> (tagged
+///   <see cref="ZoneType.Library"/>) fires for the found creature before it
+///   moves to the top of the library, via
+///   <see cref="Majik.Core.Zones.LibrarySearch.PublishRevealIfRequested"/>.
 /// </summary>
 [CardName("Worldly Tutor")]
 public static class WorldlyTutorFactory
@@ -93,6 +95,11 @@ public static class WorldlyTutorFactory
                             "creature card").ConfigureAwait(false))
                         : candidates[0];
                     if (pick == null) return;
+
+                    // CR 701.18 — "reveal that card": surface the found
+                    // creature publicly before it moves to the top of library.
+                    Majik.Core.Zones.LibrarySearch.PublishRevealIfRequested(
+                        caster, pick, CardName);
 
                     caster.Zones.Library.RemoveCard(pick);
                     // CR 701.20a — shuffle the library AFTER the search.

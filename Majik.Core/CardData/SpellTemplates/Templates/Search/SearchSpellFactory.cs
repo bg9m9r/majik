@@ -12,7 +12,18 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Search;
 
 internal static class SearchSpellFactory
 {
-    internal static SpellDefinition SearchLibrarySpell(Player caster, string kindRaw) => new(
+    /// <summary>
+    /// "Search your library for [kind], put it into your hand, then shuffle"
+    /// (Diabolic/Demonic-style tutors that deliver to hand).
+    /// </summary>
+    /// <param name="revealReason">CR 701.18 — when non-null AND a card is
+    /// found, publish a <see cref="Majik.Core.Events.CardRevealedEvent"/> for
+    /// the picked card so the printed "reveal it" step is observable (Sylvan
+    /// Scrying, Eladamri's Call, Steelshaper's Gift, Goblin Matron, …). Pass
+    /// the card name. Leave null for tutors that don't reveal (Diabolic Tutor,
+    /// Profane Tutor, Wishclaw Talisman).</param>
+    internal static SpellDefinition SearchLibrarySpell(
+        Player caster, string kindRaw, string? revealReason = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: p => new IEffect[] { new Effect($"tutor {kindRaw}", async ctx =>
@@ -49,7 +60,8 @@ internal static class SearchSpellFactory
                     caster, ctx.Agent ?? AgentRegistry.Get(caster),
                     ctx.Game ?? pickCtx, chosenTargets: null, ctx.Ct),
                 caster, candidates,
-                string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card")
+                string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card",
+                revealReason)
                 .ConfigureAwait(false);
             if (pick != null)
             {
