@@ -74,6 +74,7 @@ public class EventPayloadCoverageTests
         "GainedCitysBlessingEvent",
         "GameStartedEvent",
         "LibraryShuffledEvent",
+        "LifePaidEvent",
         "ManaAbilityActivatedEvent",
         "OpeningHandCheckEvent",
         "PermanentSacrificedEvent",
