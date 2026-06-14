@@ -1847,6 +1847,132 @@ public class AgathasSoulCauldronTests
             "the exiled imprinted Troll never receives the shield");
     }
 
+    // -----------------------------------------------------------------------
+    // agatha-rebind-steel-hellkite-variable-x-sweep — the HARD bespoke case:
+    // Steel Hellkite's "{X}: Destroy each nonland permanent with mv X whose
+    // controller was dealt combat damage by THIS CREATURE this turn." The
+    // "damaged by this creature this turn" linkage was migrated to key the
+    // combat-victim tracker BY THE DAMAGE-SOURCE permanent + read the sweep's
+    // live source off ResolutionContext.Source, so re-homing the REAL ability
+    // to a BEARER destroys permanents whose controller the BEARER damaged — not
+    // the exiled Steel Hellkite's stale linkage. The X already threads via
+    // ChosenX (GAP 2); this closes the residual combat-damage re-source.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsSteelHellkiteSweep_ToBearer_UsesBearersCombatDamageLinkage()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL Steel Hellkite in the graveyard, built with the LIVE bus so its
+        // per-source combat-victim tracker sees the bearer's combat damage too.
+        var hellkite = SteelHellkiteFactory.Create(alice, xValueProvider: null, eventBus: bus);
+        alice.Zones.Graveyard.AddCard(hellkite);
+        hellkite.SetZone(ZoneType.Graveyard);
+
+        // Its {X} sweep is RebindSafe (reads source + X + victims off the ctx).
+        hellkite.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<Majik.Core.Costs.ManaCostCost>()
+                .Any(m => m.Description == "X"))
+            .RebindSafe.Should().BeTrue();
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Imprint Steel Hellkite — the bearer gains its real {X} sweep, re-homed.
+        Resolve(TapAbility(cauldron), hellkite);
+
+        var sweep = GrantedActivated(bearer)
+            .Single(a => a.Costs.OfType<Majik.Core.Costs.ManaCostCost>()
+                .Any(m => m.Description == "X"));
+        sweep.Source.Should().BeSameAs(bearer, "the sweep is re-homed to the BEARER (CR 707.2)");
+
+        // Bob controls an mv-2 nonland permanent. The BEARER (not the exiled
+        // Steel Hellkite) deals combat damage to Bob this turn.
+        var bobBear = new Creature("Grizzly Bears", "1G", 2, 2);
+        bobBear.SetOwner(bob);
+        bobBear.SetController(bob);
+        bobBear.SetZone(ZoneType.Battlefield);
+        bob.Zones.Battlefield.AddCard(bobBear);
+
+        bus.Publish(new Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent(
+            bearer, bob, amount: 3));
+
+        // Resolve the re-homed sweep for X = 2 through the ability path so
+        // ResolutionContext.Source = the bearer and the victim set is the
+        // BEARER's. A live game over [alice, bob] supplies the sweep scope.
+        sweep.SetChosenX(2);
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(bus));
+        await sweep.ResolveAsync(agent: null, game: game);
+
+        bob.Zones.Graveyard.GetCards().Should().Contain(bobBear,
+            "the re-homed sweep destroys the mv-2 permanent whose controller the BEARER damaged this turn");
+    }
+
+    [Fact]
+    public async Task Grant_SteelHellkiteSweep_DoesNotUseExiledCardsCombatLinkage()
+    {
+        // Negative half: combat damage dealt by the EXILED Steel Hellkite (e.g.
+        // a stale linkage from before imprint) must NOT drive the BEARER's
+        // re-homed sweep. The bearer dealt no combat damage, so nothing dies.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var hellkite = SteelHellkiteFactory.Create(alice, xValueProvider: null, eventBus: bus);
+        alice.Zones.Graveyard.AddCard(hellkite);
+        hellkite.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+        Resolve(TapAbility(cauldron), hellkite);
+
+        var sweep = GrantedActivated(bearer)
+            .Single(a => a.Costs.OfType<Majik.Core.Costs.ManaCostCost>()
+                .Any(m => m.Description == "X"));
+
+        var bobBear = new Creature("Grizzly Bears", "1G", 2, 2);
+        bobBear.SetOwner(bob);
+        bobBear.SetController(bob);
+        bobBear.SetZone(ZoneType.Battlefield);
+        bob.Zones.Battlefield.AddCard(bobBear);
+
+        // The EXILED Steel Hellkite "deals" combat damage (stale linkage) — must
+        // populate Steel Hellkite's source slot, NOT the bearer's.
+        bus.Publish(new Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent(
+            hellkite, bob, amount: 3));
+
+        sweep.SetChosenX(2);
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(bus));
+        await sweep.ResolveAsync(agent: null, game: game);
+
+        bob.Zones.Battlefield.GetCards().Should().Contain(bobBear,
+            "the BEARER dealt no combat damage; the exiled Steel Hellkite's linkage does not drive the re-homed sweep");
+    }
+
     [Fact]
     public async Task Grant_RebindsRealAbility_ResolvesThroughAbilityPath_AffectingBearer()
     {
@@ -2811,22 +2937,22 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
-    // agatha-stale-body-rewrite-then-migrate — Steel Hellkite is a bespoke
-    // [CardName]-factory artifact creature. Its "{2}: Steel Hellkite gets
-    // +1/+0 until end of turn." pump ability used to register a
-    // PumpUntilEndOfTurnEffect on the CAPTURED `card`, so a re-home would
-    // pump the exiled Steel Hellkite, not the bearer. Migrated so the pump
-    // reads ResolutionContext.Source (the live ability source = the bearer
-    // when re-homed) and marked RebindSafe — Agatha's group-grant re-homes
-    // the REAL pump onto a counter-bearing bearer via ActivatedAbility.RebindTo
-    // (CR 707.2 / 613.1f). The {X} destroy-sweep ability is NOT RebindSafe
-    // (it captures a per-instance combat-damage-victim tracker keyed on the
-    // original source instance), so it is correctly NOT re-homed — only the
-    // pump is granted (a correct partial, never a broken re-home).
+    // agatha-rebind-steel-hellkite-variable-x-sweep — Steel Hellkite is a
+    // bespoke [CardName]-factory artifact creature with TWO non-mana activated
+    // abilities, BOTH now RebindSafe:
+    //   * "{2}: This creature gets +1/+0 until end of turn." — reads
+    //     ResolutionContext.Source for the pump subject (migrated earlier).
+    //   * "{X}: Destroy each nonland permanent with mv X whose controller was
+    //     dealt combat damage by THIS CREATURE this turn." — the combat-victim
+    //     tracker is now keyed by the damage-SOURCE permanent and the sweep
+    //     reads its victim set + X off the live ResolutionContext, so re-homing
+    //     it to a BEARER uses the BEARER's combat-damage linkage.
+    // Agatha's group-grant re-homes BOTH real abilities onto a counter-bearing
+    // bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f).
     // -----------------------------------------------------------------------
 
     [Fact]
-    public async Task Grant_RebindsBespokeFactoryCreature_SteelHellkite_PumpToBearer()
+    public async Task Grant_RebindsBespokeFactoryCreature_SteelHellkite_BothAbilitiesToBearer()
     {
         var alice = new Player("Alice", 20);
         var bus = new Majik.Core.Events.EventBus();
@@ -2834,13 +2960,11 @@ public class AgathasSoulCauldronTests
         var zones = new Majik.Core.Services.ZoneService(bus);
 
         var hellkite = SteelHellkiteFactory.Create(alice);
-        // Only the pump is RebindSafe; the {X} destroy-sweep captures a
-        // per-instance combat tracker and must remain non-rebindable.
-        var pumpAbility = hellkite.Abilities.OfType<ActivatedAbility>()
-            .Where(a => a is not IManaAbility && a.RebindSafe)
-            .ToList();
-        pumpAbility.Should().ContainSingle(
-            "exactly one Steel Hellkite ability (the +1/+0 pump) is RebindSafe");
+        // BOTH the pump and the {X} destroy-sweep are now RebindSafe.
+        hellkite.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .Should().OnlyContain(a => a.RebindSafe,
+                "both Steel Hellkite non-mana abilities read the live ResolutionContext and are RebindSafe");
         alice.Zones.Graveyard.AddCard(hellkite);
         hellkite.SetZone(ZoneType.Graveyard);
 
@@ -2853,16 +2977,17 @@ public class AgathasSoulCauldronTests
         Resolve(TapAbility(cauldron), hellkite);
 
         var granted = GrantedActivated(bearer);
-        granted.Should().ContainSingle(
-            "ONLY Steel Hellkite's RebindSafe pump is re-homed via RebindTo (the destroy-sweep is not)");
-        var pump = granted[0];
-        pump.Source.Should().BeSameAs(bearer,
-            "the re-homed pump is sourced on the BEARER (CR 707.2)");
-        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        granted.Should().HaveCount(2,
+            "BOTH of Steel Hellkite's real activated abilities are re-homed via RebindTo");
+        granted.Should().OnlyContain(a => ReferenceEquals(a.Source, bearer),
+            "every re-homed ability is sourced on the BEARER (CR 707.2)");
 
-        // Base 4/4 + the SeatedBearer +1/+1 counter = 5/5 before the pump.
-        // Resolve via the ability path (ResolutionContext.Source = the rebound
-        // ability's Source = the bearer) so the reused effect re-sources itself.
+        // The pump re-homed to the bearer: base 4/4 + the SeatedBearer +1/+1
+        // counter = 5/5 before the pump. Resolve via the ability path
+        // (ResolutionContext.Source = the bearer) so the reused effect
+        // re-sources itself.
+        var pump = granted.Single(a =>
+            a.Costs.OfType<Majik.Core.Costs.ManaCostCost>().Any(m => m.Description == "2"));
         var powerBefore = bearer.GetPower();
         await pump.ResolveAsync(agent: null, game: null);
         bearer.GetPower().Should().Be(powerBefore + 1,
@@ -2884,8 +3009,11 @@ public class AgathasSoulCauldronTests
         zones.MoveCard(hellkite, ZoneType.Library, ZoneType.Battlefield, alice);
         hellkite.ActiveEffects = effects;
 
+        // Select the PUMP specifically (the {2} ability) — both non-mana
+        // abilities are now RebindSafe.
         var pump = hellkite.Abilities.OfType<ActivatedAbility>()
-            .Single(a => a is not IManaAbility && a.RebindSafe);
+            .Single(a => a.Costs.OfType<Majik.Core.Costs.ManaCostCost>()
+                .Any(m => m.Description == "2"));
 
         var powerBefore = hellkite.GetPower();
         foreach (var effect in pump.Effects) effect.Execute();
