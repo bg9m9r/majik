@@ -105,6 +105,38 @@ public sealed class ContinuousEffectsService
     public IEventBus? EventBus => _eventBus;
 
     /// <summary>
+    /// CR 500.1 / 502.1 — the game's current active player (the player whose
+    /// turn it is). Auto-tracked off <see cref="TurnStartedEvent"/> when the
+    /// service is wired to a bus, so a factory routed through the effects-aware
+    /// overload (<c>Create(Player, ContinuousEffectsService)</c>) can build a
+    /// "during your turn" conditional static
+    /// (<see cref="WhileControllersTurnPumpEffect"/>, Skophos Reaver) WITHOUT a
+    /// separately-threaded turn-state parameter the source-generated dispatch
+    /// doesn't supply. The predicate compares this to the source's controller
+    /// on every <see cref="Compute(Permanent)"/>.
+    ///
+    /// <para>Null until the first turn begins (or when the service is built
+    /// outside a full game graph — pure card-shape / unit tests, where the
+    /// conditional static is simply never registered). Also publicly settable
+    /// so a test can drive the "whose turn is it" gate directly.</para>
+    /// </summary>
+    public Player? ActivePlayer
+    {
+        get => _activePlayer;
+        set
+        {
+            if (ReferenceEquals(_activePlayer, value)) return;
+            _activePlayer = value;
+            // Changing whose turn it is can flip a "during your turn"
+            // conditional P/T static — invalidate the memoization cache so the
+            // next Compute re-evaluates the gate (CR 611.2c).
+            BumpGeneration();
+        }
+    }
+
+    private Player? _activePlayer;
+
+    /// <summary>
     /// CR 110.2 / 700.6 / 611.2c — the game's live player roster, supplied by
     /// the production game graph (<c>GameFacade</c> / <c>Game</c>) so a factory
     /// routed through the effects-aware overload (<c>Create(Player,
@@ -136,6 +168,11 @@ public sealed class ContinuousEffectsService
         // life totals, control, counts of artifacts/etc.). Bump unconditionally
         // — a spurious bump only costs a recompute, never correctness.
         BumpGeneration();
+
+        // CR 500.1 / 502.1 — track the active player so a "during your turn"
+        // conditional static (WhileControllersTurnPumpEffect, Skophos Reaver)
+        // can read it live without a separately-threaded turn-state parameter.
+        if (e is TurnStartedEvent ts) ActivePlayer = ts.Player;
 
         // CR 611.2b — a "for as long as <condition>" continuous effect ends the
         // moment its condition lapses. The most common lapse is the source

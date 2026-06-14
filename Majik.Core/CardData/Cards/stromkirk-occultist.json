@@ -1,0 +1,9 @@
+{
+  "name": "Stromkirk Occultist",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Horror"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 2,
+  "keywords": ["Trample"]
+}

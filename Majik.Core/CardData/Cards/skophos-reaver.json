@@ -1,0 +1,8 @@
+{
+  "name": "Skophos Reaver",
+  "types": ["Creature"],
+  "subtypes": ["Minotaur", "Warrior"],
+  "manaCost": "{2}{R}",
+  "power": 2,
+  "toughness": 3
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Necrogoyf",
+  "types": ["Creature"],
+  "subtypes": ["Lhurgoyf"],
+  "manaCost": "{3}{B}{B}",
+  "power": 0,
+  "toughness": 4
+}
