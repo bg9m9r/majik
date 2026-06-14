@@ -22,13 +22,17 @@ namespace Majik.Core.CardData.Factories;
 ///   cards. The "then" between the two halves is a sequencing barrier —
 ///   all discards resolve before any draws begin (same body as
 ///   <see cref="WheelOfFortuneFactory.BuildResolveEffect"/>).
-/// - <b>Miracle {1}{R} (CR 702.94)</b> — no Miracle primitive exists in
-///   the engine today. Surfaced as a <see cref="KeywordAbility"/>("Miracle")
-///   marker so a downstream Miracle primitive picks Reforge up without
-///   re-touching this factory — same posture as
-///   <see cref="BonfireOfTheDamnedFactory"/>'s Miracle marker.
-///   Until that primitive lands, Reforge ships as a plain {3}{R}{R}
-///   Sorcery; the bot won't choose to cast it for its miracle cost.
+/// - <b>Miracle {1}{R} (CR 702.94)</b> — wired as a real alternative cost.
+///   The factory stamps the printed miracle cost via
+///   <see cref="Card.SetMiracleCost"/>; the draw hook in
+///   <see cref="Majik.Core.Game.TurnDriver"/> opens the one-shot window when
+///   Reforge is the first card its controller drew this turn (CR 702.94b),
+///   and the card may then be cast from hand for {1}{R} via
+///   <see cref="Majik.Core.Costs.MiracleAlternativeCost"/> (surfaced to the
+///   bot by <see cref="Majik.Core.Players.Agents.MiracleAltCostProbe"/>).
+///   The <see cref="KeywordAbility"/>("Miracle") marker is retained for
+///   keyword scanners — same posture as
+///   <see cref="BonfireOfTheDamnedFactory"/>.
 ///
 /// ## CR notes
 ///
@@ -40,15 +44,6 @@ namespace Majik.Core.CardData.Factories;
 ///   library is empty; the next draw attempt sets the
 ///   <see cref="Player.TriedToDrawFromEmptyLibrary"/> flag (CR 704.5b SBA).
 ///   Other players continue drawing independently.
-///
-/// ## Deferred (v1 gaps)
-///
-/// - <b>Miracle as a real alternative-cost primitive</b>: needs (a) a
-///   top-of-library-on-draw reveal hook, (b) a <c>MiracleAlternativeCost</c>
-///   (CR 118.9) wired through <see cref="Majik.Core.Spells.SpellCastFlow"/>,
-///   (c) a "may cast" trigger on the draw event (CR 702.94b). Same family
-///   as Bonfire of the Damned, Plot, Cascade — parked behind the same
-///   cast-flow refactor.
 /// </summary>
 [CardName("Reforge the Soul")]
 public static class ReforgeTheSoulFactory
@@ -73,10 +68,11 @@ public static class ReforgeTheSoulFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 702.94 — Miracle. Keyword marker; alternative-cost wiring
-        // deferred (see class xmldoc). Surfacing the keyword now means a
-        // future Miracle primitive picks Reforge up for free.
+        // CR 702.94 — Miracle. Keyword marker + the printed miracle cost the
+        // draw hook reads to open the first-card-drawn-this-turn window
+        // (see MiracleAlternativeCost).
         card.AddAbility(new KeywordAbility("Miracle", card, owner));
+        card.SetMiracleCost(Majik.Core.ValueObjects.ManaCost.Parse(MiracleCostText));
 
         return card;
     }

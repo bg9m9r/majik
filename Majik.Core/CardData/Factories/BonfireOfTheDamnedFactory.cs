@@ -39,16 +39,18 @@ namespace Majik.Core.CardData.Factories;
 ///   The creature list is snapshotted before the sweep so victims that
 ///   die from the primary damage to a planeswalker controller don't
 ///   skew enumeration.
-/// - <b>Miracle {X}{R} (CR 702.94)</b> — no Miracle primitive exists in
-///   the engine today (no top-of-library reveal-on-draw hook, no
-///   miracle-cast alternative-cost permission slot). Surfaced as a
-///   <see cref="KeywordAbility"/>("Miracle") marker so a downstream
-///   Miracle primitive picks Bonfire up without re-touching this
-///   factory — same posture as
-///   <see cref="PhyrexianCrusaderFactory"/>'s Infect / Inkmoth Nexus's
-///   Infect markers. Until that primitive lands, Bonfire ships as a
-///   plain {X}{X}{R} Sorcery; the bot won't choose to cast it for its
-///   miracle cost.
+/// - <b>Miracle {X}{R} (CR 702.94)</b> — wired as a real alternative cost.
+///   The factory stamps the printed miracle cost via
+///   <see cref="Card.SetMiracleCost"/>; the draw hook in
+///   <see cref="Majik.Core.Game.TurnDriver"/> opens the one-shot window when
+///   Bonfire is the first card its controller drew this turn (CR 702.94b),
+///   and the card may then be cast from hand for {X}{R} via
+///   <see cref="Majik.Core.Costs.MiracleAlternativeCost"/> (surfaced to the
+///   bot by <see cref="Majik.Core.Players.Agents.MiracleAltCostProbe"/>).
+///   X is still committed at cast time per CR 107.3, so the miracle cast
+///   pays {X}{R} (one fewer {X} than the printed {X}{X}{R}). The
+///   <see cref="KeywordAbility"/>("Miracle") marker is retained for keyword
+///   scanners.
 ///
 /// ## CR notes
 ///
@@ -67,17 +69,6 @@ namespace Majik.Core.CardData.Factories;
 ///   X-burn ships. The creature sweep uses <see cref="Creature.TakeDamage"/>
 ///   directly; future "deal damage" event-bus unification picks both
 ///   paths up for free.
-///
-/// ## Deferred (v1 gaps)
-///
-/// - <b>Miracle as a real alternative-cost primitive</b>: needs (a) a
-///   top-of-library-on-draw reveal hook (Player.DrawCards stamps a
-///   "was first card drawn this turn" flag — currently no such flag
-///   exists), (b) a <c>MiracleAlternativeCost</c> (CR 118.9) wired
-///   through <see cref="SpellCastFlow"/>, (c) a "may cast" trigger on
-///   the draw event (CR 702.94b). Same family as Plot, Cascade, Suspend
-///   — all alt-cost primitive clusters parked behind the same cast-flow
-///   refactor.
 /// </summary>
 [CardName("Bonfire of the Damned")]
 public static class BonfireOfTheDamnedFactory
@@ -100,10 +91,12 @@ public static class BonfireOfTheDamnedFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 702.94 — Miracle. Keyword marker; alternative-cost wiring
-        // deferred (see class xmldoc). Surfacing the keyword now means
-        // a future Miracle primitive picks Bonfire up for free.
+        // CR 702.94 — Miracle. Keyword marker + the printed miracle cost the
+        // draw hook reads to open the first-card-drawn-this-turn window
+        // (see MiracleAlternativeCost). Bonfire's miracle cost {X}{R} carries
+        // the same variable X as its printed {X}{X}{R} body.
         card.AddAbility(new KeywordAbility("Miracle", card, owner));
+        card.SetMiracleCost(Majik.Core.ValueObjects.ManaCost.Parse(MiracleCostText));
 
         return card;
     }
