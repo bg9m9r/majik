@@ -56,6 +56,8 @@ public class ArtifactEnchantmentSacrificeBusTests
     public static IEnumerable<object[]> SelfSacFactories => new[]
     {
         new object[] { "Sterling Grove",          (Func<Player, ContinuousEffectsService, Permanent>)((o, e) => SterlingGroveFactory.Create(o, e)) },
+        new object[] { "Seal of Fire",            (Func<Player, ContinuousEffectsService, Permanent>)((o, e) => SealOfFireFactory.Create(o, e)) },
+        new object[] { "Aura of Silence",         (Func<Player, ContinuousEffectsService, Permanent>)((o, e) => AuraOfSilenceFactory.Create(o, e)) },
         new object[] { "Seal of Cleansing",       (Func<Player, ContinuousEffectsService, Permanent>)((o, e) => SealOfCleansingFactory.Create(o, e)) },
         new object[] { "Cindervines",             (Func<Player, ContinuousEffectsService, Permanent>)((o, e) => CindervinesFactory.Create(o, e)) },
         new object[] { "Roiling Vortex",          (Func<Player, ContinuousEffectsService, Permanent>)((o, e) => RoilingVortexFactory.Create(o, e)) },
