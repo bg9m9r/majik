@@ -114,13 +114,27 @@ public static class SpectralSailorFactory
         // ----------------------------------------------------------------
         var drawEffect = new Effect(
             $"{CardName}: draw a card ({ActivatedCost} activated)",
-            () => DrawCardSelf(owner));
+            ctx =>
+            {
+                // RE-SOURCE-SAFE (agatha-bespoke migration): "draw a card" draws
+                // for the live source's controller, read off
+                // ResolutionContext.Source (the bearer after a RebindTo;
+                // otherwise this Spectral Sailor), never the captured owner. So
+                // an Agatha re-home draws for the BEARER's controller (CR 707.2).
+                var controller = (ctx.Source as Permanent)?.Controller
+                    ?? card.Controller ?? owner;
+                DrawCardSelf(controller);
+                return ValueTask.CompletedTask;
+            });
 
         var drawAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(ActivatedCost) },
-            effects: new IEffect[] { drawEffect });
+            effects: new IEffect[] { drawEffect },
+            // Agatha's Soul Cauldron re-home soundness — the draw reads its
+            // controller off ResolutionContext.Source, never the captured owner.
+            rebindSafe: true);
 
         card.AddAbility(drawAbility);
 

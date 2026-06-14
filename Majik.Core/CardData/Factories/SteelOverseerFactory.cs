@@ -105,19 +105,34 @@ public static class SteelOverseerFactory
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: +1/+1 counter on each artifact creature you control",
-            () =>
+            ctx =>
             {
-                foreach (var target in FindArtifactCreaturesControlled(card.Controller ?? owner))
+                // RE-SOURCE-SAFE (agatha-bespoke migration): "each artifact
+                // creature YOU control" reads the live source's controller off
+                // ResolutionContext.Source (the bearer after a RebindTo;
+                // otherwise this Steel Overseer), never the captured card. So an
+                // Agatha re-home pumps the BEARER's controller's artifact
+                // creatures (CR 707.2 / CR 613.1f).
+                var controller = (ctx.Source as Permanent)?.Controller
+                    ?? card.Controller ?? owner;
+
+                foreach (var target in FindArtifactCreaturesControlled(controller))
                 {
                     CountersService.Add(target, CounterType.PlusOnePlusOne, 1, replacements);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var activatedAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            // Agatha's Soul Cauldron re-home soundness — the effect reads "you
+            // control" off ResolutionContext.Source's controller and the {T}
+            // cost re-homes onto the bearer via AdditionalCost.RebindSource.
+            rebindSafe: true);
 
         card.AddAbility(activatedAbility);
 

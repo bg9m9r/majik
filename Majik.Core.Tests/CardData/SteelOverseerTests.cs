@@ -190,4 +190,56 @@ public class SteelOverseerTests
         frogmite.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2,
             "Hardened Scales bumps +1 → +2 on Frogmite as well");
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source soundness (agatha-bespoke migration) — "each artifact creature
+    // YOU control" reads its controller off ResolutionContext.Source, so
+    // Agatha's Soul Cauldron may re-home the ability to a counter-bearing
+    // bearer (CR 707.2). The {T} cost re-homes onto the bearer via
+    // AdditionalCost.RebindSource (Stage 1).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Activated_IsRebindSafe()
+    {
+        var overseer = SteelOverseerFactory.Create(_alice);
+        overseer.Abilities.OfType<ActivatedAbility>().Single()
+            .RebindSafe.Should().BeTrue(
+                "'each artifact creature you control' reads its controller off " +
+                "ResolutionContext.Source");
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Activated_ResolvesViaContextSource_PumpsBearerControllersArtifactCreatures()
+    {
+        // The exiled Steel Overseer (captured owner = Alice). A RebindTo to a
+        // Bob-controlled bearer must pump BOB's artifact creatures, not Alice's.
+        var overseer = SteelOverseerFactory.Create(_alice);
+        var ability = overseer.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Bob-controlled bearer (itself a non-artifact creature so it's not
+        // pumped — keeps the assertion about Bob's *artifact* creature crisp).
+        var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+        PutOnBattlefield(_bob, bearer);
+
+        // Bob's artifact creature — should receive the counter.
+        var bobFrogmite = new Creature("Frogmite", "{4}", 2, 2);
+        bobFrogmite.AddCardType(CardType.Artifact);
+        PutOnBattlefield(_bob, bobFrogmite);
+
+        // Alice's artifact creature — must NOT be touched (captured owner).
+        var aliceFrogmite = new Creature("Frogmite", "{4}", 2, 2);
+        aliceFrogmite.AddCardType(CardType.Artifact);
+        PutOnBattlefield(_alice, aliceFrogmite);
+
+        // Re-home the REAL ability to the Bob-controlled bearer (CR 707.2).
+        var rehomed = ability.RebindTo(bearer, _bob);
+        await rehomed.ResolveAsync(agent: null, game: null);
+
+        bobFrogmite.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the re-homed ability pumps the BEARER's controller's (Bob's) " +
+            "artifact creatures — ResolutionContext.Source = bearer");
+        aliceFrogmite.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the exiled Steel Overseer's owner (Alice) is no longer the controller");
+    }
 }
