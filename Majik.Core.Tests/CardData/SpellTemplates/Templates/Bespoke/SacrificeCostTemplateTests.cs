@@ -2,13 +2,17 @@ using FluentAssertions;
 using Majik.Core.CardData;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.CardData.SpellTemplates.Templates.Bespoke;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.SpellTemplates.Templates.Bespoke;
 
+[Trait("Color", "R")]
 public class SacrificeCostTemplateTests
 {
     private static SpellBindContext Ctx(string text) =>
@@ -108,6 +112,85 @@ public class SacrificeCostTemplateTests
             stack: null);
         def.Should().NotBeNull(
             $"{name} (oracle: {oracle}) should bind through the live OracleSpellBinder registry");
+    }
+
+    // -----------------------------------------------------------------------
+    // Kuldotha Rebirth — sacrifice-an-artifact additional cost + 3 Goblins
+    // -----------------------------------------------------------------------
+
+    private const string KuldothaOracle =
+        "As an additional cost to cast this spell, sacrifice an artifact. " +
+        "Create three 1/1 red Goblin creature tokens.";
+
+    [Fact]
+    public void KuldothaRebirth_BindsWithSacrificeAnArtifactAdditionalCost()
+    {
+        var def = new KuldothaRebirthTemplate().TryBind(Ctx(KuldothaOracle));
+
+        def.Should().NotBeNull();
+        def!.AdditionalCostsOrEmpty.Should().HaveCount(1,
+            "CR 601.2f — Kuldotha Rebirth carries one additional cost");
+        def.AdditionalCostsOrEmpty[0].Should().BeOfType<SacrificeAnArtifactAdditionalCost>();
+        def.TargetRequests.Should().BeEmpty("the token clause resolves on the caster, no targets");
+        def.HasVariableX.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KuldothaRebirth_DoesNotMatchWithoutSacrificeCostPrefix()
+    {
+        // Same token effect text WITHOUT the additional-cost prefix must NOT
+        // bind here — the template is gated on the raw sac-artifact sentence,
+        // so a generic "create three 1/1 red Goblins" card falls through.
+        new KuldothaRebirthTemplate()
+            .TryBind(Ctx("Create three 1/1 red Goblin creature tokens."))
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void KuldothaRebirth_Resolve_CreatesThreeRedGoblinTokens()
+    {
+        var caster = new Player("A", 20);
+        caster.Zones.Battlefield.GetCards().Should().BeEmpty();
+
+        var def = new KuldothaRebirthTemplate().TryBind(
+            new SpellBindContext(
+                new CardEntity { Name = "Kuldotha Rebirth", OracleText = KuldothaOracle },
+                caster, o => o, new ContinuousEffectsService(), null));
+        def.Should().NotBeNull();
+
+        var chosen = new Majik.Core.Game.ChosenSpellParams(
+            null, null, Array.Empty<IReadOnlyList<object>>(), Majik.Core.Players.Agents.ManaPayment.Empty);
+        foreach (var effect in def!.EffectFactory(chosen))
+            effect.Execute();
+
+        var tokens = caster.Zones.Battlefield.GetCards().Cast<Creature>().ToList();
+        tokens.Should().HaveCount(3, "Kuldotha Rebirth creates exactly three tokens");
+        foreach (var token in tokens)
+        {
+            token.IsToken.Should().BeTrue();
+            token.Name.Should().Be("Goblin");
+            token.BasePower.Should().Be(1);
+            token.BaseToughness.Should().Be(1);
+            token.HasSubtype(CardSubtype.Goblin).Should().BeTrue(
+                "CR 111.4 — token carries the Goblin creature subtype");
+            CardColors.GetColors(token).Should().Contain(ManaColor.Red,
+                "CR 111.4 — the token is explicitly red");
+        }
+    }
+
+    [Fact]
+    public void KuldothaRebirth_BindsThroughLiveRegistry_WithSacCost()
+    {
+        var entity = new CardEntity { Name = "Kuldotha Rebirth", OracleText = KuldothaOracle };
+        var def = Majik.Core.CardData.OracleSpellBinder.Bind(
+            entity, new Player("A", 20), o => o,
+            effects: new ContinuousEffectsService(), stack: null);
+
+        def.Should().NotBeNull("Kuldotha Rebirth must bind via the live OracleSpellBinder registry");
+        def!.AdditionalCostsOrEmpty.Should().ContainSingle()
+            .Which.Should().BeOfType<SacrificeAnArtifactAdditionalCost>(
+                "the bespoke template must win over the generic CreateTokens path so the " +
+                "sacrifice-an-artifact cost (CR 601.2f) is not silently dropped");
     }
 
     [Fact]
