@@ -1014,4 +1014,46 @@ public class LandActivatedAbilityBinderPipelineTests
         // when nothing is fetched.
         bob.Zones.Library.GetCards().Count().Should().Be(libBefore);
     }
+
+    // ======================================================================
+    // SACRIFICE-COST BUS — Treasure Vault (self-sac utility land).
+    //   "{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens."
+    // Verifies the PRODUCTION event bus (threaded by DeckCardBuilder into the
+    // land binders) reaches the self-sacrifice cost so paying it publishes a
+    // PermanentSacrificedEvent (CR 701.16a) — the sac-cost-bus-land-and-binder
+    // -payers deferral. A factory-direct test would not prove this; lands route
+    // via the binder chain, not their [CardName] factory.
+    // ======================================================================
+
+    [Fact]
+    public void Prod_TreasureVault_SacCost_PublishesPermanentSacrificedEvent()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Treasure Vault", "Artifact Land", oracleText: TreasureVaultOracle, colors: "");
+        var land = new Land("Treasure Vault", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        // The sacrifice cost gates on Controller == payer (CR 701.16a); ensure the
+        // live land is owned/controlled by Alice on her battlefield.
+        ((Permanent)live).SetOwner(facade.Alice);
+        ((Permanent)live).SetController(facade.Alice);
+        OnBattlefield(facade, land);
+
+        var seen = new List<PermanentSacrificedEvent>();
+        facade.EventBus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+
+        var sacCost = live.Abilities.OfType<ActivatedAbility>()
+            .SelectMany(a => a.Costs)
+            .OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.Sacrifice);
+
+        // Pay the self-sacrifice leg in isolation — the bus-bearing cost.
+        sacCost.Pay(facade.Alice);
+
+        live.Zone.Should().Be(ZoneType.Graveyard);
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == live
+                && ev.SacrificingPlayer == facade.Alice
+                && !ev.WasToken);
+    }
 }
