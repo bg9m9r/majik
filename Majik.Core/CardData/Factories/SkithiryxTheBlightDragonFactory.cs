@@ -98,16 +98,34 @@ public static class SkithiryxTheBlightDragonFactory
         // on the target (CR 701.15a). Activated ability, regular speed,
         // any number of times per turn (shields stack and clear at EOT).
         // Mirrors MortivoreFactory's {B}-regenerate wiring.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect shields the live ResolutionContext.Source
+        // (the ability's own Source at resolution) rather than capturing
+        // `card`, falling back to `card` only on the context-less legacy sync
+        // path (ResolutionContext.Legacy, where Source is null). Marked
+        // RebindSafe so Agatha's Soul Cauldron's group-grant re-homes the REAL
+        // regenerate ability to each counter-bearing creature via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — necessary here because
+        // Skithiryx's printed line names the creature ("Regenerate Skithiryx"),
+        // which the OracleActivatedAbilityBinder fallback's
+        // "Regenerate this creature" form cannot reconstruct from text.
         // ----------------------------------------------------------------
         var regenerateEffect = new Effect(
-            $"{CardName}: regenerate self",
-            () => card.AddRegenerationShield());
+            $"{CardName}: regenerate self (CR 701.18)",
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                subject.AddRegenerationShield();
+                return ValueTask.CompletedTask;
+            });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{B}") },
-            effects: new IEffect[] { regenerateEffect }));
+            effects: new IEffect[] { regenerateEffect },
+            rebindSafe: true));
 
         return card;
     }

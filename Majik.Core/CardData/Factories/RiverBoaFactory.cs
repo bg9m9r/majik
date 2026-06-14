@@ -65,16 +65,30 @@ public static class RiverBoaFactory
         // CR 701.18 — "Regenerate [self]" = create a regeneration shield on
         // River Boa (CR 701.15a), consumed by the next destroy this turn (tap,
         // remove from combat, heal damage). Mirrors Skithiryx / Mortivore.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): shields the live ResolutionContext.Source (the ability's
+        // own Source at resolution) rather than capturing `card`, falling back
+        // to `card` only on the context-less legacy sync path. Marked RebindSafe
+        // so Agatha's Soul Cauldron re-homes the REAL regenerate ability to a
+        // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f), rather than reconstructing it from oracle text.
         // ----------------------------------------------------------------
         var regenerateEffect = new Effect(
             $"{CardName}: regenerate self (CR 701.18)",
-            () => card.AddRegenerationShield());
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                subject.AddRegenerationShield();
+                return ValueTask.CompletedTask;
+            });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(RegenerateCost) },
-            effects: new IEffect[] { regenerateEffect }));
+            effects: new IEffect[] { regenerateEffect },
+            rebindSafe: true));
 
         return card;
     }
