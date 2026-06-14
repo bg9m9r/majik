@@ -88,11 +88,25 @@ public static class FaunaShamanFactory
         //   {T}                  -> AdditionalCost.Tap (CR 107.4 / 602.1)
         //   Discard a creature   -> DiscardACreatureCardCost (CR 701.16a)
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-closure-resolutioncontext-source-
+        // rebind-next-shape): the searching player is the controller of the
+        // LIVE ResolutionContext.Source (the ability's own Source at resolution)
+        // rather than the captured `card`, falling back to `card`'s controller
+        // only on the context-less legacy sync path. Marked RebindSafe below so
+        // Agatha's Soul Cauldron re-homes the REAL tutor ability to a
+        // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f) — the BEARER'S controller searches THEIR library, never the
+        // exiled Fauna Shaman. The {T} cost auto-re-homes (RebindTo Stage 1);
+        // the {G} mana cost and "Discard a creature card" cost pass through and
+        // are paid by the bearer's controller (the activating player), which is
+        // sound. A library tutor is outside OracleActivatedAbilityBinder's
+        // reconstructable set, so RebindTo is the only sound re-home.
         var tutorEffect = new Effect(
             $"{CardName}: search your library for a creature card -> hand, then shuffle",
             ctx =>
             {
-                var controller = card.Controller ?? owner;
+                var controller = (ctx.Source as Permanent)?.Controller
+                    ?? card.Controller ?? owner;
                 return TutorOneCreatureToHandAsync(controller, ctx);
             });
 
@@ -105,7 +119,8 @@ public static class FaunaShamanFactory
                 AdditionalCost.Tap(card),
                 new DiscardACreatureCardCost(),
             },
-            effects: new IEffect[] { tutorEffect });
+            effects: new IEffect[] { tutorEffect },
+            rebindSafe: true);
 
         card.AddAbility(activated);
 
