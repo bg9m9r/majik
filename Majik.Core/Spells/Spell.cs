@@ -248,6 +248,24 @@ public class Spell : ISpell
     /// </summary>
     public bool IsCopy { get; set; }
 
+    /// <summary>
+    /// CR 707.10a — the per-slot <see cref="Majik.Core.Players.Agents.TargetRequest"/>s
+    /// that governed this spell's original target selection (CR 601.2c),
+    /// retained on the stack object so a "copy a spell" effect can re-prompt the
+    /// copier's controller for NEW targets for the copy ("you may choose new
+    /// targets for the copy"). Each request carries the same legal-candidate
+    /// pool / <c>CandidateGatherer</c> the original cast used, so a retargeted
+    /// copy is held to the same legality.
+    ///
+    /// <para>Stamped by <see cref="Majik.Core.Game.SpellCastFlow"/> from the
+    /// resolved <see cref="Majik.Core.CardData.Definitions.SpellDefinition.TargetRequests"/>
+    /// (and by hand on test spells). Read by
+    /// <see cref="Majik.Core.Services.SpellCopier.PushCopyOfTopSpellAsync"/>;
+    /// when <c>null</c> / empty (or no live agent is supplied), the copy keeps
+    /// the original's chosen targets verbatim — the prior behaviour.</para>
+    /// </summary>
+    public IReadOnlyList<Majik.Core.Players.Agents.TargetRequest>? RetargetRequests { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)

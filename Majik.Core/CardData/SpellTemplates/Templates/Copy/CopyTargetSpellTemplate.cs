@@ -11,10 +11,12 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Copy;
 ///
 /// Matches the leading "copy target instant or sorcery spell" clause and binds
 /// the copy effect via <see cref="CopySpellFactory.CopyTargetInstantOrSorcery"/>
-/// (a distinct copy stack object, CR 706.10a). The "you may choose new targets"
-/// rider is matched-but-not-yet-honoured — the copy reuses the original's
-/// targets verbatim (the residual deferral tracked in
-/// <see cref="Majik.Core.Services.SpellCopier"/>).
+/// (a distinct copy stack object, CR 706.10a). The "you may choose new targets
+/// for the copy" rider (CR 707.10a) is honoured at resolution — the copy effect
+/// re-prompts the copier for new targets via
+/// <see cref="Majik.Core.Services.SpellCopier.PushCopyOfTopSpellAsync"/> using
+/// the copied spell's retained per-slot requests; declining keeps the original
+/// target.
 /// </summary>
 public sealed class CopyTargetSpellTemplate : ISpellTemplate
 {

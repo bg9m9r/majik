@@ -18,10 +18,9 @@ namespace Majik.Core.CardData.Factories;
 /// the stack above it (CR 707.10 / 706.10a), which resolves first then ceases
 /// to exist (CR 707.10c).
 ///
-/// ## Deferred (v1 gap)
-/// - <b>"You may choose new targets for the copy"</b> (CR 707.10a): the copy
-///   reuses the original spell's chosen targets verbatim — tracked in
-///   <see cref="Majik.Core.Services.SpellCopier"/>.
+/// "You may choose new targets for the copy" (CR 707.10a) is honoured — at
+/// resolution the copy effect re-prompts the copier for new targets via
+/// <see cref="Majik.Core.Services.SpellCopier.PushCopyOfTopSpellAsync"/>.
 /// </summary>
 [CardName("Reverberate")]
 public static class ReverberateFactory

@@ -1,5 +1,7 @@
 using Majik.Core.Abilities;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
 
@@ -39,13 +41,18 @@ namespace Majik.Core.Services;
 /// the separate cast-from-graveyard path (CR 702.34 flashback grant), not this
 /// copier — they cast the real card, they don't copy a spell.
 ///
-/// ## Residual deferral
-/// - <b>"You may choose new targets for the copy"</b> (CR 707.10a): the copy
-///   reuses the original's chosen targets verbatim. Re-prompting the controller
-///   for new targets needs the original spell's per-target TargetRequest +
-///   CandidateGatherer retained on <see cref="ISpell"/> after the cast flow
-///   (only the constructed <see cref="IEffect"/> list survives today), plus a
-///   live agent at copy-creation time. Left for follow-up.
+/// ## Choosing new targets for the copy (CR 707.10a)
+/// <see cref="PushCopyOfTopSpellAsync"/> honours "you may choose new targets for
+/// the copy": it reads the original spell's retained per-slot
+/// <see cref="TargetRequest"/>s (<see cref="Spell.RetargetRequests"/>, stamped
+/// by <see cref="Majik.Core.Game.SpellCastFlow"/> from the resolved
+/// <c>SpellDefinition.TargetRequests</c>) and prompts the copier's controller's
+/// agent for new targets, held to the same candidate pool / CandidateGatherer
+/// the original cast used. A declined slot (empty pick) keeps the original
+/// target verbatim, so partial retargeting is supported. The synchronous
+/// <see cref="PushCopyOfTopSpell"/> (no agent) keeps the verbatim-reuse
+/// behaviour for the Storm / Pyromancer-Ascension family where there is no
+/// "may choose new targets" rider.
 /// </summary>
 public static class SpellCopier
 {
@@ -80,29 +87,134 @@ public static class SpellCopier
         // copies route through a different surface.)
         if (originalSpell is not Spell spell) return;
 
-        // Build a distinct copy spell (CR 706.10a). It shares the original's
-        // card (printed characteristics = the copiable snapshot, CR 707.2) and
-        // effect list, is controlled by the copying effect's controller
-        // (CR 707.10 — defaults to the original's controller), and is flagged
-        // IsCopy so it ceases to exist on resolution instead of moving the
-        // shared card to a zone (CR 707.10c / 110.5g).
+        var copy = BuildCopy(spell, copyController);
+
+        // Push as a new, distinct stack object above the original (CR 706.10a).
+        // It is now the top of the stack and resolves first.
+        stack.Push(copy);
+    }
+
+    /// <summary>
+    /// CR 707.10 / 706.10a + CR 707.10a — like <see cref="PushCopyOfTopSpell"/>,
+    /// but the copier's controller MAY choose new targets for the copy. If the
+    /// original spell carries retained per-slot <see cref="TargetRequest"/>s
+    /// (<see cref="Spell.RetargetRequests"/>) and a live
+    /// <paramref name="agent"/> + <paramref name="game"/> are supplied, the agent
+    /// is prompted per slot ("you may choose new targets for the copy"); a slot
+    /// the agent declines (empty pick) keeps the original's target verbatim.
+    /// Falls back to verbatim reuse when there are no requests, no agent, or no
+    /// game context.
+    /// </summary>
+    public static async System.Threading.Tasks.ValueTask PushCopyOfTopSpellAsync(
+        Majik.Core.Stack.Stack stack,
+        IStackObject originalSpell,
+        IPlayerAgent? agent,
+        GameContext? game,
+        Player? copyController = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(stack);
+        ArgumentNullException.ThrowIfNull(originalSpell);
+
+        if (originalSpell is not Spell spell) return;
+
+        var copy = BuildCopy(spell, copyController);
+
+        // CR 707.10a — "you may choose new targets for the copy". Only when the
+        // original retained its per-slot requests and we have a live decision
+        // surface; otherwise the copy keeps the original's targets verbatim.
+        if (agent != null && game != null
+            && spell.RetargetRequests is { Count: > 0 } requests)
+        {
+            await RetargetCopyAsync(copy, requests, agent, game, ct).ConfigureAwait(false);
+        }
+
+        stack.Push(copy);
+    }
+
+    /// <summary>
+    /// Build the distinct copy spell (CR 706.10a). It shares the original's card
+    /// (printed characteristics = the copiable snapshot, CR 707.2) and effect
+    /// list, is controlled by the copying effect's controller (CR 707.10 —
+    /// defaults to the original's controller), is flagged <see cref="Spell.IsCopy"/>
+    /// so it ceases to exist on resolution instead of moving the shared card to
+    /// a zone (CR 707.10c / 110.5g), and reuses the original's chosen targets
+    /// (CR 707.10a — the caller may override them on the retarget path).
+    /// </summary>
+    private static Spell BuildCopy(Spell spell, Player? copyController)
+    {
         var copy = new Spell(
             card: spell.Card,
             controller: copyController ?? spell.Controller,
             effects: spell.Effects)
         {
             IsCopy = true,
-            // CR 707.10a — the copy reuses the original's chosen targets
-            // verbatim (the "may choose new targets" rider is the residual
-            // deferral). The flat cast-time list (CR 601.2c) carries over so
-            // resolution reads ChosenTargets[0] just like the original.
             TargetLegalityPredicate = spell.TargetLegalityPredicate,
         };
         foreach (var t in spell.ChosenTargets)
             copy.ChosenTargets.Add(t);
+        return copy;
+    }
 
-        // Push as a new, distinct stack object above the original (CR 706.10a).
-        // It is now the top of the stack and resolves first.
-        stack.Push(copy);
+    /// <summary>
+    /// CR 707.10a — prompt the copy's controller, per retained request slot, to
+    /// choose new targets for the copy. The copy's <see cref="Spell.ChosenTargets"/>
+    /// is a flat list (CR 601.2c) aligned slot-for-slot with
+    /// <paramref name="requests"/>; a slot whose agent pick is non-empty replaces
+    /// the original target(s) for that slot, an empty pick keeps them. New picks
+    /// are held to the same candidate pool / CandidateGatherer the original cast
+    /// used (the request is unchanged), so a retargeted copy stays legal.
+    /// </summary>
+    private static async System.Threading.Tasks.ValueTask RetargetCopyAsync(
+        Spell copy,
+        IReadOnlyList<TargetRequest> requests,
+        IPlayerAgent agent,
+        GameContext game,
+        CancellationToken ct)
+    {
+        // Rebuild the flat chosen-target list slot by slot. The copy starts with
+        // the original's targets in declaration order (one entry per slot for the
+        // single-target requests this path serves today); replace per slot.
+        var original = copy.ChosenTargets.ToList();
+        var rebuilt = new List<object>(original.Count);
+
+        for (var slot = 0; slot < requests.Count; slot++)
+        {
+            var request = requests[slot];
+            var candidates = request.ResolveCandidates(game);
+            // Materialize candidates for the prompt (CandidateGatherer ⇒ live pool).
+            var promptRequest = candidates == request.LegalCandidates
+                ? request
+                : request.WithCandidates(candidates);
+
+            var picks = await agent
+                .ChooseTargetsAsync(game, promptRequest, ct)
+                .ConfigureAwait(false);
+
+            if (picks is { Count: > 0 })
+            {
+                // New legal targets for this slot (CR 707.10a). Each pick must be
+                // among the resolved candidates (legality recheck).
+                foreach (var p in picks)
+                {
+                    if (candidates.Any(c => ReferenceEquals(c, p)))
+                        rebuilt.Add(p);
+                }
+            }
+            else if (slot < original.Count)
+            {
+                // Declined ⇒ keep the original target for this slot verbatim.
+                rebuilt.Add(original[slot]);
+            }
+        }
+
+        // Carry over any trailing original targets the requests didn't cover
+        // (defensive: requests should align with the chosen targets).
+        for (var i = requests.Count; i < original.Count; i++)
+            rebuilt.Add(original[i]);
+
+        copy.ChosenTargets.Clear();
+        foreach (var t in rebuilt)
+            copy.ChosenTargets.Add(t);
     }
 }
