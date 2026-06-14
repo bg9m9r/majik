@@ -112,6 +112,20 @@ public static class GoblinWelderFactory
         // artifact) pair belonging to the same player and performs the
         // sac + reanimate via ZoneService when available, otherwise via
         // raw zone manipulation.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-resolutioncontext-source-migration-
+        // batch): the effect body captures NO authoring permanent / player — it
+        // reads the candidate players off the live ResolutionContext
+        // (ctx.Game.AllPlayers) and scans graveyards game-wide, so it is already
+        // source-independent. The sole cost is an AdditionalCost.Tap that
+        // RebindTo re-homes to the new source automatically (Stage 1). Marked
+        // RebindSafe below so Agatha's Soul Cauldron re-homes the REAL weld
+        // ability to a counter-bearing bearer via ActivatedAbility.RebindTo
+        // (CR 707.2 / 613.1f) — the {T} cost taps the BEARER, never the exiled
+        // Goblin Welder, and the weld scans the live game's graveyards exactly
+        // as before. A "sacrifice an artifact + reanimate from graveyard"
+        // shape is outside OracleActivatedAbilityBinder's reconstructable set,
+        // so RebindTo of the real ability is the only sound re-home.
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             "Goblin Welder: sacrifice target artifact, reanimate artifact card from same player's graveyard",
@@ -130,7 +144,8 @@ public static class GoblinWelderFactory
             source: card,
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            rebindSafe: true);
 
         card.AddAbility(activatedAbility);
 

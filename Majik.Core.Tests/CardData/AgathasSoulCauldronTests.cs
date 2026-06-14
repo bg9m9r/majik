@@ -2304,4 +2304,263 @@ public class AgathasSoulCauldronTests
         ravager.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(before + 1,
             "resolving the un-rebound self-counter ability adds the counter to its own source");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-resolutioncontext-source-migration-batch — Scavenging
+    // Ooze is a bespoke [CardName]-factory creature whose sole activated
+    // ability ("{G}: Exile target creature card from a graveyard. If you do,
+    // put a +1/+1 counter on Scavenging Ooze. You gain 1 life.") is OUTSIDE
+    // the OracleActivatedAbilityBinder reconstructable set — a graveyard-
+    // exile-then-pump-and-lifegain rider is not a parseable shape. The
+    // migration retargets the +1/+1 counter onto ResolutionContext.Source and
+    // "you" (life gain + own-graveyard seed) onto its controller (rather than
+    // capturing `card` / `owner`) and marks the ability RebindSafe, so Agatha's
+    // group-grant re-homes the REAL ability onto a counter-bearing bearer via
+    // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the BEARER receives the
+    // +1/+1 counter and the BEARER's controller gains the life, never re-reading
+    // the exiled Scavenging Ooze.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_ScavengingOoze_ExilePumpLifegainToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var ooze = ScavengingOozeFactory.Create(alice);
+        var realAbilities = ooze.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Scavenging Ooze has exactly one non-mana activated ability — the {G} exile");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Scavenging Ooze ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(ooze);
+        ooze.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), ooze);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Scavenging Ooze's real exile ability is re-homed via RebindTo");
+        var exileAbility = granted[0];
+        exileAbility.Source.Should().BeSameAs(bearer,
+            "the re-homed exile ability is sourced on the BEARER (CR 707.2)");
+        exileAbility.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // A creature card in the bearer-controller's (Alice's) graveyard so the
+        // exile has a legal pick. (The exiled Ooze itself is also a creature
+        // card in Alice's graveyard — either is a legal exile pick.)
+        var foodCreature = new Creature("Graveyard Bear", "1G", 2, 2);
+        foodCreature.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(foodCreature);
+        foodCreature.SetZone(ZoneType.Graveyard);
+
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        var lifeBefore = alice.LifeTotal;
+
+        await exileAbility.ResolveAsync(agent: null, game: null);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(bearerCountersBefore + 1,
+            "the re-homed ability puts the +1/+1 counter on the BEARER (ctx.Source)");
+        alice.LifeTotal.Should().Be(lifeBefore + 1,
+            "the re-homed ability's controller (Alice) gains 1 life");
+    }
+
+    [Fact]
+    public async Task BespokeExilePump_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still puts the +1/+1 counter on its OWN
+        // source and gains life for its own controller on the normal
+        // (un-rebound) resolution path — ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var ooze = ScavengingOozeFactory.Create(alice);
+        alice.Zones.Library.AddCard(ooze);
+        zones.MoveCard(ooze, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var dead = new Creature("Dead Bear", "1G", 2, 2);
+        dead.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(dead);
+        dead.SetZone(ZoneType.Graveyard);
+
+        var exile = ooze.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var countersBefore = ooze.Counters.Count(CounterType.PlusOnePlusOne);
+        var lifeBefore = alice.LifeTotal;
+
+        await exile.ResolveAsync(agent: null, game: null);
+
+        ooze.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(countersBefore + 1,
+            "the un-rebound exile ability counters its own source");
+        alice.LifeTotal.Should().Be(lifeBefore + 1, "the un-rebound exile ability gains its controller 1 life");
+        alice.Zones.Exile.GetCards().Should().Contain(dead, "the targeted creature card was exiled");
+    }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-resolutioncontext-source-migration-batch — Spikeshot
+    // Goblin is a bespoke [CardName]-factory creature whose sole activated
+    // ability ("{R}, {T}: This creature deals damage equal to its power to any
+    // target.") is OUTSIDE the OracleActivatedAbilityBinder reconstructable set
+    // — a "damage equal to its power" pinger is not a parseable fixed-amount
+    // shape. The migration reads the source's power off
+    // ResolutionContext.Source and the chosen target off ctx.ChosenTargets
+    // (rather than capturing `card` / a captured ability handle) and marks the
+    // ability RebindSafe, so Agatha's group-grant re-homes the REAL ping onto a
+    // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f)
+    // — the damage scales with the BEARER's power and the {T} taps the BEARER,
+    // never the exiled Spikeshot Goblin.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_SpikeshotGoblin_PingToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var spikeshot = SpikeshotGoblinFactory.Create(alice);
+        var realAbilities = spikeshot.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Spikeshot Goblin has exactly one non-mana activated ability — the ping");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Spikeshot Goblin ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(spikeshot);
+        spikeshot.SetZone(ZoneType.Graveyard);
+
+        // Bearer with base power 4 (+ the SeatedBearer +1/+1 counter = 5 live
+        // power) so the ping deals the BEARER's power (5), not Spikeshot's
+        // printed 1 — proving the migrated effect reads ctx.Source's power.
+        var bearer = SeatedBearer(alice, effects, zones, power: 4, toughness: 4);
+        bearer.Power.Should().Be(5, "Counter Bear base 4/4 + the +1/+1 counter SeatedBearer adds");
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), spikeshot);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Spikeshot Goblin's real ping is re-homed via RebindTo");
+        var ping = granted[0];
+        ping.Source.Should().BeSameAs(bearer,
+            "the re-homed ping is sourced on the BEARER (CR 707.2)");
+        ping.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        ping.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Tap)
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+
+        // A creature to absorb the ping; the damage should equal the BEARER's
+        // power (5), not the exiled Spikeshot's printed power (1).
+        var victim = new Creature("Victim", "1G", 6, 6);
+        victim.SetOwner(alice);
+        alice.Zones.Library.AddCard(victim);
+        zones.MoveCard(victim, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+
+        await ping.ResolveAsync(agent: null, game: null);
+
+        victim.Damage.Should().Be(5,
+            "the re-homed ping dealt damage equal to the BEARER's power (5), not Spikeshot's printed 1");
+    }
+
+    [Fact]
+    public async Task BespokePowerPinger_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still reads its OWN source's power on the
+        // normal (un-rebound) resolution path — ResolutionContext.Source = card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var spikeshot = SpikeshotGoblinFactory.Create(alice);
+        alice.Zones.Library.AddCard(spikeshot);
+        zones.MoveCard(spikeshot, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var ping = spikeshot.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var victim = new Creature("Victim", "1G", 5, 5);
+        victim.SetOwner(alice);
+        alice.Zones.Library.AddCard(victim);
+        zones.MoveCard(victim, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+
+        await ping.ResolveAsync(agent: null, game: null);
+
+        victim.Damage.Should().Be(1,
+            "the un-rebound ping deals damage equal to its own source's power (Spikeshot's 1)");
+    }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-resolutioncontext-source-migration-batch — Goblin Welder
+    // is a bespoke [CardName]-factory creature whose sole activated ability
+    // ("{T}: ... that player sacrifices the artifact they control and returns
+    // the artifact card from their graveyard to the battlefield") is OUTSIDE
+    // the OracleActivatedAbilityBinder reconstructable set. The effect body
+    // already captured no authoring permanent / player (it scans the live
+    // game's graveyards via ctx.Game.AllPlayers) and the sole cost is an
+    // AdditionalCost.Tap that RebindTo re-homes automatically (Stage 1), so the
+    // migration is a pure RebindSafe annotation — Agatha's group-grant re-homes
+    // the REAL weld onto a counter-bearing bearer via ActivatedAbility.RebindTo
+    // (CR 707.2 / 613.1f); the {T} taps the BEARER, never the exiled Welder.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_GoblinWelder_WeldToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var welder = GoblinWelderFactory.Create(alice);
+        var realAbilities = welder.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Goblin Welder has exactly one non-mana activated ability — the weld");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Goblin Welder ability captures no source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(welder);
+        welder.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), welder);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Goblin Welder's real weld ability is re-homed via RebindTo");
+        var weld = granted[0];
+        weld.Source.Should().BeSameAs(bearer,
+            "the re-homed weld ability is sourced on the BEARER (CR 707.2)");
+        weld.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        weld.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Tap)
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+    }
 }

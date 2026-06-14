@@ -74,22 +74,44 @@ public static class ScavengingOozeFactory
         // CR 605 — not a mana ability (has a non-mana effect); goes on the
         // stack. CR 117.1a — choices at resolution.
         // v1: deterministic creature-card picker — see class xmldoc.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-resolutioncontext-source-migration-
+        // batch): both the "you control" subject (the +1/+1 counter goes on
+        // "Scavenging Ooze" = the source) and "you" (the life gainer /
+        // own-graveyard seed) are read off the live ResolutionContext — the
+        // counter is placed on (ctx.Source as Permanent), and "you" is
+        // ctx.Controller — rather than capturing `card` / `owner`. Falls back
+        // to `card` / `owner` only on the context-less legacy sync path. Marked
+        // RebindSafe below so Agatha's Soul Cauldron re-homes the REAL exile-
+        // pump-lifegain ability to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the BEARER receives
+        // the +1/+1 counter and the BEARER's controller gains the life and
+        // searches their graveyard first, never re-reading the exiled Ooze. A
+        // "exile a creature card from a graveyard, then +1/+1 + gain life"
+        // shape is outside OracleActivatedAbilityBinder's reconstructable set,
+        // so RebindTo of the real ability is the only sound re-home.
         // ----------------------------------------------------------------
         var exileEffect = new Effect(
             "Scavenging Ooze: exile creature from graveyard, then +1/+1 + 1 life",
             ctx =>
             {
+                // "you" / "Scavenging Ooze" read off the live context (the
+                // re-homed source + its controller), falling back to the
+                // authored card / owner on the context-less sync path.
+                var subject = (ctx.Source as Permanent) ?? card;
+                var controller = subject.Controller ?? ctx.Controller ?? owner;
+
                 // Build the list of graveyards to scan. Controller first, then
                 // any additional players read off the LIVE game at resolution
-                // (ctx.Game.AllPlayers, with owner deduplicated). No captured
-                // resolver, so correct on the routed prod build.
-                var graveyardOwners = new List<Player> { owner };
+                // (ctx.Game.AllPlayers, with the controller deduplicated). No
+                // captured resolver, so correct on the routed prod build.
+                var graveyardOwners = new List<Player> { controller };
                 var extra = ctx.Game?.AllPlayers;
                 if (extra != null)
                 {
                     foreach (var p in extra)
                     {
-                        if (!ReferenceEquals(p, owner)) graveyardOwners.Add(p);
+                        if (!ReferenceEquals(p, controller)) graveyardOwners.Add(p);
                     }
                 }
 
@@ -116,11 +138,11 @@ public static class ScavengingOozeFactory
                 targetOwner.Zones.Exile.AddCard(target);
                 target.SetZone(ZoneType.Exile);
 
-                // +1/+1 counter on Scavenging Ooze itself.
-                card.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
+                // +1/+1 counter on Scavenging Ooze itself (the source).
+                subject.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
 
                 // Controller gains 1 life (CR 119.3).
-                owner.GainLife(1);
+                controller.GainLife(1);
 
                 return ValueTask.CompletedTask;
             });
@@ -129,7 +151,8 @@ public static class ScavengingOozeFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{G}") },
-            effects: new IEffect[] { exileEffect });
+            effects: new IEffect[] { exileEffect },
+            rebindSafe: true);
 
         card.AddAbility(activated);
 
