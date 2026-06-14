@@ -1,0 +1,10 @@
+{
+  "name": "Conifer Wurm",
+  "types": ["Creature"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Wurm"],
+  "manaCost": "{4}{G}",
+  "power": 4,
+  "toughness": 4,
+  "keywords": ["Trample"]
+}
