@@ -122,31 +122,16 @@ public static class MetallicRebukeFactory
             EffectFactory: p =>
             {
                 var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
                 return new IEffect[]
                 {
-                    new Effect(
+                    // CR 118.4 — ask the target spell's controller whether to
+                    // pay {3} to keep it on the stack; counter on no / can't
+                    // afford (CR 701.5). See PayUnlessCounterRider.
+                    Majik.Core.Primitives.PayUnlessCounterRider.Build(
                         "Metallic Rebuke — counter target spell unless its controller pays {3}",
-                        () =>
-                        {
-                            if (stack == null || resolved is not ISpell spell) return;
-
-                            // CR 118.4 — if the target's controller can pay {3}
-                            // they may do so to save their spell. v1 auto-pays
-                            // when able (mirrors DazeFactory's unless-pay-1
-                            // pattern with N=3).
-                            if (spell.Controller is not null
-                                && spell.Controller.PayMana(
-                                    ManaCost.Zero.AddGenericCost(3)))
-                            {
-                                return; // paid — counter no-ops, spell survives
-                            }
-
-                            // Controller couldn't / wouldn't pay — counter
-                            // the spell (CR 701.5).
-                            OracleSpellBinder.RemoveFromStack(stack, spell);
-                            spell.Card.SetZone(ZoneType.Graveyard);
-                        }),
+                        stack,
+                        () => targetResolver(raw) as ISpell,
+                        unlessPayN: 3),
                 };
             });
     }

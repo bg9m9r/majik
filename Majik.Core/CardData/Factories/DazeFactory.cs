@@ -64,22 +64,16 @@ public static class DazeFactory
             EffectFactory: p =>
             {
                 var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
                 return new IEffect[]
                 {
-                    new Effect("Daze — counter target spell unless its controller pays {1}", () =>
-                    {
-                        if (stack == null || resolved is not ISpell spell) return;
-                        // CR 118.4 — if the target's controller has {1} in pool
-                        // they may pay; v1 short-circuits to "auto-pay if able".
-                        if (spell.Controller is not null
-                            && spell.Controller.PayMana(Majik.Core.ValueObjects.ManaCost.Zero.AddGenericCost(1)))
-                        {
-                            return;
-                        }
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
-                    }),
+                    // CR 118.4 — ask the target spell's controller whether to
+                    // pay {1} to keep it on the stack; counter on no / can't
+                    // afford (CR 701.5). See PayUnlessCounterRider.
+                    Majik.Core.Primitives.PayUnlessCounterRider.Build(
+                        "Daze — counter target spell unless its controller pays {1}",
+                        stack,
+                        () => targetResolver(raw) as ISpell,
+                        unlessPayN: 1),
                 };
             });
 }

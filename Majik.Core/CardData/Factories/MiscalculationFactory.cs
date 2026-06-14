@@ -121,8 +121,6 @@ public static class MiscalculationFactory
     {
         ArgumentNullException.ThrowIfNull(targetResolver);
 
-        var unlessCost = ManaCost.Zero.AddGenericCost(UnlessPayGeneric);
-
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
@@ -130,26 +128,16 @@ public static class MiscalculationFactory
             EffectFactory: p =>
             {
                 var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
                 return new IEffect[]
                 {
-                    new Effect("Miscalculation — counter target spell unless its controller pays {2}", () =>
-                    {
-                        if (stack == null || resolved is not ISpell spell) return;
-
-                        // CR 118.4 — target's controller may pay {2} to prevent
-                        // the counter. v1 auto-pays when able (same posture as
-                        // Censor / Mana Leak / Quench).
-                        if (spell.Controller is not null
-                            && spell.Controller.PayMana(unlessCost))
-                        {
-                            return;
-                        }
-
-                        // Controller couldn't pay — counter the spell (CR 701.5).
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
-                    }),
+                    // CR 118.4 — ask the target spell's controller whether to
+                    // pay to keep it on the stack; counter on no / can't afford
+                    // (CR 701.5). See PayUnlessCounterRider.
+                    Majik.Core.Primitives.PayUnlessCounterRider.Build(
+                        $"Miscalculation — counter target spell unless its controller pays {{{UnlessPayGeneric}}}",
+                        stack,
+                        () => targetResolver(raw) as ISpell,
+                        unlessPayN: UnlessPayGeneric),
                 };
             });
     }
