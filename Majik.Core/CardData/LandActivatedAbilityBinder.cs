@@ -66,9 +66,12 @@ namespace Majik.Core.CardData;
 /// <see cref="ManaCostCost"/> in the standard activated-ability cost list, and
 /// each cycle member's effect maps to an existing one-shot verb
 /// (destroy / bounce / mill / damage / token). The "costs {1} less per
-/// legendary creature you control" cost-reduction rider (CR 118.9) and the
-/// per-member follow-up riders (Boseiju's basic-land search, Eiganjo's live
-/// combat-state gate, Takenuma's "may") are deferred — see the
+/// legendary creature you control" cost-reduction rider (CR 118.9) is bound, and
+/// Eiganjo's "target attacking or blocking creature" combat-state gate is now
+/// LIVE (it reads the per-game <see cref="Majik.Core.Combat.CombatMembershipRegistry"/>
+/// that <see cref="Majik.Core.Combat.CombatFlow"/> populates at declare-attackers /
+/// declare-blockers and clears at combat end). The remaining per-member follow-up
+/// riders (Boseiju's basic-land search, Takenuma's "may") are deferred — see the
 /// <see cref="BindChannel"/> xmldoc.</para>
 ///
 /// <para><b>Deferred families / riders.</b>
@@ -413,8 +416,11 @@ public static class LandActivatedAbilityBinder
     // binder already takes; none affects which Channel ability binds):
     //   - Boseiju — the "that player may search their library for a basic land"
     //     follow-up after destroying a land (an opponent's optional search).
-    //   - Eiganjo — the live "attacking or blocking" combat-state target gate
-    //     (resolve is permissive: any chosen creature is dealt the damage).
+    //
+    // Eiganjo's "attacking or blocking" combat-state target gate is now LIVE:
+    // the candidate gatherer offers only creatures the per-game
+    // CombatMembershipRegistry reports as attacking / blocking, and resolution
+    // re-checks that membership (CR 608.2b) before dealing the damage.
     //
     // Takenuma is fully bound (mill 3, then return a creature/planeswalker
     // card from the graveyard to hand). The current oracle text has NO "may":
@@ -535,6 +541,13 @@ public static class LandActivatedAbilityBinder
                 {
                     if (FirstChosen(ability) is not Creature target) return;
                     if (target.Zone != ZoneType.Battlefield) return;
+                    // CR 608.2b — re-check legality at resolution: the chosen
+                    // creature must STILL be attacking or blocking (it may have
+                    // been removed from combat after the ability was put on the
+                    // stack). If it no longer qualifies the target is illegal and
+                    // the effect does nothing to it.
+                    if (!Majik.Core.Combat.CombatMembershipRegistryProvider.Current
+                            .IsAttackingOrBlocking(target)) return;
                     Fx.DealDamageAny(target, n);
                 });
             targets = new[]
@@ -544,7 +557,7 @@ public static class LandActivatedAbilityBinder
                     MinTargets: 1, MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal,
-                    CandidateGatherer: ctx => GatherAllCreatures(ctx)),
+                    CandidateGatherer: _ => GatherAttackingOrBlockingCreatures()),
             };
         }
         // --- Takenuma — mill 3, then return a creature/PW from your graveyard
@@ -1735,6 +1748,19 @@ public static class LandActivatedAbilityBinder
                 if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
         return result;
     }
+
+    // Eiganjo, Seat of the Empire (Channel) — "target attacking or blocking
+    // creature" (CR 601.2c). Reads the live combat-membership registry that
+    // CombatFlow populates at declare-attackers (CR 508) / declare-blockers
+    // (CR 509) and clears at combat end (CR 511.3), so only creatures actually
+    // in combat right now are offered. Off-combat / outside a live combat the
+    // membership is empty, so no candidate is offered (the ability has no legal
+    // target — CR 601.2c).
+    private static IReadOnlyList<object> GatherAttackingOrBlockingCreatures()
+        => Majik.Core.Combat.CombatMembershipRegistryProvider.Current
+            .AttackingOrBlocking()
+            .Cast<object>()
+            .ToList();
 
     private static IReadOnlyList<object> GatherAnyDamageTargets(GameContext ctx)
     {
