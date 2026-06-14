@@ -56,11 +56,20 @@ namespace Majik.Core.CardData.Factories;
 ///   unavailable when the cast object doesn't satisfy the predicate
 ///   (non-creature, or the wrong chosen type), rejecting the payment
 ///   atomically.
-/// - <b>"That spell can't be countered"</b>: requires flagging the spell
-///   object at cast time (when one of Cavern's mana entries pays a pip on
-///   a chosen-type creature spell) and gating counter-spells in
-///   <see cref="Majik.Core.Services.StackResolver"/>. Same deferral as
-///   Delighted Halfling.
+/// - <b>"That spell can't be countered"</b> (CR 701.5b / 106.4) — IMPLEMENTED
+///   via the same per-slot provenance-reaction seam Boseiju, Who Shelters All
+///   uses. Each any-color <see cref="ManaAbility"/> carries a
+///   <see cref="Majik.Core.Abilities.ManaAbility.ProvenanceReaction"/>; when the
+///   <see cref="Majik.Core.Costs.ManaPaymentResolver"/> consumes one of those
+///   units to pay a cost, it fires the reaction with the object the mana was
+///   spent on. The <see cref="Majik.Core.Mana.SpendRestriction"/> already gates
+///   the spend to a (chosen-type) creature spell, so any spell this mana paid
+///   for stamps <see cref="Cards.Card.PendingCastUncounterable"/>, which
+///   <c>SpellCastFlow.StampSpellAndCardSentinels</c> reads onto
+///   <see cref="Majik.Core.Spells.ISpell.CannotBeCountered"/> (then clears) the
+///   moment the spell is constructed — strictly per-pip / per-spell. Counter
+///   spells already honour <see cref="Majik.Core.Spells.ISpell.CannotBeCountered"/>
+///   (CR 701.5b). Delighted Halfling can reuse this same mechanism.
 /// - <b>Agent-prompt integration</b>: <see cref="Majik.Core.Players.Agents.IPlayerAgent"/>
 ///   has no ChooseSubtype prompt yet. Selector closure stands in until
 ///   that lands — same pattern as Pithing Needle's <c>nameSelector</c>.
@@ -157,13 +166,47 @@ public static class CavernOfSoulsFactory
 
         foreach (var color in new[] { "W", "U", "B", "R", "G" })
         {
-            land.AddAbility(new ManaAbility(
+            var mana = new ManaAbility(
                 land, owner, ManaCost.Parse(color),
                 canActivateCheck: null,
-                spendRestriction: restriction));
+                spendRestriction: restriction);
+
+            // "…and that spell can't be countered." (CR 701.5b / 106.4) — the
+            // same provenance-reaction seam Boseiju, Who Shelters All uses. When
+            // the payment resolver consumes one of these any-color units to pay
+            // a cost, it fires this reaction with the object the mana was spent
+            // on. The SpendRestriction above already guarantees the unit only
+            // pays a (chosen-type) creature spell, so any spell this mana
+            // actually paid for IS the kind the rider covers — stamp it
+            // uncounterable. SpellCastFlow reads PendingCastUncounterable onto
+            // Spell.CannotBeCountered (then clears) right after it builds the
+            // spell at CR 601.2h. Strictly per-pip / per-spell.
+            mana.ProvenanceReaction = MarkUncounterableIfCreatureSpell;
+
+            land.AddAbility(mana);
         }
 
         return land;
+    }
+
+    /// <summary>
+    /// CR 701.5b — Cavern of Souls' provenance reaction. When one of Cavern's
+    /// any-color units is spent paying a cost, stamp the pay-time uncounterable
+    /// flag on the underlying card so the cast flow marks the resulting spell
+    /// <see cref="Majik.Core.Spells.ISpell.CannotBeCountered"/>. The
+    /// <see cref="Majik.Core.Mana.SpendRestriction"/> on the producing ability
+    /// already gates the spend to a (chosen-type) creature spell, so reaching
+    /// this reaction means the spell qualifies for the rider. The defensive
+    /// creature-type recheck keeps the stamp off a non-spell (ability-cost)
+    /// context (<paramref name="spentOn"/> null or a non-creature card — the
+    /// gate would have rejected such a spend, but the reaction is robust to a
+    /// future caller that fires it directly).
+    /// </summary>
+    private static void MarkUncounterableIfCreatureSpell(ICard? spentOn)
+    {
+        if (spentOn is not Card card) return;
+        if (!card.HasType(CardType.Creature)) return;
+        card.MarkPendingCastUncounterable();
     }
 
     /// <summary>
