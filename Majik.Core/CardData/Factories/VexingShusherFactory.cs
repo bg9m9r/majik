@@ -108,30 +108,48 @@ public static class VexingShusherFactory
         // {R/G}: Target spell can't be countered. CR 602 — activated
         // ability; CR 701.5b — grants the targeted spell the
         // can't-be-countered property. The effect reads the chosen target
-        // off the ability and stamps Spell.CannotBeCountered, which every
-        // counter primitive (Fx.Counter + counter templates) and
+        // off the live ResolutionContext and stamps Spell.CannotBeCountered,
+        // which every counter primitive (Fx.Counter + counter templates) and
         // OracleSpellBinder.RemoveFromStack already honour.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect captures NO source permanent — it reads its
+        // chosen spell off the live ResolutionContext.ChosenTargets and
+        // re-checks legality against the (game-global) stack. Nothing is
+        // sourced from `card` / the exiled Vexing Shusher, so the ability is
+        // marked RebindSafe and Agatha's Soul Cauldron's group-grant re-homes
+        // the REAL "{R/G}: target spell can't be countered" ability onto a
+        // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f). The oracle-rebuild fallback cannot reconstruct this
+        // grant-uncounterable shape, so RebindTo is the only sound re-home.
+        // The captured `stack` is shared game state (identical for any
+        // bearer), not a source capture, so it does not break re-source
+        // soundness.
         // ----------------------------------------------------------------
-        ActivatedAbility? ability = null;
-
         var grantEffect = new Effect(
             $"{CardName}: target spell can't be countered",
-            () =>
+            ctx =>
             {
-                if (ability == null) return;
-
-                var chosen = ability.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (ctx.ChosenTargets.Count == 0 || ctx.ChosenTargets[0].Count == 0)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
                 // CR 608.2b — re-check legality at resolution: the target
                 // must still be a spell on the stack.
-                if (chosen[0][0] is not Spell spell) return;
-                if (stack != null && !stack.GetAll().Contains(spell)) return;
+                if (ctx.ChosenTargets[0][0] is not Spell spell) return ValueTask.CompletedTask;
+
+                var liveStack = ctx.Game?.Stack ?? stack;
+                if (liveStack != null && !liveStack.GetAll().Contains(spell))
+                {
+                    return ValueTask.CompletedTask;
+                }
 
                 spell.CannotBeCountered = true;
+                return ValueTask.CompletedTask;
             });
 
-        ability = new ActivatedAbility(
+        var ability = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(ActivationCost) },
@@ -143,7 +161,8 @@ public static class VexingShusherFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>()),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(ability);
 
