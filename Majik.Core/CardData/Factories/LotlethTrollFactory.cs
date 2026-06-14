@@ -125,16 +125,34 @@ public static class LotlethTrollFactory
         // DiscardACreatureCardCost is the sole activation cost (no mana).
         // +1/+1 counter via CountersService.Add (CR 614 replacements +
         // CounterAddedEvent when a ReplacementBus/EventBus is wired).
+        //
+        // RE-SOURCE-SAFE (STAGE 2/3, agatha-bespoke-resourcecontext-source-
+        // migration): the effect reads "this creature" off the live
+        // ResolutionContext.Source (the ability's own Source at resolution)
+        // rather than capturing `card`, falling back to `card` only on the
+        // context-less legacy sync path (ResolutionContext.Legacy, where
+        // Source is null). Combined with the matching regenerate effect this
+        // lets the whole ability be marked RebindSafe (below), so Agatha's
+        // Soul Cauldron's group-grant re-homes the REAL ability — including
+        // its bespoke DiscardACreatureCardCost, which the oracle-rebuild
+        // fallback cannot reconstruct — onto each counter-bearing creature
+        // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f).
         // ----------------------------------------------------------------
         var pumpEffect = new Effect(
             $"{CardName}: put a +1/+1 counter on it",
-            () => CountersService.Add(card, CounterType.PlusOnePlusOne, PumpCounters, replacements));
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                CountersService.Add(subject, CounterType.PlusOnePlusOne, PumpCounters, replacements);
+                return ValueTask.CompletedTask;
+            });
 
         var pumpAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new DiscardACreatureCardCost() },
-            effects: new IEffect[] { pumpEffect });
+            effects: new IEffect[] { pumpEffect },
+            rebindSafe: true);
 
         card.AddAbility(pumpAbility);
 
@@ -144,16 +162,27 @@ public static class LotlethTrollFactory
         // (Permanent.AddRegenerationShield — CR 701.15a), consumed by the
         // next destroy this turn (tap, remove from combat, heal damage —
         // CR 701.18). Same shield primitive as ExperimentOneFactory.
+        //
+        // RE-SOURCE-SAFE: shields the ResolutionContext.Source permanent (the
+        // ability's own source at resolution), `card` only on the legacy sync
+        // path. Marked RebindSafe so Agatha re-homes the regenerate to the
+        // bearer (CR 707.2).
         // ----------------------------------------------------------------
         var regenerateEffect = new Effect(
             $"{CardName}: regenerate self (CR 701.18)",
-            () => card.AddRegenerationShield());
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                subject.AddRegenerationShield();
+                return ValueTask.CompletedTask;
+            });
 
         var regenerateAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(RegenerateCost) },
-            effects: new IEffect[] { regenerateEffect });
+            effects: new IEffect[] { regenerateEffect },
+            rebindSafe: true);
 
         card.AddAbility(regenerateAbility);
 

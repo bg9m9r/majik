@@ -122,9 +122,16 @@ namespace Majik.Core.CardData.Factories;
 ///   EXILED card. As more bespoke effects migrate to read
 ///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> (and their
 ///   factory marks the ability <see cref="ActivatedAbility.RebindSafe"/>), the
-///   RebindTo path covers them automatically. The residual is now confined to
-///   un-migrated bespoke-factory closures — every data-driven activated ability
-///   is covered. A correct partial beats a broken "all". Tracked: v1-deferrals.
+///   RebindTo path covers them automatically. Bespoke factories have begun
+///   opting in: <see cref="LotlethTrollFactory"/>'s discard-pump (a bespoke
+///   <c>DiscardACreatureCardCost</c> the oracle fallback cannot reconstruct) +
+///   {B} regenerate now read
+///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> and are
+///   <see cref="ActivatedAbility.RebindSafe"/>, so the RebindTo path re-homes
+///   the REAL abilities to a bearer. The residual is now confined to the
+///   remaining un-migrated bespoke-factory closures — every data-driven
+///   activated ability is covered. A correct partial beats a broken "all".
+///   Tracked: v1-deferrals.
 /// </summary>
 [CardName("Agatha's Soul Cauldron")]
 public static class AgathasSoulCauldronFactory
