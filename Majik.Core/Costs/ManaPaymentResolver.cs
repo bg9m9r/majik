@@ -124,10 +124,27 @@ public sealed class ManaPaymentResolver
         var selected = new List<ICard>();
         var used = new HashSet<ICard>();
 
-        // 1) Satisfy each needed colored pip with a source that can produce it.
+        // Colored mana a selected source produced BEYOND the colored pip it was
+        // chosen for. Generic accepts any mana (CR 106.1c), so this over-yield
+        // is banked and applied against the remaining generic before any extra
+        // source is tapped.
+        int surplusForGeneric = 0;
+
+        // 1) Satisfy each needed colored pip with a source that can produce it,
+        // using PER-SOURCE per-color accounting (CR 605 / 106.1c): a source
+        // whose ability adds N of the needed color covers N pips with ONE tap.
+        // The earlier per-UNIT loop tapped one source per colored pip, so a
+        // {G}{G} source neither covered {G}{G} alone (under-select → auto-pay
+        // failed for a payable cost) NOR avoided a second tap when a spare
+        // source existed (over-select → surplus floated). This mirrors the
+        // generic greedy-pack fix (residual (c)) on the colored axis. Any
+        // over-yield (a {G}{G} source used for a single {G} pip) spills into
+        // surplusForGeneric so the leftover pays a generic unit instead of
+        // floating.
         bool TrySelectFor(Func<ManaCost, int> colorOf, int count)
         {
-            for (int i = 0; i < count; i++)
+            int remaining = count;
+            while (remaining > 0)
             {
                 var pick = candidates.FirstOrDefault(c =>
                     !used.Contains(c.Card) &&
@@ -135,6 +152,16 @@ public sealed class ManaPaymentResolver
                 if (pick.Card == null) return false;
                 used.Add(pick.Card);
                 selected.Add(pick.Card);
+                // The source's contribution to THIS color is the largest single-
+                // ability yield of that color (pick the most-paying option).
+                int yield = pick.Abilities.Max(a => colorOf(a.ManaGenerated));
+                // Cap the color credit at what's still needed; bank the rest of
+                // the source's TOTAL output (colored over-yield + any colorless
+                // riders) as generic-payable surplus.
+                int applied = Math.Min(yield, remaining);
+                remaining -= applied;
+                int total = pick.Abilities.Max(a => a.ManaGenerated.TotalValue);
+                surplusForGeneric += Math.Max(0, total - applied);
             }
             return true;
         }
@@ -153,8 +180,10 @@ public sealed class ManaPaymentResolver
         // from the remaining generic before selecting the next. The earlier
         // per-UNIT loop tapped one source per generic point, so a 2-output
         // source still pulled a second land and floated the surplus (cosmetic
-        // tap-waste; deferral mana-payment-over-select residual (c)).
-        int remainingGeneric = needGeneric;
+        // tap-waste; deferral mana-payment-over-select residual (c)). The
+        // colored-pick over-yield banked above is consumed FIRST, so a single
+        // {G}{G} source pays both the {G} pip AND a generic unit of {1}{G}.
+        int remainingGeneric = Math.Max(0, needGeneric - surplusForGeneric);
         while (remainingGeneric > 0)
         {
             var pick = candidates.FirstOrDefault(c => !used.Contains(c.Card));
