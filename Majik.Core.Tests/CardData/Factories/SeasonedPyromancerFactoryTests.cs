@@ -212,6 +212,38 @@ public class SeasonedPyromancerFactoryTests
     }
 
     [Fact]
+    public void GraveyardAbility_IsRebindSafe()
+    {
+        var sp = SeasonedPyromancerFactory.Create(_alice);
+
+        var activated = sp.Abilities.OfType<ActivatedAbility>().Single();
+        activated.RebindSafe.Should().BeTrue(
+            "the graveyard token effect reads ResolutionContext.Source (not the " +
+            "captured card), so Agatha's Soul Cauldron may re-home it");
+    }
+
+    [Fact]
+    public async Task GraveyardAbility_ResolvesViaContextSource_CreatesTwoTokens()
+    {
+        // Re-source seam: the body reads its source off ResolutionContext.Source
+        // (threaded by ActivatedAbility.ResolveAsync), not the captured card.
+        var alice = new Player("Alice", 20);
+        var sp = SeasonedPyromancerFactory.Create(alice);
+        sp.SetZone(ZoneType.Graveyard);
+        alice.Zones.Graveyard.AddCard(sp);
+
+        var activated = sp.Abilities.OfType<ActivatedAbility>().Single();
+        await activated.ResolveAsync(agent: null, game: null);
+
+        var tokens = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.Name == "Elemental" && c.BasePower == 1 && c.BaseToughness == 1)
+            .ToList();
+        tokens.Should().HaveCount(2);
+        sp.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    [Fact]
     public void GraveyardAbility_NoOp_WhenNotInGraveyard()
     {
         var alice = new Player("Alice", 20);

@@ -206,6 +206,34 @@ public class WorldBreakerFactoryTests
     }
 
     [Fact]
+    public void WorldBreaker_GraveyardActivation_IsRebindSafe()
+    {
+        var wb = WorldBreakerFactory.Create(_alice);
+
+        var activated = wb.Abilities.OfType<ActivatedAbility>().Single();
+        activated.RebindSafe.Should().BeTrue(
+            "the graveyard return-to-hand effect reads ResolutionContext.Source " +
+            "(not the captured card), so Agatha's Soul Cauldron may re-home it");
+    }
+
+    [Fact]
+    public async Task WorldBreaker_GraveyardActivation_ResolvesViaContextSource()
+    {
+        // Re-source seam: the effect reads its source off ResolutionContext.Source
+        // (threaded by ActivatedAbility.ResolveAsync), not the captured card.
+        var wb = WorldBreakerFactory.Create(_alice);
+        _alice.Zones.Graveyard.AddCard(wb);
+        wb.SetZone(ZoneType.Graveyard);
+
+        var activated = wb.Abilities.OfType<ActivatedAbility>().Single();
+        await activated.ResolveAsync(agent: null, game: null);
+
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(wb);
+        _alice.Zones.Hand.GetCards().Should().Contain(wb);
+        wb.Zone.Should().Be(ZoneType.Hand);
+    }
+
+    [Fact]
     public void NamedCardFactory_Dispatches_WorldBreaker()
     {
         var card = NamedCardFactory.Create("World Breaker", _alice);

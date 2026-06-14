@@ -242,25 +242,39 @@ public static class WorldBreakerFactory
         // performed inside the resolve body (no
         // ExileSelfFromGraveyardCost primitive yet). The mana cost is
         // exposed as ManaCostCost for shape inspection.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke migration): the effect reads the
+        // live source off ResolutionContext.Source (= the ability's own
+        // source permanent, threaded by ActivatedAbility.ResolveAsync —
+        // Creature : Permanent, so the cast holds even from the graveyard)
+        // rather than the captured `card`. "This card" / "its owner" are
+        // resolved from that live source, so a RebindTo (Agatha's Soul
+        // Cauldron) re-homes the ability to the bearer. Marked
+        // rebindSafe: true. The static `card`/`owner` remain only as the
+        // legacy-sync (ctx-less) fallback for shape-test callers that drive
+        // the effect via Execute() without a ResolutionContext.
         // ----------------------------------------------------------------
         var graveyardEffect = new Effect(
             $"{CardName}: exile from graveyard, return to owner's hand",
-            () =>
+            ctx =>
             {
-                if (card.Zone != ZoneType.Graveyard) return;
-                if (card.Owner == null) return;
-                if (!ReferenceEquals(card.Owner, owner)) return;
+                // Live source (the bearer after a RebindTo; otherwise this
+                // World Breaker) drives "this card" + "its owner".
+                var self = (ctx.Source as ICard) ?? card;
+                var cardOwner = self.Owner ?? owner;
+
+                if (self.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask;
 
                 // Cost half — exile self from owner's graveyard.
                 if (zones != null)
                 {
-                    zones.MoveCard(card, ZoneType.Graveyard, ZoneType.Exile);
+                    zones.MoveCard(self, ZoneType.Graveyard, ZoneType.Exile);
                 }
                 else
                 {
-                    owner.Zones.Graveyard.RemoveCard(card);
-                    owner.Zones.Exile.AddCard(card);
-                    card.SetZone(ZoneType.Exile);
+                    cardOwner.Zones.Graveyard.RemoveCard(self);
+                    cardOwner.Zones.Exile.AddCard(self);
+                    self.SetZone(ZoneType.Exile);
                 }
 
                 // Effect half — return this card from exile to owner's
@@ -269,21 +283,26 @@ public static class WorldBreakerFactory
                 // for the cost; the hand move is the printed effect.
                 if (zones != null)
                 {
-                    zones.MoveCard(card, ZoneType.Exile, ZoneType.Hand, owner);
+                    zones.MoveCard(self, ZoneType.Exile, ZoneType.Hand, cardOwner);
                 }
                 else
                 {
-                    owner.Zones.Exile.RemoveCard(card);
-                    owner.Zones.Hand.AddCard(card);
-                    card.SetZone(ZoneType.Hand);
+                    cardOwner.Zones.Exile.RemoveCard(self);
+                    cardOwner.Zones.Hand.AddCard(self);
+                    self.SetZone(ZoneType.Hand);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var graveyardAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(GraveyardReturnManaCost) },
-            effects: new IEffect[] { graveyardEffect });
+            effects: new IEffect[] { graveyardEffect },
+            // Agatha's Soul Cauldron re-home soundness — the effect reads
+            // the live ResolutionContext.Source, never the captured card.
+            rebindSafe: true);
 
         card.AddAbility(graveyardAbility);
 

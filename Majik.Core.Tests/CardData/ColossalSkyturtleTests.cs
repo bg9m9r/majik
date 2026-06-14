@@ -405,4 +405,48 @@ public class ColossalSkyturtleTests
         owner.Zones.Battlefield.AddCard(c);
         return c;
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source soundness (agatha-bespoke migration) — both Channel abilities
+    // read their source / controller off ResolutionContext.Source (or only the
+    // chosen target), never a captured source card, so Agatha's Soul Cauldron
+    // may re-home them.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Channel1_IsRebindSafe()
+    {
+        var card = ColossalSkyturtleFactory.Create(_alice);
+        Channel1(card).RebindSafe.Should().BeTrue(
+            "'return target card from your graveyard' reads the live source's " +
+            "controller off ResolutionContext.Source");
+    }
+
+    [Fact]
+    public void Channel2_IsRebindSafe()
+    {
+        var card = ColossalSkyturtleFactory.Create(_alice);
+        Channel2(card).RebindSafe.Should().BeTrue(
+            "the bounce reads only the chosen target + its owner, never the " +
+            "captured source card");
+    }
+
+    [Fact]
+    public async Task Channel1_ResolvesViaContextSource_ReturnsGraveyardCard()
+    {
+        // Re-source seam: with the card in the graveyard (post-discard), the
+        // effect reads "your graveyard" off ResolutionContext.Source.
+        var card = ColossalSkyturtleFactory.Create(_alice);
+        card.SetZone(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.AddCard(card);
+
+        var dead = NewGraveyardCard(_alice, "Lightning Bolt", "{R}");
+
+        var ch1 = Channel1(card);
+        ch1.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { dead } });
+        await ch1.ResolveAsync(agent: null, game: null);
+
+        _alice.Zones.Hand.GetCards().Should().Contain(dead);
+        dead.Zone.Should().Be(ZoneType.Hand);
+    }
 }
