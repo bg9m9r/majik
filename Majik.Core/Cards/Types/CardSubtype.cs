@@ -597,6 +597,11 @@ public enum CardSubtype
     /// Villain you control" triggers).</summary>
     Villain,
 
+    /// <summary>Sheep creature subtype — Enduring Innocence "Sheep Glimmer"
+    /// (Duskmourn) and the broader Sheep lineage. CR 205.3m — flavour subtype
+    /// with no inherent rules meaning.</summary>
+    Sheep,
+
     /// <summary>Hero creature subtype — Superior Spider-Man (Marvel's
     /// Spider-Man) is a "Spider Human Hero"; the broader Hero lineage. CR
     /// 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
