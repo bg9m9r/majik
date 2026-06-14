@@ -19,12 +19,13 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Copy;
 /// (CR 707.10c). The copying spell itself then finishes resolving and goes to
 /// its owner's graveyard the usual way.
 ///
-/// ## v1 simplification
-/// - <b>"You may choose new targets for the copy"</b> (CR 707.10a): the copy
-///   reuses the original spell's chosen targets verbatim — the retarget rider
-///   is the residual deferral tracked in <see cref="SpellCopier"/> (it needs
-///   the original's per-target TargetRequest retained on the stack spell plus a
-///   live agent at copy-creation time).
+/// ## Choosing new targets for the copy (CR 707.10a)
+/// "You may choose new targets for the copy" is honoured: at resolution the
+/// copy effect calls <see cref="SpellCopier.PushCopyOfTopSpellAsync"/> with the
+/// live agent + game from the <see cref="ResolutionContext"/>, which re-prompts
+/// the copier for new targets using the targeted spell's retained per-slot
+/// requests (<see cref="Majik.Core.Spells.Spell.RetargetRequests"/>). Declining
+/// a slot keeps the original target.
 /// </summary>
 internal static class CopySpellFactory
 {
@@ -46,7 +47,7 @@ internal static class CopySpellFactory
                 var resolved = resolver(raw);
                 return new IEffect[]
                 {
-                    new Effect("copy target instant or sorcery spell (CR 707.10)", () =>
+                    new Effect("copy target instant or sorcery spell (CR 707.10)", async rc =>
                     {
                         // Stack required to push the copy; shape-only / pre-bind
                         // contexts pass null → no-op.
@@ -62,7 +63,13 @@ internal static class CopySpellFactory
                         // above the original, controlled by the copier (CR 707.10
                         // — the copy's controller is the controller of the
                         // copying effect, not the original spell's controller).
-                        SpellCopier.PushCopyOfTopSpell(stack, spell, copyController: caster);
+                        // CR 707.10a — re-prompt the copier for new targets via
+                        // the live agent + game; a shape-only resolve (no agent /
+                        // game) falls back to verbatim target reuse.
+                        await SpellCopier.PushCopyOfTopSpellAsync(
+                            stack, spell, rc.Agent, rc.Game,
+                            copyController: caster, ct: rc.Ct)
+                            .ConfigureAwait(false);
                     }),
                 };
             });

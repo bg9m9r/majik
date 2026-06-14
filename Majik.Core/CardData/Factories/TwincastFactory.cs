@@ -24,11 +24,11 @@ namespace Majik.Core.CardData.Factories;
 ///   (CR 707.10 / 706.10a). The copy resolves first and then ceases to exist
 ///   (CR 707.10c).
 ///
-/// ## Deferred (v1 gap)
-/// - <b>"You may choose new targets for the copy"</b> (CR 707.10a): the copy
-///   reuses the original spell's chosen targets verbatim — the retarget rider
-///   is the residual deferral tracked in
-///   <see cref="Majik.Core.Services.SpellCopier"/>.
+/// "You may choose new targets for the copy" (CR 707.10a) is honoured — at
+/// resolution the copy effect re-prompts the copier for new targets via
+/// <see cref="Majik.Core.Services.SpellCopier.PushCopyOfTopSpellAsync"/> using
+/// the targeted spell's retained per-slot requests; declining keeps the
+/// original target.
 /// </summary>
 [CardName("Twincast")]
 public static class TwincastFactory

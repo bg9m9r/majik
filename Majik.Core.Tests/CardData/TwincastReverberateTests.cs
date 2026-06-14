@@ -131,6 +131,59 @@ public class TwincastReverberateTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Twincast_ChoosesNewTargetsForTheCopy_CR70710a()
+    {
+        var bus = new Majik.Core.Events.EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+
+        var carol = new Player("Carol", 20);
+
+        // Bob's Bolt targets Alice and carries its retarget request (CR 707.10a)
+        // — the same stamp SpellCastFlow applies on a live cast.
+        var hits = new List<Player>();
+        var bobBolt = BuildTargetInstant(_bob, hits);
+        bobBolt.RetargetRequests = new[]
+        {
+            new TargetRequest("any target", 1, 1, new object[] { _alice, carol }),
+        };
+        stack.Push(bobBolt);
+
+        // Alice resolves Twincast targeting Bob's Bolt; her agent retargets the
+        // copy to Carol.
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Twincast", ManaCost = "{U}{U}", OracleText = CopyOracle },
+            _alice, raw => raw, stack);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(
+            null, null,
+            new IReadOnlyList<object>[] { new[] { (object)bobBolt } },
+            ManaPayment.Empty);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)carol });
+        var game = new GameContext(
+            _alice, new[] { _alice, _bob, carol }, _alice, 1,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain, stack);
+
+        foreach (var e in def!.EffectFactory(chosen))
+            await e.ExecuteAsync(ResolutionContext.For(_alice, agent, game,
+                System.Array.Empty<IReadOnlyList<object>>()));
+
+        var copy = stack.Top.Should().BeOfType<Majik.Core.Spells.Spell>().Subject;
+        copy.IsCopy.Should().BeTrue();
+        copy.ChosenTargets.Should().ContainSingle()
+            .Which.Should().BeSameAs(carol, "the copier chose a new target for the copy (CR 707.10a)");
+
+        // Resolve the copy: it hits Carol (the re-chosen target), not Alice.
+        new Majik.Core.Services.StackResolver(bus).ResolveTop(stack);
+        hits.Should().ContainSingle().Which.Should().BeSameAs(carol);
+
+        // Bob's original Bolt still aims at Alice — retarget touches only the copy.
+        bobBolt.ChosenTargets.Should().ContainSingle().Which.Should().BeSameAs(_alice);
+    }
+
+    [Fact]
     public void Twincast_TargetLeftStack_Fizzles_NoCopy()
     {
         var stack = new Majik.Core.Stack.Stack();

@@ -387,6 +387,15 @@ public sealed class SpellCastFlow
 
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
 
+        // CR 707.10a — retain the per-slot target requests on the stack object so
+        // a "copy this spell" effect (Twincast / Reverberate) can re-prompt the
+        // copier for new targets for the copy. Only meaningful for targeted
+        // spells; untargeted casts leave it null (the copier reuses nothing).
+        if (definition.TargetRequests is { Count: > 0 } reqs)
+        {
+            spell.RetargetRequests = reqs.ToArray();
+        }
+
         // CR 608.2 / 715.3d / 118 / 702.138b / 702.62d / 702.33b / 702.115 /
         // 701.5b / 701.59 / 113.5 / 601.2 — stamp every per-cast sentinel on
         // the spell + underlying card so downstream gates can branch on them.
