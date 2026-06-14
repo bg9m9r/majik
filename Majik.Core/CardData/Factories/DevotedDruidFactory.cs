@@ -106,18 +106,26 @@ public static class DevotedDruidFactory
         // ----------------------------------------------------------------
         var untapCost = new AddCounterCost(card, CounterType.MinusOneMinusOne, 1, replacements);
 
+        // RebindSafe (CR 707.2 / Agatha's Soul Cauldron, CR 613.1f / 702.49) —
+        // the untap effect reads its source off the live ResolutionContext
+        // (ctx.Source) rather than closing over `card`, so a re-homed copy of
+        // this ability untaps the BEARER, not the original Devoted Druid. Paired
+        // with the AddCounterCost re-home seam (IRebindableCost) so the -1/-1
+        // counter likewise lands on the bearer.
         var untapEffect = new Effect(
             $"{CardName}: untap self",
-            () =>
+            ctx =>
             {
-                if (card.IsTapped) card.Untap();
+                if (ctx.Source is { IsTapped: true } src) src.Untap();
+                return ValueTask.CompletedTask;
             });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { untapCost },
-            effects: new IEffect[] { untapEffect }));
+            effects: new IEffect[] { untapEffect },
+            rebindSafe: true));
 
         return card;
     }

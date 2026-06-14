@@ -83,8 +83,10 @@ public class DevotedDruidTests
 
         // Pay the cost (put a -1/-1 counter on self).
         foreach (var cost in untap.Costs) cost.Pay(_alice);
-        // Run the effect (untap self).
-        foreach (var fx in untap.Effects) fx.Execute();
+        // Resolve the ability (untap self) — resolving through the ability
+        // populates ResolutionContext.Source so the re-sourceable untap effect
+        // reads its source off the context (CR 113.7 / re-source seam).
+        untap.Resolve();
 
         druid.Counters.Count(CounterType.MinusOneMinusOne).Should().Be(1);
         druid.IsTapped.Should().BeFalse("untap effect untaps the druid");
@@ -103,7 +105,7 @@ public class DevotedDruidTests
 
         var untap = druid.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var cost in untap.Costs) cost.Pay(_alice);
-        foreach (var fx in untap.Effects) fx.Execute();
+        untap.Resolve();
 
         druid.Counters.Count(CounterType.MinusOneMinusOne).Should().Be(0,
             "Vizier of Remedies replaces the -1/-1 cost-counter with no counter (Druid Combo)");
@@ -127,7 +129,7 @@ public class DevotedDruidTests
         {
             druid.Tap();
             foreach (var cost in untap.Costs) cost.Pay(_alice);
-            foreach (var fx in untap.Effects) fx.Execute();
+            untap.Resolve();
         }
 
         druid.Counters.Count(CounterType.MinusOneMinusOne).Should().Be(0,

@@ -256,12 +256,20 @@ public class ActivatedAbility : IActivatedAbility
             source: newSource ?? throw new ArgumentNullException(nameof(newSource)),
             controller: newController ?? throw new ArgumentNullException(nameof(newController)),
             targets: _targets.Count > 0 ? _targets : null,
-            // STAGE 1 — re-home source-capturing costs ({T} / sacrifice) onto
-            // the new source so the rebound ability pays its cost with the new
-            // permanent; other ICost types pass through untouched.
+            // STAGE 1 — re-home source-capturing costs onto the new source so
+            // the rebound ability pays its cost with the new permanent. Two
+            // re-home seams are consulted in order: AdditionalCost ({T} /
+            // sacrifice) via its bespoke RebindSource, and the bare
+            // counter-payment costs (add / remove +1/+1 or charge counter) via
+            // the IRebindableCost interface. Any other ICost passes through
+            // untouched (mana / pay-life carry no source permanent).
             costs: _costs.Count > 0
-                ? _costs.Select(c =>
-                    c is AdditionalCost ac ? ac.RebindSource(Source, newSource) : c)
+                ? _costs.Select(c => c switch
+                {
+                    AdditionalCost ac => ac.RebindSource(Source, newSource),
+                    IRebindableCost rc => rc.RebindTo(Source, newSource),
+                    _ => c,
+                })
                 : null,
             effects: _effects.Count > 0 ? _effects : null,
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,

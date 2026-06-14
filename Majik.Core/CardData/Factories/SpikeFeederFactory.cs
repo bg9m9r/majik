@@ -128,21 +128,26 @@ public static class SpikeFeederFactory
         // through CountersService.Add so Hardened Scales / Doubling Season
         // bumps apply (CR 122 / CR 613).
         // ----------------------------------------------------------------
-        ActivatedAbility? pumpAbility = null;
+        // RebindSafe (CR 707.2 / Agatha's Soul Cauldron, CR 613.1f / 702.49) —
+        // the effect reads its chosen target off the live ResolutionContext
+        // (ctx.ChosenTargets) rather than closing over the ability instance, so
+        // a re-homed copy resolves against the bearer's activation. Paired with
+        // the RemovePlusOnePlusOneCounterCost re-home seam (IRebindableCost) so
+        // the counter is removed from the BEARER, not the original Spike Feeder.
         var pumpEffect = new Effect(
             $"{CardName}: put a +1/+1 counter on target creature",
-            () =>
+            ctx =>
             {
-                if (pumpAbility is null) return;
-                if (pumpAbility.ChosenTargets.Count == 0) return;
-                if (pumpAbility.ChosenTargets[0].Count == 0) return;
-                if (pumpAbility.ChosenTargets[0][0] is not Creature target) return;
+                if (ctx.ChosenTargets.Count == 0) return ValueTask.CompletedTask;
+                if (ctx.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask;
+                if (ctx.ChosenTargets[0][0] is not Creature target) return ValueTask.CompletedTask;
                 // CR 608.2b — resolution recheck: target still on battlefield.
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
                 CountersService.Add(target, CounterType.PlusOnePlusOne, 1, replacements, eventBus: null);
+                return ValueTask.CompletedTask;
             });
 
-        pumpAbility = new ActivatedAbility(
+        var pumpAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -160,7 +165,8 @@ public static class SpikeFeederFactory
                     LegalCandidates: Array.Empty<object>(),
                     CandidateGatherer: ctx => GatherCreatures(ctx),
                     Intent: BotIntent.Buff),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(pumpAbility);
 
@@ -174,12 +180,16 @@ public static class SpikeFeederFactory
         // Player.GainLife, which publishes LifeChangedEvent (CR 119.3 /
         // 603.6a) so the lifegain-payoff family fires.
         // ----------------------------------------------------------------
+        // RebindSafe — gain life for the ability's CONTROLLER (read off the
+        // ResolutionContext), and remove the +1/+1 counter from the source via
+        // the re-homed RemovePlusOnePlusOneCounterCost, so a re-homed copy gains
+        // life for the bearer's controller and spends the bearer's counter.
         var gainEffect = new Effect(
             $"{CardName}: gain {LifeGained} life",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
-                controller.GainLife(LifeGained);
+                ctx.Controller.GainLife(LifeGained);
+                return ValueTask.CompletedTask;
             });
 
         var gainAbility = new ActivatedAbility(
@@ -189,7 +199,8 @@ public static class SpikeFeederFactory
             {
                 new RemovePlusOnePlusOneCounterCost(card, 1),
             },
-            effects: new IEffect[] { gainEffect });
+            effects: new IEffect[] { gainEffect },
+            rebindSafe: true);
 
         card.AddAbility(gainAbility);
 
