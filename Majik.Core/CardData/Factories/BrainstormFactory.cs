@@ -18,23 +18,24 @@ namespace Majik.Core.CardData.Factories;
 /// - Instant shape, mana cost {U}, blue.
 /// - Resolve effect (via <see cref="BuildResolveEffect"/>) draws three
 ///   cards from the top of the controller's library, then puts two cards
-///   from the controller's hand on top of the library. Agent-driven
-///   picks via <see cref="IPlayerAgent.ChooseFromHandAsync"/>
-///   (<see cref="BotIntent.Library"/>); no-agent fallback returns the
-///   last-two-by-add-order from the hand (deterministic, mirrors
-///   <see cref="SpellTemplates.Templates.Bespoke.BrainstormTemplate"/>).
+///   from the controller's hand on top of the library. The "choose two
+///   AND their order" pick is a SINGLE joint decision via
+///   <see cref="IPlayerAgent.ChooseAndOrderFromHandAsync"/>
+///   (<see cref="ChoiceKind.OrderedPickN"/>, <see cref="BotIntent.LibraryReorder"/>) —
+///   the agent evaluates the combined selection + ordering at once
+///   (result[0] ends up on top of the library). No-agent fallback returns
+///   the last-two-by-add-order from the hand (deterministic, preserving the
+///   historical factory ordering).
 /// - Graceful degradation:
 ///   - Empty library mid-draw flags the controller for the SBA loss
 ///     (CR 704.5b) and short-circuits remaining draws — matches
 ///     <see cref="FaithlessLootingFactory.BuildResolveEffect"/>.
 ///   - Hand with fewer than two cards after drawing returns however many
 ///     exist (no underflow).
-/// - "In any order" semantics: the two picks are placed via
-///   <see cref="IZone.InsertCardAt"/>(0) in sequence. The second pick lands
-///   on top (library index 0); the first pick is one below it. For the
-///   no-agent / deterministic path this preserves the
-///   <see cref="SpellTemplates.Templates.Bespoke.BrainstormTemplate"/> order
-///   (last-of-hand is the second insert → ends up on top).
+/// - "In any order" semantics: the joint pick returns an ordered list where
+///   result[0] is the card to put on TOP. The list is applied in reverse via
+///   <see cref="IZone.InsertCardAt"/>(0) so result[0] ends at library index 0
+///   (top) and result[1] sits one below it.
 ///
 /// Coverage note: the data-driven
 /// <see cref="SpellTemplates.Templates.Bespoke.BrainstormTemplate"/> already
@@ -49,11 +50,6 @@ namespace Majik.Core.CardData.Factories;
 ///      deterministic "last-2 in hand" fallback the template ships with.
 ///
 /// ## Deferred (v1 gaps)
-/// - Full "choose two cards AND their order" prompt — currently two
-///   independent ChooseFromHandAsync calls (each fed the remaining hand).
-///   A "choose-and-order-N" agent shape would let the bot evaluate the
-///   joint pick + order; v1 evaluates each pick in sequence which is
-///   adequate for the rules-faithful outcome.
 /// - SBA loss-from-empty-library handling — relies on
 ///   <see cref="Player.MarkTriedToDrawFromEmptyLibrary"/>; the SBA itself
 ///   is the engine's responsibility (CR 704.5b).
@@ -114,42 +110,69 @@ public static class BrainstormFactory
 
                 // -----------------------------------------------------------
                 // "Then put two cards from your hand on top of your library
-                // in any order." Two sequential picks; each consults the
-                // agent over the current hand snapshot. Pre-agent fallback:
-                // last-in-hand (deterministic, matches BrainstormTemplate).
+                // in any order." A SINGLE joint "choose two AND their order"
+                // decision (CR 701.x library-top reorder) via the
+                // ChoiceKind.OrderedPickN sink — the agent evaluates the
+                // combined pick + ordering at once rather than two greedy,
+                // sequential picks fed the remaining hand.
                 //
-                // Library order: index 0 is the top. InsertCardAt(0) puts
-                // a card at the top while preserving the rest. The second
-                // pick is inserted last → lands on top; the first pick
-                // sits one below it. With the deterministic fallback this
-                // preserves BrainstormTemplate's ordering exactly.
+                // Result contract (ChooseAndOrderFromHandAsync): the returned
+                // list is the chosen cards in chosen order, where result[0]
+                // is the card the chooser wants ON TOP of the library. We
+                // apply the result so result[0] ends up at library index 0.
+                //
+                // Pre-agent fallback (no agent supplied): the deterministic
+                // last-two-of-hand picker, ordered so the BrainstormTemplate
+                // library ordering is preserved EXACTLY (last-of-hand ends up
+                // on top, second-to-last one below it).
                 // -----------------------------------------------------------
-                for (var i = 0; i < ReturnCount; i++)
+                var hand = caster.Zones.Hand.GetCards().ToList();
+                var returnCount = Math.Min(ReturnCount, hand.Count);
+                if (returnCount > 0)
                 {
-                    var hand = caster.Zones.Hand.GetCards().ToList();
-                    if (hand.Count == 0) break;
-
-                    ICard? pick;
+                    IReadOnlyList<ICard> ordered;
                     if (agent != null)
                     {
-                        pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.LibraryReorder).ConfigureAwait(false));
-                        // Null = decline, or agent returned a card that
-                        // is no longer in hand (mis-wired agent). Fall
-                        // back to the deterministic pick — Brainstorm's
-                        // return clause is mandatory.
-                        if (pick == null || pick.Zone != ZoneType.Hand)
-                            pick = hand[^1];
+                        // OrderedPickN: result[0] goes on top. The agent shim
+                        // sanitizes (distinct, in-hand, exactly returnCount).
+                        ordered = await agent
+                            .ChooseAndOrderFromHandAsync(caster, hand, returnCount, BotIntent.LibraryReorder)
+                            .ConfigureAwait(false);
+                        // Defensive: if a mis-wired agent under-returns, backfill
+                        // from the deterministic tail so the mandatory return
+                        // clause always moves exactly returnCount cards.
+                        if (ordered.Count < returnCount)
+                            ordered = DeterministicTopOrder(hand, returnCount);
                     }
                     else
                     {
-                        pick = hand[^1];
+                        ordered = DeterministicTopOrder(hand, returnCount);
                     }
 
-                    caster.Zones.Hand.RemoveCard(pick);
-                    caster.Zones.Library.InsertCardAt(0, pick);
-                    pick.SetZone(ZoneType.Library);
+                    // Apply: result[0] must end on TOP (library index 0).
+                    // InsertCardAt(0) puts a card on top, so inserting in
+                    // REVERSE leaves result[0] on top, result[1] below it, …
+                    for (var i = ordered.Count - 1; i >= 0; i--)
+                    {
+                        var pick = ordered[i];
+                        caster.Zones.Hand.RemoveCard(pick);
+                        caster.Zones.Library.InsertCardAt(0, pick);
+                        pick.SetZone(ZoneType.Library);
+                    }
                 }
             }),
         };
     }
+
+    /// <summary>
+    /// Deterministic pre-agent ordering for the "put N on top in any order"
+    /// clause: the last <paramref name="count"/> cards of the hand (by add
+    /// order), returned so element 0 ends up ON TOP of the library. This
+    /// reproduces the historical factory behaviour exactly — two sequential
+    /// <c>hand[^1]</c> picks where the SECOND insert landed on top, i.e. the
+    /// second-to-last hand card on top and the last hand card just below it
+    /// (factory test <c>Brainstorm_Resolve_NoAgent_DrawsThree_ReturnsLastTwo</c>).
+    /// </summary>
+    private static IReadOnlyList<ICard> DeterministicTopOrder(IReadOnlyList<ICard> hand, int count)
+        => hand.Skip(Math.Max(0, hand.Count - count)).ToList();
 }

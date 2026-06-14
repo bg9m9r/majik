@@ -110,9 +110,9 @@ public class BrainstormFactoryTests
     {
         // Hand pre-existing: [Keep-A, Junk-B]. Library: [L1, L2, L3, L4].
         // After draws: hand = [Keep-A, Junk-B, L1, L2, L3], library = [L4].
-        // Agent script: pick "Junk-B" first, then "L1" — the agent drives
-        // both return picks. Library ends [L1, Junk-B, L4]: second insert
-        // (L1) lands on top; Junk-B sits one below; L4 stays at the bottom.
+        // Agent joint pick (OrderedPickN): return [L1, Junk-B] — L1 chosen to
+        // sit on TOP (result[0]), Junk-B one below it. Library ends
+        // [L1, Junk-B, L4]; L4 stays at the bottom.
         var keepA = NewCardInHand("Keep-A");
         var junkB = NewCardInHand("Junk-B");
         var l1 = NewLibraryCardAtEnd("L1");
@@ -121,8 +121,13 @@ public class BrainstormFactoryTests
         var l4 = NewLibraryCardAtEnd("L4");
 
         var agent = new ScriptedAgent();
-        agent.QueueFromHand(hand => hand.FirstOrDefault(c => c.Name == "Junk-B"));
-        agent.QueueFromHand(hand => hand.FirstOrDefault(c => c.Name == "L1"));
+        // Single joint "choose two AND their order" decision — the agent
+        // returns L1 then Junk-B (result[0] = L1 ends up on top).
+        agent.QueueChoice(cands => new object[]
+        {
+            cands.First(o => ((ICard)o).Name == "L1"),
+            cands.First(o => ((ICard)o).Name == "Junk-B"),
+        });
 
         var effect = BrainstormFactory.BuildResolveEffect(_alice, agent).Single();
         effect.Execute();

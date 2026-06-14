@@ -662,6 +662,79 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// Pick exactly <paramref name="count"/> cards from a candidate set in
+    /// <paramref name="chooser"/>'s hand AND choose their order, in a SINGLE
+    /// joint decision (CR 701.x library-top reorder — Brainstorm's "put two
+    /// cards from your hand on top of your library in any order"). Returns the
+    /// chosen cards as an ORDERED list: index 0 is the first element of the
+    /// chosen order. For a "put N on top of your library in any order" effect
+    /// the caller treats <c>result[0]</c> as the card that ends up ON TOP of
+    /// the library (so callers can apply the result left-to-right onto the
+    /// library top without re-reasoning about insertion order).
+    /// <para>
+    /// Distinct from looping <see cref="ChooseFromHandAsync"/> N times: the
+    /// agent sees the WHOLE joint pick at once, so a smart bot can evaluate
+    /// the combined selection + ordering rather than greedily picking each in
+    /// isolation. <paramref name="candidates"/> is pre-filtered to legal
+    /// picks; the effect is mandatory (no decline) — the agent returns
+    /// up to <c>min(count, candidates.Count)</c> cards.
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.OrderedPickN"/>,
+    /// then sanitizes the result: keeps only distinct cards drawn from
+    /// <paramref name="candidates"/>, in the agent's returned order, capped at
+    /// <paramref name="count"/>, and backfills from the remaining candidates
+    /// (in candidate order) so a misbehaving / first-candidate agent still
+    /// produces a legal ordered pick. The pre-agent posture is therefore the
+    /// first <paramref name="count"/> candidates in candidate order. Smart
+    /// bots / remote agents override <see cref="ChooseAsync"/> (or this method)
+    /// to evaluate the joint pick + order.
+    /// </para>
+    /// </summary>
+    async Task<IReadOnlyList<ICard>> ChooseAndOrderFromHandAsync(
+        Player chooser,
+        IReadOnlyList<ICard> candidates,
+        int count,
+        BotIntent intent,
+        CancellationToken ct = default)
+    {
+        var pool = candidates ?? Array.Empty<ICard>();
+        var want = Math.Min(Math.Max(0, count), pool.Count);
+        if (want == 0) return Array.Empty<ICard>();
+
+        var req = new ChoiceRequest(
+            ChoiceKind.OrderedPickN, "choose and order from hand",
+            Min: want, Max: want,
+            Candidates: pool.Cast<object>().ToList(),
+            Intent: intent, Optional: false);
+        var chosen = await ChooseAsync(null!, req, ct).ConfigureAwait(false);
+
+        // Sanitize: distinct cards from the candidate pool, in agent order,
+        // capped at `want`. Backfill from remaining candidates (candidate
+        // order) so the result is always exactly `want` legal cards.
+        var seen = new HashSet<ICard>();
+        var ordered = new List<ICard>(want);
+        foreach (var o in chosen)
+        {
+            if (o is not ICard c) continue;
+            if (!pool.Contains(c)) continue;
+            if (!seen.Add(c)) continue;
+            ordered.Add(c);
+            if (ordered.Count >= want) break;
+        }
+        if (ordered.Count < want)
+        {
+            foreach (var c in pool)
+            {
+                if (ordered.Count >= want) break;
+                if (seen.Add(c)) ordered.Add(c);
+            }
+        }
+        return ordered;
+    }
+
+    /// <summary>
     /// Pick exactly one permanent from a candidate set on the
     /// <paramref name="chooser"/>'s battlefield (or any pre-filtered
     /// battlefield subset the calling effect produced). Used by:
