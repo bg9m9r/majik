@@ -199,6 +199,15 @@ public static class LandActivatedAbilityBinder
         @"(?<p>\d+)/(?<t>\d+)\s+(?<color>white|blue|black|red|green)\s+(?<subtype>[A-Za-z]+)\s+creature\s+tokens?\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // "Sacrifice them at the beginning of the next end step." — the per-token
+    // delayed-sacrifice rider trailing Dalkovan Encampment's attack-token clause
+    // (CR 603.7). Detected on the FULL effect text (the AttackRiderTokens regex
+    // stops at "creature tokens"); when present, the minted tokens are scheduled
+    // for sacrifice at the next end step.
+    private static readonly Regex SacrificeThemNextEndStep = new(
+        @"Sacrifice\s+them\s+at\s+the\s+beginning\s+of\s+the\s+next\s+end\s+step",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // "This land deals N damage to each opponent."
     private static readonly Regex DamageEachOpponent = new(
         @"deals?\s+(?<n>\d+)\s+damage\s+to\s+each\s+opponent",
@@ -731,7 +740,7 @@ public static class LandActivatedAbilityBinder
         //     attack trigger with the live TriggerManager (CR 508.1f / 603.7).
         if (AttackRiderTokens.Match(effectText) is { Success: true } rider)
         {
-            BindAttackRiderTokens(land, controller, cost, triggers, rider);
+            BindAttackRiderTokens(land, controller, cost, triggers, rider, effectText);
             return true;
         }
 
@@ -1262,17 +1271,20 @@ public static class LandActivatedAbilityBinder
     // no TriggerManager is threaded (shape-only build) the activation is an inert
     // no-op — same posture as DalkovanEncampmentFactory.
     //
-    // v1 deferrals (mirroring DalkovanEncampmentFactory): the printed tokens enter
-    // "tapped and attacking" and are sacrificed at the next end step — the engine
-    // has no surface to insert a creature into an in-progress combat mid-trigger
-    // (same gap as Geist of Saint Traft's Angel / Goblin Rabblemaster), so v1
-    // tokens land on the battlefield untapped, not in an attacker slot, and the
-    // per-token "sacrifice at next end step" rider is not wired. The card-advantage
-    // signal — N tokens per attack — binds.
+    // v1 deferral (mirroring DalkovanEncampmentFactory): the printed tokens enter
+    // "tapped and attacking" — the engine has no surface to insert a creature into
+    // an in-progress combat mid-trigger (same gap as Geist of Saint Traft's Angel /
+    // Goblin Rabblemaster), so the tokens land on the battlefield untapped and not
+    // in an attacker slot. The "Sacrifice them at the beginning of the next end
+    // step" rider IS now wired (CR 603.7): each batch of minted tokens schedules a
+    // DelayedTriggeredAbility that sacrifices exactly those tokens at the next end
+    // step (move to owner's graveyard; SBA 704.5d / CR 111.7 then ceases them).
     // ----------------------------------------------------------------------
     private static void BindAttackRiderTokens(
-        Land land, Player controller, string cost, TriggerManager? triggers, Match m)
+        Land land, Player controller, string cost, TriggerManager? triggers, Match m,
+        string effectText)
     {
+        var sacrificeAtEndStep = SacrificeThemNextEndStep.IsMatch(effectText);
         var costs = BuildCosts(land, cost, out _);
         var count = ParseCountWord(m.Groups["count"].Value);
         var power = int.Parse(m.Groups["p"].Value);
@@ -1299,10 +1311,19 @@ public static class LandActivatedAbilityBinder
                     () =>
                     {
                         var c = land.Controller ?? controller;
-                        TokenFactory.CreateOnBattlefield(
+                        var minted = TokenFactory.CreateOnBattlefield(
                             spec, c, count: count,
                             zones: ZoneServiceRegistry.Get(c),
                             replacements: null);
+
+                        // CR 603.7 — "Sacrifice them at the beginning of the next
+                        // end step." Schedule a delayed sacrifice of exactly THIS
+                        // batch of tokens (each attack mints + schedules its own).
+                        if (sacrificeAtEndStep && minted.Count > 0)
+                        {
+                            ScheduleEndStepSacrifice(
+                                land, land.Controller ?? controller, triggers!, minted);
+                        }
                     });
 
                 var attackTrigger = new TriggeredAbility(
@@ -1335,6 +1356,42 @@ public static class LandActivatedAbilityBinder
 
         land.AddAbility(new ActivatedAbility(
             source: land, controller: controller, costs: costs, effects: new IEffect[] { effect }));
+    }
+
+    // CR 603.7 — register a DelayedTriggeredAbility that, at the start of the next
+    // end step, sacrifices exactly <paramref name="tokens"/> (the batch minted by
+    // one attack). Sacrifice = move each token to its owner's graveyard (CR 701.16);
+    // SBA 704.5d / CR 111.7 then removes the token entirely (it ceases to exist).
+    private static void ScheduleEndStepSacrifice(
+        Land land, Player controller, TriggerManager triggers, IReadOnlyList<Creature> tokens)
+    {
+        var batch = tokens.ToList();
+        var resolvedAt = LogicalClockScope.Current.NextTimestamp();
+
+        var sacrifice = new DelayedTriggeredAbility(
+            source: land,
+            controller: controller,
+            condition: new EventTriggerCondition<StepStartedEvent>(
+                (e, _) => e.StepType == Majik.Core.StateMachine.StepStateType.End
+                          && e.Timestamp > resolvedAt),
+            effects: new IEffect[]
+            {
+                new Effect(
+                    $"{land.Name}: sacrifice {batch.Count} attack-rider token(s) (next end step)",
+                    () =>
+                    {
+                        foreach (var token in batch)
+                        {
+                            var owner = token.Owner ?? controller;
+                            if (token.Zone != ZoneType.Battlefield) continue;
+                            var holder = token.Controller ?? owner;
+                            holder.Zones.Battlefield.RemoveCard(token);
+                            owner.Zones.Graveyard.AddCard(token);
+                            token.SetZone(ZoneType.Graveyard);
+                        }
+                    }),
+            });
+        triggers.RegisterDelayed(sacrifice);
     }
 
     private static int ParseCountWord(string word) =>

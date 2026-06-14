@@ -6,6 +6,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
@@ -784,6 +785,65 @@ public class LandActivatedAbilityBinderPipelineTests
         warriors.Should().OnlyContain(w => w.IsToken && w.Power == 1 && w.Toughness == 1);
         warriors.Should().OnlyContain(w =>
             w.GetEffectiveColors().Contains(Majik.Core.ValueObjects.ManaColor.Red));
+    }
+
+    [Fact]
+    public async Task Prod_DalkovanEncampment_AttackRider_SacrificesWarriorTokens_AtNextEndStep()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Dalkovan Encampment", "Land", oracleText: DalkovanOracle, colors: "");
+        var land = new Land("Dalkovan Encampment", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+        var alice = facade.Alice;
+        var triggers = facade.Triggers;
+
+        // Activate the {2}{W}, {T} ability ⇒ install the this-turn attack rider.
+        var ability = live.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        // Declare an attacker Alice controls ⇒ the rider mints two 1/1 Warriors.
+        var attacker = new Creature("Bear", "{1}{G}", 2, 2);
+        attacker.SetOwner(alice);
+        attacker.SetController(alice);
+        alice.Zones.Battlefield.AddCard(attacker);
+        attacker.SetZone(ZoneType.Battlefield);
+
+        triggers.EvaluateTriggers(
+            new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(attacker, facade.Bob));
+        await triggers.PutPendingTriggersOnStackAsync(
+            alice, new Dictionary<Player, IPlayerAgent>(), Ctx(facade));
+        while (facade.LiveStack.Pop() is { } obj)
+            await obj.ResolveAsync(null, Ctx(facade));
+
+        var warriors = alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Where(c => c.Name == "Warrior").ToList();
+        warriors.Should().HaveCount(2, "two Warriors minted before the end step");
+
+        // CR 603.7 — "Sacrifice them at the beginning of the next end step."
+        // Firing the End-step StepStartedEvent drains the delayed sacrifice
+        // trigger; resolving it moves the tokens to the graveyard.
+        triggers.EvaluateTriggers(new StepStartedEvent(StepStateType.End, alice));
+        await triggers.PutPendingTriggersOnStackAsync(
+            alice, new Dictionary<Player, IPlayerAgent>(), Ctx(facade));
+        while (facade.LiveStack.Pop() is { } obj)
+            await obj.ResolveAsync(null, Ctx(facade));
+
+        // The sacrificed tokens are off the battlefield (CR 701.16). SBA 704.5d
+        // (CR 111.7) then removes them entirely — they cease to exist.
+        var sba = new Majik.Core.Rules.StateBasedActions(
+            facade.EventBus, null, triggers);
+        sba.CheckStateBasedActions(
+            new[] { alice, facade.Bob },
+            alice.Zones.Battlefield.GetCards());
+
+        alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Where(c => c.Name == "Warrior").Should().BeEmpty(
+                "the two Warrior tokens are sacrificed at the next end step");
+        alice.Zones.Graveyard.GetCards().OfType<Creature>()
+            .Where(c => c.Name == "Warrior").Should().BeEmpty(
+                "tokens cease to exist in the graveyard via SBA 704.5d");
     }
 
     // ======================================================================
