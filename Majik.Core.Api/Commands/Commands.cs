@@ -207,9 +207,11 @@ public sealed record ChooseFromRevealedCommand(Guid? InstanceId) : GameCommand;
 /// <list type="bullet">
 /// <item>For <c>YesNo</c>, <see cref="SelectedInstanceIds"/> empty = "no", any
 /// element (or the <see cref="YesNo"/> flag) = "yes".</item>
-/// <item>For <c>PickOne</c> / <c>PickN</c> / <c>Order</c>, the list carries the
-/// InstanceIds the player chose, in order. Each must be in the offered
-/// candidate set (validated engine-side) or it is dropped.</item>
+/// <item>For <c>PickOne</c> / <c>PickN</c> / <c>OrderedPickN</c> / <c>Order</c>,
+/// the list carries the InstanceIds the player chose, in order (for
+/// <c>OrderedPickN</c> the order is the chosen library-top order — first id
+/// ends up on top). Each must be in the offered candidate set (validated
+/// engine-side) or it is dropped.</item>
 /// </list>
 /// </summary>
 public sealed record ChoiceCommand(

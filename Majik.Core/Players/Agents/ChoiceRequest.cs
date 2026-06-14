@@ -22,6 +22,17 @@ public enum ChoiceKind
     /// <summary>Pick N (Min..Max) candidates.</summary>
     PickN,
 
+    /// <summary>
+    /// Pick exactly N candidates AND their order in a single joint decision
+    /// (CR 701.x library-top reorder — Brainstorm's "put two cards from your
+    /// hand on top of your library in any order"). The agent returns an
+    /// ORDERED list of N candidates; result[0] is the first element of the
+    /// chosen order (for a put-on-top effect, the card that ends up on top).
+    /// Distinct from <see cref="PickN"/> (unordered N-of) and <see cref="Order"/>
+    /// (order ALL candidates, no sub-selection).
+    /// </summary>
+    OrderedPickN,
+
     /// <summary>Order the candidates (e.g. trigger ordering, CR 603.3b).</summary>
     Order,
 
