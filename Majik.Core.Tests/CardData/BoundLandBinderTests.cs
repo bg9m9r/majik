@@ -3,8 +3,10 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -127,6 +129,47 @@ public class BoundLandBinderTests
         _alice.LoseLife(16); // 18 → 2
         _alice.LifeTotal.Should().Be(2);
         mana.CanActivate().Should().BeFalse("CR 119.4 — can't pay 2 life at 2 life");
+    }
+
+    [Fact]
+    public void BoseijuWhoSheltersAll_BinderPath_WiresUncounterableProvenanceReaction()
+    {
+        // CR 701.5b / 106.4 — the prod load path for lands is the binder chain,
+        // NOT the [CardName] factory (lands are never routed through it). So the
+        // OracleManaBinder-bound {C} must carry the same uncounterable
+        // provenance reaction the factory wires: spent on an instant/sorcery
+        // spell, that spell is marked uncounterable.
+        var land = MakeLandShell("Boseiju, Who Shelters All");
+        OracleManaBinder.Bind(land, _repo.GetByName("Boseiju, Who Shelters All")!, _alice);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var mana = land.Abilities.OfType<ManaAbility>().Should().ContainSingle().Subject;
+        mana.ProvenanceReaction.Should().NotBeNull(
+            "the binder-bound {C} must carry Boseiju's uncounterable provenance rider");
+
+        // Drive it through the real payment resolver: {C} spent on an instant
+        // stamps the pay-time uncounterable flag on that spell's card.
+        var resolver = new ManaPaymentResolver();
+        var bolt = new Instant("Lightning Bolt", manaCost: "1");
+        var success = resolver.Pay(
+            _alice, ManaCost.Parse("1"),
+            new ManaPayment(new ICard[] { land }),
+            spentOn: bolt, out _, out _);
+
+        success.Should().BeTrue("Boseiju's {C} pays the {1} instant cost");
+        bolt.PendingCastUncounterable.Should().BeTrue(
+            "binder-bound Boseiju mana spent on an instant marks it uncounterable (CR 701.5b)");
+
+        // The rider is instant/sorcery-only — a creature spell is NOT flagged.
+        land.Untap();
+        var bear = new Creature("Grizzly Bears", manaCost: "1", power: 2, toughness: 2);
+        resolver.Pay(
+            _alice, ManaCost.Parse("1"),
+            new ManaPayment(new ICard[] { land }),
+            spentOn: bear, out _, out _);
+        bear.PendingCastUncounterable.Should().BeFalse(
+            "the rider only triggers for instant/sorcery spells");
     }
 
     // -----------------------------------------------------------------------

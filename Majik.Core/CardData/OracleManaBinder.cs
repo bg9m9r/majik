@@ -144,10 +144,12 @@ public static class OracleManaBinder
     // "{T}, Pay 2 life: Add {C}." — Boseiju, Who Shelters All (Champions of
     // Kamigawa). A {C}-producing mana ability with an additional "lose 2 life"
     // activation cost (CR 605.1a / 119.4). The "spent on an instant/sorcery →
-    // can't be countered" rider is DEFERRED (needs per-slot mana provenance +
-    // a cast-time uncounterable flag — same deferral as Cavern of Souls). The
-    // pay-life cost prefix is "{T}, Pay 2 life:" (NOT a bare {T}), so the bare
-    // tap-for-mana regexes never match it. Ports BoseijuWhoSheltersAllFactory.
+    // can't be countered" rider (CR 701.5b / 106.4) is wired via the produced
+    // {C}'s ManaAbility.ProvenanceReaction (per-slot mana provenance →
+    // PendingCastUncounterable → Spell.CannotBeCountered), in lock-step with
+    // BoseijuWhoSheltersAllFactory. The pay-life cost prefix is
+    // "{T}, Pay 2 life:" (NOT a bare {T}), so the bare tap-for-mana regexes
+    // never match it. Ports BoseijuWhoSheltersAllFactory.
     private static readonly Regex PayTwoLifeColorlessManaRegex = new(
         @"\{T\}\s*,\s*Pay\s+2\s+life\s*:\s*Add\s+\{C\}",
         RegexOptions.IgnoreCase);
@@ -330,12 +332,22 @@ public static class OracleManaBinder
                 return;
             }
 
-            // Boseiju, Who Shelters All — "{T}, Pay 2 life: Add {C}." A {C}
-            // mana ability with a lose-2-life additional cost (CR 605.1a /
-            // 119.4). The uncounterable rider is deferred (provenance infra).
+            // Boseiju, Who Shelters All — "{T}, Pay 2 life: Add {C}. If that
+            // mana is spent on an instant or sorcery spell, that spell can't be
+            // countered." A {C} mana ability with a lose-2-life additional cost
+            // (CR 605.1a / 119.4) PLUS the pay-time uncounterable rider
+            // (CR 701.5b / 106.4). Lands are never routed through their
+            // [CardName] factory, so this binder is the only LIVE path — it must
+            // wire the same ManaAbility.ProvenanceReaction
+            // BoseijuWhoSheltersAllFactory does: the produced {C} slot fires the
+            // reaction when ManaPaymentResolver consumes it, and if the object it
+            // paid for is an instant/sorcery card, stamps PendingCastUncounterable
+            // (which SpellCastFlow copies onto Spell.CannotBeCountered, then
+            // clears). Strictly per-pip / per-spell, the same slot-provenance
+            // seam as Arena of Glory's exert→haste rider.
             if (PayTwoLifeColorlessManaRegex.IsMatch(text))
             {
-                payLifeLand.AddAbility(new ManaAbility(
+                var boseiju = new ManaAbility(
                     source: payLifeLand,
                     controller: controller,
                     manaGenerated: ManaCost.Parse("C"),
@@ -345,7 +357,9 @@ public static class OracleManaBinder
                         var c = payLifeLand.Controller ?? controller;
                         return c.LifeTotal > 2;
                     },
-                    additionalCostPayer: p => p.LoseLife(2)));
+                    additionalCostPayer: p => p.LoseLife(2));
+                boseiju.ProvenanceReaction = MarkUncounterableIfInstantOrSorcery;
+                payLifeLand.AddAbility(boseiju);
                 return;
             }
 
@@ -671,4 +685,21 @@ public static class OracleManaBinder
             "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
             _ => int.TryParse(s, out var v) ? v : 0,
         };
+
+    /// <summary>
+    /// CR 701.5b — Boseiju, Who Shelters All's provenance reaction. When one of
+    /// Boseiju's {C} units is spent on an instant or sorcery <i>spell</i>, stamp
+    /// the pay-time uncounterable flag on the underlying card so
+    /// <c>SpellCastFlow.StampSpellAndCardSentinels</c> marks the resulting spell
+    /// <see cref="Majik.Core.Spells.ISpell.CannotBeCountered"/>. No-op for a
+    /// creature/other spell or a non-spell (ability-cost) context
+    /// (<paramref name="spentOn"/> is null or not an instant/sorcery card). Kept
+    /// in lock-step with <c>BoseijuWhoSheltersAllFactory</c>'s identical reaction.
+    /// </summary>
+    private static void MarkUncounterableIfInstantOrSorcery(ICard? spentOn)
+    {
+        if (spentOn is not Card card) return;
+        if (!card.HasType(CardType.Instant) && !card.HasType(CardType.Sorcery)) return;
+        card.MarkPendingCastUncounterable();
+    }
 }
