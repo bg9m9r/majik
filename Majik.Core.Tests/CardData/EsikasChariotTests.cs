@@ -170,6 +170,84 @@ public class EsikasChariotTests
     }
 
     // -----------------------------------------------------------------------
+    // Attack trigger — agent-driven targeting (CR 603.3 / CR 115.1)
+    //   "create a token that's a copy of TARGET token you control"
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void EsikasChariot_Attack_DeclaresTargetTokenYouControlRequest()
+    {
+        var alice = new Player("Alice", 20);
+        var chariot = EsikasChariotFactory.Create(alice);
+        alice.Zones.Battlefield.AddCard(chariot);
+        chariot.SetZone(ZoneType.Battlefield);
+
+        var attack = chariot.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.IsTriggered(
+                new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(
+                    chariot, alice)));
+
+        attack.TargetRequests.Should().ContainSingle(
+            "the attack trigger targets a token you control (CR 115.1) so the " +
+            "activating player's agent picks the copy target via the shared " +
+            "TriggerManager → ChooseTargetsAsync seam");
+        var req = attack.TargetRequests[0];
+        req.MinTargets.Should().Be(1);
+        req.MaxTargets.Should().Be(1);
+    }
+
+    [Fact]
+    public void EsikasChariot_Attack_HonorsAgentChosenTarget_NotDeterministicFirst()
+    {
+        var alice = new Player("Alice", 20);
+
+        // Two distinct token creatures the controller controls. The
+        // deterministic-first picker would always pick the FIRST; an
+        // agent-driven choice must be able to pick the SECOND.
+        var firstSpec = new Majik.Core.Tokens.TokenFactory.TokenSpec(
+            Name: "Cat", Power: 2, Toughness: 2,
+            Subtypes: new[] { CardSubtype.Cat });
+        var beastSpec = new Majik.Core.Tokens.TokenFactory.TokenSpec(
+            Name: "Beast", Power: 3, Toughness: 3,
+            Subtypes: new[] { CardSubtype.Beast });
+        _ = Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
+            firstSpec, alice, zones: null);
+        var beast = Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
+            beastSpec, alice, zones: null);
+
+        var chariot = EsikasChariotFactory.Create(alice);
+        alice.Zones.Battlefield.AddCard(chariot);
+        chariot.SetZone(ZoneType.Battlefield);
+
+        var attack = chariot.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.IsTriggered(
+                new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(
+                    chariot, alice)));
+
+        // Simulate what TriggerManager.PutPendingTriggersOnStackAsync does
+        // after prompting the agent: record the chosen target (the SECOND
+        // token, the Beast) on the trigger. Resolution must copy THAT, not
+        // the deterministic-first Cat.
+        attack.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { beast },
+        });
+
+        foreach (var effect in attack.Effects) effect.Execute();
+
+        var copies = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken && c.Name == "Beast"
+                && !ReferenceEquals(c, beast))
+            .ToList();
+        copies.Should().ContainSingle(
+            "the agent-chosen Beast token was copied, not the deterministic-first Cat");
+        copies[0].BasePower.Should().Be(3);
+        copies[0].BaseToughness.Should().Be(3);
+        copies[0].HasSubtype(CardSubtype.Beast).Should().BeTrue();
+    }
+
+    // -----------------------------------------------------------------------
     // Crew 4 (CR 702.122) — drives the existing VehicleCrewEffect machinery.
     // -----------------------------------------------------------------------
 

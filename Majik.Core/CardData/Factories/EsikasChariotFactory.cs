@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.Tokens;
 using Majik.Core.Zones;
@@ -48,11 +49,19 @@ namespace Majik.Core.CardData.Factories;
 ///   yet — the engine's <c>CrewAction</c> is invoked directly by tests /
 ///   bots, same shape as the rest of the vehicle MVP).
 ///
+/// ## Targeting (CR 115.1)
+/// - <b>"copy of TARGET token you control"</b>: the attack trigger declares
+///   a 1..1 <see cref="Majik.Core.Players.Agents.TargetRequest"/> with a live
+///   CandidateGatherer scoping to the controller's token permanents, so the
+///   choice routes through the shared prod targeting seam
+///   (<see cref="TriggerManager.PutPendingTriggersOnStackAsync"/> →
+///   <see cref="Majik.Core.Targeting.TargetCollection.CollectAsync"/> →
+///   <c>agent.ChooseTargetsAsync</c>). The ACTIVATING PLAYER picks the copy
+///   target; resolution re-checks legality (CR 608.2b) and falls back to the
+///   deterministic-first picker only when no agent recorded a choice
+///   (shape/dispatcher tests).
+///
 /// ## Deferred (v1 gaps)
-/// - <b>"You may" / prompts</b>: both triggers are mandatory in the
-///   printed text (no "may"). Token-copy targeting auto-picks the first
-///   eligible token-creature the controller controls; agent-driven
-///   targeting is deferred.
 /// - <b>Layer 1 copy effect on the spawned attack-copy token</b>: the
 ///   token's P/T + keywords are snapshotted at resolve time. If the
 ///   targeted token's characteristics change later (counters, lord
@@ -145,20 +154,37 @@ public static class EsikasChariotFactory
         // Attack trigger — CR 508.1f / 706 (copy effects).
         //   "Whenever Esika's Chariot attacks, create a token that's a
         //    copy of target token you control."
+        //
+        // CR 115.1 — "target token you control" is a true TARGET. Declaring
+        // a 1..1 <see cref="TargetRequest"/> (with a live CandidateGatherer
+        // enumerating the controller's token creatures) routes the choice
+        // through the shared prod targeting seam
+        // (TriggerManager.PutPendingTriggersOnStackAsync →
+        // TargetCollection.CollectAsync → agent.ChooseTargetsAsync), so the
+        // ACTIVATING PLAYER picks the copy target instead of the engine
+        // auto-picking the first token. Resolution re-checks legality and
+        // falls back to the deterministic-first picker only when no agent
+        // recorded a choice (CR 608.2b) — preserving shape/dispatcher tests.
         // ----------------------------------------------------------------
+        TriggeredAbility? attackTrigger = null;
+
         var attackEffect = new Effect(
             $"{CardName}: create a token that's a copy of target token you control",
             () => CreateCopyOfTargetToken(
                 controller: card.Controller ?? owner,
+                trigger: attackTrigger,
                 picker: copyTargetPicker,
                 zones: zoneService));
 
-        var attackTrigger = new TriggeredAbility(
+        var copyTargetRequest = BuildCopyTargetRequest(card, owner);
+
+        attackTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
             condition: Triggers.OnAttackSelf(card),
             effects: new IEffect[] { attackEffect },
-            activeZones: new[] { ZoneType.Battlefield });
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[] { copyTargetRequest });
 
         card.AddAbility(attackTrigger);
         triggers?.RegisterTriggeredAbility(attackTrigger);
@@ -187,21 +213,64 @@ public static class EsikasChariotFactory
     }
 
     /// <summary>
+    /// CR 115.1 — the "target token you control" request for the attack
+    /// trigger. Candidates are enumerated live at agent-prompt time from the
+    /// chariot's CURRENT controller's battlefield (so a controller change
+    /// still scopes "you control" correctly) and restricted to token
+    /// permanents (CR 111.10). MinTargets/MaxTargets = 1.
+    /// </summary>
+    private static TargetRequest BuildCopyTargetRequest(Creature card, Player owner)
+    {
+        return new TargetRequest(
+            Description: "target token you control",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            CandidateGatherer: _ =>
+            {
+                var ctrl = card.Controller ?? owner;
+                if (ctrl == null) return Array.Empty<object>();
+                return ctrl.Zones.Battlefield.GetCards()
+                    .OfType<Creature>()
+                    .Where(c => c.IsToken && ReferenceEquals(c.Controller, ctrl))
+                    .Cast<object>()
+                    .ToList();
+            });
+    }
+
+    /// <summary>
     /// CR 508.1f attack-trigger effect — create a token that's a copy of
-    /// the chosen token creature <paramref name="controller"/> controls.
-    /// Selector receives the controller and returns the chosen target
-    /// (or null to no-op). Deterministic fallback when no selector is
-    /// supplied: first token-creature on the controller's battlefield.
-    /// V1 copies are lossy snapshots (CR 706.2 copiable values
-    /// approximated to name + base P/T + subtypes + keyword names),
-    /// mirroring <see cref="Majik.Core.Effects.CopyEffect"/>.
+    /// the chosen token <paramref name="controller"/> controls.
+    ///
+    /// <para>
+    /// Target resolution order (CR 608.2b — re-check legality at resolution):
+    /// </para>
+    /// <list type="number">
+    ///   <item><description>The agent-chosen target recorded on
+    ///   <paramref name="trigger"/> (<see cref="TriggeredAbility.ChosenTargets"/>),
+    ///   stamped by the prod TriggerManager seam after prompting the
+    ///   activating player — the real "target token you control" choice.</description></item>
+    ///   <item><description>The explicit <paramref name="picker"/> closure
+    ///   (used by shape/dispatcher tests that call <c>effect.Execute()</c>
+    ///   directly without an agent loop).</description></item>
+    ///   <item><description>The deterministic-first token-creature fallback
+    ///   (no agent, no picker — keeps the single-arg dispatcher path
+    ///   behaviour-preserving).</description></item>
+    /// </list>
+    ///
+    /// V1 copies are lossy snapshots (CR 706.2 copiable values approximated
+    /// to name + base P/T + subtypes + keyword names), mirroring
+    /// <see cref="Majik.Core.Effects.CopyEffect"/>.
     /// </summary>
     private static Creature? CreateCopyOfTargetToken(
         Player controller,
+        TriggeredAbility? trigger,
         Func<Player, Creature?>? picker,
         ZoneService? zones)
     {
-        var target = picker?.Invoke(controller) ?? DefaultPickTokenCreature(controller);
+        var target = ResolveChosenTarget(trigger, controller)
+            ?? picker?.Invoke(controller)
+            ?? DefaultPickTokenCreature(controller);
         if (target == null) return null;
 
         // CR 706.2 copiable values snapshot — name, base P/T, subtypes,
@@ -228,6 +297,31 @@ public static class EsikasChariotFactory
 
         var copy = TokenFactory.CreateOnBattlefield(spec, controller, zones);
         return copy;
+    }
+
+    /// <summary>
+    /// CR 608.2b — read the agent-chosen target recorded on the trigger
+    /// (stamped by the prod TriggerManager seam after prompting the
+    /// activating player), re-checking legality at resolution: it must still
+    /// be a token <see cref="Creature"/> the controller still controls.
+    /// Returns null when no legal choice was recorded so the caller falls
+    /// through to the explicit picker / deterministic fallback.
+    /// </summary>
+    private static Creature? ResolveChosenTarget(
+        TriggeredAbility? trigger, Player controller)
+    {
+        if (trigger is null
+            || trigger.ChosenTargets.Count == 0
+            || trigger.ChosenTargets[0].Count == 0)
+        {
+            return null;
+        }
+
+        return trigger.ChosenTargets[0][0] is Creature chosen
+            && chosen.IsToken
+            && ReferenceEquals(chosen.Controller, controller)
+            ? chosen
+            : null;
     }
 
     /// <summary>
