@@ -1,5 +1,6 @@
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Targeting;
 using Majik.Core.Zones;
 
@@ -24,9 +25,10 @@ public class DelayedTriggeredAbility : TriggeredAbility
         ITriggerCondition condition,
         IEnumerable<ITarget>? targets = null,
         IEnumerable<IEffect>? effects = null,
-        Func<bool>? interveningIf = null)
+        Func<bool>? interveningIf = null,
+        IEnumerable<TargetRequest>? targetRequests = null)
         : base(source, controller, condition, targets, effects, interveningIf,
-               activeZones: AllZones)
+               activeZones: AllZones, targetRequests: targetRequests)
     {
     }
 }
