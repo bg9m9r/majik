@@ -356,7 +356,8 @@ public static class LandActivatedAbilityBinder
         CardEntity entity,
         Player controller,
         ContinuousEffectsService effects,
-        TriggerManager? triggers = null)
+        TriggerManager? triggers = null,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(card);
         ArgumentNullException.ThrowIfNull(entity);
@@ -424,7 +425,7 @@ public static class LandActivatedAbilityBinder
             // skipped — Channel is a deferred family (no discard-activation seam).
             if (!cost.Contains("{T}", StringComparison.OrdinalIgnoreCase)) continue;
 
-            if (BindLine(land, controller, effects, triggers, cost, effectText))
+            if (BindLine(land, controller, effects, triggers, cost, effectText, eventBus))
                 boundAny = true;
         }
 
@@ -435,7 +436,7 @@ public static class LandActivatedAbilityBinder
     /// ManaCostCost when mana symbols are present, plus a self-Sacrifice when
     /// the cost says "Sacrifice this land". Returns the parsed mana text (or
     /// null) so callers can include it in effect descriptions.</summary>
-    private static List<ICost> BuildCosts(Land land, string cost, out bool sacrificesSelf)
+    private static List<ICost> BuildCosts(Land land, string cost, out bool sacrificesSelf, IEventBus? eventBus = null)
     {
         var costs = new List<ICost> { AdditionalCost.Tap(land) };
 
@@ -452,7 +453,11 @@ public static class LandActivatedAbilityBinder
         sacrificesSelf = SacrificeSelf.IsMatch(cost);
         if (sacrificesSelf)
         {
-            costs.Add(AdditionalCost.Sacrifice(land));
+            // CR 701.16a — a sacrifice paid as a cost is still a sacrifice. The
+            // bus-aware overload publishes PermanentSacrificedEvent crediting the
+            // cost-payer on the PRODUCTION binder path (utility lands route via the
+            // binder chain, not their [CardName] factory). Null = legacy posture.
+            costs.Add(AdditionalCost.Sacrifice(land, eventBus));
         }
 
         return costs;
@@ -755,13 +760,13 @@ public static class LandActivatedAbilityBinder
 
     private static bool BindLine(
         Land land, Player controller, ContinuousEffectsService effects,
-        TriggerManager? triggers, string cost, string effectText)
+        TriggerManager? triggers, string cost, string effectText, IEventBus? eventBus = null)
     {
         // --- Scry (Castle Vantress) ---------------------------------------
         if (ScryEffect.Match(effectText) is { Success: true } sm)
         {
             var n = int.Parse(sm.Groups["n"].Value);
-            BindScry(land, controller, cost, n);
+            BindScry(land, controller, cost, n, eventBus);
             return true;
         }
 
@@ -770,14 +775,14 @@ public static class LandActivatedAbilityBinder
         if (DrawEffect.Match(effectText) is { Success: true } dm)
         {
             var n = WordToInt(dm.Groups["n"].Value);
-            BindDraw(land, controller, cost, n, effectText);
+            BindDraw(land, controller, cost, n, effectText, eventBus);
             return true;
         }
 
         // --- +1/+1 counter on EACH creature you control (Gavony Township) --
         if (CounterEachYouControl.IsMatch(effectText))
         {
-            BindCounterEachYouControl(land, controller, cost);
+            BindCounterEachYouControl(land, controller, cost, eventBus);
             return true;
         }
 
@@ -785,7 +790,7 @@ public static class LandActivatedAbilityBinder
         if (EarthbendEffect.Match(effectText) is { Success: true } eb)
         {
             var n = int.Parse(eb.Groups["n"].Value);
-            BindEarthbend(land, controller, effects, triggers, cost, n, effectText);
+            BindEarthbend(land, controller, effects, triggers, cost, n, effectText, eventBus);
             return true;
         }
 
@@ -793,7 +798,7 @@ public static class LandActivatedAbilityBinder
         if (CounterOnTargetCreature.Match(effectText) is { Success: true } cm)
         {
             var n = WordToInt(cm.Groups["n"].Value);
-            BindCounterOnTargetCreature(land, controller, cost, n);
+            BindCounterOnTargetCreature(land, controller, cost, n, eventBus);
             return true;
         }
 
@@ -802,7 +807,7 @@ public static class LandActivatedAbilityBinder
         {
             var n = int.Parse(dem.Groups["n"].Value);
             var gain = ExtractGainLife(effectText);
-            BindDamageEachOpponent(land, controller, cost, n, gain);
+            BindDamageEachOpponent(land, controller, cost, n, gain, eventBus);
             return true;
         }
 
@@ -810,7 +815,7 @@ public static class LandActivatedAbilityBinder
         if (DamageAnyTarget.Match(effectText) is { Success: true } dam)
         {
             var n = int.Parse(dam.Groups["n"].Value);
-            BindDamageAnyTarget(land, controller, cost, n);
+            BindDamageAnyTarget(land, controller, cost, n, eventBus);
             return true;
         }
 
@@ -818,7 +823,7 @@ public static class LandActivatedAbilityBinder
         if (GainLifeEffect.Match(effectText) is { Success: true } gm)
         {
             var n = int.Parse(gm.Groups["n"].Value);
-            BindGainLife(land, controller, cost, n);
+            BindGainLife(land, controller, cost, n, eventBus);
             return true;
         }
 
@@ -827,14 +832,14 @@ public static class LandActivatedAbilityBinder
         if (CreaturesYouControlGainKeywords.Match(effectText) is { Success: true } kwm
             && TryParseGrantedKeywords(kwm.Groups["kw"].Value, out var grantedKeywords))
         {
-            BindGrantKeywordsToCreaturesYouControl(land, controller, effects, cost, grantedKeywords!);
+            BindGrantKeywordsToCreaturesYouControl(land, controller, effects, cost, grantedKeywords!, eventBus);
             return true;
         }
 
         // --- Return target artifact from your graveyard (Buried Ruin) ------
         if (ReturnArtifactFromGraveyard.IsMatch(effectText))
         {
-            BindReturnArtifactFromGraveyard(land, controller, cost);
+            BindReturnArtifactFromGraveyard(land, controller, cost, eventBus);
             return true;
         }
 
@@ -843,7 +848,7 @@ public static class LandActivatedAbilityBinder
         {
             if (Enum.TryParse<CardSubtype>(rm.Groups["type"].Value, ignoreCase: true, out var st))
             {
-                BindReturnTypedYouControlToHand(land, controller, cost, st);
+                BindReturnTypedYouControlToHand(land, controller, cost, st, eventBus);
                 return true;
             }
         }
@@ -851,7 +856,7 @@ public static class LandActivatedAbilityBinder
         // --- Create X Treasure tokens (Treasure Vault) — count-linked mint -
         if (CreateXTreasures.IsMatch(effectText))
         {
-            BindCreateXTreasures(land, controller, cost);
+            BindCreateXTreasures(land, controller, cost, eventBus);
             return true;
         }
 
@@ -860,7 +865,7 @@ public static class LandActivatedAbilityBinder
         //     simple-token path (which rejects the richer riders).
         if (CreateMiteToken.Match(effectText) is { Success: true } mite)
         {
-            BindCreateMiteToken(land, controller, cost, mite);
+            BindCreateMiteToken(land, controller, cost, mite, eventBus);
             return true;
         }
 
@@ -870,7 +875,7 @@ public static class LandActivatedAbilityBinder
         //     attack trigger with the live TriggerManager (CR 508.1f / 603.7).
         if (AttackRiderTokens.Match(effectText) is { Success: true } rider)
         {
-            BindAttackRiderTokens(land, controller, cost, triggers, rider, effectText);
+            BindAttackRiderTokens(land, controller, cost, triggers, rider, effectText, eventBus);
             return true;
         }
 
@@ -878,7 +883,7 @@ public static class LandActivatedAbilityBinder
         if (CreateSimpleToken.Match(effectText) is { Success: true } tm &&
             TryParseTokenSpec(tm, out var spec))
         {
-            BindCreateToken(land, controller, cost, spec!);
+            BindCreateToken(land, controller, cost, spec!, eventBus);
             return true;
         }
 
@@ -892,7 +897,7 @@ public static class LandActivatedAbilityBinder
                 ParseBasicSubtype(searchm.Groups["b"].Value),
                 ParseBasicSubtype(searchm.Groups["c"].Value),
             };
-            BindSearchNamedBasicsTapped(land, controller, cost, subtypes);
+            BindSearchNamedBasicsTapped(land, controller, cost, subtypes, eventBus);
             return true;
         }
 
@@ -905,7 +910,7 @@ public static class LandActivatedAbilityBinder
             // "controller may search" + "you may search" follow-up clauses on
             // the SAME ability so they sequence after the destroy.
             var searchRider = ParseDestroyBasicSearchRider(effectText);
-            BindDestroyTargetLand(land, controller, cost, nonbasicOnly, opponentOnly, searchRider);
+            BindDestroyTargetLand(land, controller, cost, nonbasicOnly, opponentOnly, searchRider, eventBus);
             return true;
         }
 
@@ -915,9 +920,9 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     // Scry — Castle Vantress "{2}{U}{U}, {T}: Scry 2." (CR 701.20)
     // ----------------------------------------------------------------------
-    private static void BindScry(Land land, Player controller, string cost, int n)
+    private static void BindScry(Land land, Player controller, string cost, int n, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var effect = new Effect(
             $"{land.Name}: scry {n}",
             async ctx =>
@@ -956,9 +961,9 @@ public static class LandActivatedAbilityBinder
     // double-draw is bound as its base "draw a card" with the conditional
     // riders deferred (xmldoc) — the card-advantage signal is covered.
     // ----------------------------------------------------------------------
-    private static void BindDraw(Land land, Player controller, string cost, int n, string effectText)
+    private static void BindDraw(Land land, Player controller, string cost, int n, string effectText, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         // Castle Locthwain: "Draw a card, then you lose life equal to the
         // number of cards in your hand." Model the life loss after the draw.
@@ -1000,9 +1005,9 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     // +1/+1 counter on EACH creature you control — Gavony Township. (CR 122)
     // ----------------------------------------------------------------------
-    private static void BindCounterEachYouControl(Land land, Player controller, string cost)
+    private static void BindCounterEachYouControl(Land land, Player controller, string cost, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var effect = new Effect(
             $"{land.Name}: put a +1/+1 counter on each creature you control",
             () =>
@@ -1041,9 +1046,9 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     private static void BindGrantKeywordsToCreaturesYouControl(
         Land land, Player controller, ContinuousEffectsService effects,
-        string cost, IReadOnlyList<string> keywords)
+        string cost, IReadOnlyList<string> keywords, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var label = string.Join(" and ", keywords).ToLowerInvariant();
         var effect = new Effect(
             $"{land.Name}: creatures you control gain {label} until end of turn",
@@ -1078,9 +1083,9 @@ public static class LandActivatedAbilityBinder
     // (no binder-reachable sorcery-speed seam on this generic path; the
     // counter itself binds + targets correctly).
     // ----------------------------------------------------------------------
-    private static void BindCounterOnTargetCreature(Land land, Player controller, string cost, int n)
+    private static void BindCounterOnTargetCreature(Land land, Player controller, string cost, int n, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         ActivatedAbility? ability = null;
         var effect = new Effect(
@@ -1140,9 +1145,9 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     private static void BindEarthbend(
         Land land, Player controller, ContinuousEffectsService effects,
-        TriggerManager? triggers, string cost, int n, string effectText)
+        TriggerManager? triggers, string cost, int n, string effectText, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var sorcerySpeed = Regex.IsMatch(
             effectText, @"Activate\s+only\s+as\s+a\s+sorcery", RegexOptions.IgnoreCase);
 
@@ -1304,9 +1309,9 @@ public static class LandActivatedAbilityBinder
     // typed-sacrifice-chooser primitive); the {2}{R}{R} + {T} cost + damage
     // effect bind.
     // ----------------------------------------------------------------------
-    private static void BindDamageEachOpponent(Land land, Player controller, string cost, int n, int gain)
+    private static void BindDamageEachOpponent(Land land, Player controller, string cost, int n, int gain, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var effect = new Effect(
             $"{land.Name}: deal {n} damage to each opponent" + (gain > 0 ? $"; gain {gain} life" : ""),
             ctx =>
@@ -1331,9 +1336,9 @@ public static class LandActivatedAbilityBinder
     // threshold timing gate is deferred (no binder-reachable canActivate seam
     // for graveyard-count); the damage itself binds + targets.
     // ----------------------------------------------------------------------
-    private static void BindDamageAnyTarget(Land land, Player controller, string cost, int n)
+    private static void BindDamageAnyTarget(Land land, Player controller, string cost, int n, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         ActivatedAbility? ability = null;
         var effect = new Effect(
@@ -1367,9 +1372,9 @@ public static class LandActivatedAbilityBinder
     // sacrifice cost is deferred (no typed-sacrifice-chooser primitive); the
     // {1} + {T} cost + gain-life effect bind.
     // ----------------------------------------------------------------------
-    private static void BindGainLife(Land land, Player controller, string cost, int n)
+    private static void BindGainLife(Land land, Player controller, string cost, int n, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var effect = new Effect(
             $"{land.Name}: gain {n} life",
             () => Fx.GainLife(land.Controller ?? controller, n));
@@ -1382,9 +1387,9 @@ public static class LandActivatedAbilityBinder
     // Return target artifact card from YOUR graveyard to hand — Buried Ruin.
     // (CR 608.2b). TargetRequest over the controller's graveyard artifacts.
     // ----------------------------------------------------------------------
-    private static void BindReturnArtifactFromGraveyard(Land land, Player controller, string cost)
+    private static void BindReturnArtifactFromGraveyard(Land land, Player controller, string cost, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         ActivatedAbility? ability = null;
         var effect = new Effect(
@@ -1419,9 +1424,9 @@ public static class LandActivatedAbilityBinder
     // (CR 608.2b). TargetRequest over the controller's battlefield permanents
     // of the named subtype.
     // ----------------------------------------------------------------------
-    private static void BindReturnTypedYouControlToHand(Land land, Player controller, string cost, CardSubtype subtype)
+    private static void BindReturnTypedYouControlToHand(Land land, Player controller, string cost, CardSubtype subtype, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         ActivatedAbility? ability = null;
         var effect = new Effect(
@@ -1458,9 +1463,9 @@ public static class LandActivatedAbilityBinder
     // (unknown keyword phrasing / "tapped and attacking" rider) and fall through
     // to deferred (xmldoc) — the simple white Human / colored token binds.
     // ----------------------------------------------------------------------
-    private static void BindCreateToken(Land land, Player controller, string cost, TokenFactory.TokenSpec spec)
+    private static void BindCreateToken(Land land, Player controller, string cost, TokenFactory.TokenSpec spec, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var effect = new Effect(
             $"{land.Name}: create a {spec.Power}/{spec.Toughness} {spec.Name} token",
             () =>
@@ -1497,9 +1502,9 @@ public static class LandActivatedAbilityBinder
     // (X tokens for the chosen X); the {X}{X} double-payment exactness is a
     // separate, pre-existing engine-wide concern.
     // ----------------------------------------------------------------------
-    private static void BindCreateXTreasures(Land land, Player controller, string cost)
+    private static void BindCreateXTreasures(Land land, Player controller, string cost, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         var effect = new Effect(
             $"{land.Name}: create X Treasure tokens",
@@ -1533,9 +1538,9 @@ public static class LandActivatedAbilityBinder
     // CombatAbilities.HasCantBlock). Minted through the TokenCreationIntent path
     // so token-doublers (Doubling Season) can rewrite the count.
     // ----------------------------------------------------------------------
-    private static void BindCreateMiteToken(Land land, Player controller, string cost, Match m)
+    private static void BindCreateMiteToken(Land land, Player controller, string cost, Match m, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var power = int.Parse(m.Groups["p"].Value);
         var toughness = int.Parse(m.Groups["t"].Value);
         var toxic = m.Groups["toxic"].Success ? int.Parse(m.Groups["toxic"].Value) : 0;
@@ -1599,10 +1604,10 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     private static void BindAttackRiderTokens(
         Land land, Player controller, string cost, TriggerManager? triggers, Match m,
-        string effectText)
+        string effectText, IEventBus? eventBus = null)
     {
         var sacrificeAtEndStep = SacrificeThemNextEndStep.IsMatch(effectText);
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var count = ParseCountWord(m.Groups["count"].Value);
         var power = int.Parse(m.Groups["p"].Value);
         var toughness = int.Parse(m.Groups["t"].Value);
@@ -1756,9 +1761,9 @@ public static class LandActivatedAbilityBinder
     // ----------------------------------------------------------------------
     private static void BindDestroyTargetLand(
         Land land, Player controller, string cost,
-        bool nonbasicOnly, bool opponentOnly, DestroyBasicSearchRider rider = default)
+        bool nonbasicOnly, bool opponentOnly, DestroyBasicSearchRider rider = default, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
 
         ActivatedAbility? ability = null;
         var label = $"{land.Name}: destroy target {(nonbasicOnly ? "nonbasic " : "")}land" +
@@ -1897,9 +1902,9 @@ public static class LandActivatedAbilityBinder
     // then the library is shuffled (CR 701.20a — whether or not found).
     // ----------------------------------------------------------------------
     private static void BindSearchNamedBasicsTapped(
-        Land land, Player controller, string cost, CardSubtype[] subtypes)
+        Land land, Player controller, string cost, CardSubtype[] subtypes, IEventBus? eventBus = null)
     {
-        var costs = BuildCosts(land, cost, out _);
+        var costs = BuildCosts(land, cost, out _, eventBus);
         var label = string.Join(", ", subtypes);
 
         var effect = new Effect(

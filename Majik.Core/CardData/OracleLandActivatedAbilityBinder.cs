@@ -4,6 +4,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.CardData;
 using Majik.Core.Costs;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
@@ -109,7 +110,14 @@ public static class OracleLandActivatedAbilityBinder
     /// <see cref="Land"/>.
     /// </summary>
     /// <returns><c>true</c> when an ability was attached; <c>false</c> otherwise.</returns>
-    public static bool Bind(ICard card, CardEntity entity, Player controller)
+    /// <param name="eventBus">Optional event bus. When supplied, the self-sacrifice
+    /// leg of the bound fetch-land cost (CR 701.16a — a sacrifice paid as a cost is
+    /// still a sacrifice) publishes a <see cref="PermanentSacrificedEvent"/> crediting
+    /// the cost-payer, so "whenever a/an [player] sacrifices …" aristocrat payoffs
+    /// observe the fetch-land sacrifice on the PRODUCTION binder path (lands route via
+    /// the binder chain, not their [CardName] factory). Null preserves the legacy
+    /// publish-nothing posture.</param>
+    public static bool Bind(ICard card, CardEntity entity, Player controller, IEventBus? eventBus = null)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -139,7 +147,7 @@ public static class OracleLandActivatedAbilityBinder
         if (BasicLandFetchTapped.IsMatch(text))
         {
             var untapsWhenFourLands = FabledPassageUntapRider.IsMatch(text);
-            BindBasicLandFetchTapped(land, controller, untapsWhenFourLands);
+            BindBasicLandFetchTapped(land, controller, untapsWhenFourLands, eventBus);
             return true;
         }
 
@@ -148,7 +156,7 @@ public static class OracleLandActivatedAbilityBinder
         // ordering is for clarity, not correctness.
         if (BasicLandFetch.IsMatch(text))
         {
-            BindBasicLandFetch(land, controller);
+            BindBasicLandFetch(land, controller, eventBus);
             return true;
         }
 
@@ -175,7 +183,7 @@ public static class OracleLandActivatedAbilityBinder
             {
                 AdditionalCost.Tap(fetchLand),
                 AdditionalCost.PayLife(1),
-                AdditionalCost.Sacrifice(fetchLand),
+                AdditionalCost.Sacrifice(fetchLand, eventBus),
             },
             effects: new IEffect[]
             {
@@ -193,7 +201,7 @@ public static class OracleLandActivatedAbilityBinder
     /// Sacrifice cost as the colour-pair cycle, but the effect searches for ANY
     /// basic land (CR 205.4a) rather than two named basic-land subtypes.
     /// </summary>
-    private static void BindBasicLandFetch(Land land, Player controller)
+    private static void BindBasicLandFetch(Land land, Player controller, IEventBus? eventBus = null)
     {
         var fetchLand = land;
         var ctrl = controller;
@@ -205,7 +213,7 @@ public static class OracleLandActivatedAbilityBinder
             {
                 AdditionalCost.Tap(fetchLand),
                 AdditionalCost.PayLife(1),
-                AdditionalCost.Sacrifice(fetchLand),
+                AdditionalCost.Sacrifice(fetchLand, eventBus),
             },
             effects: new IEffect[]
             {
@@ -270,7 +278,7 @@ public static class OracleLandActivatedAbilityBinder
     /// not). Mirrors <c>TerramorphicExpanseFactory</c> / <c>FabledPassageFactory</c>
     /// so the live binder path matches the (test-only) factory path exactly.
     /// </summary>
-    private static void BindBasicLandFetchTapped(Land land, Player controller, bool untapsWhenFourLands)
+    private static void BindBasicLandFetchTapped(Land land, Player controller, bool untapsWhenFourLands, IEventBus? eventBus = null)
     {
         var fetchLand = land;
         var ctrl = controller;
@@ -282,11 +290,13 @@ public static class OracleLandActivatedAbilityBinder
                 : "sac self + tutor basic land -> battlefield tapped, shuffle",
             async ctx =>
             {
-                // Self-sacrifice inlined in the resolve closure because
-                // AdditionalCost.Sacrifice.Pay() is a no-op stub (same posture
-                // as the factories). Must happen before the search so the
-                // source is no longer on the battlefield and so it does not
-                // inflate the four-or-more-lands count for Fabled Passage.
+                // The self-sacrifice is paid by AdditionalCost.Sacrifice as a
+                // proper cost (CostPayment runs it BEFORE this effect resolves),
+                // so by the time the closure fires the source is already in the
+                // graveyard and does not inflate the four-or-more-lands count for
+                // Fabled Passage. The bus-aware overload also publishes the
+                // PermanentSacrificedEvent (CR 701.16a). Idempotent guard kept
+                // for the bus-less shape path where no service mutated zones.
                 SacrificeToOwnersGraveyard(fetchLand);
 
                 await BasicLandFetchTappedEffectAsync(ctrl, untapsWhenFourLands, ctx)
@@ -299,7 +309,7 @@ public static class OracleLandActivatedAbilityBinder
             costs: new ICost[]
             {
                 AdditionalCost.Tap(fetchLand),
-                AdditionalCost.Sacrifice(fetchLand),
+                AdditionalCost.Sacrifice(fetchLand, eventBus),
             },
             effects: new IEffect[] { fetchEffect });
 
