@@ -106,6 +106,40 @@ public static class ThievesGuildEnforcerFactory
             allPlayersResolver: null);
 
     /// <summary>
+    /// Effects-aware overload matched by the source generator's production
+    /// instance-swap route (<c>NamedCardFactory.Create(name, owner, effects)</c>).
+    /// This is the ONLY overload the live <c>GameFacade</c> routed build calls —
+    /// it threads no per-factory resolver — so the conditional self-buff
+    /// predicate (CR 700.2g, "as long as an opponent has 8+ cards in their
+    /// graveyard") must read its opponents from the live game graph, not a
+    /// closure captured at factory-build time.
+    ///
+    /// <para>CR 102.1 — the predicate scans every OPPONENT's graveyard. The live
+    /// player roster comes from <see cref="ContinuousEffectsService.PlayersProvider"/>,
+    /// wired by the game graph (GameFacade / Game). When the roster is wired the
+    /// conditional +2/+1 + deathtouch becomes correct in a real match; when it
+    /// is not (pure card-shape construction with a bare service) the predicate
+    /// reads an empty roster and stays inactive — the same safe no-op as the
+    /// captured-resolver-null path.</para>
+    ///
+    /// <para>The live <see cref="TriggerManager"/> still requires the 4-arg
+    /// overload (no per-game trigger-manager registry exists to recover it from
+    /// the service) — the each-opponent mill TRIGGER body already reads its
+    /// opponents off the resolution context regardless, so the only thing this
+    /// overload cannot wire is auto-registration of that trigger with a manager.
+    /// Mirrors <see cref="KatakiWarsWageFactory"/>'s 2-arg effects-aware
+    /// overload.</para>
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects)
+        => Create(
+            owner,
+            continuousEffects: effects,
+            triggers: null,
+            allPlayersResolver: effects?.PlayersProvider is { } roster
+                ? () => roster()?.ToList() ?? (IReadOnlyList<Player>)Array.Empty<Player>()
+                : null);
+
+    /// <summary>
     /// Construct a fully-wired Thieves' Guild Enforcer.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
@@ -118,11 +152,15 @@ public static class ThievesGuildEnforcerFactory
     /// <param name="allPlayersResolver">Closure returning the full
     /// player list. The mill trigger body no longer uses this — it reads each
     /// opponent from the live resolution context (<c>ContextOpponents.Of</c>)
-    /// so the mill is correct on prod. This resolver now feeds ONLY the
+    /// so the mill is correct on prod. This resolver feeds ONLY the
     /// conditional self-buff predicate (scan opponents' graveyards), which runs
     /// in the continuous-effects layer (no resolution context available there).
-    /// Without it the buff predicate stays inactive — a continuous-effect infra
-    /// gap, not the each-opponent effect-body bug.</param>
+    /// On the production routed build the 2-arg
+    /// <see cref="Create(Player, ContinuousEffectsService)"/> overload derives
+    /// this resolver from <see cref="ContinuousEffectsService.PlayersProvider"/>
+    /// (wired by the game graph), so the buff predicate reads opponents live
+    /// without a captured resolver. Null here → the buff predicate reads an empty
+    /// roster and stays inactive (a safe no-op for shape-only construction).</param>
     public static Creature Create(
         Player owner,
         ContinuousEffectsService? continuousEffects,

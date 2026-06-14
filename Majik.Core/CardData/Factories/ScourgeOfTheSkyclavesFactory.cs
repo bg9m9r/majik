@@ -95,17 +95,55 @@ public static class ScourgeOfTheSkyclavesFactory
         Create(owner, allPlayersResolver: null, effects: null, eventBus: null, triggers: null);
 
     /// <summary>
+    /// Effects-aware overload matched by the source generator's production
+    /// instance-swap route (<c>NamedCardFactory.Create(name, owner, effects)</c>).
+    /// This is the ONLY overload the live <c>GameFacade</c> routed build calls —
+    /// it threads no per-factory resolver — so the CDA's "highest life total
+    /// among players" lookup (CR 604.3 / 613.2 Layer 7a) must read all players
+    /// from the live game graph, not a closure captured at factory-build time.
+    ///
+    /// <para>CR 102.1 — "among players" spans EVERY player. The live roster comes
+    /// from <see cref="ContinuousEffectsService.PlayersProvider"/> (wired by the
+    /// game graph), and the CDA-lifecycle event bus from
+    /// <see cref="ContinuousEffectsService.EventBus"/> so ETB/LTB register/
+    /// unregister and life-total changes re-evaluate the P/T. When the roster is
+    /// wired the CDA becomes correct in a real match; when it is not (pure
+    /// card-shape construction with a bare service) the CDA seeds the printed 20
+    /// (no life to subtract) — the same safe fallback as the captured-resolver-
+    /// null path.</para>
+    ///
+    /// <para>The live <see cref="TriggerManager"/> still requires the 5-arg
+    /// overload (no per-game trigger-manager registry exists to recover it from
+    /// the service) — the each-player half-life-loss cast TRIGGER body already
+    /// reads its players off the resolution context regardless. Mirrors
+    /// <see cref="KatakiWarsWageFactory"/>'s 2-arg effects-aware overload.</para>
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(
+            owner,
+            allPlayersResolver: effects?.PlayersProvider is { } roster
+                ? () => roster()?.ToList() ?? (IReadOnlyList<Player>)Array.Empty<Player>()
+                : null,
+            effects: effects,
+            eventBus: effects?.EventBus,
+            triggers: null);
+
+    /// <summary>
     /// Construct Scourge with optional runtime services.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="allPlayersResolver">Returns the full player list at
     /// evaluation time. The cast trigger no longer uses this — it reads each
     /// player from the live resolution context (<c>ctx.Game.AllPlayers</c>) so
-    /// the half-life loss is correct on prod. This resolver now feeds ONLY the
+    /// the half-life loss is correct on prod. This resolver feeds ONLY the
     /// CDA's "highest life among players" lookup, which runs in the
-    /// continuous-effects layer (no resolution context available there). Null →
-    /// the CDA seeds 0/0 (a continuous-effect infra gap, not the each-player
-    /// effect-body bug).</param>
+    /// continuous-effects layer (no resolution context available there). On the
+    /// production routed build the 2-arg
+    /// <see cref="Create(Player, ContinuousEffectsService)"/> overload derives
+    /// this resolver from <see cref="ContinuousEffectsService.PlayersProvider"/>
+    /// (wired by the game graph), so the CDA reads all players live without a
+    /// captured resolver. Null here → the CDA seeds the printed 20 (a safe
+    /// fallback for shape-only construction).</param>
     /// <param name="effects">Continuous-effects service the CDA registers
     /// against on ETB. Pass null for shape-only P/T.</param>
     /// <param name="eventBus">Event bus for ETB/LTB CDA tracking. May be
