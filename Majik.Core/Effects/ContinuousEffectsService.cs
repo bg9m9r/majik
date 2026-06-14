@@ -1066,6 +1066,61 @@ public sealed class ContinuousEffectsService
     }
 
     /// <summary>
+    /// CR 105.3 / CR 613.1e — the EFFECTIVE colour set of a permanent after the
+    /// Layer-5 (colour-changing) pass, computed WITHOUT running Layer 6 / 7.
+    /// Mirrors <see cref="EffectiveKeywords"/>: colour-affecting effects never
+    /// live above Layer 5, so the result is identical to
+    /// <c>Compute(perm).Colors</c> for colour purposes — but stopping at Layer 5
+    /// is what makes this call RE-ENTRANCY-SAFE for a Layer-6/7c effect that
+    /// gates on the permanent's colour.
+    ///
+    /// <para>The use case is a colour-conditional Layer-6/7c boost — Steel of
+    /// the Godhead ("As long as enchanted creature is white …" / "… is
+    /// blue …"). Its <see cref="ContinuousEffect.AppliesTo(Creature)"/> must
+    /// read the creature's POST-Layer-5 colour to decide whether the boost
+    /// applies; calling <see cref="Permanent.GetEffectiveColors"/> there would
+    /// re-enter the full <see cref="Compute(Permanent)"/> for the SAME permanent
+    /// and recurse back through that boost's <c>AppliesTo</c>. Applying only
+    /// layers ≤ <see cref="Layer.Color"/> here respects the CR 613.8 dependency
+    /// (the colour-gated Layer-6/7c effect depends on the Layer-5 colour pass)
+    /// without the recursion. NOT memoized; a single bounded pass over the
+    /// active effects.</para>
+    /// </summary>
+    public IReadOnlySet<Majik.Core.ValueObjects.ManaColor> EffectiveColors(Permanent perm)
+    {
+        if (perm == null) throw new ArgumentNullException(nameof(perm));
+
+        var chars = SeedPrintedCharacteristics(perm);
+
+        if (_effects.Count == 0) return chars.Colors;
+
+        var stripped = ComputeStrippedSet();
+        SyncAbilityGrants(stripped);
+
+        var applicable = _effects
+            .Where(e => (int)e.Layer <= (int)Layer.Color)
+            .Where(e => e.IsActive() && e.AppliesTo(perm))
+            .Where(e => e is LoseAllAbilitiesEffect
+                        || e.Source is not Creature src
+                        || !stripped.Contains(src))
+            .ToList();
+
+        var byLayer = applicable
+            .GroupBy(e => (int)e.Layer)
+            .OrderBy(g => g.Key);
+
+        foreach (var group in byLayer)
+        {
+            foreach (var effect in TopoSortByDependencies(group.ToList()))
+            {
+                effect.Apply(chars);
+            }
+        }
+
+        return chars.Colors;
+    }
+
+    /// <summary>
     /// CR 613.2 — current controller of a permanent after applying any
     /// active Layer 2 control-change effects (latest-timestamp wins). Falls
     /// back to <see cref="Permanent.Controller"/> when no override is active.
