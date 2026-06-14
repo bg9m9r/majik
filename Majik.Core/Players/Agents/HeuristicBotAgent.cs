@@ -787,10 +787,20 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             // rationale as CanAffordWithReserve.
             .Where(p => Majik.Core.Effects.EffectiveManaAbilities.For(p, layers: null).Count > 0)
             .Count();
-        // Subtract the printed non-X portion of the cost — the engine has
-        // already required printed cost paid; X mana sits on top.
-        var printed = ManaCost.Parse(source.ManaCost ?? "").TotalValue;
-        var available = Math.Max(0, untapped - printed);
+        // Subtract the EFFECTIVE non-X portion of the cost — the engine has
+        // already required the (reduced) non-X cost paid; X mana sits on top.
+        // CR 117.7 / 601.2f — a cost-reduction static (Goblin Electromancer,
+        // affinity, Domain, …) lowers the generic portion of the spell's
+        // non-X cost, leaving MORE mana for {X}. Mirror the cast pipeline's
+        // CostReduction.GetEffectiveCost (the same layer SpellCastFlow pays
+        // with) so the affordable-X math accounts for those reducers; using
+        // the raw printed cost here makes the bot under-spend on X whenever a
+        // reducer is in play. The {X} pip itself contributes 0 to TotalValue,
+        // so the reduced TotalValue is exactly the non-X mana the bot must
+        // hold back before sinking the rest into X.
+        var nonXCost = Majik.Core.Costs.CostReduction
+            .GetEffectiveCost(source, ctx.Self, ctx.AllPlayers).TotalValue;
+        var available = Math.Max(0, untapped - nonXCost);
 
         // Lethal-face heuristic: if there's an opponent at low life and the
         // card likely deals X damage, aim for exact-lethal.

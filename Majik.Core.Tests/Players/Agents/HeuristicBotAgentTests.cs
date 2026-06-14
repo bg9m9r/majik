@@ -446,6 +446,40 @@ public class HeuristicBotAgentTests
     }
 
     [Fact]
+    public async Task ChooseX_UnderCostReducer_SubtractsEffectiveCost_PicksLargerX()
+    {
+        // CR 117.7 / 601.2f — a cost-reduction static (Goblin Electromancer:
+        // "Instant and sorcery spells you cast cost {1} less") lowers the
+        // GENERIC portion of the spell's non-X cost, so MORE mana is left for
+        // {X}. The affordable-X math must subtract the EFFECTIVE (reduced) cost
+        // — not the raw printed cost — or the bot under-spends on X.
+        //
+        // 6 untapped Mountains; X-spell printed {X}{2}{R} (non-X TotalValue 3).
+        // Under Electromancer it pays {X}{1}{R} (non-X TotalValue 2), so X = 4.
+        // Pre-fix (raw printed) the bot would pick X = 3.
+        for (var i = 0; i < 6; i++)
+        {
+            var mtn = NamedCardFactory.Create("Mountain", _alice);
+            mtn.SetZone(ZoneType.Battlefield);
+            _alice.Zones.Battlefield.AddCard(mtn);
+        }
+        var electromancer = NamedCardFactory.Create("Goblin Electromancer", _alice);
+        electromancer.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(electromancer);
+
+        var xSpell = new Instant("Comet Storm Proxy", "2R"); // printed {X}{2}{R}
+        xSpell.SetOwner(_alice);
+        xSpell.SetController(_alice);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+
+        var x = await bot.ChooseXAsync(ctx, xSpell);
+        x.Should().Be(4); // 6 untapped - effective non-X cost {1}{R} (=2)
+    }
+
+    [Fact]
     public async Task ChooseMode_OppHasCreature_PrefersRemoval()
     {
         // Opp has a creature; modes include "Destroy target creature" vs
