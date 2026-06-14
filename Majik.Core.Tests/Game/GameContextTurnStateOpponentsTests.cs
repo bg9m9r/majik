@@ -76,4 +76,40 @@ public class GameContextTurnStateOpponentsTests
 
         ctx.Opponents.Select(p => p.Name).Should().BeEquivalentTo(new[] { "Bob" });
     }
+
+    [Fact]
+    public void Opponents_RepeatedAccess_ReturnsSameCachedInstance()
+    {
+        // Perf: the accessor sits on the MCTS legality hot path
+        // (LegalActionEnumerator). It must NOT allocate a fresh list on every
+        // call when the opponent set is unchanged — repeated reads return the
+        // memoized instance.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var ctx = Ctx(alice, null, alice, bob);
+
+        var first = ctx.Opponents;
+        var second = ctx.Opponents;
+
+        second.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void Opponents_RecomputesWhenAnOpponentLeavesTheGame()
+    {
+        // CR 102.4 / 800.4 — a player who leaves the game (HasLost flips) is no
+        // longer an opponent. The cache must invalidate when the live HasLost
+        // state changes underneath a context (contexts outlive a single SBA
+        // loss check on the search hot path).
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        var ctx = Ctx(alice, null, alice, bob, carol);
+
+        ctx.Opponents.Select(p => p.Name).Should().BeEquivalentTo(new[] { "Bob", "Carol" });
+
+        bob.HasLost = true;
+
+        ctx.Opponents.Select(p => p.Name).Should().BeEquivalentTo(new[] { "Carol" });
+    }
 }
