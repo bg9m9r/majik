@@ -1556,4 +1556,86 @@ public class AgathasSoulCauldronTests
         bearer.GetPower().Should().Be(powerBefore + 2,
             "resolving the re-homed ability through ResolveAsync pumps the BEARER");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-factory-resolutioncontext-source-migration — a second
+    // batch of bespoke [CardName]-factory creatures whose {cost}: Regenerate
+    // <self> activated abilities were migrated to read ResolutionContext.Source
+    // + marked RebindSafe. Skithiryx is the case the oracle-rebuild fallback
+    // CANNOT cover: its printed regenerate names the creature ("Regenerate
+    // Skithiryx"), not "this creature", so OracleActivatedAbilityBinder's
+    // RegenerateSelfRegex never matches — only the PRIMARY RebindTo path of the
+    // REAL ability re-homes it. Mortivore / River Boa say "Regenerate this
+    // creature" (the fallback could rebuild those), but migrating them lets the
+    // RebindTo path re-home the REAL ability instead of a text reconstruction.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Skithiryx_RegenerateToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // {cost}: Regenerate <self> activated ability is now RebindSafe (reads
+        // ResolutionContext.Source). The oracle text says "Regenerate
+        // Skithiryx" (BY NAME) so the oracle-rebuild fallback cannot reconstruct
+        // it — the RebindTo of the real ability is the only sound re-home.
+        var skithiryx = SkithiryxTheBlightDragonFactory.Create(alice);
+        var realRegen = skithiryx.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realRegen.Should().ContainSingle("Skithiryx has exactly one (regenerate) activated ability");
+        realRegen.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Skithiryx regenerate reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(skithiryx);
+        skithiryx.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Skithiryx so the only way a
+        // regenerate is granted is via RebindTo of the real ability — if the
+        // grant still depended on the oracle fallback, nothing would be emitted
+        // for a by-name regenerate and this test would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), skithiryx);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Skithiryx's real regenerate ability is re-homed via RebindTo");
+        var regen = granted[0];
+        regen.Source.Should().BeSameAs(bearer,
+            "the re-homed regenerate is sourced on the BEARER (CR 707.2)");
+        regen.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Resolving the re-homed regenerate shields the BEARER (CR 701.18),
+        // never the exiled Skithiryx.
+        var bearerShieldsBefore = bearer.RegenerationShieldCount;
+        await regen.ResolveAsync(agent: null, game: null);
+        bearer.RegenerationShieldCount.Should().Be(bearerShieldsBefore + 1,
+            "the re-homed regenerate shields the BEARER (ResolutionContext.Source = bearer)");
+        skithiryx.RegenerationShieldCount.Should().Be(0,
+            "the exiled imprinted Skithiryx never receives the shield");
+    }
+
+    [Fact]
+    public async Task BespokeRegenerate_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still shields its OWN source on the normal
+        // (un-rebound) resolution path — ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var skithiryx = SkithiryxTheBlightDragonFactory.Create(alice);
+        var regen = skithiryx.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        skithiryx.RegenerationShieldCount.Should().Be(0);
+        await regen.ResolveAsync(agent: null, game: null);
+        skithiryx.RegenerationShieldCount.Should().Be(1,
+            "resolving the un-rebound regenerate shields its own source");
+    }
 }

@@ -128,8 +128,15 @@ namespace Majik.Core.CardData.Factories;
 ///   {B} regenerate now read
 ///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> and are
 ///   <see cref="ActivatedAbility.RebindSafe"/>, so the RebindTo path re-homes
-///   the REAL abilities to a bearer. The residual is now confined to the
-///   remaining un-migrated bespoke-factory closures — every data-driven
+///   the REAL abilities to a bearer. The bespoke <b>regenerate-self</b> batch
+///   has joined: <see cref="SkithiryxTheBlightDragonFactory"/> (its printed
+///   "Regenerate Skithiryx" names the creature, so the oracle fallback's
+///   "Regenerate this creature" form CANNOT reconstruct it — only RebindTo of
+///   the real ability re-homes it), <see cref="MortivoreFactory"/> and
+///   <see cref="RiverBoaFactory"/> now read
+///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> and are
+///   <see cref="ActivatedAbility.RebindSafe"/>. The residual is now confined to
+///   the remaining un-migrated bespoke-factory closures — every data-driven
 ///   activated ability is covered. A correct partial beats a broken "all".
 ///   Tracked: v1-deferrals.
 /// </summary>

@@ -115,16 +115,32 @@ public static class MortivoreFactory
         // CR 701.18 — "Regenerate [self]" = create a regeneration shield
         // on the target (CR 701.15a). Activated ability, regular speed,
         // any number of times per turn (shields stack and clear at EOT).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect shields the live ResolutionContext.Source
+        // (the ability's own Source at resolution) rather than capturing
+        // `card`, falling back to `card` only on the context-less legacy sync
+        // path. Marked RebindSafe so Agatha's Soul Cauldron re-homes the REAL
+        // regenerate ability to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f). (Mortivore's CDA P/T
+        // is a static, not an activated ability, so it is unaffected — Agatha
+        // grants only activated abilities.)
         // ---------------------------------------------------------------
         var regenerateEffect = new Effect(
-            $"{CardName}: regenerate self",
-            () => card.AddRegenerationShield());
+            $"{CardName}: regenerate self (CR 701.18)",
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                subject.AddRegenerationShield();
+                return ValueTask.CompletedTask;
+            });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{B}") },
-            effects: new IEffect[] { regenerateEffect }));
+            effects: new IEffect[] { regenerateEffect },
+            rebindSafe: true));
 
         // ---------------------------------------------------------------
         // Layer 7a CDA P/T lifecycle wiring.
