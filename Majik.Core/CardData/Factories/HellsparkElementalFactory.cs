@@ -5,6 +5,7 @@ using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -101,6 +102,22 @@ public static class HellsparkElementalFactory
         Create(owner, zoneService: null, triggers: null);
 
     /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, ContinuousEffectsService?)"/>).
+    /// Hellspark Elemental registers no continuous effect, but its end-step
+    /// self-sacrifice (CR 701.16) must publish a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// sacrifice payoffs ("whenever an opponent sacrifices…") see it — so this
+    /// forwards the bus from <c>effects.EventBus</c> into the sac closure.
+    /// Without this overload the routed build falls through to single-arg
+    /// dispatch and the resolve-time self-sacrifice publishes nothing (the
+    /// resolve-time-fx-sacrifice-bus pay-down; mirrors Spark Elemental).
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, zoneService: null, triggers: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct a fully-wired Hellspark Elemental. When
     /// <paramref name="zoneService"/> is supplied the sacrifice + unearth
     /// return route through <see cref="ZoneService.MoveCard"/> so the
@@ -108,11 +125,15 @@ public static class HellsparkElementalFactory
     /// <paramref name="triggers"/> is supplied the end-step sacrifice
     /// trigger is registered, and each unearth activation registers its own
     /// one-shot delayed end-step <b>exile</b> trigger (CR 603.7 / 702.84c).
+    /// When <paramref name="eventBus"/> is supplied (the prod effects-aware
+    /// build) the end-step self-sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
     /// </summary>
     public static Creature Create(
         Player owner,
         ZoneService? zoneService,
-        TriggerManager? triggers)
+        TriggerManager? triggers,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -143,7 +164,7 @@ public static class HellsparkElementalFactory
         // ----------------------------------------------------------------
         var sacEffect = new Effect(
             $"{CardName}: at the beginning of the end step, sacrifice this creature",
-            () => SacrificeSelf(card, owner, zoneService));
+            () => SacrificeSelf(card, owner, zoneService, eventBus));
 
         var sacTrigger = new TriggeredAbility(
             source: card,
@@ -186,17 +207,27 @@ public static class HellsparkElementalFactory
     /// <summary>
     /// CR 701.16 — sacrifice this creature: controller's battlefield →
     /// owner's graveyard. Guards the battlefield-zone check so a copy that
-    /// already left the battlefield is not pulled from elsewhere. Routes
-    /// through <see cref="ZoneService.MoveCard"/> when supplied.
+    /// already left the battlefield is not pulled from elsewhere. When
+    /// <paramref name="eventBus"/> is supplied (the prod effects-aware build)
+    /// the move routes through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>,
+    /// publishing a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the controller as the sacrificing player. Otherwise routes
+    /// through <see cref="ZoneService.MoveCard"/> when supplied, else a bare
+    /// owner-routed move.
     /// </summary>
-    private static void SacrificeSelf(Creature card, Player owner, ZoneService? zoneService)
+    private static void SacrificeSelf(
+        Creature card, Player owner, ZoneService? zoneService, IEventBus? eventBus = null)
     {
         if (card.Zone != ZoneType.Battlefield) return;
         var bfPlayer = card.Controller ?? owner;
         if (!bfPlayer.Zones.Battlefield.GetCards().Contains(card)) return;
         var graveyardOwner = card.Owner ?? owner;
 
-        if (zoneService != null)
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, bfPlayer, eventBus);
+        }
+        else if (zoneService != null)
         {
             zoneService.MoveCard(card, ZoneType.Battlefield, ZoneType.Graveyard, bfPlayer);
         }

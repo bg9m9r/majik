@@ -106,6 +106,22 @@ public static class LightningSkelementalFactory
         Create(owner, triggers: null, zoneService: null);
 
     /// <summary>
+    /// Effects-aware overload the source generator recognises and the
+    /// <b>production</b> <c>GameFacade</c> routed build dispatches to (via
+    /// <see cref="NamedCardFactory.Create(string, Player, Effects.ContinuousEffectsService?)"/>).
+    /// Lightning Skelemental registers no continuous effect, but its end-step
+    /// self-sacrifice (CR 701.16) must publish a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// sacrifice payoffs ("whenever an opponent sacrifices…") see it — so this
+    /// forwards the bus from <c>effects.EventBus</c> into the sac closure.
+    /// Without this overload the routed build falls through to single-arg
+    /// dispatch and the resolve-time self-sacrifice publishes nothing (the
+    /// resolve-time-fx-sacrifice-bus pay-down; mirrors Spark Elemental).
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, zoneService: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Lightning Skelemental with full runtime wiring.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
@@ -115,10 +131,16 @@ public static class LightningSkelementalFactory
     /// <param name="zoneService">Zone service the sacrifice routes through so
     /// LTB / zone-change events fire. May be null — raw-zone sacrifice path via
     /// <see cref="Fx.Sacrifice"/>.</param>
+    /// <param name="eventBus">Bus the end-step self-sacrifice publishes
+    /// <see cref="PermanentSacrificedEvent"/> on (CR 701.16a). When supplied the
+    /// resolve-time sac routes through
+    /// <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/>; null falls back to
+    /// the publish-nothing path (zone-service move / bare <see cref="Fx.Sacrifice"/>).</param>
     public static Creature Create(
         Player owner,
         TriggerManager? triggers,
-        ZoneService? zoneService)
+        ZoneService? zoneService,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -202,7 +224,16 @@ public static class LightningSkelementalFactory
 
                 // CR 701.16 — sacrifice (battlefield → graveyard, Sacrifice
                 // reason so Indestructible / regeneration gates don't apply).
-                if (zoneService != null)
+                // When a bus is supplied (the prod effects-aware build) route
+                // through Fx.Sacrifice(perm, player, bus) so a
+                // PermanentSacrificedEvent fires (CR 701.16a) crediting the
+                // controller as the sacrificing player — the seam aristocrat
+                // payoffs read.
+                if (eventBus != null)
+                {
+                    Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+                }
+                else if (zoneService != null)
                 {
                     zoneService.MoveCard(
                         card, ZoneType.Battlefield, ZoneType.Graveyard, card.Controller ?? owner);
