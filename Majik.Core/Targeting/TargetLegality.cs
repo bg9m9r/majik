@@ -2,7 +2,6 @@ using Majik.Core.Cards;
 using Majik.Core.Combat;
 using Majik.Core.Players;
 using Majik.Core.Zones;
-using Creature = Majik.Core.Cards.Creature;
 
 namespace Majik.Core.Targeting;
 
@@ -54,7 +53,17 @@ public static class TargetLegality
             }
         }
 
-        if (candidate is Creature creature)
+        // CR 115.5 / 702 — untargetability keywords. Gate on the EFFECTIVE
+        // creature body, not the C# instance type: a creature-front transform
+        // DFC flipped to its planeswalker back (CR 711) is a Creature instance
+        // but is NOT effectively a creature, and computing it as a
+        // CreatureCharacteristics throws (it now has a plain
+        // PermanentCharacteristics). Reading keywords through the Permanent
+        // characteristics is type-safe either way and still honours hexproof /
+        // shroud / protection granted to a real creature OR an animated
+        // manland. A flipped planeswalker back carrying its own untargetability
+        // keywords is covered by the same permanent-level keyword read.
+        if (candidate is Permanent creature && creature.IsEffectivelyCreature())
         {
             // Must still be on the battlefield (CR 115.5).
             if (creature.Zone != ZoneType.Battlefield) return false;
@@ -115,10 +124,14 @@ public static class TargetLegality
         }
     }
 
-    private static bool HasKeyword(Creature c, string keyword)
+    private static bool HasKeyword(Permanent c, string keyword)
     {
         if (c.ActiveEffects != null)
         {
+            // Compute via the Permanent overload (returns PermanentCharacteristics,
+            // a CreatureCharacteristics for an effective creature) — the
+            // Creature overload casts to CreatureCharacteristics and would throw
+            // on a flipped DFC computing as a plain PermanentCharacteristics.
             return c.ActiveEffects.Compute(c).Keywords.Contains(keyword);
         }
         return c.Abilities
