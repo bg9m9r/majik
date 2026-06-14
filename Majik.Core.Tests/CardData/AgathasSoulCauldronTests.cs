@@ -2020,4 +2020,120 @@ public class AgathasSoulCauldronTests
         after.Should().Be(before + 7,
             "resolving the un-rebound draw-7 draws seven for its own source's controller");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-closure-resolutioncontext-source-rebind-next-shape —
+    // Fauna Shaman is a bespoke [CardName]-factory creature whose sole
+    // activated ability ("{G}, {T}, Discard a creature card: Search your
+    // library for a creature card, reveal it, put it into your hand, then
+    // shuffle") is OUTSIDE the OracleActivatedAbilityBinder reconstructable set
+    // (self-pump / pinger / keyword-grant / counter / draw / gain-life /
+    // regenerate) — a "search your library → hand → shuffle" tutor is not a
+    // parseable shape. The migration retargets the effect to read the searching
+    // player off ResolutionContext.Source's controller (rather than capturing
+    // `card`) and marks the ability RebindSafe, so Agatha's group-grant re-homes
+    // the REAL tutor (and its {T} cost, auto-re-homed by RebindTo Stage 1; the
+    // {G} mana cost + "Discard a creature card" cost pass through, paid by the
+    // bearer's controller) onto a counter-bearing bearer via
+    // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the BEARER'S controller
+    // searches THEIR library, never re-reading the exiled Fauna Shaman.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_FaunaShaman_TutorToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {G},{T},Discard tutor) is now
+        // RebindSafe (searches ResolutionContext.Source's controller's library).
+        // A library tutor is NOT reconstructable from oracle text, so the
+        // RebindTo of the real ability is the only sound re-home.
+        var faunaShaman = FaunaShamanFactory.Create(alice);
+        var realAbilities = faunaShaman.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Fauna Shaman has exactly one non-mana activated ability — the tutor");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Fauna Shaman ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(faunaShaman);
+        faunaShaman.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Fauna Shaman so the only
+        // way the ability is granted is via RebindTo of the real ability — the
+        // oracle-rebuild fallback cannot reconstruct a library tutor, so if the
+        // grant still depended on it nothing would be emitted and this test
+        // would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), faunaShaman);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Fauna Shaman's real tutor is re-homed via RebindTo");
+        var tutor = granted[0];
+        tutor.Source.Should().BeSameAs(bearer,
+            "the re-homed tutor is sourced on the BEARER (CR 707.2)");
+        tutor.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        tutor.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Tap)
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+
+        // Stock the bearer-controller's (Alice's) library with a creature so the
+        // tutor has a legal target.
+        var libCreature = new Creature("Library Bear", "1G", 2, 2);
+        libCreature.SetOwner(alice);
+        alice.Zones.Library.AddCard(libCreature);
+        libCreature.SetZone(ZoneType.Library);
+
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+
+        // Resolving the re-homed tutor searches the BEARER'S controller (Alice)'s
+        // library and moves the creature to Alice's hand —
+        // ResolutionContext.Source = bearer => its controller = Alice.
+        await tutor.ResolveAsync(agent: null, game: null);
+
+        alice.Zones.Hand.GetCards().Should().Contain(libCreature,
+            "the re-homed tutor put the bearer-controller's library creature into their hand");
+        alice.Zones.Hand.GetCards().Count().Should().Be(handBefore + 1);
+        alice.Zones.Library.GetCards().Should().NotContain(libCreature,
+            "the tutored card left the library");
+    }
+
+    [Fact]
+    public async Task BespokeTutor_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still searches its OWN source's
+        // controller's library on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var faunaShaman = FaunaShamanFactory.Create(alice);
+        alice.Zones.Library.AddCard(faunaShaman);
+        zones.MoveCard(faunaShaman, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var tutor = faunaShaman.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var libCreature = new Creature("Library Bear", "1G", 2, 2);
+        libCreature.SetOwner(alice);
+        alice.Zones.Library.AddCard(libCreature);
+        libCreature.SetZone(ZoneType.Library);
+
+        await tutor.ResolveAsync(agent: null, game: null);
+
+        alice.Zones.Hand.GetCards().Should().Contain(libCreature,
+            "resolving the un-rebound tutor searches its own source's controller's library");
+    }
 }
