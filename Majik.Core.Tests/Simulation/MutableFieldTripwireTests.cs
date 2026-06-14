@@ -44,6 +44,7 @@ public sealed class MutableFieldTripwireTests
             "_offBattlefieldTypes",                 // SHARED-IMMUT (off-battlefield CDA def — shared by ref in copy-ctor)
             "_offBattlefieldSubtypes",              // SHARED-IMMUT (off-battlefield CDA def — shared by ref in copy-ctor)
             "_restrictedCastZones",                 // COPIED (AddRange — definition)
+            "_castTimingRestriction",               // SHARED-IMMUT (self cast-timing predicate — definition data, shared by ref in copy-ctor)
             "_subtypes",                            // COPIED (AddRange — definition)
             "_supertypes",                          // COPIED (AddRange — definition)
             "_zone",                                // COPIED (_zone = src._zone)

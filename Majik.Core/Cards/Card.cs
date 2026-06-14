@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -19,6 +20,18 @@ public class Card : ICard
     private readonly List<CardSubtype> _subtypes = new();
     private readonly List<IAbility> _abilities = new();
     private readonly List<ZoneType> _restrictedCastZones = new();
+
+    // CR 601.3 — a SELF-imposed cast-timing restriction baked onto the card
+    // ("Cast this spell only before the combat damage step." — Berserk). The
+    // predicate returns true when the card MAY be cast during the supplied live
+    // step (GameContext.CurrentPhase). Null for the overwhelming majority of
+    // cards (no self timing restriction); populated only by named-card factories
+    // that print one. Distinct from the OPPONENT-imposed static cast
+    // restrictions in CastingRestrictions (Meddling Mage / Teferi) — those are
+    // keyed by player/name; this one is keyed by the card itself + the live
+    // step. Definition data — set once at construction, never mutated — so the
+    // simulation copy-ctor shares it by reference.
+    private Func<StepStateType, bool>? _castTimingRestriction;
 
     // CR 604.3 — off-battlefield characteristic-defining ability. Null for the
     // overwhelming majority of cards; populated only by named-card factories
@@ -1708,6 +1721,7 @@ public class Card : ICard
         _subtypes.AddRange(src._subtypes);
         _abilities.AddRange(src._abilities);           // abilities are shared refs
         _restrictedCastZones.AddRange(src._restrictedCastZones);
+        _castTimingRestriction = src._castTimingRestriction; // definition data — shared ref
 
         // CR 604.3 off-battlefield CDA — definition data, never mutated after
         // construction; share the sets by reference (same posture as _cardTypes).
@@ -1846,6 +1860,37 @@ public class Card : ICard
         {
             _restrictedCastZones.Add(zone);
         }
+    }
+
+    /// <summary>
+    /// CR 601.3 — the card's SELF-imposed cast-timing restriction predicate, or
+    /// null when the card carries none. When non-null, the cast-legality gate
+    /// (<see cref="Majik.Core.Game.SpellCastFlow"/> and
+    /// <see cref="Majik.Core.Rules.ActionValidator"/>) invokes it with the live
+    /// step (<see cref="Majik.Core.Game.GameContext.CurrentPhase"/>) and rejects
+    /// the cast when it returns false.
+    ///
+    /// <para>The canonical consumer is Berserk ("Cast this spell only before the
+    /// combat damage step."): its factory stamps a predicate that returns true
+    /// for every step strictly before <see cref="StepStateType.CombatDamage"/>
+    /// in turn order. Distinct from the OPPONENT-imposed static restrictions in
+    /// <see cref="Majik.Core.Rules.CastingRestrictions"/> (Meddling Mage,
+    /// Teferi) — those are keyed by player or card name; this one is baked onto
+    /// the card and keyed off the live turn step.</para>
+    /// </summary>
+    public Func<StepStateType, bool>? CastTimingRestriction => _castTimingRestriction;
+
+    /// <summary>
+    /// Bake a SELF cast-timing restriction onto this card (CR 601.3). The
+    /// supplied predicate returns true when the card MAY be cast during the
+    /// given live step. Called by named-card factories at construction (e.g.
+    /// <see cref="Majik.Core.CardData.Factories.BerserkFactory"/> restricts
+    /// casting to steps before the combat damage step). Last writer wins —
+    /// a card prints at most one self-timing clause.
+    /// </summary>
+    public void SetCastTimingRestriction(Func<StepStateType, bool> predicate)
+    {
+        _castTimingRestriction = predicate ?? throw new ArgumentNullException(nameof(predicate));
     }
 
     // Cached live AsReadOnly wrapper — see CardTypes for rationale. Add/Remove
