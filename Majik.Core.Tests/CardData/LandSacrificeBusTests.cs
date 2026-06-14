@@ -4,11 +4,13 @@ using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -174,6 +176,138 @@ public class LandSacrificeBusTests
         land.SetZone(ZoneType.Battlefield);
 
         SacCost(land).Pay(alice);
+
+        land.Zone.Should().Be(ZoneType.Graveyard, "the move still happens");
+        seen.Should().BeEmpty("no bus was threaded into the bus-less binder call");
+    }
+
+    // ---------------------------------------------------------------------
+    // LandActivatedAbilityBinder — TYPED NON-SELF land sacrifice
+    // (sacrifice-a-desert-typed-non-self-land-cost).
+    //
+    // Ramunap Ruins' "{2}{R}{R}, {T}, Sacrifice a Desert: This land deals 2
+    // damage to each opponent" is the TYPED non-self sacrifice cost (CR 701.16):
+    // unlike "Sacrifice this land", the controller sacrifices ANY Desert they
+    // control — the source land qualifies (it IS a Desert) but is not the only
+    // legal choice. The binder must bind a real SacrificeFilteredCost over the
+    // controller's Deserts, NOT a self-only AdditionalCost.Sacrifice stub. Lands
+    // route through the binder chain in prod, never their [CardName] factory
+    // (named-factory-vs-binder-chain), so this is the live path.
+    // ---------------------------------------------------------------------
+
+    private static SacrificeFilteredCost TypedSacCost(ICard land) =>
+        land.Abilities.OfType<ActivatedAbility>()
+            .SelectMany(a => a.Costs)
+            .OfType<SacrificeFilteredCost>()
+            .First();
+
+    private static Land DesertLand(string name, Player owner)
+    {
+        var l = new Land(name, subtypes: new[] { CardSubtype.Desert })
+        { Owner = owner, Controller = owner };
+        owner.Zones.Battlefield.AddCard(l);
+        l.SetZone(ZoneType.Battlefield);
+        return l;
+    }
+
+    private static Land BindRamunapRuins(Player owner, ContinuousEffectsService effects, IEventBus? bus)
+    {
+        var land = new Land("Ramunap Ruins", subtypes: new[] { CardSubtype.Desert })
+        { Owner = owner, Controller = owner };
+        var entity = new CardEntity
+        {
+            Name = "Ramunap Ruins",
+            TypeLine = "Land — Desert",
+            // Exact Scryfall oracle text.
+            OracleText = "{T}: Add {C}.\n" +
+                         "{T}, Pay 1 life: Add {R}.\n" +
+                         "{2}{R}{R}, {T}, Sacrifice a Desert: This land deals 2 damage to each opponent.",
+        };
+        var bound = LandActivatedAbilityBinder.Bind(land, entity, owner, effects, triggers: null, eventBus: bus);
+        bound.Should().BeTrue("the binder recognises the {2}{R}{R}, {T}, Sacrifice a Desert ability");
+        owner.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        return land;
+    }
+
+    [Fact]
+    public void TypedSacrifice_RamunapRuins_BindsRealFilteredCost_NotSelfStub()
+    {
+        var alice = new Player("Alice", 20);
+        var (bus, _) = Wired();
+        var effects = new ContinuousEffectsService(bus);
+
+        var land = BindRamunapRuins(alice, effects, bus);
+
+        var ability = land.Abilities.OfType<ActivatedAbility>().Should().ContainSingle().Subject;
+        ability.Costs.OfType<SacrificeFilteredCost>().Should().ContainSingle(
+            "\"Sacrifice a Desert\" binds a typed non-self SacrificeFilteredCost (CR 701.16)");
+        // It must NOT be modelled as a self-only AdditionalCost.Sacrifice stub.
+        ability.Costs.OfType<AdditionalCost>()
+            .Where(c => c.CostType == AdditionalCostType.Sacrifice)
+            .Should().BeEmpty("the typed cost is non-self — no self-sac AdditionalCost is added");
+    }
+
+    [Fact]
+    public void TypedSacrifice_RamunapRuins_CanSacrificeAnotherDesert_NotItself()
+    {
+        var alice = new Player("Alice", 20);
+        var (bus, seen) = Wired();
+        var effects = new ContinuousEffectsService(bus);
+
+        var ruins = BindRamunapRuins(alice, effects, bus);
+        // A SECOND Desert the controller controls — the non-self choice.
+        var otherDesert = DesertLand("Sunscorched Desert", alice);
+
+        var sac = TypedSacCost(ruins);
+        sac.CanPay(alice).Should().BeTrue("the controller controls at least one Desert");
+
+        // Agent pre-picks the OTHER Desert (CR 701.16 — controller's choice).
+        sac.Target = otherDesert;
+        sac.Pay(alice);
+
+        otherDesert.Zone.Should().Be(ZoneType.Graveyard, "the chosen non-self Desert is sacrificed");
+        ruins.Zone.Should().Be(ZoneType.Battlefield, "Ramunap Ruins itself survives — it was not the pick");
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == otherDesert
+                && ev.SacrificingPlayer == alice
+                && !ev.WasToken);
+    }
+
+    [Fact]
+    public void TypedSacrifice_RamunapRuins_SacrificesItself_WhenOnlyDesert_AndPublishes()
+    {
+        var alice = new Player("Alice", 20);
+        var (bus, seen) = Wired();
+        var effects = new ContinuousEffectsService(bus);
+
+        var ruins = BindRamunapRuins(alice, effects, bus);
+
+        var sac = TypedSacCost(ruins);
+        // No Target pre-set + Ramunap Ruins is the only Desert → it qualifies and
+        // is the deterministic v1 pick (CR 701.16 — the source qualifies).
+        sac.Pay(alice);
+
+        ruins.Zone.Should().Be(ZoneType.Graveyard, "the only Desert is sacrificed (itself)");
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == ruins
+                && ev.SacrificingPlayer == alice
+                && !ev.WasToken);
+    }
+
+    [Fact]
+    public void TypedSacrifice_RamunapRuins_WithoutBus_StaysBusLess_NoPublish()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new EventBus();
+        var seen = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+        var effects = new ContinuousEffectsService(bus);
+
+        // No bus threaded into the binder (legacy posture).
+        var land = BindRamunapRuins(alice, effects, bus: null);
+
+        TypedSacCost(land).Pay(alice);
 
         land.Zone.Should().Be(ZoneType.Graveyard, "the move still happens");
         seen.Should().BeEmpty("no bus was threaded into the bus-less binder call");

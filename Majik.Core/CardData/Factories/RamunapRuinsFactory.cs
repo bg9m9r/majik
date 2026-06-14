@@ -1,11 +1,11 @@
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -44,30 +44,28 @@ namespace Majik.Core.CardData.Factories;
 ///       "Pay life" cost.</item>
 ///   </list>
 /// - <b>{2}{R}{R}, {T}, Sacrifice a Desert: deal 2 damage to each opponent</b>
-///   — an <see cref="ActivatedAbility"/> with a <see cref="ManaCostCost"/>
-///   ({2}{R}{R}) plus <see cref="AdditionalCost.Tap"/>. On resolution the
-///   effect:
-///   <list type="number">
-///     <item>Sacrifices a Desert — this land itself qualifies (CR 305 — it has
-///       the Desert subtype). Performed inside the effect closure, the same
-///       posture as <see cref="BarbarianRingFactory"/> (the generic
-///       <see cref="AdditionalCost.Sacrifice"/> payment is a no-op stub; v1
-///       sacrifices self rather than letting the controller choose an
-///       arbitrary other Desert).</item>
-///     <item>Deals 2 damage to each opponent (CR 800.4 — "opponent" means
-///       every other player). Damage routes through <see cref="Fx.DealDamage"/>
-///       (Player → <see cref="Player.LoseLife"/>, CR 119.8). The live
-///       "each opponent" list is resolver-injected via
-///       <paramref name="opponentResolver"/> — same pattern as
-///       <see cref="ElectrostaticFieldFactory"/>; without a resolver the
-///       damage half no-ops (no <c>Player.Opponents</c> accessor at v1).</item>
-///   </list>
+///   — an <see cref="ActivatedAbility"/> whose costs are a
+///   <see cref="ManaCostCost"/> ({2}{R}{R}) + <see cref="AdditionalCost.Tap"/> +
+///   the real <b>"Sacrifice a Desert"</b> typed non-self filtered cost
+///   (<see cref="SacrificeFilteredCost"/> via
+///   <see cref="Primitives.Costs.SacrificeASubtype"/>, CR 701.16 — same primitive
+///   the production <see cref="LandActivatedAbilityBinder"/> path binds). The
+///   sacrifice is a genuine battlefield → graveyard COST over ANY Desert the
+///   controller controls; this land itself qualifies (CR 305 — it has the Desert
+///   subtype) and is the deterministic v1 pick when it is the only Desert, but
+///   the controller may pre-pick another Desert via
+///   <see cref="SacrificeFilteredCost.Target"/>. On resolution the effect deals
+///   2 damage to each opponent (CR 800.4 — "opponent" means every other player).
+///   Damage routes through <see cref="Fx.DealDamage"/> (Player →
+///   <see cref="Player.LoseLife"/>, CR 119.8); the live "each opponent" list is
+///   read off the resolution context (<see cref="ContextOpponents"/>) so it is
+///   correct on the routed prod build.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"Sacrifice a Desert" choice</b>: v1 sacrifices this land itself rather
-///   than offering the controller a choice among all Deserts they control
-///   (the generic <see cref="AdditionalCost.Sacrifice"/> is a no-op stub —
-///   same simplification as Barbarian Ring / Pyrite Spellbomb).
+/// - <b>"Sacrifice a Desert" agent prompt</b>: the filtered sacrifice cost
+///   deterministically picks the first eligible Desert when the agent has not
+///   pre-set a <see cref="SacrificeFilteredCost.Target"/> — the same prompting
+///   MVP every sibling sacrifice-picker cost waits on.
 /// - <b>Live "each opponent" enumeration</b>: no <c>Player.Opponents</c>
 ///   accessor at v1 — the damage half is resolver-injected (shared with
 ///   Electrostatic Field / Voldaren Epicure). The shape-only dispatcher path
@@ -127,22 +125,19 @@ public static class RamunapRuinsFactory
         // ----------------------------------------------------------------
         // {2}{R}{R}, {T}, Sacrifice a Desert:
         //   This land deals 2 damage to each opponent.
-        // CR 602 — activated ability (non-mana). Mana cost {2}{R}{R} + {T}.
-        // The "Sacrifice a Desert" cost is paid inside the effect closure by
-        // sacrificing this land itself (it has the Desert subtype, so it is a
-        // legal sacrifice) — same no-op-stub posture as Barbarian Ring. The
-        // damage half iterates each opponent (CR 800.4) via the injected
-        // resolver and routes through Fx.DealDamage (CR 119.8).
+        // CR 602 — activated ability (non-mana). Costs: {2}{R}{R} + {T} + the
+        // real "Sacrifice a Desert" typed non-self filtered cost (CR 701.16 —
+        // SacrificeFilteredCost, the same primitive the production
+        // LandActivatedAbilityBinder path binds). The sacrifice is a genuine
+        // COST over ANY Desert the controller controls; this land itself
+        // qualifies (CR 305 — Desert subtype) and is the deterministic v1 pick.
+        // The damage half iterates each opponent (CR 800.4) read off the live
+        // resolution context and routes through Fx.DealDamage (CR 119.8).
         // ----------------------------------------------------------------
         var sacEffect = new Effect(
-            $"{CardName}: sacrifice a Desert + deal {SacDamage} damage to each opponent",
+            $"{CardName}: deal {SacDamage} damage to each opponent",
             ctx =>
             {
-                // Sacrifice a Desert (this land qualifies) — battlefield →
-                // owner's graveyard. Performed before damage; mirrors the
-                // Barbarian Ring closure.
-                SacrificeSelf(land, owner);
-
                 // CR 800.4 — deal 2 damage to each opponent, read from the LIVE
                 // resolution context — NOT a captured resolver, which was null
                 // on the routed prod build and made the damage INERT in real
@@ -163,25 +158,12 @@ public static class RamunapRuinsFactory
             {
                 new ManaCostCost("{2}{R}{R}"),
                 AdditionalCost.Tap(land),
-                AdditionalCost.Sacrifice(land),
+                Primitives.Costs.SacrificeASubtype(CardSubtype.Desert),
             },
             effects: new IEffect[] { sacEffect });
 
         land.AddAbility(sacAbility);
 
         return land;
-    }
-
-    /// <summary>
-    /// Move <paramref name="land"/> from the battlefield to its owner's
-    /// graveyard. Idempotent — no-op if already off the battlefield. Mirrors
-    /// the closure used by Barbarian Ring / Pyrite Spellbomb.
-    /// </summary>
-    private static void SacrificeSelf(Land land, Player owner)
-    {
-        if (land.Zone != ZoneType.Battlefield) return;
-        owner.Zones.Battlefield.RemoveCard(land);
-        owner.Zones.Graveyard.AddCard(land);
-        land.SetZone(ZoneType.Graveyard);
     }
 }
