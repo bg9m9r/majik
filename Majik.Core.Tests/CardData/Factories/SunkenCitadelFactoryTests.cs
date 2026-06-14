@@ -128,7 +128,9 @@ public class SunkenCitadelFactoryTests
 
     // -----------------------------------------------------------------------
     // {T}: Add two mana of the chosen color. Spend this mana only to activate
-    // abilities of land sources (CR 605.1a / 106.4 — rider data, gate deferred).
+    // abilities of land sources (CR 605.1a / 106.4 — rider data; the payment
+    // gate is ENFORCED by ManaPaymentResolver, see
+    // SpendRestrictionProvenanceGateTests + OracleManaBinderTests prod path).
     // -----------------------------------------------------------------------
 
     [Theory]
