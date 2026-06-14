@@ -142,7 +142,7 @@ public class RamunapRuinsFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void RamunapRuins_HasExactlyOneActivatedAbility_WithManaTapAndSacrificeCosts()
+    public void RamunapRuins_HasExactlyOneActivatedAbility_WithManaTapAndTypedSacrificeCosts()
     {
         var land = RamunapRuinsFactory.Create(_alice);
 
@@ -151,10 +151,18 @@ public class RamunapRuinsFactoryTests
         var manaCost = ability.Costs.OfType<ManaCostCost>().Single().Cost;
         manaCost.Red.Should().Be(2, "{2}{R}{R} charges two red");
         manaCost.Generic.Should().Be(2, "{2}{R}{R} charges two generic");
+
+        // "Sacrifice a Desert" is a typed non-self filtered cost (CR 701.16),
+        // NOT a self-only AdditionalCost.Sacrifice stub.
+        ability.Costs.OfType<SacrificeFilteredCost>().Should().ContainSingle(
+            "Sacrifice a Desert binds a typed non-self SacrificeFilteredCost");
+        ability.Costs.OfType<AdditionalCost>()
+            .Where(c => c.CostType == AdditionalCostType.Sacrifice)
+            .Should().BeEmpty("the typed cost is non-self — no self-sac AdditionalCost is added");
     }
 
     [Fact]
-    public void RamunapRuins_SacAbility_DealsTwoDamageToEachOpponent_AndSacrificesSelf()
+    public void RamunapRuins_SacAbility_DealsTwoDamageToEachOpponent_OnResolution()
     {
         var bob = new Player("Bob", 20);
         var carol = new Player("Carol", 20);
@@ -165,28 +173,28 @@ public class RamunapRuinsFactoryTests
 
         var sac = land2.Abilities.OfType<ActivatedAbility>().Single();
         // Resolve through a live game so the damage half reads "each opponent"
-        // off the resolution context (resolver-null bug-class fix).
+        // off the resolution context (resolver-null bug-class fix). The
+        // sacrifice is now a COST (paid before resolution), so resolution only
+        // deals the damage.
         Majik.Core.Tests.Helpers.ContextResolve.Resolve(sac, _alice, _alice, bob, carol);
 
         bob.LifeTotal.Should().Be(18, "each opponent takes 2 damage (CR 800.4)");
         carol.LifeTotal.Should().Be(18, "each opponent takes 2 damage (CR 800.4)");
-        land2.Zone.Should().Be(ZoneType.Graveyard,
-            "Ramunap Ruins sacrifices a Desert (itself) as part of resolution");
     }
 
     [Fact]
-    public void RamunapRuins_SacAbility_WithoutResolver_NoOpsDamage_ButStillSacrifices()
+    public void RamunapRuins_SacCost_SacrificesADesert_Itself_WhenOnlyDesert()
     {
         var land = RamunapRuinsFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
 
-        var sac = land.Abilities.OfType<ActivatedAbility>().Single();
-        sac.Resolve();
+        var sac = land.Abilities.OfType<ActivatedAbility>().Single()
+            .Costs.OfType<SacrificeFilteredCost>().Single();
+        sac.CanPay(_alice).Should().BeTrue("Ramunap Ruins is a Desert it controls (CR 701.16)");
+        sac.Pay(_alice);
 
-        // Shape-only path: no opponent resolver, damage half no-ops, but the
-        // sacrifice still happens (same posture as Electrostatic Field's
-        // resolver-injected damage half).
-        land.Zone.Should().Be(ZoneType.Graveyard);
+        // The only Desert is itself — the deterministic v1 pick.
+        land.Zone.Should().Be(ZoneType.Graveyard, "the only Desert (itself) is sacrificed");
     }
 }
