@@ -1,0 +1,5 @@
+{
+  "name": "Spectral Interference",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
