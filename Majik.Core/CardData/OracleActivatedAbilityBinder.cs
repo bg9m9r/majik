@@ -49,6 +49,15 @@ namespace Majik.Core.CardData;
 ///     <see cref="TargetRequest"/> and resolution through
 ///     <see cref="Fx.DealDamageAny"/> (Player / Creature / Planeswalker funnel,
 ///     CR 119.3 / 306.7) — exactly Endbringer's pinger.</item>
+///   <item><b>Same-name-spillover pinger</b> —
+///     <c>"{cost}: This creature deals N damage to target creature and each
+///     other creature with the same name as that creature."</c> Izzet
+///     Staticaster's shape. Rebuilt with a 1..1 <see cref="TargetRequest"/>; the
+///     chosen creature takes N, then every OTHER battlefield creature whose
+///     EFFECTIVE name (CR 707.2) matches — read off the live game at resolution —
+///     also takes N (CR 109.2). Sound to re-home: the BEARER is only the source /
+///     cost-payer; the spill set depends only on the chosen name + the current
+///     board, never the exiled imprinted card.</item>
 ///   <item><b>Power-pinger</b> —
 ///     <c>"{cost}: This creature deals damage equal to its power to &lt;any
 ///     target | target creature | target player&gt;."</c> The variable-amount
@@ -211,6 +220,21 @@ public static class OracleActivatedAbilityBinder
     // "{cost}: This creature deals N damage to <target form>."
     private static readonly Regex PingerRegex = new(
         @"^(" + CostList + @")\s*:\s*This creature deals (\d+) damage to (any target|target creature|target player)\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: This creature deals N damage to target creature and each other
+    // creature with the same name as that creature." (Izzet Staticaster's
+    // spillover shape, CR 109.2 exact-name match / CR 707.2 copy-effect name.)
+    // A targeted ping that SPILLS to every OTHER battlefield creature sharing the
+    // chosen creature's EFFECTIVE name. Re-source-safe to reconstruct: the BEARER
+    // is ONLY the source / cost-payer (its own {T} cost taps it); the damage lands
+    // on the chosen creature + the same-name set read off the LIVE game at
+    // resolution — never the exiled imprinted card. The same-name sweep reads
+    // every player's battlefield off rc.Game (the re-homed source's live game),
+    // so it scopes to the whole board the way the printed card does, with no
+    // dependence on the source card's own identity. Group 1 = cost, group 2 = N.
+    private static readonly Regex SameNameSpilloverPingerRegex = new(
+        @"^(" + CostList + @")\s*:\s*This creature deals (\d+) damage to target creature and each other creature with the same name as that creature\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: This creature deals damage equal to its power to <target form>."
@@ -463,6 +487,16 @@ public static class OracleActivatedAbilityBinder
                 var costs = TryBuildCostList(powerPing.Groups[1].Value, bearer, controller);
                 if (costs == null) continue; // unsound cost token — skip
                 result.Add(BuildPowerPinger(costs, powerPing.Groups[2].Value, bearer, controller));
+                continue;
+            }
+
+            var spillover = SameNameSpilloverPingerRegex.Match(line);
+            if (spillover.Success)
+            {
+                var costs = TryBuildCostList(spillover.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                var amount = int.Parse(spillover.Groups[2].Value);
+                result.Add(BuildSameNameSpilloverPinger(costs, amount, bearer, controller));
                 continue;
             }
 
@@ -891,6 +925,87 @@ public static class OracleActivatedAbilityBinder
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: intent),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Build a same-name-spillover pinger: "{cost}: This creature deals N damage
+    /// to target creature and each other creature with the same name as that
+    /// creature." (Izzet Staticaster, CR 109.2 / 707.2.) Re-homed so the SOURCE is
+    /// the bearer (the cost taps it). The chosen target creature takes N damage,
+    /// then EACH OTHER creature on ANY battlefield whose EFFECTIVE name
+    /// (<see cref="Permanent.GetEffectiveName"/> — CR 707.2, so a copy of the
+    /// target counts) equals the chosen target's effective name also takes N. The
+    /// same-name set is read off the LIVE game (<see cref="ResolutionContext.Game"/>)
+    /// at resolution, never the exiled imprinted card — re-homing is sound because
+    /// the sweep depends only on the chosen target's name + the current board, with
+    /// no reference to the source card's identity. The bearer is the damage source
+    /// (<see cref="ResolutionContext.Source"/> when resolved through the ability
+    /// path, else the captured bearer). When no live game is wired (shape-only
+    /// path) only the chosen target takes damage — the same posture as the
+    /// IzzetStaticasterFactory single-arg overload.
+    /// </summary>
+    private static ActivatedAbility BuildSameNameSpilloverPinger(
+        List<ICost> costs,
+        int amount,
+        Permanent bearer,
+        Player controller)
+    {
+        ActivatedAbility? ability = null;
+        var damageEffect = new Effect(
+            $"Granted: this creature deals {amount} damage to target creature and each other creature with the same name",
+            (ResolutionContext rc) =>
+            {
+                if (ability == null) return ValueTask.CompletedTask;
+                if (ability.ChosenTargets.Count == 0) return ValueTask.CompletedTask;
+                if (ability.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask;
+
+                if (ability.ChosenTargets[0][0] is not Creature target)
+                    return ValueTask.CompletedTask;
+
+                // CR 113.7 — the damage source is the re-homed bearer
+                // (rc.Source on the live ability path, else the captured bearer).
+                var source = (rc.Source ?? bearer) as Creature;
+
+                // Primary target takes the ping (CR 119 / 306.7).
+                Fx.DealDamageAny(target, amount, source);
+
+                // CR 109.2 / 707.2 — "each other creature with the same name":
+                // sweep every battlefield off the live game and ping any creature
+                // (other than the primary target) whose EFFECTIVE name matches.
+                // No live game (shape-only path) → only the primary target is hit.
+                if (rc.Game is null) return ValueTask.CompletedTask;
+
+                var targetName = target.GetEffectiveName();
+                foreach (var player in rc.Game.AllPlayers)
+                {
+                    foreach (var card in player.Zones.Battlefield.GetCards())
+                    {
+                        if (card is not Creature other) continue;
+                        if (ReferenceEquals(other, target)) continue;
+                        if (other.GetEffectiveName() != targetName) continue;
+                        Fx.DealDamageAny(other, amount, source);
+                    }
+                }
+
+                return ValueTask.CompletedTask;
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { damageEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal),
             });
 
         return ability;
