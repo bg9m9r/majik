@@ -7,21 +7,23 @@ using Majik.Core.Players.Agents;
 namespace Majik.Core.Game;
 
 /// <summary>
-/// CR 700.6 / 701.17 — when an activated ability carries a
+/// CR 700.6 / 701.16-17 — when an activated ability carries a
 /// <see cref="IChooseCreatureToSacrificeCost"/> ("Sacrifice another creature" /
 /// "Sacrifice a creature" as a COST, e.g. Yawgmoth, Thran Physician / Goblin
-/// Bombardment), the CONTROLLER chooses which creature to sacrifice. Because
+/// Bombardment) OR a typed <see cref="IChoosePermanentToSacrificeCost"/>
+/// ("Sacrifice a Desert" — Ramunap Ruins / Scavenger Grounds, "Sacrifice a
+/// token"), the CONTROLLER chooses which permanent to sacrifice. Because
 /// <see cref="ICost.Pay"/> is synchronous and has no agent, the choice can't be
 /// made during payment — the activation dispatch must prompt for it FIRST and
-/// stamp the chosen creature onto the cost so <see cref="ICost.Pay"/> sacrifices
-/// the right one.
+/// stamp the chosen permanent onto the cost so <see cref="ICost.Pay"/>
+/// sacrifices the right one.
 ///
 /// <para>This shared helper is called by every activation-dispatch path
 /// (<c>GameFacade.DispatchActivate</c> and <c>TurnDriver.DispatchActivate</c>)
 /// before <c>AbilityActivator.ActivateAbility</c> pays the costs. It reuses the
 /// existing <see cref="IPlayerAgent.ChooseAsync"/> PickOne prompt (rendered by
 /// the portal as a <c>ChoiceCommand</c>) — no new wire contract. Without it the
-/// cost auto-picked the first eligible creature with no prompt: the live-play
+/// cost auto-picked the first eligible permanent with no prompt: the live-play
 /// bug.</para>
 /// </summary>
 public static class SacrificeCostPrompt
@@ -47,30 +49,82 @@ public static class SacrificeCostPrompt
 
         foreach (var cost in ability.Costs)
         {
-            if (cost is not IChooseCreatureToSacrificeCost sacCost) continue;
-
-            var eligible = sacCost.EligibleSacrifices(actor);
-            if (eligible.Count == 0) continue; // unaffordable — handled upstream.
-
-            if (eligible.Count == 1)
+            switch (cost)
             {
-                // Only one legal choice — no need to prompt.
-                sacCost.ChooseSacrifice(eligible[0]);
-                continue;
+                case IChooseCreatureToSacrificeCost creatureSac:
+                    await PromptCreatureSacAsync(actor, creatureSac, agent, ctx, ct)
+                        .ConfigureAwait(false);
+                    break;
+                // Typed NON-creature sacrifice ("Sacrifice a Desert" / "Sacrifice
+                // a token"). A cost implementing BOTH (none today) is handled by
+                // the creature branch above and skipped here.
+                case IChoosePermanentToSacrificeCost permanentSac:
+                    await PromptPermanentSacAsync(actor, permanentSac, agent, ctx, ct)
+                        .ConfigureAwait(false);
+                    break;
             }
-
-            var req = new ChoiceRequest(
-                Kind: ChoiceKind.PickOne,
-                Description: $"Choose a creature to sacrifice ({cost.Description})",
-                Min: 1,
-                Max: 1,
-                Candidates: eligible.Cast<object>().ToList(),
-                Intent: BotIntent.None,
-                Optional: false);
-
-            var chosen = await agent.ChooseAsync(ctx, req, ct).ConfigureAwait(false);
-            var pick = chosen.OfType<Creature>().FirstOrDefault() ?? eligible[0];
-            sacCost.ChooseSacrifice(pick);
         }
+    }
+
+    private static async Task PromptCreatureSacAsync(
+        Player actor,
+        IChooseCreatureToSacrificeCost sacCost,
+        IPlayerAgent agent,
+        GameContext ctx,
+        CancellationToken ct)
+    {
+        var eligible = sacCost.EligibleSacrifices(actor);
+        if (eligible.Count == 0) return; // unaffordable — handled upstream.
+
+        if (eligible.Count == 1)
+        {
+            // Only one legal choice — no need to prompt.
+            sacCost.ChooseSacrifice(eligible[0]);
+            return;
+        }
+
+        var req = new ChoiceRequest(
+            Kind: ChoiceKind.PickOne,
+            Description: $"Choose a creature to sacrifice ({sacCost.Description})",
+            Min: 1,
+            Max: 1,
+            Candidates: eligible.Cast<object>().ToList(),
+            Intent: BotIntent.None,
+            Optional: false);
+
+        var chosen = await agent.ChooseAsync(ctx, req, ct).ConfigureAwait(false);
+        var pick = chosen.OfType<Creature>().FirstOrDefault() ?? eligible[0];
+        sacCost.ChooseSacrifice(pick);
+    }
+
+    private static async Task PromptPermanentSacAsync(
+        Player actor,
+        IChoosePermanentToSacrificeCost sacCost,
+        IPlayerAgent agent,
+        GameContext ctx,
+        CancellationToken ct)
+    {
+        var eligible = sacCost.EligiblePermanents(actor);
+        if (eligible.Count == 0) return; // unaffordable — handled upstream.
+
+        if (eligible.Count == 1)
+        {
+            // Only one legal choice — no need to prompt.
+            sacCost.ChoosePermanent(eligible[0]);
+            return;
+        }
+
+        var req = new ChoiceRequest(
+            Kind: ChoiceKind.PickOne,
+            Description: $"Choose a permanent to sacrifice ({sacCost.Description})",
+            Min: 1,
+            Max: 1,
+            Candidates: eligible.Cast<object>().ToList(),
+            Intent: BotIntent.None,
+            Optional: false);
+
+        var chosen = await agent.ChooseAsync(ctx, req, ct).ConfigureAwait(false);
+        var pick = chosen.OfType<Permanent>().FirstOrDefault() ?? eligible[0];
+        sacCost.ChoosePermanent(pick);
     }
 }
