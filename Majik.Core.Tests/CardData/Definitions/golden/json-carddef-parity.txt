@@ -21750,6 +21750,60 @@
     "White"
   ]
 }
+==== knight-of-meadowgrain ====
+{
+  "name": "Knight of Meadowgrain",
+  "manaCost": "{W}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Kithkin",
+    "Knight"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 2,
+      "list": [
+        "First strike",
+        "Lifelink"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== knight-of-the-ebon-legion ====
 {
   "name": "Knight of the Ebon Legion",
