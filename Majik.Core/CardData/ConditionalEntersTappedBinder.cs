@@ -20,6 +20,18 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class ConditionalEntersTappedBinder
 {
+    // "enters tapped unless you revealed a <Subtype> card this way or you
+    // control a <Subtype>." — Temple of the Dragon Queen ("…unless you revealed
+    // a Dragon card this way or you control a Dragon"). The reveal half is an
+    // "as this enters" decision (CR 614.10) resolved by a paired
+    // RevealCardFromHandReplacement that stamps a shared flag; the control half
+    // counts the controller's battlefield permanents carrying that subtype
+    // (CR 205.3). Captured BEFORE the generic clauses so its richer shape isn't
+    // mis-claimed.
+    private static readonly Regex RevealedSubtypeOrControlClause = new(
+        @"enters\s+(?:the\s+battlefield\s+)?tapped\s+unless\s+you\s+revealed\s+an?\s+(?<subtype>\w+)\s+card\s+this\s+way\s+or\s+you\s+control\s+an?\s+\w+",
+        RegexOptions.IgnoreCase);
+
     // "enters tapped unless you control <count> or <more|fewer> other lands."
     // Captures the count word and the direction so the predicate can be
     // built generically.
@@ -53,6 +65,31 @@ public static class ConditionalEntersTappedBinder
         if (replacements == null) throw new ArgumentNullException(nameof(replacements));
 
         var text = entity.OracleText ?? string.Empty;
+
+        // Reveal-or-control variant (Temple of the Dragon Queen): "enters tapped
+        // unless you revealed a <Subtype> card this way or you control a
+        // <Subtype>." CR 614.10 — the reveal is an "as this enters" may-decision;
+        // CR 205.3 — Dragon is a creature type counted on the battlefield. Two
+        // replacements are registered: a RevealCardFromHandReplacement that
+        // prompts the controller's agent and stamps a shared flag (registered
+        // FIRST so the flag is set before the tapped predicate runs), then a
+        // ConditionalEntersTappedReplacement whose predicate is
+        // (revealed-this-way OR control-a-Subtype).
+        var revealMatch = RevealedSubtypeOrControlClause.Match(text);
+        if (revealMatch.Success
+            && ParseSubtype(revealMatch.Groups["subtype"].Value) is { } revealSubtype)
+        {
+            var flag = new RevealedFromHandFlag();
+            var matchLabel = $"a {revealMatch.Groups["subtype"].Value} card";
+
+            replacements.Register(
+                new RevealCardFromHandReplacement(card, revealSubtype, matchLabel, flag));
+            replacements.Register(new ConditionalEntersTappedReplacement(
+                card,
+                entersUntappedIf: (controller, self) =>
+                    flag.Revealed || CountOtherSubtype(controller, self, revealSubtype) >= 1));
+            return true;
+        }
 
         // Subtype-count variant first (Witch's Cottage / the ELD cottage cycle):
         // "enters tapped unless you control N or more other <Subtype>s." CR 109.2
@@ -100,6 +137,9 @@ public static class ConditionalEntersTappedBinder
     private static int CountOtherSubtype(Player controller, ICard self, CardSubtype subtype) =>
         controller.Zones.Battlefield.GetCards()
             .Count(c => !ReferenceEquals(c, self) && c.HasSubtype(subtype));
+
+    private static CardSubtype? ParseSubtype(string raw) =>
+        Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s) ? s : null;
 
     private static int WordToInt(string s) =>
         s.ToLowerInvariant() switch
