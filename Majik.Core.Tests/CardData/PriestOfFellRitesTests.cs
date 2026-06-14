@@ -14,23 +14,46 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Unit tests for <see cref="PriestOfFellRitesFactory"/>.
+/// Unit tests for <see cref="PriestOfFellRitesFactory"/> (current printing,
+/// verified against Scryfall + the embedded seed):
+///   "{T}, Pay 3 life, Sacrifice this creature: Return target creature card
+///    from your graveyard to the battlefield. Activate only as a sorcery.
+///    Unearth {3}{W}{B}"
 ///
 /// Covers:
 /// - Identity (name, type, P/T, subtypes, mana cost, owner/controller).
 /// - NamedCardFactory dispatch.
-/// - ETB trigger filter: rejects non-creature cards in graveyard
-///   (Lightning Bolt mv 1), accepts a creature with mv ≤ 3 (Bear mv 1).
-/// - ETB trigger no-op when graveyard has no eligible target.
-/// - ETB trigger routes through ZoneService when supplied so ETB triggers
-///   on the reanimated creature fire (CR 603.6a regression — PR #165).
-/// - Activated ability shape: {2}{W}{B} mana cost.
-/// - Activated ability resolve: exiles Priest from graveyard and
-///   reanimates target creature card (no mana-value cap).
+/// - The reanimation ability's cost shape (Tap + Pay 3 life + Sacrifice self),
+///   sorcery-speed, RebindSafe.
+/// - The reanimation ability resolving against a chosen creature card (returns
+///   it to the battlefield; rejects an instant; fizzles on a vanished target).
+/// - The reanimation ability reads "your graveyard" off the live
+///   ResolutionContext.Source — closing the
+///   priest-of-fell-rites-exile-from-gy-reanimate-rebind deferral (it re-homes
+///   to a bearer via ActivatedAbility.RebindTo).
+/// - Unearth {3}{W}{B} shape + resolution.
 /// </summary>
 public class PriestOfFellRitesTests
 {
     private readonly Player _alice = new("Alice", 20);
+
+    private static ActivatedAbility ReanimateAbility(Creature priest) =>
+        priest.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<AdditionalCost>()
+                .Any(c => c.CostType == AdditionalCostType.Sacrifice));
+
+    private static ActivatedAbility UnearthAbility(Creature priest) =>
+        priest.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+
+    /// <summary>Resolve an activated ability through its async path with the
+    /// chosen target threaded, so ResolutionContext.Source = the ability's own
+    /// source (the re-source seam the RebindSafe migration relies on).</summary>
+    private static void ResolveWithTarget(ActivatedAbility ability, ICard target)
+    {
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+        ability.ResolveAsync(agent: null, game: null).AsTask().GetAwaiter().GetResult();
+    }
 
     // -----------------------------------------------------------------------
     // Identity
@@ -64,49 +87,55 @@ public class PriestOfFellRitesTests
     }
 
     // -----------------------------------------------------------------------
-    // ETB trigger — eligibility filter
+    // Reanimation ability — shape
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void PriestOfFellRites_EtbTrigger_IgnoresInstantsInGraveyard()
+    public void PriestOfFellRites_ReanimateAbility_HasTapPayLifeAndSacrificeCosts()
     {
-        var alice = new Player("Alice", 20);
+        var priest = PriestOfFellRitesFactory.Create(_alice);
+        var ability = ReanimateAbility(priest);
 
-        // A non-creature (instant) at mv 1 is not eligible regardless of mv.
-        var bolt = new Instant("Lightning Bolt", "R");
-        bolt.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(bolt);
-        bolt.SetZone(ZoneType.Graveyard);
-
-        var priest = PriestOfFellRitesFactory.Create(alice);
-        var etb = priest.Abilities.OfType<TriggeredAbility>().Single();
-
-        var act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
-
-        act.Should().NotThrow(
-            "Lightning Bolt is an instant — no eligible creature target, so the ETB no-ops");
-        bolt.Zone.Should().Be(ZoneType.Graveyard,
-            "the instant must stay in the graveyard — only creature cards reanimate");
-        alice.Zones.Battlefield.GetCards().Should().NotContain(bolt);
+        var costs = ability.Costs.OfType<AdditionalCost>().ToList();
+        costs.Should().Contain(c => c.CostType == AdditionalCostType.Tap, "{T}");
+        costs.Should().Contain(c => c.CostType == AdditionalCostType.PayLife, "Pay 3 life");
+        costs.Should().Contain(c => c.CostType == AdditionalCostType.Sacrifice, "Sacrifice this creature");
     }
 
     [Fact]
-    public void PriestOfFellRites_EtbTrigger_ReanimatesCreatureWithManaValueAtMostThree()
+    public void PriestOfFellRites_ReanimateAbility_IsSorcerySpeedAndRebindSafe()
+    {
+        var priest = PriestOfFellRitesFactory.Create(_alice);
+        var ability = ReanimateAbility(priest);
+
+        ability.IsSorcerySpeed.Should().BeTrue("'Activate only as a sorcery.'");
+        ability.RebindSafe.Should().BeTrue(
+            "the reanimation effect reads ResolutionContext.Source + its costs " +
+            "re-home via AdditionalCost.RebindSource, so Agatha's Soul Cauldron " +
+            "can re-home the REAL ability to a counter-bearing bearer (CR 707.2)");
+    }
+
+    // -----------------------------------------------------------------------
+    // Reanimation ability — resolution
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PriestOfFellRites_ReanimateAbility_ReturnsChosenCreatureCardToBattlefield()
     {
         var alice = new Player("Alice", 20);
 
-        // A Bear (mv 1 creature) is eligible.
         var bear = new Creature("Grizzly Bears", "1G", 2, 2);
         bear.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(bear);
         bear.SetZone(ZoneType.Graveyard);
 
         var priest = PriestOfFellRitesFactory.Create(alice);
-        var etb = priest.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var effect in etb.Effects) effect.Execute();
+        var ability = ReanimateAbility(priest);
+
+        ResolveWithTarget(ability, bear);
 
         bear.Zone.Should().Be(ZoneType.Battlefield,
-            "Bear is a creature with mv ≤ 3 — eligible for the ETB reanimation");
+            "the chosen creature card was reanimated to the controller's battlefield");
         alice.Zones.Graveyard.GetCards().Should().NotContain(bear);
         alice.Zones.Battlefield.GetCards().Should().Contain(bear);
         bear.Controller.Should().BeSameAs(alice,
@@ -114,133 +143,162 @@ public class PriestOfFellRitesTests
     }
 
     [Fact]
-    public void PriestOfFellRites_EtbTrigger_NoEligibleTarget_IsNoOp()
+    public void PriestOfFellRites_ReanimateAbility_NoTarget_IsNoOp()
+    {
+        var alice = new Player("Alice", 20);
+        var priest = PriestOfFellRitesFactory.Create(alice);
+        var ability = ReanimateAbility(priest);
+
+        // No chosen target → resolves as a no-op (CR 608.2b).
+        var act = () => ability.ResolveAsync(agent: null, game: null)
+            .AsTask().GetAwaiter().GetResult();
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void PriestOfFellRites_ReanimateAbility_RejectsNonCreatureTarget()
     {
         var alice = new Player("Alice", 20);
 
-        // A high-mv creature is NOT eligible (mv 4 > 3 cap).
-        var giant = new Creature("Hill Giant", "3R", 3, 3);
-        giant.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(giant);
-        giant.SetZone(ZoneType.Graveyard);
+        var bolt = new Instant("Lightning Bolt", "R");
+        bolt.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bolt);
+        bolt.SetZone(ZoneType.Graveyard);
 
         var priest = PriestOfFellRitesFactory.Create(alice);
-        var etb = priest.Abilities.OfType<TriggeredAbility>().Single();
+        var ability = ReanimateAbility(priest);
 
-        var act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
+        ResolveWithTarget(ability, bolt);
 
-        act.Should().NotThrow("no creature card with mv ≤ 3 in graveyard → no-op (CR 117.x)");
-        giant.Zone.Should().Be(ZoneType.Graveyard,
-            "Hill Giant has mv 4 — outside the ≤ 3 cap, must remain in graveyard");
-        alice.Zones.Battlefield.GetCards().Should().NotContain(giant);
+        bolt.Zone.Should().Be(ZoneType.Graveyard,
+            "an instant is not a creature card — it stays in the graveyard (CR 608.2b)");
+        alice.Zones.Battlefield.GetCards().Should().NotContain(bolt);
     }
 
     // -----------------------------------------------------------------------
-    // ETB trigger — CR 603.6a regression: ZoneService routing
+    // RE-SOURCE-SAFE — Agatha's Soul Cauldron re-home (deferral close).
+    // The reanimate ability re-homed to a BEARER (via RebindTo) reanimates from
+    // the BEARER's controller's graveyard, reading ResolutionContext.Source.
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void PriestOfFellRites_EtbTrigger_RoutesThroughZoneService_PublishesCardMovedEvent()
+    public void PriestOfFellRites_ReanimateAbility_RebindsToBearer_ReadsBearersGraveyard()
     {
         var alice = new Player("Alice", 20);
-        var bus = new EventBus();
-        var zones = new ZoneService(eventBus: bus);
+        var bob = new Player("Bob", 20);
 
-        var movedEvents = new List<CardMovedEvent>();
-        bus.Subscribe<CardMovedEvent>(movedEvents.Add);
+        // The Priest is exiled (imprinted under Agatha). Build the ability, then
+        // re-home it to a bearer Bob controls — the grant mechanism's RebindTo.
+        var priest = PriestOfFellRitesFactory.Create(alice);
+        var ability = ReanimateAbility(priest);
 
-        var bear = new Creature("Grizzly Bears", "1G", 2, 2);
-        bear.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(bear);
-        bear.SetZone(ZoneType.Graveyard);
+        var bearer = new Creature("Bearer Beast", "2G", 3, 3);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+        bearer.SetZone(ZoneType.Battlefield);
+        bob.Zones.Battlefield.AddCard(bearer);
 
-        var priest = PriestOfFellRitesFactory.Create(
-            alice, zoneService: zones, eventBus: bus, triggers: null);
+        var rebound = ability.RebindTo(bearer, bob);
+        rebound.Source.Should().BeSameAs(bearer, "re-homed to the BEARER (CR 707.2)");
+        rebound.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
 
-        var etb = priest.Abilities.OfType<TriggeredAbility>().Single();
-        foreach (var effect in etb.Effects) effect.Execute();
+        // A creature card sits in BOB's graveyard (the bearer's controller).
+        var zombie = new Creature("Walking Corpse", "1B", 2, 2);
+        zombie.SetOwner(bob);
+        bob.Zones.Graveyard.AddCard(zombie);
+        zombie.SetZone(ZoneType.Graveyard);
 
-        bear.Zone.Should().Be(ZoneType.Battlefield);
-        movedEvents.Should().ContainSingle(
-                e => ReferenceEquals(e.Card, bear)
-                    && e.FromZone == ZoneType.Graveyard
-                    && e.ToZone == ZoneType.Battlefield,
-                "graveyard → battlefield routes through ZoneService so ETB triggers fire (CR 603.6a)");
+        // A decoy in ALICE's graveyard (the exiled Priest's controller) must NOT
+        // be the pool the re-homed ability reanimates from.
+        var decoy = new Creature("Decoy Ogre", "2R", 3, 3);
+        decoy.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(decoy);
+        decoy.SetZone(ZoneType.Graveyard);
+
+        ResolveWithTarget(rebound, zombie);
+
+        zombie.Zone.Should().Be(ZoneType.Battlefield,
+            "the re-homed ability reanimates from the BEARER's controller's graveyard");
+        bob.Zones.Battlefield.GetCards().Should().Contain(zombie);
+        zombie.Controller.Should().BeSameAs(bob,
+            "the reanimated permanent enters under the BEARER's controller (CR 110.2)");
+        decoy.Zone.Should().Be(ZoneType.Graveyard,
+            "the exiled Priest's controller's graveyard is untouched");
+    }
+
+    [Fact]
+    public void PriestOfFellRites_ReanimateAbility_RebindToBearer_RehomesTapAndSacrificeCosts()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var priest = PriestOfFellRitesFactory.Create(alice);
+        var ability = ReanimateAbility(priest);
+
+        var bearer = new Creature("Bearer Beast", "2G", 3, 3);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+
+        var rebound = ability.RebindTo(bearer, bob);
+
+        // STAGE 1 — the Tap + Sacrifice AdditionalCosts now capture the BEARER.
+        var tap = rebound.Costs.OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.Tap);
+        var sac = rebound.Costs.OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.Sacrifice);
+
+        tap.Description.Should().Contain(bearer.Name,
+            "RebindTo re-homes the {T} cost to the bearer (AdditionalCost.RebindSource)");
+        sac.Description.Should().Contain(bearer.Name,
+            "RebindTo re-homes the sacrifice cost to the bearer");
     }
 
     // -----------------------------------------------------------------------
-    // Activated ability — shape
+    // Unearth {3}{W}{B} — shape + resolution
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void PriestOfFellRites_ActivatedAbility_HasManaCost()
+    public void PriestOfFellRites_Unearth_HasManaCostAndSorcerySpeed()
     {
         var priest = PriestOfFellRitesFactory.Create(_alice);
+        var unearth = UnearthAbility(priest);
 
-        var ability = priest.Abilities.OfType<ActivatedAbility>().Single();
-
-        ability.Costs.OfType<ManaCostCost>().Should().ContainSingle(
-            "the activated ability requires {2}{W}{B} mana");
+        unearth.Costs.OfType<ManaCostCost>().Should().ContainSingle("Unearth {3}{W}{B}");
+        unearth.IsSorcerySpeed.Should().BeTrue("'Unearth only as a sorcery.' (CR 702.84a)");
     }
 
-    // -----------------------------------------------------------------------
-    // Activated ability — resolution (graveyard-activated unearth)
-    // -----------------------------------------------------------------------
-
     [Fact]
-    public void PriestOfFellRites_ActivatedAbility_ExilesSelf_AndReanimatesTargetCreature()
+    public void PriestOfFellRites_Unearth_ReturnsSelfFromGraveyardWithHaste()
     {
         var alice = new Player("Alice", 20);
 
         var priest = PriestOfFellRitesFactory.Create(alice);
-        // Priest is in graveyard (precondition for the activated ability).
         alice.Zones.Graveyard.AddCard(priest);
         priest.SetZone(ZoneType.Graveyard);
 
-        // A target creature card (no mv cap on the activated ability).
-        var giant = new Creature("Hill Giant", "3R", 3, 3);
-        giant.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(giant);
-        giant.SetZone(ZoneType.Graveyard);
+        var unearth = UnearthAbility(priest);
+        foreach (var effect in unearth.Effects) effect.Execute();
 
-        var ability = priest.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var effect in ability.Effects) effect.Execute();
-
-        priest.Zone.Should().Be(ZoneType.Exile,
-            "Priest of Fell Rites pays its activation cost by exiling itself from the graveyard");
-        alice.Zones.Graveyard.GetCards().Should().NotContain(priest);
-        alice.Zones.Exile.GetCards().Should().Contain(priest);
-
-        giant.Zone.Should().Be(ZoneType.Battlefield,
-            "the target creature was reanimated to the battlefield");
-        alice.Zones.Graveyard.GetCards().Should().NotContain(giant);
-        giant.Controller.Should().BeSameAs(alice,
-            "the reanimated permanent enters under the activator's control (CR 110.2)");
+        priest.Zone.Should().Be(ZoneType.Battlefield,
+            "Unearth returns the card from the graveyard to the battlefield (CR 702.84a)");
+        alice.Zones.Battlefield.GetCards().Should().Contain(priest);
+        priest.HasSummoningSickness.Should().BeFalse("Unearth grants Haste (CR 702.10)");
     }
 
     [Fact]
-    public void PriestOfFellRites_ActivatedAbility_NotInGraveyard_IsNoOp()
+    public void PriestOfFellRites_Unearth_NotInGraveyard_IsNoOp()
     {
         var alice = new Player("Alice", 20);
 
         var priest = PriestOfFellRitesFactory.Create(alice);
-        // Priest is on the battlefield, NOT in graveyard.
         alice.Zones.Battlefield.AddCard(priest);
         priest.SetZone(ZoneType.Battlefield);
 
-        var giant = new Creature("Hill Giant", "3R", 3, 3);
-        giant.SetOwner(alice);
-        alice.Zones.Graveyard.AddCard(giant);
-        giant.SetZone(ZoneType.Graveyard);
+        var unearth = UnearthAbility(priest);
+        var act = () => { foreach (var effect in unearth.Effects) effect.Execute(); };
 
-        var ability = priest.Abilities.OfType<ActivatedAbility>().Single();
-        var act = () => { foreach (var effect in ability.Effects) effect.Execute(); };
-
-        act.Should().NotThrow(
-            "shape guard — the graveyard-activated ability no-ops when Priest is not in graveyard");
-        priest.Zone.Should().Be(ZoneType.Battlefield,
-            "Priest must not be moved when activation precondition fails");
-        giant.Zone.Should().Be(ZoneType.Graveyard,
-            "no reanimation happens without a valid graveyard-zone activation");
+        act.Should().NotThrow("Unearth no-ops when the card is not in the graveyard");
+        priest.Zone.Should().Be(ZoneType.Battlefield);
     }
 }
