@@ -1369,6 +1369,8 @@ public static class CardDefRuntime
             PumpTargetEffectDef pump => BuildPumpTargetEffect(pump, card, targetRequestIndex),
             PumpSelfEffectDef pumpSelf => BuildPumpSelfEffect(pumpSelf, card),
             GrantKeywordUntilEotTargetEffectDef grant => BuildGrantKeywordUntilEotTargetEffect(grant, card, targetRequestIndex),
+            GrantKeywordToCreaturesYouControlEffectDef groupGrant =>
+                BuildGrantKeywordToCreaturesYouControlEffect(groupGrant, card, controller),
             BecomesArtifactTargetEffectDef artifact => BuildBecomesArtifactTargetEffect(artifact, card, targetRequestIndex),
             DamageAndTapEachFlyerOpponentsControlEffectDef flyers =>
                 BuildDamageAndTapEachFlyerOpponentsControlEffect(flyers, card),
@@ -2154,6 +2156,39 @@ public static class CardDefRuntime
                         new GrantKeywordUntilEndOfTurnEffect(creature, keyword));
                 }
                 return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildGrantKeywordToCreaturesYouControlEffect(
+        GrantKeywordToCreaturesYouControlEffectDef def, ICard card, Player controller)
+    {
+        // CR 613.1c / CR 514.2 — the GROUP-apply "creatures you control gain
+        // [keyword(s)] until end of turn" verb (Vault of the Archangel). The
+        // declarative form of LandActivatedAbilityBinder
+        // .BindGrantKeywordsToCreaturesYouControl: at resolution it walks the
+        // activating player's battlefield (CR 611.2c — a one-shot, resolution-
+        // time snapshot; creatures that enter later this turn are not
+        // retroactively granted) and registers one Layer-6
+        // GrantKeywordUntilEndOfTurnEffect per keyword on each creature's OWN
+        // ActiveEffects (auto-expires at cleanup). The controller's Battlefield
+        // zone already scopes "you control"; opponent creatures are untouched.
+        // ActiveEffects null (pure-shape test path) → that creature is skipped.
+        var keywords = def.Keywords.ToArray();
+        var label = keywords.Length == 0 ? "(no keywords)" : string.Join(" and ", keywords).ToLowerInvariant();
+        return new Effect(
+            $"{card.Name}: creatures you control gain {label} until end of turn",
+            () =>
+            {
+                foreach (var creature in controller.Zones.Battlefield.GetCards()
+                             .OfType<Creature>().ToList())
+                {
+                    if (creature.ActiveEffects is null) continue;
+                    foreach (var kw in keywords)
+                    {
+                        creature.ActiveEffects.Register(
+                            new GrantKeywordUntilEndOfTurnEffect(creature, kw));
+                    }
+                }
             });
     }
 
