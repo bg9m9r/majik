@@ -123,7 +123,7 @@ public static class SealOfFireFactory
                     Fx.DealDamageAny(target, PingDamage);
                 }
 
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
             });
 
         pingAbility = new ActivatedAbility(
@@ -152,10 +152,26 @@ public static class SealOfFireFactory
     /// Move <paramref name="seal"/> from the battlefield to its owner's
     /// graveyard. Idempotent — no-op if already off the battlefield. Mirrors
     /// the closure used by <see cref="PyriteSpellbombFactory"/>.
+    ///
+    /// <para>CR 701.16a — when a bus is supplied (prod effects-aware build),
+    /// route through <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/> so a
+    /// <see cref="PermanentSacrificedEvent"/> is published crediting the
+    /// cost-payer. In the live activation path the
+    /// <see cref="AdditionalCost.Sacrifice(Cards.Permanent, IEventBus?)"/> cost
+    /// already moved the seal, so this closure no-ops (single publish either
+    /// way). Mirrors <see cref="SealOfCleansingFactory"/>'s bus-aware
+    /// self-sac fallback.</para>
     /// </summary>
-    private static void SacrificeSelf(Enchantment seal, Player owner)
+    private static void SacrificeSelf(Enchantment seal, Player owner, IEventBus? eventBus)
     {
         if (seal.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(seal, seal.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(seal);
         owner.Zones.Graveyard.AddCard(seal);
         seal.SetZone(ZoneType.Graveyard);
