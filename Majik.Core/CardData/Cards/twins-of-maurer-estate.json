@@ -1,0 +1,8 @@
+{
+  "name": "Twins of Maurer Estate",
+  "types": ["Creature"],
+  "subtypes": ["Vampire"],
+  "manaCost": "{4}{B}",
+  "power": 3,
+  "toughness": 5
+}

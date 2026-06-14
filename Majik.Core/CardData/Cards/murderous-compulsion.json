@@ -1,0 +1,6 @@
+{
+  "name": "Murderous Compulsion",
+  "types": ["Sorcery"],
+  "manaCost": "{1}{B}",
+  "colors": ["B"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Just the Wind",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}",
+  "colors": ["U"]
+}
