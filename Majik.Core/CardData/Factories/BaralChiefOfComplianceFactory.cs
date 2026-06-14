@@ -64,8 +64,8 @@ public static class BaralChiefOfComplianceFactory
 
     /// <summary>
     /// Construct Baral, Chief of Compliance with the spell-cost reduction
-    /// rider attached as static metadata. The counter-rebate trigger is
-    /// deferred (see class-level remarks).
+    /// rider attached as static metadata and the counter → loot
+    /// <see cref="TriggeredAbility"/> bound (see class-level remarks).
     /// </summary>
     public static Creature Create(Player owner)
     {

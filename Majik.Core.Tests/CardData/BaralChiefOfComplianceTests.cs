@@ -37,9 +37,9 @@ namespace Majik.Core.Tests.CardData;
 ///       * Floor-at-zero on a {R} instant; coloured pips untouched.
 ///       * Opponent-controlled Baral does NOT discount your spells.
 ///
-/// The counter-rebate trigger ("draw + discard when opponent counters your
-/// spell") is NOT implemented in v1 — see the factory's class-level
-/// remarks. No test asserts that path.
+/// The counter → loot trigger ("whenever a spell or ability you control
+/// counters a spell, draw a card, then discard a card") IS implemented — see
+/// the factory's class-level remarks and the Counter → loot tests below.
 /// </summary>
 public class BaralChiefOfComplianceTests
 {
