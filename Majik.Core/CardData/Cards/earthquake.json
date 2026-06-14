@@ -1,0 +1,5 @@
+{
+  "name": "Earthquake",
+  "types": ["Sorcery"],
+  "manaCost": "{X}{R}"
+}
