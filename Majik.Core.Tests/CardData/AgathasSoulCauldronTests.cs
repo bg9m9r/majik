@@ -1834,4 +1834,122 @@ public class AgathasSoulCauldronTests
         after.Should().Be(before + 1,
             "resolving the un-rebound token-maker mints X=1 (Krenko counts himself)");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-grant-imprinted-arbitrary-bespoke-closure-rehome — Griselbrand is
+    // a bespoke [CardName]-factory creature whose sole activated ability ("Pay 7
+    // life: Draw seven cards") is OUTSIDE the OracleActivatedAbilityBinder
+    // reconstructable set: the "Pay 7 life" cost is explicitly REJECTED by the
+    // binder's cost grammar (mana pips + {T} + "Sacrifice this creature" only),
+    // so the oracle-rebuild fallback cannot reconstruct this clause at all. The
+    // migration retargets the effect to draw for ResolutionContext.Source's
+    // controller (rather than capturing `card`) and marks the ability
+    // RebindSafe, so Agatha's group-grant re-homes the REAL ability (and its
+    // PayLife cost, passed through unchanged by RebindTo Stage 1) onto a
+    // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) —
+    // the BEARER's controller pays 7 life and draws 7, never the exiled
+    // Griselbrand. This is the Skithiryx case (a real ability whose printed cost
+    // is not reconstructable from oracle text).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Griselbrand_DrawSevenToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the "Pay 7 life: Draw seven cards") is now
+        // RebindSafe (draws for ResolutionContext.Source's controller). The
+        // "Pay 7 life" cost is NOT reconstructable from oracle text, so the
+        // RebindTo of the real ability is the only sound re-home.
+        var griselbrand = GriselbrandFactory.Create(alice);
+        var realAbilities = griselbrand.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Griselbrand has exactly one non-mana activated ability — the draw-7");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Griselbrand ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(griselbrand);
+        griselbrand.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Griselbrand so the only way
+        // the ability is granted is via RebindTo of the real ability — the
+        // oracle-rebuild fallback cannot reconstruct the "Pay 7 life" cost, so if
+        // the grant still depended on it nothing would be emitted and this test
+        // would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), griselbrand);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Griselbrand's real Pay-7-life draw-7 is re-homed via RebindTo");
+        var draw7 = granted[0];
+        draw7.Source.Should().BeSameAs(bearer,
+            "the re-homed draw-7 is sourced on the BEARER (CR 707.2)");
+        draw7.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        draw7.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle(
+                "the PayLife cost is passed through unchanged by RebindTo (Stage 1)");
+
+        // Stock the bearer-controller's (Alice's) library so the seven draws are
+        // observable.
+        for (int i = 0; i < 10; i++)
+        {
+            var libCard = new Creature($"Lib {i}", "G", 1, 1);
+            libCard.SetOwner(alice);
+            alice.Zones.Library.AddCard(libCard);
+            libCard.SetZone(ZoneType.Library);
+        }
+
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+
+        // Resolving the re-homed draw-7 draws SEVEN for the BEARER'S controller
+        // (Alice) — ResolutionContext.Source = bearer => its controller = Alice.
+        await draw7.ResolveAsync(agent: null, game: null);
+
+        var handAfter = alice.Zones.Hand.GetCards().Count();
+        handAfter.Should().Be(handBefore + 7,
+            "the re-homed draw-7 drew seven cards for the bearer's controller (Alice)");
+    }
+
+    [Fact]
+    public async Task BespokeDrawSeven_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still draws for its OWN source's controller
+        // on the normal (un-rebound) resolution path — ResolutionContext.Source =
+        // the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var griselbrand = GriselbrandFactory.Create(alice);
+        alice.Zones.Library.AddCard(griselbrand);
+        zones.MoveCard(griselbrand, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var draw7 = griselbrand.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        for (int i = 0; i < 10; i++)
+        {
+            var libCard = new Creature($"Lib {i}", "G", 1, 1);
+            libCard.SetOwner(alice);
+            alice.Zones.Library.AddCard(libCard);
+            libCard.SetZone(ZoneType.Library);
+        }
+
+        var before = alice.Zones.Hand.GetCards().Count();
+        await draw7.ResolveAsync(agent: null, game: null);
+        var after = alice.Zones.Hand.GetCards().Count();
+        after.Should().Be(before + 7,
+            "resolving the un-rebound draw-7 draws seven for its own source's controller");
+    }
 }
