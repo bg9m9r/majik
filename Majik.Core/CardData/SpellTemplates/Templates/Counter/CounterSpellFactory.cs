@@ -48,13 +48,17 @@ internal static class CounterSpellFactory
 
     /// <summary>
     /// "Counter target [type] spell unless its controller pays {N}." —
-    /// Spell Pierce / Mana Tithe / Mana Leak shape. The rider is modeled as
-    /// an automatic mana-pool consult on resolution: if the target spell's
-    /// controller has {N} generic mana in their pool, it's spent and the
-    /// counter no-ops (the spell resolves); otherwise the spell is countered
-    /// per CR 701.5 / CR 118.4. <paramref name="requireCreature"/> and
-    /// <paramref name="requireNonCreature"/> let the same factory cover
-    /// hypothetical typed variants alongside the plain "target spell" form.
+    /// Spell Pierce / Mana Tithe / Mana Leak shape. The pay rider is wired
+    /// through <see cref="Majik.Core.Primitives.PayUnlessCounterRider"/>: at
+    /// resolution the target spell's CONTROLLER is asked (CR 118.4) whether to
+    /// pay {N} to keep their spell on the stack; on "yes" + affordable it is
+    /// spent and the counter no-ops, on "no" / can't afford the spell is
+    /// countered (CR 701.5). The legacy synchronous (shape-only) path keeps the
+    /// deterministic "pay if able" posture. <paramref name="requireCreature"/>
+    /// and <paramref name="requireNonCreature"/> let the same factory cover
+    /// typed variants (Spell Pierce — noncreature) alongside the plain
+    /// "target spell" form; an illegal type at resolution is a clean no-op
+    /// (CR 608.2b).
     /// </summary>
     internal static SpellDefinition CounterTargetSpellUnlessPay(
         Func<object, object> resolver,
@@ -66,26 +70,24 @@ internal static class CounterSpellFactory
         TargetRequests: new[] { new TargetRequest("target spell", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
         {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("counter target spell unless its controller pays", () =>
+            var raw = p.Targets[0][0];
+            // The type rider is applied inside the resolveTarget closure: a
+            // target whose type no longer matches the predicate resolves to
+            // null, so PayUnlessCounterRider does nothing (CR 608.2b).
+            return new IEffect[]
             {
-                if (stack == null || target is not ISpell spell) return;
-                var isCreature = spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature);
-                // Type rider: target became illegal → effect does nothing
-                // (CR 608.2b — the target spell remains on the stack).
-                if (requireCreature && !isCreature) return;
-                if (requireNonCreature && isCreature) return;
-                // Pay rider: if the controller has the generic mana available,
-                // they auto-pay and the spell resolves. Otherwise → counter.
-                if (unlessPayN > 0
-                    && spell.Controller is not null
-                    && spell.Controller.PayMana(Majik.Core.ValueObjects.ManaCost.Zero.AddGenericCost(unlessPayN)))
-                {
-                    return;
-                }
-                // CR 701.5b — uncounterable spells survive the attempt.
-                if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-                spell.Card.SetZone(ZoneType.Graveyard);
-            }) };
+                Majik.Core.Primitives.PayUnlessCounterRider.Build(
+                    "counter target spell unless its controller pays",
+                    stack,
+                    () =>
+                    {
+                        if (resolver(raw) is not ISpell spell) return null;
+                        var isCreature = spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature);
+                        if (requireCreature && !isCreature) return null;
+                        if (requireNonCreature && isCreature) return null;
+                        return spell;
+                    },
+                    unlessPayN: unlessPayN),
+            };
         });
 }

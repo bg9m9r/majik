@@ -19,16 +19,14 @@ namespace Majik.Core.CardData.Factories;
 /// ## Implemented (v1)
 /// - Instant shape, mana cost {1}{U}, blue.
 /// - <b>Counter target spell unless its controller pays {3}</b> — mirrors the
-///   "unless pay" pattern from <see cref="DazeFactory"/>. At resolution the
-///   engine checks whether the target spell's controller has {3} available;
-///   if yes, it is spent automatically and the counter no-ops (v1 auto-pay
-///   posture — same as Daze / Mana Tithe). If no, the spell is countered via
-///   <see cref="OracleSpellBinder.RemoveFromStack"/> and its card goes to the
-///   graveyard (CR 701.5).
-///
-/// ## Deferred
-/// - Real "do you want to pay {3}?" agent prompt — same queue as Daze /
-///   Stubborn Denial / Spell Pierce. v1 is deterministic: "pay if able."
+///   "unless pay" pattern from <see cref="DazeFactory"/>, routed through
+///   <see cref="Majik.Core.Primitives.PayUnlessCounterRider"/>. At resolution
+///   the target spell's CONTROLLER is asked (CR 118.4) whether to pay {3} to
+///   keep their spell; on "yes" + affordable it is spent and the counter
+///   no-ops, on "no" / can't afford the spell is countered (CR 701.5). The
+///   default heuristic bot pays when able; remote / human agents get the real
+///   prompt. The legacy synchronous (shape-only) path keeps the deterministic
+///   "pay if able" posture.
 /// </summary>
 [CardName("Mana Leak")]
 public static class ManaLeakFactory
@@ -58,8 +56,6 @@ public static class ManaLeakFactory
     {
         ArgumentNullException.ThrowIfNull(targetResolver);
 
-        var unlessCost = ManaCost.Zero.AddGenericCost(3);
-
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
@@ -67,26 +63,16 @@ public static class ManaLeakFactory
             EffectFactory: p =>
             {
                 var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
                 return new IEffect[]
                 {
-                    new Effect("Mana Leak — counter target spell unless its controller pays {3}", () =>
-                    {
-                        if (stack == null || resolved is not ISpell spell) return;
-
-                        // CR 118.4 — if the target's controller has {3} in their
-                        // mana pool, they may pay; v1 auto-pays when able.
-                        if (spell.Controller is not null
-                            && spell.Controller.PayMana(unlessCost))
-                        {
-                            // Controller paid {3} — spell is NOT countered.
-                            return;
-                        }
-
-                        // Controller couldn't pay — counter the spell.
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
-                    }),
+                    // CR 118.4 — ask the target spell's controller whether to
+                    // pay {3} to keep it on the stack; counter on no / can't
+                    // afford (CR 701.5). See PayUnlessCounterRider.
+                    Majik.Core.Primitives.PayUnlessCounterRider.Build(
+                        "Mana Leak — counter target spell unless its controller pays {3}",
+                        stack,
+                        () => targetResolver(raw) as ISpell,
+                        unlessPayN: 3),
                 };
             });
     }
