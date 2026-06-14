@@ -889,6 +889,77 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_ProtectionGrant_RehomesChosenColorProtectionToChosenCreature()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: Mother of Runes' protection grant —
+        // "{T}: Target creature you control gains protection from the color of
+        // your choice until end of turn." Re-homing is sound: the SOURCE /
+        // cost-payer is the BEARER (its own {T} cost taps it), and the
+        // ProtectionAbility lands on the CHOSEN target creature via a self-sourced
+        // GrantAbilityEffect against the target's own ActiveEffects, never the
+        // exiled imprinted card (CR 613.1f Layer 6; CR 702.16). The chosen colour
+        // defaults to white (first WUBRG) on the deterministic binder path — same
+        // posture as MotherOfRunesFactory's WhitePicker default (the agent colour
+        // prompt is a documented v1 gap).
+        var mom = new Creature("Runes Stub", "W", 1, 1);
+        mom.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(mom);
+        mom.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A separate creature on the battlefield to receive the protection grant.
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Runes Stub",
+                "{T}: Target creature you control gains protection from the color of your choice until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), mom);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's protection grant");
+        var grant = granted[0];
+        grant.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        grant.Costs.OfType<Majik.Core.Costs.AdditionalCost>().Should()
+            .ContainSingle("the {T} cost taps the BEARER");
+        grant.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"),
+            "a protection grant requires a 1..1 target-creature request");
+
+        // The ally has no protection yet.
+        Majik.Core.Rules.Protection.HasProtectionFromColor(ally, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeFalse("no grant has resolved yet");
+
+        // Resolving with the ALLY chosen grants the ALLY protection from white
+        // (the deterministic default colour), not the bearer and not the exiled card.
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        foreach (var effect in grant.Effects) effect.Execute();
+
+        Majik.Core.Rules.Protection.HasProtectionFromColor(ally, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeTrue("the re-homed protection grant gives the CHOSEN creature protection from the chosen colour");
+        Majik.Core.Rules.Protection.HasProtectionFromColor(bearer, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeFalse("the bearer (mere source) is not protected — only the chosen target");
+
+        // CR 514.2 — the protection grant expires at cleanup.
+        effects.ExpireEndOfTurn();
+        Majik.Core.Rules.Protection.HasProtectionFromColor(ally, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeFalse("the granted protection expires at end of turn");
+    }
+
+    [Fact]
     public void Grant_NonMana_Pinger_RehomesTapAndDamageToBearer()
     {
         var alice = new Player("Alice", 20);
