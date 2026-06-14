@@ -81,6 +81,7 @@ namespace Majik.Core.CardData.Factories;
 [CardName("Enduring Tenacity")]
 public static class EnduringTenacityFactory
 {
+    // Duskmourn "Enduring" cycle sibling of EnduringCuriosityFactory.
     public const string CardName = "Enduring Tenacity";
     public const string Slug = "enduring-tenacity";
 
