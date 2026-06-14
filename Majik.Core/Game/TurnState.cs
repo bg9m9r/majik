@@ -20,13 +20,31 @@ public sealed class TurnState
     public int CreaturesDiedThisTurn { get; private set; }
 
     /// <summary>
-    /// Total number of attacking creatures declared this turn (CR 508.1).
-    /// Read by dynamic-X effects keyed on the attacker count — Raffine, Scheming
-    /// Seer connives X = number of attacking creatures. Incremented by the
-    /// attacker-declaration subscriber in <see cref="TurnDriver"/> (mirrors how
-    /// <see cref="CreaturesDiedThisTurn"/> is event-driven). Reset each turn.
+    /// Total number of attacking creatures declared this turn (CR 508.1),
+    /// CUMULATIVE across every combat phase the turn contained. Reset each turn.
+    /// Incremented by the attacker-declaration subscriber in
+    /// <see cref="TurnDriver"/> (mirrors how <see cref="CreaturesDiedThisTurn"/>
+    /// is event-driven).
+    ///
+    /// <para>This is the turn SUM — NOT the right value for "number of attacking
+    /// creatures" effects (Raffine, Scheming Seer), which CR 508.1 scopes to the
+    /// CURRENT combat. On an extra-combat turn (Aggravated Assault, Relentless
+    /// Assault, Combat Celebrant) this tally over-counts the current combat.
+    /// Use <see cref="AttackersDeclaredThisCombat"/> for current-combat X.</para>
     /// </summary>
     public int AttackersDeclaredThisTurn { get; private set; }
+
+    /// <summary>
+    /// Number of attacking creatures declared in the CURRENT combat phase
+    /// (CR 508.1). Reset at the beginning of each combat phase
+    /// (<see cref="BeginCombat"/>, driven by <see cref="TurnDriver"/>) and
+    /// accumulated by <see cref="RecordAttackersDeclared"/> as attackers are
+    /// declared. This is the value "X = the number of attacking creatures"
+    /// effects (Raffine, Scheming Seer; data-driven <c>attackers_this_turn</c>
+    /// source) read, so extra-combat turns do not over-count X by summing both
+    /// combats.
+    /// </summary>
+    public int AttackersDeclaredThisCombat { get; private set; }
 
     /// <summary>Total number of permanents that left the battlefield this turn.</summary>
     public int PermanentsLeftBattlefieldThisTurn { get; private set; }
@@ -132,14 +150,35 @@ public sealed class TurnState
     }
 
     /// <summary>
+    /// Called at the start of each combat phase (CR 506.1), before any attacker
+    /// is declared, to reset the per-combat attacker tally
+    /// (<see cref="AttackersDeclaredThisCombat"/>). Driven by
+    /// <see cref="TurnDriver"/> at the beginning-of-combat step so an
+    /// extra-combat turn (Aggravated Assault etc.) counts each combat's
+    /// attackers independently for current-combat X effects (CR 508.1). The
+    /// turn-cumulative <see cref="AttackersDeclaredThisTurn"/> is left untouched.
+    /// </summary>
+    public void BeginCombat()
+    {
+        AttackersDeclaredThisCombat = 0;
+    }
+
+    /// <summary>
     /// Called when attackers are declared (CR 508.1). Adds the number of
-    /// declared attacking creatures to the per-turn attacker tally. Read by
-    /// dynamic-X "number of attacking creatures" effects (Raffine, Scheming
-    /// Seer). Negative / zero counts are ignored.
+    /// declared attacking creatures to BOTH the turn-cumulative tally
+    /// (<see cref="AttackersDeclaredThisTurn"/>) and the current-combat tally
+    /// (<see cref="AttackersDeclaredThisCombat"/>, reset at each combat begin via
+    /// <see cref="BeginCombat"/>). Dynamic-X "number of attacking creatures"
+    /// effects (Raffine, Scheming Seer) read the per-combat value so extra-combat
+    /// turns do not over-count. Negative / zero counts are ignored.
     /// </summary>
     public void RecordAttackersDeclared(int count)
     {
-        if (count > 0) AttackersDeclaredThisTurn += count;
+        if (count > 0)
+        {
+            AttackersDeclaredThisTurn += count;
+            AttackersDeclaredThisCombat += count;
+        }
     }
 
     /// <summary>
@@ -393,6 +432,7 @@ public sealed class TurnState
         // ── Scalar globals ───────────────────────────────────────────────────
         CreaturesDiedThisTurn = src.CreaturesDiedThisTurn;
         AttackersDeclaredThisTurn = src.AttackersDeclaredThisTurn;
+        AttackersDeclaredThisCombat = src.AttackersDeclaredThisCombat;
         PermanentsLeftBattlefieldThisTurn = src.PermanentsLeftBattlefieldThisTurn;
 
         // ── Guid-keyed integer dictionaries — remap keys ─────────────────────
@@ -458,6 +498,7 @@ public sealed class TurnState
     {
         CreaturesDiedThisTurn = 0;
         AttackersDeclaredThisTurn = 0;
+        AttackersDeclaredThisCombat = 0;
         PermanentsLeftBattlefieldThisTurn = 0;
         _creaturesDiedByController.Clear();
         _permanentsLeftByController.Clear();

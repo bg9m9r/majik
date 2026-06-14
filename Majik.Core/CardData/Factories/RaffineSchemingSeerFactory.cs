@@ -35,8 +35,10 @@ namespace Majik.Core.CardData.Factories;
 ///   creatures." Fires on <see cref="AttackersDeclaredEvent"/> when Raffine's
 ///   controller is the attacking player. The connive amount X is read LIVE off
 ///   the resolving <see cref="Majik.Core.Game.GameContext.TurnState"/>
-///   (<c>AttackersDeclaredThisTurn</c>, Task 3.1 / 3.3) — NOT a captured
-///   build-time TurnState, so it is correct on the production routed build. The
+///   (<c>AttackersDeclaredThisCombat</c> — the CURRENT combat's attacker count
+///   per CR 508.1, reset at each combat begin so extra-combat turns don't
+///   over-count) — NOT a captured build-time TurnState, so it is correct on the
+///   production routed build. The
 ///   target attacking creature comes from the trigger's
 ///   <see cref="TriggeredAbility.ChosenTargets"/> (the prod async trigger-drain
 ///   prompts the controller's agent), falling back to the first attacking
@@ -127,10 +129,13 @@ public static class RaffineSchemingSeerFactory
                 // CR 608.2b — resolution-time legality re-check.
                 if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
-                // X = number of attacking creatures declared this turn, read
-                // LIVE off the resolution context's TurnState (Task 3.1 / 3.3) —
-                // never a captured build-time count. 0 ⇒ Fx.Connive no-ops.
-                var x = rc.Game?.TurnState?.AttackersDeclaredThisTurn ?? 0;
+                // X = number of attacking creatures in the CURRENT combat (CR
+                // 508.1), read LIVE off the resolution context's TurnState's
+                // per-combat tally (reset at each combat begin) — never the
+                // turn-cumulative sum, so an extra-combat turn (Aggravated
+                // Assault etc.) doesn't over-count X, and never a captured
+                // build-time count. 0 ⇒ Fx.Connive no-ops.
+                var x = rc.Game?.TurnState?.AttackersDeclaredThisCombat ?? 0;
                 Fx.Connive(target, x);
                 return ValueTask.CompletedTask;
             });

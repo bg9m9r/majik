@@ -1474,7 +1474,12 @@ public static class CardDefRuntime
         return amountSource switch
         {
             "creatures_died_this_turn" => ts.CreaturesDiedThisTurn,
-            "attackers_this_turn" => ts.AttackersDeclaredThisTurn,
+            // CR 508.1 — "X = the number of attacking creatures" is scoped to the
+            // CURRENT combat. Read the per-combat tally (reset each combat begin)
+            // so extra-combat turns (Aggravated Assault etc.) don't over-count by
+            // summing both combats. The source name is the printed-oracle alias,
+            // not the cumulative turn sum.
+            "attackers_this_turn" => ts.AttackersDeclaredThisCombat,
             _ => 0,
         };
     }
