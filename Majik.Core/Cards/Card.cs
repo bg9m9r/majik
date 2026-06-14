@@ -222,6 +222,54 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.94 — the printed Miracle cost of this card, set at construction
+    /// by the card factory (e.g. Terminus = <c>{W}</c>, Bonfire of the Damned
+    /// = <c>{X}{R}</c>). Null for cards without Miracle. This is the STATIC
+    /// printed value the draw hook reads to decide what runtime grant to
+    /// stamp; it is distinct from <see cref="RuntimeMiracleCost"/> (the
+    /// transient "the window is open right now" grant). Survives zone changes.
+    /// </summary>
+    public ValueObjects.ManaCost? MiracleCost { get; private set; }
+
+    /// <summary>
+    /// Stamp this card's printed Miracle cost (CR 702.94). Called once at
+    /// construction by the miracle card's factory. Idempotent.
+    /// </summary>
+    public void SetMiracleCost(ValueObjects.ManaCost cost)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        MiracleCost = cost;
+    }
+
+    /// <summary>
+    /// CR 702.94b–c — runtime Miracle grant ("you may cast this card for its
+    /// miracle cost when you draw it if it's the first card you drew this
+    /// turn"). When non-null, the card may be cast from the HAND via a
+    /// <see cref="Majik.Core.Costs.MiracleAlternativeCost"/> built from this
+    /// cost. Stamped by the draw hook (<see cref="Majik.Core.Game.TurnDriver"/>)
+    /// when the card is the first card its controller drew this turn, and
+    /// cleared either by the cast (<see cref="Majik.Core.Costs.MiracleAlternativeCost.OnResolved"/>)
+    /// or by end-of-turn cleanup if the window lapses unused.
+    /// </summary>
+    public ValueObjects.ManaCost? RuntimeMiracleCost { get; private set; }
+
+    /// <summary>
+    /// Open the one-shot Miracle window on this card (CR 702.94b). Idempotent —
+    /// a later grant overwrites an earlier one.
+    /// </summary>
+    public void GrantRuntimeMiracle(ValueObjects.ManaCost cost)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        RuntimeMiracleCost = cost;
+    }
+
+    /// <summary>Clear any open Miracle window on this card.</summary>
+    public void ClearRuntimeMiracle()
+    {
+        RuntimeMiracleCost = null;
+    }
+
+    /// <summary>
     /// CR 118.9 — runtime "may cast from graveyard" grant. Used by static
     /// abilities such as Lurrus of the Dream-Den that allow casting a
     /// permanent card from the graveyard for its printed mana cost. When
@@ -1728,6 +1776,8 @@ public class Card : ICard
 
         // runtime grants (immutable value-object refs or scalars)
         RuntimeFlashbackCost = src.RuntimeFlashbackCost;
+        MiracleCost = src.MiracleCost;                  // printed miracle cost (CR 702.94)
+        RuntimeMiracleCost = src.RuntimeMiracleCost;    // open miracle window (CR 702.94b)
         RuntimeGraveyardCastCost = src.RuntimeGraveyardCastCost;
         RuntimeExileCastAllowedCaster = src.RuntimeExileCastAllowedCaster;
         RuntimeExileCastCost = src.RuntimeExileCastCost;

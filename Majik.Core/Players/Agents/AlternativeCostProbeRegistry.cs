@@ -135,6 +135,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new SuspendAltCostProbe(SuspendAltCostProbe.DefaultLookup))
             .Register(new ImproviseAltCostProbe())
             .Register(new ConvokeAltCostProbe())
-            .Register(new DiscardedThisTurnAltCostProbe(DiscardedThisTurnAltCostProbe.DefaultLookup));
+            .Register(new DiscardedThisTurnAltCostProbe(DiscardedThisTurnAltCostProbe.DefaultLookup))
+            .Register(new MiracleAltCostProbe());
     }
 }

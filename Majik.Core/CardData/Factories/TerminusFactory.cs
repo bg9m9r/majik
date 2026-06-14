@@ -22,12 +22,18 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="WrathOfGodFactory"/> destroy-all-creatures sweep — same
 ///   snapshot-then-iterate shape, but the destination is the owner's
 ///   library bottom rather than the owner's graveyard.
-/// - <b>Miracle {W} (CR 702.94)</b> — no Miracle alternative-cost
-///   primitive exists in the engine today. Surfaced as a
-///   <see cref="KeywordAbility"/>("Miracle") marker so a downstream
-///   Miracle primitive picks Terminus up without re-touching this
-///   factory — same posture as <see cref="ReforgeTheSoulFactory"/> and
-///   <see cref="BonfireOfTheDamnedFactory"/>.
+/// - <b>Miracle {W} (CR 702.94)</b> — wired as a real alternative cost.
+///   The factory stamps the printed miracle cost via
+///   <see cref="Card.SetMiracleCost"/>; the draw hook in
+///   <see cref="Majik.Core.Game.TurnDriver"/> opens the one-shot window
+///   (<see cref="Card.RuntimeMiracleCost"/>) when Terminus is the first
+///   card its controller drew this turn (CR 702.94b), and the card may then
+///   be cast from hand for {W} via
+///   <see cref="Majik.Core.Costs.MiracleAlternativeCost"/> (surfaced to the
+///   bot by <see cref="Majik.Core.Players.Agents.MiracleAltCostProbe"/>).
+///   The <see cref="KeywordAbility"/>("Miracle") marker is retained for
+///   keyword scanners — same posture as <see cref="ReforgeTheSoulFactory"/>
+///   and <see cref="BonfireOfTheDamnedFactory"/>.
 ///
 /// ## CR notes
 ///
@@ -46,14 +52,6 @@ namespace Majik.Core.CardData.Factories;
 /// - This is NOT a destroy: indestructible, regeneration, and "dies"
 ///   triggers do not apply — the creatures simply change zones (CR 701.x
 ///   "put … into … library" is a zone change, not destruction).
-///
-/// ## Deferred (v1 gaps)
-///
-/// - <b>Miracle as a real alternative-cost primitive</b>: needs (a) a
-///   top-of-library-on-draw reveal hook, (b) a <c>MiracleAlternativeCost</c>
-///   (CR 118.9) wired through the cast flow, (c) a "may cast" trigger on
-///   the draw event (CR 702.94b). Parked behind the same cast-flow
-///   refactor as Reforge the Soul / Bonfire of the Damned / Cascade.
 /// </summary>
 [CardName("Terminus")]
 public static class TerminusFactory
@@ -75,10 +73,11 @@ public static class TerminusFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 702.94 — Miracle. Keyword marker; alternative-cost wiring
-        // deferred (see class xmldoc). Surfacing the keyword now means a
-        // future Miracle primitive picks Terminus up for free.
+        // CR 702.94 — Miracle. Keyword marker (combat/keyword scanners) +
+        // the printed miracle cost stamp the draw hook reads to open the
+        // first-card-drawn-this-turn window (see MiracleAlternativeCost).
         card.AddAbility(new KeywordAbility("Miracle", card, owner));
+        card.SetMiracleCost(Majik.Core.ValueObjects.ManaCost.Parse(MiracleCostText));
 
         return card;
     }

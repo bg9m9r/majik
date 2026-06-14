@@ -227,6 +227,24 @@ public sealed class TurnDriver
 
     private void OnCardDrawn(CardDrawnEvent e)
     {
+        // CR 702.94b — Miracle. Detect "the first card you drew this turn"
+        // BEFORE recording this draw: at this instant the per-turn tally has
+        // not yet counted the card now being drawn, so a tally of 0 means this
+        // IS the first card. When that first card carries a printed miracle
+        // cost (stamped at construction), open its one-shot miracle window so
+        // its controller may cast it from hand for the miracle cost via
+        // MiracleAlternativeCost (surfaced to the bot by MiracleAltCostProbe).
+        // The window is cleared by the cast (OnResolved) or, if unused, at
+        // end-of-turn cleanup. This is the engine's reveal-on-draw hook — a
+        // full CardRevealedEvent is a separate deferral, so we stamp the grant
+        // without publishing a reveal event.
+        if (TurnState.CardsDrawnByPlayer(e.Player) == 0
+            && e.Card is Card concrete
+            && concrete.MiracleCost is { } miracleCost)
+        {
+            concrete.GrantRuntimeMiracle(miracleCost);
+        }
+
         TurnState.RecordCardDrawn(e.Player);
     }
 
@@ -1532,5 +1550,17 @@ public sealed class TurnDriver
         // ("until end of turn, whenever X happens, do Y"; e.g. the Beck half
         // of Beck // Call) stop existing once the turn that created them ends.
         _triggerManager.ExpireTurnScopedDelayedTriggers();
+
+        // 7. CR 702.94c — close any miracle window left open this turn (the
+        // "you may cast it" permission lasts only until the player would next
+        // receive priority; at the granularity this engine models the window
+        // is bounded by the turn, so any unused window lapses at cleanup).
+        foreach (var card in _players.SelectMany(p => p.Zones.Hand.GetCards()).OfType<Card>())
+        {
+            if (card.RuntimeMiracleCost != null)
+            {
+                card.ClearRuntimeMiracle();
+            }
+        }
     }
 }

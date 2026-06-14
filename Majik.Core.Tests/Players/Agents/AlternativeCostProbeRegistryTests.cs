@@ -37,9 +37,9 @@ public class AlternativeCostProbeRegistryTests
     {
         var registry = AlternativeCostProbeRegistry.CreateDefault();
 
-        // Pitch + Delve + Overload + Cascade + Energy + Escape + Kicker + Multikicker + Suspend + Improvise + Convoke + DiscardedThisTurn
-        // (CR 118.9 + CR 106.13 + CR 702.138 + CR 702.33 + CR 702.32 + CR 702.62 + CR 702.127 + CR 702.51).
-        registry.Probes.Should().HaveCount(12);
+        // Pitch + Delve + Overload + Cascade + Energy + Escape + Kicker + Multikicker + Suspend + Improvise + Convoke + DiscardedThisTurn + Miracle
+        // (CR 118.9 + CR 106.13 + CR 702.138 + CR 702.33 + CR 702.32 + CR 702.62 + CR 702.127 + CR 702.51 + CR 702.94).
+        registry.Probes.Should().HaveCount(13);
         registry.Probes.Should().ContainSingle(p => p is PitchAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is DelveAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is OverloadAltCostProbe);
@@ -52,6 +52,7 @@ public class AlternativeCostProbeRegistryTests
         registry.Probes.Should().ContainSingle(p => p is ImproviseAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is ConvokeAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is DiscardedThisTurnAltCostProbe);
+        registry.Probes.Should().ContainSingle(p => p is MiracleAltCostProbe);
     }
 
     [Fact]
