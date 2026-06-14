@@ -697,7 +697,12 @@ public static class CardDefRuntime
     private static IReadOnlyList<object> AnyTargetCandidates(GameContext ctx) =>
         ctx.AllPlayers
             .SelectMany(p => p.Zones.Battlefield.GetCards())
-            .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+            // CR 115.4 / 711 — classify by EFFECTIVE types, not the printed
+            // instance type: a creature-front DFC flipped to its planeswalker
+            // back is offered as a planeswalker (and not as a creature), while
+            // the lingering printed Creature flag still reads true. See
+            // Majik.Core.Targeting.DamageTargeting.
+            .Where(Majik.Core.Targeting.DamageTargeting.IsAnyDamageTarget)
             .Cast<object>()
             .Concat(ctx.AllPlayers.Cast<object>())
             .ToList();

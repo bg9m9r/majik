@@ -1641,7 +1641,9 @@ public static class OracleTriggeredAbilityBinder
             result.Add(p); // a player is a legal "any target"
             foreach (var c in p.Zones.Battlefield.GetCards())
             {
-                if (c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+                // CR 115.4 / 711 — classify by EFFECTIVE types (a flipped
+                // creature-front DFC offered as a planeswalker, not a creature).
+                if (Majik.Core.Targeting.DamageTargeting.IsAnyDamageTarget(c))
                     result.Add(c);
             }
         }
