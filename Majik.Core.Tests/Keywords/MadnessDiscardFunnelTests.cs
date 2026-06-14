@@ -206,4 +206,23 @@ public sealed class MadnessDiscardFunnelTests : IDisposable
             .Should().Be(ManaCost.Parse("{0}"));
         MadnessCatalog.Count.Should().BeGreaterThan(40, "the Modern pool has 40+ Madness cards");
     }
+
+    [Fact]
+    public void Catalog_IncludesEmrakulTheWorldAnew_WithSixColorlessMadnessCost()
+    {
+        // CR 702.35 — Emrakul, the World Anew's printed madness is
+        // "Madness—Pay six {C}." Six {C} is a pure (colorless) mana cost the
+        // name → mana-cost catalog shape CAN carry — it was previously read as
+        // a non-mana {special} rider and wrongly excluded. Once catalogued, the
+        // whole discard → exile → cast-for-madness funnel works for Emrakul.
+        var emrakul = new Card("Emrakul, the World Anew", "");
+        MadnessCatalog.HasMadness(emrakul).Should().BeTrue(
+            "Emrakul's six-{C} madness cost is expressible as a mana cost");
+
+        var cost = MadnessCatalog.CostFor(emrakul);
+        cost.Should().Be(ManaCost.Parse("{C}{C}{C}{C}{C}{C}"),
+            "Madness—Pay six {C} parses to six colorless pips");
+        cost!.Colorless.Should().Be(6, "all six pips demand colorless mana (CR 107.4c)");
+        cost.TotalValue.Should().Be(6, "six pips, mana value six");
+    }
 }
