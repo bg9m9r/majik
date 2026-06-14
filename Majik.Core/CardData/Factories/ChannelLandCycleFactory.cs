@@ -87,9 +87,15 @@ namespace Majik.Core.CardData.Factories;
 ///   filtering at resolve is permissive (any creature passed in
 ///   <see cref="ChosenTargets"/> is destroyed). Combat-state predicates
 ///   land alongside the targeting-system upgrade.
-/// - Takenuma "may" rider on the creature/planeswalker pick — v1
-///   auto-accepts (same simplification as Sneak Attack / Through the
-///   Breach).
+/// - Takenuma — this TEST-ONLY factory still models the original Kamigawa
+///   "look at the top four, put one creature/planeswalker into your hand"
+///   wording. The PRODUCTION binder-chain path
+///   (<see cref="LandActivatedAbilityBinder"/>, the only path lands take on
+///   the live table — see that file's xmldoc) implements the current
+///   "Mill three cards, then return a creature or planeswalker card from
+///   your graveyard to your hand" oracle text instead. There is NO "may"
+///   on the modern card: the return is mandatory whenever an eligible card
+///   exists (CR 608.2c); only the WHICH-card choice is agent-driven.
 ///
 /// ## Cycle members not shipped here
 /// - Boseiju, Who Endures — shipped via the JSON-driven

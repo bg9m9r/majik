@@ -415,7 +415,13 @@ public static class LandActivatedAbilityBinder
     //     follow-up after destroying a land (an opponent's optional search).
     //   - Eiganjo — the live "attacking or blocking" combat-state target gate
     //     (resolve is permissive: any chosen creature is dealt the damage).
-    //   - Takenuma — the "may" rider on the graveyard return (auto-accepts).
+    //
+    // Takenuma is fully bound (mill 3, then return a creature/planeswalker
+    // card from the graveyard to hand). The current oracle text has NO "may":
+    // the return is MANDATORY whenever an eligible card exists (CR 608.2c) and
+    // only the WHICH-card choice is the controller's, taken from the registered
+    // agent via ChooseLibraryPickAsync. The earlier "may rider auto-accepts"
+    // note referred to stale Kamigawa wording and does not apply.
     // ======================================================================
     // CR 118.9 cost-reduction rider on a Channel ability: "This ability costs
     // {1} less to activate for each legendary creature you control." The
@@ -558,6 +564,13 @@ public static class LandActivatedAbilityBinder
                         .ToList();
                     if (eligible.Count == 0) return;
 
+                    // CR 608.2 — the controller chooses WHICH eligible card to
+                    // return (agent-driven). The return itself is MANDATORY: the
+                    // current oracle text has no "may", so when at least one
+                    // eligible card exists the effect must return one (CR 608.2c).
+                    // A null agent pick (an agent that declines) is therefore
+                    // forced to the first eligible card rather than skipping the
+                    // return.
                     var agent = ctx.Agent ?? AgentRegistry.Get(ctrl);
                     var pick = agent != null
                         ? await agent.ChooseLibraryPickAsync(ctx.Game, eligible, "creature or planeswalker card").ConfigureAwait(false)

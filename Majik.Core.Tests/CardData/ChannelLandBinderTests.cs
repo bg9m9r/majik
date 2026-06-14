@@ -6,8 +6,10 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.Zones;
+using Moq;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData;
@@ -303,5 +305,146 @@ public class ChannelLandBinderTests
 
         bound.Should().BeFalse();
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
+    }
+
+    // -------------------------------------------------------------------
+    // Takenuma — RESOLVE behaviour on the production binder-chain path.
+    //
+    // Current oracle (Scryfall, authoritative): "Mill three cards, then
+    // return a creature or planeswalker card from your graveyard to your
+    // hand." There is NO "may" — the return is MANDATORY whenever an
+    // eligible card exists (CR 608.2c: the spell/ability does as much as
+    // it can). The only player decision is WHICH eligible card to return,
+    // which the binder must take from the controller's registered agent
+    // (CR 608.2 — the controller of the ability makes its choices). These
+    // tests exercise the live binder-chain effect body, which the prior
+    // binder tests only covered at bind time (cost shape / verb), never at
+    // resolve.
+    // -------------------------------------------------------------------
+
+    private const string TakenumaOracle =
+        "{T}: Add {B}.\nChannel — {3}{B}, Discard this card: Mill three cards, then return a creature or planeswalker card from your graveyard to your hand. This ability costs {1} less to activate for each legendary creature you control.";
+
+    private Land BindTakenuma()
+    {
+        var land = new Land("Takenuma, Abandoned Mire") { Owner = _alice, Controller = _alice };
+        LandActivatedAbilityBinder.Bind(
+            land, Entity("Takenuma, Abandoned Mire", TakenumaOracle), _alice, _effects);
+        return land;
+    }
+
+    [Fact]
+    public void Takenuma_Resolve_Mills3_ThenReturnsAgentChosenCreature()
+    {
+        AgentRegistry.Clear();
+        try
+        {
+            var land = BindTakenuma();
+
+            // Library top → milled into the graveyard, then become eligible
+            // return targets (CR 701.13 mill → graveyard).
+            var bolt = new Instant("Lightning Bolt", "R");
+            var bear = new Creature("Grizzly Bears", "1G", 2, 2);
+            var giant = new Creature("Hill Giant", "3R", 3, 3);
+            foreach (var c in new ICard[] { bolt, bear, giant })
+            {
+                c.SetOwner(_alice);
+                _alice.Zones.Library.AddCard(c);
+            }
+
+            // Agent picks the Hill Giant — proves the binder honoured the
+            // agent's choice rather than the first eligible card (the Bear,
+            // milled first). Eligible = the two milled creatures.
+            var agent = new Mock<IPlayerAgent>();
+            agent.Setup(a => a.ChooseLibraryPickAsync(
+                    It.IsAny<Majik.Core.Game.GameContext?>(),
+                    It.IsAny<IReadOnlyList<ICard>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ICard?)giant);
+            AgentRegistry.Set(_alice, agent.Object);
+
+            land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+            _alice.Zones.Hand.GetCards().Should().Contain(giant,
+                "the agent picked the Hill Giant to return to hand");
+            _alice.Zones.Hand.GetCards().Should().NotContain(bear,
+                "only the chosen card returns; the Bear stays in the graveyard");
+            _alice.Zones.Graveyard.GetCards().Should().Contain(new ICard[] { bolt, bear },
+                "the milled non-chosen cards remain in the graveyard");
+            _alice.Zones.Library.GetCards().Should().BeEmpty("all three top cards were milled");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Takenuma_Resolve_ReturnIsMandatory_AgentCannotDecline()
+    {
+        // CR 608.2c — Takenuma's return has no "may"; when an eligible
+        // creature/planeswalker card is in the graveyard the effect MUST
+        // return one. Even an agent that returns null (declines) is forced
+        // to a return: the optional-decline path of ChooseLibraryPickAsync
+        // does not apply to this mandatory clause.
+        AgentRegistry.Clear();
+        try
+        {
+            var land = BindTakenuma();
+
+            var bear = new Creature("Grizzly Bears", "1G", 2, 2);
+            bear.SetOwner(_alice);
+            _alice.Zones.Library.AddCard(bear);
+
+            var agent = new Mock<IPlayerAgent>();
+            agent.Setup(a => a.ChooseLibraryPickAsync(
+                    It.IsAny<Majik.Core.Game.GameContext?>(),
+                    It.IsAny<IReadOnlyList<ICard>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ICard?)null);
+            AgentRegistry.Set(_alice, agent.Object);
+
+            land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+            _alice.Zones.Hand.GetCards().Should().Contain(bear,
+                "the return is mandatory (no \"may\"); the lone eligible card is returned even when the agent declines");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Takenuma_Resolve_NoEligibleCardInGraveyard_NothingReturned()
+    {
+        // CR 608.2c — no creature/planeswalker card to return → the return
+        // half simply does nothing (the mill still happened).
+        AgentRegistry.Clear();
+        try
+        {
+            var land = BindTakenuma();
+
+            var bolt = new Instant("Lightning Bolt", "R");
+            var wrath = new Sorcery("Wrath of God", "2WW");
+            foreach (var c in new ICard[] { bolt, wrath })
+            {
+                c.SetOwner(_alice);
+                _alice.Zones.Library.AddCard(c);
+            }
+
+            land.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+            _alice.Zones.Hand.GetCards().Should().BeEmpty(
+                "no creature/planeswalker among the milled cards → nothing returns");
+            _alice.Zones.Graveyard.GetCards().Should().Contain(new ICard[] { bolt, wrath },
+                "the milled cards stay in the graveyard");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
     }
 }
