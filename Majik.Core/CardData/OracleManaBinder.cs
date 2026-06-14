@@ -634,22 +634,32 @@ public static class OracleManaBinder
             controller: controller,
             manaGenerator: () => choice.SinglePip(),
             canActivateCheck: () => !land.IsTapped,
-            printedManaGenerated: choice.SinglePip()));
+            printedManaGenerated: choice.SinglePip(),
+            spendRestriction: null,
+            // CR 614.12 — the colour is stamped onto the holder AFTER this
+            // ability is bound (the ETB ChooseColorReplacement). A live preview
+            // keeps ManaGenerated reading the CURRENT chosen colour so the bot's
+            // mana picker / UI hints never see the stale bind-time default. The
+            // generator is pure (just reads the holder), so previewing is safe.
+            livePreview: () => choice.SinglePip()));
 
         if (ChosenColorTwoManaLandAbilityRegex.IsMatch(text))
         {
             // "{T}: Add two mana of the chosen color. Spend this mana only to
             // activate abilities of land sources." — one dynamic double-pip
             // ability, same holder, carrying the land-ability-only spend rider
-            // (CR 106.4; payment-gate enforcement is the resolver's job and is
-            // already live for static SpendRestrictions).
+            // (CR 106.4). The live preview keeps ManaGenerated reading the
+            // current chosen colour so the resolver's spend-restriction gate
+            // (ManaPaymentResolver.CountBlocked, which inspects ManaGenerated
+            // BEFORE activation) withholds the RIGHT colour's restricted units.
             land.AddAbility(new ManaAbility(
                 source: land,
                 controller: controller,
                 manaGenerator: () => choice.DoublePip(),
                 canActivateCheck: () => !land.IsTapped,
                 printedManaGenerated: choice.DoublePip(),
-                spendRestriction: SunkenCitadelLandAbilitiesOnly));
+                spendRestriction: SunkenCitadelLandAbilitiesOnly,
+                livePreview: () => choice.DoublePip()));
         }
     }
 

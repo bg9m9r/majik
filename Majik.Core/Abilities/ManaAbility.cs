@@ -17,7 +17,32 @@ public class ManaAbility : IManaAbility
 
     public object Source { get; }
     public Player Controller { get; }
-    public ManaCost ManaGenerated { get; private set; }
+
+    // Backing field for the inspection seed. For DYNAMIC abilities whose
+    // generator is side-effect-FREE (chosen-color lands reading a ColorChoice
+    // holder), a live preview generator (_livePreview) recomputes the seed on
+    // every read so it never goes stale when the underlying choice changes
+    // (CR 614.12 — the colour can be stamped AFTER the ability is bound). For
+    // fixed-mana abilities and side-effecting dynamic abilities (Cabal Coffers'
+    // "{2},{T}: …"), _livePreview is null and this stored value is used.
+    private ManaCost _manaGenerated = ManaCost.Zero;
+    private readonly Func<ManaCost>? _livePreview = null;
+
+    /// <summary>
+    /// The mana this ability produces. After <see cref="Activate"/> this is the
+    /// exact amount last produced. BEFORE activation it is the inspection seed:
+    /// for fixed-mana abilities the printed amount; for a side-effect-free
+    /// dynamic ability (a chosen-color land reading its <c>ColorChoice</c>) the
+    /// LIVE preview, recomputed each read so a colour stamped after binding is
+    /// reflected (CR 614.12); for a side-effecting dynamic ability (Cabal
+    /// Coffers) the static printed seed (the generator is NOT evaluated here —
+    /// it would pay {2}).
+    /// </summary>
+    public ManaCost ManaGenerated
+    {
+        get => _livePreview is not null ? _livePreview() : _manaGenerated;
+        private set => _manaGenerated = value;
+    }
 
     /// <summary>
     /// Optional spend-restriction stamped on every unit of mana this
@@ -60,9 +85,11 @@ public class ManaAbility : IManaAbility
     /// Construct a mana ability whose generated mana carries a
     /// spend-restriction (Cavern of Souls, Eldrazi Temple, future
     /// Mishra's Workshop). <see cref="SpendRestriction"/> is stamped on
-    /// every unit produced; the payment-gate enforcement is deferred
-    /// until <see cref="Majik.Core.ValueObjects.ManaPool"/> grows
-    /// per-slot tags (see property xmldoc).
+    /// every unit produced; the payment-gate enforcement is LIVE — the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> withholds a restricted
+    /// unit the cast spell doesn't satisfy from the bucketed spend, via the
+    /// per-slot <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> ledger (CR
+    /// 106.4; see property xmldoc).
     /// </summary>
     public ManaAbility(
         object source,
@@ -112,20 +139,33 @@ public class ManaAbility : IManaAbility
     /// <paramref name="spendRestriction"/> the resolver stamps onto every
     /// produced unit (CR 106.4).
     /// </summary>
+    /// <param name="livePreview">Optional side-effect-FREE preview generator for
+    /// the inspection seed (CR 614.12). When supplied — chosen-color lands pass
+    /// their pure <c>() =&gt; choice.DoublePip()</c> — <see cref="ManaGenerated"/>
+    /// recomputes it on every read, so a colour stamped onto the
+    /// <c>ColorChoice</c> AFTER this ability was bound is reflected immediately
+    /// (the static <paramref name="printedManaGenerated"/> seed would otherwise
+    /// stay at the bind-time default and mis-report the produced colour to the
+    /// resolver's spend-restriction gate and the bot's mana picker). Pass ONLY a
+    /// pure generator here — it is evaluated on inspection, so a side-effecting
+    /// one (Cabal Coffers paying {2}) must leave this null.</param>
     public ManaAbility(
         object source,
         Player controller,
         Func<ManaCost> manaGenerator,
         Func<bool>? canActivateCheck,
         ManaCost? printedManaGenerated,
-        SpendRestriction? spendRestriction)
+        SpendRestriction? spendRestriction,
+        Func<ManaCost>? livePreview = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
         _canActivateCheck = canActivateCheck;
+        _livePreview = livePreview;
         // Inspection seed (printed amount) when provided, else Zero until the
-        // generator runs at Activate time.
+        // generator runs at Activate time. Ignored when livePreview is supplied
+        // (the getter recomputes the seed live).
         ManaGenerated = printedManaGenerated ?? ManaCost.Zero;
         _tapsAsCost = true;
         SpendRestriction = spendRestriction;

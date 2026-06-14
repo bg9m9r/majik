@@ -319,6 +319,95 @@ public class OracleManaBinderTests
             .Should().Be(3, because: "Gemstone Mine enters with three mining counters");
     }
 
+    // -----------------------------------------------------------------------
+    // Sunken Citadel — PROD PATH spend-restriction gate (CR 106.4 / 605.1a).
+    //
+    // Lands never route through their [CardName] factory in prod
+    // (GameFacade.BuildDeckCard gates the instance-swap on !HasType(Land)) —
+    // only the binder chain runs. These tests exercise the REAL prod path:
+    // OracleManaBinder.BindChosenColorLand parses Sunken Citadel's
+    //   "{T}: Add two mana of the chosen color. Spend this mana only to
+    //    activate abilities of land sources."
+    // clause, attaches a dynamic-output ManaAbility carrying the
+    // land-ability-only SpendRestriction, and the ManaPaymentResolver withholds
+    // that restricted mana from any spell spend. (The factory-path equivalents
+    // live in SpendRestrictionProvenanceGateTests; this pins the binder path the
+    // factory-dead land actually uses in real games.)
+    // -----------------------------------------------------------------------
+
+    private const string SunkenCitadelOracle =
+        "This land enters tapped. As it enters, choose a color.\n"
+        + "{T}: Add one mana of the chosen color.\n"
+        + "{T}: Add two mana of the chosen color. Spend this mana only to "
+        + "activate abilities of land sources.";
+
+    private Land BindSunkenCitadel(ManaColor chosen)
+    {
+        var land = new Land("Sunken Citadel") { Owner = _alice, Controller = _alice };
+        var entity = new CardEntity
+        {
+            Name = "Sunken Citadel",
+            TypeLine = "Land — Cave",
+            OracleText = SunkenCitadelOracle,
+        };
+
+        OracleManaBinder.Bind(land, entity, _alice);
+
+        // CR 614.12 — stamp the "as it enters" colour choice onto the shared
+        // holder the dynamic abilities read (the ETB ChooseColorReplacement does
+        // this in prod; here we set it directly).
+        OracleManaBinder.GetColorChoice(land)!.Choose(chosen);
+        land.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        return land;
+    }
+
+    [Fact]
+    public void SunkenCitadel_ProdBinder_AttachesRestrictedDoubleManaAbility()
+    {
+        var land = BindSunkenCitadel(ManaColor.Green);
+
+        var abilities = land.Abilities.OfType<ManaAbility>().ToList();
+        abilities.Should().HaveCount(2,
+            "one {T}: Add one + one {T}: Add two of the chosen color");
+
+        var restricted = abilities.Single(a => a.SpendRestriction != null);
+        restricted.ManaGenerated.Should().Be(ManaCost.Parse("GG"),
+            "the double-mana ability produces two pips of the chosen color (green)");
+        restricted.SpendRestriction!.Description.Should().Be("land source ability");
+
+        var unrestricted = abilities.Single(a => a.SpendRestriction == null);
+        unrestricted.ManaGenerated.Should().Be(ManaCost.Parse("G"),
+            "the single-mana ability is unrestricted (matches printed oracle)");
+    }
+
+    [Fact]
+    public void SunkenCitadel_ProdBinder_DoubleMana_OnAnySpell_IsRejected_NotTapped()
+    {
+        var land = BindSunkenCitadel(ManaColor.Green);
+        // Use ONLY the restricted double-mana ability as the payment source by
+        // tapping is gated atomically by the resolver; the resolver's greedy
+        // per-source pick selects the double-mana ability for a {G}{G} cost.
+        // Remove the unrestricted ability so the resolver can't fall back to it.
+        var restricted = land.Abilities.OfType<ManaAbility>().Single(a => a.SpendRestriction != null);
+        var onlyRestricted = new Land("Sunken Citadel (restricted only)")
+        { Owner = _alice, Controller = _alice };
+        onlyRestricted.AddAbility(restricted);
+        onlyRestricted.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+
+        var spell = new Creature("Llanowar Elves", manaCost: "GG", power: 1, toughness: 1);
+        var resolver = new Majik.Core.Costs.ManaPaymentResolver();
+
+        var success = resolver.Pay(
+            _alice, ManaCost.Parse("GG"),
+            new Majik.Core.Players.Agents.ManaPayment(new ICard[] { onlyRestricted }),
+            spentOn: spell, out _, out _);
+
+        success.Should().BeFalse(
+            "Sunken Citadel's double-mana pays no spell — land abilities only (CR 106.4)");
+        onlyRestricted.IsTapped.Should().BeFalse("atomic — nothing tapped on rejection");
+        _alice.ManaPool.Total.Should().Be(0, "no mana left floating after rejection");
+    }
+
     private static CardEntity GemstoneEntity() => new()
     {
         Name = "Gemstone Mine",
