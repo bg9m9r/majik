@@ -32,10 +32,13 @@ namespace Majik.Core.CardData.Factories;
 ///   predicate <c>spell => spell.Card.HasSubtype(CardSubtype.Eldrazi)</c>.
 ///   The {T}: Add {C} ability is <b>unrestricted</b> (matches the
 ///   printed oracle — only the second mana ability carries the rider).
-///   The "or activated abilities of Eldrazi" half of the restriction is
-///   not modelled here (mana paid into ability costs goes through a
-///   separate path that doesn't surface an <c>ISpell</c>); the predicate
-///   is conservative — spell-side only.
+///   The "or activate abilities of Eldrazi" half is now modelled too: the
+///   restriction carries an ability-spend predicate
+///   (<c>ctx => ctx.SourceHasSubtype(Eldrazi)</c>) consulted on the
+///   ability-cost payment path (<see cref="Majik.Core.Costs.ManaCostCost"/> /
+///   <see cref="Majik.Core.Costs.CostPayment"/> via the
+///   <see cref="Majik.Core.Mana.ManaSpendContext"/>), so the {C}{C} pays an
+///   Eldrazi source's activated ability but NOT a non-Eldrazi source's.
 ///
 ///   <b>Payment-gate enforcement</b> is now live for this COLORLESS ({C}{C})
 ///   mana too: the per-slot provenance ledger tracks a {C} unit in its own
@@ -80,9 +83,15 @@ public static class EldraziTempleFactory
         // resolver withholds this restricted {C}{C} from a non-Eldrazi spend
         // (see class xmldoc + SpendRestrictionProvenanceGateTests).
         // ----------------------------------------------------------------
+        // CR 106.4 — "Spend this mana only to cast Eldrazi spells or activate
+        // abilities of Eldrazi." Both halves now enforced: the spell predicate
+        // (Eldrazi-subtype spell) rides ManaPaymentResolver; the ability
+        // predicate (the activated ability's source is an Eldrazi) rides the
+        // ability-cost spend context.
         var eldraziRestriction = new SpendRestriction(
             "Eldrazi spell or ability",
-            spell => spell.Card.HasSubtype(CardSubtype.Eldrazi));
+            spell => spell.Card.HasSubtype(CardSubtype.Eldrazi),
+            ctx => ctx.SourceHasSubtype(CardSubtype.Eldrazi));
 
         land.AddAbility(new ManaAbility(
             land, owner, ManaCost.Parse("CC"),

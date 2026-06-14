@@ -54,11 +54,30 @@ public sealed class SpendRestriction : IEquatable<SpendRestriction>
     public Func<ISpell, bool> Predicate { get; }
 
     /// <summary>
+    /// Optional predicate evaluated against an ABILITY-ACTIVATION cost spend
+    /// (the <see cref="ManaSpendContext.ForAbilityCost"/> shape). Models the
+    /// "or activate abilities of X" / "only to activate abilities of land
+    /// sources" half of a restriction (Eldrazi Temple, Sunken Citadel) — a
+    /// surface the spell-only <see cref="Predicate"/> can't express. <c>null</c>
+    /// ⇒ the restriction permits NO ability spend (the conservative default the
+    /// spell-only restrictions used: Ancient Ziggurat / Cavern of Souls only
+    /// permit spells). CR 106.4 — the restriction names which kind of spend is
+    /// permitted.
+    /// </summary>
+    public Func<ManaSpendContext, bool>? AbilityPredicate { get; }
+
+    /// <summary>
     /// Construct a spend-restriction.
     /// </summary>
     /// <param name="description">Non-empty human-readable label.</param>
     /// <param name="predicate">Predicate against the spell to be paid.</param>
-    public SpendRestriction(string description, Func<ISpell, bool> predicate)
+    /// <param name="abilityPredicate">Optional predicate against an
+    /// ability-activation cost spend (the "or activate abilities of X" half).
+    /// <c>null</c> ⇒ no ability spend is permitted.</param>
+    public SpendRestriction(
+        string description,
+        Func<ISpell, bool> predicate,
+        Func<ManaSpendContext, bool>? abilityPredicate = null)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -66,6 +85,7 @@ public sealed class SpendRestriction : IEquatable<SpendRestriction>
         }
         Description = description;
         Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        AbilityPredicate = abilityPredicate;
     }
 
     /// <summary>
@@ -76,16 +96,29 @@ public sealed class SpendRestriction : IEquatable<SpendRestriction>
     /// </summary>
     public bool SatisfiedBy(ISpell? spell) => spell != null && Predicate(spell);
 
+    /// <summary>
+    /// CR 106.4 — evaluate the restriction against an ABILITY-COST spend
+    /// (<paramref name="context"/> must be an
+    /// <see cref="ManaSpendContext.IsAbilitySpend"/> context). Returns
+    /// <c>true</c> only when this restriction carries an
+    /// <see cref="AbilityPredicate"/> AND that predicate accepts the context.
+    /// A restriction with no ability predicate permits no ability spend.
+    /// </summary>
+    public bool SatisfiedBy(ManaSpendContext context) =>
+        context.IsAbilitySpend && AbilityPredicate is not null && AbilityPredicate(context);
+
     public bool Equals(SpendRestriction? other)
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
-        return Description == other.Description && Predicate == other.Predicate;
+        return Description == other.Description
+               && Predicate == other.Predicate
+               && AbilityPredicate == other.AbilityPredicate;
     }
 
     public override bool Equals(object? obj) => Equals(obj as SpendRestriction);
 
-    public override int GetHashCode() => HashCode.Combine(Description, Predicate);
+    public override int GetHashCode() => HashCode.Combine(Description, Predicate, AbilityPredicate);
 
     public override string ToString() => $"SpendRestriction(\"{Description}\")";
 }
