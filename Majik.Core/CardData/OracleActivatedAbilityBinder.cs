@@ -223,6 +223,31 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*(Tap|Untap) target creature\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Target creature you control gains protection from the color of
+    // your choice until end of turn." (CR 702.16 / 601.2c.) Mother of Runes'
+    // (and Giver of Runes / any "protection from <chosen color>" body's) shape.
+    // A self-source on-demand protection grant is a classic activated payoff on
+    // real creature cards. Sound to re-home: the BEARER is ONLY the source /
+    // cost-payer (its own {T} cost taps it); the ProtectionAbility lands on the
+    // CHOSEN target creature via a self-sourced GrantAbilityEffect against the
+    // target's OWN ActiveEffects (CR 613.1f Layer 6) — never the exiled imprinted
+    // card and never the bearer itself. The "you control" candidate filter scopes
+    // to the bearer's controller-side creatures (a RESTRICTED filter, but a sound
+    // one to reconstruct here — unlike the open "target creature" forms, "creature
+    // YOU control" is unambiguous: it is exactly the controller's battlefield
+    // creatures, with no source-card dependence). The chosen colour is a CR 601.2c
+    // "of your choice" decision made as the ability is put on the stack; the
+    // deterministic binder path has no agent to prompt, so it defaults to white
+    // (first WUBRG) — the SAME posture as MotherOfRunesFactory's WhitePicker
+    // default (the agent colour prompt is a documented v1 gap shared by both
+    // surfaces). The "color of your choice" wording is matched explicitly; a
+    // fixed-colour protection grant ("protection from red") is NOT this shape and
+    // is skipped (it would need its own reconstruction, and is not the Cauldron's
+    // canonical re-home target).
+    private static readonly Regex ProtectionGrantRegex = new(
+        @"^(" + CostList + @")\s*:\s*Target creature you control gains protection from the colou?r of your choice until end of turn\.$",
+        RegexOptions.IgnoreCase);
+
     // "{cost}: This creature fights target creature." (CR 701.12.)
     // A self-source fight is a common activated payoff on real creature cards
     // (a {cost}: ~ fights target creature ability). Sound to re-home: the SOURCE
@@ -444,6 +469,15 @@ public static class OracleActivatedAbilityBinder
                 var untap = string.Equals(
                     tapTarget.Groups[2].Value, "Untap", StringComparison.OrdinalIgnoreCase);
                 result.Add(BuildTapTarget(costs, untap, bearer, controller));
+                continue;
+            }
+
+            var protGrant = ProtectionGrantRegex.Match(line);
+            if (protGrant.Success)
+            {
+                var costs = TryBuildCostList(protGrant.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                result.Add(BuildProtectionGrant(costs, bearer, controller));
                 continue;
             }
 
@@ -931,6 +965,102 @@ public static class OracleActivatedAbilityBinder
                     // Tapping a creature denies a blocker/attacker (a removal-like
                     // tempo play); untapping is a utility move with no clean intent.
                     Intent: untap ? BotIntent.None : BotIntent.Removal),
+            });
+
+        return ability;
+    }
+
+    // The deterministic default protection-from-<colour> quality used by the
+    // re-homed grant. CR 601.2c "of your choice" is an agent decision made as the
+    // ability is put on the stack; the binder path has no agent to prompt, so it
+    // defaults to "white" (first WUBRG) — the SAME default as
+    // MotherOfRunesFactory.WhitePicker. The agent colour prompt is a documented v1
+    // gap shared by both the bespoke factory and this reconstructed shape.
+    private const string DefaultProtectionColor = "white";
+
+    /// <summary>
+    /// Build a protection-grant ability: "{cost}: Target creature you control
+    /// gains protection from the color of your choice until end of turn."
+    /// (Mother of Runes / Giver of Runes shape, CR 702.16 / 601.2c.) Re-homed so
+    /// the BEARER is ONLY the source / cost-payer; the
+    /// <see cref="ProtectionAbility"/> lands on the CHOSEN target creature via a
+    /// self-sourced <see cref="GrantAbilityEffect"/> (CR 613.1f Layer 6, EOT
+    /// expiry per CR 514.2) registered against the TARGET's own
+    /// <see cref="Creature.ActiveEffects"/> — never the exiled imprinted card and
+    /// never the bearer. The bearer need NOT be a creature (a non-creature bearer
+    /// can still pay to grant protection to a chosen creature), so this does not
+    /// gate on <see cref="Creature"/>. The chosen colour defaults to white (see
+    /// <see cref="DefaultProtectionColor"/>); a no-layers shape-only target (null
+    /// <see cref="Creature.ActiveEffects"/>) attaches the marker directly so it is
+    /// still inspectable — the SAME posture as
+    /// <see cref="Factories.MotherOfRunesFactory.Resolve"/>. Mirrors
+    /// <see cref="TryBuildPumpOther"/>'s 1..1 single-creature target request,
+    /// scoped to the controller's own creatures ("creature you control").
+    /// </summary>
+    private static ActivatedAbility BuildProtectionGrant(
+        List<ICost> costs,
+        Permanent bearer,
+        Player controller)
+    {
+        ActivatedAbility? ability = null;
+        var grantEffect = new Effect(
+            "Granted: target creature you control gains protection from the chosen colour EOT",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                if (ability.ChosenTargets[0][0] is not Creature chosen) return;
+                // CR 608.2b — target must still be a battlefield creature.
+                if (chosen.Zone != ZoneType.Battlefield) return;
+
+                var protection = new ProtectionAbility(DefaultProtectionColor);
+                if (chosen.ActiveEffects is not null)
+                {
+                    // CR 613.1f Layer 6 / CR 514.2 — self-sourced grant on the
+                    // CHOSEN target's own effects service so EOT cleanup runs
+                    // through the continuous-effects layer. Source = the target
+                    // itself (the grant lives while the target is on the
+                    // battlefield), never the exiled imprinted card.
+                    var grant = new GrantAbilityEffect(
+                        source: chosen,
+                        target: chosen,
+                        ability: protection,
+                        expiresAtEndOfTurn: true);
+                    chosen.ActiveEffects.Register(grant);
+                    // Sync immediately so target legality reads the grant on the
+                    // same priority window (CR 117.5 / CR 700.2a).
+                    grant.Sync();
+                }
+                else
+                {
+                    // No layers service wired (shape-only path): attach the
+                    // ProtectionAbility directly so the marker is inspectable.
+                    chosen.AddAbility(protection);
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { grantEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature you control",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Protection,
+                    // CR 602.1 — "target creature you control": the candidates are
+                    // exactly the BEARER's controller-side battlefield creatures
+                    // (re-sourced to the controller, never the exiled card).
+                    CandidateGatherer: _ => controller.Zones.Battlefield.GetCards()
+                        .Where(c => c.HasType(CardType.Creature))
+                        .Cast<object>()
+                        .ToList()),
             });
 
         return ability;
