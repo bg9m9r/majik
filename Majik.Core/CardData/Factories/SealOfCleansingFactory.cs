@@ -3,6 +3,8 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -67,11 +69,31 @@ public static class SealOfCleansingFactory
     /// <summary>
     /// Construct Seal of Cleansing owned and controlled by
     /// <paramref name="owner"/>, with its self-sacrifice destroy ability
-    /// attached. The ability is not registered with any stack/priority
-    /// manager — suitable for shape, dispatcher, and direct-resolution tests
-    /// (same posture as the Spellbomb factories).
+    /// attached. Shape-only — no event bus, so the self-sacrifice cost
+    /// publishes nothing (legacy posture; dispatcher / shape / direct-
+    /// resolution tests, same as the Spellbomb factories).
     /// </summary>
-    public static Enchantment Create(Player owner)
+    public static Enchantment Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an enchantment gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the self-sacrifice cost
+    /// so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a) crediting the cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Enchantment Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Enchantment Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -121,7 +143,7 @@ public static class SealOfCleansingFactory
 
                 // Self-sacrifice (cost paid — happens regardless of whether a
                 // legal target remained at resolution).
-                SacrificeSelf(seal, owner);
+                SacrificeSelf(seal, owner, eventBus);
             });
 
         destroyAbility = new ActivatedAbility(
@@ -129,7 +151,10 @@ public static class SealOfCleansingFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(seal),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent;
+                // SacrificeSelf is the bus-aware resolve-only fallback.
+                AdditionalCost.Sacrifice(seal, eventBus),
             },
             effects: new IEffect[] { destroyEffect },
             targetRequests: new[]
@@ -161,9 +186,20 @@ public static class SealOfCleansingFactory
     /// the closure used by Pyrite / Nihil Spellbomb (the generic
     /// <see cref="AdditionalCost.Pay"/> sacrifice path is a stub).
     /// </summary>
-    private static void SacrificeSelf(Enchantment seal, Player owner)
+    private static void SacrificeSelf(Enchantment seal, Player owner, IEventBus? eventBus)
     {
         if (seal.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.16a — when a bus is supplied (prod effects-aware build), route
+        // through Fx.Sacrifice so a PermanentSacrificedEvent is published. In
+        // the live activation path the cost already moved the seal, so this
+        // closure no-ops (single publish either way).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(seal, seal.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(seal);
         owner.Zones.Graveyard.AddCard(seal);
         seal.SetZone(ZoneType.Graveyard);

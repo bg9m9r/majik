@@ -3,8 +3,10 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -132,7 +134,7 @@ public static class SterlingGroveFactory
                 var controller = card.Controller ?? card.Owner ?? owner;
 
                 // Self-sacrifice (CR 701.16) — controller's battlefield -> owner's graveyard.
-                SacrificeToOwnersGraveyard(card);
+                SacrificeToOwnersGraveyard(card, continuousEffects?.EventBus);
 
                 await TutorEnchantmentToTopOfLibraryAsync(controller, ctx).ConfigureAwait(false);
             });
@@ -143,7 +145,11 @@ public static class SterlingGroveFactory
             costs: new ICost[]
             {
                 new ManaCostCost(ActivationManaCost),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent;
+                // SacrificeToOwnersGraveyard is the bus-aware resolve-only
+                // fallback (no-ops once the cost already moved the card).
+                AdditionalCost.Sacrifice(card, continuousEffects?.EventBus),
             },
             effects: new IEffect[] { tutorEffect });
 
@@ -158,11 +164,21 @@ public static class SterlingGroveFactory
     /// already left the battlefield (idempotent — protects against
     /// double-fire from a re-resolved ability).
     /// </summary>
-    private static void SacrificeToOwnersGraveyard(Enchantment self)
+    private static void SacrificeToOwnersGraveyard(Enchantment self, IEventBus? eventBus)
     {
         var ownerOfSelf = self.Owner;
         if (ownerOfSelf == null) return;
         if (self.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.16a — when a bus is supplied (prod effects-aware build), route
+        // through Fx.Sacrifice so a PermanentSacrificedEvent is published
+        // crediting the cost-payer. In the live activation path the cost already
+        // moved the card, so this closure no-ops (single publish either way).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(self, self.Controller ?? ownerOfSelf, eventBus);
+            return;
+        }
 
         var holder = self.Controller ?? ownerOfSelf;
         holder.Zones.Battlefield.RemoveCard(self);

@@ -2,9 +2,12 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -79,12 +82,28 @@ public static class OmenOfTheSeaFactory
     public static Enchantment Create(Player owner) => Create(owner, triggers: null);
 
     /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an enchantment gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the self-sacrifice cost
+    /// so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). The ETB <see cref="TriggerManager"/> is not reachable
+    /// through <see cref="ContinuousEffectsService"/>, so it stays null here
+    /// (unchanged from the prior single-arg prod posture).
+    /// </summary>
+    public static Enchantment Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, eventBus: effects?.EventBus);
+
+    /// <summary>
     /// Construct Omen of the Sea with optional <see cref="TriggerManager"/>
     /// wiring. When <paramref name="triggers"/> is supplied, the ETB trigger is
     /// registered so a battlefield <see cref="Events.CardMovedEvent"/> places it
-    /// on the stack automatically (CR 603.3).
+    /// on the stack automatically (CR 603.3). When <paramref name="eventBus"/>
+    /// is supplied the self-sacrifice activation cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
     /// </summary>
-    public static Enchantment Create(Player owner, TriggerManager? triggers)
+    public static Enchantment Create(Player owner, TriggerManager? triggers, IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -147,7 +166,7 @@ public static class OmenOfTheSeaFactory
             async ctx =>
             {
                 // Sacrifice payment stub: move Battlefield → Graveyard.
-                SacrificeSelf(card, owner);
+                SacrificeSelf(card, owner, eventBus);
 
                 // CR 701.20 — Scry 2.
                 await Scry2Async(owner, ctx).ConfigureAwait(false);
@@ -159,7 +178,9 @@ public static class OmenOfTheSeaFactory
             costs: new ICost[]
             {
                 new ManaCostCost(ActivatedManaCost),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { scryEffect });
 
@@ -200,9 +221,20 @@ public static class OmenOfTheSeaFactory
     /// Move <paramref name="card"/> from the battlefield to its owner's
     /// graveyard. Idempotent — no-op if already off the battlefield.
     /// </summary>
-    private static void SacrificeSelf(Enchantment card, Player owner)
+    private static void SacrificeSelf(Enchantment card, Player owner, IEventBus? eventBus)
     {
         if (card.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.16a — when a bus is supplied (prod effects-aware build), route
+        // through Fx.Sacrifice so a PermanentSacrificedEvent is published. In
+        // the live activation path the cost already moved the card, so this
+        // closure no-ops (single publish either way).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(card, card.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(card);
         owner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);

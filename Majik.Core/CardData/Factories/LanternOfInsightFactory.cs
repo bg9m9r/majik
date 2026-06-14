@@ -3,8 +3,10 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -80,7 +82,27 @@ public static class LanternOfInsightFactory
     /// "{T}, Sacrifice: target player shuffles" activated ability are attached
     /// structurally.
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c>; an artifact gets the
+    /// <c>[CardName]</c> factory instance-swap in production, so this IS the
+    /// prod path). Threads <c>effects.EventBus</c> into the self-sacrifice cost
+    /// so paying it publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a).
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -114,7 +136,7 @@ public static class LanternOfInsightFactory
             () =>
             {
                 var controller = lantern.Controller ?? owner;
-                SacrificeSelf(lantern, owner, controller);
+                SacrificeSelf(lantern, owner, controller, eventBus);
 
                 Player targetPlayer = controller;
                 if (shuffleAbility != null
@@ -135,7 +157,9 @@ public static class LanternOfInsightFactory
             costs: new ICost[]
             {
                 AdditionalCost.Tap(lantern),
-                AdditionalCost.Sacrifice(lantern),
+                // CR 701.16a — bus on the SAC COST so the live activation path
+                // (CostPayment -> cost.Pay) publishes PermanentSacrificedEvent.
+                AdditionalCost.Sacrifice(lantern, eventBus),
             },
             effects: new IEffect[] { shuffleEffect },
             targetRequests: new[]
@@ -156,9 +180,20 @@ public static class LanternOfInsightFactory
     /// CR 701.16 — move <paramref name="lantern"/> from the battlefield to its
     /// owner's graveyard. Idempotent. Mirrors Renegade Map / Nihil Spellbomb.
     /// </summary>
-    private static void SacrificeSelf(Artifact lantern, Player owner, Player controller)
+    private static void SacrificeSelf(Artifact lantern, Player owner, Player controller, IEventBus? eventBus)
     {
         if (lantern.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.16a — when a bus is supplied (prod effects-aware build), route
+        // through Fx.Sacrifice so a PermanentSacrificedEvent is published. In
+        // the live activation path the cost already moved the lantern, so this
+        // closure no-ops (single publish either way).
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(lantern, controller, eventBus);
+            return;
+        }
+
         controller.Zones.Battlefield.RemoveCard(lantern);
         owner.Zones.Graveyard.AddCard(lantern);
         lantern.SetZone(ZoneType.Graveyard);
