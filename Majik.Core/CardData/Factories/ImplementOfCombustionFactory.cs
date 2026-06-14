@@ -133,7 +133,7 @@ public static class ImplementOfCombustionFactory
                     Fx.DealDamageAny(target, 1);
                 }
 
-                SacrificeSelf(impl, owner);
+                SacrificeSelf(impl, owner, eventBus);
             });
 
         damageAbility = new ActivatedAbility(
@@ -188,10 +188,29 @@ public static class ImplementOfCombustionFactory
     /// Move <paramref name="impl"/> from the battlefield to its owner's
     /// graveyard. Idempotent — no-op if already off the battlefield. Mirrors
     /// the closure used by Pyrite / Aether Spellbomb.
+    ///
+    /// <para>
+    /// CR 701.16a — when an <paramref name="eventBus"/> is supplied (the prod
+    /// effects-aware build), route the resolve-time self-sacrifice through the
+    /// bus-aware <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/> so a
+    /// <see cref="PermanentSacrificedEvent"/> is published for aristocrat
+    /// payoffs (Mayhem Devil, Blood Artist, It That Betrays). In the live
+    /// activation path the SAC COST already moved the artifact off the
+    /// battlefield, so the on-battlefield guard makes this resolve-leg
+    /// sacrifice a no-op (single publish either way). Bus-less builds keep the
+    /// publish-nothing direct-zone-move posture.
+    /// </para>
     /// </summary>
-    private static void SacrificeSelf(Artifact impl, Player owner)
+    private static void SacrificeSelf(Artifact impl, Player owner, IEventBus? eventBus)
     {
         if (impl.Zone != ZoneType.Battlefield) return;
+
+        if (eventBus != null)
+        {
+            Fx.Sacrifice(impl, impl.Controller ?? owner, eventBus);
+            return;
+        }
+
         owner.Zones.Battlefield.RemoveCard(impl);
         owner.Zones.Graveyard.AddCard(impl);
         impl.SetZone(ZoneType.Graveyard);
