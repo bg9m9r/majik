@@ -1,0 +1,9 @@
+{
+  "name": "Prime Speaker Vannifar",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elf", "Ooze", "Wizard"],
+  "manaCost": "{2}{G}{U}",
+  "power": 2,
+  "toughness": 4
+}
