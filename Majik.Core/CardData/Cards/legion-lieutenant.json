@@ -1,0 +1,9 @@
+{
+  "name": "Legion Lieutenant",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Knight"],
+  "manaCost": "{W}{B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
