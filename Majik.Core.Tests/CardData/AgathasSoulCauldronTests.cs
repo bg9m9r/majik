@@ -1345,6 +1345,70 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_TapTarget_RehomesTapToBearerAndChosenCreature()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability taps another creature:
+        // "{W}, {T}: Tap target creature." (Master Decoy / Goldmeadow Harrier).
+        // Re-homing is sound: the BEARER is only the source / cost-payer (its own
+        // {T} cost taps it); the effect taps the CHOSEN target creature via
+        // Fx.Tap (CR 701.21a), never the exiled imprinted card — the verb has no
+        // "this creature" / source reference at all, so re-homing is a clean
+        // controller-scoped tap of a chosen permanent.
+        var tapper = new Creature("Decoy Stub", "1W", 1, 2);
+        tapper.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(tapper);
+        tapper.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // An opposing UNTAPPED creature for the bearer to tap.
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2);
+        enemy.SetOwner(bob);
+        enemy.ChangeController(bob);
+        bob.Zones.Library.AddCard(enemy);
+        zones.MoveCard(enemy, ZoneType.Library, ZoneType.Battlefield, bob);
+        enemy.IsTapped.Should().BeFalse("the chosen creature starts untapped");
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Decoy Stub", "{W}, {T}: Tap target creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), tapper);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's tap-target ability");
+        var tap = granted[0];
+        tap.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        tap.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("W"));
+        tap.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        tap.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"));
+
+        // Resolving with the enemy chosen taps the ENEMY, not the bearer and not
+        // the exiled card.
+        tap.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { enemy } });
+        foreach (var effect in tap.Effects) effect.Execute();
+
+        enemy.IsTapped.Should().BeTrue(
+            "the re-homed tap-target ability taps the CHOSEN creature (CR 701.21a)");
+        bearer.IsTapped.Should().BeFalse(
+            "the bearer (mere source) is not tapped by the effect — only its {T} cost taps it");
+        tapper.IsTapped.Should().BeFalse(
+            "the exiled imprinted card is never touched by the granted ability");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);
