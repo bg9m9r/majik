@@ -1,0 +1,9 @@
+{
+  "name": "Enduring Innocence",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Sheep", "Glimmer"],
+  "manaCost": "{1}{W}{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
