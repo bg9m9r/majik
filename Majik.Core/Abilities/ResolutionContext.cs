@@ -90,6 +90,28 @@ public sealed record ResolutionContext(
     public Permanent? Source { get; init; }
 
     /// <summary>
+    /// SPELL path — the underlying <see cref="Card"/> of the resolving SPELL
+    /// (CR 608, the stack object's card). This is the spell-side analogue of
+    /// <see cref="Source"/> (which is the battlefield permanent for the
+    /// ability paths): a sorcery / instant has no <see cref="Source"/>
+    /// permanent, but its resolution effect may still need to read per-cast
+    /// state stamped on the card at payment time — most importantly the
+    /// mana-provenance ledger
+    /// <see cref="Card.PendingCastColors"/> /
+    /// <see cref="Card.PendingCastColorCounts"/> (CR 106.4 / CR 202.2 —
+    /// "the number of colors of mana spent to cast this spell"), the
+    /// Converge count that gates Prismatic Ending / Bring to Light.
+    ///
+    /// <para>
+    /// Populated by <see cref="Majik.Core.Spells.Spell.ResolveAsync"/> from the
+    /// resolving spell's <see cref="Majik.Core.Spells.Spell.Card"/>. Null on the
+    /// ability paths (use <see cref="Source"/>), the legacy synchronous path,
+    /// and any caller that resolves an effect without a spell frame.
+    /// </para>
+    /// </summary>
+    public ICard? SourceCard { get; init; }
+
+    /// <summary>
     /// GAP 2 — the X chosen for a variable-X ({X}-cost) ACTIVATED ability,
     /// threaded from <see cref="ActivatedAbility.ChosenX"/> by
     /// <see cref="ActivatedAbility.ResolveAsync"/>. Lets the resolution effect
@@ -154,7 +176,8 @@ public sealed record ResolutionContext(
         IReadOnlyList<IReadOnlyList<object>>? chosenTargets,
         CancellationToken ct = default,
         Permanent? source = null,
-        int? chosenX = null)
+        int? chosenX = null,
+        ICard? sourceCard = null)
     {
         var targets = chosenTargets ?? EmptyTargets;
         return new(controller, agent, game, targets, ct)
@@ -162,6 +185,7 @@ public sealed record ResolutionContext(
             SharedSlotControllers = SnapshotSharedSlotControllers(targets),
             Source = source,
             ChosenX = chosenX,
+            SourceCard = sourceCard,
         };
     }
 

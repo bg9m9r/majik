@@ -29,38 +29,39 @@ namespace Majik.Core.CardData.Factories;
 ///   iff it is still on the battlefield, is not a land, and its mana
 ///   value is &lt;= the cap. CR 608.2b — illegal target → no effect.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Mana provenance ledger</b>: the engine has no per-spell record
-///   of which colours of mana were actually spent on the cost. Until
-///   that exists, callers must pass <paramref name="colorsSpentProvider"/>
-///   explicitly. The single-arg <see cref="BuildSpellDefinition(Func{object, object})"/>
-///   path defaults to a cap of <see cref="DefaultColorsSpent"/> (1),
-///   which models the printed minimum (the {W} pip alone) — enough to
-///   exile mv-0 / mv-1 nonland permanents. See <see cref="ColorCount"/>
-///   for the helper test/integration callers can compose against.
-/// - <b>Hybrid / Phyrexian colour selection</b>: when a real provenance
-///   ledger exists, hybrid pips paid as colour C count toward C only;
-///   Phyrexian pips paid with life count zero colours. The
-///   <see cref="Func{Int32}"/> closure is the integration point.
+/// ## Mana-provenance ledger (live)
+/// The colours-of-mana-spent count is read off the LIVE mana-provenance
+/// ledger (<see cref="Majik.Core.Cards.Card.PendingCastColors"/>, stamped
+/// by <see cref="Majik.Core.Game.TurnDriver"/> at payment time), surfaced
+/// to the resolution effect via
+/// <see cref="Majik.Core.Abilities.ResolutionContext.SourceCard"/>. Hybrid
+/// pips count the colour actually paid, Phyrexian pips paid with life count
+/// zero colours, and colourless / generic mana never contributes — all of
+/// which fall out of the ledger's per-colour pool delta for free
+/// (CR 106.4 / CR 202.2). The production card binds through
+/// <see cref="Majik.Core.CardData.SpellTemplates.Templates.Bespoke.ConvergeExileTemplate"/>,
+/// which uses the same ledger read
+/// (<see cref="Majik.Core.CardData.SpellTemplates.Templates.Bespoke.ConvergeColorsSpent"/>).
+///
+/// <para>The <c>colorsSpentProvider</c> closure remains as an explicit
+/// override for shape / dispatcher tests that resolve outside a live spell
+/// frame; when <c>null</c> the effect reads the live ledger off the
+/// resolution context.</para>
 /// </summary>
 [CardName("Prismatic Ending")]
 public static class PrismaticEndingFactory
 {
     public const string CardName = "Prismatic Ending";
-    public const string PrintedManaCost = "{W}";
 
-    /// <summary>
-    /// Default colours-spent cap when no provider is supplied — models
-    /// the printed minimum (single {W} pip → 1 colour). This is the
-    /// floor; any real cast pays at least the printed pip.
-    /// </summary>
-    public const int DefaultColorsSpent = 1;
+    // CR 107.3 — printed cost is {X}{W}; the generic {X} is poured into more
+    // colours of mana so Converge can reach a higher colours-spent count.
+    public const string PrintedManaCost = "{X}{W}";
 
-    /// <summary>Printed oracle text. Kept here so the data-driven import
-    /// path can cross-check the named factory against Scryfall.</summary>
+    /// <summary>Current Scryfall oracle text. Kept here so the data-driven
+    /// import path can cross-check the named factory against Scryfall.</summary>
     public const string OracleText =
-        "Exile target nonland permanent with mana value less than or equal " +
-        "to the number of colors of mana spent to cast Prismatic Ending.";
+        "Converge — Exile target nonland permanent if its mana value is less " +
+        "than or equal to the number of colors of mana spent to cast this spell.";
 
     /// <summary>
     /// Build a Prismatic Ending sorcery owned by <paramref name="owner"/>.
@@ -78,9 +79,12 @@ public static class PrismaticEndingFactory
     }
 
     /// <summary>
-    /// Single-arg path — defaults to <see cref="DefaultColorsSpent"/> for
-    /// the colours-spent cap. Suitable for shape / dispatcher tests where
-    /// no live mana-provenance ledger is wired.
+    /// Single-arg path — reads the colours-spent cap off the LIVE
+    /// mana-provenance ledger
+    /// (<see cref="Majik.Core.Abilities.ResolutionContext.SourceCard"/> →
+    /// <see cref="Majik.Core.Cards.Card.PendingCastColors"/>) at resolution.
+    /// This is the production shape. Tests that resolve outside a live spell
+    /// frame supply an explicit provider via the two-arg overload.
     /// </summary>
     public static SpellDefinition BuildSpellDefinition(
         Func<object, object> resolver) =>
@@ -95,10 +99,12 @@ public static class PrismaticEndingFactory
     /// </summary>
     /// <param name="resolver">Target resolver supplied by the caller's
     /// <see cref="GameContext"/> (chosen target → live game object).</param>
-    /// <param name="colorsSpentProvider">Optional. Called at resolve time
-    /// to fetch the count of distinct colours of mana spent to cast this
-    /// instance of the spell. <c>null</c> falls back to
-    /// <see cref="DefaultColorsSpent"/>.</param>
+    /// <param name="colorsSpentProvider">Optional explicit override of the
+    /// colours-spent count, for shape / dispatcher tests that resolve outside
+    /// a live spell frame. <c>null</c> reads the LIVE mana-provenance ledger
+    /// (<see cref="Majik.Core.Cards.Card.PendingCastColors"/>) off the
+    /// resolution context's
+    /// <see cref="Majik.Core.Abilities.ResolutionContext.SourceCard"/>.</param>
     public static SpellDefinition BuildSpellDefinition(
         Func<object, object> resolver,
         Func<int>? colorsSpentProvider)
@@ -123,17 +129,24 @@ public static class PrismaticEndingFactory
                 {
                     new Effect(
                         $"{CardName}: exile target nonland permanent with mv ≤ colors spent",
-                        () =>
+                        rc =>
                         {
-                            if (raw is not Permanent target) return;
+                            if (raw is not Permanent target)
+                                return ValueTask.CompletedTask;
 
                             // CR 608.2b — resolution-time legality check.
-                            if (target.Zone != ZoneType.Battlefield) return;
-                            if (target.HasType(CardType.Land)) return;
+                            if (target.Zone != ZoneType.Battlefield)
+                                return ValueTask.CompletedTask;
+                            if (target.HasType(CardType.Land))
+                                return ValueTask.CompletedTask;
 
+                            // CR 202.2 — colours of mana spent. Explicit
+                            // provider wins (test seam); otherwise read the
+                            // live mana-provenance ledger off SourceCard.
                             var cap = colorsSpentProvider?.Invoke()
-                                      ?? DefaultColorsSpent;
-                            if (target.ManaCostValue.TotalValue > cap) return;
+                                      ?? SpellTemplates.Templates.Bespoke.ConvergeColorsSpent.From(rc);
+                            if (target.ManaCostValue.TotalValue > cap)
+                                return ValueTask.CompletedTask;
 
                             // Exile (CR 701.21). Routed through the owning
                             // player's zones so the permanent's owner-of-
@@ -146,6 +159,7 @@ public static class PrismaticEndingFactory
                                 fromOwner.Zones.Exile.AddCard(target);
                             }
                             target.SetZone(ZoneType.Exile);
+                            return ValueTask.CompletedTask;
                         }),
                 };
             });
