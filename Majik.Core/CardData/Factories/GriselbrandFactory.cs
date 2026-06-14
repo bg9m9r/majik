@@ -47,6 +47,19 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Lifelink damage trigger</b>: the combat lifelink wiring is handled
 ///   by <see cref="Majik.Core.Combat.CombatAbilities"/> reading the
 ///   KeywordAbility marker — the factory only attaches the marker.
+///
+/// ## Agatha's Soul Cauldron re-source provenance
+/// The "Pay 7 life: Draw seven cards" activated ability reads its drawing
+/// player off the live <see cref="Majik.Core.Abilities.ResolutionContext.Source"/>'s
+/// controller (not a captured permanent) and is marked
+/// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindSafe"/> = true, so
+/// <see cref="AgathasSoulCauldronFactory"/>'s group-grant re-homes the REAL
+/// ability to a counter-bearing bearer via
+/// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindTo"/> (CR 707.2 /
+/// 613.1f). This is the only sound re-home: the "Pay 7 life" cost is outside
+/// the <see cref="Majik.Core.CardData.OracleActivatedAbilityBinder"/>
+/// reconstructable cost grammar, so the oracle-rebuild fallback cannot
+/// reconstruct it — the real ability must carry its own re-sourceability.
 /// </summary>
 [CardName("Griselbrand")]
 public static class GriselbrandFactory
@@ -94,6 +107,23 @@ public static class GriselbrandFactory
         // so every per-draw CR 121.1 replacement (Dredge, Leyline of the
         // Void, etc.) fires for each draw, and an empty library sets the
         // tried-to-draw SBA flag (CR 704.5b).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect draws for the live ResolutionContext.Source's
+        // CONTROLLER (the ability's own source at resolution) rather than
+        // capturing `card`, falling back to `card` / `owner` only on the
+        // context-less legacy sync path (ResolutionContext.Legacy, where Source
+        // is null). Marked RebindSafe so Agatha's Soul Cauldron re-homes this
+        // REAL ability to a counter-bearing bearer via ActivatedAbility.RebindTo
+        // (CR 707.2 / 613.1f): the bearer's controller pays 7 life and draws 7,
+        // never the exiled Griselbrand. RebindTo is the ONLY sound re-home here:
+        // the "Pay 7 life" cost is OUTSIDE the OracleActivatedAbilityBinder
+        // reconstructable cost grammar (mana pips + {T} + "Sacrifice this
+        // creature" only — a life cost is explicitly rejected as unsound), so
+        // the oracle-rebuild fallback cannot reconstruct this clause at all
+        // (the Skithiryx / Krenko situation — the real ability must carry its
+        // own re-sourceability). PayLife is a non-source-capturing cost, so
+        // RebindTo Stage 1 passes it through unchanged.
         // --------------------------------------------------------------------
         var drawAbility = new ActivatedAbility(
             source: card,
@@ -106,17 +136,22 @@ public static class GriselbrandFactory
             {
                 new Effect(
                     "Griselbrand: draw seven cards",
-                    () =>
+                    ctx =>
                     {
+                        var subject = (ctx.Source as Permanent) ?? card;
+
                         // CR 113.6 — activated abilities only function while
                         // the source is on the battlefield (or where specified
                         // by the ability; Griselbrand specifies no zone override).
-                        if (card.Zone != ZoneType.Battlefield) return;
+                        if (subject.Zone != ZoneType.Battlefield)
+                            return ValueTask.CompletedTask;
 
-                        var controller = card.Controller ?? owner;
+                        var controller = subject.Controller ?? card.Controller ?? owner;
                         Fx.DrawCards(controller, 7);
+                        return ValueTask.CompletedTask;
                     }),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(drawAbility);
 
