@@ -131,31 +131,51 @@ public static class KrenkoMobBossFactory
         //     with no "other" qualifier; Krenko is a Goblin he controls.
         //   - Counts Goblin permanents on controller's battlefield only
         //     (CR 109.5 — "you control" = controller, not opponents).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-resolutioncontext-source-
+        // migration): the effect reads "you" / "Goblins you control" off the
+        // live ResolutionContext.Source (the ability's own source at
+        // resolution) and ITS controller, rather than capturing `card`,
+        // falling back to `card` / `owner` only on the context-less legacy
+        // sync path. The {T} cost is an AdditionalCost.Tap that RebindTo
+        // re-homes to the new source automatically (Stage 1), so the whole
+        // ability is marked RebindSafe: Agatha's Soul Cauldron re-homes this
+        // REAL token-maker to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — counting Goblins the
+        // BEARER's controller controls and minting tokens under them, never
+        // re-reading the exiled Krenko. Token creation is NOT in the
+        // OracleActivatedAbilityBinder reconstructable set (self-pump / pinger
+        // / keyword-grant / counter / draw / gain-life / regenerate), so
+        // RebindTo of the real ability is the only sound re-home.
         // ----------------------------------------------------------------
         var tapEffect = new Effect(
             $"{CardName}: create X 1/1 red Goblin tokens (X = Goblins you control)",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
+                var subject = (ctx.Source as Permanent) ?? card;
+                var controller = subject.Controller ?? card.Controller ?? owner;
 
-                // CR 608.2 — snapshot the count at resolution. Includes
-                // Krenko (no "other" qualifier on the oracle text).
+                // CR 608.2 — snapshot the count at resolution. Includes the
+                // source (no "other" qualifier on the oracle text).
                 int gobCount = controller.Zones.Battlefield.GetCards()
                     .Count(c => c.HasSubtype(CardSubtype.Goblin));
 
-                if (gobCount <= 0) return;
+                if (gobCount <= 0) return ValueTask.CompletedTask;
 
                 for (int i = 0; i < gobCount; i++)
                 {
                     CreateGoblinToken(controller, zoneService);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var tapAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
-            effects: new IEffect[] { tapEffect });
+            effects: new IEffect[] { tapEffect },
+            rebindSafe: true);
 
         card.AddAbility(tapAbility);
 

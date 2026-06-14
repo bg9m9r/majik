@@ -1644,4 +1644,130 @@ public class AgathasSoulCauldronTests
         skithiryx.RegenerationShieldCount.Should().Be(1,
             "resolving the un-rebound regenerate shields its own source");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-activated-ability-non-reconstructable-source-migration —
+    // Krenko, Mob Boss is a bespoke [CardName]-factory creature whose sole
+    // activated ability ("{T}: Create X 1/1 red Goblin creature tokens, where
+    // X is the number of Goblins you control") is OUTSIDE the
+    // OracleActivatedAbilityBinder reconstructable set (self-pump / pinger /
+    // keyword-grant / counter / draw / gain-life / regenerate) — token
+    // creation with a "Goblins you control" count is not a parseable shape.
+    // The migration retargets the effect to read "you" off
+    // ResolutionContext.Source's controller and marks the ability RebindSafe,
+    // so Agatha's group-grant re-homes the REAL token-maker (and its {T} cost,
+    // auto-re-homed by RebindTo Stage 1) onto a counter-bearing bearer via
+    // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — counting the BEARER's
+    // controller's Goblins and minting under them, never re-reading the exiled
+    // Krenko.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Krenko_TokenMakerToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {T} token-maker) is now RebindSafe
+        // (reads ResolutionContext.Source's controller). Token creation is NOT
+        // reconstructable from oracle text, so the RebindTo of the real ability
+        // is the only sound re-home.
+        var krenko = KrenkoMobBossFactory.Create(alice);
+        var realAbilities = krenko.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Krenko has exactly one non-mana activated ability — the {T} token-maker");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Krenko ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(krenko);
+        krenko.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Krenko so the only way the
+        // ability is granted is via RebindTo of the real ability — the
+        // oracle-rebuild fallback cannot reconstruct token creation, so if the
+        // grant still depended on it nothing would be emitted and this test
+        // would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), krenko);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Krenko's real {T} token-maker is re-homed via RebindTo");
+        var tokenMaker = granted[0];
+        tokenMaker.Source.Should().BeSameAs(bearer,
+            "the re-homed token-maker is sourced on the BEARER (CR 707.2)");
+        tokenMaker.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        tokenMaker.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle()
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+
+        // Put a couple of Goblins onto the bearer's controller (Alice) so the
+        // "X = Goblins you control" count is observable. The bearer itself
+        // ("Counter Bear") is not a Goblin and Krenko is in exile, so neither is
+        // counted — only the two real Goblins on Alice's battlefield.
+        var goblinA = new Creature("Goblin A", "R", 1, 1, subtypes: new[] { CardSubtype.Goblin });
+        var goblinB = new Creature("Goblin B", "R", 1, 1, subtypes: new[] { CardSubtype.Goblin });
+        foreach (var g in new[] { goblinA, goblinB })
+        {
+            g.SetOwner(alice);
+            g.ChangeController(alice);
+            alice.Zones.Library.AddCard(g);
+            zones.MoveCard(g, ZoneType.Library, ZoneType.Battlefield, alice);
+        }
+
+        var goblinsBefore = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        goblinsBefore.Should().Be(2, "two real Goblins control by Alice before resolution");
+
+        // Resolving the re-homed token-maker counts Goblins the BEARER'S
+        // controller (Alice) controls and mints that many tokens under Alice —
+        // ResolutionContext.Source = bearer => its controller = Alice.
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+
+        var goblinsAfter = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        goblinsAfter.Should().Be(goblinsBefore + 2,
+            "the re-homed token-maker minted X=2 (the bearer's controller's Goblin count) under Alice");
+    }
+
+    [Fact]
+    public async Task BespokeTokenMaker_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still reads "Goblins you control" off its
+        // OWN source on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var krenko = KrenkoMobBossFactory.Create(alice, zones);
+        alice.Zones.Library.AddCard(krenko);
+        zones.MoveCard(krenko, ZoneType.Library, ZoneType.Battlefield, alice);
+        krenko.ClearSummoningSickness();
+
+        var tokenMaker = krenko.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        // Krenko himself is the only Goblin Alice controls — X = 1.
+        var before = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        before.Should().Be(1, "Krenko alone is on the battlefield (counts himself)");
+
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+
+        var after = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        after.Should().Be(before + 1,
+            "resolving the un-rebound token-maker mints X=1 (Krenko counts himself)");
+    }
 }
