@@ -106,31 +106,47 @@ public static class SpikeshotGoblinFactory
         // layer at activation; the damage is performed in the resolve
         // closure, where the amount is the source's CURRENT power
         // (CR 608.2h — determined as the ability resolves).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-resolutioncontext-source-migration-
+        // batch): "this creature deals damage equal to ITS power" reads the
+        // power off the live ResolutionContext.Source (the ability's own source
+        // at resolution) rather than capturing `card`, and the chosen target is
+        // read off ctx.ChosenTargets rather than a captured ability handle.
+        // Falls back to the authored `card` only on the context-less legacy
+        // sync path. Marked RebindSafe below so Agatha's Soul Cauldron re-homes
+        // the REAL ping to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the damage scales with
+        // the BEARER's power and the {T} cost taps the BEARER, never the exiled
+        // Spikeshot Goblin. A "deal damage equal to its power" pinger is outside
+        // OracleActivatedAbilityBinder's reconstructable set (fixed-amount /
+        // self-pump / keyword-grant only), so RebindTo of the real ability is
+        // the only sound re-home.
         // ----------------------------------------------------------------
-        ActivatedAbility? pingAbility = null;
         var pingEffect = new Effect(
             $"{CardName}: damage equal to its power to any target",
-            () =>
+            ctx =>
             {
-                if (pingAbility == null
-                    || pingAbility.ChosenTargets.Count == 0
-                    || pingAbility.ChosenTargets[0].Count == 0)
+                if (ctx.ChosenTargets.Count == 0 || ctx.ChosenTargets[0].Count == 0)
                 {
-                    return;
+                    return ValueTask.CompletedTask;
                 }
 
-                // CR 608.2h — read the source's power at resolution time.
-                var amount = card.Power;
+                // CR 608.2h — read the SOURCE's power at resolution time, off
+                // the live context (the re-homed source) so a granted copy
+                // scales with the bearer; falls back to the authored card on
+                // the context-less sync path.
+                var amount = (ctx.Source as Creature)?.Power ?? card.Power;
                 if (amount <= 0)
                 {
-                    return; // 0 (or negative-floored) power deals no damage.
+                    return ValueTask.CompletedTask; // 0 (or floored) power deals no damage.
                 }
 
-                var target = pingAbility.ChosenTargets[0][0];
+                var target = ctx.ChosenTargets[0][0];
                 Fx.DealDamageAny(target, amount);
+                return ValueTask.CompletedTask;
             });
 
-        pingAbility = new ActivatedAbility(
+        var pingAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -146,7 +162,8 @@ public static class SpikeshotGoblinFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>()),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(pingAbility);
 
