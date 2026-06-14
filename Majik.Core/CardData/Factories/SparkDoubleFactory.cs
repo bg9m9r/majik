@@ -31,18 +31,26 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="RemoveSupertypeEffect"/>) so copying a Legendary creature does
 ///   not trip the legend rule.
 ///
+/// ## Effective-planeswalker copy source (CR 712.4 — deferral paid down)
+/// - <b>Copying a creature-front DFC flipped to its planeswalker BACK</b> (an
+///   EFFECTIVE planeswalker — Ral, Monsoon Mage // Ral, Leyline Prodigy) is now
+///   supported. The clone takes the back face's copiable values (Planeswalker
+///   type, subtypes, supertypes, colour) via
+///   <see cref="CopyCharacteristicsEffect.EffectiveBackFace"/>, and gains a
+///   working loyalty BODY + the back face's loyalty ABILITIES on the Option-B
+///   transient surface (<see cref="Permanent.SetTransientLoyalty"/> /
+///   <see cref="OracleLoyaltyAbilityBinder.RebindOracleText"/>) — without
+///   re-instancing the <see cref="Creature"/> clone as a <see cref="Planeswalker"/>
+///   (the rejected re-classing approach). The CR 706.9b loyalty-counter rider
+///   then rides through <see cref="Permanent.AddTransientLoyalty"/>.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Planeswalker copy source — loyalty counter rider</b>: the engine tracks
-///   loyalty on <see cref="Planeswalker.Loyalty"/> rather than the generic
-///   counters collection, and a Spark Double built as a <see cref="Creature"/>
-///   C# instance cannot itself become a Planeswalker through the
-///   characteristics-row copy (the manland-P/T-style instance gap documented on
-///   <see cref="CopyCharacteristicsEffect"/>). So Spark Double copying a
-///   planeswalker you control is NOT fully surfaced at v1; the
-///   <see cref="EntersAsCopyReplacement.Options.LoyaltyCounterIfCopiedPlaneswalker"/>
-///   rider is wired and applies when the entering instance is itself a
-///   Planeswalker, but the common-case creature copy is the supported path.
-///   (Recorded in v1-deferrals.)
+/// - <b>Copying a printed Planeswalker card</b>: a real <see cref="Planeswalker"/>
+///   source keeps its loyalty on its own field, and a Spark Double built as a
+///   <see cref="Creature"/> C# instance has no authoritative loyalty field to
+///   receive it — so copying a NON-flipped printed planeswalker you control is
+///   still lossy (separate from the effective-PW back-face case above, which is
+///   handled via the transient surface). Recorded in v1-deferrals.
 /// - "You may" choice — auto-yes when any candidate exists (shared
 ///   <see cref="EntersAsCopyReplacement"/> posture).
 /// </summary>

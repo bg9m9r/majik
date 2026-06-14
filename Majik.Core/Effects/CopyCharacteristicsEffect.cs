@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 
 namespace Majik.Core.Effects;
 
@@ -186,25 +187,38 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
     /// </summary>
     private void ApplyShared(PermanentCharacteristics chars)
     {
+        // CR 712.4 — when the source is a transform DFC currently flipped to
+        // its (non-creature) back face, its COPIABLE values come from the
+        // currently-up back face, not the printed front. A creature-front DFC
+        // flipped to a planeswalker back (Ral, Monsoon Mage // Ral, Leyline
+        // Prodigy) is built as a Creature C# instance carrying a transient
+        // loyalty body, so reading _source.CardTypes (the printed front) would
+        // wrongly make the clone a creature. Prefer the back-face seed so the
+        // clone becomes a copy of the planeswalker back (CR 707.2 + 712.4).
+        var backFace = EffectiveBackFace(_source);
+
         // CR 707.2 / 613.2 (Layer 1) — name + mana cost are copiable values.
         // The runtime Card.Name / Card.ManaCost stay immutable; overwrite the
         // layer-system effective slots so GetEffectiveName / GetEffectiveManaCost
         // (same-name matching, mana-value reads) report the copied identity.
-        chars.Name = _source.Name;
-        chars.ManaCost = _source.ManaCost;
+        chars.Name = backFace?.Name ?? _source.Name;
+        chars.ManaCost = _source.ManaCost;  // back faces have no mana cost (CR 711.4)
 
         chars.Types.Clear();
-        foreach (var t in _source.CardTypes) chars.Types.Add(t);
+        foreach (var t in backFace?.Types ?? (IEnumerable<CardType>)_source.CardTypes)
+            chars.Types.Add(t);
 
         chars.Subtypes.Clear();
-        foreach (var st in _source.Subtypes) chars.Subtypes.Add(st);
+        foreach (var st in backFace?.Subtypes ?? (IEnumerable<CardSubtype>)_source.Subtypes)
+            chars.Subtypes.Add(st);
 
         // CR 707.2 / 205.4 — supertypes are copiable. Re-seed from the source's
         // printed supertypes (#1715 slot) so a clone of a Legendary permanent
         // copies Legendary; the legend-rule SBA reads HasEffectiveSupertype,
         // which consults this set via Compute.
         chars.Supertypes.Clear();
-        foreach (var sup in _source.Supertypes) chars.Supertypes.Add(sup);
+        foreach (var sup in backFace?.Supertypes ?? (IEnumerable<CardSupertype>)_source.Supertypes)
+            chars.Supertypes.Add(sup);
 
         // CR 707.2 / 105.3 — colour is copiable. Re-seed the Layer-5 colour
         // slot (#1681) from the source's printed/static colour so a clone of a
@@ -212,16 +226,46 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
         // Permanent.GetEffectiveColors). Later-timestamp Layer-5 SET/ADD colour
         // effects still apply on top per CR 613.
         chars.Colors.Clear();
-        foreach (var c in Majik.Core.Cards.CardColors.GetColors(_source))
+        var sourceColors = backFace is { Colors.Count: > 0 }
+            ? (IEnumerable<Majik.Core.ValueObjects.ManaColor>)backFace.Colors
+            : Majik.Core.Cards.CardColors.GetColors(_source);
+        foreach (var c in sourceColors)
         {
             chars.Colors.Add(c);
         }
 
         chars.Keywords.Clear();
-        foreach (var kw in _source.Abilities.OfType<KeywordAbility>())
+        if (backFace != null)
         {
-            chars.Keywords.Add(kw.Keyword);
+            foreach (var kw in backFace.Keywords) chars.Keywords.Add(kw);
         }
+        else
+        {
+            foreach (var kw in _source.Abilities.OfType<KeywordAbility>())
+            {
+                chars.Keywords.Add(kw.Keyword);
+            }
+        }
+    }
+
+    /// <summary>
+    /// CR 712.4 — the source's currently-up BACK-face characteristics when it
+    /// is a transform DFC flipped to a back face that re-classes it to an
+    /// effective planeswalker (a creature-front DFC built as a Creature instance
+    /// carrying a transient loyalty body). Returns <c>null</c> for an unflipped
+    /// permanent, a real <see cref="Planeswalker"/> (its copiable PW values come
+    /// from the printed face), or a back face that grants no loyalty body — so
+    /// the copy falls back to the printed-characteristic path in every other
+    /// case (byte-for-byte unchanged for the existing artifact / creature / land
+    /// clones).
+    /// </summary>
+    internal static Majik.Core.CardData.MDFCs.BackFaceCharacteristics? EffectiveBackFace(
+        Permanent source)
+    {
+        if (source is Planeswalker) return null;
+        if (source.MdfcState is not { IsBackFace: true } state) return null;
+        var back = state.BackFaceCharacteristics;
+        return back is { Loyalty: not null } ? back : null;
     }
 
     /// <summary>
@@ -270,6 +314,45 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
 
         var copy = new CopyCharacteristicsEffect(target, source, expiresAtEndOfTurn);
         effects.Register(copy);
+
+        // CR 712.4 / 711 / 306.5b — copy-of-effective-planeswalker. When the
+        // source is a transform DFC flipped to its planeswalker back (an
+        // effective planeswalker that is NOT a real Planeswalker instance), the
+        // characteristic copy above already overwrites the copy's type line with
+        // the back face (Planeswalker type, via EffectiveBackFace). The copy must
+        // ALSO gain a working loyalty BODY + the back face's loyalty ABILITIES,
+        // reproduced on the copy's own Option-B transient surface rather than by
+        // re-instancing the copy as a Planeswalker (the rejected re-classing
+        // approach). A real Planeswalker source is excluded by EffectiveBackFace
+        // (its loyalty lives on its own field; that copy path is separate).
+        var backFace = EffectiveBackFace(source);
+        if (backFace is { Loyalty: { } startingLoyalty } && target is not Planeswalker)
+        {
+            // CR 306.5b — seed the copy's transient loyalty body from the back
+            // face's starting loyalty (inert on a real Planeswalker target,
+            // which keeps its own authoritative field).
+            target.SetTransientLoyalty(startingLoyalty);
+
+            // CR 707.2 / 606 — mirror the back face's loyalty abilities onto the
+            // copy, bound to ITS Permanent-typed loyalty surface (4A) via the
+            // same OracleLoyaltyAbilityBinder the transform path uses, so "[+1]"
+            // raises the COPY's loyalty. Granted through GrantAbilityEffect so
+            // the grant shares the copy's lifetime (revoked on LTB / EOT).
+            var controller = target.Controller ?? target.Owner;
+            if (controller != null && !string.IsNullOrWhiteSpace(backFace.OracleText))
+            {
+                foreach (var loyaltyAbility in
+                    Majik.Core.CardData.OracleLoyaltyAbilityBinder.RebindOracleText(
+                        target, backFace.OracleText!, controller))
+                {
+                    effects.Register(new GrantAbilityEffect(
+                        source: target,
+                        target: target,
+                        ability: loyaltyAbility,
+                        expiresAtEndOfTurn: expiresAtEndOfTurn));
+                }
+            }
+        }
 
         if (abilityRebind != null)
         {

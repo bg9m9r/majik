@@ -416,4 +416,52 @@ public class EntersAsCopyGeneralizedTests
         sorcerer.Abilities.OfType<ActivatedAbility>().Single().Source.Should().BeSameAs(sorcerer,
             "the source's own ability is untouched");
     }
+
+    // -----------------------------------------------------------------------
+    // Deferral pay-down: copy-of-effective-planeswalker-reclass.
+    // Spark Double copying a creature-front DFC currently FLIPPED to its
+    // planeswalker back face (an EFFECTIVE planeswalker — CR 712.4). The clone
+    // becomes a copy of the PW back: Planeswalker type + back-face loyalty body
+    // + back-face loyalty abilities + the CR 706.9b loyalty-counter rider — all
+    // on the Option-B transient surface, no re-instancing.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SparkDouble_CopyOfFlippedPlaneswalkerBack_BecomesEffectivePlaneswalker_WithLoyaltyCounter()
+    {
+        var bus = new ReplacementBus();
+        var effects = new ContinuousEffectsService();
+
+        // Ral, Monsoon Mage (creature front) flipped to Ral, Leyline Prodigy
+        // (planeswalker back, loyalty 2) — an effective planeswalker on the
+        // battlefield.
+        var ral = RalMonsoonMageFactory.Create(_alice);
+        ral.ActiveEffects = effects;
+        _alice.Zones.Battlefield.AddCard(ral);
+        ral.SetZone(ZoneType.Battlefield);
+        ral.MdfcState!.Transform();
+        ral.IsEffectivePlaneswalker().Should().BeTrue("Ral is flipped to its PW back");
+
+        var sd = SparkDoubleFactory.Create(_alice, replacements: bus, effects: effects);
+        sd.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(sd);
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(sd, ZoneType.Hand, ZoneType.Battlefield, _alice);
+
+        // CR 712.4 / 707.2 — the clone copies the PW back face.
+        var chars = effects.Compute(sd);
+        chars.Types.Should().Contain(CardType.Planeswalker,
+            "the clone of a flipped DFC takes the back face's PW type");
+        chars.Subtypes.Should().Contain(CardSubtype.Ral);
+
+        // CR 706.9b — copying a planeswalker → enters with an additional loyalty
+        // counter (2 starting + 1 rider = 3), on the transient surface.
+        sd.IsEffectivePlaneswalker().Should().BeTrue();
+        sd.GetEffectiveLoyalty().Should().Be(3,
+            "Ral, Leyline Prodigy's loyalty 2 + CR 706.9b's extra loyalty counter");
+
+        // CR 706.2 — and it isn't legendary.
+        sd.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeFalse();
+    }
 }
