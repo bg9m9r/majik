@@ -1,0 +1,10 @@
+{
+  "name": "Bloodthirsty Conqueror",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Knight"],
+  "manaCost": "{3}{B}{B}",
+  "power": 5,
+  "toughness": 5,
+  "keywords": ["Flying", "Deathtouch"],
+  "abilities": []
+}
