@@ -166,6 +166,85 @@ public class BotMatchRehydrationTests
         }
     }
 
+    [Fact]
+    public async Task MctsRehydration_ReplaysWholeScript_WithoutReinvokingTheLiveSearch()
+    {
+        // The determinism-removal guarantee at the seam: on the rehydrate path
+        // the recorded stream is replayed VERBATIM by a ScriptedPlayerAgent and
+        // the live (wall-clock-budgeted) mcts search is NEVER consulted for any
+        // replayed prompt — that is precisely why iteration-count variance can
+        // no longer diverge the replay. We prove it by counting decisions the
+        // RECORDING continuation appends during a pure-prefix replay: zero, so
+        // long as the replay does not run past the recorded live edge. Every
+        // bot prompt up to the edge is answered from the script.
+        var matchId = Guid.NewGuid();
+        var commandLog = new InMemoryEngineCommandLogStore();
+        var checkpoints = new InMemoryEngineCheckpointStore();
+        var botDecisions = new InMemoryBotDecisionLogStore();
+
+        var coordA = BuildCoordinator(commandLog, checkpoints, botDecisions);
+        var factoryA = BuildMctsFactory();
+
+        GameStateDto stateAfterA;
+        using var crashCts = new CancellationTokenSource();
+        using (DeterministicIdScope.Push(new DeterministicIdSource(Seed)))
+        {
+            var facadeA = factoryA.Create(
+                "Alice", "Bot", BuildDeck(), BuildDeck(),
+                botSeatArchetype: Archetype,
+                botDecisionRecorder: r => coordA.RecordBotDecisionAsync(matchId, r, default));
+            (stateAfterA, _) = await DriveAndRecordAsync(
+                facadeA, matchId, coordA, stopAfter: 10, gameCt: crashCts.Token);
+        }
+        crashCts.Cancel();
+        factoryA.Delete(stateAfterA.GameId);
+
+        var script = await botDecisions.ReadAllAsync(matchId, default);
+        script.Should().NotBeEmpty("the mcts bot must have recorded decisions to replay");
+
+        // Rehydrate, but route the recording continuation into a counter so we
+        // can prove the live search was never reached for a script-covered
+        // prompt (any continuation append == the live edge was crossed).
+        var coordB = BuildCoordinator(commandLog, checkpoints, botDecisions);
+        var factoryB = BuildMctsFactory();
+        var continuationAppends = 0;
+
+        ScriptedPlayerAgent? scripted = null;
+        using (DeterministicIdScope.Push(new DeterministicIdSource(Seed)))
+        {
+            var facadeB = await coordB.TryRehydrateAsync(
+                matchId, Seed,
+                buildFreshFacade: () =>
+                {
+                    var f = factoryB.BuildUnregisteredFacade(
+                        "Alice", "Bot", BuildDeck(), BuildDeck(),
+                        botSeatArchetype: Archetype,
+                        botReplayScript: script,
+                        botDecisionRecorder: _ =>
+                        {
+                            Interlocked.Increment(ref continuationAppends);
+                            return Task.CompletedTask;
+                        });
+                    scripted = Majik.Core.Players.Agents.AgentRegistry.Get(f.Bob) as ScriptedPlayerAgent;
+                    return f;
+                },
+                CancellationToken.None);
+            facadeB.Should().NotBeNull();
+        }
+
+        scripted.Should().NotBeNull(
+            "the rehydrated bot seat must be a ScriptedPlayerAgent replaying the recorded stream");
+
+        // Every bot decision consumed during the replay came from the script —
+        // the live mcts search produced none of them. continuationAppends > 0
+        // would mean the replay ran past the recorded edge and re-invoked the
+        // live (nondeterministic) search, the exact failure this deferral closed.
+        scripted!.Consumed.Should().Be(script.Count,
+            "the whole recorded stream is replayed verbatim");
+        continuationAppends.Should().Be(0,
+            "no bot decision is RE-COMPUTED by the live search during a prefix replay");
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
