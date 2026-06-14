@@ -121,16 +121,37 @@ public static class ArcboundRavagerFactory
         // ----------------------------------------------------------------
         // Activated ability — "Sacrifice an artifact: Put a +1/+1 counter
         // on this creature." (no mana cost, just the sacrifice).
+        //
+        // RE-SOURCE-SAFE (agatha-grant-next-bespoke-closure-resourcecontext-
+        // migration): the +1/+1 counter is placed on the live
+        // ResolutionContext.Source (the ability's own Source at resolution)
+        // rather than capturing `card`, falling back to `card` only on the
+        // context-less legacy sync path. Marked RebindSafe below so Agatha's
+        // Soul Cauldron re-homes the REAL ability to a counter-bearing bearer
+        // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the BEARER
+        // receives the +1/+1 counter, never the exiled Arcbound Ravager. The
+        // "Sacrifice an artifact" cost passes through unchanged (it sacrifices
+        // any artifact the activating player controls — it does NOT capture the
+        // source). A "Sacrifice an artifact" cost is outside
+        // OracleActivatedAbilityBinder's reconstructable cost grammar (mana /
+        // {T} / "Sacrifice this creature" only), so RebindTo is the sole sound
+        // re-home for this clause (the Skithiryx-class case).
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: +1/+1 counter for sacrificed artifact",
-            () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                CountersService.Add(subject, CounterType.PlusOnePlusOne, 1, replacements);
+                return ValueTask.CompletedTask;
+            });
 
         var activatedAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new SacrificeAnArtifactCost() },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            rebindSafe: true);
 
         card.AddAbility(activatedAbility);
 
