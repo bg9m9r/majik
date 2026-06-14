@@ -1,0 +1,8 @@
+{
+  "name": "Weirded Vampire",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Horror"],
+  "manaCost": "{3}{B}",
+  "power": 3,
+  "toughness": 3
+}
