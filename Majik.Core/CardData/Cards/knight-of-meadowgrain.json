@@ -1,0 +1,9 @@
+{
+  "name": "Knight of Meadowgrain",
+  "types": ["Creature"],
+  "subtypes": ["Kithkin", "Knight"],
+  "manaCost": "{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["First strike", "Lifelink"]
+}
