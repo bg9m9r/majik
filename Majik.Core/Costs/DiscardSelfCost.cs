@@ -16,13 +16,36 @@ namespace Majik.Core.Costs;
 /// Activation zone: Hand. The ability cannot be activated if the card is
 /// not currently in the activating player's hand (CR 702.74a).
 /// </summary>
-public sealed class DiscardSelfCost : ICost
+public sealed class DiscardSelfCost : ICost, IRebindableCost
 {
     private readonly ICard _self;
 
     public DiscardSelfCost(ICard self)
     {
         _self = self ?? throw new ArgumentNullException(nameof(self));
+    }
+
+    /// <summary>The card this cost discards (for inspection / re-home checks).</summary>
+    public ICard Self => _self;
+
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — re-home the captured self-card when
+    /// the owning <see cref="Majik.Core.Abilities.ActivatedAbility"/> is
+    /// re-sourced (CR 707.2 / 613.1f). Returns a fresh cost discarding
+    /// <paramref name="newSource"/> when (and only when) the current captured
+    /// card is reference-equal to <paramref name="oldSource"/>; otherwise
+    /// returns this instance unchanged. Pure — the original is never mutated.
+    /// (Without this, Agatha's Soul Cauldron re-homing a Channel ability would
+    /// leave a DiscardSelfCost pointed at the EXILED card, which can never be
+    /// paid from a battlefield bearer.)
+    /// </summary>
+    public ICost RebindTo(object oldSource, object newSource)
+    {
+        if (ReferenceEquals(_self, oldSource) && newSource is ICard newCard)
+        {
+            return new DiscardSelfCost(newCard);
+        }
+        return this;
     }
 
     /// <inheritdoc/>

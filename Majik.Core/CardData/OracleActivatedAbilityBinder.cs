@@ -927,6 +927,28 @@ public static class OracleActivatedAbilityBinder
             ["three"] = 3,
         };
 
+    // "{cost}: Return this card from your graveyard to your hand."
+    // (CR 113.6 — a graveyard-zone activated ability; CR 701.20 — "return … to
+    // its owner's hand".) The self-recursion shape that World Breaker's
+    // "{G}, Exile this card from your graveyard: Return this card to its owner's
+    // hand" and Colossal Skyturtle's Channel graveyard return both wear (the
+    // "Exile this card from your graveyard" cost half is folded into the resolve
+    // body — see the factory note). Sound to re-home: the verb references ONLY
+    // the source itself ("this card") and its owner, with no board dependence,
+    // so the rebuilt effect returns the BEARER (rc.Source) from ITS owner's
+    // graveyard to ITS owner's hand. When the bearer is on the battlefield (the
+    // Cauldron's only grantee — a creature you control with a +1/+1 counter) the
+    // zone guard makes it a clean no-op, never touching the exiled imprinted
+    // card. The cost is any mana / {T} run; a cost half this binder cannot model
+    // (e.g. "Sacrifice a land", "Exile this card from your graveyard") is NOT
+    // part of the reconstructed cost grammar, so a printing whose ONLY cost is
+    // such a token is skipped as unsound (TryBuildCostList returns null). Group 1
+    // = cost. Both "this card"/"this creature" and "its owner's hand"/"your hand"
+    // spellings are accepted. A trailing reminder run is stripped before matching.
+    private static readonly Regex GraveyardReturnSelfRegex = new(
+        @"^(" + CostList + @")\s*:\s*Return this (?:card|creature) (?:from your graveyard )?to (?:its owner's|your) hand\.$",
+        RegexOptions.IgnoreCase);
+
     // A single tap symbol inside a cost list.
     private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
 
@@ -1223,6 +1245,14 @@ public static class OracleActivatedAbilityBinder
             if (mill.Success)
             {
                 var ability = TryBuildMillSelf(mill, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var gyReturn = GraveyardReturnSelfRegex.Match(line);
+            if (gyReturn.Success)
+            {
+                var ability = TryBuildGraveyardReturnSelf(gyReturn, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -2023,6 +2053,48 @@ public static class OracleActivatedAbilityBinder
             });
 
         return ability;
+    }
+
+    /// <summary>
+    /// Build a graveyard-return-self ability: "{cost}: Return this card from your
+    /// graveyard to your hand." (CR 113.6 / 701.20.) Re-homed so the rebuilt
+    /// effect returns the BEARER (<see cref="ResolutionContext.Source"/> on the
+    /// live ability path, else the captured bearer) from ITS owner's graveyard to
+    /// ITS owner's hand via <see cref="Fx.ReturnFromGraveyardToHand"/> — never the
+    /// exiled imprinted card. A "still in its owner's graveyard" zone guard
+    /// (CR 113.6 — printed source zone is the graveyard) makes the ability a clean
+    /// no-op when the bearer is anywhere else, which is exactly the Cauldron case
+    /// (the bearer is on the battlefield). Does NOT gate on <see cref="Creature"/>
+    /// — any permanent can carry a "return this card from your graveyard" ability.
+    /// </summary>
+    private static ActivatedAbility? TryBuildGraveyardReturnSelf(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var returnEffect = new Effect(
+            "Granted: return this card from your graveyard to your hand (CR 701.20)",
+            (ResolutionContext rc) =>
+            {
+                // CR 113.7 — the subject is the re-homed bearer (rc.Source on the
+                // live ability path, else the captured bearer).
+                var subject = (rc.Source as Permanent) ?? bearer;
+
+                // CR 113.6 / 608.2b — the printed source zone is the graveyard;
+                // a subject anywhere else (a battlefield bearer) cleanly no-ops.
+                if (subject.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask;
+                if (subject.Owner is null) return ValueTask.CompletedTask;
+
+                Fx.ReturnFromGraveyardToHand(subject);
+                return ValueTask.CompletedTask;
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { returnEffect });
     }
 
     /// <summary>

@@ -254,6 +254,20 @@ public static class WorldBreakerFactory
         // legacy-sync (ctx-less) fallback for shape-test callers that drive
         // the effect via Execute() without a ResolutionContext.
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (oracle-activated-shape-from-graveyard-return-
+        // abilities): the effect reads its subject off the live
+        // ResolutionContext.Source (the ability's own Source at resolution)
+        // rather than capturing `card`, falling back to `card` only on the
+        // context-less legacy sync path (ResolutionContext.Legacy → Source
+        // null). In normal play rc.Source IS World Breaker, so behaviour is
+        // unchanged. When Agatha's Soul Cauldron re-homes this REAL ability to
+        // a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f), rc.Source is the BEARER: the "still in your graveyard" guard
+        // reads the bearer's zone — a battlefield bearer cleanly no-ops (it is
+        // not in a graveyard), so the re-homed ability NEVER acts on the exiled
+        // World Breaker. Marked RebindSafe so the Cauldron's group-grant uses
+        // the PRIMARY RebindTo path (re-home the real ability) rather than the
+        // oracle-rebuild fallback.
         var graveyardEffect = new Effect(
             $"{CardName}: exile from graveyard, return to owner's hand",
             ctx =>

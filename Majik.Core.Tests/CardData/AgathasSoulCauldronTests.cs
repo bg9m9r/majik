@@ -7002,4 +7002,197 @@ public class AgathasSoulCauldronTests
         knight.Zone.Should().Be(ZoneType.Exile,
             "the imprinted Knight stays exiled (CR 702.49) — the re-home is sound, never reaching back to the exiled card");
     }
+
+    // -----------------------------------------------------------------------
+    // oracle-activated-shape-from-graveyard-return-abilities
+    //
+    // World Breaker's "{G}: exile this card from your graveyard, return this
+    // card to its owner's hand" and Colossal Skyturtle's two Channel-from-
+    // graveyard abilities now read ResolutionContext.Source / Controller and
+    // are marked RebindSafe, so Agatha's Soul Cauldron re-homes the REAL
+    // abilities onto a counter-bearing bearer via ActivatedAbility.RebindTo
+    // (CR 707.2 / 613.1f). DiscardSelfCost now implements IRebindableCost so
+    // the Channel cost re-homes too. The OracleActivatedAbilityBinder also
+    // reconstructs the "{cost}: Return this card from your graveyard to your
+    // hand" shape for oracle-text-only cards.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void WorldBreaker_GraveyardReturnAbility_IsRebindSafe()
+    {
+        var alice = new Player("Alice", 20);
+        var wb = WorldBreakerFactory.Create(alice);
+
+        var activated = wb.Abilities.OfType<ActivatedAbility>().Single();
+        activated.RebindSafe.Should().BeTrue(
+            "the migrated graveyard return-to-hand ability reads ResolutionContext.Source and is RebindSafe");
+    }
+
+    [Fact]
+    public void ColossalSkyturtle_ChannelAbilities_AreRebindSafe()
+    {
+        var alice = new Player("Alice", 20);
+        var sky = ColossalSkyturtleFactory.Create(alice);
+
+        sky.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .Should().OnlyContain(a => a.RebindSafe,
+                "both migrated Channel abilities read the live ResolutionContext and are RebindSafe");
+    }
+
+    [Fact]
+    public void DiscardSelfCost_RebindsCapturedSelfToNewSource()
+    {
+        var alice = new Player("Alice", 20);
+        var original = new Creature("Original", "{1}{U}", 2, 2);
+        var bearer = new Creature("Bearer", "{1}{G}", 2, 2);
+
+        var cost = new Majik.Core.Costs.DiscardSelfCost(original);
+        var rebound = cost.RebindTo(original, bearer);
+
+        rebound.Should().BeOfType<Majik.Core.Costs.DiscardSelfCost>();
+        ((Majik.Core.Costs.DiscardSelfCost)rebound).Self.Should().BeSameAs(bearer,
+            "RebindTo re-homes the captured self-card to the new source");
+
+        // A non-matching old source leaves the cost untouched.
+        cost.RebindTo(bearer, alice).Should().BeSameAs(cost,
+            "RebindTo is a no-op when the captured card is not the old source");
+    }
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_WorldBreaker_GraveyardReturnToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var wb = WorldBreakerFactory.Create(alice);
+        wb.Abilities.OfType<ActivatedAbility>().Single().RebindSafe.Should().BeTrue();
+        alice.Zones.Graveyard.AddCard(wb);
+        wb.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub returns nothing for World Breaker, so the only way the
+        // ability is granted is via RebindTo of the real ability.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), wb);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "World Breaker's real graveyard return ability is re-homed via RebindTo");
+        var rehomed = granted[0];
+        rehomed.Source.Should().BeSameAs(bearer,
+            "the re-homed ability is sourced on the BEARER (CR 707.2)");
+        rehomed.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+    }
+
+    [Fact]
+    public async Task WorldBreakerRebind_NoOpsOnBattlefieldBearer_NeverTouchesExiledCard()
+    {
+        // The re-homed graveyard-return ability reads ResolutionContext.Source.
+        // A battlefield bearer is NOT in a graveyard, so resolving the re-homed
+        // ability is a clean no-op — and the exiled World Breaker is untouched.
+        var alice = new Player("Alice", 20);
+        var wb = WorldBreakerFactory.Create(alice);
+        var ability = wb.Abilities.OfType<ActivatedAbility>().Single();
+        alice.Zones.Exile.AddCard(wb);
+        wb.SetZone(ZoneType.Exile); // exiled (imprinted) card
+
+        var bearer = new Creature("GY Return Bearer", "{1}{G}", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(bearer);
+
+        var rebound = ability.RebindTo(bearer, alice);
+        await rebound.ResolveAsync(agent: null, game: null);
+
+        bearer.Zone.Should().Be(ZoneType.Battlefield,
+            "a battlefield bearer is not in a graveyard — the re-homed ability no-ops");
+        wb.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted World Breaker is never touched by the re-homed ability");
+    }
+
+    [Fact]
+    public async Task WorldBreakerRebind_ReturnsBearerFromGraveyard_NotExiledCard()
+    {
+        // When the bearer (rc.Source) IS in its owner's graveyard, the re-homed
+        // ability returns the BEARER to hand — never the exiled World Breaker.
+        var alice = new Player("Alice", 20);
+        var wb = WorldBreakerFactory.Create(alice);
+        var ability = wb.Abilities.OfType<ActivatedAbility>().Single();
+        alice.Zones.Exile.AddCard(wb);
+        wb.SetZone(ZoneType.Exile);
+
+        var bearer = new Creature("Graveyard Bearer", "{1}{G}", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Graveyard);
+        alice.Zones.Graveyard.AddCard(bearer);
+
+        var rebound = ability.RebindTo(bearer, alice);
+        await rebound.ResolveAsync(agent: null, game: null);
+
+        bearer.Zone.Should().Be(ZoneType.Hand,
+            "the re-homed ability returns the BEARER (rc.Source) from graveyard to hand");
+        alice.Zones.Hand.GetCards().Should().Contain(bearer);
+        wb.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted World Breaker is never returned by the re-homed ability");
+    }
+
+    [Fact]
+    public void OracleBinder_ReconstructsGraveyardReturnSelf_FromOracleText()
+    {
+        var alice = new Player("Alice", 20);
+
+        // A bearer IN a graveyard so the reconstructed return can fire.
+        var bearer = new Creature("Oracle GY Returner", "{1}{G}", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Graveyard);
+        alice.Zones.Graveyard.AddCard(bearer);
+
+        var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+            .RebuildActivatedAbilities(
+                "{G}: Return this card from your graveyard to your hand.",
+                bearer, alice);
+
+        rebuilt.Should().ContainSingle(
+            "the binder reconstructs the graveyard-return-self shape from oracle text");
+        rebuilt[0].Source.Should().BeSameAs(bearer);
+
+        rebuilt[0].Resolve();
+
+        bearer.Zone.Should().Be(ZoneType.Hand,
+            "the reconstructed ability returns the bearer from its graveyard to hand");
+        alice.Zones.Hand.GetCards().Should().Contain(bearer);
+    }
+
+    [Fact]
+    public void OracleBinder_GraveyardReturnSelf_NoOpsWhenBearerNotInGraveyard()
+    {
+        var alice = new Player("Alice", 20);
+
+        var bearer = new Creature("Battlefield Returner", "{1}{G}", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(bearer);
+
+        var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+            .RebuildActivatedAbilities(
+                "{G}: Return this card from your graveyard to your hand.",
+                bearer, alice);
+
+        rebuilt.Should().ContainSingle();
+        rebuilt[0].Resolve();
+
+        bearer.Zone.Should().Be(ZoneType.Battlefield,
+            "CR 113.6 — a battlefield bearer is not in a graveyard; the ability no-ops");
+    }
 }

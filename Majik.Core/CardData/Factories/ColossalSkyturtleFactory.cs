@@ -177,6 +177,17 @@ public static class ColossalSkyturtleFactory
                 }),
         };
 
+        // RE-SOURCE-SAFE (oracle-activated-shape-from-graveyard-return-
+        // abilities): "your graveyard" / "your hand" are controller-scoped, so
+        // the effect reads the live ResolutionContext.Controller (the ability's
+        // own Controller at resolution) instead of capturing this card's
+        // controller. In normal play that IS Colossal Skyturtle's controller,
+        // so behaviour is unchanged. When Agatha's Soul Cauldron re-homes this
+        // REAL ability to a bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f), rc.Controller is the bearer's controller and the
+        // DiscardSelfCost is re-homed onto the bearer (IRebindableCost), so the
+        // granted ability acts on the bearer-controller's graveyard, never the
+        // exiled Skyturtle. Marked RebindSafe.
         var effect = new Effect(
             $"{CardName} (Channel 1): return target card from your graveyard to your hand",
             ctx =>
@@ -261,22 +272,32 @@ public static class ColossalSkyturtleFactory
                     .ToList()),
         };
 
+        // RE-SOURCE-SAFE (oracle-activated-shape-from-graveyard-return-
+        // abilities): "target creature" / "its owner's hand" reference ONLY the
+        // chosen target — there is no "this creature" / source reference at all,
+        // so this effect is intrinsically re-source-safe (the bounce lands on
+        // the chosen creature and goes to THAT creature's owner's hand,
+        // regardless of which permanent is the source). With the DiscardSelfCost
+        // now re-homed onto the bearer (IRebindableCost), the whole ability is
+        // sound to re-home, so it is marked RebindSafe: Agatha's Soul Cauldron
+        // re-homes the REAL bounce to a bearer via ActivatedAbility.RebindTo
+        // (CR 707.2 / 613.1f).
         var effect = new Effect(
             $"{CardName} (Channel 2): return target creature to its owner's hand",
-            () =>
+            ctx =>
             {
                 if (channel!.ChosenTargets.Count == 0
-                    || channel.ChosenTargets[0].Count == 0) return;
+                    || channel.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask;
 
                 var raw = channel.ChosenTargets[0][0];
 
                 // CR 608.2b — target must still be a creature on the
                 // battlefield at resolution.
-                if (raw is not Creature target) return;
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (raw is not Creature target) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
                 var targetOwner = target.Owner;
-                if (targetOwner == null) return;
+                if (targetOwner == null) return ValueTask.CompletedTask;
 
                 var controller = target.Controller ?? targetOwner;
 
@@ -285,6 +306,8 @@ public static class ColossalSkyturtleFactory
                 targetOwner.Zones.Hand.AddCard(target);
                 target.SetZone(ZoneType.Hand);
                 target.SetController(targetOwner);
+
+                return ValueTask.CompletedTask;
             });
 
         channel = new ActivatedAbility(
