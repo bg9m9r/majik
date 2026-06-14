@@ -1,0 +1,6 @@
+{
+  "name": "Ichor Slick",
+  "types": ["Sorcery"],
+  "manaCost": "{2}{B}",
+  "colors": ["B"]
+}

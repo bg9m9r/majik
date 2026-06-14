@@ -1,0 +1,9 @@
+{
+  "name": "Kitchen Imp",
+  "types": ["Creature"],
+  "subtypes": ["Imp"],
+  "manaCost": "{3}{B}",
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["Flying", "Haste"]
+}

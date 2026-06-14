@@ -1,0 +1,6 @@
+{
+  "name": "Nagging Thoughts",
+  "types": ["Sorcery"],
+  "manaCost": "{1}{U}",
+  "colors": ["U"]
+}
