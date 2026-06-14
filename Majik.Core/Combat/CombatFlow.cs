@@ -504,6 +504,20 @@ public sealed class CombatFlow
         {
             target.LoseLife(intent.Amount);
         }
+
+        // CR 702.180b — Toxic N. A creature with toxic N that deals combat
+        // damage to a player causes that player to ALSO get N poison counters,
+        // in addition to (not instead of) the normal effect of the damage. This
+        // is independent of infect: an infect+toxic source deals its damage as
+        // poison (infect form) AND adds the toxic N poison on top. The toxic
+        // value is the cumulative sum of every toxic marker (CR 702.180c). The
+        // 10-poison loss is picked up by the next SBA pass (CR 704.5c).
+        var toxic = CombatAbilities.GetToxic(source);
+        if (toxic > 0)
+        {
+            target.AddPoisonCounters(toxic);
+        }
+
         if (CombatAbilities.HasLifelink(source) && source.Controller != null)
         {
             source.Controller.GainLife(intent.Amount);
