@@ -1,4 +1,3 @@
-using System.Linq;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
 
@@ -44,16 +43,64 @@ public sealed class GameContext
     /// </summary>
     public TurnState? TurnState { get; }
 
+    // Memoized opponent set. The accessor sits on the MCTS legality hot path
+    // (LegalActionEnumerator enumerates it per candidate action), so the prior
+    // .Where(...).ToList() allocated a fresh list on every call. AllPlayers is
+    // fixed at construction (immutable IReadOnlyList field); the only mutation
+    // that can change the result underneath a live context is a player leaving
+    // the game (HasLost flipping true — monotonic, never un-set; see
+    // Player.MarkLost / the SBA loss loop). We therefore memoize the filtered
+    // list keyed on the count of lost players across AllPlayers: that count is
+    // monotonic non-decreasing and changes exactly when the opponent set must be
+    // recomputed (CR 102.4 / 800.4 — a player who leaves is no longer an
+    // opponent). Cheap O(n) validity check, no per-call allocation on the steady
+    // state. Single-threaded engine — a GameContext is read by one agent at a
+    // time, so no locking is needed.
+    private IReadOnlyList<Player>? _opponentsCache;
+    private int _opponentsCacheLostCount = -1;
+
     /// <summary>
     /// CR 102.1 / 102.4 — every other player still in the game (not
     /// <see cref="Self"/> and not <see cref="Players.Player.HasLost"/>). A player
     /// is never their own opponent, and a player who has left the game is no
     /// longer an opponent. Used by context-aware activation predicates and
     /// effects that need the opponent set at the choice point without a captured
-    /// resolver.
+    /// resolver. Memoized (invalidated when a player leaves the game) because it
+    /// is enumerated on the MCTS legality hot path.
     /// </summary>
-    public IReadOnlyList<Player> Opponents =>
-        AllPlayers.Where(p => !ReferenceEquals(p, Self) && !p.HasLost).ToList();
+    public IReadOnlyList<Player> Opponents
+    {
+        get
+        {
+            int lostCount = 0;
+            for (int i = 0; i < AllPlayers.Count; i++)
+            {
+                if (AllPlayers[i].HasLost)
+                {
+                    lostCount++;
+                }
+            }
+
+            if (_opponentsCache is not null && lostCount == _opponentsCacheLostCount)
+            {
+                return _opponentsCache;
+            }
+
+            var opponents = new List<Player>(AllPlayers.Count);
+            for (int i = 0; i < AllPlayers.Count; i++)
+            {
+                var p = AllPlayers[i];
+                if (!ReferenceEquals(p, Self) && !p.HasLost)
+                {
+                    opponents.Add(p);
+                }
+            }
+
+            _opponentsCache = opponents;
+            _opponentsCacheLostCount = lostCount;
+            return opponents;
+        }
+    }
 
     public GameContext(
         Player self,
