@@ -109,4 +109,56 @@ public class SpectralSailorFactoryTests
         act.Should().NotThrow();
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source soundness (agatha-bespoke migration) — the draw ability reads
+    // its controller off ResolutionContext.Source, so Agatha's Soul Cauldron
+    // may re-home it to a counter-bearing bearer (CR 707.2).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SpectralSailor_DrawAbility_IsRebindSafe()
+    {
+        var c = SpectralSailorFactory.Create(_alice);
+        c.Abilities.OfType<ActivatedAbility>().Single()
+            .RebindSafe.Should().BeTrue(
+                "'Draw a card' reads its controller off ResolutionContext.Source");
+    }
+
+    [Fact]
+    public async Task SpectralSailor_DrawAbility_ResolvesViaContextSource_DrawsForBearerController()
+    {
+        // The exiled Spectral Sailor (its captured owner = Alice). A RebindTo to
+        // a Bob-controlled bearer must draw for BOB, never Alice.
+        var bob = new Player("Bob", 20);
+
+        var sailor = SpectralSailorFactory.Create(_alice);
+        var draw = sailor.Abilities.OfType<ActivatedAbility>().Single();
+
+        // A Bob-controlled bearer permanent.
+        var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+        bearer.SetZone(ZoneType.Battlefield);
+        bob.Zones.Battlefield.AddCard(bearer);
+
+        var bobTop = new Sorcery("Bob Top", "{1}");
+        bobTop.SetOwner(bob);
+        bobTop.SetZone(ZoneType.Library);
+        bob.Zones.Library.AddCard(bobTop);
+
+        var aliceTop = new Sorcery("Alice Top", "{1}");
+        aliceTop.SetOwner(_alice);
+        aliceTop.SetZone(ZoneType.Library);
+        _alice.Zones.Library.AddCard(aliceTop);
+
+        // Re-home the REAL ability to the bearer (CR 707.2).
+        var rehomed = draw.RebindTo(bearer, bob);
+        await rehomed.ResolveAsync(agent: null, game: null);
+
+        bob.Zones.Hand.GetCards().Should().Contain(bobTop,
+            "the re-homed draw reads its controller off ResolutionContext.Source = bearer (Bob)");
+        _alice.Zones.Hand.GetCards().Should().NotContain(aliceTop,
+            "the exiled Spectral Sailor's owner (Alice) never draws");
+    }
 }
