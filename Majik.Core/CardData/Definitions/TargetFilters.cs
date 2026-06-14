@@ -189,6 +189,16 @@ public static class TargetFilters
             "artifact" =>
                 ($"target artifact to {verb}",
                     o => o is Permanent p && OnBattlefield(p) && p.HasType(CardType.Artifact)),
+            // CR 109.5 — "noncreature artifact": an artifact that is NOT also a
+            // creature (an artifact creature is excluded). Both the candidate
+            // gatherer and the CR 608.2b resolution re-check apply the !Creature
+            // gate. Canonical case: Blinkmoth Well — "{2}, {T}: Tap target
+            // noncreature artifact."
+            "noncreature_artifact" =>
+                ($"target noncreature artifact to {verb}",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && p.HasType(CardType.Artifact)
+                         && !p.HasType(CardType.Creature)),
             "artifact_or_enchantment" =>
                 ($"target artifact or enchantment to {verb}",
                     o => o is Permanent p && OnBattlefield(p)

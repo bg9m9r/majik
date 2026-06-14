@@ -1,0 +1,20 @@
+{
+  "name": "Blinkmoth Well",
+  "types": ["Land"],
+  "abilities": [
+    {
+      "kind": "mana",
+      "produces": "{C}"
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "tap_target", "targetFilter": "noncreature_artifact" }
+      ]
+    }
+  ]
+}
