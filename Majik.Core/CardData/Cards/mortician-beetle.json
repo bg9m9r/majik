@@ -1,0 +1,18 @@
+{
+  "name": "Mortician Beetle",
+  "types": ["Creature"],
+  "subtypes": ["Insect"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_a_player_sacrifices_permanent", "permanentType": "Creature" },
+      "optional": true,
+      "effects": [
+        { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" }
+      ]
+    }
+  ]
+}

@@ -956,6 +956,8 @@ public static class CardDefRuntime
                 BuildWheneverAPlayerCastsSpellTrigger(anyCast, card),
             WheneverAnOpponentSacrificesPermanentTriggerDef oppSac =>
                 BuildWheneverAnOpponentSacrificesPermanentTrigger(oppSac, card),
+            WheneverAPlayerSacrificesPermanentTriggerDef anySac =>
+                BuildWheneverAPlayerSacrificesPermanentTrigger(anySac, card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
@@ -1234,6 +1236,50 @@ public static class CardDefRuntime
             // CR 111.7 — a token in the graveyard ceases to exist.
             if (nontokenOnly && e.WasToken) return false;
             // CR 603.3 — stamp "that player" (the sacrificing opponent) for the
+            // untargeted resolve effect to read at resolution.
+            if (ability is Majik.Core.Abilities.TriggeredAbility ta)
+            {
+                ta.SetTriggeringPlayer(e.SacrificingPlayer);
+            }
+            return true;
+        });
+    }
+
+    /// <summary>
+    /// CR 701.16 / CR 700.6 / CR 603.3 — "Whenever a player sacrifices a
+    /// [permanent], …". The <b>any-player</b> sibling of
+    /// <see cref="BuildWheneverAnOpponentSacrificesPermanentTrigger"/>: fires on
+    /// the dedicated <see cref="Majik.Core.Events.PermanentSacrificedEvent"/> off
+    /// EVERY player's sacrifice (the controller's own included — CR 700.6 "a
+    /// player" is unrestricted, so NO controller scoping), optionally gated on the
+    /// sacrificed permanent's card type
+    /// (<see cref="WheneverAPlayerSacrificesPermanentTriggerDef.PermanentType"/>,
+    /// CR 205.2 — Mortician Beetle's "a creature") and on excluding tokens
+    /// (<see cref="WheneverAPlayerSacrificesPermanentTriggerDef.NontokenOnly"/>,
+    /// CR 111.7). As it matches it STAMPS the sacrificing player onto the
+    /// resolving ability
+    /// (<see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>)
+    /// for an untargeted player-payoff verb to read back at resolution (CR 603.3)
+    /// — the declarative analogue of the hand-rolled Mayhem Devil any-player
+    /// sacrifice trigger over the SAME event surface.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverAPlayerSacrificesPermanentTrigger(
+        WheneverAPlayerSacrificesPermanentTriggerDef def, ICard card)
+    {
+        var permanentType = string.IsNullOrWhiteSpace(def.PermanentType)
+            ? (CardType?)null
+            : ParseType(def.PermanentType);
+        var nontokenOnly = def.NontokenOnly;
+        return new EventTriggerCondition<Majik.Core.Events.PermanentSacrificedEvent>((e, ability) =>
+        {
+            // CR 700.6 — "a player" is unrestricted; the trigger fires off any
+            // player's sacrifice (no controller read needed; works even before a
+            // controller is set so the shape is inspectable).
+            // CR 205.2 — card-type gate (e.g. "a creature").
+            if (permanentType is CardType t && !e.SacrificedCard.HasType(t)) return false;
+            // CR 111.7 — a token in the graveyard ceases to exist.
+            if (nontokenOnly && e.WasToken) return false;
+            // CR 603.3 — stamp "that player" (the sacrificing player) for any
             // untargeted resolve effect to read at resolution.
             if (ability is Majik.Core.Abilities.TriggeredAbility ta)
             {

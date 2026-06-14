@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(StateWhenCountersGeTriggerDef), "state_when_counters_ge")]
 [JsonDerivedType(typeof(WheneverAPlayerCastsSpellTriggerDef), "whenever_a_player_casts_spell")]
 [JsonDerivedType(typeof(WheneverAnOpponentSacrificesPermanentTriggerDef), "whenever_an_opponent_sacrifices_permanent")]
+[JsonDerivedType(typeof(WheneverAPlayerSacrificesPermanentTriggerDef), "whenever_a_player_sacrifices_permanent")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -536,6 +537,54 @@ public sealed class WheneverAnOpponentSacrificesPermanentTriggerDef : TriggerDef
 {
     /// <summary>Optional card-type gate (CR 205.2) — only a sacrificed permanent
     /// of this type fires it (e.g. <c>"Artifact"</c>). <c>null</c>/empty = no
+    /// type restriction. Parsed as
+    /// <see cref="Majik.Core.Cards.Types.CardType"/>.</summary>
+    public string? PermanentType { get; set; }
+
+    /// <summary>Exclude token permanents (CR 111.7). Default <c>false</c> = any
+    /// permanent (token or nontoken).</summary>
+    public bool NontokenOnly { get; set; }
+}
+
+/// <summary>
+/// "Whenever a player sacrifices a [permanent], …" (CR 701.16 / CR 603.1) — the
+/// <b>any-player</b> sacrifice trigger that fires off EVERY player's sacrifice,
+/// the controller's own included (CR 700.6 — "a player" is unrestricted). This
+/// is the controller-agnostic mirror of
+/// <see cref="WheneverAnOpponentSacrificesPermanentTriggerDef"/> (which scopes
+/// to opponents) and the declarative lift of the hand-rolled Mayhem Devil /
+/// Mortician Beetle "whenever a player sacrifices a permanent/creature" shape.
+/// Fires on the dedicated <see cref="Majik.Core.Events.PermanentSacrificedEvent"/>
+/// (published by the bus-aware sacrifice paths — cost / edict / land-binder /
+/// token self-sac — CR 701.16a credits the cost-payer as the sacrificing
+/// player) with NO controller scoping at all.
+///
+/// <para>
+/// Two optional, composable filters (AND-combined), mirroring the opponent
+/// variant:
+/// <list type="bullet">
+///   <item><see cref="PermanentType"/> — restrict to a sacrificed permanent
+///   whose card has this card type (CR 205.2 — e.g. "a <b>creature</b>",
+///   Mortician Beetle). <c>null</c>/empty = any permanent type ("a permanent",
+///   Mayhem Devil). Parsed as
+///   <see cref="Majik.Core.Cards.Types.CardType"/>.</item>
+///   <item><see cref="NontokenOnly"/> — exclude token permanents (CR 111.7).
+///   Default <c>false</c> = any permanent (token or nontoken — Mayhem Devil /
+///   Mortician Beetle both fire on a sacrificed token).</item>
+/// </list>
+/// </para>
+///
+/// <para>
+/// As it matches it STAMPS the sacrificing player onto the resolving ability
+/// via <see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>
+/// (CR 603.3 — "that player") so a downstream untargeted player-payoff verb can
+/// read it back at resolution, exactly like the opponent variant.
+/// </para>
+/// </summary>
+public sealed class WheneverAPlayerSacrificesPermanentTriggerDef : TriggerDefinition
+{
+    /// <summary>Optional card-type gate (CR 205.2) — only a sacrificed permanent
+    /// of this type fires it (e.g. <c>"Creature"</c>). <c>null</c>/empty = no
     /// type restriction. Parsed as
     /// <see cref="Majik.Core.Cards.Types.CardType"/>.</summary>
     public string? PermanentType { get; set; }

@@ -349,6 +349,33 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 603.1 + CR 701.16 + CR 700.6 — "Whenever a player sacrifices a
+    /// [type] permanent, …" trigger. The <b>any-player</b> sibling of
+    /// <see cref="OnOpponentSacrifices(Player, CardType?)"/>: fires on the
+    /// dedicated <see cref="PermanentSacrificedEvent"/> off EVERY player's
+    /// sacrifice — including the controller's own (CR 700.6 "a player" is
+    /// unrestricted) — so there is NO controller scoping. The producer-side
+    /// primitive the Mayhem Devil ("a player sacrifices a permanent") /
+    /// Mortician Beetle ("a player sacrifices a creature") family consumes.
+    ///
+    /// <para>
+    /// When <paramref name="ofType"/> is supplied the sacrificed permanent must
+    /// have that card type ("sacrifices a <b>creature</b>" — Mortician Beetle).
+    /// When null any permanent type matches ("sacrifices a permanent" — Mayhem
+    /// Devil). The card type is a printed/characteristic property, read off the
+    /// sacrificed card even though it is already in its owner's graveyard by the
+    /// time the event publishes (CR 701.16a). This predicate does NOT filter on
+    /// <see cref="PermanentSacrificedEvent.WasToken"/> — both Mayhem Devil and
+    /// Mortician Beetle fire on a sacrificed token just the same.
+    /// </para>
+    /// </summary>
+    public static ITriggerCondition OnAnyPlayerSacrifices(CardType? ofType = null)
+    {
+        return new EventTriggerCondition<PermanentSacrificedEvent>((e, _) =>
+            ofType is null || e.SacrificedCard.HasType(ofType.Value));
+    }
+
+    /// <summary>
     /// CR 121 / CR 603.6 — "Whenever one or more +1/+1 counters are put on a
     /// permanent you control, …" trigger. Fires on
     /// <see cref="CounterAddedEvent"/> where the event's

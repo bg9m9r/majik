@@ -186,16 +186,29 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
     /// </summary>
     internal Majik.Core.ValueObjects.ManaCost? OptionalManaCost { get; }
 
+    /// <summary>
+    /// CR 603.4 — the <b>free</b> optional "you may [effect]" rider on the WHOLE
+    /// ability (no payment, just a yes/no choice). When <c>true</c>, the
+    /// materialized effect array is wrapped in a single gating effect
+    /// (<see cref="FreeOptionalRider"/>) that prompts the controller's agent
+    /// yes/no and only then runs the gated effects. The cost-free sibling of
+    /// <see cref="OptionalManaCost"/>; the two are mutually exclusive. Mortician
+    /// Beetle is the canonical case.
+    /// </summary>
+    internal bool FreeOptional { get; }
+
     internal CardDefTriggeredAbility(
         Func<ICard, ITriggerCondition> triggerBuilder,
         IReadOnlyList<CardDefEffectSpec> effectSpecs,
         IReadOnlyList<Majik.Core.Zones.ZoneType>? activeZones = null,
-        Majik.Core.ValueObjects.ManaCost? optionalManaCost = null)
+        Majik.Core.ValueObjects.ManaCost? optionalManaCost = null,
+        bool freeOptional = false)
     {
         TriggerBuilder = triggerBuilder;
         EffectSpecs = effectSpecs;
         ActiveZones = activeZones;
         OptionalManaCost = optionalManaCost;
+        FreeOptional = freeOptional;
     }
 
     internal override IAbility Build(
@@ -211,7 +224,10 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
         // (CR 603.3d), independent of the later payment.
         var resolveEffects = OptionalManaCost is { } cost
             ? new IEffect[] { OptionalManaRider.Wrap(card, controller, cost, effects) }
-            : effects;
+            : FreeOptional
+                // CR 603.4 — the free "you may …" yes/no gate (no payment).
+                ? new IEffect[] { FreeOptionalRider.Wrap(card, controller, effects) }
+                : effects;
         return new TriggeredAbility(
             source: card,
             controller: controller,
