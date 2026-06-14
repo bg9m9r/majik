@@ -468,6 +468,10 @@ public sealed class TurnDriver
     {
         // Combat (CR 506-511).
         SetTurnState(PhaseStateType.Combat);
+        // CR 508.1 — reset the per-combat attacker tally so current-combat X
+        // effects (Raffine, Scheming Seer) count THIS combat's attackers, not
+        // the turn sum (matters on extra-combat turns).
+        TurnState.BeginCombat();
         SetPhase(StepStateType.BeginningOfCombat);
         await PriorityRound(activePlayer, ct);
 
@@ -494,6 +498,10 @@ public sealed class TurnDriver
         while (_additionalCombats.TryConsume(out var followedByMainPhase))
         {
             SetTurnState(PhaseStateType.Combat);
+            // CR 508.1 — reset the per-combat attacker tally for THIS extra
+            // combat so current-combat X effects don't carry over the prior
+            // combat's attackers.
+            TurnState.BeginCombat();
             SetPhase(StepStateType.BeginningOfCombat);
             await PriorityRound(activePlayer, ct);
             if (GameIsOver()) return; // CR 104.1 — same halt as the first combat

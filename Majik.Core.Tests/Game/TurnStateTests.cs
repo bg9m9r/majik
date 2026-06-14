@@ -46,6 +46,56 @@ public class TurnStateTests
     }
 
     [Fact]
+    public void RecordAttackersDeclared_FeedsBothTurnAndCombatTallies()
+    {
+        var ts = new TurnState();
+
+        ts.RecordAttackersDeclared(3);
+
+        ts.AttackersDeclaredThisTurn.Should().Be(3);
+        ts.AttackersDeclaredThisCombat.Should().Be(3);
+    }
+
+    [Fact]
+    public void RecordAttackersDeclared_IgnoresZeroOrNegativeCounts()
+    {
+        var ts = new TurnState();
+
+        ts.RecordAttackersDeclared(0);
+        ts.RecordAttackersDeclared(-2);
+
+        ts.AttackersDeclaredThisTurn.Should().Be(0);
+        ts.AttackersDeclaredThisCombat.Should().Be(0);
+    }
+
+    [Fact]
+    public void BeginCombat_ResetsPerCombatTally_ButNotTurnCumulative()
+    {
+        // CR 508.1 — "number of attacking creatures" effects (Raffine, Scheming
+        // Seer) read the CURRENT combat's attacker count, not the turn sum. On
+        // an extra-combat turn (Aggravated Assault etc.) the second combat must
+        // not inherit the first combat's attacker count.
+        var ts = new TurnState();
+
+        // First combat: 2 attackers.
+        ts.BeginCombat();
+        ts.RecordAttackersDeclared(2);
+        ts.AttackersDeclaredThisCombat.Should().Be(2);
+        ts.AttackersDeclaredThisTurn.Should().Be(2);
+
+        // Extra combat (CR 506.4): 1 attacker. Per-combat tally resets to this
+        // combat's count; the turn-cumulative tally keeps summing.
+        ts.BeginCombat();
+        ts.AttackersDeclaredThisCombat.Should().Be(0, "per-combat tally resets at each combat begin");
+        ts.RecordAttackersDeclared(1);
+
+        ts.AttackersDeclaredThisCombat.Should().Be(1,
+            "X = attackers in the CURRENT combat (CR 508.1), not the turn sum");
+        ts.AttackersDeclaredThisTurn.Should().Be(3,
+            "turn-cumulative tally still sums both combats");
+    }
+
+    [Fact]
     public void RevoltActive_FalseUntilAPermanentLeaves()
     {
         var ts = new TurnState();

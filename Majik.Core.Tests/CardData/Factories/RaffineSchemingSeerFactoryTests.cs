@@ -146,6 +146,64 @@ public class RaffineSchemingSeerFactoryTests
         _alice.Zones.Graveyard.GetCards().Should().HaveCount(2);
     }
 
+    [Fact]
+    public void ConnivesX_OnExtraCombat_UsesCurrentCombatCount_NotTurnSum()
+    {
+        // CR 508.1 — "X = the number of attacking creatures" is scoped to the
+        // CURRENT combat. On an extra-combat turn (Aggravated Assault etc.) the
+        // second trigger must connive X = the second combat's attacker count,
+        // NOT the cumulative sum of both combats (which would over-count).
+        var card = (Creature)NamedCardFactory.Create("Raffine, Scheming Seer", _alice);
+        card.SetZone(ZoneType.Battlefield);
+        var trigger = GetAttackTrigger(card);
+
+        // Second combat declares a single attacker.
+        var a1 = MakeAttacker(_alice, "Soldier A");
+        var combat = new Majik.Core.Combat.Combat(_alice, _bob);
+        combat.AddAttacker(new Majik.Core.Combat.Attacker(a1, _bob));
+        trigger.IsTriggered(new AttackersDeclaredEvent(combat)).Should().BeTrue();
+
+        // Library: 3 nonlands — enough to over-draw if X mistakenly read the
+        // turn sum (3) instead of the current-combat count (1).
+        for (var i = 0; i < 3; i++)
+        {
+            var spell = new Creature("Spell", "{1}", 1, 1);
+            spell.SetOwner(_alice);
+            spell.SetController(_alice);
+            spell.SetZone(ZoneType.Library);
+            _alice.Zones.Library.AddCard(spell);
+        }
+
+        // TurnState models an extra-combat turn: first combat had 2 attackers
+        // (turn sum = 3), but the current combat (after BeginCombat reset) has 1.
+        var ts = new TurnState();
+        ts.BeginCombat();
+        ts.RecordAttackersDeclared(2); // first combat
+        ts.BeginCombat();              // CR 506.4 — extra combat begins, reset per-combat
+        ts.RecordAttackersDeclared(1); // second combat
+        ts.AttackersDeclaredThisTurn.Should().Be(3);
+        ts.AttackersDeclaredThisCombat.Should().Be(1);
+
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, _bob },
+            activePlayer: _alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(),
+            landPlayAvailable: true,
+            turnState: ts);
+
+        ResolveTrigger(trigger, ctx);
+
+        // X = 1 (current combat), NOT 3 (turn sum): a1 connives 1 → 1 counter.
+        a1.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "connive X = attackers in the CURRENT combat (CR 508.1), not the turn sum");
+        _alice.Zones.Graveyard.GetCards().Should().HaveCount(1);
+        _alice.Zones.Library.GetCards().Should().HaveCount(2,
+            "only 1 card drawn+discarded, not the over-counted 3");
+    }
+
     private static void ResolveTrigger(TriggeredAbility trigger, GameContext ctx) =>
         trigger.ResolveAsync(agent: null, game: ctx).AsTask().GetAwaiter().GetResult();
 }
