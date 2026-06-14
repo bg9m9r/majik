@@ -404,6 +404,13 @@ public class Permanent : Card
         AdditionalLandPlaysGranted = src.AdditionalLandPlaysGranted;
         WasDealtDamageThisTurn = src.WasDealtDamageThisTurn;
         _transientLoyalty = src._transientLoyalty;
+        // Permanent-level combat-body marked damage (inert on a Creature, which
+        // overrides MarkedDamage to read its own Damage field — that field is
+        // copied in Creature's own ctor). MarkedForDestructionByDeathtouch is
+        // virtual; the assignment lands on whichever store the runtime type uses
+        // (Creature's ctor sets it again from src, harmlessly).
+        _markedDamage = src._markedDamage;
+        MarkedForDestructionByDeathtouch = src.MarkedForDestructionByDeathtouch;
         _regenerationShields = src._regenerationShields;
         // Counters: deep-copy each per-type count from the source bag into this
         // permanent's own (already-initialised) CounterCollection.
@@ -656,6 +663,117 @@ public class Permanent : Card
         if (ActiveEffects == null)
             return CardTypes.Contains(Types.CardType.Creature);
         return ActiveEffects.Compute(this).Types.Contains(Types.CardType.Creature);
+    }
+
+    // -----------------------------------------------------------------------
+    // Permanent-level combat body — effective P/T + marked-damage + lethal
+    // damage (CR 613.1c / 119 / 704.5f). The combat damage / lethal-damage
+    // model historically lived only on <see cref="Creature"/> (its
+    // Power/Toughness props + private _damage field), so an animated NON-creature
+    // C# instance — a manland (a <see cref="Land"/> computing as a creature via a
+    // Layer-4 type grant) or a Karn-animated artifact — had NO P/T and NO damage
+    // surface, even though <see cref="Effects.ContinuousEffectsService.Compute(Permanent)"/>
+    // already upgrades its working row to a CreatureCharacteristics with the
+    // animated body's P/T. This surface (the analogue of the transient-loyalty
+    // body above, CR 711 Option B) lets every permanent that is EFFECTIVELY a
+    // creature carry a combat body the combat / SBA subsystems can read —
+    // without re-instancing the Land as a Creature (which churns zone refs /
+    // attachments / combat-plan refs, the trap the deferral calls out).
+    //
+    // A real <see cref="Creature"/> OVERRIDES every member below to read/mutate
+    // its own authoritative Power/Toughness/Damage fields, so it stays a single
+    // source of truth (identical to how <see cref="Planeswalker"/> overrides the
+    // loyalty surface). This non-Creature default reads P/T from the layer
+    // system and marks damage in a parallel field that only matters while the
+    // permanent is effectively a creature.
+    // -----------------------------------------------------------------------
+
+    private int _markedDamage;
+
+    /// <summary>
+    /// CR 613 / 708.2 — this permanent's EFFECTIVE power after the full layer
+    /// pipeline. 0 when it is not effectively a creature (no P/T row). A real
+    /// <see cref="Creature"/> overrides this to return its own
+    /// <see cref="Creature.Power"/>. For an animated <see cref="Land"/> the value
+    /// comes from the Layer-7b set-base P/T registered on animate, surfaced
+    /// through <see cref="Effects.ContinuousEffectsService.Compute(Permanent)"/>'s
+    /// creature-row upgrade.
+    /// </summary>
+    public virtual int GetEffectivePower()
+    {
+        if (ActiveEffects == null) return 0;
+        return ActiveEffects.Compute(this) is Effects.CreatureCharacteristics cc ? cc.Power : 0;
+    }
+
+    /// <summary>
+    /// CR 613 / 708.2 — this permanent's EFFECTIVE toughness. 0 when not
+    /// effectively a creature. A real <see cref="Creature"/> overrides this to
+    /// return its own <see cref="Creature.Toughness"/>. See
+    /// <see cref="GetEffectivePower"/>.
+    /// </summary>
+    public virtual int GetEffectiveToughness()
+    {
+        if (ActiveEffects == null) return 0;
+        return ActiveEffects.Compute(this) is Effects.CreatureCharacteristics cc ? cc.Toughness : 0;
+    }
+
+    /// <summary>
+    /// CR 119 — combat / noncombat damage marked on this permanent's creature
+    /// body. A real <see cref="Creature"/> overrides this to read its own
+    /// authoritative <see cref="Creature.Damage"/> (the two are the same store);
+    /// a non-Creature effectively-creature permanent reads the parallel field.
+    /// </summary>
+    public virtual int MarkedDamage => _markedDamage;
+
+    /// <summary>
+    /// CR 702.2b — set when a deathtouch source deals nonzero damage to this
+    /// permanent's creature body; <see cref="HasLethalMarkedDamage"/> treats it
+    /// as lethal regardless of toughness. <see cref="Creature"/> overrides this
+    /// to read/write its own field so a real creature keeps one store. Cleared
+    /// by <see cref="ClearMarkedDamage"/> at cleanup (CR 514.2).
+    /// </summary>
+    public virtual bool MarkedForDestructionByDeathtouch { get; set; }
+
+    /// <summary>
+    /// CR 119.3 — mark <paramref name="amount"/> damage on this permanent's
+    /// creature body, stamping the per-turn
+    /// <see cref="WasDealtDamageThisTurn"/> flag at the common Permanent damage
+    /// seam (CR 120.3; a 0-amount deal is not damage and is filtered). A real
+    /// <see cref="Creature"/> overrides this to route to
+    /// <see cref="Creature.TakeDamage"/> (its authoritative Damage field).
+    /// </summary>
+    public virtual void MarkDamage(int amount)
+    {
+        if (amount < 0)
+            throw new ArgumentException("Damage amount cannot be negative", nameof(amount));
+        RecordDamageDealt(amount);
+        _markedDamage += amount;
+    }
+
+    /// <summary>
+    /// CR 514.2 / 701.15c — clear all marked damage (and the deathtouch flag)
+    /// from this permanent's creature body. A real <see cref="Creature"/>
+    /// overrides this to clear its own Damage field.
+    /// </summary>
+    public virtual void ClearMarkedDamage()
+    {
+        _markedDamage = 0;
+        MarkedForDestructionByDeathtouch = false;
+    }
+
+    /// <summary>
+    /// CR 704.5f / 702.2b — true when this permanent's creature body has lethal
+    /// marked damage (>= effective toughness, with toughness &gt; 0) OR carries
+    /// the deathtouch destruction flag. Mirrors
+    /// <see cref="Creature.IsDead"/> + <see cref="MarkedForDestructionByDeathtouch"/>
+    /// at the Permanent level so the creature-death SBA can govern an animated
+    /// non-creature combatant too.
+    /// </summary>
+    public bool HasLethalMarkedDamage()
+    {
+        if (MarkedForDestructionByDeathtouch) return true;
+        var toughness = GetEffectiveToughness();
+        return toughness > 0 && MarkedDamage >= toughness;
     }
 
     /// <summary>
