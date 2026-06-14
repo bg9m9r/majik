@@ -1,0 +1,9 @@
+{
+  "name": "Enduring Vitality",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Elk", "Glimmer"],
+  "manaCost": "{1}{G}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}

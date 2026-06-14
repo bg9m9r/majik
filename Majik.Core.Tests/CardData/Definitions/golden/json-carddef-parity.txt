@@ -11491,6 +11491,58 @@
     "Blue"
   ]
 }
+==== enduring-vitality ====
+{
+  "name": "Enduring Vitality",
+  "manaCost": "{1}{G}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature",
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Elk",
+    "Glimmer"
+  ],
+  "power": 3,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== energy-refractor ====
 {
   "name": "Energy Refractor",
