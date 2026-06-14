@@ -1,0 +1,8 @@
+{
+  "name": "Dwarven Mine",
+  "types": ["Land"],
+  "subtypes": ["Mountain"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
