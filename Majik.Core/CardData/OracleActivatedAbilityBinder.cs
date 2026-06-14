@@ -83,6 +83,16 @@ namespace Majik.Core.CardData;
 ///     replacement, not creature-only). Trailing reminder text is stripped
 ///     before matching so both the bare and the reminder-bearing printings are
 ///     recognised.</item>
+///   <item><b>Draw-a-card</b> —
+///     <c>"{cost}: Draw a card."</c> / <c>"Draw N cards."</c> Rebuilt as a
+///     no-target <see cref="ActivatedAbility"/> whose resolution draws for the
+///     BEARER's CONTROLLER via <see cref="Majik.Core.Primitives.Fx.DrawCards"/>
+///     (CR 121.1 / 613.1f) — the soundest re-home of all the non-mana shapes
+///     because a draw has NO "this creature" / source reference (the controller
+///     draws from their own library, never the exiled card). Count "a"/"one" ⇒
+///     1, plus the spelled-out "two"/"three" and a bare digit; an unrecognised
+///     count word is skipped. Sound on any permanent bearer, not just
+///     creatures.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -111,7 +121,8 @@ namespace Majik.Core.CardData;
 ///     the candidate filter isn't reconstructed; only the open
 ///     any-target / target-creature / target-player forms are rebuilt.</item>
 ///   <item>Every shape not in the list above (tutors, mode-bearing abilities,
-///     token makers, anthem grants, "{T}: Draw", loyalty-style, bespoke
+///     token makers, anthem grants, scry/mill/surveil — which need an agent
+///     decision the closure can't prompt for — loyalty-style, bespoke
 ///     one-offs). These are unbounded and not generally reconstructable from
 ///     oracle text without per-card work — a correct partial beats a broken
 ///     "all".</item>
@@ -187,6 +198,34 @@ public static class OracleActivatedAbilityBinder
     private static readonly Regex SelfCounterRegex = new(
         @"^(" + CostList + @")\s*:\s*Put (?:a|one|(\d+)) \+1/\+1 counters? on this creature\.$",
         RegexOptions.IgnoreCase);
+
+    // "{cost}: Draw a card." / "Draw N cards." (CR 121.) A self-source draw is
+    // one of the most common activated card-advantage shapes on real creature
+    // cards (Arcanis the Omnipotent "{T}: Draw three cards.", a host of
+    // {T}: Draw payoffs). Sound to re-home: a draw references the BEARER's
+    // CONTROLLER's own library/hand (Fx.DrawCards), NEVER the exiled imprinted
+    // card — no "this creature" / source reference at all, so this is the
+    // soundest re-home of any non-mana shape. The count is "a"/"one" ⇒ 1, an
+    // explicit digit ("draw 2 cards"), or a small spelled-out word
+    // ("two"/"three" — the only forms that appear on real activated draw
+    // abilities). An unrecognised count word makes the clause unsound and is
+    // skipped. Trailing reminder text is stripped before matching.
+    private static readonly Regex DrawCardsRegex = new(
+        @"^(" + CostList + @")\s*:\s*Draw (a|one|two|three|\d+) cards?\.$",
+        RegexOptions.IgnoreCase);
+
+    // Spelled-out small counts that appear on real "Draw N cards" activated
+    // abilities. "a"/"one" ⇒ 1. Larger counts on activated draw abilities are
+    // always written as a word in this range (no real card says "draw 9 cards"
+    // on an activated ability), but a bare digit is also accepted for safety.
+    private static readonly IReadOnlyDictionary<string, int> DrawCountWords =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+            ["one"] = 1,
+            ["two"] = 2,
+            ["three"] = 3,
+        };
 
     // "{cost}: Regenerate this creature." (CR 701.18 / 701.15a.)
     // A self-source regeneration ability — one of the most common activated
@@ -298,6 +337,14 @@ public static class OracleActivatedAbilityBinder
             if (regenerate.Success)
             {
                 var ability = TryBuildRegenerateSelf(regenerate, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var draw = DrawCardsRegex.Match(line);
+            if (draw.Success)
+            {
+                var ability = TryBuildDrawCards(draw, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -451,6 +498,45 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { regenerateEffect });
+    }
+
+    /// <summary>
+    /// Build a draw-a-card ability: "{cost}: Draw a/N card(s)." Re-homed so the
+    /// draw is for the BEARER's CONTROLLER's own library/hand
+    /// (<see cref="Fx.DrawCards"/>, CR 121.1 / 613.1f) — never the exiled
+    /// imprinted card. This is the soundest non-mana re-home of all: a draw has
+    /// no "this creature" / source reference at all, so re-homing is a clean
+    /// controller-scoped operation. Does NOT gate on <see cref="Creature"/> — a
+    /// draw is sound on any permanent bearer (the controller draws, not the
+    /// permanent). The count is "a"/"one" ⇒ 1, a spelled-out "two"/"three", or a
+    /// bare digit; an unrecognised count word is skipped (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildDrawCards(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int count;
+        if (!DrawCountWords.TryGetValue(countToken, out count)
+            && !int.TryParse(countToken, out count))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (count <= 0) return null;
+
+        var drawEffect = new Effect(
+            $"Granted: draw {count} card(s)",
+            // CR 121.1 / 613.1f — the BEARER's controller draws from their own
+            // library. No source-card reference, so re-homing is trivially sound.
+            () => Fx.DrawCards(controller, count));
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { drawEffect });
     }
 
     /// <summary>

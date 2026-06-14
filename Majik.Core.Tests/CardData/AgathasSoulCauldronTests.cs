@@ -1032,6 +1032,104 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_DrawACard_RehomesDrawToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability draws a card:
+        // "{2}, {T}: Draw a card." (Arcanis-style card-advantage engine — a
+        // common self-source draw shape). Re-homing is sound: a draw references
+        // the BEARER-CONTROLLER's own library/hand (Fx.DrawCards), never the
+        // exiled card (CR 121 / 613.1f).
+        var looter = new Creature("Looter Stub", "2U", 1, 1);
+        looter.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(looter);
+        looter.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // Put a card on top of Alice's library so the granted draw has something
+        // to draw.
+        var topCard = new Card("Top Card", "");
+        topCard.SetOwner(alice);
+        alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Looter Stub", "{2}, {T}: Draw a card.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), looter);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's draw-a-card ability");
+        var drawAbility = granted[0];
+        drawAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        drawAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("2"));
+        drawAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        drawAbility.TargetRequests.Should().BeEmpty(
+            "\"draw a card\" targets nothing — the controller's library is fixed");
+
+        // Activating it draws into the BEARER-CONTROLLER's hand.
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+        foreach (var effect in drawAbility.Effects) effect.Execute();
+        alice.Zones.Hand.GetCards().Count().Should().Be(handBefore + 1,
+            "the re-homed draw-a-card ability draws for the bearer's controller");
+        alice.Zones.Hand.GetCards().Should().Contain(topCard,
+            "the top card of the controller's library is drawn");
+    }
+
+    [Fact]
+    public void Grant_NonMana_DrawNCards_RehomesMultiDrawToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var engine = new Creature("Engine Stub", "3U", 1, 1);
+        engine.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(engine);
+        engine.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var c = new Card($"Lib {i}", "");
+            c.SetOwner(alice);
+            alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Engine Stub", "{4}: Draw two cards.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), engine);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's draw-two-cards ability");
+        var drawAbility = granted[0];
+
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+        foreach (var effect in drawAbility.Effects) effect.Execute();
+        alice.Zones.Hand.GetCards().Count().Should().Be(handBefore + 2,
+            "the re-homed \"draw two cards\" ability draws two for the bearer's controller");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);
