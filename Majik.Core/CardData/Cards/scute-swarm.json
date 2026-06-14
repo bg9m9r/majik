@@ -1,0 +1,9 @@
+{
+  "name": "Scute Swarm",
+  "types": ["Creature"],
+  "subtypes": ["Insect"],
+  "manaCost": "{1}{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
