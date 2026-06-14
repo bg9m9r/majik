@@ -161,20 +161,33 @@ public static class SteelHellkiteFactory
         // ----------------------------------------------------------------
         // {2}: Steel Hellkite gets +1/+0 until end of turn.
         // CR 602.1 — plain activated ability, instant speed.
+        //
+        // RE-SOURCE-SAFE (agatha-stale-body-rewrite-then-migrate): the pump
+        // reads the live ResolutionContext.Source (the ability's own Source at
+        // resolution) and registers the PumpUntilEndOfTurnEffect on THAT
+        // permanent, falling back to `card` only on the context-less legacy sync
+        // path. Marked RebindSafe below so Agatha's Soul Cauldron re-homes the
+        // REAL +1/+0 pump to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the pump bumps the
+        // BEARER, never the exiled Steel Hellkite. The pump effect registers on
+        // the subject's own ActiveEffects service (the bearer's, when re-homed),
+        // so a re-home with no live effects service no-ops cleanly.
         // ----------------------------------------------------------------
         var pumpEffect = new Effect(
             $"{CardName}: +1/+0 EOT for {{2}}",
-            () =>
+            ctx =>
             {
-                if (card.ActiveEffects == null) return;
-                card.ActiveEffects.Register(new PumpUntilEndOfTurnEffect(card, 1, 0));
+                var subject = (ctx.Source as Creature) ?? card;
+                subject.ActiveEffects?.Register(new PumpUntilEndOfTurnEffect(subject, 1, 0));
+                return ValueTask.CompletedTask;
             });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{2}") },
-            effects: new IEffect[] { pumpEffect }));
+            effects: new IEffect[] { pumpEffect },
+            rebindSafe: true));
 
         // ----------------------------------------------------------------
         // Combat-damage-victim tracker. Accumulates the controllers of
