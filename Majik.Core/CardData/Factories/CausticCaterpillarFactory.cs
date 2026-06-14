@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
@@ -67,8 +69,30 @@ public static class CausticCaterpillarFactory
     /// Construct Caustic Caterpillar owned and controlled by
     /// <paramref name="owner"/>. The single "sacrifice: destroy target
     /// artifact or enchantment" activated ability is attached structurally.
+    /// No event bus ⇒ the self-sacrifice cost publishes nothing (legacy
+    /// shape-only posture for dispatcher / shape tests).
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises only a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload). Forwards <c>effects.EventBus</c> so paying the self-sacrifice
+    /// cost publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a) for
+    /// "whenever a/an [player] sacrifices …" aristocrat payoffs. Mirrors the
+    /// Festival-Crasher / Spellbomb seam.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Construct Caustic Caterpillar. When <paramref name="eventBus"/> is
+    /// supplied, the self-sacrifice activation cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer; when null the move still happens but nothing is published.
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -124,7 +148,7 @@ public static class CausticCaterpillarFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sacEffect },
             targetRequests: new[]

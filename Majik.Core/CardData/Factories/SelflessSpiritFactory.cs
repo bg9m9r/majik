@@ -123,9 +123,12 @@ public static class SelflessSpiritFactory
         var sacAbility = new ActivatedAbility(
             source: card,
             controller: owner,
+            // CR 701.16a — thread the bus from the effects service so paying
+            // the self-sacrifice cost publishes PermanentSacrificedEvent for
+            // aristocrat payoffs (Festival-Crasher / Spellbomb seam).
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, continuousEffects?.EventBus),
             },
             effects: new IEffect[] { sacEffect });
 

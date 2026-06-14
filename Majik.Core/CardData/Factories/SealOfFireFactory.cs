@@ -3,6 +3,8 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -63,10 +65,27 @@ public static class SealOfFireFactory
     /// <summary>
     /// Construct Seal of Fire owned and controlled by <paramref name="owner"/>.
     /// The "Sacrifice: 2 damage to any target" activated ability is attached
-    /// to the card. The ability is fully self-contained — no service wiring
-    /// required.
+    /// to the card. No bus ⇒ the self-sacrifice cost publishes nothing
+    /// (legacy shape-only posture).
     /// </summary>
-    public static Enchantment Create(Player owner)
+    public static Enchantment Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to. Forwards <c>effects.EventBus</c> so paying the
+    /// self-sacrifice cost publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a) for aristocrat payoffs. Mirrors the Festival-Crasher /
+    /// Spellbomb seam.
+    /// </summary>
+    public static Enchantment Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Construct Seal of Fire. When <paramref name="eventBus"/> is supplied the
+    /// self-sacrifice activation cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
+    /// </summary>
+    public static Enchantment Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -106,7 +125,7 @@ public static class SealOfFireFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { pingEffect },
             targetRequests: new[]

@@ -87,7 +87,21 @@ public static class MausoleumWandererFactory
     /// Suitable for dispatcher / shape tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, stack: null, triggers: null, continuousEffects: null);
+        Create(owner, stack: null, triggers: null, continuousEffects: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises only a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c>). Forwards
+    /// <paramref name="effects"/> for the +1/+1 pump AND <c>effects.EventBus</c>
+    /// so paying the self-sacrifice cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) for aristocrat
+    /// payoffs. The live stack is not exposed on the effects service, so the
+    /// counter half stays no-op on this path (unchanged from the prior
+    /// single-arg routed posture); only the sacrifice-bus seam is added.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, stack: null, triggers: null, continuousEffects: effects, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Mausoleum Wanderer with optional runtime services.
@@ -108,7 +122,21 @@ public static class MausoleumWandererFactory
         Player owner,
         Majik.Core.Stack.Stack? stack,
         TriggerManager? triggers,
-        ContinuousEffectsService? continuousEffects)
+        ContinuousEffectsService? continuousEffects) =>
+        Create(owner, stack, triggers, continuousEffects, eventBus: null);
+
+    /// <summary>
+    /// Construct Mausoleum Wanderer with optional runtime services + event bus.
+    /// When <paramref name="eventBus"/> is supplied, paying the self-sacrifice
+    /// activation cost publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a) for aristocrat payoffs.
+    /// </summary>
+    public static Creature Create(
+        Player owner,
+        Majik.Core.Stack.Stack? stack,
+        TriggerManager? triggers,
+        ContinuousEffectsService? continuousEffects,
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -197,7 +225,7 @@ public static class MausoleumWandererFactory
             controller: owner,
             costs: new ICost[]
             {
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { counterEffect },
             targetRequests: new[]

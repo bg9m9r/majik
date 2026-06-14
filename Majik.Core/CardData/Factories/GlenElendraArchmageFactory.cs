@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -59,17 +61,41 @@ public static class GlenElendraArchmageFactory
 
     /// <summary>
     /// Construct Glen Elendra Archmage with no live stack — the counter
-    /// activated ability is shape-only (no-op on resolution).
+    /// activated ability is shape-only (no-op on resolution). No bus ⇒ the
+    /// self-sacrifice cost publishes nothing (legacy shape-only posture).
     /// </summary>
-    public static Creature Create(Player owner) => Create(owner, stack: null);
+    public static Creature Create(Player owner) => Create(owner, stack: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises only a two-param
+    /// <c>Create(Player, ContinuousEffectsService)</c>). Forwards
+    /// <c>effects.EventBus</c> so paying the {U}+self-sacrifice cost publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) for aristocrat
+    /// payoffs. The live stack is not exposed on the effects service, so the
+    /// counter half stays no-op on this path (unchanged from the prior
+    /// single-arg routed posture); only the sacrifice-bus seam is added.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, stack: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Glen Elendra Archmage with optional live stack. When
     /// <paramref name="stack"/> is supplied, the activated counter ability
     /// removes the target spell from the stack via <see cref="Fx.Counter"/>
-    /// (CR 701.5). When null the counter is a no-op (shape-only).
+    /// (CR 701.5). When null the counter is a no-op (shape-only). Bus-less
+    /// overload — the self-sacrifice cost publishes nothing.
     /// </summary>
-    public static Creature Create(Player owner, Majik.Core.Stack.Stack? stack)
+    public static Creature Create(Player owner, Majik.Core.Stack.Stack? stack) =>
+        Create(owner, stack, eventBus: null);
+
+    /// <summary>
+    /// Construct Glen Elendra Archmage with optional live stack + event bus.
+    /// When <paramref name="eventBus"/> is supplied, paying the self-sacrifice
+    /// cost publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a) for
+    /// aristocrat payoffs.
+    /// </summary>
+    public static Creature Create(Player owner, Majik.Core.Stack.Stack? stack, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -129,7 +155,7 @@ public static class GlenElendraArchmageFactory
             costs: new ICost[]
             {
                 new ManaCostCost(ActivationCost),
-                AdditionalCost.Sacrifice(card),
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { counterEffect },
             targetRequests: new[]
