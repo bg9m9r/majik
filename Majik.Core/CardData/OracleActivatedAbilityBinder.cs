@@ -3,6 +3,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -180,7 +181,14 @@ namespace Majik.Core.CardData;
 /// <see cref="AdditionalCost.Tap"/>(bearer). So <c>"{R}, {T}:"</c>,
 /// <c>"{T}:"</c>, <c>"{2}:"</c>, and <c>"{1}{U}:"</c> are all handled. The
 /// <c>"Sacrifice this creature:"</c> cost becomes
-/// <see cref="AdditionalCost.Sacrifice"/>(bearer).
+/// <see cref="AdditionalCost.Sacrifice"/>(bearer). A
+/// <c>"Remove N +1/+1 counters from this creature"</c> leg becomes
+/// <see cref="AdditionalCost.RemoveCounters"/>(bearer, +1/+1, N) — the
+/// re-source-safe counter-removal additional cost (CR 118.3) that rebinds onto
+/// the bearer via <see cref="AdditionalCost.RebindSource"/>, exactly like the
+/// bespoke Etched Oracle. So <c>"{1}, Remove four +1/+1 counters from this
+/// creature: Target player draws three cards."</c> is reconstructed (the
+/// counter-removal cost riding the existing target-player-draw verb).
 ///
 /// <h3>Soundness boundary (what is deliberately SKIPPED, not broken)</h3>
 /// To never emit an ability that would behave incorrectly when re-homed, any
@@ -206,14 +214,45 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleActivatedAbilityBinder
 {
-    // A cost token is either {T} or a RUN of one-or-more concatenated mana pips
-    // we can model exactly — generic digits and/or W/U/B/R/G/C — written the way
-    // oracle text spells a multi-symbol cost ("{R}", "{2}", "{1}{U}", "{2}{R}").
-    // Anything else ({X}, {E}, {S}, Phyrexian {R/P}, etc.) is intentionally NOT
-    // matched so the clause is skipped as unsound. The cost is a ", "-separated
-    // list of these (TryBuildCostList re-validates each token before folding).
-    private const string CostToken = @"(?:\{T\}|(?:\{(?:\d+|[WUBRGC])\})+)";
+    // A cost token is one of:
+    //   * {T} — the tap symbol;
+    //   * a RUN of one-or-more concatenated mana pips we can model exactly —
+    //     generic digits and/or W/U/B/R/G/C — written the way oracle text spells
+    //     a multi-symbol cost ("{R}", "{2}", "{1}{U}", "{2}{R}");
+    //   * a "Remove N +1/+1 counters from this creature" counter-removal token
+    //     (CR 118.3) — a re-source-safe additional cost (rides
+    //     AdditionalCost.RemoveCounters, which rebinds onto the bearer via
+    //     RebindSource, exactly like the bespoke Etched Oracle). N is a/one ⇒ 1,
+    //     a small spelled-out word, or a bare digit.
+    // Anything else ({X}, {E}, {S}, Phyrexian {R/P}, "Pay N life", "Discard a
+    // card", a counter type other than +1/+1, …) is intentionally NOT matched so
+    // the clause is skipped as unsound. The cost is a ", "-separated list of
+    // these (TryBuildCostList re-validates each token before folding). The
+    // counter-removal token contains no comma, so the ", " split is safe.
+    private const string RemoveCountersToken =
+        @"Remove (?:a|one|two|three|four|five|\d+) \+1/\+1 counters? from this creature";
+    private const string CostToken =
+        @"(?:\{T\}|(?:\{(?:\d+|[WUBRGC])\})+|" + RemoveCountersToken + @")";
     private const string CostList = CostToken + @"(?:\s*,\s*" + CostToken + @")*";
+
+    // Matches a single counter-removal cost token and captures its count word.
+    private static readonly Regex RemoveCountersTokenRegex = new(
+        @"^Remove (a|one|two|three|four|five|\d+) \+1/\+1 counters? from this creature$",
+        RegexOptions.IgnoreCase);
+
+    // Spelled-out small counts that appear on real "Remove N +1/+1 counters"
+    // additional costs ("a"/"one" ⇒ 1). A bare digit is also accepted; an
+    // unrecognised word makes the cost unsound and the clause is skipped.
+    private static readonly IReadOnlyDictionary<string, int> CounterCountWords =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+            ["one"] = 1,
+            ["two"] = 2,
+            ["three"] = 3,
+            ["four"] = 4,
+            ["five"] = 5,
+        };
 
     // "{cost}: This creature gets ±X/±Y until end of turn."
     // Each delta carries its OWN sign so signed-pump shapes — a negative
@@ -1516,6 +1555,7 @@ public static class OracleActivatedAbilityBinder
         var costs = new List<ICost>();
         var manaSymbols = new System.Text.StringBuilder();
         var tapped = false;
+        var counterRemovalSeen = false;
 
         foreach (var rawToken in costList.Split(','))
         {
@@ -1528,6 +1568,30 @@ public static class OracleActivatedAbilityBinder
                 // would be an unmodellable cost, so reject it.
                 if (tapped) return null;
                 tapped = true;
+                continue;
+            }
+
+            var removeCounters = RemoveCountersTokenRegex.Match(token);
+            if (removeCounters.Success)
+            {
+                // CR 118.3 / CR 707.2 — a "Remove N +1/+1 counters from this
+                // creature" additional cost, re-homed onto the BEARER. A duplicate
+                // counter-removal leg in one cost is not a real shape — reject it.
+                if (counterRemovalSeen) return null;
+                var countWord = removeCounters.Groups[1].Value.Trim();
+                if (!CounterCountWords.TryGetValue(countWord, out var count)
+                    && !int.TryParse(countWord, out count))
+                {
+                    return null; // unrecognised count — skip the clause as unsound
+                }
+                if (count <= 0) return null;
+
+                // AdditionalCost.RemoveCounters is re-source-safe: RebindTo
+                // re-homes it onto the new bearer via RebindSource, so the
+                // counters come off the BEARER, never the exiled imprinted card.
+                costs.Add(AdditionalCost.RemoveCounters(
+                    bearer, CounterType.PlusOnePlusOne, count));
+                counterRemovalSeen = true;
                 continue;
             }
 

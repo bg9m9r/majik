@@ -3572,6 +3572,95 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // agatha-oracle-shape-remove-counters-each-player-draws — the
+    // OracleActivatedAbilityBinder now reconstructs a counter-removal cost token
+    // ("Remove N +1/+1 counters from this creature") inside its cost grammar, so
+    // the FALLBACK oracle-rebuild path (an arbitrary imprinted creature with the
+    // Etched-Oracle-style shape but NO bespoke [CardName] factory) re-homes the
+    // ability soundly: the declared AdditionalCost.RemoveCounters comes off the
+    // BEARER (CR 118.3 / 707.2), and the existing draw verbs ride on top. This is
+    // the soundly-reconstructable oracle shape the deferral asked for — the
+    // counter-removal cost is re-source-safe (rebinds onto the new bearer via
+    // AdditionalCost.RebindSource), exactly like the bespoke Etched Oracle.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_NonMana_RemoveCountersTargetPlayerDraw_RehomesCostAndDrawToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature with the Etched-Oracle-style shape but WITHOUT a
+        // bespoke factory (a generic stub), so the only way Agatha re-homes its
+        // ability is the OracleActivatedAbilityBinder reconstruction path.
+        var stub = new Creature("Counter Sage Stub", "4", 0, 0);
+        stub.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(stub);
+        stub.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+        // Give the bearer enough +1/+1 counters to pay the reconstructed cost.
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 4);
+
+        // Cards on BOB's library — the chosen target player draws their own.
+        for (var i = 0; i < 3; i++)
+        {
+            var c = new Card($"Bob Lib {i}", "");
+            c.SetOwner(bob);
+            bob.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Counter Sage Stub",
+                "{1}, Remove four +1/+1 counters from this creature: Target player draws three cards.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), stub);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the binder reconstructs the remove-counters target-player-draw shape and re-homes it");
+        var draw = granted[0];
+        draw.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card (CR 707.2)");
+
+        // The mana leg is the {1}; the counter-removal leg is a declared
+        // AdditionalCost.RemoveCounters re-homed onto the BEARER.
+        draw.Costs.OfType<ManaCostCost>().Should().ContainSingle(
+            "the {1} mana leg is reconstructed");
+        var counterCost = draw.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.RemoveCounters)
+            .Subject;
+        counterCost.CounterType.Should().Be(CounterType.PlusOnePlusOne,
+            "the reconstructed cost removes +1/+1 counters");
+        counterCost.CounterAmount.Should().Be(4,
+            "the reconstructed cost removes the stated four counters");
+        counterCost.Permanent.Should().BeSameAs(bearer,
+            "the counter-removal cost is re-homed onto the BEARER (CR 707.2), not the exiled card");
+
+        // Pay the declared cost off the BEARER, then choose BOB and resolve:
+        // the chosen player draws from THEIR OWN library.
+        new Majik.Core.Costs.CostPayment().PayCosts(
+            alice, new[] { (Majik.Core.Costs.ICost)counterCost });
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "paying the reconstructed cost removed four +1/+1 counters from the BEARER (5 → 1)");
+
+        draw.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+        var bobHandBefore = bob.Zones.Hand.GetCards().Count();
+        var aliceHandBefore = alice.Zones.Hand.GetCards().Count();
+        foreach (var effect in draw.Effects) effect.Execute();
+        bob.Zones.Hand.GetCards().Count().Should().Be(bobHandBefore + 3,
+            "the re-homed \"target player draws three cards\" draws three for the CHOSEN player");
+        alice.Zones.Hand.GetCards().Count().Should().Be(aliceHandBefore,
+            "only the chosen target player draws — the controller does not");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-oracle-shape-yawgmoth-pay-life-counter-pump-loop — Yawgmoth, Thran
     // Physician is a bespoke [CardName]-factory creature whose activated ability
     // ("Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one
