@@ -1,0 +1,8 @@
+{
+  "name": "Gingerbread Cabin",
+  "types": ["Land"],
+  "subtypes": ["Forest"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
