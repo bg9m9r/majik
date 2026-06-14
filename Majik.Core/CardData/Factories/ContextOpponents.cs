@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Majik.Core.Abilities;
 using Majik.Core.Players;
 
@@ -31,13 +33,40 @@ public static class ContextOpponents
     /// CR 102.1 / 102.4 — every opponent of <paramref name="controller"/> that
     /// is still in the game, read from the live resolution context. Returns an
     /// empty sequence when no live game context is available (shape-only paths),
-    /// so the each-opponent clause is a safe no-op rather than throwing.
+    /// so the each-opponent clause is a safe no-op rather than throwing. When
+    /// <paramref name="controller"/> is the context's <c>Self</c> (the common
+    /// shape) the memoized <c>GameContext.Opponents</c> list is returned directly
+    /// — zero per-call allocation on the each-opponent resolution path.
     /// </summary>
     public static IEnumerable<Player> Of(ResolutionContext ctx, Player controller)
     {
         ArgumentNullException.ThrowIfNull(controller);
-        var players = ctx?.Game?.AllPlayers;
-        if (players == null) yield break;
+        var game = ctx?.Game;
+        if (game?.AllPlayers == null) return Enumerable.Empty<Player>();
+
+        // Fast path — the resolving controller IS the context's Self (the
+        // overwhelmingly common shape: an each-opponent effect's controller is
+        // the player who cast/activated it, i.e. GameContext.Self). Reuse the
+        // memoized GameContext.Opponents list (#2687) instead of spinning up a
+        // fresh iterator + filter on every resolution. This is the prod path for
+        // Gray Merchant / Sheoldred / Hired Claw etc., which the bot evaluates
+        // repeatedly during search. The list is already filtered to non-Self /
+        // not-lost (CR 102.1 / 800.4a), identical to the slow-path projection.
+        if (ReferenceEquals(controller, game.Self))
+        {
+            return game.Opponents;
+        }
+
+        return Filtered(game.AllPlayers, controller);
+    }
+
+    /// <summary>
+    /// Slow path — <paramref name="controller"/> is not the context's Self (e.g.
+    /// an opponent's triggered ability resolving), so the memoized Self-keyed
+    /// list can't be reused. Filters live off AllPlayers per CR 102.1 / 800.4a.
+    /// </summary>
+    private static IEnumerable<Player> Filtered(IReadOnlyList<Player> players, Player controller)
+    {
         foreach (var p in players)
         {
             if (p == null) continue;
