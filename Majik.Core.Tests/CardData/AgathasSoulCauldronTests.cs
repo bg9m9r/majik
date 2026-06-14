@@ -2683,4 +2683,172 @@ public class AgathasSoulCauldronTests
         pteramander.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(PteramanderFactory.AdaptAmount,
             "resolving the un-rebound Adapt places counters on its own source");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-stale-body-rewrite-then-migrate — Steel Hellkite is a bespoke
+    // [CardName]-factory artifact creature. Its "{2}: Steel Hellkite gets
+    // +1/+0 until end of turn." pump ability used to register a
+    // PumpUntilEndOfTurnEffect on the CAPTURED `card`, so a re-home would
+    // pump the exiled Steel Hellkite, not the bearer. Migrated so the pump
+    // reads ResolutionContext.Source (the live ability source = the bearer
+    // when re-homed) and marked RebindSafe — Agatha's group-grant re-homes
+    // the REAL pump onto a counter-bearing bearer via ActivatedAbility.RebindTo
+    // (CR 707.2 / 613.1f). The {X} destroy-sweep ability is NOT RebindSafe
+    // (it captures a per-instance combat-damage-victim tracker keyed on the
+    // original source instance), so it is correctly NOT re-homed — only the
+    // pump is granted (a correct partial, never a broken re-home).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_SteelHellkite_PumpToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var hellkite = SteelHellkiteFactory.Create(alice);
+        // Only the pump is RebindSafe; the {X} destroy-sweep captures a
+        // per-instance combat tracker and must remain non-rebindable.
+        var pumpAbility = hellkite.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility && a.RebindSafe)
+            .ToList();
+        pumpAbility.Should().ContainSingle(
+            "exactly one Steel Hellkite ability (the +1/+0 pump) is RebindSafe");
+        alice.Zones.Graveyard.AddCard(hellkite);
+        hellkite.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones, power: 4, toughness: 4);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), hellkite);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "ONLY Steel Hellkite's RebindSafe pump is re-homed via RebindTo (the destroy-sweep is not)");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the re-homed pump is sourced on the BEARER (CR 707.2)");
+        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Base 4/4 + the SeatedBearer +1/+1 counter = 5/5 before the pump.
+        // Resolve via the ability path (ResolutionContext.Source = the rebound
+        // ability's Source = the bearer) so the reused effect re-sources itself.
+        var powerBefore = bearer.GetPower();
+        await pump.ResolveAsync(agent: null, game: null);
+        bearer.GetPower().Should().Be(powerBefore + 1,
+            "the re-homed +1/+0 pumped the BEARER, not the exiled Steel Hellkite");
+    }
+
+    [Fact]
+    public void BespokeSteelHellkitePump_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated pump still pumps its OWN source on the normal
+        // (un-rebound) resolution path — ResolutionContext.Source = card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var hellkite = SteelHellkiteFactory.Create(alice);
+        alice.Zones.Library.AddCard(hellkite);
+        zones.MoveCard(hellkite, ZoneType.Library, ZoneType.Battlefield, alice);
+        hellkite.ActiveEffects = effects;
+
+        var pump = hellkite.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility && a.RebindSafe);
+
+        var powerBefore = hellkite.GetPower();
+        foreach (var effect in pump.Effects) effect.Execute();
+        hellkite.GetPower().Should().Be(powerBefore + 1,
+            "the un-rebound pump pumps its own source (Steel Hellkite)");
+    }
+
+    // -----------------------------------------------------------------------
+    // agatha-stale-body-rewrite-then-migrate — Etched Oracle is a bespoke
+    // [CardName]-factory artifact creature. Its "{2}, Remove three +1/+1
+    // counters from Etched Oracle: Each player draws three cards." ability
+    // used to read/remove the counters off the CAPTURED `card`, so a re-home
+    // would remove counters from the exiled Etched Oracle, not the bearer.
+    // The counter-removal is performed inline in the resolve closure (NOT a
+    // separate ICost), so migrating it to read ResolutionContext.Source makes
+    // the whole ability RebindSafe — Agatha's group-grant re-homes the REAL
+    // ability onto a counter-bearing bearer via ActivatedAbility.RebindTo
+    // (CR 707.2 / 613.1f); the counters come off the BEARER, the draw reads
+    // ctx.Game.AllPlayers (already source-independent).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_EtchedOracle_DrawToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var oracle = EtchedOracleFactory.Create(alice);
+        var realAbilities = oracle.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Etched Oracle has exactly one non-mana activated ability — the each-player-draw");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Etched Oracle ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(oracle);
+        oracle.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), oracle);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Etched Oracle's real each-player-draw ability is re-homed via RebindTo");
+        var draw = granted[0];
+        draw.Source.Should().BeSameAs(bearer,
+            "the re-homed ability is sourced on the BEARER (CR 707.2)");
+        draw.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+    }
+
+    [Fact]
+    public async Task BespokeEtchedOracle_RemovesCountersFromOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated counter-removal reads its OWN source's counters
+        // on the normal (un-rebound) resolution path — ResolutionContext.Source
+        // = card. Stack three +1/+1 counters, activate, expect them removed and
+        // the controller to draw three.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var oracle = EtchedOracleFactory.Create(alice);
+        oracle.Counters.Add(CounterType.PlusOnePlusOne, 3);
+        alice.Zones.Library.AddCard(oracle);
+        zones.MoveCard(oracle, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Three cards to draw.
+        for (var i = 0; i < 3; i++)
+        {
+            var c = new Creature($"Card{i}", "G", 1, 1);
+            c.SetOwner(alice);
+            alice.Zones.Library.AddCard(c);
+        }
+
+        var ability = oracle.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        await ability.ResolveAsync(agent: null, game: null);
+
+        oracle.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the un-rebound ability removed three +1/+1 counters from its own source");
+        alice.Zones.Hand.GetCards().Count().Should().Be(3,
+            "the controller drew three cards");
+    }
 }

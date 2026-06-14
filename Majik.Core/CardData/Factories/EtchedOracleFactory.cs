@@ -125,9 +125,24 @@ public static class EtchedOracleFactory
             $"{CardName}: each player draws {CardsDrawn} cards",
             ctx =>
             {
+                // RE-SOURCE-SAFE (agatha-stale-body-rewrite-then-migrate): the
+                // counter-removal half ("Remove three +1/+1 counters from Etched
+                // Oracle") reads/mutates the counters off the live
+                // ResolutionContext.Source (the ability's own Source at
+                // resolution) rather than the captured `card`, falling back to
+                // `card` only on the context-less legacy sync path. This makes
+                // the whole ability re-source-safe — the inline counter-removal
+                // is NOT a separate ICost (so RebindTo Stage 1 doesn't touch a
+                // cost), but reading ctx.Source makes the counters come off the
+                // BEARER when Agatha's Soul Cauldron re-homes the ability via
+                // ActivatedAbility.RebindTo (CR 707.2 / 613.1f). The draw half
+                // already reads ctx.Game.AllPlayers (source-independent), so the
+                // ability is marked RebindSafe below.
+                var subject = (ctx.Source as Permanent) ?? card;
+
                 // Counter-removal payment is a no-op stub at the engine
                 // level — perform it inline so visible state matches.
-                if (card.Counters.Count(CounterType.PlusOnePlusOne) < CountersToRemove)
+                if (subject.Counters.Count(CounterType.PlusOnePlusOne) < CountersToRemove)
                 {
                     // CR 602.1 — illegal activation. Bail out cleanly;
                     // the test surface checks the counter total before
@@ -135,7 +150,7 @@ public static class EtchedOracleFactory
                     // earlier via CostValidator.
                     return ValueTask.CompletedTask;
                 }
-                card.Counters.Remove(CounterType.PlusOnePlusOne, CountersToRemove);
+                subject.Counters.Remove(CounterType.PlusOnePlusOne, CountersToRemove);
 
                 // "Each player draws" — read every player from the LIVE game at
                 // resolution (ctx.Game.AllPlayers). No captured resolver.
@@ -157,7 +172,8 @@ public static class EtchedOracleFactory
             {
                 new ManaCostCost("{2}"),
             },
-            effects: new IEffect[] { drawEffect });
+            effects: new IEffect[] { drawEffect },
+            rebindSafe: true);
 
         card.AddAbility(ability);
 
