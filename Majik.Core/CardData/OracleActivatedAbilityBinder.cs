@@ -73,6 +73,16 @@ namespace Majik.Core.CardData;
 ///     613.1f). Sound to re-home: the counter is placed on the bearer, never the
 ///     exiled card. (Especially apt for the Cauldron: the grown bearer is, by
 ///     construction, a creature you control with a +1/+1 counter.)</item>
+///   <item><b>Regenerate-self</b> —
+///     <c>"{cost}: Regenerate this creature."</c> Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose resolution creates a regeneration
+///     shield on the BEARER via <see cref="Permanent.AddRegenerationShield"/>
+///     (CR 701.18 / 701.15a) — the SAME shield primitive River Boa / Drudge
+///     Skeletons / Mortivore / Lotleth Troll use. Sound to re-home onto any
+///     permanent bearer (the shield is a <see cref="Permanent"/>-level
+///     replacement, not creature-only). Trailing reminder text is stripped
+///     before matching so both the bare and the reminder-bearing printings are
+///     recognised.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -178,8 +188,34 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Put (?:a|one|(\d+)) \+1/\+1 counters? on this creature\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Regenerate this creature." (CR 701.18 / 701.15a.)
+    // A self-source regeneration ability — one of the most common activated
+    // abilities on real creature cards (River Boa, Drudge Skeletons, Wall of
+    // Bone, Twisted Abomination, Lotleth Troll, Mortivore, …). Sound to re-home:
+    // a regeneration shield protects the BEARER (Permanent.AddRegenerationShield),
+    // never the exiled card. Reminder text in parentheses ("(The next time this
+    // creature would be destroyed …)") is stripped before matching so both the
+    // bare and the reminder-bearing oracle spellings are recognised. The
+    // self-source "Regenerate this creature" / "Regenerate {self name}" forms
+    // are matched; a target-OTHER regenerate ("Regenerate target creature") is
+    // NOT — its target candidate filter isn't reconstructed here, so it is
+    // skipped as unsound (consistent with the restricted-target boundary above).
+    private static readonly Regex RegenerateSelfRegex = new(
+        @"^(" + CostList + @")\s*:\s*Regenerate this creature\.$",
+        RegexOptions.IgnoreCase);
+
     // A single tap symbol inside a cost list.
     private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
+
+    // Trailing parenthetical reminder text on an oracle line, e.g.
+    // "(The next time this creature would be destroyed this turn, …)". Reminder
+    // text is non-rules flavour (CR 207.2) and varies across printings, so it is
+    // stripped before a line is matched against the shape regexes — otherwise a
+    // card whose regenerate line carries reminder text (Drudge Skeletons, Wall
+    // of Bone) would fail to match a regex anchored to the rules text. Stripping
+    // is conservative: it only removes a parenthesised run that ENDS the line.
+    private static readonly Regex TrailingReminderRegex = new(
+        @"\s*\([^)]*\)\s*$", RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Parse <paramref name="oracleText"/> into fresh non-mana
@@ -209,7 +245,10 @@ public static class OracleActivatedAbilityBinder
 
         foreach (var rawLine in oracleText.Split('\n'))
         {
-            var line = rawLine.Trim();
+            // Strip any trailing reminder text (CR 207.2) so a shape regex
+            // anchored to the rules text still matches a printing that carries
+            // it (e.g. "{B}: Regenerate this creature. (The next time …)").
+            var line = TrailingReminderRegex.Replace(rawLine.Trim(), string.Empty).Trim();
             if (line.Length == 0) continue;
 
             var pump = SelfPumpRegex.Match(line);
@@ -251,6 +290,14 @@ public static class OracleActivatedAbilityBinder
             if (selfCounter.Success)
             {
                 var ability = TryBuildSelfCounter(selfCounter, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var regenerate = RegenerateSelfRegex.Match(line);
+            if (regenerate.Success)
+            {
+                var ability = TryBuildRegenerateSelf(regenerate, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -372,6 +419,38 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { counterEffect });
+    }
+
+    /// <summary>
+    /// Build a regenerate-self ability: "{cost}: Regenerate this creature."
+    /// Re-homed so the regeneration shield is created on the BEARER's own
+    /// <see cref="Permanent.AddRegenerationShield"/> (CR 701.18 / 701.15a) — the
+    /// next destroy of the BEARER this turn is replaced (tap, remove from combat,
+    /// heal damage), never the exiled imprinted card. This is the SAME shield
+    /// primitive the Mortivore / Lotleth Troll / River Boa factories use. Sound
+    /// to re-home onto ANY permanent bearer (the shield is a
+    /// <see cref="Permanent"/>-level replacement, not creature-only), so unlike
+    /// the pump / keyword / counter shapes this one does not gate on
+    /// <see cref="Creature"/>.
+    /// </summary>
+    private static ActivatedAbility? TryBuildRegenerateSelf(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var regenerateEffect = new Effect(
+            "Granted: regenerate this creature (CR 701.18)",
+            // CR 701.15a — create a regeneration shield on the BEARER. No
+            // effects-service dependency: the shield is a self-contained
+            // replacement counter on the permanent.
+            () => bearer.AddRegenerationShield());
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { regenerateEffect });
     }
 
     /// <summary>

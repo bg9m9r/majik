@@ -983,6 +983,55 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_RegenerateSelf_RehomesRegenerationShieldToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability regenerates itself:
+        // "{B}: Regenerate this creature." (River Boa, Drudge Skeletons, Wall of
+        // Bone, Twisted Abomination, Lotleth Troll — a very common real shape).
+        // Sound to re-home: a regeneration shield (CR 701.18) is a self-source
+        // replacement that protects the BEARER, never the exiled card.
+        var boa = new Creature("Boa Stub", "1G", 1, 1);
+        boa.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(boa);
+        boa.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Boa Stub", "{B}: Regenerate this creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), boa);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's regenerate-self ability");
+        var regenAbility = granted[0];
+        regenAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        regenAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("B"));
+        regenAbility.TargetRequests.Should().BeEmpty(
+            "\"regenerate this creature\" targets nothing — the bearer is fixed");
+
+        // Activating it creates a regeneration shield on the BEARER, not the
+        // exiled card (CR 701.18 / 701.15a).
+        var bearerShieldsBefore = bearer.RegenerationShieldCount;
+        var boaShieldsBefore = boa.RegenerationShieldCount;
+        foreach (var effect in regenAbility.Effects) effect.Execute();
+        bearer.RegenerationShieldCount.Should().Be(bearerShieldsBefore + 1,
+            "the re-homed regenerate-self ability shields the BEARER");
+        boa.RegenerationShieldCount.Should().Be(boaShieldsBefore,
+            "the exiled imprinted card never receives the shield");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);

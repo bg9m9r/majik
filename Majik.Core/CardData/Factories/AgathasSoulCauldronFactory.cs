@@ -102,7 +102,10 @@ namespace Majik.Core.CardData.Factories;
 ///       ("{cost}: This creature gets ±X/±Y until end of turn" — including a
 ///       SIGNED/negative delta as on Aetherling / Canyon Crab / Flowstone), self-keyword
 ///       grant ("{cost}: This creature gains &lt;simple keyword&gt; until end of
-///       turn"), pinger ("{cost}: This creature deals N damage to …"), and
+///       turn"), self-counter ("{cost}: Put a/N +1/+1 counter(s) on this
+///       creature"), regenerate-self ("{cost}: Regenerate this creature" — River
+///       Boa / Drudge Skeletons / Wall of Bone, reminder text tolerated),
+///       pinger ("{cost}: This creature deals N damage to …"), and
 ///       sacrifice-self pinger ("Sacrifice this creature: It deals N damage to
 ///       …"). Cost grammar: any ", "-separated list of generic / coloured mana
 ///       pips and {T}.</item>
@@ -112,8 +115,9 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Bespoke <c>[CardName]</c>-factory activated abilities</b> whose effect
 ///   closures still capture the original card (so they are NOT
 ///   <see cref="ActivatedAbility.RebindSafe"/>) AND whose oracle text is outside
-///   the fallback's soundly-reconstructable set (firebreathing / pinger /
-///   sac-pinger). For such an imprinted creature the grant emits nothing for
+///   the fallback's soundly-reconstructable set (firebreathing / self-pump /
+///   self-keyword / self-counter / regenerate-self / pinger / sac-pinger). For
+///   such an imprinted creature the grant emits nothing for
 ///   those abilities rather than re-home a closure that would tap/affect the
 ///   EXILED card. As more bespoke effects migrate to read
 ///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> (and their
@@ -343,7 +347,9 @@ public static class AgathasSoulCauldronFactory
     ///   <item><b>NON-mana activated abilities</b> — firebreathing / self-pump
     ///     ("{cost}: This creature gets +X/+Y until end of turn"), self-keyword
     ///     grants ("{cost}: This creature gains &lt;simple keyword&gt; until end
-    ///     of turn"), pingers ("{cost}: This creature deals N damage to …"), and
+    ///     of turn"), self-counter ("{cost}: Put a/N +1/+1 counter(s) on this
+    ///     creature"), regenerate-self ("{cost}: Regenerate this creature"),
+    ///     pingers ("{cost}: This creature deals N damage to …"), and
     ///     sacrifice-self pingers ("Sacrifice this creature: It deals N damage
     ///     to …") via
     ///     <see cref="OracleActivatedAbilityBinder.RebuildActivatedAbilities"/>;
