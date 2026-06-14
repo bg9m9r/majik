@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Counters;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -418,5 +419,158 @@ public class AdditionalCostTests
 
         // Assert — non-source cost types pass through untouched.
         result.Should().BeSameAs(cost);
+    }
+
+    // -----------------------------------------------------------------------
+    // RemoveCounters additional cost — pays down
+    // additional-cost-remove-counters-primitive. "Remove N <type> counters
+    // from <bearer>" hoisted from the resolve closure into the declared cost
+    // list (CR 118.3 / 602.2) so cost-analysis / activation-legality scans see
+    // it. Mirrors AdditionalCost.Sacrifice.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void RemoveCounters_ValidBearer_CreatesRemoveCountersCost()
+    {
+        // Arrange
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0);
+
+        // Act
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 4);
+
+        // Assert
+        cost.CostType.Should().Be(AdditionalCostType.RemoveCounters);
+        cost.CounterType.Should().Be(CounterType.PlusOnePlusOne);
+        cost.CounterAmount.Should().Be(4);
+        cost.Description.Should().Contain("Remove 4 +1/+1 counters");
+        cost.Description.Should().Contain("Etched Oracle");
+        cost.Permanent.Should().BeSameAs(bearer);
+    }
+
+    [Fact]
+    public void RemoveCounters_SingularDescription_WhenAmountIsOne()
+    {
+        var bearer = new Creature("Spike Feeder", "{2}{G}", 0, 0);
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 1);
+        cost.Description.Should().Be("Remove a +1/+1 counter from Spike Feeder");
+    }
+
+    [Fact]
+    public void RemoveCounters_NullBearer_ThrowsException() =>
+        new Action(() => AdditionalCost.RemoveCounters(null!, CounterType.PlusOnePlusOne, 1))
+            .Should().Throw<ArgumentNullException>();
+
+    [Fact]
+    public void RemoveCounters_NullCounterType_ThrowsException()
+    {
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0);
+        new Action(() => AdditionalCost.RemoveCounters(bearer, null!, 1))
+            .Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void RemoveCounters_NonPositiveAmount_ThrowsException()
+    {
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0);
+        new Action(() => AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 0))
+            .Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void CanPay_RemoveCounters_SufficientCounters_ReturnsTrue()
+    {
+        var player = new Player("Alice", 20);
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0) { Controller = player };
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 4);
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 4);
+
+        cost.CanPay(player).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanPay_RemoveCounters_InsufficientCounters_ReturnsFalse()
+    {
+        var player = new Player("Alice", 20);
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0) { Controller = player };
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 3);
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 4);
+
+        cost.CanPay(player).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanPay_RemoveCounters_WrongCounterType_ReturnsFalse()
+    {
+        var player = new Player("Alice", 20);
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0) { Controller = player };
+        bearer.Counters.Add(CounterType.Charge, 4);
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 4);
+
+        cost.CanPay(player).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Pay_RemoveCounters_RemovesTheDeclaredCounters()
+    {
+        var player = new Player("Alice", 20);
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0) { Controller = player };
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 5);
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 4);
+
+        cost.Pay(player);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "exactly the declared four +1/+1 counters were removed");
+    }
+
+    [Fact]
+    public void RemoveCounters_PaidThroughCentralCostPaymentSeam_RemovesCounters()
+    {
+        var player = new Player("Alice", 20);
+        var bearer = new Creature("Etched Oracle", "{4}", 0, 0) { Controller = player };
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 4);
+        var cost = AdditionalCost.RemoveCounters(bearer, CounterType.PlusOnePlusOne, 4);
+
+        new CostPayment().PayCosts(player, new ICost[] { cost });
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
+    }
+
+    [Fact]
+    public void RebindSource_RemoveCounters_Matching_RemovesFromNewBearer_NotOld()
+    {
+        // Arrange — a "remove four +1/+1" cost captured on A; both bearers
+        // carry counters.
+        var player = new Player("Alice", 20);
+        var a = new Creature("Etched Oracle", "{4}", 0, 0) { Controller = player };
+        a.Counters.Add(CounterType.PlusOnePlusOne, 4);
+        var b = new Creature("Spike Feeder", "{2}{G}", 0, 0) { Controller = player };
+        b.Counters.Add(CounterType.PlusOnePlusOne, 4);
+
+        var cost = AdditionalCost.RemoveCounters(a, CounterType.PlusOnePlusOne, 4);
+
+        // Act — rebind old=A to new=B (CR 707.2), then pay.
+        var rebound = cost.RebindSource(a, b);
+        rebound.Pay(player);
+
+        // Assert — B lost its counters; A is untouched.
+        rebound.Should().NotBeSameAs(cost);
+        b.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
+        a.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4);
+        rebound.Description.Should().Contain("Spike Feeder");
+    }
+
+    [Fact]
+    public void RebindSource_RemoveCounters_NonMatching_ReturnsUnchanged()
+    {
+        var a = new Creature("Etched Oracle", "{4}", 0, 0);
+        var unrelated = new Creature("Memnite", "0", 1, 1);
+        var b = new Creature("Spike Feeder", "{2}{G}", 0, 0);
+        var cost = AdditionalCost.RemoveCounters(a, CounterType.PlusOnePlusOne, 4);
+
+        var result = cost.RebindSource(unrelated, b);
+
+        result.Should().BeSameAs(cost);
+        result.Description.Should().Contain("Etched Oracle");
     }
 }

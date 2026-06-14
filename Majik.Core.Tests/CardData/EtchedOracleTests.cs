@@ -4,6 +4,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Players;
 using Majik.Core.Tests.Helpers;
@@ -17,10 +18,11 @@ namespace Majik.Core.Tests.CardData;
 /// Unit tests for <see cref="EtchedOracleFactory"/> (Fifth Dawn, {4}).
 ///
 /// Covers:
-/// - Identity (Artifact Creature — Human Wizard, {4} 1/1, owner/controller).
+/// - Identity (Artifact Creature — Wizard, {4} 0/0, owner/controller).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - Sunburst ETB lands +1/+1 counters (CR 702.44a — creature branch).
-/// - {2}, Remove three +1/+1 counters: each player draws three cards.
+/// - {1}, Remove four +1/+1 counters: target player draws three cards
+///   (the counter-removal is a DECLARED AdditionalCost.RemoveCounters cost).
 /// </summary>
 public class EtchedOracleTests
 {
@@ -73,7 +75,32 @@ public class EtchedOracleTests
         card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "Sunburst ETB trigger is surfaced for shape");
         card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "{2}, remove three +1/+1 counters: each player draws 3 is surfaced");
+            "{1}, remove four +1/+1 counters: target player draws 3 is surfaced");
+    }
+
+    // -----------------------------------------------------------------------
+    // Declared counter-removal cost (CR 118.3) — the +1/+1 removal is hoisted
+    // from the resolve closure into the ability's declared cost list as an
+    // AdditionalCost.RemoveCounters, so cost-validation / activation-legality
+    // scans see it (additional-cost-remove-counters-primitive).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void EtchedOracle_Activated_DeclaresRemoveFourPlusOnePlusOneCountersCost()
+    {
+        var eo = EtchedOracleFactory.Create(_alice);
+
+        var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
+
+        ability.Costs.OfType<ManaCostCost>().Should().ContainSingle()
+            .Which.Cost.TotalValue.Should().Be(1, "the ability costs {1}");
+
+        ability.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.RemoveCounters)
+            .Which.Should().Match<AdditionalCost>(c =>
+                c.CounterType == CounterType.PlusOnePlusOne
+                && c.CounterAmount == 4,
+                "remove four +1/+1 counters is a declared cost, not inline in the resolve closure");
     }
 
     // -----------------------------------------------------------------------
@@ -114,73 +141,84 @@ public class EtchedOracleTests
     }
 
     // -----------------------------------------------------------------------
-    // Activated ability — {2}, remove three +1/+1 counters: each player
-    // draws three cards.
+    // Activated ability — {1}, Remove four +1/+1 counters: target player
+    // draws three cards. The removal is paid as the DECLARED cost; the
+    // resolve effect only performs the draw.
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void EtchedOracle_Activated_RemovesCounters_AndDrawsForController()
+    public void EtchedOracle_RemoveCountersCost_Paid_RemovesFourCounters()
     {
         var eo = EtchedOracleFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(eo);
         eo.SetZone(ZoneType.Battlefield);
-        eo.Counters.Add(CounterType.PlusOnePlusOne, 3);
-
-        SeedLibrary(_alice, 10);
-
-        var aliceHandBefore = _alice.Zones.Hand.GetCards().Count();
+        eo.Counters.Add(CounterType.PlusOnePlusOne, 5);
 
         var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        var counterCost = ability.Costs.OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.RemoveCounters);
 
-        eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "three +1/+1 counters were the activation cost");
-        (_alice.Zones.Hand.GetCards().Count() - aliceHandBefore).Should().Be(3,
-            "controller draws three cards");
+        // Pay the declared counter-removal cost through the central seam.
+        new CostPayment().PayCosts(_alice, new ICost[] { counterCost });
+
+        eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "exactly the declared four +1/+1 counters were removed as the cost");
     }
 
     [Fact]
-    public void EtchedOracle_Activated_WithAllPlayersResolver_DrawsForEveryPlayer()
+    public void EtchedOracle_RemoveCountersCost_CannotPay_WithFewerThanFour()
     {
         var eo = EtchedOracleFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(eo);
         eo.SetZone(ZoneType.Battlefield);
         eo.Counters.Add(CounterType.PlusOnePlusOne, 3);
 
+        var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
+        var counterCost = ability.Costs.OfType<AdditionalCost>()
+            .Single(c => c.CostType == AdditionalCostType.RemoveCounters);
+
+        counterCost.CanPay(_alice).Should().BeFalse(
+            "three +1/+1 counters is fewer than the required four");
+    }
+
+    [Fact]
+    public void EtchedOracle_Activated_NoTargetChosen_DrawsForController()
+    {
+        var eo = EtchedOracleFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(eo);
+        eo.SetZone(ZoneType.Battlefield);
+        SeedLibrary(_alice, 10);
+
+        var aliceBefore = _alice.Zones.Hand.GetCards().Count();
+
+        // No target chosen (shape-test path) → controller (ctx.Controller) draws.
+        var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
+        ContextResolve.Resolve(ability, _alice, _alice);
+
+        (_alice.Zones.Hand.GetCards().Count() - aliceBefore).Should().Be(3,
+            "with no target chosen, the controller draws three (no-target fallback)");
+    }
+
+    [Fact]
+    public void EtchedOracle_Activated_TargetPlayerDrawsThree()
+    {
+        var eo = EtchedOracleFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(eo);
+        eo.SetZone(ZoneType.Battlefield);
         SeedLibrary(_alice, 10);
         SeedLibrary(_bob, 10);
 
         var aliceBefore = _alice.Zones.Hand.GetCards().Count();
         var bobBefore = _bob.Zones.Hand.GetCards().Count();
 
-        // Resolve through a live GameContext so the draw reads
-        // ctx.Game.AllPlayers (the production path) — every player.
+        // Choose Bob as the "target player".
         var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { _bob } });
         ContextResolve.Resolve(ability, _alice, _alice, _bob);
 
-        (_alice.Zones.Hand.GetCards().Count() - aliceBefore).Should().Be(3,
-            "Alice draws three");
         (_bob.Zones.Hand.GetCards().Count() - bobBefore).Should().Be(3,
-            "Bob also draws three");
-    }
-
-    [Fact]
-    public void EtchedOracle_Activated_InsufficientCounters_IsCleanNoOp()
-    {
-        var eo = EtchedOracleFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(eo);
-        eo.SetZone(ZoneType.Battlefield);
-        eo.Counters.Add(CounterType.PlusOnePlusOne, 2);
-        SeedLibrary(_alice, 10);
-
-        var aliceBefore = _alice.Zones.Hand.GetCards().Count();
-
-        var ability = eo.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
-
-        eo.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2,
-            "insufficient counters → no removal");
+            "the chosen target player draws three");
         (_alice.Zones.Hand.GetCards().Count() - aliceBefore).Should().Be(0,
-            "insufficient counters → no draw");
+            "the non-targeted player draws nothing");
     }
 }

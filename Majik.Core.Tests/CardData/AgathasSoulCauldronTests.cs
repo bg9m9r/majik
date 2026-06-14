@@ -3482,16 +3482,15 @@ public class AgathasSoulCauldronTests
 
     // -----------------------------------------------------------------------
     // agatha-stale-body-rewrite-then-migrate — Etched Oracle is a bespoke
-    // [CardName]-factory artifact creature. Its "{2}, Remove three +1/+1
-    // counters from Etched Oracle: Each player draws three cards." ability
-    // used to read/remove the counters off the CAPTURED `card`, so a re-home
-    // would remove counters from the exiled Etched Oracle, not the bearer.
-    // The counter-removal is performed inline in the resolve closure (NOT a
-    // separate ICost), so migrating it to read ResolutionContext.Source makes
-    // the whole ability RebindSafe — Agatha's group-grant re-homes the REAL
-    // ability onto a counter-bearing bearer via ActivatedAbility.RebindTo
-    // (CR 707.2 / 613.1f); the counters come off the BEARER, the draw reads
-    // ctx.Game.AllPlayers (already source-independent).
+    // [CardName]-factory artifact creature. Its "{1}, Remove four +1/+1
+    // counters from this creature: Target player draws three cards." ability
+    // now declares the counter-removal as an AdditionalCost.RemoveCounters
+    // cost (additional-cost-remove-counters-primitive). That cost is
+    // re-source-safe (rebinds via AdditionalCost.RebindSource), and the draw
+    // reads its target/controller off the ResolutionContext, so the whole
+    // ability is RebindSafe — Agatha's group-grant re-homes the REAL ability
+    // onto a counter-bearing bearer via ActivatedAbility.RebindTo
+    // (CR 707.2 / 613.1f); the cost's counters come off the BEARER.
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -3533,16 +3532,17 @@ public class AgathasSoulCauldronTests
     [Fact]
     public async Task BespokeEtchedOracle_RemovesCountersFromOwnSourceWhenNotRebound()
     {
-        // Sanity: the migrated counter-removal reads its OWN source's counters
-        // on the normal (un-rebound) resolution path — ResolutionContext.Source
-        // = card. Stack three +1/+1 counters, activate, expect them removed and
-        // the controller to draw three.
+        // Sanity: on the normal (un-rebound) path the DECLARED counter-removal
+        // cost (AdditionalCost.RemoveCounters) comes off the ability's OWN
+        // source, and the resolve effect draws three for the controller (the
+        // no-target fallback). Stack four +1/+1 counters, pay the declared cost,
+        // resolve, expect them removed and the controller to draw three.
         var alice = new Player("Alice", 20);
         var bus = new Majik.Core.Events.EventBus();
         var zones = new Majik.Core.Services.ZoneService(bus);
 
         var oracle = EtchedOracleFactory.Create(alice);
-        oracle.Counters.Add(CounterType.PlusOnePlusOne, 3);
+        oracle.Counters.Add(CounterType.PlusOnePlusOne, 4);
         alice.Zones.Library.AddCard(oracle);
         zones.MoveCard(oracle, ZoneType.Library, ZoneType.Battlefield, alice);
 
@@ -3557,12 +3557,18 @@ public class AgathasSoulCauldronTests
         var ability = oracle.Abilities.OfType<ActivatedAbility>()
             .Single(a => a is not IManaAbility);
 
+        // Pay the DECLARED counter-removal cost (CR 118.3), then resolve.
+        var counterCost = ability.Costs
+            .OfType<Majik.Core.Costs.AdditionalCost>()
+            .Single(c => c.CostType == Majik.Core.Costs.AdditionalCostType.RemoveCounters);
+        new Majik.Core.Costs.CostPayment().PayCosts(alice, new[] { (Majik.Core.Costs.ICost)counterCost });
+
         await ability.ResolveAsync(agent: null, game: null);
 
         oracle.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
-            "the un-rebound ability removed three +1/+1 counters from its own source");
+            "the declared counter-removal cost removed four +1/+1 counters from its own source");
         alice.Zones.Hand.GetCards().Count().Should().Be(3,
-            "the controller drew three cards");
+            "the controller drew three cards (no-target fallback)");
     }
 
     // -----------------------------------------------------------------------
