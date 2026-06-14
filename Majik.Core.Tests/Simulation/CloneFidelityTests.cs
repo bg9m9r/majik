@@ -266,6 +266,79 @@ public sealed class CloneFidelityTests
     }
 
     [Fact]
+    public void Clone_CopiesMdfcState_PreservingActiveFace()
+    {
+        // CR 711 — a transform DFC's face tracker (MdfcState) must travel across
+        // the sim clone boundary so the MCTS determinized search can observe the
+        // active face AND flip it. Previously _mdfcState was nulled on the clone,
+        // so a sim clone could neither see "is this transformed?" nor transform.
+        var alice = new Player("Alice", 20);
+        var delver = new Creature("Delver of Secrets", "{U}", 1, 1);
+        delver.ChangeOwner(alice);
+        delver.ChangeController(alice);
+        alice.Zones.Battlefield.AddCard(delver);
+
+        delver.MdfcState = new MdfcState(
+            "Delver of Secrets",
+            "Insectile Aberration",
+            BackFaceCharacteristics.Creature(
+                name: "Insectile Aberration",
+                power: 3,
+                toughness: 2,
+                keywords: new[] { "Flying" },
+                colors: new[] { ManaColor.Blue }));
+        delver.MdfcState!.Transform(); // → back face up
+
+        var cClone = (Creature)delver.CloneForSim();
+
+        cClone.MdfcState.Should().NotBeNull("CloneForSim must thread MdfcState onto the clone");
+        cClone.MdfcState!.IsBackFace.Should().BeTrue("the clone carries the same active (back) face");
+        cClone.MdfcState.ActiveFaceName.Should().Be("Insectile Aberration");
+        cClone.MdfcState.BackFaceCharacteristics.Should()
+            .BeSameAs(delver.MdfcState!.BackFaceCharacteristics,
+                "immutable back-face definition data is shared by reference");
+
+        // The cloned state must be a DISTINCT instance (so flipping the clone
+        // does not flip the original — sandbox independence).
+        cClone.MdfcState.Should().NotBeSameAs(delver.MdfcState);
+    }
+
+    [Fact]
+    public void Clone_MdfcState_CanTransformInSandbox_WithoutTouchingOriginal()
+    {
+        // CR 711 — the cloned face tracker must support a working Transform()
+        // whose OnTransformed callback fires against the CLONE permanent, not the
+        // original (the source state's callback closes over the original). The
+        // search must be able to model flipping an MDFC inside the sandbox.
+        var alice = new Player("Alice", 20);
+        var delver = new Creature("Delver of Secrets", "{U}", 1, 1);
+        delver.ChangeOwner(alice);
+        delver.ChangeController(alice);
+        alice.Zones.Battlefield.AddCard(delver);
+
+        delver.MdfcState = new MdfcState(
+            "Delver of Secrets",
+            "Insectile Aberration",
+            BackFaceCharacteristics.Creature(
+                name: "Insectile Aberration",
+                power: 3,
+                toughness: 2,
+                keywords: new[] { "Flying" },
+                colors: new[] { ManaColor.Blue }));
+        // Original starts on the FRONT face.
+
+        var cClone = (Creature)delver.CloneForSim();
+        cClone.MdfcState!.IsBackFace.Should().BeFalse("clone starts on the same (front) face");
+
+        // Flip the clone inside the sandbox.
+        cClone.MdfcState.Transform();
+
+        cClone.MdfcState.IsBackFace.Should().BeTrue("the clone's Transform() flips its own face");
+        delver.MdfcState!.IsBackFace.Should().BeFalse(
+            "flipping the clone must NOT transform the original (sandbox independence)");
+    }
+
+    [Fact]
     public void Clone_CopiesStackObjects_TargetingClones()
     {
         var alice = new Player("Alice", 20);

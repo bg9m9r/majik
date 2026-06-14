@@ -118,6 +118,28 @@ public sealed class MdfcState
 
     public string ActiveFaceName => IsBackFace ? BackFaceName : FrontFaceName;
 
+    /// <summary>
+    /// CR 711 — clone this face tracker for sandbox simulation
+    /// (<see cref="Majik.Core.Cards.Card.CloneForSim"/>). Returns a fresh
+    /// <see cref="MdfcState"/> carrying the SAME immutable definition data
+    /// (face names, <see cref="CastableBackFace"/>, <see cref="BackFaceCharacteristics"/>
+    /// — all shared by reference, same posture as the card's definition lists)
+    /// and the SAME mutable <see cref="IsBackFace"/> face so a clone that was
+    /// already transformed stays on its back face, and a subsequent
+    /// <see cref="Transform"/> inside the MCTS sandbox flips it correctly.
+    ///
+    /// <para>The new state's <see cref="OnTransformed"/> callback is left null;
+    /// the <see cref="Majik.Core.Cards.Card.MdfcState"/> setter re-wires it to
+    /// the CLONE permanent's continuous-effects + transient-loyalty surface when
+    /// this state is attached. Never carries the source's callback (which closes
+    /// over the ORIGINAL permanent).</para>
+    /// </summary>
+    internal MdfcState CloneForSim() =>
+        new(FrontFaceName, BackFaceName, CastableBackFace, BackFaceCharacteristics)
+        {
+            IsBackFace = IsBackFace,
+        };
+
     public void Transform()
     {
         IsBackFace = !IsBackFace;
