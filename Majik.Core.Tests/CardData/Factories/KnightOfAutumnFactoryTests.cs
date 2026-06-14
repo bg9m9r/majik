@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
@@ -236,5 +237,52 @@ public class KnightOfAutumnFactoryTests : IDisposable
 
         alice.LifeTotal.Should().Be(24,
             "entering the battlefield via the bus with mode 2 gains controller 4 life end-to-end");
+    }
+
+    // -----------------------------------------------------------------------
+    // CR 700.2d — TRUE agent-driven mode prompt (engine-recorded at stack
+    // entry), overriding the factory-captured default mode.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task KnightOfAutumn_AgentChoosesMode_OverridesFactoryDefault()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggerManager = new TriggerManager(stack, bus);
+
+        // Factory default is mode 0 (counters); the AGENT chooses mode 2 (gain
+        // 4 life) at stack entry via the declared ModeRequest — the engine
+        // records it on the trigger and the effect honours it.
+        var knight = KnightOfAutumnFactory.Create(
+            alice, mode: KnightOfAutumnFactory.ModeCounters, triggers: triggerManager);
+        knight.SetZone(ZoneType.Battlefield);
+
+        var agent = new ScriptedAgent();
+        agent.QueueMode(KnightOfAutumnFactory.ModeGainLife); // mode 2
+        // Mode 1's optional target slot (MinTargets=0) is still collected at
+        // stack entry — supply an empty pick (mode 2 wants no target).
+        agent.QueueTargets(System.Array.Empty<object>());
+        var agents = new Dictionary<Player, IPlayerAgent> { [alice] = agent };
+        var ctx = new GameContext(
+            alice, new[] { alice }, alice, 1,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain, stack);
+
+        bus.Publish(new CardMovedEvent(knight, ZoneType.Hand, ZoneType.Battlefield));
+
+        await triggerManager.PutPendingTriggersOnStackAsync(alice, agents, ctx);
+        while (stack.Count > 0)
+        {
+            var obj = stack.Pop();
+            if (obj is TriggeredAbility ta) await ta.ResolveAsync(agent, ctx);
+            else obj?.Resolve();
+        }
+
+        alice.LifeTotal.Should().Be(24,
+            "the agent's stack-entry mode choice (mode 2 — gain 4 life) overrides "
+            + "the factory-captured default (mode 0 — counters)");
+        knight.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "mode 0 (counters) was NOT executed — the agent picked mode 2");
     }
 }

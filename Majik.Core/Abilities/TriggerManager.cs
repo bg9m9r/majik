@@ -379,6 +379,25 @@ public class TriggerManager
 
             foreach (var ability in mine)
             {
+                // CR 700.2d / CR 603.3 — prompt for the MODE(s) of a modal
+                // trigger ("choose one —" / "choose two —") at stack entry, the
+                // analogue of the target prompt below. The chosen mode index(es)
+                // are recorded on the ability via SetChosenModes and threaded
+                // into ResolutionContext.ChosenModes at resolve time — the
+                // engine-driven mode-choice seam the v1 modal-ETB factories
+                // (Knight of Autumn, Charming Prince) deferred. A null agent
+                // (none registered for this controller) records nothing, so the
+                // effect body falls back to its factory default — behaviour-
+                // preserving for the no-agent dispatcher path.
+                if (ability is TriggeredAbility modal
+                    && modal.ModeRequest is { } modeReq
+                    && agent != null)
+                {
+                    var chosenModes = await ChooseModesForTriggerAsync(
+                        agent, modeReq, ctx, ct);
+                    modal.SetChosenModes(chosenModes);
+                }
+
                 // Prompt for targets if the concrete ability has declared any
                 // TargetRequests (Rule 603.3). Abilities without requests skip
                 // straight to the push.
@@ -403,6 +422,53 @@ public class TriggerManager
                 _stack.Push(ability);
             }
         }
+    }
+
+    /// <summary>
+    /// CR 700.2d / CR 603.3 — prompt the controller's <paramref name="agent"/>
+    /// for the mode(s) of a modal trigger at stack entry. A "choose one"
+    /// request (<see cref="ModeRequest.IsSingleMode"/>) routes through the
+    /// scalar <see cref="IPlayerAgent.ChooseModeAsync"/> so existing agents /
+    /// scripts keep their behaviour; "choose two" / "choose one or more"
+    /// requests route through <see cref="IPlayerAgent.ChooseModesAsync"/>. The
+    /// returned indices are validated/sanitized by those agent methods (or the
+    /// interface default) and recorded on the ability — the exact analogue of
+    /// the spell path's <c>SpellCastFlow.PromptForModesAsync</c>. An agent that
+    /// hard-requires a non-null context (and throws) falls back to the first
+    /// <see cref="ModeRequest.MinModes"/> modes so the trigger still resolves.
+    /// </summary>
+    private static async Task<IReadOnlyList<int>> ChooseModesForTriggerAsync(
+        IPlayerAgent agent, ModeRequest req, GameContext ctx, CancellationToken ct)
+    {
+        try
+        {
+            if (req.IsSingleMode)
+            {
+                var single = await agent.ChooseModeAsync(
+                    ctx, req.Modes, req.ModeIntents, ct).ConfigureAwait(false);
+                if (single >= 0 && single < req.Modes.Count)
+                {
+                    return new[] { single };
+                }
+            }
+            else
+            {
+                var multi = await agent.ChooseModesAsync(
+                    ctx, req.Modes, req.MinModes, req.MaxModes, req.ModeIntents, ct)
+                    .ConfigureAwait(false);
+                if (multi.Count > 0) return multi;
+            }
+        }
+        catch
+        {
+            // Agent hard-requires a non-null context or otherwise threw — fall
+            // through to the deterministic first-N default below (same posture
+            // as the factory-time PickModeAsync fallback).
+        }
+
+        // CR 700.2e — deterministic fallback: the first MinModes modes.
+        var n = Math.Clamp(req.MinModes, 1, Math.Max(1, req.Modes.Count));
+        return Enumerable.Range(0, n).ToList();
     }
 
     public void Clear()

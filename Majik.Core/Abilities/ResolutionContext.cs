@@ -101,6 +101,34 @@ public sealed record ResolutionContext(
     /// </summary>
     public int? ChosenX { get; init; }
 
+    /// <summary>
+    /// CR 700.2d / CR 601.2b — the mode index(es) chosen for a MODAL triggered
+    /// ability ("choose one —" / "choose two —"), threaded from
+    /// <see cref="TriggeredAbility.ChosenModes"/> by
+    /// <see cref="TriggeredAbility.ResolveAsync"/>. The engine prompts the
+    /// controller's agent for the mode at STACK-ENTRY time (Rule 603.3, in
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/>) and records
+    /// it on the stack object the way <see cref="ChosenTargets"/> and
+    /// <see cref="ChosenX"/> already are — so a modal ETB effect body reads the
+    /// real agent-chosen mode off the live context instead of a factory-captured
+    /// closure. This is the "true agent-driven mode prompt" the v1 modal-ETB
+    /// factories (Knight of Autumn, Charming Prince) deferred.
+    /// <para>
+    /// Convenience accessor <see cref="ChosenMode"/> returns the first chosen
+    /// mode (the "choose one" common case). Null when no mode was recorded (the
+    /// spell path, the legacy sync path, a non-modal trigger, or the no-agent
+    /// dispatcher path); effect bodies fall back to a factory default in that
+    /// case.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<int>? ChosenModes { get; init; }
+
+    /// <summary>
+    /// Convenience: the FIRST chosen mode index (CR 700.2d "choose one"), or
+    /// null when no mode was recorded. See <see cref="ChosenModes"/>.
+    /// </summary>
+    public int? ChosenMode => ChosenModes is { Count: > 0 } m ? m[0] : (int?)null;
+
     private static readonly IReadOnlyDictionary<int, Player> EmptySharedSlot =
         new Dictionary<int, Player>();
 

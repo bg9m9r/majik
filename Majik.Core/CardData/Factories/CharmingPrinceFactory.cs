@@ -190,6 +190,17 @@ public static class CharmingPrinceFactory
             effects: new IEffect[] { etbEffect },
             interveningIf: null,
             activeZones: new[] { ZoneType.Battlefield },
+            // CR 700.2d — declare the "choose one —" mode request so the engine
+            // prompts the controller's agent at stack entry (Rule 603.3) and
+            // records the chosen mode on the ability; PickModeAsync reads it off
+            // ResolutionContext.ChosenModes at resolve time (true agent-driven
+            // mode prompt), falling back to the captured `mode` only when no
+            // mode was recorded (the no-agent dispatcher path).
+            modeRequest: new ModeRequest(
+                Modes: Modes,
+                MinModes: 1,
+                MaxModes: 1,
+                ModeIntents: ModeIntents),
             targetRequests: new[]
             {
                 // Mode 2 target slot. MinTargets=0 so modes 0 and 1 don't
@@ -221,13 +232,24 @@ public static class CharmingPrinceFactory
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Resolve the mode to execute. Consults the registered agent's
-    /// <see cref="IPlayerAgent.ChooseModeAsync"/> when available; falls
-    /// back to the captured <paramref name="defaultMode"/> (the factory-
-    /// time mode parameter).
+    /// Resolve the mode to execute. PREFERS the engine-recorded mode the
+    /// controller's agent chose at STACK ENTRY (CR 700.2d / CR 603.3 — surfaced
+    /// on <see cref="ResolutionContext.ChosenMode"/> by the
+    /// <see cref="ModeRequest"/> the ETB declares); this is the true
+    /// agent-driven mode prompt. Falls back to consulting a registered agent at
+    /// resolve time (legacy posture), then to the captured
+    /// <paramref name="defaultMode"/> (the factory-time mode parameter / no-agent
+    /// dispatcher path).
     /// </summary>
     private static async ValueTask<int> PickModeAsync(Player controller, int defaultMode, ResolutionContext ctx)
     {
+        // CR 700.2d — the engine prompted the agent at stack entry and recorded
+        // the chosen mode on the trigger; honour it.
+        if (ctx.ChosenMode is { } recorded && recorded >= 0 && recorded < Modes.Count)
+        {
+            return recorded;
+        }
+
         var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         if (agent == null) return defaultMode;
 
