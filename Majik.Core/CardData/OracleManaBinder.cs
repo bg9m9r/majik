@@ -52,6 +52,15 @@ public static class OracleManaBinder
         return _chosenColors.TryGetValue(land, out var choice) ? choice : null;
     }
 
+    // A double-quoted run — the text of an ability a card GRANTS to OTHER
+    // objects, e.g. Joraga Treespeaker's LEVEL 5+ anthem
+    // ("Elves you control have \"{T}: Add {G}{G}.\""). Such a granted ability is
+    // NOT the card's own activated ability (CR 613.1f / 702.49), so its
+    // "{T}: Add …" mana clause must not be re-homed by ParseTapManaCosts.
+    // Non-greedy so two distinct quoted runs on one card are each stripped.
+    private static readonly Regex QuotedGrantRegex = new(
+        "\"[^\"]*\"", RegexOptions.Singleline);
+
     // {T}: Add {R}.  or  {T}: Add {R}{R}.  or  {T}: Add one {G}.
     private static readonly Regex TapForManaRegex = new(
         @"\{T\}\s*:\s*Add\s+((?:\{[WUBRGC]\}\s*)+)",
@@ -237,6 +246,17 @@ public static class OracleManaBinder
     {
         var result = new List<ManaCost>();
         if (string.IsNullOrWhiteSpace(oracleText)) return result;
+
+        // CR 613.1f / 702.49 — re-homing (Agatha's Soul Cauldron) grants the
+        // imprinted creature's OWN activated abilities, NOT abilities it GRANTS
+        // to OTHER objects via a quoted ability. A "{T}: Add …" clause inside a
+        // double-quoted run is such a grant ("Elves you control have '{T}: Add
+        // {G}{G}.'" — Joraga Treespeaker's LEVEL 5+ anthem), so strip every
+        // quoted run before scanning — otherwise the anthem's quoted mana ability
+        // would be wrongly re-homed onto the bearer (double-grant). Real cards
+        // use straight ASCII double quotes around granted abilities; this leaves
+        // the card's own (unquoted) "{T}: Add …" clauses intact.
+        oracleText = StripQuotedGrants(oracleText);
 
         // Any-colour mana sources (Mox Opal, City of Brass, command tower).
         if (TapForAnyColorRegex.IsMatch(oracleText))
@@ -676,6 +696,16 @@ public static class OracleManaBinder
                 livePreview: () => choice.DoublePip()));
         }
     }
+
+    /// <summary>
+    /// Strip every double-quoted run (the text of abilities a card GRANTS to
+    /// OTHER objects) from <paramref name="oracleText"/> so the mana-clause scan
+    /// in <see cref="ParseTapManaCosts"/> only sees the card's OWN abilities
+    /// (CR 613.1f / 702.49). A blank line is left where each quoted run was so a
+    /// "{T}: Add …" clause is never accidentally spliced across the removal.
+    /// </summary>
+    private static string StripQuotedGrants(string oracleText) =>
+        QuotedGrantRegex.Replace(oracleText, " ");
 
     private static int WordToInt(string s) =>
         s.ToLowerInvariant() switch

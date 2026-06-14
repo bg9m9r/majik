@@ -408,6 +408,66 @@ public class OracleManaBinderTests
         _alice.ManaPool.Total.Should().Be(0, "no mana left floating after rejection");
     }
 
+    // -------------------------------------------------------------------
+    // ParseTapManaCosts — the source-agnostic core that re-homes "{T}: Add …"
+    // mana abilities to an arbitrary bearer (Agatha's Soul Cauldron). It must
+    // return ONLY the imprinted creature card's OWN tap-for-mana abilities —
+    // never a "{T}: Add …" clause that appears inside a QUOTED ability the card
+    // GRANTS to OTHER permanents (CR 613.1f / 702.49: the Cauldron grants the
+    // exiled creature's own activated abilities, not abilities it confers on
+    // others). The motivating card is Joraga Treespeaker, whose LEVEL 5+ line
+    // is an anthem — "Elves you control have '{T}: Add {G}{G}.'" — whose quoted
+    // mana ability must NOT be re-homed to an Agatha bearer.
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void ParseTapManaCosts_SimpleTapForMana_ReturnsOneCost()
+    {
+        var costs = OracleManaBinder.ParseTapManaCosts("{T}: Add {G}{G}.");
+
+        costs.Should().ContainSingle("a bare {T}: Add {G}{G} is one mana ability")
+            .Which.ToString().Should().Be(ManaCost.Parse("GG").ToString());
+    }
+
+    [Fact]
+    public void ParseTapManaCosts_IgnoresQuotedGrantedAbility_JoragaTreespeaker()
+    {
+        // Joraga Treespeaker's full oracle text. The card's OWN mana ability is
+        // the LEVEL 1-4 "{T}: Add {G}{G}." line; the LEVEL 5+ line is an anthem
+        // that GRANTS a quoted "{T}: Add {G}{G}." to other Elves — that quoted
+        // clause is NOT Joraga's own ability and must not be re-homed by Agatha.
+        const string joraga =
+            "Level up {1}{G} ({1}{G}: Put a level counter on this. "
+            + "Level up only as a sorcery.)\n"
+            + "LEVEL 1-4\n1/2\n{T}: Add {G}{G}.\n"
+            + "LEVEL 5+\n1/4\n"
+            + "Elves you control have \"{T}: Add {G}{G}.\"";
+
+        var costs = OracleManaBinder.ParseTapManaCosts(joraga);
+
+        costs.Should().ContainSingle(
+            "only Joraga's OWN LEVEL 1-4 mana ability is re-homable — the LEVEL 5+ "
+            + "quoted anthem ability is granted to OTHER Elves, not Joraga itself "
+            + "(CR 613.1f / 702.49)")
+            .Which.ToString().Should().Be(ManaCost.Parse("GG").ToString());
+    }
+
+    [Fact]
+    public void ParseTapManaCosts_IgnoresQuotedGrant_KeepsSeparateOwnAbility()
+    {
+        // A card whose own ability is "{T}: Add {C}." but which also grants a
+        // quoted "{T}: Add {U}." to others. Only the {C} (own) ability is
+        // returned; the quoted {U} grant is excluded.
+        const string oracle =
+            "{T}: Add {C}.\n"
+            + "Other artifacts you control have \"{T}: Add {U}.\"";
+
+        var costs = OracleManaBinder.ParseTapManaCosts(oracle);
+
+        costs.Should().ContainSingle("only the card's OWN {T}: Add {C} is re-homable")
+            .Which.ToString().Should().Be(ManaCost.Parse("C").ToString());
+    }
+
     private static CardEntity GemstoneEntity() => new()
     {
         Name = "Gemstone Mine",
