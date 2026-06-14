@@ -304,6 +304,16 @@ public static class LandActivatedAbilityBinder
         @"You\s+may\s+search\s+your\s+library\s+for\s+a\s+basic\s+land\s+card\s*,\s*put\s+it\s+onto\s+the\s+battlefield",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Boseiju, Who Endures' Channel follow-up (CR 701.19a / 701.20a): after the
+    // destroy, "That player may search their library for a land card WITH A
+    // BASIC LAND TYPE, put it onto the battlefield, then shuffle." Distinct from
+    // Demolition Field's "basic land card" rider — Boseiju matches by basic land
+    // TYPE (subtype Plains/Island/Swamp/Mountain/Forest), which also catches
+    // typed nonbasics (duals / shocks). The fetched land enters untapped.
+    private static readonly Regex ChannelDestroyedControllerSearchBasicLandType = new(
+        @"That\s+player\s+may\s+search\s+their\s+library\s+for\s+a\s+land\s+card\s+with\s+a\s+basic\s+land\s+type\s*,\s*put\s+it\s+onto\s+the\s+battlefield",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // "Creatures you control gain <keyword>[ and <keyword>] until end of turn."
     // The mass until-EOT keyword-grant family (Vault of the Archangel). The
     // <kw> capture is the keyword list ("deathtouch and lifelink", "trample",
@@ -469,10 +479,14 @@ public static class LandActivatedAbilityBinder
     // against live board state (ChannelLegendaryReductionRider regex +
     // LegendaryCreaturesControlled below).
     //
-    // Deferred riders (each consistent with the deferrals the rest of this
-    // binder already takes; none affects which Channel ability binds):
-    //   - Boseiju — the "that player may search their library for a basic land"
-    //     follow-up after destroying a land (an opponent's optional search).
+    // Boseiju's "that player may search their library for a land card with a
+    // basic land type" follow-up is now BOUND (CR 701.19a / 701.20a): after the
+    // destroy, when a LAND was actually destroyed, its controller is OFFERED an
+    // optional basic-land-TYPE search (ChannelDestroyedControllerSearchBasicLandType
+    // regex → TutorBasicLandTypeUntapped, routed through the player's agent so
+    // declining / finding nothing is legal and the "may" is genuinely offered,
+    // not auto-accepted — the binder-bound-optional-you-may seam). The fetched
+    // land enters untapped (no "tapped" printed).
     //
     // Eiganjo's "attacking or blocking" combat-state target gate is now LIVE:
     // the candidate gatherer offers only creatures the per-game
@@ -542,15 +556,40 @@ public static class LandActivatedAbilityBinder
                 @"^Destroy\s+target\s+artifact,\s*enchantment,\s*or\s+nonbasic\s+land",
                 RegexOptions.IgnoreCase))
         {
+            // CR 701.19a / 701.20a — Boseiju's optional follow-up: "THAT PLAYER
+            // may search their library for a land card with a basic land type,
+            // put it onto the battlefield, then shuffle." This is a binder-bound
+            // resolution-time "you may" (the destroyed land's controller is
+            // OFFERED the search — declining / finding nothing is legal). The
+            // search runs only when a LAND was actually destroyed (CR 608.2b —
+            // an illegal target / destroyed artifact-enchantment leaves no "that
+            // player"). The fetched land enters UNTAPPED (no "tapped" printed).
+            var hasBasicTypeSearchRider = ChannelDestroyedControllerSearchBasicLandType
+                .IsMatch(effectText);
+
             effect = new Effect(
-                $"{land.Name} (Channel): destroy target artifact, enchantment, or nonbasic land an opponent controls",
-                () =>
+                $"{land.Name} (Channel): destroy target artifact, enchantment, or nonbasic land an opponent controls" +
+                    (hasBasicTypeSearchRider ? "; that player may search for a basic-land-type land" : string.Empty),
+                async ctx =>
                 {
                     if (FirstChosen(ability) is not ICard target) return;
                     if (target.Zone != ZoneType.Battlefield) return;
                     if (!(target.HasType(CardType.Artifact) || target.HasType(CardType.Enchantment)
                           || (target.HasType(CardType.Land) && !target.HasSupertype(CardSupertype.Basic)))) return;
+
+                    // Only a destroyed LAND grants its controller the optional
+                    // search (CR 701.19a — "that player").
+                    var destroyedLandController = target.HasType(CardType.Land)
+                        ? (target as Permanent)?.Controller
+                        : null;
+
                     Fx.MoveToGraveyard(target, ZoneMoveReason.Destroy);
+
+                    if (hasBasicTypeSearchRider && destroyedLandController != null)
+                    {
+                        await TutorBasicLandTypeUntapped(ctx, destroyedLandController)
+                            .ConfigureAwait(false);
+                    }
                 });
             targets = new[]
             {
@@ -1806,6 +1845,46 @@ public static class LandActivatedAbilityBinder
         }
 
         LibraryShuffle.ShuffleLibrary(player, "demolition-field-tutor");
+    }
+
+    /// <summary>CR 701.19a / 701.20a — Boseiju's optional Channel follow-up:
+    /// <paramref name="player"/> (the destroyed land's controller) MAY search
+    /// their library for a land card WITH A BASIC LAND TYPE (subtype
+    /// Plains/Island/Swamp/Mountain/Forest — so typed nonbasics like duals also
+    /// qualify), put it onto the battlefield UNTAPPED, then shuffle (the shuffle
+    /// fires whether or not a card is found, CR 701.20a). The pick is routed
+    /// through the player's agent — declining (returning null) or an empty
+    /// candidate pool still shuffles, so the "may" is genuinely offered, not
+    /// auto-accepted.</summary>
+    private static async ValueTask TutorBasicLandTypeUntapped(ResolutionContext ctx, Player player)
+    {
+        if (player == null) return;
+
+        var candidates = player.Zones.Library.GetCards()
+            .Where(c => c.HasType(CardType.Land)
+                        && c.Subtypes.Any(BasicLandManaColors.IsBasicLandSubtype))
+            .ToList();
+
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "land card with a basic land type").ConfigureAwait(false);
+
+        if (pick != null)
+        {
+            var zones = ZoneServiceRegistry.Get(player);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+            }
+            else
+            {
+                player.Zones.Library.RemoveCard(pick);
+                player.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(player);
+            }
+        }
+
+        LibraryShuffle.ShuffleLibrary(player, "boseiju-channel-tutor");
     }
 
     // ----------------------------------------------------------------------
