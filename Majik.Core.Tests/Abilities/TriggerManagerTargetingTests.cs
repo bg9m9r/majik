@@ -149,7 +149,146 @@ public class TriggerManagerTargetingTests
         ability.TargetRequests[0].Should().BeSameAs(req);
     }
 
+    // -----------------------------------------------------------------------
+    // CR 700.2d / CR 603.3 — agent-driven mode prompt at stack entry.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_PromptsMode_RecordsChoiceOnAbility()
+    {
+        // A modal ETB trigger ("choose one —" with three modes).
+        var modeReq = new ModeRequest(
+            Modes: new[] { "Mode A", "Mode B", "Mode C" },
+            MinModes: 1, MaxModes: 1);
+        var ability = BuildEtbAbilityWithModeRequest(_alice, modeReq);
+
+        ((ICard)ability.Source).SetZone(ZoneType.Battlefield);
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent((ICard)ability.Source, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Agent chooses mode index 2 at stack entry.
+        var agent = new ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { ability });
+        agent.QueueMode(2);
+
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+
+        await _manager.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        _stack.Count.Should().Be(1);
+        ability.ChosenModes.Should().NotBeNull();
+        ability.ChosenModes!.Should().ContainSingle().Which.Should().Be(2,
+            "the engine prompts the agent for the mode at stack entry (CR 700.2d) "
+            + "and records it on the ability, mirroring ChosenTargets");
+    }
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_NoModeRequest_LeavesChosenModesNull()
+    {
+        var source = new Creature("Bear", "1G", 2, 2)
+            { Owner = _alice, Zone = ZoneType.Battlefield };
+        var ability = new TriggeredAbility(source, _alice,
+            Triggers.OnEnterBattlefieldSelf(source));
+
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent(source, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Agent has no mode queued; would throw if ChooseModeAsync were called.
+        var agent = new ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { ability });
+
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+
+        await _manager.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        _stack.Count.Should().Be(1);
+        ability.ChosenModes.Should().BeNull("a non-modal trigger declares no ModeRequest");
+    }
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_NoAgent_LeavesChosenModesNull()
+    {
+        // CR 700.2d — no agent registered for the controller: nothing is
+        // recorded, so the effect body falls back to its factory default.
+        var modeReq = new ModeRequest(new[] { "Mode A", "Mode B" }, 1, 1);
+        var ability = BuildEtbAbilityWithModeRequest(_alice, modeReq);
+
+        ((ICard)ability.Source).SetZone(ZoneType.Battlefield);
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent((ICard)ability.Source, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Empty agents map.
+        await _manager.PutPendingTriggersOnStackAsync(
+            _alice, new Dictionary<Player, IPlayerAgent>(), NewContext());
+
+        _stack.Count.Should().Be(1);
+        ability.ChosenModes.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_ChosenMode_ThreadedIntoResolutionContext()
+    {
+        // End-to-end: the engine-recorded mode is threaded into
+        // ResolutionContext.ChosenMode at resolve time.
+        var modeReq = new ModeRequest(new[] { "Mode A", "Mode B", "Mode C" }, 1, 1);
+
+        int? observedMode = null;
+        var source = new Creature($"Modal-{Guid.NewGuid()}", "1G", 2, 2)
+            { Owner = _alice, Zone = ZoneType.Battlefield };
+        var effect = new Effect("observe chosen mode", ctx =>
+        {
+            observedMode = ctx.ChosenMode;
+            return ValueTask.CompletedTask;
+        });
+        var ability = new TriggeredAbility(
+            source, _alice,
+            Triggers.OnEnterBattlefieldSelf(source),
+            effects: new[] { effect },
+            modeRequest: modeReq);
+
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent(source, ZoneType.Hand, ZoneType.Battlefield));
+
+        var agent = new ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { ability });
+        agent.QueueMode(1);
+
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+        await _manager.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        await ability.ResolveAsync(agent, NewContext());
+
+        observedMode.Should().Be(1,
+            "the chosen mode is threaded into ResolutionContext.ChosenMode (CR 700.2d)");
+    }
+
+    [Fact]
+    public void TriggeredAbility_ModeRequest_DefaultsToNull()
+    {
+        var source = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var ability = new TriggeredAbility(source, _alice,
+            Triggers.OnEnterBattlefieldSelf(source));
+
+        ability.ModeRequest.Should().BeNull();
+        ability.ChosenModes.Should().BeNull();
+    }
+
     // ---- helpers -----------------------------------------------------------
+
+    private TriggeredAbility BuildEtbAbilityWithModeRequest(
+        Player controller, ModeRequest modeRequest)
+    {
+        var source = new Creature($"Modal-{Guid.NewGuid()}", "1G", 2, 2)
+            { Owner = controller };
+        return new TriggeredAbility(
+            source, controller,
+            Triggers.OnEnterBattlefieldSelf(source),
+            modeRequest: modeRequest);
+    }
 
     private TriggeredAbility BuildEtbAbilityWithTargetRequests(
         Player controller,

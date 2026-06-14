@@ -27,6 +27,14 @@ public class TriggeredAbility : ITriggeredAbility
     private IReadOnlyList<IReadOnlyList<object>> _chosenTargets =
         Array.Empty<IReadOnlyList<object>>();
 
+    // Deferred mode choice (CR 700.2d / CR 603.3): a modal trigger declares a
+    // ModeRequest at construction time; the chosen mode index(es) are stored
+    // after the controller's agent responds at stack-entry time (the
+    // triggered-ability analogue of ChosenTargets / the activated-ability
+    // ChosenX ledger). Null until the engine prompts; effects read it off the
+    // resolution context (ResolutionContext.ChosenModes).
+    private IReadOnlyList<int>? _chosenModes;
+
     public Guid Id { get; }
     public Player Controller { get; }
     public DateTime Timestamp { get; }
@@ -72,6 +80,29 @@ public class TriggeredAbility : ITriggeredAbility
     public IReadOnlyList<IReadOnlyList<object>> ChosenTargets => _chosenTargets;
 
     /// <summary>
+    /// CR 700.2d / CR 601.2b — the "choose one (or more)" mode request this
+    /// trigger carries, declared at construction time. Null for a non-modal
+    /// trigger. When present, the engine prompts the controller's agent for the
+    /// mode(s) at stack-entry time (Rule 603.3) and records the answer via
+    /// <see cref="SetChosenModes"/> — the triggered-ability analogue of
+    /// <see cref="TargetRequests"/> / the activated-ability
+    /// <c>ChosenX</c> ledger.
+    /// </summary>
+    public ModeRequest? ModeRequest { get; }
+
+    /// <summary>
+    /// The mode index(es) chosen by the controller's agent for this modal
+    /// trigger (CR 700.2d). Populated by <see cref="SetChosenModes"/> before
+    /// the ability is pushed onto the stack; threaded into
+    /// <see cref="ResolutionContext.ChosenModes"/> at resolve time. Null until
+    /// the engine prompts (or when the trigger is non-modal). A modal effect
+    /// body should read the chosen mode off the resolution context, falling
+    /// back to a factory default only when the slot was never populated (the
+    /// no-agent dispatcher posture).
+    /// </summary>
+    public IReadOnlyList<int>? ChosenModes => _chosenModes;
+
+    /// <summary>
     /// CR 603.3 — the player identified by THIS trigger's event as it was
     /// evaluated (the "that player" / triggering player), captured by the
     /// trigger condition the moment it matches and read back by an UNTARGETED
@@ -104,7 +135,8 @@ public class TriggeredAbility : ITriggeredAbility
         Func<bool>? interveningIf = null,
         IEnumerable<ZoneType>? activeZones = null,
         IEnumerable<TargetRequest>? targetRequests = null,
-        Func<bool>? activeWhen = null)
+        Func<bool>? activeWhen = null,
+        ModeRequest? modeRequest = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -131,6 +163,8 @@ public class TriggeredAbility : ITriggeredAbility
         TargetRequests = targetRequests is null
             ? Array.Empty<TargetRequest>()
             : targetRequests.ToList().AsReadOnly();
+
+        ModeRequest = modeRequest;
 
         if (targets != null)
         {
@@ -168,7 +202,8 @@ public class TriggeredAbility : ITriggeredAbility
             interveningIf: InterveningIf,
             activeZones: ActiveZones,
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
-            activeWhen: ActiveWhen);
+            activeWhen: ActiveWhen,
+            modeRequest: ModeRequest);
 
     /// <summary>
     /// Store the targets chosen by the controller's agent. Called by
@@ -179,6 +214,16 @@ public class TriggeredAbility : ITriggeredAbility
     {
         _chosenTargets = chosen ?? Array.Empty<IReadOnlyList<object>>();
     }
+
+    /// <summary>
+    /// CR 700.2d / CR 603.3 — store the mode index(es) chosen by the
+    /// controller's agent for this modal trigger. Called by
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/> immediately
+    /// before pushing the ability onto the stack, mirroring
+    /// <see cref="SetChosenTargets"/>. The recorded modes are threaded into
+    /// <see cref="ResolutionContext.ChosenModes"/> at resolution.
+    /// </summary>
+    public void SetChosenModes(IReadOnlyList<int>? chosen) => _chosenModes = chosen;
 
     public bool IsTriggered(GameEvent e)
     {
@@ -232,7 +277,7 @@ public class TriggeredAbility : ITriggeredAbility
         var rc = ResolutionContext.For(
                 Controller, agent, game, _chosenTargets, ct, source: Source as Permanent)
             with
-            { TriggeringPlayer = TriggeringPlayer };
+            { TriggeringPlayer = TriggeringPlayer, ChosenModes = _chosenModes };
 
         // Attribute any counter performed during this ability's resolution to
         // its controller — "a spell or ability you control counters a spell"
