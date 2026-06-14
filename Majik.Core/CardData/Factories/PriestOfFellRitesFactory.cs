@@ -2,86 +2,109 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Priest of Fell Rites (Modern Horizons 2, {W}{B}).
+/// Named-card factory for Priest of Fell Rites (Modern Horizons 3, {W}{B}).
 ///
-/// Creature — Human Warlock 2/2. Oracle text:
-///   "When Priest of Fell Rites enters, you may return target creature card
-///    with mana value 3 or less from your graveyard to the battlefield.
-///    {2}{W}{B}, Exile Priest of Fell Rites from your graveyard: Return
-///    target creature card from your graveyard to the battlefield. Activate
-///    only as a sorcery."
+/// Creature — Human Warlock 2/2. Oracle text (verified against Scryfall +
+/// the embedded seed, current printing):
+///   "{T}, Pay 3 life, Sacrifice this creature: Return target creature card
+///    from your graveyard to the battlefield. Activate only as a sorcery.
+///    Unearth {3}{W}{B} ({3}{W}{B}: Return this card from your graveyard to
+///    the battlefield. It gains haste. Exile it at the beginning of the next
+///    end step or if it would leave the battlefield. Unearth only as a
+///    sorcery.)"
 ///
 /// ## Implemented (v1)
-/// - 2/2 Human Warlock with mana cost {W}{B}.
-/// - <b>ETB triggered ability (CR 603.1)</b>: When Priest of Fell Rites
-///   enters, the controller may return target creature card with mana
-///   value 3 or less from their graveyard to the battlefield. v1 picks
-///   the first eligible creature card deterministically; the "you may"
-///   defaults to taking the action when an eligible candidate exists.
-///   Movement is funnelled through <see cref="ZoneService.MoveCard"/>
-///   when a service is supplied so ETB triggers on the reanimated
-///   permanent fire (CR 603.6a). When no ZoneService is supplied the
-///   move falls back to raw zone manipulation suitable for shape tests.
-/// - <b>Graveyard-activated unearth-style ability (CR 113.6 / 117.1a)</b>:
-///   <c>{2}{W}{B}, Exile Priest of Fell Rites from your graveyard: Return
-///    target creature card from your graveyard to the battlefield.</c>
-///   The exile-self portion of the cost is folded into the resolution
-///   effect (no <c>ExileSelfFromGraveyardCost</c> ICost shape exists at
-///   v1; mirrors the Stoneforge pattern of expressing the second-half
-///   cost work inside the Effect body). The mana cost is exposed as a
-///   <see cref="ManaCostCost"/> on the activated ability for shape
-///   inspection.
+/// - <b>Creature — Human Warlock {W}{B} 2/2</b>, owner/controller wired.
+/// - <b>"{T}, Pay 3 life, Sacrifice this creature: Return target creature card
+///   from your graveyard to the battlefield. Activate only as a sorcery."</b> —
+///   a battlefield-zone <see cref="ActivatedAbility"/> whose costs are
+///   <see cref="AdditionalCost.Tap"/> + <see cref="AdditionalCost.PayLife"/>(3)
+///   + <see cref="AdditionalCost.Sacrifice"/>(self) (CR 118 / 701.16 / 119.3).
+///   The reanimation target is a creature CARD in the controller's graveyard
+///   (CR 110.4); chosen via a <see cref="TargetRequest"/> + CandidateGatherer
+///   and read at resolution from <see cref="ResolutionContext.ChosenTargets"/>
+///   (CR 601.2c), re-validated per CR 608.2b. Sorcery-speed (CR 117.1a / 307.5).
 ///   <para>
-///   The engine does NOT presently gate activated abilities on source
-///   zone — i.e. abilities are not zone-scoped. So this activated
-///   ability is enumerable while Priest of Fell Rites is in any zone;
-///   the resolution body checks that the Priest is in the graveyard
-///   before paying the exile portion of the cost, so spurious
-///   activations from battlefield/exile are no-op-shaped at v1. Tests
-///   exercise the ability by enumerating activated abilities and
-///   executing their effects, mirroring StoneforgeMystic / VexingBauble.
+///   <b>RE-SOURCE-SAFE (agatha-resolutioncontext-source migration; closes the
+///   priest-of-fell-rites-exile-from-gy-reanimate-rebind deferral).</b> The
+///   reanimation effect reads its source / controller off the live
+///   <see cref="ResolutionContext.Source"/> (<c>(ctx.Source as Permanent) ??
+///   card</c>) rather than capturing the authoring <c>card</c>, and the ability
+///   is marked <see cref="ActivatedAbility.RebindSafe"/> = true. Its three costs
+///   are all source-capturing <see cref="AdditionalCost"/>s (Tap + Sacrifice
+///   carry the permanent; PayLife carries no source), so
+///   <see cref="ActivatedAbility.RebindTo"/> Stage-1 re-homes the Tap /
+///   Sacrifice to the BEARER via <see cref="AdditionalCost.RebindSource"/>.
+///   Agatha's Soul Cauldron therefore re-homes the REAL ability to a
+///   counter-bearing creature (CR 707.2 / 613.1f / 702.49): the bearer taps +
+///   pays 3 life + sacrifices ITSELF, and reanimates from the bearer's
+///   controller's graveyard. NOTE — the current printing's cost is a plain
+///   self-sacrifice (an <see cref="AdditionalCost"/> the Stage-1 seam already
+///   covers); the prior printing's "Exile Priest of Fell Rites from your
+///   graveyard" (a zone-and-name-bound graveyard self-exile cost that needed a
+///   bespoke rebind seam) is no longer on the card, so the deferral resolves
+///   onto the existing AdditionalCost rebind path with no new cost primitive.
 ///   </para>
+/// - <b>Unearth {3}{W}{B} (CR 702.84)</b> — a graveyard-activated, sorcery-speed
+///   <see cref="ActivatedAbility"/> with a {3}{W}{B} <see cref="ManaCostCost"/>
+///   that returns this card from the graveyard to the battlefield, grants Haste
+///   (CR 702.10), and (when a <see cref="TriggerManager"/> is supplied)
+///   registers a one-shot delayed end-step EXILE (CR 702.84c). Same shape as
+///   <see cref="ScrapworkMuttFactory"/> / Hellspark Elemental. NOT marked
+///   RebindSafe — Unearth is intrinsically a graveyard ability of THIS card and
+///   is not a grant target (an imprinted card's Unearth is meaningless on a
+///   battlefield bearer).
 ///
 /// ## Deferred (v1 gaps)
-/// (The activate-as-sorcery timing window is now enforced via the
-/// ActionValidator gate; see "Implemented" above.)
-/// - <b>"You may" prompt</b>: the ETB trigger autopicks the first
-///   eligible creature card; declining and target-selection are
-///   deferred to the agent-prompt MVP.
-/// - <b>Zone-scoped activated abilities</b>: graveyard activations are
-///   enumerable from any zone; a future engine pass should restrict
-///   activation to the printed source zone (CR 113.6).
+/// - <b>Agent target / "Pay 3 life or not" prompt</b>: the battlefield ability
+///   declares a real <see cref="TargetRequest"/> the live trigger/activation
+///   path fills; factory-direct shape tests set <see cref="ResolutionContext"/>
+///   targets explicitly.
+/// - <b>Zone-scoped activated abilities</b>: Unearth is enumerable while the
+///   card is in any zone; the resolution body guards on the graveyard zone so
+///   spurious activations are no-op-shaped (engine zone-scoping still future
+///   work).
 /// </summary>
 [CardName("Priest of Fell Rites")]
 public static class PriestOfFellRitesFactory
 {
+    public const string CardName = "Priest of Fell Rites";
+    public const string PrintedManaCost = "{W}{B}";
+    public const int Power = 2;
+    public const int Toughness = 2;
+    public const int PayLifeAmount = 3;
+    public const string UnearthCost = "{3}{W}{B}";
+    public const string Haste = "Haste";
+
     /// <summary>
-    /// Construct Priest of Fell Rites with no live ZoneService /
-    /// TriggerManager wiring (the shape/dispatcher path). The ETB
-    /// trigger is attached but not registered; the activated ability
-    /// uses raw zone moves for the reanimation target — suitable for
-    /// unit / shape tests.
+    /// Construct Priest of Fell Rites with no live runtime wiring (the shape /
+    /// dispatcher path). Both activated abilities are attached; the battlefield
+    /// reanimation uses raw zone moves when resolved without a registered
+    /// ZoneService, and Unearth registers no delayed exile trigger. This is the
+    /// overload <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Creature Create(Player owner) =>
         Create(owner, zoneService: null, eventBus: null, triggers: null);
 
     /// <summary>
-    /// Construct Priest of Fell Rites with optional runtime services.
-    /// When <paramref name="zoneService"/> is supplied, both the ETB
-    /// trigger and the activated ability route the graveyard →
-    /// battlefield move through <see cref="ZoneService.MoveCard"/> so
-    /// ETB triggers / replacements on the reanimated creature fire
-    /// (CR 603.6a). When <paramref name="triggers"/> is supplied, the
-    /// ETB trigger is registered so a <see cref="CardMovedEvent"/> to
-    /// the battlefield places it on the stack automatically.
+    /// Construct Priest of Fell Rites with optional runtime services. When
+    /// <paramref name="zoneService"/> is supplied, the graveyard → battlefield
+    /// reanimation routes through <see cref="ZoneService.MoveCard"/> so ETB
+    /// triggers on the reanimated creature fire (CR 603.6a). When
+    /// <paramref name="triggers"/> is supplied, Unearth's delayed end-step exile
+    /// is registered (CR 702.84c).
     /// </summary>
     public static Creature Create(
         Player owner,
@@ -92,128 +115,198 @@ public static class PriestOfFellRitesFactory
         ArgumentNullException.ThrowIfNull(owner);
 
         var card = new Creature(
-            name: "Priest of Fell Rites",
-            manaCost: "{W}{B}",
-            power: 2,
-            toughness: 2,
+            name: CardName,
+            manaCost: PrintedManaCost,
+            power: Power,
+            toughness: Toughness,
             subtypes: new[] { CardSubtype.Human, CardSubtype.Warlock });
 
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // ----------------------------------------------------------------
-        // ETB triggered ability — CR 603.1.
-        //   "When Priest of Fell Rites enters, you may return target
-        //    creature card with mana value 3 or less from your graveyard
-        //    to the battlefield."
-        // v1: deterministic — pick the first creature card (mana value
-        // ≤ 3) in the controller's graveyard; "you may" defaults to
-        // taking the action when an eligible candidate exists. See
-        // class xmldoc for agent-prompt deferral.
-        // ----------------------------------------------------------------
-        var etbEffect = new Effect(
-            "Priest of Fell Rites: reanimate target creature card (mv ≤ 3)",
-            () => ReanimatePick(owner, zoneService, maxManaValue: 3));
-
-        var etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(card),
-            effects: new IEffect[] { etbEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(etbTrigger);
-        triggers?.RegisterTriggeredAbility(etbTrigger);
-
-        // ----------------------------------------------------------------
-        // Activated ability — {2}{W}{B}, Exile this from graveyard:
-        //   Return target creature card from your graveyard to the
-        //   battlefield. Activate only as a sorcery.
-        //
-        // CR 113.6 / 117.1a — printed zone is graveyard. Mana cost is
-        // expressed as a ManaCostCost on the ability for shape
-        // inspection. The exile-self portion of the cost is performed
-        // inside the resolution effect (no ExileSelfFromGraveyardCost
-        // ICost shape exists at v1). The sorcery-speed restriction is
-        // not enforced (see class xmldoc — "Deferred").
-        //
-        // Guard: only fire when the Priest is currently in its owner's
-        // graveyard, so spurious activations from other zones are
-        // no-op-shaped while engine zone-scoping is deferred.
-        // ----------------------------------------------------------------
-        var activatedEffect = new Effect(
-            "Priest of Fell Rites: exile from graveyard, reanimate target creature",
-            () =>
-            {
-                // Cost half: exile Priest from graveyard. Skip if not
-                // currently in graveyard — activation is illegal from
-                // other zones (engine gating deferred; the guard keeps
-                // shape tests honest).
-                if (card.Zone != ZoneType.Graveyard) return;
-                if (card.Owner == null) return;
-                if (!ReferenceEquals(card.Owner, owner)) return;
-
-                owner.Zones.Graveyard.RemoveCard(card);
-                owner.Zones.Exile.AddCard(card);
-                card.SetZone(ZoneType.Exile);
-
-                // Effect half: reanimate first creature card in
-                // controller's graveyard (no mana-value cap on the
-                // activated ability — only the ETB has that rider).
-                ReanimatePick(owner, zoneService, maxManaValue: null);
-            });
-
-        // CR 117.1a / 307.5 — "Activate only as a sorcery". The timing
-        // gate runs unconditionally regardless of source zone (graveyard-
-        // zone scoping is still future work — see class xmldoc).
-        var activatedAbility = new ActivatedAbility(
-            source: card,
-            controller: owner,
-            costs: new ICost[] { new ManaCostCost("{2}{W}{B}") },
-            effects: new IEffect[] { activatedEffect },
-            sorcerySpeed: true);
-
-        card.AddAbility(activatedAbility);
+        AddReanimationAbility(card, owner);
+        AddUnearthAbility(card, owner, zoneService, triggers);
 
         return card;
     }
 
-    /// <summary>
-    /// Shared reanimation helper. Picks the first creature card in
-    /// <paramref name="controller"/>'s graveyard whose mana value is
-    /// less than or equal to <paramref name="maxManaValue"/> (when
-    /// supplied) and moves it to the battlefield under the controller's
-    /// control. Routes through <see cref="ZoneService.MoveCard"/> when
-    /// available so ETB triggers on the reanimated permanent fire
-    /// (CR 603.6a / PR #165); falls back to raw zone manipulation
-    /// otherwise (shape-only path).
-    /// </summary>
-    private static void ReanimatePick(
-        Player controller,
-        ZoneService? zoneService,
-        int? maxManaValue)
+    // -----------------------------------------------------------------------
+    // "{T}, Pay 3 life, Sacrifice this creature: Return target creature card
+    //  from your graveyard to the battlefield. Activate only as a sorcery."
+    //
+    // RE-SOURCE-SAFE: the effect reads (ctx.Source as Permanent) ?? card for
+    // the live source + its controller, never the captured `card`. The Tap +
+    // Sacrifice costs are AdditionalCosts that RebindTo re-homes (Stage 1), so
+    // Agatha's Soul Cauldron re-homes the REAL ability to a bearer. Marked
+    // rebindSafe: true.
+    // -----------------------------------------------------------------------
+    private static void AddReanimationAbility(Creature card, Player owner)
     {
-        var pick = controller.Zones.Graveyard.GetCards()
-            .OfType<Creature>()
-            .FirstOrDefault(c =>
-                maxManaValue is null
-                    ? true
-                    : c.ManaCostValue.TotalValue <= maxManaValue.Value);
+        // CR 601.2c — the chosen target is read at resolution from
+        // ResolutionContext.ChosenTargets[0][0]; the candidate pool is the
+        // controller's graveyard creature CARDS (CR 110.4).
+        var targetRequest = new TargetRequest(
+            Description: "target creature card from your graveyard",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            CandidateGatherer: _ => GraveyardCreatureCards(card.Controller ?? owner));
 
-        // CR 117.x — a "you may" / target-required effect with no valid
-        // target resolves as a no-op.
-        if (pick == null) return;
+        var reanimateEffect = new Effect(
+            $"{CardName}: return target creature card from your graveyard to the battlefield",
+            ctx =>
+            {
+                // RE-SOURCE-SAFE — the live source (the bearer after a RebindTo;
+                // otherwise this Priest) and its controller drive "your
+                // graveyard".
+                var controller = ResolveController(ctx, card, owner);
 
+                // CR 608.2b — read the chosen target; re-validate at resolution.
+                var pick = ctx.ChosenTargets.Count > 0 && ctx.ChosenTargets[0].Count > 0
+                    ? ctx.ChosenTargets[0][0] as ICard
+                    : null;
+                if (pick == null) return ValueTask.CompletedTask;
+
+                // Still a creature card in the controller's graveyard.
+                if (pick.Zone != ZoneType.Graveyard) return ValueTask.CompletedTask;
+                if (!controller.Zones.Graveyard.ContainsCard(pick)) return ValueTask.CompletedTask;
+                if (!pick.HasType(CardType.Creature)) return ValueTask.CompletedTask;
+
+                // CR 701.20 — reanimate to the controller's battlefield, routed
+                // through ZoneService when registered so ETB triggers fire.
+                var zones = ZoneServiceRegistry.Get(controller);
+                Fx.ReturnFromGraveyardToBattlefield(pick, controller, zones);
+                return ValueTask.CompletedTask;
+            });
+
+        card.AddAbility(new ActivatedAbility(
+            source: card,
+            controller: owner,
+            costs: new ICost[]
+            {
+                AdditionalCost.Tap(card),
+                AdditionalCost.PayLife(PayLifeAmount),
+                AdditionalCost.Sacrifice(card),
+            },
+            effects: new IEffect[] { reanimateEffect },
+            targetRequests: new[] { targetRequest },
+            // "Activate only as a sorcery." (CR 117.1a / 307.5)
+            sorcerySpeed: true,
+            // Agatha's Soul Cauldron re-home soundness — every effect reads the
+            // live ResolutionContext.Source; the Tap / Sacrifice costs re-home
+            // via AdditionalCost.RebindSource (Stage 1).
+            rebindSafe: true));
+    }
+
+    /// <summary>
+    /// The live source's controller (the bearer's controller after a RebindTo,
+    /// else this Priest's controller, else the authoring owner). Drives "your
+    /// graveyard" so a re-homed ability reanimates from the BEARER's controller's
+    /// graveyard, never the exiled imprinted card's.
+    /// </summary>
+    private static Player ResolveController(ResolutionContext ctx, Creature card, Player owner) =>
+        (ctx.Source as Permanent)?.Controller ?? card.Controller ?? owner;
+
+    /// <summary>
+    /// Candidate pool for the reanimation target — creature CARDS in the
+    /// controller's graveyard (CR 110.4 — a card in a graveyard, not a permanent).
+    /// </summary>
+    private static IReadOnlyList<object> GraveyardCreatureCards(Player controller) =>
+        controller.Zones.Graveyard.GetCards()
+            .Where(c => c.HasType(CardType.Creature))
+            .Cast<object>()
+            .ToList();
+
+    // -----------------------------------------------------------------------
+    // Unearth {3}{W}{B} — CR 702.84. Graveyard-activated, sorcery-speed.
+    // Returns this card from graveyard → battlefield, grants Haste, registers
+    // a delayed end-step EXILE. Mirrors ScrapworkMutt / Hellspark Elemental.
+    // -----------------------------------------------------------------------
+    private static void AddUnearthAbility(
+        Creature card, Player owner, ZoneService? zoneService, TriggerManager? triggers)
+    {
+        var unearthEffect = new Effect(
+            $"{CardName}: unearth — return from graveyard, gain haste, exile next end step",
+            () => ResolveUnearth(card, owner, zoneService, triggers));
+
+        card.AddAbility(new ActivatedAbility(
+            source: card,
+            controller: owner,
+            costs: new ICost[] { new ManaCostCost(UnearthCost) },
+            effects: new IEffect[] { unearthEffect },
+            // CR 702.84a — "Unearth only as a sorcery."
+            sorcerySpeed: true));
+    }
+
+    /// <summary>
+    /// CR 702.84 — resolve the Unearth activation. Returns the card from its
+    /// owner's graveyard to the battlefield under the controller's control,
+    /// grants Haste (CR 702.10 / 613.1c), clears summoning sickness, and (when
+    /// <paramref name="triggers"/> is supplied) registers a one-shot delayed
+    /// end-step trigger that EXILES the creature (CR 702.84c). No-ops cleanly
+    /// when the card is not in its owner's graveyard.
+    /// </summary>
+    private static void ResolveUnearth(
+        Creature card, Player owner, ZoneService? zoneService, TriggerManager? triggers)
+    {
+        if (card.Zone != ZoneType.Graveyard) return;
+        if (card.Owner == null || !ReferenceEquals(card.Owner, owner)) return;
+        if (!owner.Zones.Graveyard.GetCards().Contains(card)) return;
+
+        // Graveyard → battlefield (CR 702.84a). ZoneService routes the publish
+        // so ETB triggers fire (CR 603.6a).
         if (zoneService != null)
         {
-            zoneService.MoveCard(pick, ZoneType.Graveyard, ZoneType.Battlefield, controller);
+            zoneService.MoveCard(card, ZoneType.Graveyard, ZoneType.Battlefield, owner);
         }
         else
         {
-            controller.Zones.Graveyard.RemoveCard(pick);
-            controller.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            pick.SetController(controller);
+            owner.Zones.Graveyard.RemoveCard(card);
+            owner.Zones.Battlefield.AddCard(card);
+            card.SetZone(ZoneType.Battlefield);
+            card.SetController(owner);
         }
+
+        // "It gains haste." CR 702.84a / CR 613.1c (Layer 6).
+        if (card.ActiveEffects != null)
+        {
+            card.ActiveEffects.Register(new GrantKeywordUntilEndOfTurnEffect(card, Haste));
+        }
+        card.HasSummoningSickness = false;
+
+        // "Exile it at the beginning of the next end step." CR 702.84c / 603.7.
+        if (triggers == null) return;
+
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
+        var exileEffect = new Effect(
+            $"{CardName}: unearth — exile at next end step",
+            () =>
+            {
+                if (card.Zone != ZoneType.Battlefield) return;
+                var bfPlayer = card.Controller ?? owner;
+                if (!bfPlayer.Zones.Battlefield.GetCards().Contains(card)) return;
+                var exileOwner = card.Owner ?? owner;
+
+                if (zoneService != null)
+                {
+                    zoneService.MoveCard(card, ZoneType.Battlefield, ZoneType.Exile, bfPlayer);
+                }
+                else
+                {
+                    bfPlayer.Zones.Battlefield.RemoveCard(card);
+                    exileOwner.Zones.Exile.AddCard(card);
+                    card.SetZone(ZoneType.Exile);
+                }
+            });
+
+        var delayedExile = new DelayedTriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: new EventTriggerCondition<StepStartedEvent>(
+                (e, _) => e.StepType == StepStateType.End
+                          && e.Timestamp > resolvedAt),
+            effects: new IEffect[] { exileEffect });
+
+        triggers.RegisterDelayed(delayedExile);
     }
 }

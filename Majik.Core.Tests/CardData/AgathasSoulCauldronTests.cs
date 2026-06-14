@@ -1913,6 +1913,74 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // priest-of-fell-rites-exile-from-gy-reanimate-rebind — the bespoke
+    // [CardName]-factory creature whose reanimation activated ability ("{T},
+    // Pay 3 life, Sacrifice this creature: Return target creature card from your
+    // graveyard to the battlefield") was migrated to read
+    // ResolutionContext.Source + marked RebindSafe. Its Tap + Sacrifice costs
+    // re-home via AdditionalCost.RebindSource (Stage 1), so the grant re-homes
+    // the REAL ability to a BEARER: the bearer taps + sacrifices ITSELF and
+    // reanimates from the BEARER's controller's graveyard.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_PriestOfFellRites_ToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // reanimation activated ability is now RebindSafe.
+        var priest = PriestOfFellRitesFactory.Create(alice);
+        priest.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+                .Any(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Sacrifice))
+            .RebindSafe.Should().BeTrue(
+                "the migrated Priest reanimation reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(priest);
+        priest.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), priest);
+
+        // The bearer gains the Priest's REAL reanimation ability, re-homed.
+        var reanimate = GrantedActivated(bearer).Single(a =>
+            a.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+                .Any(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Sacrifice));
+        reanimate.Source.Should().BeSameAs(bearer, "re-homed to the BEARER (CR 707.2)");
+        reanimate.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // STAGE 1 — the Tap + Sacrifice costs now capture the BEARER, not the
+        // exiled Priest.
+        reanimate.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Single(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Sacrifice)
+            .Description.Should().Contain(bearer.Name,
+                "the sacrifice cost re-homes to the bearer (AdditionalCost.RebindSource)");
+
+        // A creature card in the BEARER's controller's graveyard reanimates when
+        // the re-homed ability resolves (ResolutionContext.Source = bearer →
+        // controller = bearer's controller).
+        var zombie = new Creature("Walking Corpse", "1B", 2, 2);
+        zombie.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(zombie);
+        zombie.SetZone(ZoneType.Graveyard);
+
+        reanimate.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { zombie } });
+        await reanimate.ResolveAsync(agent: null, game: null);
+
+        zombie.Zone.Should().Be(ZoneType.Battlefield,
+            "the re-homed reanimation returns the chosen creature card to the bearer's controller's battlefield");
+        alice.Zones.Battlefield.GetCards().Should().Contain(zombie);
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-rebind-steel-hellkite-variable-x-sweep — the HARD bespoke case:
     // Steel Hellkite's "{X}: Destroy each nonland permanent with mv X whose
     // controller was dealt combat damage by THIS CREATURE this turn." The
