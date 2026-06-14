@@ -6,6 +6,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -211,6 +212,70 @@ public class LeylineOfCombustionFactoryTests
 
         _bob.LifeTotal.Should().Be(18,
             "Combustion deals 2 damage to the controller of the targeting spell (Bob) on the prod path");
+    }
+
+    /// <summary>
+    /// PROD-PATH regression guard, mirroring Festival Crasher's
+    /// <c>EffectsAwareDispatch_WiresAndFiresCastTrigger_OnProdPath</c>.
+    ///
+    /// The Class B trigger-wiring audit (and the live <c>GameFacade.BuildDeckCard</c>
+    /// routed build) constructs every deck card via
+    /// <see cref="NamedCardFactory.Create(string, Player, ContinuousEffectsService?)"/>
+    /// — the effects-aware dispatch — NOT the explicit
+    /// <c>Create(Player, IEventBus?, TriggerManager?)</c> overload. Leyline of
+    /// Combustion exposes no <c>Create(Player, ContinuousEffectsService)</c>
+    /// overload, so that dispatch falls through to the single-arg
+    /// <see cref="LeylineOfCombustionFactory.Create(Player)"/>; the becomes-
+    /// targeted trigger (CR 603.6c) is attached to the card SHAPE in BOTH
+    /// overloads, so the live <see cref="TriggerManager"/> auto-binds it on the
+    /// first zone crossing (battlefield entry, CardMovedEvent →
+    /// SyncCardRegistration). This drives the full prod cycle — exact audit
+    /// build entry → auto-bind → opponent-targets-you → fire → resolve — and
+    /// asserts the opponent takes 2 damage, proving the trigger is reached on
+    /// the production build path (the seam this deferral named).
+    /// </summary>
+    [Fact]
+    public async System.Threading.Tasks.Task EffectsAwareDispatch_WiresAndFiresTargetedTrigger_OnProdPath()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var effects = new ContinuousEffectsService();
+
+        // Prod dispatch — the EXACT call TriggerWiringAuditTests.BuildCard and
+        // GameFacade.BuildDeckCard make: NamedCardFactory.Create(name, owner, effects).
+        var built = NamedCardFactory.Create("Leyline of Combustion", _alice, effects);
+        built.Should().BeOfType<Enchantment>();
+        var leyline = (Enchantment)built;
+        leyline.SetController(_alice);
+
+        // The becomes-targeted trigger must ride the card shape so the live
+        // TriggerManager auto-binds it on battlefield entry.
+        leyline.Abilities.OfType<TriggeredAbility>().Should().ContainSingle(
+            "the prod effects-aware dispatch must produce a card carrying the "
+            + "becomes-targeted trigger (auto-bound on battlefield entry)");
+
+        // Mirror ZoneService prod ordering: set the zone THEN publish the move
+        // event so the auto-bind sees the card already on the battlefield.
+        leyline.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(leyline);
+        bus.Publish(new CardMovedEvent(leyline, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Bob's spell targets Alice → opponent-targets-you gate fires.
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _bob };
+        var spell = new Majik.Core.Spells.Spell(bolt, _bob, new[] { Target.Player(_alice) });
+        bus.Publish(new TargetsChosenEvent(spell, spell.Targets));
+
+        triggers.PendingCount.Should().Be(1,
+            "the becomes-targeted trigger must be auto-bound + fired on the prod build path");
+
+        var trigger = leyline.Abilities.OfType<TriggeredAbility>().Single();
+        _bob.LifeTotal.Should().Be(20);
+        await trigger.ResolveAsync(agent: null, LiveContext(_alice, _bob, stack));
+
+        _bob.LifeTotal.Should().Be(18,
+            "Combustion deals 2 damage to the targeting spell's controller (Bob) "
+            + "through the effects-aware prod dispatch");
     }
 
     private static void PlaceOnBattlefield(Enchantment leyline, Player owner)

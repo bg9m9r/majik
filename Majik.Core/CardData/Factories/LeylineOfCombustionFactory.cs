@@ -52,10 +52,25 @@ public static class LeylineOfCombustionFactory
     public const string PrintedManaCost = "{2}{R}{R}";
 
     /// <summary>
-    /// Constructs Leyline of Combustion with no live runtime wiring (the
-    /// shape / dispatcher path). The becomes-targeted trigger is attached to
-    /// the card for shape observability but not registered with a
-    /// <see cref="TriggerManager"/>.
+    /// Constructs Leyline of Combustion on the <b>production</b> dispatcher
+    /// path. This is the overload the source-gen dispatch table (and therefore
+    /// <c>GameFacade.BuildDeckCard</c> / the Class B trigger-wiring audit's
+    /// <c>NamedCardFactory.Create(name, owner, effects)</c>) routes to —
+    /// Leyline exposes no <c>Create(Player, ContinuousEffectsService)</c>
+    /// overload, so the effects-aware dispatch falls through to here. The
+    /// becomes-targeted trigger (CR 603.6c) is attached to the card SHAPE here
+    /// (no captured <see cref="TriggerManager"/> needed): the live
+    /// <see cref="TriggerManager"/> auto-binds any card carrying an
+    /// <see cref="ITriggeredAbility"/> on its first zone crossing (battlefield
+    /// entry — <see cref="Majik.Core.Events.CardMovedEvent"/> →
+    /// <c>SyncCardRegistration</c>), and the live priority loop drains the fired
+    /// trigger through the async agent-aware path. No
+    /// <see cref="ContinuousEffectsService"/> overload is required because the
+    /// trigger deals damage to a player off existing primitives
+    /// (<see cref="Fx.DealDamageAny(object,int)"/>) — there is no continuous /
+    /// layered effect to register (unlike Festival Crasher's pump). Verified
+    /// end-to-end through the prod build entry by
+    /// <c>LeylineOfCombustionFactoryTests.EffectsAwareDispatch_WiresAndFiresTargetedTrigger_OnProdPath</c>.
     /// </summary>
     public static Enchantment Create(Player owner) =>
         Create(owner, eventBus: null, triggers: null);
