@@ -356,7 +356,8 @@ public static class AgathasSoulCauldronFactory
     ///     grants ("{cost}: This creature gains &lt;simple keyword&gt; until end
     ///     of turn"), self-counter ("{cost}: Put a/N +1/+1 counter(s) on this
     ///     creature"), regenerate-self ("{cost}: Regenerate this creature"),
-    ///     pingers ("{cost}: This creature deals N damage to …"), and
+    ///     draw-a-card ("{cost}: Draw N cards"), gain-life ("{cost}: You gain N
+    ///     life"), pingers ("{cost}: This creature deals N damage to …"), and
     ///     sacrifice-self pingers ("Sacrifice this creature: It deals N damage
     ///     to …") via
     ///     <see cref="OracleActivatedAbilityBinder.RebuildActivatedAbilities"/>;

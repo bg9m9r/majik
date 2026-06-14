@@ -93,6 +93,16 @@ namespace Majik.Core.CardData;
 ///     1, plus the spelled-out "two"/"three" and a bare digit; an unrecognised
 ///     count word is skipped. Sound on any permanent bearer, not just
 ///     creatures.</item>
+///   <item><b>Gain-life</b> —
+///     <c>"{cost}: You gain N life."</c> Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose resolution gains life for the
+///     BEARER's CONTROLLER via <see cref="Majik.Core.Primitives.Fx.GainLife"/>
+///     (CR 119.3 / 613.1f) — like draw, one of the soundest re-homes: "you gain
+///     N life" references the controller's OWN life total, with NO "this
+///     creature" / source reference at all, so re-homing is a clean
+///     controller-scoped operation. Count is "a"/"one" ⇒ 1, the spelled-out
+///     "two"/"three", or a bare digit; an unrecognised count is skipped. Sound
+///     on any permanent bearer, not just creatures.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -227,6 +237,33 @@ public static class OracleActivatedAbilityBinder
             ["three"] = 3,
         };
 
+    // "{cost}: You gain N life." (CR 119.3.) A self-source lifegain is a common
+    // activated payoff on real creature cards (a cleric / soul-warden style
+    // {T}: gain payoff, Staff-of-Domination-style {N}, {T}: you gain N life).
+    // Sound to re-home: "you gain N life" references the BEARER's CONTROLLER's
+    // OWN life total (Fx.GainLife), NEVER the exiled imprinted card — no "this
+    // creature" / source reference at all, so this is as sound a re-home as
+    // draw. The count is "a"/"one" ⇒ 1, an explicit digit ("you gain 5 life"),
+    // or a small spelled-out word ("two"/"three"). An unrecognised count word
+    // makes the clause unsound and is skipped. Trailing reminder text is
+    // stripped before matching. (Note: "Pay N life" is a COST, not an effect,
+    // and is never matched here — this only recognises gaining life.)
+    private static readonly Regex GainLifeRegex = new(
+        @"^(" + CostList + @")\s*:\s*You gain (a|one|two|three|\d+) life\.$",
+        RegexOptions.IgnoreCase);
+
+    // Spelled-out small counts that appear on real "You gain N life" activated
+    // abilities ("a"/"one" ⇒ 1). A bare digit is also accepted for larger
+    // amounts; an unrecognised word makes the clause unsound and is skipped.
+    private static readonly IReadOnlyDictionary<string, int> LifeCountWords =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+            ["one"] = 1,
+            ["two"] = 2,
+            ["three"] = 3,
+        };
+
     // "{cost}: Regenerate this creature." (CR 701.18 / 701.15a.)
     // A self-source regeneration ability — one of the most common activated
     // abilities on real creature cards (River Boa, Drudge Skeletons, Wall of
@@ -345,6 +382,14 @@ public static class OracleActivatedAbilityBinder
             if (draw.Success)
             {
                 var ability = TryBuildDrawCards(draw, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var gainLife = GainLifeRegex.Match(line);
+            if (gainLife.Success)
+            {
+                var ability = TryBuildGainLife(gainLife, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -537,6 +582,45 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { drawEffect });
+    }
+
+    /// <summary>
+    /// Build a gain-life ability: "{cost}: You gain N life." Re-homed so the
+    /// life is gained by the BEARER's CONTROLLER (<see cref="Fx.GainLife"/>,
+    /// CR 119.3 / 613.1f) — never the exiled imprinted card. Like draw, this has
+    /// no "this creature" / source reference, so re-homing is a clean
+    /// controller-scoped operation; it does NOT gate on <see cref="Creature"/> (a
+    /// lifegain is sound on any permanent bearer — the controller gains the life,
+    /// not the permanent). The count is "a"/"one" ⇒ 1, a spelled-out
+    /// "two"/"three", or a bare digit; an unrecognised count word is skipped
+    /// (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildGainLife(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int amount;
+        if (!LifeCountWords.TryGetValue(countToken, out amount)
+            && !int.TryParse(countToken, out amount))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (amount <= 0) return null;
+
+        var gainEffect = new Effect(
+            $"Granted: you gain {amount} life",
+            // CR 119.3 / 613.1f — the BEARER's controller gains life. No
+            // source-card reference, so re-homing is trivially sound.
+            () => Fx.GainLife(controller, amount));
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { gainEffect });
     }
 
     /// <summary>
