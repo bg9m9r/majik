@@ -72,6 +72,33 @@ public static class CombatAbilities
         source != null && HasInfect(source);
 
     /// <summary>
+    /// CR 702.180a/b — Toxic N. Returns the total toxic value of
+    /// <paramref name="source"/> (the sum of every <c>"toxic"</c>
+    /// <see cref="KeywordAbility"/> marker's <see cref="KeywordAbility.Arg"/>),
+    /// or 0 if the source has no toxic. CR 702.180c — multiple instances of
+    /// toxic on the same creature are cumulative, so the values are summed.
+    /// Unlike infect, toxic does NOT change the FORM of combat damage: a
+    /// creature with toxic N that deals combat damage to a player causes that
+    /// player to ALSO get N poison counters (CR 702.180b), in addition to the
+    /// normal life loss. Read at the combat-damage-to-player site so the Mite
+    /// (Mirrex), Pile of Rags, and the whole ONE toxic family give poison.
+    /// </summary>
+    public static int GetToxic(Creature? source)
+    {
+        if (source == null) return 0;
+        var total = 0;
+        foreach (var k in source.Abilities.OfType<KeywordAbility>())
+        {
+            if (string.Equals(k.Keyword, "toxic", StringComparison.OrdinalIgnoreCase)
+                && k.Arg is int n && n > 0)
+            {
+                total += n;
+            }
+        }
+        return total;
+    }
+
+    /// <summary>
     /// CR 509.1b — returns the minimum number of blockers required to
     /// legally block this creature (from a
     /// <see cref="KeywordAbility"/> with keyword
