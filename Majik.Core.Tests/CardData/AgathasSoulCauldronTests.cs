@@ -1584,12 +1584,16 @@ public class AgathasSoulCauldronTests
         // Skithiryx" (BY NAME) so the oracle-rebuild fallback cannot reconstruct
         // it — the RebindTo of the real ability is the only sound re-home.
         var skithiryx = SkithiryxTheBlightDragonFactory.Create(alice);
-        var realRegen = skithiryx.Abilities.OfType<ActivatedAbility>()
+        var realAbilities = skithiryx.Abilities.OfType<ActivatedAbility>()
             .Where(a => a is not IManaAbility)
             .ToList();
-        realRegen.Should().ContainSingle("Skithiryx has exactly one (regenerate) activated ability");
-        realRegen.Should().OnlyContain(a => a.RebindSafe,
-            "the migrated Skithiryx regenerate reads ResolutionContext.Source and is RebindSafe");
+        realAbilities.Should().HaveCount(2,
+            "current printing: {B}: gains haste until EOT + {B}{B}: regenerate self");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "both migrated Skithiryx abilities read ResolutionContext.Source and are RebindSafe");
+        realAbilities.Should().Contain(a => a.Effects.Any(e =>
+            e.Description.Contains("regenerate", StringComparison.OrdinalIgnoreCase)),
+            "the by-name regenerate ability is the case the oracle-rebuild fallback cannot cover");
         alice.Zones.Graveyard.AddCard(skithiryx);
         skithiryx.SetZone(ZoneType.Graveyard);
 
@@ -1606,9 +1610,10 @@ public class AgathasSoulCauldronTests
         Resolve(TapAbility(cauldron), skithiryx);
 
         var granted = GrantedActivated(bearer);
-        granted.Should().ContainSingle(
-            "Skithiryx's real regenerate ability is re-homed via RebindTo");
-        var regen = granted[0];
+        granted.Should().HaveCount(2,
+            "both of Skithiryx's real abilities (gain-haste + regenerate) are re-homed via RebindTo");
+        var regen = granted.Single(a => a.Effects.Any(e =>
+            e.Description.Contains("regenerate", StringComparison.OrdinalIgnoreCase)));
         regen.Source.Should().BeSameAs(bearer,
             "the re-homed regenerate is sourced on the BEARER (CR 707.2)");
         regen.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
@@ -1631,7 +1636,8 @@ public class AgathasSoulCauldronTests
         var alice = new Player("Alice", 20);
         var skithiryx = SkithiryxTheBlightDragonFactory.Create(alice);
         var regen = skithiryx.Abilities.OfType<ActivatedAbility>()
-            .Single(a => a is not IManaAbility);
+            .Single(a => a is not IManaAbility && a.Effects.Any(e =>
+                e.Description.Contains("regenerate", StringComparison.OrdinalIgnoreCase)));
 
         skithiryx.RegenerationShieldCount.Should().Be(0);
         await regen.ResolveAsync(agent: null, game: null);
