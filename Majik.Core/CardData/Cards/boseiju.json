@@ -11,7 +11,14 @@
         { "type": "discard_self" }
       ],
       "effects": [
-        { "type": "destroy_target", "targetFilter": "artifact_enchantment_nonbasic_land" }
+        {
+          "type": "destroy_target",
+          "targetFilter": "artifact_enchantment_nonbasic_land",
+          "thenControllerMaySearch": {
+            "subtypes": ["Plains", "Island", "Swamp", "Mountain", "Forest"],
+            "destination": "battlefield"
+          }
+        }
       ]
     }
   ]
