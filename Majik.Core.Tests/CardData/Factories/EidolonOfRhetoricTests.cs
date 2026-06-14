@@ -97,8 +97,8 @@ public class EidolonOfRhetoricTests : IDisposable
         _validator.ValidateAction(first).IsValid.Should().BeTrue(
             "the first spell of the turn is allowed (cap = 1 remaining)");
 
-        // Simulate the cast consuming the allowance (SpellCastFlow's hook).
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_bob);
+        // Simulate the cast (SpellCastFlow's per-cast hook on the static rail).
+        CastingRestrictions.RecordSpellCast(_bob);
 
         var second = new CastSpellAction(spell, _bob, sorcerySpeedAvailable: true);
         var result = _validator.ValidateAction(second);
@@ -112,15 +112,15 @@ public class EidolonOfRhetoricTests : IDisposable
     {
         EidolonOnBattlefield();
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse();
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_bob).Should().BeFalse();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_bob).Should().BeFalse();
 
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_alice);
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_bob);
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.RecordSpellCast(_bob);
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeTrue(
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeTrue(
             "Each player can't cast more than one spell each turn (CR 109.5 — symmetric)");
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_bob).Should().BeTrue();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_bob).Should().BeTrue();
     }
 
     [Fact]
@@ -128,12 +128,12 @@ public class EidolonOfRhetoricTests : IDisposable
     {
         EidolonOnBattlefield();
 
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_alice);
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeTrue();
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeTrue();
 
         _bus.Publish(new TurnStartedEvent(_bob, 2));
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse(
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse(
             "the per-turn cap is re-seeded at turn start (CR 514.2)");
     }
 
@@ -142,12 +142,12 @@ public class EidolonOfRhetoricTests : IDisposable
     {
         var eidolon = EidolonOnBattlefield();
 
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_alice);
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeTrue();
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeTrue();
 
         _zones.MoveCard(eidolon, ZoneType.Battlefield, ZoneType.Graveyard);
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse(
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse(
             "the cast cap lifts when Eidolon of Rhetoric leaves the battlefield");
     }
 
@@ -156,7 +156,8 @@ public class EidolonOfRhetoricTests : IDisposable
     {
         EidolonOfRhetoricFactory.Create(_alice);
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse(
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse(
             "no cast cap is registered on the single-arg path");
     }
 }

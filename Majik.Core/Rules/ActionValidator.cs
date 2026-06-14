@@ -244,6 +244,19 @@ public class ActionValidator
                 new RuleViolation("601.3", "additional-spell cap exhausted"));
         }
 
+        // CR 601.3 / 611 — static "can't cast more than N spells each turn" cap
+        // (Eidolon of Rhetoric / Archon of Emeria). Distinct ledger from the
+        // consumable Irencrag-Feat allowance above: this reads the explicit
+        // per-turn spells-cast counter against the tightest registered static
+        // cap and is never consumed.
+        if (action.Player != null
+            && CastingRestrictions.IsAtSpellsPerTurnCap(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast more spells this turn (spells-per-turn cap reached)",
+                new RuleViolation("601.3", "spells-per-turn cap reached"));
+        }
+
         // CR 605/616 / 601.3 — Ethersworn Canonist nonartifact restriction:
         // "Each player who has cast a nonartifact spell this turn can't cast
         // additional nonartifact spells." Gated to NONARTIFACT candidate spells

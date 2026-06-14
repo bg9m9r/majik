@@ -416,6 +416,14 @@ public sealed class SpellCastFlow
         // so ActionValidator can gate the next cast attempt.
         Majik.Core.Rules.CastingRestrictions.ConsumeAdditionalSpellAllowance(caster);
 
+        // CR 601.3 / 608.2 — record this cast for the static spells-per-turn cap
+        // counter (Eidolon of Rhetoric / Archon of Emeria: "Each player can't
+        // cast more than one spell each turn."). Tracked unconditionally so a
+        // cap source entering mid-turn correctly sees prior casts; the
+        // battlefield gate + the cap value live on the static rail + the
+        // lifecycle binder. Separate ledger from the consumable allowance above.
+        Majik.Core.Rules.CastingRestrictions.RecordSpellCast(caster);
+
         // CR 605/616 / 601.3 — record a NONARTIFACT cast for the per-turn
         // Canonist counter (Ethersworn Canonist: "Each player who has cast a
         // nonartifact spell this turn can't cast additional nonartifact

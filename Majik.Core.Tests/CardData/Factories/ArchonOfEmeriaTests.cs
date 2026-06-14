@@ -124,16 +124,16 @@ public class ArchonOfEmeriaTests : IDisposable
         ArchonOnBattlefield();
 
         // Each player may still cast their first spell.
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse();
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_bob).Should().BeFalse();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_bob).Should().BeFalse();
 
-        // After one cast each, both are exhausted.
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_alice);
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_bob);
+        // After one cast each, both are at the cap.
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.RecordSpellCast(_bob);
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeTrue(
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeTrue(
             "Each player can't cast more than one spell each turn (CR 601.3) — symmetric");
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_bob).Should().BeTrue();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_bob).Should().BeTrue();
     }
 
     [Fact]
@@ -148,8 +148,8 @@ public class ArchonOfEmeriaTests : IDisposable
         _validator.ValidateAction(first).IsValid.Should().BeTrue(
             "the first spell of the turn is allowed (cap = 1 remaining)");
 
-        // Simulate the cast consuming the allowance (SpellCastFlow's hook).
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_bob);
+        // Simulate the cast (SpellCastFlow's per-cast hook on the static rail).
+        CastingRestrictions.RecordSpellCast(_bob);
 
         var second = new CastSpellAction(spell, _bob, sorcerySpeedAvailable: true);
         var result = _validator.ValidateAction(second);
@@ -164,17 +164,17 @@ public class ArchonOfEmeriaTests : IDisposable
         ArchonOnBattlefield();
 
         // Both players cast their one allowed spell this turn.
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_alice);
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_bob);
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeTrue();
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_bob).Should().BeTrue();
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.RecordSpellCast(_bob);
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeTrue();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_bob).Should().BeTrue();
 
         // A new turn begins — the "each turn" allowance refreshes (CR 514.2).
         _bus.Publish(new TurnStartedEvent(_bob, 2));
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse(
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse(
             "the per-turn cap is re-seeded to 1 at turn start");
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_bob).Should().BeFalse();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_bob).Should().BeFalse();
     }
 
     [Fact]
@@ -182,14 +182,14 @@ public class ArchonOfEmeriaTests : IDisposable
     {
         var archon = ArchonOnBattlefield();
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse();
-        CastingRestrictions.ConsumeAdditionalSpellAllowance(_alice);
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeTrue();
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse();
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeTrue();
 
         // Archon dies — the static stops applying.
         _zones.MoveCard(archon, ZoneType.Battlefield, ZoneType.Graveyard);
 
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse(
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse(
             "the cast cap lifts when Archon of Emeria leaves the battlefield");
     }
 
@@ -311,7 +311,8 @@ public class ArchonOfEmeriaTests : IDisposable
             "no enters-tapped replacement is registered on the single-arg path");
 
         // Cast cap not registered.
-        CastingRestrictions.HasExhaustedAdditionalSpellAllowance(_alice).Should().BeFalse(
+        CastingRestrictions.RecordSpellCast(_alice);
+        CastingRestrictions.IsAtSpellsPerTurnCap(_alice).Should().BeFalse(
             "no cast cap is registered on the single-arg path");
     }
 }

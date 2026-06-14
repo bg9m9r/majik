@@ -175,6 +175,25 @@ public static class CastingRestrictions
         // tears them down when it leaves; the per-turn nonartifact-cast counter
         // above is the looked-back state that flips the gate on.
         internal readonly List<(object Token, Player Player)> CanonistNonartifactEntries = new();
+        // CR 601.3 / 611 — "Each player can't cast more than N spells each turn"
+        // TRUE STATIC cap (Eidolon of Rhetoric / Archon of Emeria). Two pieces,
+        // mirroring the Canonist nonartifact rail above:
+        //   (1) SpellsCastThisTurn — an always-on per-player counter of how many
+        //       spells each player has cast this turn (the looked-back state, CR
+        //       608.2). Reseeded at the CR 514/500 turn boundary by the caller.
+        //   (2) SpellsPerTurnCapEntries — battlefield-gated token-keyed per-player
+        //       cap entries; a player is gated iff their SpellsCastThisTurn count
+        //       has reached the TIGHTEST (minimum) registered cap targeting them.
+        //
+        // This is deliberately a SEPARATE ledger from MaxAdditionalSpells above
+        // (the consumable one-shot Irencrag Feat allowance): the static cap reads
+        // the explicit per-turn counter and is never consumed (CR 611 — a static
+        // recomputes from game state), whereas Irencrag Feat's allowance is a
+        // mutable counter decremented per cast. Keeping them apart removes the
+        // shared-field race where the static-cap turn-start reseed could clobber
+        // (or be clobbered by) the Feat's same-turn allowance.
+        internal readonly Dictionary<Guid, int> SpellsCastThisTurn = new();
+        internal readonly List<(object Token, Player Player, int Cap)> SpellsPerTurnCapEntries = new();
         internal readonly object Gate = new();
     }
 
@@ -1155,6 +1174,146 @@ public static class CastingRestrictions
         }
     }
 
+    // ---------------------------------------------------------------------
+    // CR 601.3 / 611 — "Each player can't cast more than N spells each turn"
+    // TRUE STATIC cap rail (Eidolon of Rhetoric / Archon of Emeria). Two
+    // pieces: (1) an always-on per-player spells-cast-this-turn counter (the
+    // looked-back state), and (2) a battlefield-gated token-keyed per-player
+    // cap entry. The validator combines them via IsAtSpellsPerTurnCap. This is
+    // a SEPARATE ledger from the consumable MaxAdditionalSpells allowance used
+    // by Irencrag Feat — see the Store field comments.
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Record that <paramref name="player"/> has cast a spell this turn
+    /// (CR 608.2 looked-back state for the spells-per-turn cap). Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> after every successful cast.
+    /// Tracked unconditionally (independent of any cap source being on the
+    /// battlefield) so a cap source entering mid-turn correctly sees how many
+    /// spells a player has already cast. Reseeded at the turn boundary via
+    /// <see cref="ClearSpellsCastThisTurn"/> (CR 514/500).
+    /// </summary>
+    public static void RecordSpellCast(Player player)
+    {
+        if (player == null) return;
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.SpellsCastThisTurn[player.Id] =
+                store.SpellsCastThisTurn.GetValueOrDefault(player.Id) + 1;
+        }
+    }
+
+    /// <summary>
+    /// The number of spells <paramref name="player"/> has cast this turn
+    /// (CR 608.2). Read by <see cref="IsAtSpellsPerTurnCap"/>.
+    /// </summary>
+    public static int SpellsCastThisTurn(Player player)
+    {
+        if (player == null) return 0;
+        var store = Current;
+        lock (store.Gate)
+        {
+            return store.SpellsCastThisTurn.GetValueOrDefault(player.Id);
+        }
+    }
+
+    /// <summary>
+    /// Clear the per-player spells-cast-this-turn counter for all players.
+    /// Called at the CR 514/500 turn boundary (the "each turn" tally refreshes);
+    /// tests may also call this directly via <see cref="Clear"/>. Because the
+    /// cap is a TRUE static (CR 611) that reads this counter, clearing it is the
+    /// ONLY turn-boundary action the static cap needs — the cap entries
+    /// themselves persist while their source stays on the battlefield.
+    /// </summary>
+    public static void ClearSpellsCastThisTurn()
+    {
+        var store = Current;
+        lock (store.Gate) store.SpellsCastThisTurn.Clear();
+    }
+
+    /// <summary>
+    /// Register a "<paramref name="player"/> can't cast more than
+    /// <paramref name="cap"/> spell(s) each turn" static cap (CR 601.3 — Eidolon
+    /// of Rhetoric / Archon of Emeria), keyed by <paramref name="token"/>.
+    /// Idempotent for the same (token, player) pair — re-registering refreshes
+    /// the cap value rather than adding a second entry. The cap is SYMMETRIC for
+    /// these cards ("Each player"); the lifecycle binder registers an entry for
+    /// every player while the source is on the battlefield. A registered entry
+    /// alone does NOT block — the player must also have cast at least
+    /// <paramref name="cap"/> spells this turn
+    /// (<see cref="IsAtSpellsPerTurnCap"/>). Removed when the source leaves the
+    /// battlefield via <see cref="RemoveSpellsPerTurnCap"/>.
+    /// </summary>
+    public static void AddSpellsPerTurnCap(object token, Player player, int cap)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        if (cap < 0) cap = 0;
+        var store = Current;
+        lock (store.Gate)
+        {
+            for (var i = 0; i < store.SpellsPerTurnCapEntries.Count; i++)
+            {
+                var entry = store.SpellsPerTurnCapEntries[i];
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player))
+                {
+                    store.SpellsPerTurnCapEntries[i] = (token, player, cap);
+                    return;
+                }
+            }
+            store.SpellsPerTurnCapEntries.Add((token, player, cap));
+        }
+    }
+
+    /// <summary>
+    /// Remove every spells-per-turn cap entry registered under
+    /// <paramref name="token"/> (across all players). Used when the source
+    /// permanent leaves the battlefield (CR 611.2g — the static stops applying).
+    /// Scoped by token, so removing one source (e.g. one Archon) does not tear
+    /// down a second source's (e.g. an Eidolon's) entries.
+    /// </summary>
+    public static void RemoveSpellsPerTurnCap(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.SpellsPerTurnCapEntries.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if <paramref name="player"/> has reached their tightest registered
+    /// spells-per-turn cap (CR 601.3 — Eidolon of Rhetoric / Archon of Emeria).
+    /// The gate fires iff at least one cap entry targets the player AND the
+    /// player's spells-cast-this-turn count is &gt;= the MINIMUM (tightest) such
+    /// cap. Returns false when no cap entry targets the player. Consulted by
+    /// <see cref="ActionValidator.ValidateCastSpell"/>. This is a true static
+    /// (CR 611): it recomputes from the live counter every call and is never
+    /// consumed.
+    /// </summary>
+    public static bool IsAtSpellsPerTurnCap(Player player)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            var tightest = int.MaxValue;
+            foreach (var entry in store.SpellsPerTurnCapEntries)
+            {
+                if (ReferenceEquals(entry.Player, player) && entry.Cap < tightest)
+                {
+                    tightest = entry.Cap;
+                }
+            }
+            if (tightest == int.MaxValue) return false; // no cap targets player
+            var cast = store.SpellsCastThisTurn.GetValueOrDefault(player.Id);
+            return cast >= tightest;
+        }
+    }
+
     /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
@@ -1177,6 +1336,8 @@ public static class CastingRestrictions
             store.MaxAdditionalSpells.Clear();
             store.NonartifactSpellsCastThisTurn.Clear();
             store.CanonistNonartifactEntries.Clear();
+            store.SpellsCastThisTurn.Clear();
+            store.SpellsPerTurnCapEntries.Clear();
         }
     }
 }
