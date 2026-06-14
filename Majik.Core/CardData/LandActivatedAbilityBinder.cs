@@ -585,7 +585,12 @@ public static class LandActivatedAbilityBinder
     // Eiganjo's "attacking or blocking" combat-state target gate is now LIVE:
     // the candidate gatherer offers only creatures the per-game
     // CombatMembershipRegistry reports as attacking / blocking, and resolution
-    // re-checks that membership (CR 608.2b) before dealing the damage.
+    // re-checks that membership (CR 608.2b) before dealing the damage. The gate
+    // is no longer permissive for a creature removed from combat mid-combat: a
+    // regenerated creature (CR 701.15c) and a creature that LEAVES the
+    // battlefield (CR 506.4a — bounced / destroyed / exiled, dropped via
+    // Permanent.ResetOnLeaveBattlefield) both stop being legal targets while the
+    // rest of the combat continues.
     //
     // Takenuma is fully bound (mill 3, then return a creature/planeswalker
     // card from the graveyard to hand). The current oracle text has NO "may":
