@@ -496,3 +496,89 @@ public sealed class HatredTemplate : ISpellTemplate
             });
     }
 }
+
+/// <summary>
+/// Kuldotha Rebirth ({R} Sorcery) — "As an additional cost to cast this
+/// spell, sacrifice an artifact. Create three 1/1 red Goblin creature
+/// tokens."
+///
+/// The token-creation clause alone would match the generic
+/// <c>CreateTokensTemplate</c>, but that path does NOT re-attach the
+/// "sacrifice an artifact" additional cost — <see cref="OracleTextNormalizer"/>
+/// strips the cost sentence before normalized matching (line ~98-102), so a
+/// generic bind would create the Goblins for free. This bespoke template
+/// re-detects the sac-artifact prefix on <see cref="SpellBindContext.RawText"/>
+/// (same discipline as the sac-a-creature templates above) and attaches
+/// <see cref="SacrificeAnArtifactAdditionalCost"/> (CR 601.2f) so the cost is
+/// actually charged — <see cref="SpellCastFlow"/> rejects the cast when the
+/// caster controls no artifact (CR 601.2g).
+/// </summary>
+public sealed class KuldothaRebirthTemplate : ISpellTemplate
+{
+    public const int TokenCount = 3;
+    public const int TokenPower = 1;
+    public const int TokenToughness = 1;
+
+    public int Priority => 95;
+    public string Name => "KuldothaRebirth";
+    public BotIntent Intent => BotIntent.Token;
+
+    // Anchor on the sac-artifact prefix (RawText, pre-strip) + the three-Goblin
+    // token clause (Text, post-strip). The token clause is matched loosely on
+    // the normalized body so a future errata that only re-orders words still
+    // binds.
+    private static readonly Regex GoblinTokenClause = new(
+        @"create\s+three\s+1/1\s+red\s+goblin\s+creature\s+tokens",
+        RegexOptions.IgnoreCase);
+
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.SacArtifactPrefix.IsMatch(raw) &&
+        GoblinTokenClause.IsMatch(text);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"KuldothaRebirth Rehydrate could not bind '{ctx.Entity.Name}'.");
+
+    public SpellDefinition? TryBind(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        if (!Detect(ctx.RawText, ctx.Text)) return null;
+
+        var caster = ctx.Caster;
+        var zones = ctx.Zones;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: Array.Empty<TargetRequest>(),
+            EffectFactory: _ => new IEffect[]
+            {
+                new Effect("kuldotha rebirth: create three 1/1 red Goblins", () =>
+                {
+                    // CR 111 / CR 111.4 — three 1/1 red Goblin creature tokens.
+                    var spec = new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                        Name: "Goblin",
+                        Power: TokenPower,
+                        Toughness: TokenToughness,
+                        Subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Goblin },
+                        Keywords: null,
+                        Colors: new[] { Majik.Core.ValueObjects.ManaColor.Red });
+
+                    for (var i = 0; i < TokenCount; i++)
+                        Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(spec, caster, zones);
+                }),
+            },
+            // CR 601.2f — "As an additional cost to cast this spell, sacrifice
+            // an artifact." Charged by SpellCastFlow; the cast is illegal when
+            // the caster controls no artifact (CR 601.2g).
+            AdditionalCosts: new IAdditionalCost[]
+            {
+                new SacrificeAnArtifactAdditionalCost(ctx.EventBus),
+            });
+    }
+}
