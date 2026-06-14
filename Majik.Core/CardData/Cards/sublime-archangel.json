@@ -1,0 +1,9 @@
+{
+  "name": "Sublime Archangel",
+  "types": ["Creature"],
+  "subtypes": ["Angel"],
+  "manaCost": "{2}{W}{W}",
+  "power": 4,
+  "toughness": 3,
+  "keywords": ["Flying"]
+}
