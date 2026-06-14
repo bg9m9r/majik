@@ -164,4 +164,58 @@ public class RestlessFortressTests
         _bob.LifeTotal.Should().Be(18, "defending player loses 2 life");
         _alice.LifeTotal.Should().Be(22, "you gain 2 life");
     }
+
+    [Fact]
+    public void RestlessFortress_AttackTrigger_DrainsEffectivePlaneswalkerController()
+    {
+        // CR 506.2 / 508.4d — when the animated land attacks an EFFECTIVE
+        // planeswalker (a flipped creature-front DFC carrying a transient
+        // loyalty body, CR 711), the "defending player" is that planeswalker's
+        // CONTROLLER. The drain must hit them, not silently no-op because the
+        // DefendingPlayerOrPlaneswalker value isn't a Player C# instance.
+        var land = RestlessFortressFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
+
+        // Bob controls a flipped creature-front DFC with a transient loyalty
+        // body — an EFFECTIVE planeswalker (not a real Planeswalker instance).
+        var dfc = MakeFlippedPlaneswalkerDfc(5, _bob);
+        dfc.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(dfc);
+
+        var dummyAttacker = new Creature("dummy", "{0}", 1, 1);
+        var ev = new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(
+            attacker: dummyAttacker,
+            defendingPlayerOrPlaneswalker: dfc);
+
+        trigger.Condition.Matches(ev, trigger);
+
+        foreach (var e in trigger.Effects) e.Execute();
+
+        _bob.LifeTotal.Should().Be(18,
+            "defending player (the effective planeswalker's controller) loses 2 life");
+        _alice.LifeTotal.Should().Be(22, "you gain 2 life");
+    }
+
+    /// <summary>Build a creature-front DFC already flipped to a planeswalker
+    /// back — a Creature instance carrying a transient loyalty body (CR 711).</summary>
+    private static Creature MakeFlippedPlaneswalkerDfc(int loyalty, Player owner)
+    {
+        var card = new Creature("Ral, Monsoon Mage", "1", power: 1, toughness: 3)
+        { Owner = owner, Controller = owner };
+        card.ActiveEffects = new ContinuousEffectsService();
+        card.MdfcState = new Majik.Core.CardData.MDFCs.MdfcState(
+            "Ral, Monsoon Mage", "Ral, Leyline Prodigy",
+            new Majik.Core.CardData.MDFCs.BackFaceCharacteristics(
+                name: "Ral, Leyline Prodigy",
+                isCreature: false,
+                power: 0,
+                toughness: 0,
+                types: new[] { CardType.Planeswalker },
+                loyalty: loyalty));
+        card.MdfcState.Transform(); // flip to the planeswalker back
+        return card;
+    }
 }

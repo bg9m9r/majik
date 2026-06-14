@@ -31,4 +31,32 @@ public class CreatureAttacksEvent : GameEvent
         DefendingPlayerOrPlaneswalker = defendingPlayerOrPlaneswalker
             ?? throw new ArgumentNullException(nameof(defendingPlayerOrPlaneswalker));
     }
+
+    /// <summary>
+    /// CR 506.2 / CR 508.4d — resolve the <b>defending player</b> from a
+    /// <see cref="DefendingPlayerOrPlaneswalker"/> value. When the attack was
+    /// declared against a player, that player IS the defending player; when it
+    /// was declared against a planeswalker (real OR an EFFECTIVE planeswalker —
+    /// a flipped creature-front DFC carrying a transient loyalty body, CR 711),
+    /// the defending player is the <em>controller of that planeswalker</em>.
+    ///
+    /// <para>This consults <see cref="Permanent.IsEffectivePlaneswalker"/> rather
+    /// than the concrete C# instance type so that a non-real planeswalker
+    /// defender resolves the same as a real one. Without it, an attack-trigger
+    /// effect that reads "defending player" (Restless Fortress's drain) silently
+    /// no-ops when the defender is an effective planeswalker — the residual
+    /// coupling between the widened Permanent-level combat surface and the
+    /// trigger-time defender read.</para>
+    /// </summary>
+    /// <returns>The defending player, or <c>null</c> for an unexpected value.</returns>
+    public static Player? DefendingPlayerOf(object? defendingPlayerOrPlaneswalker) =>
+        defendingPlayerOrPlaneswalker switch
+        {
+            Player p => p,
+            Permanent pw when pw.IsEffectivePlaneswalker() => pw.Controller,
+            _ => null,
+        };
+
+    /// <summary>The defending player for THIS attack (CR 506.2 / 508.4d).</summary>
+    public Player? DefendingPlayer => DefendingPlayerOf(DefendingPlayerOrPlaneswalker);
 }
