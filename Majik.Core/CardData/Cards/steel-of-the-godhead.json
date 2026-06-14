@@ -1,0 +1,7 @@
+{
+  "name": "Steel of the Godhead",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{2}{W/U}",
+  "colors": ["W", "U"]
+}
