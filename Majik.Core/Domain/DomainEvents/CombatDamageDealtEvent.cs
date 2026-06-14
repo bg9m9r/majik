@@ -15,8 +15,11 @@ namespace Majik.Core.Domain.DomainEvents;
 /// </summary>
 public class CombatDamageDealtEvent : DamageDealtEvent
 {
-    /// <summary>Combat damage is always dealt by a creature (CR 510.1).</summary>
-    public Creature Source { get; }
+    /// <summary>The combat-damage source. Typed <see cref="Permanent"/> so an
+    /// animated NON-creature combatant (a manland — deferral
+    /// <c>animated-noncreature-as-combatant</c>) is carried; a real
+    /// <see cref="Creature"/> assigns unchanged (CR 510.1).</summary>
+    public Permanent Source { get; }
 
     /// <summary>Target card (creature or planeswalker); null for player targets.</summary>
     public ICard? Target { get; }
@@ -24,7 +27,7 @@ public class CombatDamageDealtEvent : DamageDealtEvent
     /// <summary>True when this damage was dealt in the first-strike sub-step (CR 702.7c).</summary>
     public bool IsFirstStrike { get; }
 
-    public CombatDamageDealtEvent(Creature source, ICard? target, int amount, bool isFirstStrike = false)
+    public CombatDamageDealtEvent(Permanent source, ICard? target, int amount, bool isFirstStrike = false)
         : base(
             EventType.CombatDamageDealt,
             sourceCard: source ?? throw new ArgumentNullException(nameof(source)),
@@ -39,7 +42,7 @@ public class CombatDamageDealtEvent : DamageDealtEvent
         IsFirstStrike = isFirstStrike;
     }
 
-    public CombatDamageDealtEvent(Creature source, Player targetPlayer, int amount, bool isFirstStrike = false)
+    public CombatDamageDealtEvent(Permanent source, Player targetPlayer, int amount, bool isFirstStrike = false)
         : base(
             EventType.CombatDamageDealt,
             sourceCard: source ?? throw new ArgumentNullException(nameof(source)),

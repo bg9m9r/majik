@@ -263,8 +263,10 @@ public static class IntiSeneschalOfTheSunFactory
         // Soaring Thought-Thief's mill target).
         foreach (var atk in combat.Attackers)
         {
-            var creature = atk?.Creature;
-            if (creature == null) continue;
+            // CR 508 — Attacker.Creature is now Permanent-typed (animated
+            // manlands may attack); this v1 fallback targets a real attacking
+            // CREATURE card, so an animated land attacker is skipped here.
+            if (atk?.Creature is not Creature creature) continue;
             if (ReferenceEquals(creature.Controller, controller)) return creature;
         }
         return null;

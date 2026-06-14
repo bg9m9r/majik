@@ -223,7 +223,7 @@ public sealed class RingState
     /// <see cref="TemptCount"/> threshold at fire time.</summary>
     private void RegisterAttackDrawDiscardTrigger()
     {
-        Creature? attackingBearer = null;
+        Permanent? attackingBearer = null;
         var attackTrigger = new TriggeredAbility(
             source: _owner,
             controller: _owner,

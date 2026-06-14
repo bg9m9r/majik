@@ -65,9 +65,9 @@ public class PriorityLoopAutoPassTests
             => _inner.OrderTriggersAsync(ctx, mine, ct);
         public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default)
             => _inner.ChooseManaSourcesAsync(ctx, cost, ct);
-        public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(GameContext ctx, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.Creature> eligibleAttackers, CancellationToken ct = default)
+        public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(GameContext ctx, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.Permanent> eligibleAttackers, CancellationToken ct = default)
             => _inner.DeclareAttackersAsync(ctx, eligibleAttackers, ct);
-        public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(GameContext ctx, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.Creature> attackers, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.Creature> eligibleBlockers, CancellationToken ct = default)
+        public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(GameContext ctx, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.Permanent> attackers, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.Permanent> eligibleBlockers, CancellationToken ct = default)
             => _inner.DeclareBlockersAsync(ctx, attackers, eligibleBlockers, ct);
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, System.Collections.Generic.IReadOnlyList<Majik.Core.Cards.ICard> peeked, CancellationToken ct = default)
             => _inner.ChooseScryDecisionAsync(ctx, peeked, ct);

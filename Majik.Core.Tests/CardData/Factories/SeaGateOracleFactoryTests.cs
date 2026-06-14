@@ -295,12 +295,12 @@ public class SeaGateOracleFactoryTests
             => _base.ChooseManaSourcesAsync(ctx, cost, ct);
 
         public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(
-            Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+            Majik.Core.Game.GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
             => _base.DeclareAttackersAsync(ctx, eligibleAttackers, ct);
 
         public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(
-            Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> attackers,
-            IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+            Majik.Core.Game.GameContext ctx, IReadOnlyList<Permanent> attackers,
+            IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
             => _base.DeclareBlockersAsync(ctx, attackers, eligibleBlockers, ct);
 
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(

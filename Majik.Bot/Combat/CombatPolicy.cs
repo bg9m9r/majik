@@ -84,7 +84,7 @@ public sealed class CombatPolicy
         {
             var alternativeBlocker = eligible
                 .Where(b => !ReferenceEquals(b, decl.Blocker)
-                    && b.Toughness > decl.Attacker.Power
+                    && b.Toughness > decl.Attacker.GetEffectivePower()
                     && !chosen.Blockers.Any(d => ReferenceEquals(d.Blocker, b)))
                 .OrderByDescending(b => b.Power)
                 .FirstOrDefault();
@@ -121,7 +121,7 @@ public sealed class CombatPolicy
             ["blocksAssigned"] = chosen.Blockers.Count.ToString(),
         };
         var unblockedPower = attackers.Sum(a => a.Power)
-            - chosen.Blockers.Sum(b => b.Attacker.Power);
+            - chosen.Blockers.Sum(b => b.Attacker.GetEffectivePower());
         if (unblockedPower >= self.LifeTotal) ctxFlags["lethalIncoming"] = "true";
         if (chosen.Blockers.Count == 0) ctxFlags["takeFullDamage"] = "true";
 
@@ -146,11 +146,11 @@ public sealed class CombatPolicy
     /// </summary>
     private static double ScoreBlockPlan(BlockPlan plan)
     {
-        double prevented = plan.Blockers.Sum(d => (double)d.Attacker.Power);
+        double prevented = plan.Blockers.Sum(d => (double)d.Attacker.GetEffectivePower());
         // Trade penalty: blocker dies (blocker.Toughness <= attacker.Power).
         double tradePenalty = plan.Blockers
-            .Where(d => d.Blocker.Toughness <= d.Attacker.Power)
-            .Sum(d => (double)d.Blocker.Toughness * 0.5);
+            .Where(d => d.Blocker.GetEffectiveToughness() <= d.Attacker.GetEffectivePower())
+            .Sum(d => (double)d.Blocker.GetEffectiveToughness() * 0.5);
         return prevented - tradePenalty;
     }
 

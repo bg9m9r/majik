@@ -201,21 +201,21 @@ public static class BotDecisionCodec
     }
 
     public static CombatPlan DecodeAttackers(
-        BotDecisionPayload payload, GameContext ctx, IReadOnlyList<Creature> eligibleAttackers)
+        BotDecisionPayload payload, GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers)
         => new(Expect<AttackersPayload>(payload).Attackers
             .Select(a => new AttackerDeclaration(
-                (Creature)ResolveFrom(eligibleAttackers, a.AttackerId, "eligible attackers"),
+                (Permanent)ResolveFrom(eligibleAttackers, a.AttackerId, "eligible attackers"),
                 DecodeRef(a.Defender, ctx)))
             .ToList());
 
     public static BlockPlan DecodeBlockers(
         BotDecisionPayload payload,
-        IReadOnlyList<Creature> attackers,
-        IReadOnlyList<Creature> eligibleBlockers)
+        IReadOnlyList<Permanent> attackers,
+        IReadOnlyList<Permanent> eligibleBlockers)
         => new(Expect<BlockersPayload>(payload).Pairs
             .Select(b => new BlockerDeclaration(
-                (Creature)ResolveFrom(eligibleBlockers, b.BlockerId, "eligible blockers"),
-                (Creature)ResolveFrom(attackers, b.AttackerId, "attackers")))
+                (Permanent)ResolveFrom(eligibleBlockers, b.BlockerId, "eligible blockers"),
+                (Permanent)ResolveFrom(attackers, b.AttackerId, "attackers")))
             .ToList());
 
     public static ScryAction.ScryDecision DecodeScry(

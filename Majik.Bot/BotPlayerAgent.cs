@@ -173,11 +173,15 @@ public sealed class BotPlayerAgent : IPlayerAgent
     public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickMana(ctx, _self, cost), ct);
 
-    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
-        => WrapAsync(() => _strategy.PickAttackers(ctx, _self, eligibleAttackers), ct);
+    // Deferral animated-noncreature-as-combatant (4B) — the eligible lists are
+    // now Permanent-typed; IBotStrategy still keys off Creature, so project to
+    // the real-Creature subset (the heuristic strategy doesn't proactively swing
+    // animated manlands in v1 — the live engine still allows it).
+    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
+        => WrapAsync(() => _strategy.PickAttackers(ctx, _self, eligibleAttackers.OfType<Creature>().ToList()), ct);
 
-    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
-        => WrapAsync(() => _strategy.PickBlockers(ctx, _self, attackers, eligibleBlockers), ct);
+    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
+        => WrapAsync(() => _strategy.PickBlockers(ctx, _self, attackers.OfType<Creature>().ToList(), eligibleBlockers.OfType<Creature>().ToList()), ct);
 
     public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickScry(ctx, _self, peeked), ct);

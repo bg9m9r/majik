@@ -239,7 +239,7 @@ public class CombatManager
     /// attacker in it (nothing to block — the caller should fall back to a plain
     /// battlefield token).
     /// </summary>
-    public Blocker? AddBlockingToken(Creature token, Creature blockedAttacker)
+    public Blocker? AddBlockingToken(Creature token, Permanent blockedAttacker)
     {
         if (token == null)
         {
@@ -452,10 +452,10 @@ public class AttackerDeclaration
 /// </summary>
 public class BlockerDeclaration
 {
-    public Creature Creature { get; }
+    public Permanent Creature { get; }
     public Attacker Attacker { get; }
 
-    public BlockerDeclaration(Creature creature, Attacker attacker)
+    public BlockerDeclaration(Permanent creature, Attacker attacker)
     {
         Creature = creature ?? throw new ArgumentNullException(nameof(creature));
         Attacker = attacker ?? throw new ArgumentNullException(nameof(attacker));

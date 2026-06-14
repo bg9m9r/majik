@@ -896,10 +896,10 @@ public sealed class RemoteAgent : IPlayerAgent
         // resolver translates Cancelled → no-op cast at the dispatch site.
         => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand), typeof(CancelCastCommand));
 
-    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
         => Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));
 
-    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
         => Prompt<BlockPlan>(ct, typeof(DeclareBlockersCommand));
 
     // CR 508.1 — translate the wire DeclareAttackersCommand into the

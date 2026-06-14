@@ -89,7 +89,7 @@ public class HeroOfBladeholdFactoryTests
             triggers: triggers,
             combat: combat,
             attackingCreaturesSource: () => combat.CurrentCombat?.Attackers
-                .Select(a => a.Creature).ToList() ?? new System.Collections.Generic.List<Creature>());
+                .Select(a => a.Creature).OfType<Creature>().ToList() ?? new System.Collections.Generic.List<Creature>());
         alice.Zones.Battlefield.AddCard(hero);
         hero.SetZone(ZoneType.Battlefield);
         hero.ClearSummoningSickness();
@@ -152,7 +152,7 @@ public class HeroOfBladeholdFactoryTests
             triggers: triggers,
             combat: combat,
             attackingCreaturesSource: () => combat.CurrentCombat?.Attackers
-                .Select(a => a.Creature).ToList() ?? new System.Collections.Generic.List<Creature>());
+                .Select(a => a.Creature).OfType<Creature>().ToList() ?? new System.Collections.Generic.List<Creature>());
         hero.ActiveEffects = effects;
         alice.Zones.Battlefield.AddCard(hero);
         hero.SetZone(ZoneType.Battlefield);

@@ -518,13 +518,10 @@ public class DevourerOfDestinyFactoryTests
             Majik.Core.ValueObjects.ManaCost cost,
             CancellationToken ct = default)
             => throw new NotImplementedException();
-        public Task<CombatPlan> DeclareAttackersAsync(
-            GameContext ctx, IReadOnlyList<Creature> eligibleAttackers,
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers,
             CancellationToken ct = default)
             => throw new NotImplementedException();
-        public Task<BlockPlan> DeclareBlockersAsync(
-            GameContext ctx, IReadOnlyList<Creature> attackers,
-            IReadOnlyList<Creature> eligibleBlockers,
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers,
             CancellationToken ct = default)
             => throw new NotImplementedException();
         public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(

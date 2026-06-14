@@ -86,7 +86,7 @@ public class GoblinWardriverFactoryTests
             alice,
             triggers: triggers,
             attackingCreaturesSource: () => combat.CurrentCombat?.Attackers
-                .Select(a => a.Creature).ToList() ?? new System.Collections.Generic.List<Creature>());
+                .Select(a => a.Creature).OfType<Creature>().ToList() ?? new System.Collections.Generic.List<Creature>());
         wardriver.ActiveEffects = effects;
         alice.Zones.Battlefield.AddCard(wardriver);
         wardriver.SetZone(ZoneType.Battlefield);

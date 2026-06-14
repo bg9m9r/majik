@@ -1380,4 +1380,45 @@ public class ManlandBinderPipelineTests
             .Should().BeOfType<CreatureCharacteristics>().Subject.Power.Should().Be(3,
             "the cast-pump grants +1/+0 until end of turn");
     }
+
+    // -----------------------------------------------------------------------
+    // Deferral animated-noncreature-as-combatant (4B) — prod-path verification
+    // that an animated manland, built through GameFacade + animated via the
+    // prod binder chain, is now an ELIGIBLE ATTACKER (CombatValidator.CanAttack
+    // accepts a Permanent that IsEffectivelyCreature). Before this slice the
+    // whole combat attacker subsystem was Creature-instance-typed so a manland
+    // (a Land C# instance) could never be declared as an attacker.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Prod_AnimatedMutavault_IsEligibleAttacker()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Mutavault", "Land", oracleText: MutavaultOracle);
+        var land = new Land("Mutavault", supertypes: null, subtypes: null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        var alice = facade.Alice;
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+        land.Controller = alice;
+        land.ActiveEffects = facade.ContinuousEffects; // IsEffectivelyCreature reads this
+        land.HasSummoningSickness = false; // a land you've controlled since your last turn
+
+        var validator = new Majik.Core.Combat.CombatValidator(facade.ContinuousEffects);
+
+        // Not yet animated → not a creature → can't attack (CR 508.1a).
+        validator.CanAttack(land, alice).Should().BeFalse(
+            "a plain (un-animated) Mutavault is not effectively a creature");
+
+        // Animate it through the prod-bound ability, then it IS an eligible
+        // attacker (CR 613.1c — effectively a creature).
+        var animate = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<ManaCostCost>().Any());
+        foreach (var e in animate.Effects) e.Execute();
+
+        land.IsEffectivelyCreature().Should().BeTrue();
+        validator.CanAttack(land, alice).Should().BeTrue(
+            "an animated Mutavault is effectively a 2/2 creature and may now attack");
+    }
 }

@@ -276,9 +276,21 @@ public sealed class SearchAgent : IPlayerAgent
     /// <inheritdoc/>
     public async Task<CombatPlan> DeclareAttackersAsync(
         GameContext ctx,
-        IReadOnlyList<Creature> eligibleAttackers,
+        IReadOnlyList<Permanent> eligibleAttackersAll,
         CancellationToken ct = default)
     {
+        // Deferral animated-noncreature-as-combatant (4B) — the eligible list is
+        // now Permanent-typed (animated manlands may attack). The search
+        // bot's move generation + remap key off Creature.InstanceId, so it
+        // searches over the real-Creature subset; an animated manland is not
+        // proactively swung by the search bot in v1 (a strict degradation, NOT
+        // a correctness bug — the live engine still allows it, the heuristic bot
+        // swings it, and the block-side remap keys off InstanceId on any
+        // Permanent). Widening the IBotStrategy / SimMove combat search to
+        // Permanent attackers is a follow-up (keeps the Frozen/FB1 snapshot
+        // untouched here).
+        var eligibleAttackers = eligibleAttackersAll.OfType<Creature>().ToList();
+
         // Rollout mode short-circuit: script empty + strategy set → delegate to
         // the heuristic strategy with the live context (no pause, no TCS).
         if (_script.Count == 0 && _rolloutStrategy != null)
@@ -389,10 +401,18 @@ public sealed class SearchAgent : IPlayerAgent
     /// <inheritdoc/>
     public async Task<BlockPlan> DeclareBlockersAsync(
         GameContext ctx,
-        IReadOnlyList<Creature> attackers,
-        IReadOnlyList<Creature> eligibleBlockers,
+        IReadOnlyList<Permanent> attackersAll,
+        IReadOnlyList<Permanent> eligibleBlockersAll,
         CancellationToken ct = default)
     {
+        // Deferral animated-noncreature-as-combatant (4B) — Permanent-typed
+        // lists. The search bot's block solver keys off Creature; project to the
+        // real-Creature subset (an animated manland attacker is simply not
+        // separately blocked, and a manland is not chosen as a blocker, by the
+        // search bot in v1 — the engine handles its combat damage regardless).
+        var attackers = attackersAll.OfType<Creature>().ToList();
+        var eligibleBlockers = eligibleBlockersAll.OfType<Creature>().ToList();
+
         // Rollout mode short-circuit.
         if (_script.Count == 0 && _rolloutStrategy != null)
             return _rolloutStrategy.PickBlockers(ctx, _seat, attackers, eligibleBlockers);
@@ -671,8 +691,8 @@ public sealed class SearchAgent : IPlayerAgent
             var ca = a.CombatPlan?.Attackers.Count ?? 0;
             var cb = b.CombatPlan?.Attackers.Count ?? 0;
             if (ca != cb) return cb.CompareTo(ca); // descending attacker count
-            var pa = a.CombatPlan?.Attackers.Sum(d => d.Attacker.Power) ?? 0;
-            var pb = b.CombatPlan?.Attackers.Sum(d => d.Attacker.Power) ?? 0;
+            var pa = a.CombatPlan?.Attackers.Sum(d => d.Attacker.GetEffectivePower()) ?? 0;
+            var pb = b.CombatPlan?.Attackers.Sum(d => d.Attacker.GetEffectivePower()) ?? 0;
             return pb.CompareTo(pa); // descending total power
         });
 

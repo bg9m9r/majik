@@ -837,7 +837,7 @@ public sealed class ContinuousEffectsService
     /// Multiple such effects intersect (any single rejecting effect forbids
     /// the block). Returns true when no restriction is registered.
     /// </summary>
-    public bool CanBlockUnderExceptByRestrictions(Creature attacker, Creature blocker)
+    public bool CanBlockUnderExceptByRestrictions(Permanent attacker, Permanent blocker)
     {
         if (attacker == null) throw new ArgumentNullException(nameof(attacker));
         if (blocker == null) throw new ArgumentNullException(nameof(blocker));
@@ -864,6 +864,32 @@ public sealed class ContinuousEffectsService
         foreach (var e in _effects)
         {
             if (MatchesCombatRestriction(e, creature, restriction)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// <see cref="Permanent"/> overload of
+    /// <see cref="HasRestriction(Creature, CombatRestriction)"/> so an animated
+    /// NON-creature combatant (a manland — deferral
+    /// <c>animated-noncreature-as-combatant</c>) can be checked for per-turn
+    /// attack/block restrictions. A real <see cref="Creature"/> routes to the
+    /// full check (including the <see cref="Creature"/>-typed dynamic predicate);
+    /// a non-Creature permanent matches only direct-target / mass restrictions
+    /// (the predicate family — Ensnaring Bridge etc. — is creature-power-keyed
+    /// and does not apply to lands).
+    /// </summary>
+    public bool HasRestriction(Permanent permanent, CombatRestriction restriction)
+    {
+        if (permanent == null) throw new ArgumentNullException(nameof(permanent));
+        if (permanent is Creature creature) return HasRestriction(creature, restriction);
+        foreach (var e in _effects)
+        {
+            if (e is not CombatRestrictionEffect r) continue;
+            if (!r.IsActive()) continue;
+            if (r.Restriction != restriction) continue;
+            if (r.Predicate != null) continue; // Creature-typed; N/A to a non-creature
+            if (r.Target == null || ReferenceEquals(r.Target, permanent)) return true;
         }
         return false;
     }

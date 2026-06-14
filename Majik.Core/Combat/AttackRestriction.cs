@@ -23,7 +23,7 @@ public abstract class AttackRestriction
 
     /// <summary>True when <paramref name="attacker"/> may legally attack
     /// the protected target (the controller paid any required cost, etc.).</summary>
-    public abstract bool MayAttack(Creature attacker, object defender);
+    public abstract bool MayAttack(Permanent attacker, object defender);
 }
 
 /// <summary>
@@ -51,7 +51,7 @@ public sealed class PayPerAttackerRestriction : AttackRestriction
     private readonly Func<ManaCost> _costPerAttacker;
     private readonly bool _protectsPlaneswalkers;
     private readonly Func<bool>? _isActive;
-    private readonly HashSet<Creature> _paid = new();
+    private readonly HashSet<Permanent> _paid = new();
 
     private PayPerAttackerRestriction(
         Player protectedPlayer,
@@ -115,7 +115,7 @@ public sealed class PayPerAttackerRestriction : AttackRestriction
         return false;
     }
 
-    public override bool MayAttack(Creature attacker, object defender)
+    public override bool MayAttack(Permanent attacker, object defender)
     {
         if (!Protects(defender)) return true;
         return _paid.Contains(attacker);
@@ -124,7 +124,7 @@ public sealed class PayPerAttackerRestriction : AttackRestriction
     /// <summary>Engine calls this after the attacker's controller pays the
     /// per-attacker cost. The mark is consumed when combat resets via
     /// <see cref="ClearForTurn"/>.</summary>
-    public void MarkPaid(Creature attacker) => _paid.Add(attacker);
+    public void MarkPaid(Permanent attacker) => _paid.Add(attacker);
 
     public void ClearForTurn() => _paid.Clear();
 }
@@ -137,6 +137,6 @@ public sealed class AttackRestrictionRegistry
     public void Register(AttackRestriction r) => _entries.Add(r);
     public void Unregister(AttackRestriction r) => _entries.Remove(r);
 
-    public bool MayAttack(Creature attacker, object defender) =>
+    public bool MayAttack(Permanent attacker, object defender) =>
         _entries.All(r => r.MayAttack(attacker, defender));
 }

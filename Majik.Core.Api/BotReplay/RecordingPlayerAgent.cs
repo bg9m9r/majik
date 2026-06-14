@@ -126,13 +126,13 @@ public sealed class RecordingPlayerAgent : IPlayerAgent
             BotDecisionKind.ManaSources, BotDecisionCodec.EncodeManaSources).ConfigureAwait(false);
 
     public async Task<CombatPlan> DeclareAttackersAsync(
-        GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
         => await RecordAsync(
             await _inner.DeclareAttackersAsync(ctx, eligibleAttackers, ct).ConfigureAwait(false),
             BotDecisionKind.Attackers, BotDecisionCodec.EncodeAttackers).ConfigureAwait(false);
 
     public async Task<BlockPlan> DeclareBlockersAsync(
-        GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers,
+        GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers,
         CancellationToken ct = default)
         => await RecordAsync(
             await _inner.DeclareBlockersAsync(ctx, attackers, eligibleBlockers, ct).ConfigureAwait(false),

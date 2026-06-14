@@ -14,13 +14,15 @@ namespace Majik.Core.Domain.DomainEvents;
 /// </summary>
 public class CreatureBlocksEvent : GameEvent
 {
-    /// <summary>The creature that was declared as a blocker.</summary>
-    public Creature Blocker { get; }
+    /// <summary>The permanent that was declared as a blocker (typed
+    /// <see cref="Permanent"/> so an animated manland blocking is carried too;
+    /// deferral <c>animated-noncreature-as-combatant</c>, 4B).</summary>
+    public Permanent Blocker { get; }
 
-    /// <summary>The attacking creature that <see cref="Blocker"/> is blocking.</summary>
-    public Creature BlockedAttacker { get; }
+    /// <summary>The attacking permanent that <see cref="Blocker"/> is blocking.</summary>
+    public Permanent BlockedAttacker { get; }
 
-    public CreatureBlocksEvent(Creature blocker, Creature blockedAttacker)
+    public CreatureBlocksEvent(Permanent blocker, Permanent blockedAttacker)
         : base(EventType.PhaseEnded)
     {
         Blocker = blocker ?? throw new ArgumentNullException(nameof(blocker));

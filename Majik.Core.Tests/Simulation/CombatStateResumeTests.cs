@@ -45,7 +45,7 @@ public sealed class CombatStateResumeTests
         bob.Zones.Battlefield.AddCard(liveBlocker);
         liveBlocker.SetZone(ZoneType.Battlefield);
 
-        IReadOnlyList<Creature>? capturedAttackers = null;
+        IReadOnlyList<Permanent>? capturedAttackers = null;
         var recordingAgent = new RecordingDefenderAgent(
             attackers => capturedAttackers = attackers);
 
@@ -107,12 +107,12 @@ public sealed class CombatStateResumeTests
     /// </summary>
     private sealed class RecordingDefenderAgent : IPlayerAgent
     {
-        private readonly Action<IReadOnlyList<Creature>> _onBlockAsk;
+        private readonly Action<IReadOnlyList<Permanent>> _onBlockAsk;
 
-        public RecordingDefenderAgent(Action<IReadOnlyList<Creature>> onBlockAsk)
+        public RecordingDefenderAgent(Action<IReadOnlyList<Permanent>> onBlockAsk)
             => _onBlockAsk = onBlockAsk;
 
-        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
         {
             _onBlockAsk(attackers);
             return Task.FromResult(BlockPlan.None);
@@ -142,7 +142,7 @@ public sealed class CombatStateResumeTests
         public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
             => Task.FromResult(ManaPayment.Empty);
 
-        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
             => Task.FromResult(CombatPlan.None);
 
         public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)

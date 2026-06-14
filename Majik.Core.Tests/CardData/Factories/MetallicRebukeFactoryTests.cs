@@ -331,14 +331,11 @@ public class MetallicRebukeFactoryTests
             CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ITriggeredAbility>>(mine);
 
-        public Task<CombatPlan> DeclareAttackersAsync(
-            GameContext ctx, IReadOnlyList<Creature> eligibleAttackers,
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers,
             CancellationToken ct = default)
             => Task.FromResult(CombatPlan.None);
 
-        public Task<BlockPlan> DeclareBlockersAsync(
-            GameContext ctx, IReadOnlyList<Creature> attackers,
-            IReadOnlyList<Creature> eligibleBlockers,
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers,
             CancellationToken ct = default)
             => Task.FromResult(BlockPlan.None);
 

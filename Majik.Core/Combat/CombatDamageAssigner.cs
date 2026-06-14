@@ -112,8 +112,8 @@ public sealed class CombatDamageAssigner
         }
     }
 
-    private static int CalculateLethalDamage(Creature creature, bool hasDeathtouch)
-        => hasDeathtouch ? 1 : creature.Toughness;
+    private static int CalculateLethalDamage(Permanent creature, bool hasDeathtouch)
+        => hasDeathtouch ? 1 : creature.GetEffectiveToughness();
 
     private void Resolve(Combat combat, bool isFirstStrike)
     {
@@ -123,7 +123,7 @@ public sealed class CombatDamageAssigner
             {
                 if (blocker.AssignedDamage > 0)
                 {
-                    blocker.Creature.TakeDamage(blocker.AssignedDamage);
+                    blocker.Creature.MarkDamage(blocker.AssignedDamage);
                     _eventBus?.Publish(new CombatDamageDealtEvent(
                         attacker.Creature, blocker.Creature, blocker.AssignedDamage, isFirstStrike));
                 }
@@ -156,11 +156,12 @@ public sealed class CombatDamageAssigner
 
             foreach (var blocker in attacker.Blockers)
             {
-                if (blocker.Creature.Power > 0)
+                var blockerPower = blocker.Creature.GetEffectivePower();
+                if (blockerPower > 0)
                 {
-                    attacker.Creature.TakeDamage(blocker.Creature.Power);
+                    attacker.Creature.MarkDamage(blockerPower);
                     _eventBus?.Publish(new CombatDamageDealtEvent(
-                        blocker.Creature, attacker.Creature, blocker.Creature.Power, isFirstStrike));
+                        blocker.Creature, attacker.Creature, blockerPower, isFirstStrike));
                 }
             }
         }

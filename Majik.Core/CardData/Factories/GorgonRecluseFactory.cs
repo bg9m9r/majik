@@ -108,11 +108,11 @@ public static class GorgonRecluseFactory
         // The captured "that creature" is stashed so the resolved effect knows
         // which creature to destroy (mirrors Brimaz's captured-event pattern).
         // ----------------------------------------------------------------
-        Creature? capturedThatCreature = null;
+        Permanent? capturedThatCreature = null;
 
         var condition = new EventTriggerCondition<CreatureBlocksEvent>((e, _) =>
         {
-            Creature thatCreature;
+            Permanent thatCreature;
             if (ReferenceEquals(e.Blocker, card))
                 thatCreature = e.BlockedAttacker;        // Gorgon Recluse blocks.
             else if (ReferenceEquals(e.BlockedAttacker, card))
