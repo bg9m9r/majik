@@ -1006,6 +1006,61 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_PowerPinger_RehomesDamageEqualToBearerPower()
+    {
+        // agatha-oracle-shape-spikeshot-goblin-ping-equal-power: the
+        // OracleActivatedAbilityBinder now reconstructs the POWER-pinger oracle
+        // shape "{cost}: This creature deals damage equal to its power to <target>."
+        // (Spikeshot Goblin's shape). Re-homing is the exact case that motivated
+        // the re-sourceable representation: the damage amount MUST read the
+        // BEARER's power at resolution (CR 608.2h), never the exiled card's.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: a 1/2 with Spikeshot's printed power-pinger line.
+        var spike = new Creature("Spike Stub", "2R", 1, 2);
+        spike.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(spike);
+        spike.SetZone(ZoneType.Graveyard);
+
+        // Bearer base 4/4 + the SeatedBearer +1/+1 counter = 5 live power.
+        var bearer = SeatedBearer(alice, effects, zones, power: 4, toughness: 4);
+        bearer.GetEffectivePower().Should().Be(5,
+            "Counter Bear base 4/4 + the +1/+1 counter SeatedBearer adds");
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Spike Stub",
+                "{R}, {T}: This creature deals damage equal to its power to any target.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), spike);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's power-pinger");
+        var ping = granted[0];
+        ping.Source.Should().BeSameAs(bearer, "re-homed to the BEARER");
+        ping.TargetRequests.Should().ContainSingle(t => t.Description.Contains("any target"));
+        ping.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("R"),
+            "the {R} mana cost is reconstructed");
+        ping.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the {T} cost taps the BEARER");
+
+        // Resolving deals damage equal to the BEARER's power (5), not the exiled
+        // card's printed power (1).
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+        var lifeBefore = bob.LifeTotal;
+        foreach (var effect in ping.Effects) effect.Execute();
+        bob.LifeTotal.Should().Be(lifeBefore - 5,
+            "the re-homed power-pinger deals damage equal to the BEARER's power (5), " +
+            "not the exiled imprinted card's printed power (1)");
+    }
+
+    [Fact]
     public void Grant_NonMana_SacrificePinger_RehomesSacOfBearer()
     {
         var alice = new Player("Alice", 20);

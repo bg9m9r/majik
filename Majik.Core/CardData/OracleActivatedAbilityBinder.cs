@@ -49,6 +49,17 @@ namespace Majik.Core.CardData;
 ///     <see cref="TargetRequest"/> and resolution through
 ///     <see cref="Fx.DealDamageAny"/> (Player / Creature / Planeswalker funnel,
 ///     CR 119.3 / 306.7) — exactly Endbringer's pinger.</item>
+///   <item><b>Power-pinger</b> —
+///     <c>"{cost}: This creature deals damage equal to its power to &lt;any
+///     target | target creature | target player&gt;."</c> The variable-amount
+///     sibling of the fixed pinger (Spikeshot Goblin). Rebuilt with a 1..1
+///     <see cref="TargetRequest"/>; the damage amount is read off the BEARER's
+///     <see cref="Permanent.GetEffectivePower"/> AT RESOLUTION (CR 608.2h — the
+///     amount is determined as the ability resolves), so a pumped / animated /
+///     counter-grown bearer scales the damage with ITS own power, never the
+///     exiled card's printed power. This is the exact case that motivated the
+///     re-sourceable representation: a "deal damage equal to its power" closure
+///     MUST read the bearer.</item>
 ///   <item><b>Sacrifice-self pinger</b> —
 ///     <c>"Sacrifice this creature: It deals N damage to &lt;…&gt;."</c> Same as
 ///     above but the cost is <see cref="AdditionalCost.Sacrifice"/>(bearer)
@@ -200,6 +211,20 @@ public static class OracleActivatedAbilityBinder
     // "{cost}: This creature deals N damage to <target form>."
     private static readonly Regex PingerRegex = new(
         @"^(" + CostList + @")\s*:\s*This creature deals (\d+) damage to (any target|target creature|target player)\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: This creature deals damage equal to its power to <target form>."
+    // The POWER-pinger sibling of the fixed-amount pinger (Spikeshot Goblin's
+    // "{R}, {T}: This creature deals damage equal to its power to any target.").
+    // Re-source-safe to reconstruct, and the EXACT case that motivated the
+    // re-sourceable representation: the damage amount must read the BEARER's
+    // power at resolution (CR 608.2h — determined as the ability resolves), NOT
+    // the exiled imprinted card's. The rebuilt effect reads
+    // <see cref="Permanent.GetEffectivePower"/> off the BEARER source, so an
+    // animated-land or pumped bearer scales the damage with ITS own power, never
+    // the exiled card's printed power. Group 1 = cost, group 2 = target form.
+    private static readonly Regex PowerPingerRegex = new(
+        @"^(" + CostList + @")\s*:\s*This creature deals damage equal to its power to (any target|target creature|target player)\.$",
         RegexOptions.IgnoreCase);
 
     // "Sacrifice this creature: It deals N damage to <target form>."
@@ -429,6 +454,15 @@ public static class OracleActivatedAbilityBinder
             {
                 var ability = TryBuildPumpOther(pumpOther, bearer, controller);
                 if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var powerPing = PowerPingerRegex.Match(line);
+            if (powerPing.Success)
+            {
+                var costs = TryBuildCostList(powerPing.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                result.Add(BuildPowerPinger(costs, powerPing.Groups[2].Value, bearer, controller));
                 continue;
             }
 
@@ -830,6 +864,74 @@ public static class OracleActivatedAbilityBinder
                 if (ability == null) return;
                 if (ability.ChosenTargets.Count == 0) return;
                 if (ability.ChosenTargets[0].Count == 0) return;
+
+                var target = ability.ChosenTargets[0][0];
+                // CR 119 / 306.7 — Player / Creature / Planeswalker funnel.
+                // The bearer is the damage source (it dealt the damage).
+                Fx.DealDamageAny(target, amount, bearer as Creature);
+            });
+
+        var (description, intent) = targetForm.ToLowerInvariant() switch
+        {
+            "target creature" => ("target creature", BotIntent.Removal),
+            "target player" => ("target player", BotIntent.None),
+            _ => ("any target", BotIntent.Burn),
+        };
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { damageEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: description,
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: intent),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Build a POWER-pinger: "deals damage equal to its power to &lt;target
+    /// form&gt;", re-homed so the SOURCE is the bearer. The damage amount is read
+    /// off the BEARER's <see cref="Permanent.GetEffectivePower"/> AT RESOLUTION
+    /// (CR 608.2h — the amount is determined as the ability resolves), so a
+    /// pumped / animated / counter-grown bearer scales the damage with ITS own
+    /// power — never the exiled imprinted card's printed power. This is the exact
+    /// case that motivated the re-sourceable representation (Spikeshot Goblin):
+    /// a "deal damage equal to its power" closure MUST read the bearer. A
+    /// non-positive (0 or floored) power deals no damage. Creature-only — only a
+    /// creature has a power to read, so a non-creature bearer returns the ability
+    /// unguarded but its <see cref="Permanent.GetEffectivePower"/> is 0 (no
+    /// damage); we still emit it because an animated-land bearer DOES have a
+    /// power. Resolution funnels through <see cref="Fx.DealDamageAny"/>; the cost
+    /// (mana/tap) already taps the bearer.
+    /// </summary>
+    private static ActivatedAbility BuildPowerPinger(
+        List<ICost> costs,
+        string targetForm,
+        Permanent bearer,
+        Player controller)
+    {
+        ActivatedAbility? ability = null;
+        var damageEffect = new Effect(
+            $"Granted: this creature deals damage equal to its power to {targetForm}",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 608.2h — read the BEARER's power AT RESOLUTION (the
+                // re-homed source), never the exiled imprinted card's. 0 (or
+                // floored) power deals no damage.
+                var amount = bearer.GetEffectivePower();
+                if (amount <= 0) return;
 
                 var target = ability.ChosenTargets[0][0];
                 // CR 119 / 306.7 — Player / Creature / Planeswalker funnel.
