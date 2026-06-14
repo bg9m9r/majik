@@ -23507,6 +23507,59 @@
     "White"
   ]
 }
+==== master-decoy ====
+{
+  "name": "Master Decoy",
+  "manaCost": "{1}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Human",
+    "Soldier"
+  ],
+  "power": 1,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== master-of-waves ====
 {
   "name": "Master of Waves",

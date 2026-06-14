@@ -1,0 +1,20 @@
+{
+  "name": "Master Decoy",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "W" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "tap_target", "targetFilter": "creature" }
+      ]
+    }
+  ]
+}

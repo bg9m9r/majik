@@ -62,6 +62,18 @@ namespace Majik.Core.CardData;
 ///     reconstructed (a restricted filter like "target creature you don't
 ///     control" is skipped, consistent with the pinger's restricted-target
 ///     boundary). Creature-only (only a creature can fight).</item>
+///   <item><b>Tap / untap target</b> —
+///     <c>"{cost}: Tap target creature."</c> /
+///     <c>"{cost}: Untap target creature."</c> Rebuilt with a 1..1
+///     <see cref="TargetRequest"/> and resolution through
+///     <see cref="Fx.Tap(Permanent, Player?)"/> /
+///     <see cref="Fx.Untap(Permanent)"/> (CR 701.21a / 701.27a) — exactly Master
+///     Decoy / Goldmeadow Harrier. Sound to re-home: the BEARER is only the
+///     source / cost-payer (its own {T} cost taps it); the effect (un)taps the
+///     CHOSEN creature, never the exiled card and never the bearer. Only the OPEN
+///     "target creature" filter is reconstructed (a restricted filter is skipped,
+///     consistent with the pinger / fight restricted-target boundary). Not
+///     creature-only: any permanent bearer can pay to tap a chosen creature.</item>
 ///   <item><b>Self-keyword grant</b> —
 ///     <c>"{cost}: This creature gains &lt;keyword&gt; until end of turn."</c>
 ///     (the keyword sibling of firebreathing). Rebuilt as a no-target
@@ -193,6 +205,22 @@ public static class OracleActivatedAbilityBinder
     // "Sacrifice this creature: It deals N damage to <target form>."
     private static readonly Regex SacPingerRegex = new(
         @"^Sacrifice this creature:\s*It deals (\d+) damage to (any target|target creature|target player)\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Tap target creature." / "{cost}: Untap target creature."
+    // (CR 701.21a / 701.27a.) A self-source tapper / untapper is one of the most
+    // common activated control shapes on real creature cards (Master Decoy,
+    // Goldmeadow Harrier, Icatian Javelineers-style tappers; the untap leg covers
+    // Pestermite-style "untap target" payoffs). Sound to re-home: the BEARER is
+    // ONLY the source / cost-payer (its own {T} cost taps it); the effect taps /
+    // untaps the CHOSEN target creature via Fx.Tap / Fx.Untap — the verb has NO
+    // "this creature" / source reference at all, so re-homing is a clean tap of a
+    // chosen permanent, never the exiled imprinted card. Only the OPEN "target
+    // creature" filter is reconstructed (no restricted candidate filter), consistent
+    // with the pinger / fight / pump-other restricted-target boundary. Group 2 is
+    // the verb ("Tap" | "Untap").
+    private static readonly Regex TapTargetRegex = new(
+        @"^(" + CostList + @")\s*:\s*(Tap|Untap) target creature\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: This creature fights target creature." (CR 701.12.)
@@ -405,6 +433,17 @@ public static class OracleActivatedAbilityBinder
                 if (costs == null) continue; // unsound cost token — skip
                 var ability = BuildFight(costs, bearer, controller);
                 if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var tapTarget = TapTargetRegex.Match(line);
+            if (tapTarget.Success)
+            {
+                var costs = TryBuildCostList(tapTarget.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                var untap = string.Equals(
+                    tapTarget.Groups[2].Value, "Untap", StringComparison.OrdinalIgnoreCase);
+                result.Add(BuildTapTarget(costs, untap, bearer, controller));
                 continue;
             }
 
@@ -834,6 +873,64 @@ public static class OracleActivatedAbilityBinder
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Build a tap-target ability: "{cost}: Tap target creature." (or the untap
+    /// sibling, when <paramref name="untap"/> is true). Re-homed so the BEARER is
+    /// ONLY the source / cost-payer; the effect taps/untaps the CHOSEN target
+    /// creature via <see cref="Fx.Tap(Permanent, Player?)"/> /
+    /// <see cref="Fx.Untap(Permanent)"/> (CR 701.21a / 701.27a) — never the exiled
+    /// imprinted card, and never the bearer itself (the bearer is only tapped by
+    /// its own {T} cost, not by the effect). The bearer need NOT be a creature (a
+    /// non-creature bearer can still pay to tap a chosen creature), so this does
+    /// not gate on <see cref="Creature"/>. Mirrors <see cref="BuildPinger"/>'s 1..1
+    /// single-creature target request.
+    /// </summary>
+    private static ActivatedAbility BuildTapTarget(
+        List<ICost> costs,
+        bool untap,
+        Permanent bearer,
+        Player controller)
+    {
+        ActivatedAbility? ability = null;
+        var verb = untap ? "untap" : "tap";
+        var tapEffect = new Effect(
+            $"Granted: {verb} target creature",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 701.21a / 701.27a — (un)tap the CHOSEN permanent. A non-permanent
+                // chosen target (shape-only path) silently no-ops. The bearer is
+                // untouched by the effect; only the chosen creature is (un)tapped.
+                if (ability.ChosenTargets[0][0] is Permanent chosen)
+                {
+                    if (untap) Fx.Untap(chosen);
+                    else Fx.Tap(chosen, controller);
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { tapEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    // Tapping a creature denies a blocker/attacker (a removal-like
+                    // tempo play); untapping is a utility move with no clean intent.
+                    Intent: untap ? BotIntent.None : BotIntent.Removal),
             });
 
         return ability;
