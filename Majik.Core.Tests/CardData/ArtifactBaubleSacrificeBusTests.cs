@@ -4,6 +4,7 @@ using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
@@ -105,6 +106,83 @@ public class ArtifactBaubleSacrificeBusTests
         SacCost(bauble).Pay(alice);
 
         bauble.Zone.Should().Be(ZoneType.Graveyard, "the move still happens");
+        seen.Should().BeEmpty("no bus was threaded into the single-arg overload");
+    }
+
+    // ------------------------------------------------------------------
+    // RESOLVE-CLOSURE sac (artifact-bauble-resolve-closure-sac-bus).
+    //
+    // The central IBusAwareCost seam (#2736) only reaches the *cost* leg —
+    // the AdditionalCost.Sacrifice paid by CostPayment during activation. But
+    // each of these baubles ALSO performs the self-sacrifice inside its RESOLVE
+    // closure (SacrificeSelf), the bus-aware fallback for the resolve-only
+    // dispatcher path where the cost was not pre-paid (e.g. a directly-Resolved
+    // ability, or a future "resolve the ability without paying costs" effect).
+    // The effects-aware Create(Player, ContinuousEffectsService) overload threads
+    // effects.EventBus into that closure too, so a resolve-time self-sacrifice
+    // publishes PermanentSacrificedEvent (CR 701.16a) crediting the controller —
+    // the seam aristocrat payoffs (Mayhem Devil, It That Betrays) read.
+    // ------------------------------------------------------------------
+
+    private static Land BasicForest(Player owner)
+    {
+        var forest = new Land("Forest",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest });
+        forest.SetOwner(owner);
+        owner.Zones.Library.AddCard(forest);
+        forest.SetZone(ZoneType.Library);
+        return forest;
+    }
+
+    [Theory]
+    [MemberData(nameof(BaubleFactories))]
+    public void ResolveClosure_WhenBusWired_SacrificesSelf_AndPublishes(
+        string name, System.Func<Player, ContinuousEffectsService, Artifact> create)
+    {
+        var alice = new Player("Alice", 20);
+        var (_, effects, seen) = Wired();
+        BasicForest(alice); // a candidate so the search half of the closure runs
+
+        var bauble = create(alice, effects);
+        bauble.Name.Should().Be(name);
+        alice.Zones.Battlefield.AddCard(bauble);
+        bauble.SetZone(ZoneType.Battlefield);
+
+        // Resolve the ability DIRECTLY (costs NOT pre-paid), so the bauble is
+        // still on the battlefield when the resolve closure runs — this is the
+        // resolve-closure SacrificeSelf path, distinct from the cost path above.
+        var tutor = bauble.Abilities.OfType<ActivatedAbility>().Single();
+        tutor.Resolve();
+
+        bauble.Zone.Should().Be(ZoneType.Graveyard, "the resolve closure sacrificed the bauble");
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == bauble
+                && ev.SacrificingPlayer == alice
+                && !ev.WasToken,
+            "the resolve-closure self-sacrifice publishes via the threaded bus (CR 701.16a)");
+    }
+
+    [Theory]
+    [MemberData(nameof(BaubleFactories))]
+    public void ResolveClosure_ShapeOnly_StaysBusLess_NoPublish(
+        string name, System.Func<Player, ContinuousEffectsService, Artifact> create)
+    {
+        _ = create; // shape-only path uses the single-arg overload below
+        var alice = new Player("Alice", 20);
+        var bus = new EventBus();
+        var seen = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+        BasicForest(alice);
+
+        var bauble = (Artifact)Majik.Core.CardData.NamedCardFactory.Create(name, alice);
+        alice.Zones.Battlefield.AddCard(bauble);
+        bauble.SetZone(ZoneType.Battlefield);
+
+        var tutor = bauble.Abilities.OfType<ActivatedAbility>().Single();
+        tutor.Resolve();
+
+        bauble.Zone.Should().Be(ZoneType.Graveyard, "the resolve closure still sacrifices the bauble");
         seen.Should().BeEmpty("no bus was threaded into the single-arg overload");
     }
 }
