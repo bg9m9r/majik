@@ -42,12 +42,18 @@ namespace Majik.Core.CardData.Factories;
 /// "This land enters tapped unless you revealed a Dragon card this way or you
 /// control a Dragon" is a <see cref="ConditionalEntersTappedReplacement"/>
 /// registered when a <see cref="ReplacementBus"/> is supplied. The "revealed a
-/// Dragon card this way" half is itself an "as this enters" decision
-/// (CR 614.10) — resolved up front and passed as <c>revealedDragon</c>, same
-/// deferred-prompt posture as the chosen color. The "you control a Dragon"
-/// half counts the controller's battlefield permanents carrying the Dragon
-/// subtype (CR 205.3 — Dragon is a creature type), excluding this land itself
-/// by reference equality. The land enters untapped iff either half holds.
+/// Dragon card this way" half is itself an "as this enters" may-decision
+/// (CR 614.10). On the live prod path (lands route through the binder chain,
+/// not this factory) that reveal is now agent-driven: <see cref="ConditionalEntersTappedBinder"/>
+/// registers a <see cref="RevealCardFromHandReplacement"/> that prompts the
+/// controller via <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseRevealCardFromHandAsync"/>
+/// and stamps a shared <see cref="RevealedFromHandFlag"/> the tapped predicate
+/// reads — pairing with the choose-a-color ETB family. This test-only factory
+/// path instead takes the already-resolved <c>revealedDragon</c> up front. The
+/// "you control a Dragon" half counts the controller's battlefield permanents
+/// carrying the Dragon subtype (CR 205.3 — Dragon is a creature type), excluding
+/// this land itself by reference equality. The land enters untapped iff either
+/// half holds.
 /// </para>
 ///
 /// <para>

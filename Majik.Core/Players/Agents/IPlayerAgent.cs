@@ -151,6 +151,58 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// CR 614.10 / CR 701.16 — "as this enters, you may reveal a [match] card
+    /// from your hand" decision (Temple of the Dragon Queen — "you may reveal a
+    /// Dragon card from your hand", and the wider conditional-tapped reveal
+    /// family). The engine has already filtered the chooser's hand down to the
+    /// <paramref name="matching"/> cards that satisfy the reveal predicate (the
+    /// named subtype / type), so the prompt is only raised when at least one
+    /// legal card exists. Returns the revealed card (which the caller may show
+    /// publicly per CR 701.16a and feed into the gating condition), or
+    /// <see langword="null"/> to decline — revealing is a "may" (CR 614.10).
+    /// <para>
+    /// <paramref name="matchLabel"/> is human-readable ("a Dragon card") for
+    /// remote-agent prompt UIs. Mirrors the up-front choose-a-color ETB prompt
+    /// (<see cref="ChooseColorAsync"/>) — both are binder-reachable "as this
+    /// enters" agent surfaces.
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.YesNo"/>
+    /// ("reveal a [match] card?"), classified <see cref="BotIntent.CardAdvantage"/>
+    /// — revealing has no downside and lets the land enter untapped, so the
+    /// default heuristic answers "yes" and reveals the first matching card. A
+    /// "no" (empty result) returns <see langword="null"/> (declined). Smart bots
+    /// / remote agents override <see cref="ChooseAsync"/> (or this method) to
+    /// decide whether to reveal.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect closures
+    /// (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<ICard?> ChooseRevealCardFromHandAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> matching,
+        string matchLabel,
+        CancellationToken ct = default)
+    {
+        if (matching is null || matching.Count == 0) return null;
+
+        var req = new ChoiceRequest(
+            ChoiceKind.YesNo,
+            $"Reveal {matchLabel} from your hand?",
+            Min: 0, Max: 1,
+            Candidates: Array.Empty<object>(),
+            Intent: BotIntent.CardAdvantage,
+            Optional: true);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        // "Yes" (non-empty) reveals the first matching card; "no" (empty)
+        // declines (CR 614.10 — revealing is a "may").
+        return chosen.Count > 0 ? matching[0] : null;
+    }
+
+    /// <summary>
     /// Pick a mode index for a modal spell or ability.
     /// <paramref name="modeIntents"/> is parallel to <paramref name="modes"/>
     /// when populated, carrying each mode's
