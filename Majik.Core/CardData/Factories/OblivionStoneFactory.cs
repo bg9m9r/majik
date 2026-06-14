@@ -3,7 +3,10 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -83,7 +86,28 @@ public static class OblivionStoneFactory
     /// #2551). With no live game context the scans fall back to the
     /// controller's battlefield (shape-only paths).
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> + the
+    /// resolve-path sweep closure so the sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -155,11 +179,23 @@ public static class OblivionStoneFactory
             {
                 // Self-sac stub — perform the zone move so visible state
                 // matches CR 701.16 BEFORE the sweep scans the battlefield.
+                // When a bus is wired (prod effects-aware build) route through
+                // Fx.Sacrifice so the resolve-only dispatcher/test path
+                // publishes PermanentSacrificedEvent (CR 701.16a); the live
+                // activation path already moved + published via the sac cost,
+                // so this no-ops there (single publish either way).
                 if (stone.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(stone);
-                    owner.Zones.Graveyard.AddCard(stone);
-                    stone.SetZone(ZoneType.Graveyard);
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(stone, stone.Controller ?? owner, eventBus);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(stone);
+                        owner.Zones.Graveyard.AddCard(stone);
+                        stone.SetZone(ZoneType.Graveyard);
+                    }
                 }
 
                 // "Each nonland permanent" — across every player's battlefield,
@@ -211,7 +247,7 @@ public static class OblivionStoneFactory
             {
                 new ManaCostCost("{5}"),
                 AdditionalCost.Tap(stone),
-                AdditionalCost.Sacrifice(stone),
+                AdditionalCost.Sacrifice(stone, eventBus),
             },
             effects: new IEffect[] { sweepEffect }));
 

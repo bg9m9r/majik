@@ -4,7 +4,10 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -103,7 +106,19 @@ public static class BlastZoneFactory
     /// tests.
     /// </summary>
     public static Land Create(Player owner) =>
-        Create(owner, chargeXValueProvider: null, allPlayersResolver: null);
+        Create(owner, chargeXValueProvider: null, allPlayersResolver: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — Festival-Crasher pattern). Threads <c>effects.EventBus</c>
+    /// into the self-sacrifice cost so paying it publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting the
+    /// cost-payer — the seam aristocrat payoffs read.
+    /// </summary>
+    public static Land Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, chargeXValueProvider: null, allPlayersResolver: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Blast Zone. When <paramref name="chargeXValueProvider"/>
@@ -117,7 +132,21 @@ public static class BlastZoneFactory
     public static Land Create(
         Player owner,
         Func<int>? chargeXValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        Func<IReadOnlyList<Player>>? allPlayersResolver) =>
+        Create(owner, chargeXValueProvider, allPlayersResolver, eventBus: null);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> + the
+    /// resolve-path sweep closure so the sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
+    /// legacy publish-nothing posture.
+    /// </summary>
+    public static Land Create(
+        Player owner,
+        Func<int>? chargeXValueProvider,
+        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -207,12 +236,24 @@ public static class BlastZoneFactory
 
                 // Sacrifice payment is a no-op stub at the engine level —
                 // move Blast Zone to its owner's graveyard here so SBAs +
-                // visible state line up with CR 701.16.
+                // visible state line up with CR 701.16. When a bus is wired
+                // (prod effects-aware build) route through Fx.Sacrifice so the
+                // resolve-only dispatcher/test path publishes
+                // PermanentSacrificedEvent (CR 701.16a); the live activation
+                // path already moved + published via the sac cost, so this
+                // no-ops there (single publish either way).
                 if (land.Zone == ZoneType.Battlefield)
                 {
-                    owner.Zones.Battlefield.RemoveCard(land);
-                    owner.Zones.Graveyard.AddCard(land);
-                    land.SetZone(ZoneType.Graveyard);
+                    if (eventBus != null)
+                    {
+                        Fx.Sacrifice(land, land.Controller ?? owner, eventBus);
+                    }
+                    else
+                    {
+                        owner.Zones.Battlefield.RemoveCard(land);
+                        owner.Zones.Graveyard.AddCard(land);
+                        land.SetZone(ZoneType.Graveyard);
+                    }
                 }
 
                 var players = allPlayersResolver?.Invoke()
@@ -250,7 +291,7 @@ public static class BlastZoneFactory
             {
                 new ManaCostCost("{3}"),
                 AdditionalCost.Tap(land),
-                AdditionalCost.Sacrifice(land),
+                AdditionalCost.Sacrifice(land, eventBus),
             },
             effects: new IEffect[] { sweepEffect },
             sorcerySpeed: true));

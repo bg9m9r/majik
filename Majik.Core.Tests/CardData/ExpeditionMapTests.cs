@@ -32,6 +32,35 @@ public class ExpeditionMapTests
 {
     private readonly Player _alice = new("Alice", 20);
 
+    [Fact]
+    public void SacSelf_OnProdPath_PublishesPermanentSacrificedEvent()
+    {
+        // class-(b) sac-bus pay-down: the effects-aware
+        // Create(Player, ContinuousEffectsService) overload the source-gen
+        // routes on the prod GameFacade build threads effects.EventBus so the
+        // self-sacrifice ability publishes PermanentSacrificedEvent (CR 701.16a).
+        var bus = new global::Majik.Core.Events.EventBus();
+        var effects = new global::Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var captured = new List<global::Majik.Core.Events.PermanentSacrificedEvent>();
+        bus.Subscribe<global::Majik.Core.Events.PermanentSacrificedEvent>(captured.Add);
+
+        var built = NamedCardFactory.Create("Expedition Map", _alice, effects);
+        built.Should().BeOfType<Artifact>();
+        var map = (Artifact)built;
+        _alice.Zones.Battlefield.AddCard(map);
+        map.SetZone(ZoneType.Battlefield);
+
+        var sac = map.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<AdditionalCost>()
+                .Any(c => c.CostType == AdditionalCostType.Sacrifice));
+        sac.Resolve();
+
+        captured.Should().ContainSingle()
+            .Which.SacrificingPlayer.Should().BeSameAs(_alice);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(map);
+    }
+
     // --------------------------------------------------------------
     // Card identity + dispatch
     // --------------------------------------------------------------
