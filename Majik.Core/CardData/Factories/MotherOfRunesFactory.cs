@@ -115,24 +115,46 @@ public static class MotherOfRunesFactory
         // with a tap cost. Unlike Giver of Runes this targets ANY creature
         // you control (including this one). The chosen target is honoured on
         // resolution (CR 608.2b re-validates).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-resolutioncontext-source-migration-
+        // batch): "of your choice" / the grant-quality controller ("you") is
+        // read off the live ResolutionContext.Controller, and the chosen
+        // target is read off ctx.ChosenTargets — rather than capturing a
+        // captured ability handle (grantAbility.ChosenTargets) or `owner`.
+        // The {T} cost re-homes onto the new source via
+        // AdditionalCost.RebindSource (Stage 1), and the protection grant is
+        // self-sourced on the chosen TARGET (Resolve registers a
+        // GrantAbilityEffect with source: target), so re-homing does not
+        // re-read Mother of Runes. Marked RebindSafe below so Agatha's Soul
+        // Cauldron re-homes the REAL ability onto a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the {T} taps the
+        // BEARER and "you" is the BEARER's controller, never the exiled Mother
+        // of Runes. A "target creature you control gains protection from a
+        // chosen colour" grant is outside OracleActivatedAbilityBinder's
+        // reconstructable set, so RebindTo of the real ability is the only
+        // sound re-home.
         // ----------------------------------------------------------------
-        ActivatedAbility? grantAbility = null;
         var grantEffect = new Effect(
             $"{CardName}: target creature you control gains protection (chosen colour) EOT",
-            () =>
+            ctx =>
             {
-                if (grantAbility == null) return;
-                var chosen = grantAbility.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (ctx.ChosenTargets.Count == 0 || ctx.ChosenTargets[0].Count == 0)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
-                // Default quality is "white"; agents / tests supply a colour
-                // via an injectable picker. Here the picker defaults to white
-                // on the dispatcher path (no agent colour prompt yet — see
-                // class xmldoc).
-                Resolve(owner, chosen[0][0], WhitePicker);
+                // "you" (the grant-quality controller) read off the live
+                // context (the re-homed controller), falling back to the
+                // authored owner on the context-less sync path. Default
+                // quality is "white"; agents / tests supply a colour via an
+                // injectable picker (no agent colour prompt yet — see class
+                // xmldoc).
+                var controller = ctx.Controller ?? owner;
+                Resolve(controller, ctx.ChosenTargets[0][0], WhitePicker);
+                return ValueTask.CompletedTask;
             });
 
-        grantAbility = new ActivatedAbility(
+        var grantAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
@@ -151,7 +173,8 @@ public static class MotherOfRunesFactory
                         .Where(c => c.HasType(CardType.Creature))
                         .Cast<object>()
                         .ToList()),
-            });
+            },
+            rebindSafe: true);
 
         card.AddAbility(grantAbility);
 

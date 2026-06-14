@@ -2480,6 +2480,100 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // agatha-oracle-shape-scavenging-ooze-exile-gy-pump-gain — Mother of Runes
+    // is a bespoke [CardName]-factory creature whose sole activated ability
+    // ("{T}: Target creature you control gains protection from the color of
+    // your choice until end of turn.") is OUTSIDE the
+    // OracleActivatedAbilityBinder reconstructable set — a chosen-colour
+    // protection grant is not a parseable shape. The migration reads the chosen
+    // target off ResolutionContext.ChosenTargets and "you" (the grant-quality
+    // controller) off ctx.Controller — rather than capturing a captured ability
+    // handle / `owner` — and marks the ability RebindSafe, so Agatha's group-
+    // grant re-homes the REAL ability onto a counter-bearing bearer via
+    // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the {T} cost taps the
+    // BEARER and "you" is the BEARER's controller, never the exiled Mother of
+    // Runes. The protection grant is self-sourced on the chosen TARGET, so the
+    // re-home does not re-read Mother of Runes.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_MotherOfRunes_ProtectionGrantToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var mother = MotherOfRunesFactory.Create(alice);
+        var realAbilities = mother.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Mother of Runes has exactly one non-mana activated ability — the {T} protection grant");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Mother of Runes ability reads ResolutionContext.ChosenTargets/Controller and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(mother);
+        mother.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), mother);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Mother of Runes' real protection-grant ability is re-homed via RebindTo");
+        var grantAbility = granted[0];
+        grantAbility.Source.Should().BeSameAs(bearer,
+            "the re-homed grant ability is sourced on the BEARER (CR 707.2)");
+        grantAbility.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // The bearer (a creature Alice controls, with ActiveEffects wired)
+        // is the chosen target — "target creature you control" off the
+        // re-homed controller.
+        grantAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bearer } });
+
+        Majik.Core.Rules.Protection.HasProtectionFromColor(bearer, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeFalse("the bearer has no protection before the grant resolves");
+
+        await grantAbility.ResolveAsync(agent: null, game: null);
+
+        Majik.Core.Rules.Protection.HasProtectionFromColor(bearer, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeTrue(
+                "the re-homed grant gives the chosen BEARER protection from white (self-sourced on the target)");
+    }
+
+    [Fact]
+    public async Task BespokeProtectionGrant_ResolvesOnChosenTargetWhenNotRebound()
+    {
+        // Sanity: the migrated effect still grants protection to the CHOSEN
+        // target on the normal (un-rebound) resolution path — it reads
+        // ResolutionContext.ChosenTargets, not a captured ability handle.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var mother = MotherOfRunesFactory.Create(alice);
+        alice.Zones.Library.AddCard(mother);
+        zones.MoveCard(mother, ZoneType.Library, ZoneType.Battlefield, alice);
+        mother.ActiveEffects = effects;
+
+        var grant = mother.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { mother } });
+
+        await grant.ResolveAsync(agent: null, game: null);
+
+        Majik.Core.Rules.Protection.HasProtectionFromColor(mother, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeTrue(
+                "the un-rebound grant gives the chosen target (Mother of Runes itself) protection from white");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-bespoke-resolutioncontext-source-migration-batch — Spikeshot
     // Goblin is a bespoke [CardName]-factory creature whose sole activated
     // ability ("{R}, {T}: This creature deals damage equal to its power to any
