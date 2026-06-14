@@ -319,6 +319,49 @@ public static class TargetFilters
     }
 
     /// <summary>
+    /// CR 707.10 — build the 1..1 "target instant or sorcery spell" request
+    /// for the spell-copy family (Twincast / Reverberate). Like
+    /// <see cref="SpellOnStackRequest"/> the candidate pool is the live STACK,
+    /// filtered to instant / sorcery spells (the only legal copy targets for
+    /// these cards). <see cref="InstantOrSorcerySpellMatches"/> double-gates the
+    /// CR 608.2b resolution re-check, so a target that has left the stack or is
+    /// no longer an instant/sorcery fizzles cleanly.
+    /// </summary>
+    public static TargetRequest InstantOrSorcerySpellOnStackRequest() =>
+        new TargetRequest(
+            Description: "target instant or sorcery spell",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Buff,
+            CandidateGatherer: GatherInstantOrSorcerySpellsOnStack);
+
+    private static IReadOnlyList<object> GatherInstantOrSorcerySpellsOnStack(GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var obj in ctx.Stack.GetAll())
+        {
+            if (obj is Majik.Core.Spells.ISpell spell && InstantOrSorcerySpellMatches(spell))
+            {
+                result.Add(spell);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// CR 608.2b — does <paramref name="target"/> still satisfy "instant or
+    /// sorcery spell" at resolution? A non-spell (the chosen object left the
+    /// stack) or a non-instant/sorcery spell never matches.
+    /// </summary>
+    public static bool InstantOrSorcerySpellMatches(object? target)
+    {
+        if (target is not Majik.Core.Spells.ISpell spell) return false;
+        return spell.Card.HasType(CardType.Instant)
+            || spell.Card.HasType(CardType.Sorcery);
+    }
+
+    /// <summary>
     /// CR 608.2b — does <paramref name="target"/> still satisfy the counter
     /// verb's type rider at resolution? A non-spell (the chosen object left the
     /// stack and is no longer an <see cref="Majik.Core.Spells.ISpell"/>) never

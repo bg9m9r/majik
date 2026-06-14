@@ -185,9 +185,11 @@ public class TendrilsOfAgonyTests
         var evt = new SpellCastEvent(spell);
         stormTrigger.Condition.Matches(evt, stormTrigger).Should().BeTrue();
 
-        // 4 copies via SpellCopier (re-executes the original effect list
-        // in place) + 1 original = 5 resolutions × 2 life swing = 10.
+        // 4 copies via SpellCopier (each pushed as a distinct stack object,
+        // CR 706.10a; drained here, then they cease to exist, CR 707.10c) +
+        // 1 original = 5 resolutions × 2 life swing = 10.
         foreach (var e in stormTrigger.Effects) e.Execute();
+        new Majik.Core.Services.StackResolver().ResolveAll(stack);
         foreach (var e in spell.Effects) e.Execute();
 
         _bob.LifeTotal.Should().Be(10, "5 resolutions (1 original + 4 storm copies) × 2 life loss = 10");

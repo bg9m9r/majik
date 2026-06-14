@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.Players;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
 
@@ -12,52 +13,65 @@ namespace Majik.Core.Services;
 /// controller of the copy may choose new targets (CR 707.10a "you may
 /// choose new targets for the copy").
 ///
-/// ## v1 stub — what this actually does
+/// ## What this does (distinct copy stack object)
 ///
-/// The engine doesn't yet retain a spell's <c>SpellDefinition</c> /
-/// <c>ChosenSpellParams</c> on its <see cref="ISpell"/> after the cast
-/// flow (only the constructed <see cref="IEffect"/> list survives). That
-/// means we can't reconstruct a fresh copy that re-prompts the agent for
-/// targets, nor can we usefully push a second <see cref="Spell"/> wrapping
-/// the same <see cref="ICard"/> onto the stack — the second resolution
-/// would try to move the (already-resolved) card a second time and the
-/// re-resolve guard on <see cref="Spell.Resolve"/> would throw.
+/// <see cref="PushCopyOfTopSpell"/> constructs a distinct, independent copy
+/// <see cref="Spell"/> from an existing spell and <see cref="Majik.Core.Stack.Stack.Push">
+/// pushes</see> it onto the stack as a new <see cref="IStackObject"/>
+/// (CR 706.10a — placed above the original). The copy:
+///   - is its own <see cref="IStackObject"/> with its own <see cref="Spell.Id"/>
+///     (observable via <see cref="Majik.Core.Domain.DomainEvents.StackObjectAddedEvent"/>
+///     and <see cref="Majik.Core.Stack.Stack.Count"/>);
+///   - snapshots the original's copiable characteristics — it shares the
+///     original's <see cref="ICard"/> (the card's printed characteristics are
+///     the snapshot, CR 707.2) plus the same effect list, and is controlled by
+///     the original's controller (CR 707.10);
+///   - reuses the original's chosen targets verbatim (CR 707.10a — the
+///     "you may choose new targets" rider is the residual deferral; see below);
+///   - resolves FIRST (LIFO, on top), then CEASES TO EXIST without moving any
+///     card to a zone (CR 707.10c / CR 110.5g — a copy on the stack ceases to
+///     exist as a state-based action). <see cref="Majik.Core.Services.StackResolver"/>
+///     reads <see cref="Spell.IsCopy"/> to skip the post-resolution zone move,
+///     so the original card is left exactly where it was.
 ///
-/// So v1 just re-executes the original spell's effect list in place, at
-/// the moment the copy "would have resolved". Lossy semantics:
-///   - Copy and original effectively resolve together rather than the copy
-///     resolving first on top of the stack (CR 706.10a).
-///   - Targets are reused verbatim; the "may choose new targets" rider
-///     (CR 707.10a) is dropped.
-///   - The copy isn't observable as a distinct <see cref="IStackObject"/>;
-///     anything subscribing to <see cref="Majik.Core.Domain.DomainEvents.StackObjectAddedEvent"/>
-///     or counting <see cref="Majik.Core.Stack.Stack.Count"/> won't see it.
+/// Binds the Galvanic Iteration / Doublecast / Howl of the Horde / Storm /
+/// Pyromancer Ascension family. Snapcaster Mage / Bloodthirsty Adversary use
+/// the separate cast-from-graveyard path (CR 702.34 flashback grant), not this
+/// copier — they cast the real card, they don't copy a spell.
 ///
-/// Binds the Galvanic Iteration / Doublecast / Howl of the Horde family
-/// for now; a real spell-copy stack object is left for follow-up once
-/// <c>SpellDefinition</c> + <c>ChosenSpellParams</c> are retained on
-/// <see cref="ISpell"/>.
+/// ## Residual deferral
+/// - <b>"You may choose new targets for the copy"</b> (CR 707.10a): the copy
+///   reuses the original's chosen targets verbatim. Re-prompting the controller
+///   for new targets needs the original spell's per-target TargetRequest +
+///   CandidateGatherer retained on <see cref="ISpell"/> after the cast flow
+///   (only the constructed <see cref="IEffect"/> list survives today), plus a
+///   live agent at copy-creation time. Left for follow-up.
 /// </summary>
 public static class SpellCopier
 {
     /// <summary>
-    /// Re-execute the just-cast spell's effects to model a copy of it
-    /// (CR 707.10 — lossy v1 stub; see class-level remarks).
-    ///
-    /// <paramref name="stack"/> is accepted for forward-compat with the
-    /// eventual "push a real copy stack object" implementation — v1
-    /// ignores it.
+    /// Construct a distinct copy of <paramref name="originalSpell"/> and push
+    /// it onto <paramref name="stack"/> as a new <see cref="IStackObject"/>
+    /// above the original (CR 706.10a / 707.10). The copy resolves first and
+    /// then ceases to exist (CR 707.10c) — see class-level remarks.
     /// </summary>
-    /// <param name="stack">
-    /// Reserved for the future stack-object implementation. v1 unused.
-    /// </param>
+    /// <param name="stack">The stack to push the copy onto (above the original).</param>
     /// <param name="originalSpell">
     /// The spell to copy. Must implement <see cref="ISpell"/>; non-spell
     /// stack objects (activated/triggered abilities) are silently ignored.
     /// </param>
+    /// <param name="copyController">
+    /// CR 707.10 — the controller of the copy is the player who controls the
+    /// effect that created it. For Storm / Galvanic Iteration / Pyromancer
+    /// Ascension that player IS the original spell's controller, so this
+    /// defaults to <c>null</c> ⇒ the original's controller. For "copy target
+    /// spell" effects (Twincast / Reverberate) the copier and the targeted
+    /// spell's controller can differ — the caster passes themselves here.
+    /// </param>
     public static void PushCopyOfTopSpell(
         Majik.Core.Stack.Stack stack,
-        IStackObject originalSpell)
+        IStackObject originalSpell,
+        Player? copyController = null)
     {
         ArgumentNullException.ThrowIfNull(stack);
         ArgumentNullException.ThrowIfNull(originalSpell);
@@ -66,56 +80,29 @@ public static class SpellCopier
         // copies route through a different surface.)
         if (originalSpell is not Spell spell) return;
 
-        // Re-run every effect on the original spell. This is the load-bearing
-        // semantic the binding cards rely on: "copy that spell" means the
-        // listed effects fire a second time. See class-level remarks for the
-        // gaps (no stack push, simultaneous resolution).
-        //
-        // CR 707.10a — a copy uses the original's targets (the v1 stub reuses
-        // them verbatim; the "may choose new targets" rider is dropped). So we
-        // resolve the copied effects against a ResolutionContext built from the
-        // original spell's ChosenTargets, mirroring Spell.ResolveAsync, rather
-        // than the raw Execute() path's empty ResolutionContext.Legacy. Without
-        // this, a copy of a TARGETED spell (whose effect — e.g. any declarative
-        // JSON targeted verb — reads its pick off ChosenTargets) would resolve
-        // with no targets and no-op. The synchronous Execute()-style behaviour
-        // is preserved for untargeted spells (empty ChosenTargets → the same
-        // empty list Legacy carried).
-        var rc = BuildCopyContext(spell);
-        foreach (var effect in spell.Effects)
+        // Build a distinct copy spell (CR 706.10a). It shares the original's
+        // card (printed characteristics = the copiable snapshot, CR 707.2) and
+        // effect list, is controlled by the copying effect's controller
+        // (CR 707.10 — defaults to the original's controller), and is flagged
+        // IsCopy so it ceases to exist on resolution instead of moving the
+        // shared card to a zone (CR 707.10c / 110.5g).
+        var copy = new Spell(
+            card: spell.Card,
+            controller: copyController ?? spell.Controller,
+            effects: spell.Effects)
         {
-            // SpellCopier's binders all sit on the synchronous resolution path,
-            // so drive the async effect body to completion here (the same
-            // GetAwaiter().GetResult() shim Effect.Execute() used). The ONLY
-            // change versus Execute() is the context now carries the original's
-            // chosen targets instead of ResolutionContext.Legacy.
-            effect.ExecuteAsync(rc).GetAwaiter().GetResult();
-        }
-    }
+            IsCopy = true,
+            // CR 707.10a — the copy reuses the original's chosen targets
+            // verbatim (the "may choose new targets" rider is the residual
+            // deferral). The flat cast-time list (CR 601.2c) carries over so
+            // resolution reads ChosenTargets[0] just like the original.
+            TargetLegalityPredicate = spell.TargetLegalityPredicate,
+        };
+        foreach (var t in spell.ChosenTargets)
+            copy.ChosenTargets.Add(t);
 
-    /// <summary>
-    /// Build the resolution context a copied spell's effects resolve against,
-    /// threading the original spell's <see cref="Spell.ChosenTargets"/>
-    /// (CR 707.10a — targets reused verbatim in the v1 stub). The flat
-    /// cast-time target list (CR 601.2c) is wrapped as a single target group
-    /// so a targeted JSON verb reads <c>ChosenTargets[0]</c> uniformly with the
-    /// ability / spell resolve paths. Untargeted spells yield an empty
-    /// chosen-targets list — the same posture <see cref="ResolutionContext.Legacy"/>
-    /// carried, so their behaviour is unchanged.
-    /// </summary>
-    private static ResolutionContext BuildCopyContext(Spell spell)
-    {
-        var chosen = spell.ChosenTargets.Count > 0
-            ? new IReadOnlyList<object>[] { spell.ChosenTargets.ToList() }
-            : System.Array.Empty<IReadOnlyList<object>>();
-
-        // No live agent / game is available on this synchronous re-execution
-        // seam (it mirrors the old Execute() path); a copied targeted verb only
-        // needs the chosen targets, which is exactly what was missing.
-        return ResolutionContext.For(
-            controller: spell.Controller,
-            agent: null,
-            game: null,
-            chosenTargets: chosen);
+        // Push as a new, distinct stack object above the original (CR 706.10a).
+        // It is now the top of the stack and resolves first.
+        stack.Push(copy);
     }
 }

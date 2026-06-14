@@ -102,13 +102,13 @@ public class GalvanicIterationTests
         bus.Publish(new SpellCastEvent(sourceSpell));
         triggers.PendingCount.Should().Be(1, "delayed trigger fired on instant cast");
 
-        // Put the pending copy trigger on the stack and resolve it. The
-        // copy effect re-runs every effect on the captured spell —
-        // SpellCopier v1 stub semantics.
+        // Put the pending copy trigger on the stack and resolve it. The copy
+        // effect pushes a distinct copy stack object (CR 706.10a); draining
+        // the stack then resolves that copy (it ceases to exist, CR 707.10c).
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
-        copyCount.Should().Be(1, "SpellCopier re-executed the captured spell's effects once");
+        copyCount.Should().Be(1, "the copy resolved the captured spell's effects once");
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class GalvanicIterationTests
         triggers.PendingCount.Should().Be(1, "delayed trigger fires on sorcery cast too");
 
         triggers.PutPendingTriggersOnStack(_alice);
-        stack.Pop()!.Resolve();
+        new Majik.Core.Services.StackResolver(bus).ResolveAll(stack);
 
         copyCount.Should().Be(1);
     }

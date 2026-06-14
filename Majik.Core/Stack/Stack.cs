@@ -184,6 +184,7 @@ public class Stack
             if (spell.WasCastFromGraveyard) clonedSpell.WasCastFromGraveyard = true;
             if (spell.WasKicked)           clonedSpell.WasKicked           = true;
             if (spell.CannotBeCountered)   clonedSpell.CannotBeCountered   = true;
+            if (spell.IsCopy)              clonedSpell.IsCopy              = true;
             clonedSpell.TimesKicked = spell.TimesKicked;
             clonedSpell.TotalManaSpentThisCast = spell.TotalManaSpentThisCast;
             if (spell.PostResolutionZoneOverride.HasValue)

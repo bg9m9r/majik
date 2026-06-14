@@ -167,6 +167,18 @@ public class StackResolver
             return;
         }
 
+        // CR 707.10c / CR 110.5g — a COPY of a spell ceases to exist as a
+        // state-based action once it finishes resolving; it is never moved to
+        // a zone. Its Card is the snapshot shared with the original (still on
+        // the stack or already in another zone), so moving it here would drag
+        // the ORIGINAL card somewhere it shouldn't go. The copy already ran its
+        // effects above; just let it leave the stack (it was Pop()'d before
+        // resolution) and disappear.
+        if (spell is Majik.Core.Spells.Spell { IsCopy: true })
+        {
+            return;
+        }
+
         var card = spell.Card;
         var destinationZone = GetSpellDestinationZone(spell);
 
