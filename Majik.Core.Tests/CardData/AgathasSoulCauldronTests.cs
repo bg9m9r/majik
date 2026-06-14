@@ -617,6 +617,60 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_ImprintedJoragaTreespeaker_ReHomesOnlyOwnManaAbility_NotQuotedAnthem()
+    {
+        // Joraga Treespeaker's LEVEL 5+ line is an anthem that GRANTS a quoted
+        // "{T}: Add {G}{G}." to OTHER Elves — that quoted ability is not Joraga's
+        // OWN activated ability, so Agatha must re-home Joraga's LEVEL 1-4
+        // "{T}: Add {G}{G}." mana ability EXACTLY ONCE, never twice (CR 613.1f /
+        // 702.49). This is the mana-ability re-source-able shape the Joraga
+        // deferral closes.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var joraga = new Creature(
+            "Joraga Treespeaker", "G", 1, 1,
+            subtypes: new[] { CardSubtype.Elf, CardSubtype.Druid });
+        joraga.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(joraga);
+        joraga.SetZone(ZoneType.Graveyard);
+
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        bearer.ClearSummoningSickness();
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        const string joragaOracle =
+            "Level up {1}{G} ({1}{G}: Put a level counter on this. "
+            + "Level up only as a sorcery.)\n"
+            + "LEVEL 1-4\n1/2\n{T}: Add {G}{G}.\n"
+            + "LEVEL 5+\n1/4\n"
+            + "Elves you control have \"{T}: Add {G}{G}.\"";
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Joraga Treespeaker", joragaOracle)));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), joraga);
+
+        var granted = bearer.Abilities.OfType<IManaAbility>()
+            .Where(a => a.ManaGenerated.Green == 2)
+            .ToList();
+        granted.Should().ContainSingle(
+            "Joraga's OWN {T}: Add {G}{G} is re-homed exactly once — the LEVEL 5+ "
+            + "quoted anthem ability is granted to OTHER Elves, not Joraga, so it "
+            + "is NOT re-homed to the Agatha bearer (CR 613.1f / 702.49)");
+        granted[0].Source.Should().BeSameAs(bearer,
+            "the granted mana ability is re-homed to the BEARER, not the exiled card");
+    }
+
+    [Fact]
     public void Grant_AppliesToCreatureYouControlButOpponentOwns()
     {
         var alice = new Player("Alice", 20);
