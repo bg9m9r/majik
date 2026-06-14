@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -154,5 +155,60 @@ public class CostPaymentTests
 
         // Assert
         result.Should().BeFalse();
+    }
+
+    // ------------------------------------------------------------------
+    // icost-pay-central-bus-seam — CR 701.16. A bus-aware sacrifice cost
+    // (SacrificeSelfCost implementing IBusAwareCost) must publish a
+    // PermanentSacrificedEvent through the central cost-payment path when a
+    // bus is supplied, so "whenever a/an [player] sacrifices …" aristocrat
+    // triggers fire on a "Sacrifice CARDNAME:" activated-ability cost — not
+    // only on the Fx.Sacrifice(perm, player, bus) effect overload.
+    // ------------------------------------------------------------------
+    [Fact]
+    public void PayCosts_SacrificeSelfCost_WithBus_PublishesPermanentSacrificedEvent()
+    {
+        // Arrange
+        var bus = new EventBus();
+        var seen = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+        var payment = new CostPayment();
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Spore Frog", "G", 1, 1) { Owner = player, Controller = player };
+        permanent.SetZone(ZoneType.Battlefield);
+        player.Zones.Battlefield.AddCard(permanent);
+        var costs = new List<ICost> { new SacrificeSelfCost(permanent) };
+
+        // Act — pay through the bus-aware central seam.
+        payment.PayCosts(player, costs, Majik.Core.Mana.ManaSpendContext.None, bus);
+
+        // Assert — the permanent left for its owner's graveyard …
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
+        player.Zones.Graveyard.ContainsCard(permanent).Should().BeTrue();
+
+        // … and a PermanentSacrificedEvent fired with the sacrificing player.
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == permanent
+                  && ev.SacrificingPlayer == player
+                  && !ev.WasToken);
+    }
+
+    [Fact]
+    public void PayCosts_SacrificeSelfCost_WithoutBus_StillSacrifices_NoEvent()
+    {
+        // Arrange — legacy bus-less path still works (back-compat).
+        var payment = new CostPayment();
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Spore Frog", "G", 1, 1) { Owner = player, Controller = player };
+        permanent.SetZone(ZoneType.Battlefield);
+        player.Zones.Battlefield.AddCard(permanent);
+        var costs = new List<ICost> { new SacrificeSelfCost(permanent) };
+
+        // Act
+        payment.PayCosts(player, costs);
+
+        // Assert — sacrifice still happens; no bus, so nothing to publish.
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
+        player.Zones.Graveyard.ContainsCard(permanent).Should().BeTrue();
     }
 }

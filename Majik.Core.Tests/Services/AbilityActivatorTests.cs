@@ -107,6 +107,39 @@ public class AbilityActivatorTests
         player.ManaPool.IsEmpty.Should().BeTrue();
     }
 
+    // icost-pay-central-bus-seam — CR 701.16. Activating a "Sacrifice
+    // CARDNAME:" ability whose cost is a SacrificeSelfCost must publish a
+    // PermanentSacrificedEvent on the ability-activation bus, because the
+    // activator threads its bus into CostPayment and SacrificeSelfCost is an
+    // IBusAwareCost. This is the prod path (TurnDriver builds an
+    // AbilityActivator with the live bus) — the seam that was missing while
+    // ICost.Pay carried no bus.
+    [Fact]
+    public void ActivateAbility_SacrificeSelfCost_PublishesPermanentSacrificedEvent()
+    {
+        // Arrange — real bus so the cost path can publish + subscribers fire.
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var activator = new AbilityActivator(stack, bus);
+        var seen = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(seen.Add);
+
+        var player = new Player("Alice", 20);
+        var source = new Creature("Spore Frog", "G", 1, 1) { Owner = player, Controller = player };
+        source.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        player.Zones.Battlefield.AddCard(source);
+        var ability = new ActivatedAbility(source, player);
+        var costs = new List<ICost> { new SacrificeSelfCost(source) };
+
+        // Act
+        activator.ActivateAbility(ability, player, null, costs);
+
+        // Assert — the source is sacrificed AND a sacrifice event fired.
+        source.Zone.Should().Be(Majik.Core.Zones.ZoneType.Graveyard);
+        seen.Should().ContainSingle().Which.Should().Match<PermanentSacrificedEvent>(
+            ev => ev.SacrificedCard == source && ev.SacrificingPlayer == player);
+    }
+
     [Fact]
     public void ActivateAbility_PublishesEvents()
     {
