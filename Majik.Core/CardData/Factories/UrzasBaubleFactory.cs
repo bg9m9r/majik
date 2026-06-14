@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
@@ -75,14 +76,30 @@ public static class UrzasBaubleFactory
     /// will not actually fire because no <see cref="TriggerManager"/> is
     /// available to register it. Suitable for card-shape tests only.
     /// </summary>
-    public static Artifact Create(Player owner) => Create(owner, triggerManager: null);
+    public static Artifact Create(Player owner) => Create(owner, triggerManager: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer. The delayed upkeep-draw still registers
+    /// through the <see cref="TriggerManager"/> overload (separate wiring).
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggerManager: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Urza's Bauble fully wired: activating the {T}, Sacrifice
     /// ability registers the upkeep draw delayed trigger with
-    /// <paramref name="triggerManager"/>.
+    /// <paramref name="triggerManager"/>. <paramref name="eventBus"/> (when
+    /// non-null) is threaded into the self-sacrifice <see cref="AdditionalCost"/>
+    /// so the cost-payment path publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
     /// </summary>
-    public static Artifact Create(Player owner, TriggerManager? triggerManager)
+    public static Artifact Create(Player owner, TriggerManager? triggerManager, IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -155,7 +172,9 @@ public static class UrzasBaubleFactory
             costs: new ICost[]
             {
                 AdditionalCost.Tap(bauble),
-                AdditionalCost.Sacrifice(bauble),
+                // CR 701.16a — thread the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(bauble, eventBus),
             },
             effects: new IEffect[] { effect });
 

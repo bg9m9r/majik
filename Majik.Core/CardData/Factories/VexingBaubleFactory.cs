@@ -76,7 +76,20 @@ public static class VexingBaubleFactory
     /// dispatcher / structural tests.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, triggers: null, stack: null);
+        Create(owner, triggers: null, stack: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer. The free-spell counter trigger + live stack
+    /// still wire through the three-arg overload (separate wiring).
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, stack: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Vexing Bauble with optional runtime services.
@@ -87,10 +100,14 @@ public static class VexingBaubleFactory
     /// <param name="stack">The live stack — required for the counter effect
     /// to remove the free spell (CR 701.5). Without it the counter trigger
     /// fires but no-ops.</param>
+    /// <param name="eventBus">When non-null, threaded into the self-sacrifice
+    /// <see cref="AdditionalCost"/> on the draw ability so the cost-payment path
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a).</param>
     public static Artifact Create(
         Player owner,
         TriggerManager? triggers,
-        Majik.Core.Stack.Stack? stack)
+        Majik.Core.Stack.Stack? stack,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -156,7 +173,9 @@ public static class VexingBaubleFactory
             {
                 new ManaCostCost("{1}"),
                 AdditionalCost.Tap(bauble),
-                AdditionalCost.Sacrifice(bauble),
+                // CR 701.16a — thread the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(bauble, eventBus),
             },
             effects: new IEffect[] { drawEffect });
 

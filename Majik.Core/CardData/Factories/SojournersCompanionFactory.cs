@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
@@ -95,9 +97,31 @@ public static class SojournersCompanionFactory
     /// Construct Sojourner's Companion owned and controlled by
     /// <paramref name="owner"/>. Wires the Affinity-for-artifacts cost
     /// reducer + keyword marker + the {2}, {T}, Sac tutor activated
-    /// ability.
+    /// ability. Shape-only — no event bus, so the self-sacrifice cost
+    /// publishes nothing (legacy posture; suitable for dispatcher /
+    /// structural tests).
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer.
+    /// </summary>
+    public static Creature Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -187,7 +211,9 @@ public static class SojournersCompanionFactory
             {
                 new ManaCostCost(TutorActivationCost),
                 AdditionalCost.Tap(card),
-                AdditionalCost.Sacrifice(card),
+                // CR 701.16a — thread the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { tutorEffect });
 

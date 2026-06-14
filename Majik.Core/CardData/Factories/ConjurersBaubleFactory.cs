@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -59,9 +61,32 @@ public static class ConjurersBaubleFactory
 
     /// <summary>
     /// Construct Conjurer's Bauble owned and controlled by
-    /// <paramref name="owner"/>.
+    /// <paramref name="owner"/>. Shape-only — no event bus, so the
+    /// self-sacrifice cost publishes nothing (legacy posture; suitable for
+    /// dispatcher / structural tests).
     /// </summary>
-    public static Artifact Create(Player owner)
+    public static Artifact Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer — aristocrat payoffs then fire on the
+    /// bauble's activation path.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, effects?.EventBus);
+
+    /// <summary>
+    /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
+    /// threaded into the self-sacrifice <see cref="AdditionalCost"/> so the
+    /// cost-payment path publishes a <see cref="PermanentSacrificedEvent"/>
+    /// (CR 701.16a). Null preserves the legacy publish-nothing posture.
+    /// </summary>
+    public static Artifact Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -108,7 +133,9 @@ public static class ConjurersBaubleFactory
             {
                 new ManaCostCost("{1}"),
                 AdditionalCost.Tap(bauble),
-                AdditionalCost.Sacrifice(bauble),
+                // CR 701.16a — thread the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(bauble, eventBus),
             },
             effects: new IEffect[] { recycleEffect },
             targetRequests: new[]

@@ -2,6 +2,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -77,15 +79,31 @@ public static class ImplementOfCombustionFactory
     /// tests can observe it; for end-to-end firing pass a live
     /// <see cref="TriggerManager"/> via the overload.
     /// </summary>
-    public static Artifact Create(Player owner) => Create(owner, triggers: null);
+    public static Artifact Create(Player owner) => Create(owner, triggers: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
+    /// build dispatches to (the source generator recognises
+    /// <c>Create(Player, ContinuousEffectsService)</c> as the effects-aware
+    /// overload — see <see cref="FestivalCrasherFactory"/>). Threads
+    /// <c>effects.EventBus</c> into the self-sacrifice cost so paying it
+    /// publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer. The dies-trigger registration still goes
+    /// through the <see cref="TriggerManager"/> overload (separate wiring).
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects) =>
+        Create(owner, triggers: null, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Construct Implement of Combustion with optional trigger-manager wiring.
     /// When <paramref name="triggers"/> is supplied, the dies trigger is
     /// registered so the bus surfaces it automatically (mirrors Ichor
-    /// Wellspring's two-arg pattern).
+    /// Wellspring's two-arg pattern). <paramref name="eventBus"/> (when
+    /// non-null) is threaded into the self-sacrifice <see cref="AdditionalCost"/>
+    /// so the cost-payment path publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a).
     /// </summary>
-    public static Artifact Create(Player owner, TriggerManager? triggers)
+    public static Artifact Create(Player owner, TriggerManager? triggers, IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -124,7 +142,9 @@ public static class ImplementOfCombustionFactory
             costs: new ICost[]
             {
                 new ManaCostCost("{R}"),
-                AdditionalCost.Sacrifice(impl),
+                // CR 701.16a — thread the in-scope bus so paying the sac cost
+                // publishes PermanentSacrificedEvent for aristocrat payoffs.
+                AdditionalCost.Sacrifice(impl, eventBus),
             },
             effects: new IEffect[] { damageEffect },
             targetRequests: new[]
