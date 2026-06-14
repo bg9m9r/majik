@@ -12,7 +12,7 @@ using Xunit;
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// Unit tests for <see cref="TempleOfPlentyFactory"/> (Theros Beyond Death).
+/// Unit tests for <see cref="TempleOfPlentyFactory"/> (Born of the Gods).
 ///
 /// G/W "scry land". Oracle text:
 ///   "This land enters tapped.
@@ -36,7 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// load path by <see cref="Majik.Core.CardData.EntersTappedBinder"/>, not by
 /// this named-card factory — same posture as the Temple of Triumph cycle.
 /// </summary>
-[Trait("Color", "C")]
+[Trait("Color", "M")]
 public class TempleOfPlentyTests
 {
     private readonly Player _alice = new("Alice", 20);
