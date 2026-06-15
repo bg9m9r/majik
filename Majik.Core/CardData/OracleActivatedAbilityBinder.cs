@@ -142,6 +142,19 @@ namespace Majik.Core.CardData;
 ///     613.1f). Sound to re-home: the counter is placed on the bearer, never the
 ///     exiled card. (Especially apt for the Cauldron: the grown bearer is, by
 ///     construction, a creature you control with a +1/+1 counter.)</item>
+///   <item><b>Targeted-counter</b> —
+///     <c>"{cost}: Put a/N +1/+1 counter(s) on target creature."</c> The
+///     to-TARGET counterpart of the self-counter shape (Hangarback Walker /
+///     Walking Ballista / Ivy Lane Denizen-class counter sources). Rebuilt with a
+///     1..1 <see cref="TargetRequest"/> whose resolution adds the +1/+1
+///     counter(s) to the CHOSEN target creature's own
+///     <see cref="Majik.Core.Counters.CounterCollection"/> (CR 122.1 / 613.1f).
+///     Sound to re-home: the BEARER is only the source / cost-payer; the counter
+///     lands on the chosen creature, never the exiled imprinted card and never
+///     the bearer. Only the OPEN "target creature" filter is reconstructed
+///     (consistent with the pump-other / tap-target restricted-target boundary);
+///     not creature-only (any permanent bearer can pay to grow a chosen
+///     creature).</item>
 ///   <item><b>Regenerate-self</b> —
 ///     <c>"{cost}: Regenerate this creature."</c> Rebuilt as a no-target
 ///     <see cref="ActivatedAbility"/> whose resolution creates a regeneration
@@ -549,6 +562,27 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Put (?:a|one|(\d+)) \+1/\+1 counters? on this creature\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Put a/N +1/+1 counter(s) on target creature."
+    // The to-TARGET counterpart of the self-counter shape (SelfCounterRegex):
+    // instead of growing the source, a CHOSEN creature gets the +1/+1
+    // counter(s). Hangarback Walker / Walking Ballista / Ivy Lane Denizen-class
+    // "{cost}: Put a +1/+1 counter on target creature" sources, and the
+    // canonical Cauldron re-home of any imprinted creature whose activated
+    // ability adds a +1/+1 counter to a target. Sound to re-home: the BEARER is
+    // ONLY the source / cost-payer (its own {T}/mana cost); the
+    // CounterCollection.Add (CR 122.1 / 613.1f) lands on the CHOSEN target
+    // creature's OWN counters — never the exiled imprinted card and never the
+    // bearer. Only the OPEN "target creature" filter is reconstructed (no
+    // restricted candidate filter like "target creature you control"),
+    // consistent with the pinger / fight / tap-target / pump-other
+    // restricted-target boundary. The bearer need NOT be a creature (any
+    // permanent bearer can pay to grow a chosen creature), so this does not gate
+    // on Creature the way self-counter does. Group 1 = cost, group 2 = explicit
+    // count (absent ⇒ "a"/"one" ⇒ 1).
+    private static readonly Regex CounterOtherRegex = new(
+        @"^(" + CostList + @")\s*:\s*Put (?:a|one|(\d+)) \+1/\+1 counters? on target creature\.$",
+        RegexOptions.IgnoreCase);
+
     // "{cost}: Draw a card." / "Draw N cards." (CR 121.) A self-source draw is
     // one of the most common activated card-advantage shapes on real creature
     // cards (Arcanis the Omnipotent "{T}: Draw three cards.", a host of
@@ -906,6 +940,14 @@ public static class OracleActivatedAbilityBinder
                 continue;
             }
 
+            var counterOther = CounterOtherRegex.Match(line);
+            if (counterOther.Success)
+            {
+                var ability = TryBuildCounterOther(counterOther, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
             var selfCounter = SelfCounterRegex.Match(line);
             if (selfCounter.Success)
             {
@@ -1225,6 +1267,66 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { counterEffect });
+    }
+
+    /// <summary>
+    /// Build a targeted-counter ability: "{cost}: Put a/N +1/+1 counter(s) on
+    /// target creature." (the to-TARGET counterpart of
+    /// <see cref="TryBuildSelfCounter"/>). Re-homed so the BEARER is only the
+    /// source / cost-payer; the +1/+1 counter(s) land on the CHOSEN target
+    /// creature's own <see cref="Majik.Core.Counters.CounterCollection"/>
+    /// (CR 122.1 / 613.1f) — never the exiled imprinted card and never the
+    /// bearer. The bearer need NOT be a creature (a non-creature bearer can still
+    /// tap/pay to grow a chosen creature), so this does not gate on
+    /// <see cref="Creature"/> the way self-counter does. Mirrors
+    /// <see cref="TryBuildPumpOther"/>'s 1..1 single-creature target request and
+    /// resolve-time chosen-target read.
+    /// </summary>
+    private static ActivatedAbility? TryBuildCounterOther(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        // Group 2 is the explicit count ("Put 2 +1/+1 counters …"); absent for
+        // the "Put a +1/+1 counter …" / "Put one …" forms ⇒ a single counter.
+        var count = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 1;
+
+        ActivatedAbility? ability = null;
+        var counterEffect = new Effect(
+            $"Granted: put {count} +1/+1 counter(s) on target creature",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                if (ability.ChosenTargets[0][0] is not Creature chosen) return;
+                // CR 608.2b — target must still be a battlefield creature.
+                if (chosen.Zone != ZoneType.Battlefield) return;
+
+                // CR 122.1 / 613.1f — place the counter(s) directly on the CHOSEN
+                // target creature's OWN counter collection. The bearer is
+                // untouched; only the chosen creature is grown.
+                chosen.Counters.Add(Counters.CounterType.PlusOnePlusOne, count);
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { counterEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff),
+            });
+
+        return ability;
     }
 
     /// <summary>

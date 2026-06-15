@@ -174,8 +174,14 @@ public class ActivatedAbilityDefinitionTests
     }
 
     [Fact]
-    public void Build_PutCounterEffect_NonSelfTarget_Throws()
+    public async System.Threading.Tasks.Task Build_PutCounterEffect_TargetCreature_ReservesTargetSlot_AndCountersChosen()
     {
+        // The targeted PutCounterEffectDef ("Put a +1/+1 counter on target
+        // creature." — Dragon Blood's shape) now reserves a 1..1 target-creature
+        // request and, at resolution, adds the counter to the CHOSEN creature,
+        // not the source. (Previously target != "self" threw NotSupportedException;
+        // the targeting path is now wired — the on-card sibling of
+        // OracleActivatedAbilityBinder's counter-other rebuild.)
         var def = new CardDefinition
         {
             Name = "Test Card",
@@ -187,16 +193,34 @@ public class ActivatedAbilityDefinitionTests
             {
                 new ActivatedAbilityDefinition
                 {
-                    Costs = new List<CostDefinition>(),
+                    Costs = new List<CostDefinition> { new ManaCostDef { Amount = "0" } },
                     Effects = new List<EffectDefinition>
                     {
-                        new PutCounterEffectDef { Counter = "+1/+1", Target = "target_creature" },
+                        new PutCounterEffectDef { Counter = "+1/+1", Amount = 1, Target = "creature" },
                     },
                 },
             },
         };
 
-        Action call = () => CardDefinitionFactory.Build(def, Alice);
-        call.Should().Throw<NotSupportedException>().WithMessage("*target_creature*");
+        var source = (Creature)CardDefinitionFactory.Build(def, Alice);
+        var activated = source.Abilities.OfType<ActivatedAbility>().Single();
+        activated.TargetRequests.Should().ContainSingle(
+            "the targeted counter reserves a 1..1 target-creature slot");
+        activated.TargetRequests[0].MinTargets.Should().Be(1);
+        activated.TargetRequests[0].MaxTargets.Should().Be(1);
+
+        var ally = new Creature("Ally", "{1}", 2, 2);
+        ally.SetOwner(Alice);
+        ally.SetController(Alice);
+        ally.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        Alice.Zones.Battlefield.AddCard(ally);
+
+        activated.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        await activated.ResolveAsync(agent: null, game: null);
+
+        ally.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the +1/+1 counter lands on the chosen creature");
+        source.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the source does not receive the counter — the effect is targeted");
     }
 }
