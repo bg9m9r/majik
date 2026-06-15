@@ -185,6 +185,34 @@ namespace Majik.Core.CardData;
 ///     Count is "a"/"one" ⇒ 1, the spelled-out "two"/"three", or a bare digit;
 ///     an unrecognised count is skipped. Sound on any permanent bearer, not just
 ///     creatures.</item>
+///   <item><b>Surveil-self</b> —
+///     <c>"{cost}: Surveil N."</c> Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose ResolutionContext-aware resolution
+///     surveils the BEARER's CONTROLLER's own library (CR 701.42), consulting the
+///     live agent off <see cref="ResolutionContext.Agent"/> (falling back to
+///     <see cref="AgentRegistry"/>, then the all-to-graveyard default) — the EXACT
+///     posture of the declarative <c>surveil_self</c> verb
+///     (<see cref="Definitions.SurveilSelfEffectDef"/>). Sound to re-home onto any
+///     permanent bearer: surveil references the controller's OWN library, with NO
+///     "this creature" / source reference (Sinister Starfish, Rune-Sealed Wall).
+///     The earlier "needs an agent decision the closure can't prompt for" note is
+///     now stale — the resolution context carries the agent.</item>
+///   <item><b>Mill-self</b> —
+///     <c>"{cost}: Mill N."</c> Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose resolution mills the BEARER's
+///     CONTROLLER's own library via <see cref="Fx.Mill"/> (CR 701.13). No agent
+///     decision (the cards move unconditionally), so the soundest of the two
+///     library shapes. Count "a"/"one" ⇒ 1, "two"/"three", or a bare digit; an
+///     unrecognised count is skipped. Sound on any permanent bearer (Excavated
+///     Wall, Molt Tender, Skull Prophet).</item>
+///   <item><b>Target-player mill</b> —
+///     <c>"{cost}: Target player mills N."</c> The TARGETED-player sibling of
+///     mill-self. Rebuilt with a 1..1 target-player
+///     <see cref="TargetRequest"/>; resolution mills the CHOSEN player off
+///     <see cref="ActivatedAbility.ChosenTargets"/> via <see cref="Fx.Mill"/> —
+///     the chosen player mills from THEIR OWN library (CR 701.13), so the BEARER
+///     is only the source / cost-payer, exactly the way the pinger's "target
+///     player" leg routes a chosen-player effect.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -220,12 +248,13 @@ namespace Majik.Core.CardData;
 ///     the candidate filter isn't reconstructed; only the open
 ///     any-target / target-creature / target-player forms are rebuilt.</item>
 ///   <item>Every shape not in the list above (tutors, mode-bearing abilities,
-///     token makers, anthem grants, mill/surveil — which need an agent decision
-///     the closure can't prompt for — loyalty-style, bespoke one-offs). (Scry,
-///     listed here previously, IS now reconstructed: its agent decision is read
-///     off the live <see cref="ResolutionContext"/> the same way the declarative
-///     scry_self verb resolves it — see the scry-self shape below.) These are
-///     unbounded and not generally reconstructable from oracle text without
+///     token makers, anthem grants, loyalty-style, bespoke one-offs). (Scry /
+///     mill / surveil, listed here previously, ARE now reconstructed above: the
+///     library-selection shapes read their agent decision off the live
+///     <see cref="ResolutionContext"/> the same way the declarative
+///     scry_self / surveil_self verbs resolve it — see the scry-self / surveil-self
+///     / mill-self shapes above.) These are unbounded and not generally
+///     reconstructable from oracle text without
 ///     per-card work — a correct partial beats a broken "all".</item>
 /// </list>
 /// </summary>
@@ -570,6 +599,63 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Regenerate this creature\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Surveil N." (CR 701.42.) A self-source surveil — look at the top
+    // N cards of YOUR library, then put any number into your graveyard and the
+    // rest back on top in any order. One of the most common activated
+    // graveyard-fuel / card-selection shapes on real creature cards (Sinister
+    // Starfish, Rune-Sealed Wall, Coastal Bulwark's "{2}, {T}: Surveil 1."). Sound
+    // to re-home onto ANY permanent bearer: surveil references the BEARER's
+    // CONTROLLER's own library, never the exiled imprinted card — there is no
+    // "this creature" / source reference at all, so re-homing is a clean
+    // controller-scoped operation (CR 701.42 / 613.1f). The earlier soundness
+    // boundary note ("surveil needs an agent decision the closure can't prompt
+    // for") is now stale: the ResolutionContext-aware effect body reads the live
+    // agent off rc.Agent (falling back to AgentRegistry, then the
+    // all-to-graveyard default) exactly the way the declarative surveil_self verb
+    // does (CardDefRuntime.BuildSurveilSelfEffect). N is always written as a digit
+    // on real surveil text ("Surveil 1", "Surveil 2"). Group 2 = N.
+    private static readonly Regex SurveilSelfRegex = new(
+        @"^(" + CostList + @")\s*:\s*Surveil (\d+)\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Mill N." (CR 701.13.) A self-source mill — put the top N cards of
+    // YOUR library into your graveyard. A common activated graveyard-fuel shape on
+    // real creature cards (Excavated Wall "{1}, {T}: Mill a card.", Molt Tender /
+    // Skull Prophet "{T}: Mill a/two card(s)."). Sound to re-home onto ANY
+    // permanent bearer: mill references the BEARER's CONTROLLER's own library,
+    // never the exiled imprinted card — no "this creature" / source reference at
+    // all, so re-homing is a clean controller-scoped operation (CR 701.13 /
+    // 613.1f). Unlike surveil it needs no agent decision (the cards move
+    // unconditionally to the graveyard), so it is the soundest of the two. The
+    // count is "a"/"one" ⇒ 1, a spelled-out "two"/"three", or a bare digit
+    // (reusing MillCountWords); an unrecognised count is skipped. Group 2 = count.
+    private static readonly Regex MillSelfRegex = new(
+        @"^(" + CostList + @")\s*:\s*Mill (a|one|two|three|\d+) cards?\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Target player mills N." (CR 701.13.) The TARGETED-player sibling of
+    // the self-mill shape: a CHOSEN player mills rather than the controller. A
+    // common activated mill/disruption shape. Sound to re-home: mill references
+    // the chosen player's OWN library (Fx.Mill on ChosenTargets), never the exiled
+    // imprinted card, so the BEARER is only the source / cost-payer — exactly the
+    // way PingerRegex's "target player" leg routes a chosen-player effect. Count
+    // parsed like self-mill; an unrecognised count is skipped. Group 2 = count.
+    private static readonly Regex TargetPlayerMillRegex = new(
+        @"^(" + CostList + @")\s*:\s*Target player mills (a|one|two|three|\d+) cards?\.$",
+        RegexOptions.IgnoreCase);
+
+    // Spelled-out small counts that appear on real "Mill N cards" activated
+    // abilities ("a"/"one" ⇒ 1). A bare digit is also accepted; an unrecognised
+    // word makes the clause unsound and is skipped.
+    private static readonly IReadOnlyDictionary<string, int> MillCountWords =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+            ["one"] = 1,
+            ["two"] = 2,
+            ["three"] = 3,
+        };
+
     // A single tap symbol inside a cost list.
     private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
 
@@ -761,6 +847,30 @@ public static class OracleActivatedAbilityBinder
             if (scry.Success)
             {
                 var ability = TryBuildScrySelf(scry, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var surveil = SurveilSelfRegex.Match(line);
+            if (surveil.Success)
+            {
+                var ability = TryBuildSurveilSelf(surveil, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var targetPlayerMill = TargetPlayerMillRegex.Match(line);
+            if (targetPlayerMill.Success)
+            {
+                var ability = TryBuildTargetPlayerMill(targetPlayerMill, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var mill = MillSelfRegex.Match(line);
+            if (mill.Success)
+            {
+                var ability = TryBuildMillSelf(mill, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -1256,6 +1366,176 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { scryEffect });
+    }
+
+    /// <summary>
+    /// Build a self-surveil ability: "{cost}: Surveil N." (CR 701.42.) Re-homed so
+    /// the BEARER's CONTROLLER surveils their own library — never the exiled
+    /// imprinted card. Does NOT gate on <see cref="Creature"/> (surveil is sound on
+    /// any permanent bearer — the controller surveils, not the permanent). Uses the
+    /// ResolutionContext-aware effect body so the live agent is read off
+    /// <see cref="ResolutionContext.Agent"/> (falling back to
+    /// <see cref="AgentRegistry"/>, then the all-to-graveyard default) — the EXACT
+    /// agent-consultation posture of the declarative <c>surveil_self</c> verb
+    /// (<see cref="Definitions.SurveilSelfEffectDef"/> /
+    /// <c>CardDefRuntime.BuildSurveilSelfEffect</c>). The controller is read off
+    /// <see cref="ResolutionContext.Controller"/> when the ability resolves through
+    /// the live path, else the captured <paramref name="controller"/> (the legacy
+    /// sync path). N is always a digit on real surveil text. A non-positive N is
+    /// skipped (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildSurveilSelf(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var amount = int.Parse(match.Groups[2].Value);
+        if (amount <= 0) return null;
+
+        var surveilEffect = new Effect(
+            $"Granted: surveil {amount}",
+            async (ResolutionContext rc) =>
+            {
+                // CR 701.42 / 613.1f — the BEARER's controller surveils their own
+                // library. Read the controller off the live context, else the
+                // captured controller (legacy sync path).
+                var surveiller = rc.Controller ?? controller;
+
+                var peeked = Keywords.SurveilAction.Peek(surveiller, amount);
+                if (peeked.Count == 0) return;
+
+                // Prompt the live agent off the resolution context; fall back to
+                // the registry, then the all-to-graveyard default — the SAME
+                // posture as CardDefRuntime.BuildSurveilSelfEffect.
+                var agent = rc.Agent ?? AgentRegistry.Get(surveiller);
+                Keywords.SurveilAction.SurveilDecision decision;
+                if (agent != null)
+                {
+                    decision = await agent
+                        .ChooseSurveilDecisionAsync(rc.Game, peeked, rc.Ct)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    decision = new Keywords.SurveilAction.SurveilDecision(
+                        ToGraveyard: peeked.ToList(),
+                        TopOrder: Array.Empty<Cards.ICard>());
+                }
+                Keywords.SurveilAction.Apply(surveiller, amount, decision);
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { surveilEffect });
+    }
+
+    /// <summary>
+    /// Build a self-mill ability: "{cost}: Mill N." (CR 701.13.) Re-homed so the
+    /// BEARER's CONTROLLER mills their own library — never the exiled imprinted
+    /// card. Does NOT gate on <see cref="Creature"/> (mill is sound on any
+    /// permanent bearer — the controller mills, not the permanent). Unlike surveil
+    /// it needs no agent decision (the cards move unconditionally), so the body
+    /// reads only the controller (off <see cref="ResolutionContext.Controller"/> on
+    /// the live path, else the captured <paramref name="controller"/>) and routes
+    /// through <see cref="Fx.Mill"/>. The count is "a"/"one" ⇒ 1, a spelled-out
+    /// "two"/"three", or a bare digit; an unrecognised count is skipped (returns
+    /// null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildMillSelf(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int count;
+        if (!MillCountWords.TryGetValue(countToken, out count)
+            && !int.TryParse(countToken, out count))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (count <= 0) return null;
+
+        var millEffect = new Effect(
+            $"Granted: mill {count} card(s)",
+            (ResolutionContext rc) =>
+            {
+                // CR 701.13 / 613.1f — the BEARER's controller mills their own
+                // library. No agent decision, no source-card reference.
+                Fx.Mill(rc.Controller ?? controller, count);
+                return ValueTask.CompletedTask;
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { millEffect });
+    }
+
+    /// <summary>
+    /// Build a target-player-mill ability: "{cost}: Target player mills N."
+    /// (CR 701.13.) The TARGETED-player sibling of <see cref="TryBuildMillSelf"/>:
+    /// a CHOSEN player mills rather than the controller. Re-homed so the BEARER is
+    /// ONLY the source / cost-payer; the mill resolves on the CHOSEN player (read
+    /// off <see cref="ActivatedAbility.ChosenTargets"/>) via <see cref="Fx.Mill"/>
+    /// — the chosen player mills from THEIR OWN library, never the exiled imprinted
+    /// card. Does NOT gate on <see cref="Creature"/>. Mirrors
+    /// <see cref="BuildPinger"/>'s 1..1 "target player" request. The count is
+    /// "a"/"one" ⇒ 1, a spelled-out "two"/"three", or a bare digit; an
+    /// unrecognised count is skipped (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildTargetPlayerMill(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int count;
+        if (!MillCountWords.TryGetValue(countToken, out count)
+            && !int.TryParse(countToken, out count))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (count <= 0) return null;
+
+        ActivatedAbility? ability = null;
+        var millEffect = new Effect(
+            $"Granted: target player mills {count} card(s)",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 701.13 / 613.1f — the CHOSEN player mills their OWN library.
+                // A non-player chosen target (shape-only path) no-ops.
+                if (ability.ChosenTargets[0][0] is Player chosen)
+                {
+                    Fx.Mill(chosen, count);
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { millEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target player",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.None),
+            });
+
+        return ability;
     }
 
     /// <summary>

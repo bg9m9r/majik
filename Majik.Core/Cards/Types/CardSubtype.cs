@@ -612,4 +612,9 @@ public enum CardSubtype
     /// Spider-Man) is a "Spider Human Hero"; the broader Hero lineage. CR
     /// 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
     Hero,
+
+    /// <summary>Starfish creature subtype — Sinister Starfish (Outlaws of Thunder
+    /// Junction). CR 205.3m — flavour subtype with no inherent rules meaning of
+    /// its own.</summary>
+    Starfish,
 }

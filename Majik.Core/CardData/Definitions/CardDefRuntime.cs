@@ -1451,6 +1451,7 @@ public static class CardDefRuntime
                 BuildDealDamageToTriggeringPlayerEffect(trigDamage, card),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
+            MillSelfEffectDef mill => BuildMillSelfEffect(mill, card, controller),
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
             ExileTargetEffectDef exile => BuildExileTargetEffect(exile, card, targetRequestIndex),
@@ -3042,6 +3043,18 @@ public static class CardDefRuntime
                 }
                 Majik.Core.Keywords.SurveilAction.Apply(controller, amount, decision);
             });
+    }
+
+    private static IEffect BuildMillSelfEffect(MillSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: mill {amount} card(s)",
+            // CR 701.13 — the controller mills the top N cards of their own
+            // library into their graveyard. Routed through Fx.Mill (the shared
+            // MillAction wrapper); milling more than remain mills all of them and
+            // does not by itself cause the loss (CR 104.3c).
+            () => Fx.Mill(controller, amount));
     }
 
     private static IEffect BuildDrawCardEffect(DrawCardEffectDef def, ICard card, Player controller)
