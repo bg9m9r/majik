@@ -1,0 +1,5 @@
+{
+  "name": "Spell Stutter",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
