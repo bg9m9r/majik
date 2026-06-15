@@ -1,0 +1,9 @@
+{
+  "name": "Sleep-Cursed Faerie",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Wizard"],
+  "manaCost": "{U}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
