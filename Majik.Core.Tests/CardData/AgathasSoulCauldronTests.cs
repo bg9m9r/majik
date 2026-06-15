@@ -1250,6 +1250,69 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_CounterOther_RehomesCounterPlacementToChosenCreature()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability puts a +1/+1 counter on ANOTHER
+        // creature: "{2}: Put a +1/+1 counter on target creature." (the
+        // to-TARGET counterpart of the self-counter shape — Hangarback Walker /
+        // Walking Ballista / Ivy Lane Denizen-class counter sources). Re-homing
+        // is sound: the SOURCE / cost-payer is the BEARER, and the +1/+1 counter
+        // lands on the CHOSEN target creature's own CounterCollection
+        // (CR 122.1 / 613.1f), never the exiled imprinted card.
+        var denizen = new Creature("Denizen Stub", "1G", 2, 2);
+        denizen.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(denizen);
+        denizen.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A separate creature on the battlefield to receive the targeted counter.
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Denizen Stub", "{2}: Put a +1/+1 counter on target creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), denizen);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's targeted counter ability");
+        var counterAbility = granted[0];
+        counterAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        counterAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("2"));
+        counterAbility.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"),
+            "a targeted counter requires a 1..1 target-creature request");
+
+        // Resolving with the ALLY chosen puts the +1/+1 counter on the ALLY,
+        // not the bearer and not the exiled card.
+        counterAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        var allyCountersBefore = ally.Counters.Count(CounterType.PlusOnePlusOne);
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        var denizenCountersBefore = denizen.Counters.Count(CounterType.PlusOnePlusOne);
+        foreach (var effect in counterAbility.Effects) effect.Execute();
+        ally.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(allyCountersBefore + 1,
+            "the re-homed targeted counter ability puts the counter on the CHOSEN creature");
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(bearerCountersBefore,
+            "the bearer (mere source) does not receive the counter — only the chosen target");
+        denizen.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(denizenCountersBefore,
+            "the exiled imprinted card never receives the counter");
+    }
+
+    [Fact]
     public void Grant_NonMana_SelfCounter_RehomesCounterPlacementToBearer()
     {
         var alice = new Player("Alice", 20);

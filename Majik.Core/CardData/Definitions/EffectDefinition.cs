@@ -165,14 +165,35 @@ public abstract class EffectDefinition
         System.Array.Empty<Majik.Core.Players.Agents.TargetRequest>();
 }
 
-/// <summary>Add N counters of the given type to a target permanent.
-/// v1 only supports <c>"target": "self"</c>; "target creature" + chosen
-/// targets plug in when the targeting system is wired.</summary>
+/// <summary>Add N counters of the given type to a permanent (CR 122.1).
+/// <para><c>"target": "self"</c> places the counter(s) on the SOURCE permanent
+/// with no target slot — the original v1 posture (Stonecoil Serpent / Walking
+/// Ballista's enters-with-counters family).</para>
+/// <para>A targeted form (<c>"target": "creature"</c>) reserves a 1..1
+/// target-creature slot (via <see cref="ToTargetRequest"/>) and, at resolution,
+/// reads the chosen creature off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and adds
+/// the counter(s) to THAT creature's own
+/// <see cref="Majik.Core.Counters.CounterCollection"/> — the declarative
+/// counterpart of <see cref="PumpTargetEffectDef"/>, and the on-card sibling of
+/// <see cref="OracleActivatedAbilityBinder"/>'s targeted-counter rebuild shape.
+/// Canonical case: Dragon Blood — "{3}, {T}: Put a +1/+1 counter on target
+/// creature." CR 608.2b — an illegal target at resolution fizzles cleanly.</para>
+/// </summary>
 public sealed class PutCounterEffectDef : EffectDefinition
 {
     public string Counter { get; set; } = "+1/+1";
     public int Amount { get; set; } = 1;
     public string Target { get; set; } = "self";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        string.Equals(Target, "self", StringComparison.OrdinalIgnoreCase)
+            ? null // self-counter targets nothing — no slot reserved
+            : TargetFilters.ToTargetRequest(
+                Target,
+                $"get {Amount} {Counter} counter(s)",
+                Majik.Core.Cards.BotIntent.Buff);
 }
 
 /// <summary>

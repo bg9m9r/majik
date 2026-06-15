@@ -1445,7 +1445,7 @@ public static class CardDefRuntime
         int targetRequestIndex = -1, ContinuousEffectsService? continuous = null) =>
         definition switch
         {
-            PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements),
+            PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements, targetRequestIndex),
             DealDamageEffectDef damage => BuildDealDamageEffect(damage, card, targetRequestIndex),
             DealDamageToTriggeringPlayerEffectDef trigDamage =>
                 BuildDealDamageToTriggeringPlayerEffect(trigDamage, card),
@@ -3062,15 +3062,44 @@ public static class CardDefRuntime
             });
     }
 
-    private static IEffect BuildPutCounterEffect(PutCounterEffectDef def, ICard card, ReplacementBus? replacements)
+    private static IEffect BuildPutCounterEffect(
+        PutCounterEffectDef def, ICard card, ReplacementBus? replacements, int targetRequestIndex)
     {
-        if (!string.Equals(def.Target, "self", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new NotSupportedException(
-                $"PutCounterEffectDef.Target '{def.Target}' is not yet supported (v1 = 'self').");
-        }
         var counterType = ParseCounterType(def.Counter);
         var amount = def.Amount;
+
+        // CR 122.1 — targeted counter placement ("Put a/N +1/+1 counter(s) on
+        // target creature."). Reads the chosen creature off ChosenTargets at the
+        // reserved index and adds the counter(s) to THAT creature's own
+        // collection — the declarative sibling of BuildPumpTargetEffect and the
+        // on-card counterpart of OracleActivatedAbilityBinder's targeted-counter
+        // rebuild. CR 608.2b — an illegal target at resolution (left the
+        // battlefield / no longer matches) fizzles cleanly: no counter.
+        if (!string.Equals(def.Target, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            var filter = def.Target;
+            return new Effect(
+                $"{card.Name}: put {amount} {def.Counter} counter(s) on target {filter}",
+                ctx =>
+                {
+                    var live = ChosenTargetAt(ctx, targetRequestIndex);
+                    if (live is Permanent target
+                        && target.Zone == ZoneType.Battlefield
+                        && TargetFilters.Matches(filter, target))
+                    {
+                        if (counterType == CounterType.PlusOnePlusOne)
+                        {
+                            CountersService.Add(target, counterType, amount, replacements);
+                        }
+                        else
+                        {
+                            target.Counters.Add(counterType, amount);
+                        }
+                    }
+                    return ValueTask.CompletedTask;
+                });
+        }
+
         return new Effect(
             $"{card.Name}: put {amount} {def.Counter} counter(s) on self",
             () =>
