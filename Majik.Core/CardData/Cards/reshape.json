@@ -1,0 +1,6 @@
+{
+  "name": "Reshape",
+  "types": ["Sorcery"],
+  "manaCost": "{X}{U}{U}",
+  "abilities": []
+}
