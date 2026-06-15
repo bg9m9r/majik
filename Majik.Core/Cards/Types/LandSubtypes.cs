@@ -27,6 +27,7 @@ public static class LandSubtypes
         CardSubtype.Mine,
         CardSubtype.PowerPlant,
         CardSubtype.Tower,
+        CardSubtype.Town,
         CardSubtype.Urzas,
     };
 }

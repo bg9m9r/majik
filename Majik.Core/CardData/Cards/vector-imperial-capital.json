@@ -1,0 +1,9 @@
+{
+  "name": "Vector, Imperial Capital",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
