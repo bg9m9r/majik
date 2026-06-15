@@ -1125,6 +1125,115 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_DestroyTarget_RehomesDestroyToChosenCreature()
+    {
+        // agatha-oracle-shape-destroy-or-exile-target: the
+        // OracleActivatedAbilityBinder now reconstructs the "{cost}: Destroy
+        // target <X>." oracle shape (Avatar of Woe's "{T}: Destroy target
+        // creature." body). Re-homing is sound: the BEARER is ONLY the source /
+        // cost-payer (its own {T} cost taps it); the destroy lands on the CHOSEN
+        // target permanent via Fx.MoveToGraveyard (CR 701.7), never the exiled
+        // imprinted card and never the bearer itself.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability destroys a target creature.
+        var avatar = new Creature("Avatar Stub", "6BB", 6, 5);
+        avatar.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(avatar);
+        avatar.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A victim creature on the battlefield to be destroyed.
+        var victim = new Creature("Victim Bear", "1G", 2, 2);
+        victim.SetOwner(alice);
+        victim.ChangeController(alice);
+        alice.Zones.Library.AddCard(victim);
+        zones.MoveCard(victim, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Avatar Stub", "{T}: Destroy target creature.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), avatar);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's destroy ability");
+        var destroy = granted[0];
+        destroy.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        destroy.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the {T} cost taps the BEARER");
+        destroy.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"),
+            "a destroy-target ability requires a 1..1 target-creature request");
+
+        // Resolving with the VICTIM chosen destroys the VICTIM (CR 701.7), not
+        // the bearer and not the exiled card.
+        destroy.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+        foreach (var effect in destroy.Effects) effect.Execute();
+
+        alice.Zones.Graveyard.GetCards().Should().Contain(victim,
+            "the re-homed destroy moves the CHOSEN creature to its owner's graveyard");
+        alice.Zones.Battlefield.GetCards().Should().NotContain(victim);
+        alice.Zones.Battlefield.GetCards().Should().Contain(bearer,
+            "the bearer (mere source) is untouched — only the chosen target is destroyed");
+    }
+
+    [Fact]
+    public void Grant_NonMana_ExileTarget_RehomesExileToChosenPermanent()
+    {
+        // agatha-oracle-shape-destroy-or-exile-target: the exile leg of the
+        // destroy/exile-target shape — "{cost}: Exile target <X>." Re-homed so
+        // the BEARER is ONLY the source / cost-payer; the exile lands on the
+        // CHOSEN target permanent via Fx.MoveToExile (CR 701.20), never the
+        // exiled imprinted card and never the bearer.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var sage = new Creature("Sage Stub", "3W", 3, 3);
+        sage.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(sage);
+        sage.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A target artifact on the battlefield to be exiled.
+        var artifact = new Artifact("Some Relic", "2");
+        artifact.SetOwner(alice);
+        artifact.ChangeController(alice);
+        alice.Zones.Library.AddCard(artifact);
+        zones.MoveCard(artifact, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Sage Stub", "{2}, {T}: Exile target artifact.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sage);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's exile ability");
+        var exile = granted[0];
+        exile.Source.Should().BeSameAs(bearer, "re-homed to the BEARER");
+        exile.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target artifact"),
+            "an exile-target ability requires a 1..1 target-artifact request");
+
+        exile.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { artifact } });
+        foreach (var effect in exile.Effects) effect.Execute();
+
+        alice.Zones.Exile.GetCards().Should().Contain(artifact,
+            "the re-homed exile moves the CHOSEN permanent to its owner's exile zone");
+        alice.Zones.Battlefield.GetCards().Should().NotContain(artifact);
+    }
+
+    [Fact]
     public void Grant_NonMana_PowerPinger_RehomesDamageEqualToBearerPower()
     {
         // agatha-oracle-shape-spikeshot-goblin-ping-equal-power: the

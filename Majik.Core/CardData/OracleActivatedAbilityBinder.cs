@@ -454,6 +454,40 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*This creature fights target creature\.$",
         RegexOptions.IgnoreCase);
 
+    // The OPEN, source-independent permanent-target forms a "Destroy/Exile
+    // target <X>." ability may reference. Each maps to an unambiguous card-type
+    // membership predicate with NO dependence on the source card's identity, so
+    // the candidate filter reconstructs soundly (CR 602.1c / 608.2b). RESTRICTED
+    // forms ("target tapped creature", "target creature an opponent controls",
+    // "another target creature", "target permanent you don't control") are NOT
+    // matched — their candidate filter isn't reconstructed here, consistent with
+    // the pinger / fight / tap-target open-target soundness boundary. Group is
+    // captured so the builder can scope the TargetRequest's candidate gatherer.
+    private const string PermanentTargetForm =
+        @"(creature or planeswalker|artifact or enchantment|nonland permanent"
+        + @"|creature|artifact|enchantment|land|planeswalker|permanent)";
+
+    // "{cost}: Destroy target <X>." with an optional "It can't be regenerated."
+    // rider (Avatar of Woe / Visara — "{T}: Destroy target creature. It can't be
+    // regenerated."). CR 701.7 — a "destroy" effect: the destroy gates on
+    // Indestructible (CR 702.12b) and consumes a regeneration shield (CR 701.15c)
+    // unless the rider suppresses it (DestroyNoRegeneration). The verb has NO
+    // "this creature" / source reference, so re-homing is a clean destroy of the
+    // CHOSEN permanent, never the exiled imprinted card. Group 1 = cost, group 2 =
+    // target form, group 3 = the optional no-regen rider (non-empty when present).
+    private static readonly Regex DestroyTargetRegex = new(
+        @"^(" + CostList + @")\s*:\s*Destroy target " + PermanentTargetForm
+        + @"\.(\s*It can't be regenerated\.)?$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Exile target <X>." CR 701.20 — move the CHOSEN permanent to its
+    // owner's exile zone. Like the destroy leg the verb is source-independent, so
+    // re-homing exiles the chosen permanent, never the exiled imprinted card.
+    // Group 1 = cost, group 2 = target form.
+    private static readonly Regex ExileTargetRegex = new(
+        @"^(" + CostList + @")\s*:\s*Exile target " + PermanentTargetForm + @"\.$",
+        RegexOptions.IgnoreCase);
+
     // "{cost}: This creature gains <keyword> until end of turn."
     private static readonly Regex SelfKeywordGrantRegex = new(
         @"^(" + CostList + @")\s*:\s*This creature gains (.+?) until end of turn\.$",
@@ -799,6 +833,30 @@ public static class OracleActivatedAbilityBinder
                 if (costs == null) continue; // unsound cost token — skip
                 var ability = BuildFight(costs, bearer, controller);
                 if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var destroy = DestroyTargetRegex.Match(line);
+            if (destroy.Success)
+            {
+                var costs = TryBuildCostList(destroy.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                var noRegen = destroy.Groups[3].Success
+                    && destroy.Groups[3].Value.Trim().Length > 0;
+                result.Add(BuildDestroyOrExileTarget(
+                    costs, exile: false, noRegen: noRegen,
+                    destroy.Groups[2].Value, bearer, controller));
+                continue;
+            }
+
+            var exile = ExileTargetRegex.Match(line);
+            if (exile.Success)
+            {
+                var costs = TryBuildCostList(exile.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                result.Add(BuildDestroyOrExileTarget(
+                    costs, exile: true, noRegen: false,
+                    exile.Groups[2].Value, bearer, controller));
                 continue;
             }
 
@@ -1958,6 +2016,132 @@ public static class OracleActivatedAbilityBinder
             });
 
         return ability;
+    }
+
+    /// <summary>
+    /// Map an OPEN permanent-target form (the captured group of
+    /// <see cref="DestroyTargetRegex"/> / <see cref="ExileTargetRegex"/>) to a
+    /// source-independent card-type membership predicate. Each form is an
+    /// unambiguous type test (CR 602.1c) with no dependence on the source card's
+    /// identity, so it re-homes soundly. Returns null for an unrecognised form
+    /// (defensive — the regex only emits the eight handled forms).
+    /// </summary>
+    private static Func<ICard, bool>? PermanentFormPredicate(string targetForm)
+        => targetForm.ToLowerInvariant() switch
+        {
+            "creature" => c => c.HasType(CardType.Creature),
+            "artifact" => c => c.HasType(CardType.Artifact),
+            "enchantment" => c => c.HasType(CardType.Enchantment),
+            "land" => c => c.HasType(CardType.Land),
+            "planeswalker" => c => c.HasType(CardType.Planeswalker),
+            "permanent" => _ => true,
+            "nonland permanent" => c => !c.HasType(CardType.Land),
+            "creature or planeswalker" =>
+                c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker),
+            "artifact or enchantment" =>
+                c => c.HasType(CardType.Artifact) || c.HasType(CardType.Enchantment),
+            _ => null,
+        };
+
+    /// <summary>
+    /// Build a destroy-target (or exile-target, when <paramref name="exile"/> is
+    /// true) ability: "{cost}: Destroy/Exile target &lt;X&gt;." Re-homed so the
+    /// BEARER is ONLY the source / cost-payer; the verb has no "this creature" /
+    /// source reference, so the effect destroys (CR 701.7) or exiles (CR 701.20)
+    /// the CHOSEN target permanent via <see cref="Fx.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+    /// / <see cref="Fx.MoveToExile(ICard)"/> — never the exiled imprinted card and
+    /// never the bearer itself (the bearer is only tapped by its own {T} cost, not
+    /// by the effect). A "destroy … It can't be regenerated." rider
+    /// (<paramref name="noRegen"/>) uses <see cref="ZoneMoveReason.DestroyNoRegeneration"/>
+    /// so a regeneration shield is NOT consumed (CR 701.15 suppressed; CR 702.12b
+    /// Indestructible still applies). The bearer need NOT be a creature (a
+    /// non-creature bearer can still pay to destroy/exile a chosen permanent), so
+    /// this does not gate on <see cref="Creature"/>. Mirrors
+    /// <see cref="BuildTapTarget"/>'s 1..1 single-permanent target request, scoped
+    /// to the open type form via <see cref="PermanentFormPredicate"/>.
+    /// </summary>
+    private static ActivatedAbility BuildDestroyOrExileTarget(
+        List<ICost> costs,
+        bool exile,
+        bool noRegen,
+        string targetForm,
+        Permanent bearer,
+        Player controller)
+    {
+        Func<ICard, bool> predicate = PermanentFormPredicate(targetForm) ?? (_ => true);
+        var verb = exile ? "exile" : "destroy";
+        var description = "target " + targetForm.ToLowerInvariant();
+
+        ActivatedAbility? ability = null;
+        var effect = new Effect(
+            $"Granted: {verb} {description}",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 701.7 / 701.20 — destroy / exile the CHOSEN permanent. A
+                // non-permanent chosen target (shape-only path) silently no-ops.
+                // CR 608.2b — the target must still be a battlefield permanent.
+                if (ability.ChosenTargets[0][0] is not Permanent chosen) return;
+                if (chosen.Zone != ZoneType.Battlefield) return;
+
+                if (exile)
+                {
+                    Fx.MoveToExile(chosen);
+                }
+                else
+                {
+                    Fx.MoveToGraveyard(
+                        chosen,
+                        noRegen ? ZoneMoveReason.DestroyNoRegeneration : ZoneMoveReason.Destroy);
+                }
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { effect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: description,
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    // Destroy / exile of a chosen permanent is removal.
+                    Intent: BotIntent.Removal,
+                    // CR 602.1c — the open type form's candidates are every
+                    // battlefield permanent of the matching type on ANY player's
+                    // battlefield (re-sourced to the live game's roster), never
+                    // the exiled card. The gatherer reads every player's
+                    // battlefield off the live context.
+                    CandidateGatherer: ctx => GatherPermanents(ctx, controller, predicate)),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Gather every battlefield permanent (on any player's battlefield) matching
+    /// <paramref name="predicate"/>. Reads the live game roster off the
+    /// <see cref="GameContext"/> when available so the candidate set scopes to the
+    /// whole board the printed card targets; falls back to the
+    /// <paramref name="controller"/>'s own battlefield on the context-less path.
+    /// </summary>
+    private static IReadOnlyList<object> GatherPermanents(
+        Majik.Core.Game.GameContext? ctx, Player controller, Func<ICard, bool> predicate)
+    {
+        IEnumerable<Player> roster = ctx?.AllPlayers is { Count: > 0 } all
+            ? all
+            : new[] { controller };
+        return roster
+            .SelectMany(p => p.Zones.Battlefield.GetCards())
+            .Where(predicate)
+            .Cast<object>()
+            .ToList();
     }
 
     // The deterministic default protection-from-<colour> quality used by the
