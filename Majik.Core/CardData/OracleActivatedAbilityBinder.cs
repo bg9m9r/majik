@@ -170,6 +170,21 @@ namespace Majik.Core.CardData;
 ///     controller-scoped operation. Count is "a"/"one" ⇒ 1, the spelled-out
 ///     "two"/"three", or a bare digit; an unrecognised count is skipped. Sound
 ///     on any permanent bearer, not just creatures.</item>
+///   <item><b>Scry-self</b> —
+///     <c>"{cost}: Scry N."</c> Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose resolution scries over the BEARER's
+///     CONTROLLER's own library (<see cref="Majik.Core.Primitives.Fx.Scry"/> /
+///     <see cref="Majik.Core.Keywords.ScryAction"/>, CR 701.20 / 613.1f) — like
+///     draw / gain-life one of the soundest re-homes: "scry N" has NO "this
+///     creature" / source reference, so re-homing is a clean controller-scoped
+///     operation. The agent's scry decision is read off the live
+///     <see cref="ResolutionContext"/> (the async-bodied <see cref="Effect"/>
+///     ctor + <c>ctx.Agent</c>) — the SAME way the declarative scry_self verb
+///     resolves it — so the closure prompts the live agent rather than needing
+///     a captured one (no-agent fallback sends every peeked card to the bottom).
+///     Count is "a"/"one" ⇒ 1, the spelled-out "two"/"three", or a bare digit;
+///     an unrecognised count is skipped. Sound on any permanent bearer, not just
+///     creatures.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -205,11 +220,13 @@ namespace Majik.Core.CardData;
 ///     the candidate filter isn't reconstructed; only the open
 ///     any-target / target-creature / target-player forms are rebuilt.</item>
 ///   <item>Every shape not in the list above (tutors, mode-bearing abilities,
-///     token makers, anthem grants, scry/mill/surveil — which need an agent
-///     decision the closure can't prompt for — loyalty-style, bespoke
-///     one-offs). These are unbounded and not generally reconstructable from
-///     oracle text without per-card work — a correct partial beats a broken
-///     "all".</item>
+///     token makers, anthem grants, mill/surveil — which need an agent decision
+///     the closure can't prompt for — loyalty-style, bespoke one-offs). (Scry,
+///     listed here previously, IS now reconstructed: its agent decision is read
+///     off the live <see cref="ResolutionContext"/> the same way the declarative
+///     scry_self verb resolves it — see the scry-self shape below.) These are
+///     unbounded and not generally reconstructable from oracle text without
+///     per-card work — a correct partial beats a broken "all".</item>
 /// </list>
 /// </summary>
 public static class OracleActivatedAbilityBinder
@@ -507,6 +524,36 @@ public static class OracleActivatedAbilityBinder
             ["three"] = 3,
         };
 
+    // "{cost}: Scry N." (CR 701.20.) A self-source scry is a common activated
+    // library-smoothing shape on real creature cards (a {T}: Scry payoff). Sound
+    // to re-home: scry references the BEARER's CONTROLLER's OWN library
+    // (Fx.Scry / ScryAction), NEVER the exiled imprinted card — there is no "this
+    // creature" / source reference at all, so this is as sound a re-home as draw
+    // / gain-life. The agent's scry decision is read off the live
+    // ResolutionContext (Effect's async-body ctor + ctx.Agent), exactly the way
+    // the declarative scry_self verb (CardDefRuntime.BuildScrySelfEffect) and the
+    // OracleTriggeredAbilityBinder's "Scry N" rider resolve it — so re-homing
+    // captures no source-card identity. The count is "a"/"one" ⇒ 1, a
+    // spelled-out "two"/"three", or a bare digit; an unrecognised count word
+    // makes the clause unsound and is skipped. Does NOT gate on Creature (a scry
+    // is sound on any permanent bearer — the controller scries, not the
+    // permanent). Group 1 = cost, group 2 = count token.
+    private static readonly Regex ScrySelfRegex = new(
+        @"^(" + CostList + @")\s*:\s*Scry (a|one|two|three|\d+)\.$",
+        RegexOptions.IgnoreCase);
+
+    // Spelled-out small counts that appear on real "Scry N" activated abilities
+    // ("a"/"one" ⇒ 1). A bare digit is also accepted for larger amounts; an
+    // unrecognised word makes the clause unsound and is skipped.
+    private static readonly IReadOnlyDictionary<string, int> ScryCountWords =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+            ["one"] = 1,
+            ["two"] = 2,
+            ["three"] = 3,
+        };
+
     // "{cost}: Regenerate this creature." (CR 701.18 / 701.15a.)
     // A self-source regeneration ability — one of the most common activated
     // abilities on real creature cards (River Boa, Drudge Skeletons, Wall of
@@ -706,6 +753,14 @@ public static class OracleActivatedAbilityBinder
             if (gainLife.Success)
             {
                 var ability = TryBuildGainLife(gainLife, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var scry = ScrySelfRegex.Match(line);
+            if (scry.Success)
+            {
+                var ability = TryBuildScrySelf(scry, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -1133,6 +1188,74 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { gainEffect });
+    }
+
+    /// <summary>
+    /// Build a scry-self ability: "{cost}: Scry N." (CR 701.20.) Re-homed so the
+    /// scry is over the BEARER's CONTROLLER's own library (<see cref="Fx.Scry"/>
+    /// / <see cref="Majik.Core.Keywords.ScryAction"/>, CR 613.1f) — never the
+    /// exiled imprinted card. Like draw / gain-life this has no "this creature" /
+    /// source reference, so re-homing is a clean controller-scoped operation; it
+    /// does NOT gate on <see cref="Creature"/> (a scry is sound on any permanent
+    /// bearer — the controller scries, not the permanent). The agent's scry
+    /// decision is read off the live <see cref="ResolutionContext"/> via the
+    /// async-bodied <see cref="Effect"/> ctor (exactly the declarative scry_self
+    /// verb in <c>CardDefRuntime.BuildScrySelfEffect</c> and the
+    /// <c>OracleTriggeredAbilityBinder</c>'s "Scry N" rider) — with the
+    /// no-agent fallback sending every peeked card to the bottom. The count is
+    /// "a"/"one" ⇒ 1, a spelled-out "two"/"three", or a bare digit; an
+    /// unrecognised count word is skipped (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildScrySelf(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int count;
+        if (!ScryCountWords.TryGetValue(countToken, out count)
+            && !int.TryParse(countToken, out count))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (count <= 0) return null;
+
+        var scryEffect = new Effect(
+            $"Granted: scry {count}",
+            async ctx =>
+            {
+                // CR 701.20 / 613.1f — peek the BEARER's controller's own top N.
+                // No source-card reference, so re-homing is trivially sound.
+                var peeked = Majik.Core.Keywords.ScryAction.Peek(controller, count);
+                if (peeked.Count == 0) return;
+
+                // Prompt the live agent off the resolution context; fall back to
+                // the registry, then to the deterministic all-to-bottom default
+                // (the SAME posture as the declarative scry_self verb).
+                var agent = ctx.Agent
+                    ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                Majik.Core.Keywords.ScryAction.ScryDecision decision;
+                if (agent != null)
+                {
+                    decision = await agent
+                        .ChooseScryDecisionAsync(ctx.Game, peeked, ctx.Ct)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    decision = new Majik.Core.Keywords.ScryAction.ScryDecision(
+                        ToBottom: peeked.ToList(),
+                        TopOrder: Array.Empty<ICard>());
+                }
+                Fx.Scry(controller, peeked.Count, decision);
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { scryEffect });
     }
 
     /// <summary>
