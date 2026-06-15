@@ -4306,4 +4306,82 @@ public class AgathasSoulCauldronTests
         boromir.Zone.Should().Be(ZoneType.Exile,
             "the imprinted Boromir stays untouched in exile under the Cauldron");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-migration-worldbreaker-audit-grep-tail — Heliod,
+    // Sun-Crowned, a bespoke [CardName]-factory creature from the audit-grep
+    // tail, migrated to read ResolutionContext.Source + marked RebindSafe:
+    //   - Heliod, Sun-Crowned — "{1}{W}: Another target creature gains lifelink
+    //     until end of turn." Non-reconstructable from oracle text; "Another"
+    //     now measures against ResolutionContext.Source (the BEARER), not the
+    //     exiled Heliod, so Agatha re-homes the REAL ability via RebindTo.
+    // (Joraga Treespeaker — the other audit-grep-tail card — was migrated in a
+    //  sibling PR; its re-home test lives above.)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Heliod_LifelinkGrantToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {1}{W} lifelink grant) is now
+        // RebindSafe (the "Another" check reads ResolutionContext.Source).
+        var heliod = HeliodSunCrownedFactory.Create(alice);
+        var realAbilities = heliod.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Heliod has exactly one non-mana activated ability — the {1}{W} lifelink grant");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Heliod ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(heliod);
+        heliod.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), heliod);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Heliod's real lifelink grant is re-homed via RebindTo");
+        var lifelinkGrant = granted[0];
+        lifelinkGrant.Source.Should().BeSameAs(bearer,
+            "the re-homed lifelink grant is sourced on the BEARER (CR 707.2)");
+        lifelinkGrant.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Another creature the BEARER's controller controls — the legal
+        // "Another target creature" for the re-homed grant.
+        var ally = new Creature("Ally Soldier", "{W}", 1, 1);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        ally.ActiveEffects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        lifelinkGrant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        await lifelinkGrant.ResolveAsync(agent: null, game: null);
+
+        ally.ActiveEffects.Compute(ally).Keywords
+            .Any(k => string.Equals(k, "Lifelink", System.StringComparison.OrdinalIgnoreCase))
+            .Should().BeTrue(
+                "the re-homed grant gives the chosen 'Another' creature Lifelink");
+
+        // "Another" now excludes the BEARER (ResolutionContext.Source), not the
+        // exiled Heliod — targeting the bearer itself grants nothing.
+        bearer.ActiveEffects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        lifelinkGrant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bearer } });
+        await lifelinkGrant.ResolveAsync(agent: null, game: null);
+        bearer.ActiveEffects.Compute(bearer).Keywords
+            .Any(k => string.Equals(k, "Lifelink", System.StringComparison.OrdinalIgnoreCase))
+            .Should().BeFalse(
+                "'Another' is measured against the BEARER (CR 707.2 / 608.2b)");
+    }
 }

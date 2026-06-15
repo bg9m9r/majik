@@ -252,21 +252,39 @@ public static class HeliodSunCrownedFactory
         ActivatedAbility? lifelinkGrantAbility = null;
         var lifelinkGrantEffect = new Effect(
             $"{CardName}: another target creature gains Lifelink until end of turn",
-            () =>
+            ctx =>
             {
-                if (lifelinkGrantAbility == null) return;
-                var chosen = lifelinkGrantAbility.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                // Read the chosen target off the live ResolutionContext (threaded
+                // by ActivatedAbility.ResolveAsync from THIS resolving ability's
+                // chosen targets) so a RebindTo'd (Agatha-re-homed) ability reads
+                // the bearer ability's targets, not the captured original's. The
+                // captured `lifelinkGrantAbility` is the ctx-less Execute()
+                // fallback only.
+                var chosen = ctx.ChosenTargets.Count > 0
+                    ? ctx.ChosenTargets
+                    : (lifelinkGrantAbility?.ChosenTargets
+                        ?? (IReadOnlyList<IReadOnlyList<object>>)System.Array.Empty<IReadOnlyList<object>>());
+                if (chosen.Count == 0 || chosen[0].Count == 0) return ValueTask.CompletedTask;
 
                 var raw = chosen[0][0];
-                if (raw is not Creature target) return;
-                if (target.Zone != ZoneType.Battlefield) return; // CR 608.2b
-                if (ReferenceEquals(target, card)) return;      // "Another"
-                if (target.ActiveEffects == null) return;       // shape-only no-op
+                if (raw is not Creature target) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask; // CR 608.2b
+
+                // RE-SOURCE-SAFE (agatha-bespoke migration): "Another" is
+                // measured against the live source off ResolutionContext.Source
+                // (= the bearer after a RebindTo; otherwise this Heliod) rather
+                // than the captured `card`, so Agatha's Soul Cauldron re-homes
+                // "Another target creature" to mean "another than the BEARER"
+                // (CR 707.2 / 613.1f). Falls back to the captured `card` only on
+                // the ctx-less legacy Execute() path.
+                var self = (ctx.Source as ICard) ?? card;
+                if (ReferenceEquals(target, self)) return ValueTask.CompletedTask; // "Another"
+                if (target.ActiveEffects == null) return ValueTask.CompletedTask;  // shape-only no-op
 
                 // CR 613.1c Layer 6 — keyword grant (Lifelink), EOT-expirable.
                 target.ActiveEffects.Register(
                     new GrantKeywordUntilEndOfTurnEffect(target, "Lifelink"));
+                return ValueTask.CompletedTask;
             });
 
         lifelinkGrantAbility = new ActivatedAbility(
@@ -274,6 +292,9 @@ public static class HeliodSunCrownedFactory
             controller: owner,
             costs: new ICost[] { new ManaCostCost(LifelinkActivationCost) },
             effects: new IEffect[] { lifelinkGrantEffect },
+            // Agatha's Soul Cauldron re-home soundness — the "Another" check
+            // reads ResolutionContext.Source, never the captured card.
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(

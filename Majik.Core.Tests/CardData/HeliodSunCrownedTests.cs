@@ -380,4 +380,73 @@ public class HeliodSunCrownedTests
         HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice).Should().Be(2);
         service.Compute((Permanent)heliod).Types.Should().NotContain(CardType.Creature);
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-factory-resolutioncontext-source-migration — the
+    // "{1}{W}: Another target creature gains lifelink" activated ability now
+    // measures "Another" against ResolutionContext.Source (not the captured
+    // card) and is marked RebindSafe, so Agatha's Soul Cauldron can re-home it
+    // onto a counter-bearing bearer (CR 707.2): "another than the BEARER".
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void LifelinkGrant_IsRebindSafe()
+    {
+        var heliod = HeliodSunCrownedFactory.Create(_alice);
+
+        var activated = heliod.Abilities.OfType<ActivatedAbility>().Single();
+        activated.RebindSafe.Should().BeTrue(
+            "the lifelink-grant effect reads ResolutionContext.Source for its " +
+            "'Another' identity check, so Agatha's Soul Cauldron may re-home it");
+    }
+
+    [Fact]
+    public async Task LifelinkGrant_ResolvesViaContextSource_GrantsLifelinkToAnother()
+    {
+        var service = new ContinuousEffectsService();
+        var heliod = HeliodSunCrownedFactory.Create(_alice, triggers: null, effects: service);
+        _alice.Zones.Battlefield.AddCard(heliod);
+        heliod.SetZone(ZoneType.Battlefield);
+
+        var ally = new Creature("Soldier", "{W}", 1, 1);
+        ally.SetOwner(_alice);
+        ally.SetController(_alice);
+        ally.ActiveEffects = new ContinuousEffectsService();
+        _alice.Zones.Battlefield.AddCard(ally);
+        ally.SetZone(ZoneType.Battlefield);
+
+        var activated = heliod.Abilities.OfType<ActivatedAbility>().Single();
+        activated.SetChosenTargets(new[] { new object[] { ally } });
+
+        // Resolve via the context path (Source threaded by ResolveAsync). The
+        // "Another" check measures against ResolutionContext.Source = heliod.
+        await activated.ResolveAsync(agent: null, game: null);
+
+        ally.ActiveEffects.Compute(ally).Keywords
+            .Any(k => string.Equals(k, "Lifelink", StringComparison.OrdinalIgnoreCase))
+            .Should().BeTrue(
+                "the chosen 'Another target creature' gained Lifelink (Layer 6)");
+    }
+
+    [Fact]
+    public async Task LifelinkGrant_ResolvesViaContextSource_SelfTargetFizzles()
+    {
+        // "Another" measured off ResolutionContext.Source — targeting the
+        // source itself is illegal and grants nothing.
+        var service = new ContinuousEffectsService();
+        var heliod = HeliodSunCrownedFactory.Create(_alice, triggers: null, effects: service);
+        heliod.ActiveEffects = service;
+        _alice.Zones.Battlefield.AddCard(heliod);
+        heliod.SetZone(ZoneType.Battlefield);
+
+        var activated = heliod.Abilities.OfType<ActivatedAbility>().Single();
+        activated.SetChosenTargets(new[] { new object[] { heliod } });
+
+        await activated.ResolveAsync(agent: null, game: null);
+
+        service.Compute((Permanent)heliod).Keywords
+            .Any(k => string.Equals(k, "Lifelink", StringComparison.OrdinalIgnoreCase))
+            .Should().BeFalse(
+                "'Another' excludes the source itself (CR 608.2b)");
+    }
 }
