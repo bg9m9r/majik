@@ -1,0 +1,10 @@
+{
+  "name": "Marwyn, the Nurturer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
