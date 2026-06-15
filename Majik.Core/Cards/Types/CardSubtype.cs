@@ -334,8 +334,11 @@ public enum CardSubtype
     /// Cave onto the battlefield this way, you gain 4 life" rider keys off.
     /// CR 205.3i.</summary>
     Cave,
-    /// <summary>Town land subtype — Treno, Dark City (Final Fantasy). The
-    /// printed land subtype on the FF "city" dual taplands. CR 205.3i.</summary>
+    /// <summary>Town land subtype — Treno, Dark City (Final Fantasy) and
+    /// Gohn, Town of Ruin (Edge of Eternities). The printed land subtype on
+    /// the FF "city" dual taplands and the EOE "Town" land cycle. No rules
+    /// reference the Town subtype yet; it is purely a printed characteristic.
+    /// CR 205.3i.</summary>
     Town,
 
     // Enchantment subtypes (examples)
