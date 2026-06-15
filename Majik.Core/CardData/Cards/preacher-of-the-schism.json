@@ -1,0 +1,8 @@
+{
+  "name": "Preacher of the Schism",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Cleric"],
+  "manaCost": "{2}{B}",
+  "power": 2,
+  "toughness": 4
+}
