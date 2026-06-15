@@ -1,0 +1,20 @@
+{
+  "name": "Temporal Adept",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{1}{U}{U}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "UUU" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "return_to_hand", "targetFilter": "permanent" }
+      ]
+    }
+  ]
+}
