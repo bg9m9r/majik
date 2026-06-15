@@ -1,0 +1,9 @@
+{
+  "name": "Elvish Champion",
+  "types": ["Creature"],
+  "subtypes": ["Elf"],
+  "manaCost": "{1}{G}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
