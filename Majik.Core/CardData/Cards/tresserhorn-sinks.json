@@ -1,0 +1,9 @@
+{
+  "name": "Tresserhorn Sinks",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
