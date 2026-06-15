@@ -1,0 +1,6 @@
+{
+  "name": "Geistlight Snare",
+  "types": ["Instant"],
+  "manaCost": "{2}{U}",
+  "colors": ["U"]
+}
