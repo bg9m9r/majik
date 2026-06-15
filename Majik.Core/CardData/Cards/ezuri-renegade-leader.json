@@ -1,0 +1,10 @@
+{
+  "name": "Ezuri, Renegade Leader",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elf", "Warrior"],
+  "manaCost": "{1}{G}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
