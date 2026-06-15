@@ -30,6 +30,9 @@ public enum CardSubtype
     Zombie,
     Skeleton,
     Beast,
+    /// <summary>Bat creature subtype — Deep-Cavern Bat (Lost Caverns of
+    /// Ixalan), Vampire Bats, Chittering Host adjacent printings. CR 205.3m.</summary>
+    Bat,
     Bird,
     Cat,
     Dog,

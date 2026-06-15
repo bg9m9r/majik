@@ -1,0 +1,9 @@
+{
+  "name": "Deep-Cavern Bat",
+  "types": ["Creature"],
+  "subtypes": ["Bat"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
