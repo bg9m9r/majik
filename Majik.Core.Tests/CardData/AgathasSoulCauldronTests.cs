@@ -3757,6 +3757,88 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // etched-oracle-variable-x-counter-removal-rebind (Pteramander leg) —
+    // Pteramander is a bespoke [CardName]-factory creature whose Adapt 4
+    // activated ability carries a GraveyardReducedManaCost ("{7}{U}; this
+    // ability costs {1} less for each instant/sorcery in your graveyard").
+    // The cost captures the source card to count "your graveyard" (CR 118.5).
+    // Before this seam, an Agatha-granted Adapt re-homed its EFFECT + counter
+    // gate to the bearer (RebindSafe) but the GraveyardReducedManaCost was a
+    // plain ManaCostCost that passed THROUGH RebindTo untouched — still bound to
+    // the exiled Pteramander, so the reduction read the WRONG graveyard. The
+    // cost now implements IRebindableCost, so RebindTo (CR 707.2 / 613.1f)
+    // swaps its captured source onto the BEARER.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_Pteramander_ReducedCostHomedToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its Adapt
+        // ability reads ResolutionContext.Source (RebindSafe) and carries the
+        // GraveyardReducedManaCost the oracle-rebuild fallback cannot reconstruct.
+        var pteramander = PteramanderFactory.Create(alice);
+        var realAbility = pteramander.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        realAbility.RebindSafe.Should().BeTrue(
+            "the Pteramander Adapt ability reads ResolutionContext.Source and is RebindSafe");
+        realAbility.Costs.OfType<PteramanderFactory.GraveyardReducedManaCost>()
+            .Single().Source.Should().BeSameAs(pteramander,
+                "before re-home the reduction is bound to Pteramander's own source");
+        alice.Zones.Graveyard.AddCard(pteramander);
+        pteramander.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), pteramander);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Pteramander's real Adapt ability is re-homed via RebindTo");
+        var adapt = granted[0];
+        adapt.Source.Should().BeSameAs(bearer,
+            "the re-homed ability is sourced on the BEARER (CR 707.2)");
+
+        var reducedCost = adapt.Costs
+            .OfType<PteramanderFactory.GraveyardReducedManaCost>()
+            .Should().ContainSingle(
+                "the graveyard-reducing mana cost is re-homed, not dropped")
+            .Subject;
+        reducedCost.Source.Should().BeSameAs(bearer,
+            "the GraveyardReducedManaCost is re-homed onto the BEARER (CR 707.2 / 613.1f) " +
+            "so the {1}-less-per-instant/sorcery reduction reads the bearer's controller's graveyard");
+    }
+
+    [Fact]
+    public void Pteramander_ReducedCost_ReadsOwnSourceWhenNotRebound()
+    {
+        // Sanity: on the normal (un-rebound) path the GraveyardReducedManaCost
+        // is bound to Pteramander itself, and RebindTo against a non-matching
+        // source is a no-op (returns the same instance — purity).
+        var alice = new Player("Alice", 20);
+        var pteramander = PteramanderFactory.Create(alice);
+
+        var cost = pteramander.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility)
+            .Costs.OfType<PteramanderFactory.GraveyardReducedManaCost>()
+            .Single();
+
+        cost.Source.Should().BeSameAs(pteramander);
+
+        var someoneElse = new Creature("Bystander", "1G", 2, 2);
+        cost.RebindTo(someoneElse, pteramander).Should().BeSameAs(cost,
+            "RebindTo against a non-matching old source returns the same instance (pure no-op)");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-oracle-shape-yawgmoth-pay-life-counter-pump-loop — Yawgmoth, Thran
     // Physician is a bespoke [CardName]-factory creature whose activated ability
     // ("Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one

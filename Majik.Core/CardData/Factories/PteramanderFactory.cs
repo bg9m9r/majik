@@ -159,8 +159,10 @@ public static class PteramanderFactory
             // agatha-adapt-rebind — the Adapt effect reads ResolutionContext.Source
             // (re-source-safe), so the re-wrapped ability stays RebindSafe and
             // Agatha's group-grant re-homes it to a counter-bearing bearer. The
-            // GraveyardReducedManaCost reads the source's controller live, so it
-            // tracks the new controller after RebindTo as well.
+            // GraveyardReducedManaCost implements IRebindableCost, so RebindTo
+            // (CR 707.2 / 613.1f) swaps its captured source onto the BEARER —
+            // the {1}-less-per-instant/sorcery reduction then reads the bearer's
+            // controller's graveyard, not the exiled Pteramander's.
             rebindSafe: baseAdapt.RebindSafe);
 
         card.AddAbility(adaptAbility);
@@ -178,7 +180,7 @@ public static class PteramanderFactory
     /// (<see cref="ValueObjects.ManaCost.WithGeneric"/>) and coloured pips
     /// are never touched (CR 117.7c).
     /// </summary>
-    public sealed class GraveyardReducedManaCost : ManaCostCost
+    public sealed class GraveyardReducedManaCost : ManaCostCost, IRebindableCost
     {
         private readonly ValueObjects.ManaCost _printed;
         private readonly Card _source;
@@ -194,6 +196,32 @@ public static class PteramanderFactory
         /// The printed (pre-reduction) cost, for inspection / tooltips.
         /// </summary>
         public ValueObjects.ManaCost Printed => _printed;
+
+        /// <summary>
+        /// The card whose controller's graveyard drives the reduction count
+        /// (CR 118.5). Exposed for inspection — after the owning ability is
+        /// re-sourced via <see cref="Abilities.ActivatedAbility.RebindTo"/> /
+        /// <see cref="RebindTo(object,object)"/> this is the new bearer.
+        /// </summary>
+        public Card Source => _source;
+
+        /// <summary>
+        /// STAGE 1 (re-sourceable abilities) — re-home this cost onto a new
+        /// source when the owning ability is re-sourced (CR 707.2 / 613.1f —
+        /// Agatha's Soul Cauldron). The reduction reads "instant and sorcery
+        /// cards in <em>your</em> graveyard" off the bound source's CURRENT
+        /// controller, so without re-homing an Agatha-granted Adapt ability
+        /// would count the EXILED Pteramander's controller's graveyard instead
+        /// of the BEARER's. Swaps the captured source only when it is
+        /// reference-equal to <paramref name="oldSource"/> and
+        /// <paramref name="newSource"/> is a <see cref="Card"/>; otherwise
+        /// returns this instance unchanged (pure — the source ability is
+        /// untouched). The printed cost is preserved.
+        /// </summary>
+        public ICost RebindTo(object oldSource, object newSource) =>
+            ReferenceEquals(_source, oldSource) && newSource is Card c
+                ? new GraveyardReducedManaCost(_printed.ToString(), c)
+                : this;
 
         /// <summary>
         /// CR 118.5 — count instant and sorcery cards in the source's
