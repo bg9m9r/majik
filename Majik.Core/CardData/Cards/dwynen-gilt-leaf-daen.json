@@ -1,0 +1,11 @@
+{
+  "name": "Dwynen, Gilt-Leaf Daen",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elf", "Warrior"],
+  "manaCost": "{2}{G}{G}",
+  "power": 3,
+  "toughness": 4,
+  "keywords": ["Reach"],
+  "abilities": []
+}

@@ -11293,6 +11293,61 @@
   "mdfc": null,
   "colors": []
 }
+==== dwynen-gilt-leaf-daen ====
+{
+  "name": "Dwynen, Gilt-Leaf Daen",
+  "manaCost": "{2}{G}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Elf",
+    "Warrior"
+  ],
+  "power": 3,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Reach"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== dwynens-elite ====
 {
   "name": "Dwynen\u0027s Elite",
