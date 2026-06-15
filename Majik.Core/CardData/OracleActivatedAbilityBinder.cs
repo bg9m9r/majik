@@ -95,6 +95,20 @@ namespace Majik.Core.CardData;
 ///     "target creature" filter is reconstructed (a restricted filter is skipped,
 ///     consistent with the pinger / fight restricted-target boundary). Not
 ///     creature-only: any permanent bearer can pay to tap a chosen creature.</item>
+///   <item><b>Return target to hand</b> —
+///     <c>"{cost}: Return target creature/permanent to its owner's hand."</c>
+///     (CR 701.20.) Temporal Adept's
+///     <c>"{U}{U}{U}, {T}: Return target permanent to its owner's hand."</c>
+///     shape — the targeted-BOUNCE sibling of the tapper. Rebuilt with a 1..1
+///     <see cref="TargetRequest"/> and resolution through
+///     <see cref="Fx.BounceToHand(Majik.Core.Cards.ICard, Majik.Core.Services.ZoneService?)"/>.
+///     Sound to re-home: the BEARER is only the source / cost-payer; the effect
+///     bounces the CHOSEN target to ITS OWNER's hand (never the bearer's
+///     controller's, never the exiled card). Only the OPEN "target creature" /
+///     "target permanent" filters are reconstructed (a restricted filter like
+///     "you control" / "an opponent controls" is skipped, consistent with the
+///     pinger / tap-target restricted-target boundary). Not creature-only: any
+///     permanent bearer can pay to bounce a chosen target.</item>
 ///   <item><b>Self-keyword grant</b> —
 ///     <c>"{cost}: This creature gains &lt;keyword&gt; until end of turn."</c>
 ///     (the keyword sibling of firebreathing). Rebuilt as a no-target
@@ -334,6 +348,27 @@ public static class OracleActivatedAbilityBinder
     // the verb ("Tap" | "Untap").
     private static readonly Regex TapTargetRegex = new(
         @"^(" + CostList + @")\s*:\s*(Tap|Untap) target creature\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Return target creature to its owner's hand." /
+    // "{cost}: Return target permanent to its owner's hand." (CR 701.20.)
+    // A self-source targeted BOUNCE is a classic activated tempo shape on real
+    // creature cards (Temporal Adept's "{U}{U}{U}, {T}: Return target permanent
+    // to its owner's hand."; the bounce sibling of the tapper / pinger). Sound to
+    // re-home: the BEARER is ONLY the source / cost-payer (its own {T}/mana cost);
+    // the effect returns the CHOSEN target to ITS OWNER's hand via
+    // Fx.BounceToHand — the verb has NO "this creature" / source reference at all
+    // and bounces to the TARGET's owner (never the bearer's controller), so
+    // re-homing is a clean controller-agnostic bounce of a chosen permanent, never
+    // the exiled imprinted card. Only the OPEN "target creature" / "target
+    // permanent" filters are reconstructed (no restricted candidate filter like
+    // "target permanent you control" or "an opponent controls"), consistent with
+    // the pinger / fight / tap-target restricted-target boundary. The bearer need
+    // NOT be a creature (any permanent bearer can pay to bounce a chosen target),
+    // so this does not gate on Creature. Group 2 = the target filter
+    // ("creature" | "permanent").
+    private static readonly Regex ReturnToHandTargetRegex = new(
+        @"^(" + CostList + @")\s*:\s*Return target (creature|permanent) to its owner's hand\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: Target creature you control gains protection from the color of
@@ -642,6 +677,16 @@ public static class OracleActivatedAbilityBinder
                 var untap = string.Equals(
                     tapTarget.Groups[2].Value, "Untap", StringComparison.OrdinalIgnoreCase);
                 result.Add(BuildTapTarget(costs, untap, bearer, controller));
+                continue;
+            }
+
+            var returnToHand = ReturnToHandTargetRegex.Match(line);
+            if (returnToHand.Success)
+            {
+                var costs = TryBuildCostList(returnToHand.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                result.Add(BuildReturnToHandTarget(
+                    costs, returnToHand.Groups[2].Value, bearer, controller));
                 continue;
             }
 
@@ -1440,6 +1485,73 @@ public static class OracleActivatedAbilityBinder
                     // Tapping a creature denies a blocker/attacker (a removal-like
                     // tempo play); untapping is a utility move with no clean intent.
                     Intent: untap ? BotIntent.None : BotIntent.Removal),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Build a return-to-hand-target ability: "{cost}: Return target
+    /// creature/permanent to its owner's hand." (CR 701.20.) Re-homed so the
+    /// BEARER is ONLY the source / cost-payer; the effect returns the CHOSEN target
+    /// to ITS OWNER's hand via <see cref="Fx.BounceToHand(Majik.Core.Cards.ICard, Majik.Core.Services.ZoneService?)"/>
+    /// — never the exiled imprinted card, and (unlike a controller-scoped draw /
+    /// lifegain) the bounce lands in the TARGET's owner's hand, never the bearer's
+    /// controller's. The bearer need NOT be a creature (any permanent bearer can
+    /// pay to bounce a chosen target), so this does not gate on
+    /// <see cref="Creature"/>. CR 608.2b — at resolution the chosen object is
+    /// re-checked: it must still be a battlefield permanent whose type still
+    /// matches the printed filter ("creature" ⇒ still a creature), otherwise the
+    /// ability fizzles cleanly — the SAME legality re-check the
+    /// <see cref="BuildTapTarget"/> / pinger shapes use. Mirrors
+    /// <see cref="BuildPinger"/>'s 1..1 single-target request.
+    /// </summary>
+    private static ActivatedAbility BuildReturnToHandTarget(
+        List<ICost> costs,
+        string targetFilter,
+        Permanent bearer,
+        Player controller)
+    {
+        var creatureOnly = string.Equals(
+            targetFilter, "creature", StringComparison.OrdinalIgnoreCase);
+
+        ActivatedAbility? ability = null;
+        var bounceEffect = new Effect(
+            $"Granted: return target {targetFilter} to its owner's hand",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 701.20 — bounce the CHOSEN permanent to ITS OWNER's hand. A
+                // non-permanent chosen target (shape-only path) silently no-ops.
+                // CR 608.2b — re-check legality at resolution: the chosen object
+                // must still be a battlefield permanent that still matches the
+                // printed filter ("creature" ⇒ still a creature), else fizzle.
+                if (ability.ChosenTargets[0][0] is not Permanent chosen) return;
+                if (chosen.Zone != ZoneType.Battlefield) return;
+                if (creatureOnly && !chosen.HasType(CardType.Creature)) return;
+
+                // The bounce lands in the TARGET's OWNER's hand, never the
+                // bearer's controller's — Fx.BounceToHand reads chosen.Owner.
+                Fx.BounceToHand(chosen);
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { bounceEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: creatureOnly ? "target creature" : "target permanent",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    // Bouncing a permanent is a tempo / removal-like play.
+                    Intent: BotIntent.Removal),
             });
 
         return ability;

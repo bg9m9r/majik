@@ -1763,6 +1763,77 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_ReturnToHandTarget_RehomesBounceToBearerAndChosensOwner()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability bounces a chosen permanent:
+        // "{U}{U}{U}, {T}: Return target permanent to its owner's hand." (Temporal
+        // Adept). Re-homing is sound: the BEARER is only the source / cost-payer
+        // (its own {T} cost taps it); the effect returns the CHOSEN target to ITS
+        // OWNER's hand via Fx.BounceToHand (CR 701.20) — never the exiled imprinted
+        // card and never the bearer (the verb has no "this creature" / source
+        // reference, and bounces to the TARGET's owner, not the bearer's
+        // controller).
+        var adept = new Creature("Adept Stub", "1UU", 1, 1);
+        adept.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(adept);
+        adept.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // An opposing creature for the bearer to bounce — owned by Bob, so it must
+        // return to BOB's hand, not Alice's (the bearer's controller).
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2);
+        enemy.SetOwner(bob);
+        enemy.ChangeController(bob);
+        bob.Zones.Library.AddCard(enemy);
+        zones.MoveCard(enemy, ZoneType.Library, ZoneType.Battlefield, bob);
+        enemy.Zone.Should().Be(ZoneType.Battlefield, "the chosen target starts on the battlefield");
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Adept Stub",
+                "{U}{U}{U}, {T}: Return target permanent to its owner's hand.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), adept);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's return-to-hand ability");
+        var bounce = granted[0];
+        bounce.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        bounce.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("U"));
+        bounce.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        bounce.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target permanent"));
+
+        // Resolving with the enemy chosen returns the ENEMY to BOB's hand, not the
+        // bearer, not the exiled card, and not Alice's hand.
+        bounce.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { enemy } });
+        foreach (var effect in bounce.Effects) effect.Execute();
+
+        enemy.Zone.Should().Be(ZoneType.Hand,
+            "the re-homed return-to-hand ability bounces the CHOSEN permanent (CR 701.20)");
+        bob.Zones.Hand.GetCards().Should().Contain(enemy,
+            "the bounce lands in the TARGET's OWNER's hand (Bob), not the bearer's controller's");
+        alice.Zones.Hand.GetCards().Should().NotContain(enemy,
+            "the bounce does not go to the bearer's controller's hand");
+        bearer.Zone.Should().Be(ZoneType.Battlefield,
+            "the bearer (mere source) is not bounced — only its {T} cost taps it");
+        adept.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted card is never touched by the granted ability");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);
