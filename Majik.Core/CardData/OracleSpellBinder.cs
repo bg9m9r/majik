@@ -188,6 +188,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.InfernalPlungeTemplate(),
             new SpellTemplates.Templates.Bespoke.FlingLikeTemplate(),
             new SpellTemplates.Templates.Bespoke.KuldothaRebirthTemplate(),
+            new SpellTemplates.Templates.Bespoke.GleefulDemolitionTemplate(),
             new SpellTemplates.Templates.Bespoke.IchorExplosionTemplate(),
             new SpellTemplates.Templates.Bespoke.LifesLegacyTemplate(),
             new SpellTemplates.Templates.Bespoke.TormentedThoughtsTemplate(),
