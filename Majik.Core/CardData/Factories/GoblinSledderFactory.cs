@@ -133,6 +133,13 @@ public sealed class SacrificeAGoblinCost : ICost, IRebindableCost
     private readonly Creature _self;
     private readonly Player _controller;
 
+    /// <summary>The source creature this cost is rooted at (the ability's
+    /// own permanent). Exposed so a re-home (Agatha's Soul Cauldron via
+    /// <see cref="ActivatedAbility.RebindTo"/>) can be verified to have
+    /// swapped the captured source onto the new bearer (CR 707.2 / 613.1f);
+    /// mirrors <see cref="Majik.Core.Costs.SacrificeSelfCost.Self"/>.</summary>
+    public Creature Self => _self;
+
     /// <summary>The Goblin actually sacrificed once <see cref="Pay"/>
     /// succeeded. Null before payment. Exposed for downstream effects /
     /// tests that want to inspect the chosen sacrifice.</summary>

@@ -5016,4 +5016,289 @@ public class AgathasSoulCauldronTests
             .Should().BeFalse(
                 "'Another' is measured against the BEARER (CR 707.2 / 608.2b)");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-migration-utility-creature-tail-batch — re-home tests for
+    // the already-migrated (RebindSafe + ResolutionContext.Source) audit-grep
+    // tail factories that lacked a dedicated Agatha re-home case. Each closes the
+    // deferral's "one AgathasSoulCauldronTests re-home case per card + a
+    // resolves-on-own-source-when-not-rebound fallback":
+    //   - Pashalik Mons      — {3}{R}, Sacrifice a Goblin: create two Goblin tokens
+    //   - Fanatical Firebrand — {T}, Sacrifice this creature: 1 damage to any target
+    //   - Guide of Souls     — {E}{E}: target creature gains flying + +1/+1
+    // All three carry a NON-reconstructable cost (sac-a-Goblin / sac-self / pay
+    // energy) outside the OracleActivatedAbilityBinder set, so RebindTo of the
+    // REAL ability is the only sound re-home. OracleStub() returns nothing so the
+    // grant cannot come from the oracle-rebuild fallback.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_PashalikMons_TokenMakerToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // {3}{R}, Sacrifice a Goblin: create two 1/1 red Goblin tokens ability is
+        // RebindSafe (the effect reads ResolutionContext.Source's controller; the
+        // SacrificeAGoblinCost re-homes via IRebindableCost).
+        var mons = PashalikMonsFactory.Create(alice, zones);
+        mons.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility
+                && a.Costs.OfType<SacrificeAGoblinCost>().Any())
+            .RebindSafe.Should().BeTrue(
+                "the migrated Pashalik Mons token-maker reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(mons);
+        mons.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), mons);
+
+        var tokenMaker = GrantedActivated(bearer).Single(a =>
+            a.Costs.OfType<SacrificeAGoblinCost>().Any());
+        tokenMaker.Source.Should().BeSameAs(bearer, "the ability is re-homed to the BEARER (CR 707.2)");
+        tokenMaker.RebindSafe.Should().BeTrue("RebindTo preserves the re-source-safe provenance");
+
+        // STAGE 1 — the SacrificeAGoblinCost re-homes to the BEARER (IRebindableCost).
+        tokenMaker.Costs.OfType<SacrificeAGoblinCost>()
+            .Single().Self.Should().BeSameAs(bearer,
+                "the sacrifice-a-Goblin cost re-homes to the bearer (IRebindableCost.RebindTo)");
+
+        // Resolving the re-homed token-maker mints two 1/1 red Goblin tokens under
+        // the BEARER's controller (Alice) — ResolutionContext.Source = bearer.
+        var goblinsBefore = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+        var goblinsAfter = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        goblinsAfter.Should().Be(goblinsBefore + 2,
+            "the re-homed ability minted two 1/1 red Goblin tokens under the bearer's controller");
+        mons.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted Pashalik Mons stays untouched in exile under the Cauldron");
+    }
+
+    [Fact]
+    public async Task BespokePashalikTokenMaker_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect mints tokens under its OWN source's
+        // controller on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var mons = PashalikMonsFactory.Create(alice, zones);
+        alice.Zones.Library.AddCard(mons);
+        zones.MoveCard(mons, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var tokenMaker = mons.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility && a.Costs.OfType<SacrificeAGoblinCost>().Any());
+
+        var goblinsBefore = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        goblinsBefore.Should().Be(1, "Pashalik Mons himself is the only Goblin before resolution");
+
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+
+        var goblinsAfter = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Goblin));
+        goblinsAfter.Should().Be(goblinsBefore + 2,
+            "resolving the un-rebound token-maker mints two tokens under Mons' own controller");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_FanaticalFirebrand_SacPingToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // {T}, Sacrifice this creature: 1 damage to any target ability is
+        // RebindSafe (the closure sacrifices ResolutionContext.Source and sources
+        // the damage from it).
+        var firebrand = FanaticalFirebrandFactory.Create(alice, bus);
+        var realAbilities = firebrand.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Fanatical Firebrand has exactly one non-mana activated ability — the sac-ping");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Fanatical Firebrand ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(firebrand);
+        firebrand.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), firebrand);
+
+        var ping = GrantedActivated(bearer).Single();
+        ping.Source.Should().BeSameAs(bearer, "the re-homed ping is sourced on the BEARER (CR 707.2)");
+        ping.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // STAGE 1 — both the {T} and the self-sacrifice AdditionalCosts re-home to
+        // the BEARER (the sacrifice now targets the bearer, never the exiled card).
+        ping.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().Contain(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Sacrifice
+                && c.Description.Contains(bearer.Name),
+                "the self-sacrifice cost re-homes to the bearer (RebindTo Stage 1)");
+
+        // A creature to absorb the ping; resolving sacrifices the BEARER and deals
+        // 1 damage to the chosen target — the exiled Firebrand is untouched.
+        var victim = new Creature("Victim", "1G", 4, 4);
+        victim.SetOwner(alice);
+        alice.Zones.Library.AddCard(victim);
+        zones.MoveCard(victim, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+        await ping.ResolveAsync(agent: null, game: null);
+
+        victim.Damage.Should().Be(1, "the re-homed sac-ping deals 1 damage to the chosen target");
+        bearer.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed ability sacrifices the BEARER (RebindTo Stage 1), not the exiled Firebrand");
+        firebrand.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted Fanatical Firebrand stays untouched in exile under the Cauldron");
+    }
+
+    [Fact]
+    public async Task BespokeSacPing_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect sacrifices its OWN source on the normal
+        // (un-rebound) resolution path — ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var firebrand = FanaticalFirebrandFactory.Create(alice, bus);
+        alice.Zones.Library.AddCard(firebrand);
+        zones.MoveCard(firebrand, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var ping = firebrand.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var victim = new Creature("Victim", "1G", 4, 4);
+        victim.SetOwner(alice);
+        alice.Zones.Library.AddCard(victim);
+        zones.MoveCard(victim, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        ping.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { victim } });
+        await ping.ResolveAsync(agent: null, game: null);
+
+        victim.Damage.Should().Be(1,
+            "the un-rebound sac-ping deals 1 damage to the chosen target");
+        firebrand.Zone.Should().Be(ZoneType.Graveyard,
+            "resolving the un-rebound ability sacrifices its own source");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_GuideOfSouls_FlyingPumpGrantToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // {E}{E}: target creature gains flying and +1/+1 ability is RebindSafe
+        // (it captures no source — the grant lands on ctx.ChosenTargets). The
+        // bespoke PayEnergyCost is OUTSIDE the OracleActivatedAbilityBinder
+        // reconstructable set, so RebindTo of the real ability is the only sound
+        // re-home.
+        var guide = GuideOfSoulsFactory.Create(alice);
+        var realAbilities = guide.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Guide of Souls has exactly one non-mana activated ability — the {E}{E} flying+pump grant");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Guide of Souls ability is RebindSafe");
+        alice.Zones.Graveyard.AddCard(guide);
+        guide.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), guide);
+
+        var grant = GrantedActivated(bearer).Single();
+        grant.Source.Should().BeSameAs(bearer, "the re-homed grant is sourced on the BEARER (CR 707.2)");
+        grant.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        grant.Costs.OfType<PayEnergyCost>().Should().ContainSingle(
+            "the bespoke PayEnergyCost passes through RebindTo (no captured source)");
+
+        // A creature on the battlefield to receive the targeted grant.
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        var allyPowerBefore = ally.GetPower();
+        await grant.ResolveAsync(agent: null, game: null);
+
+        ally.GetPower().Should().Be(allyPowerBefore + 1,
+            "the re-homed grant raises the CHOSEN creature's power by +1");
+        effects.Compute(ally).Keywords
+            .Any(k => string.Equals(k, "Flying", System.StringComparison.OrdinalIgnoreCase))
+            .Should().BeTrue("the re-homed grant gives the chosen creature Flying");
+        guide.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted Guide of Souls stays untouched in exile under the Cauldron");
+
+        // CR 514.2 — the granted flying + pump expire at cleanup.
+        effects.ExpireEndOfTurn();
+        ally.GetPower().Should().Be(allyPowerBefore,
+            "the re-homed grant expires at end of turn");
+    }
+
+    [Fact]
+    public async Task BespokeFlyingPumpGrant_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect grants flying + pump to the chosen target on
+        // the normal (un-rebound) resolution path — independent of the source.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var guide = GuideOfSoulsFactory.Create(alice);
+        alice.Zones.Library.AddCard(guide);
+        zones.MoveCard(guide, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var grant = guide.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        var allyPowerBefore = ally.GetPower();
+        await grant.ResolveAsync(agent: null, game: null);
+
+        ally.GetPower().Should().Be(allyPowerBefore + 1,
+            "the un-rebound grant raises the chosen creature's power by +1");
+        effects.Compute(ally).Keywords
+            .Any(k => string.Equals(k, "Flying", System.StringComparison.OrdinalIgnoreCase))
+            .Should().BeTrue("the un-rebound grant gives the chosen creature Flying");
+    }
 }
