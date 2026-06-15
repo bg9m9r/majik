@@ -56,6 +56,17 @@ public static class KnownPartialImplementations
                 + "RebindTo path picks them up automatically. Targeting + Legendary supertype + "
                 + "mana-colour-substitution done (#2497)."),
 
+            ["Avatar of Woe"] = new CardGap(
+                CardGapSeverity.Partial,
+                "Activated ability fully implemented: '{T}: Destroy target creature. It can't be "
+                + "regenerated.' (DestroyNoRegeneration — CR 701.7 / 701.15 / 702.12b), and it is "
+                + "re-source-safe (Agatha re-homes the real ability via RebindTo; the shape is also "
+                + "reconstructed by OracleActivatedAbilityBinder's DestroyTargetRegex). Residual "
+                + "(NOT emitted broken): the conditional cost reduction ('costs {6} less if ten or "
+                + "more creature cards in all graveyards', CR 601.2f) is not applied, and the Fear "
+                + "keyword is stamped (inspectable) but Fear's block restriction (CR 702.36) is not "
+                + "yet enforced in BlockLegality."),
+
             // Tameshi, Reality Architect — FULL as of GAP 2 (per-activation X
             // ledger). Both halves are now emitted: the once-per-turn noncreature-
             // bounce draw trigger AND the "{X}{W}, Return a land you control to
