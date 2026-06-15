@@ -1079,6 +1079,82 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_KeywordGrantOther_GenericKeyword_BareTargetForm_RehomesToChosenCreature()
+    {
+        // The deferral asks for the GENERIC any-keyword to-TARGET shape via the
+        // existing grant_keyword_until_eot_target verb, distinct from the
+        // Heliod-specific lifelink rebind (which is the case the lifelink test
+        // above pins). This case proves the same OracleActivatedAbilityBinder
+        // shape (KeywordGrantOtherRegex / TryBuildKeywordGrantOther) is keyword-
+        // GENERIC — it re-homes a NON-lifelink keyword (TRAMPLE) — AND covers the
+        // bare "Target creature gains <keyword> …" form (no "Another" prefix), so
+        // the chosen target may even be the bearer itself. Re-homing is sound: the
+        // SOURCE / cost-payer is the BEARER, the GrantKeywordUntilEndOfTurnEffect
+        // (CR 613.1f Layer 6) lands on the CHOSEN target creature's own
+        // ActiveEffects, never the exiled imprinted card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{1}{G}: Target creature gains trample until end of
+        // turn." (bare form, no "Another" — a generic on-demand-lord shape).
+        var lordStub = new Creature("Lord Stub", "2G", 4, 4);
+        lordStub.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(lordStub);
+        lordStub.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A separate creature on the battlefield to receive the keyword grant.
+        var ally = new Creature("Ally Bear", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Lord Stub",
+                "{1}{G}: Target creature gains trample until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), lordStub);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's GENERIC targeted keyword grant");
+        var grant = granted[0];
+        grant.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        grant.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("G"));
+        grant.TargetRequests.Should().ContainSingle(t => t.Description.Contains("target creature"),
+            "a targeted keyword grant requires a 1..1 target-creature request");
+        // The bare form (no "Another") does NOT exclude the bearer.
+        grant.TargetRequests[0].Description.Should().NotContain("another",
+            "the bare \"Target creature\" form has no \"Another\" restriction");
+
+        // The ally has no trample yet.
+        effects.Compute(ally).Keywords.Should().NotContain("Trample");
+
+        // Resolving with the ALLY chosen grants the ALLY trample (CR 613.1f
+        // Layer 6) — the GENERIC (non-lifelink) keyword lands on the chosen
+        // creature via the existing grant_keyword_until_eot_target verb.
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+        foreach (var effect in grant.Effects) effect.Execute();
+        effects.Compute(ally).Keywords.Should().Contain("Trample",
+            "the re-homed GENERIC keyword grant gives the CHOSEN creature the keyword");
+        effects.Compute(bearer).Keywords.Should().NotContain("Trample",
+            "the bearer (mere source) does not gain the keyword — only the chosen target");
+
+        // CR 514.2 — the granted keyword expires at cleanup.
+        effects.ExpireEndOfTurn();
+        effects.Compute(ally).Keywords.Should().NotContain("Trample",
+            "the granted keyword expires at end of turn");
+    }
+
+    [Fact]
     public void Grant_NonMana_Pinger_RehomesTapAndDamageToBearer()
     {
         var alice = new Player("Alice", 20);
