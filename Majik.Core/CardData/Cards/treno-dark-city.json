@@ -1,0 +1,9 @@
+{
+  "name": "Treno, Dark City",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
