@@ -2313,6 +2313,100 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_ReturnFromGraveyardToHand_RehomesGyScopeToBearersController()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability returns a card from the
+        // controller's OWN graveyard to hand:
+        // "{2}{G}, {T}: Return target enchantment card from your graveyard to
+        // your hand." (Dowsing Shaman). Re-homing is sound: the BEARER is only
+        // the source / cost-payer (its own {T} cost taps it); the "your
+        // graveyard" scope reads the BEARER's CONTROLLER's graveyard (CR 109.5 /
+        // 400.7 — "your" = the ability's controller), never the exiled imprinted
+        // card's graveyard, and the chosen card returns to that controller's hand
+        // via Fx.ReturnFromGraveyardToHand (CR 701.20).
+        var shaman = new Creature("Dowser Stub", "4G", 3, 4);
+        shaman.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(shaman);
+        shaman.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A matching enchantment card in ALICE's (the bearer's controller's)
+        // graveyard — the only sound recursion target.
+        var aura = new Enchantment("Spirit Loop", "1W");
+        aura.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(aura);
+        aura.SetZone(ZoneType.Graveyard);
+
+        // A matching enchantment in BOB's graveyard — must NOT be a candidate,
+        // because "your graveyard" scopes to the ability's controller (Alice).
+        var enemyAura = new Enchantment("Enemy Loop", "1B");
+        enemyAura.SetOwner(bob);
+        bob.Zones.Graveyard.AddCard(enemyAura);
+        enemyAura.SetZone(ZoneType.Graveyard);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Dowser Stub",
+                "{2}{G}, {T}: Return target enchantment card from your graveyard to your hand.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), shaman);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's graveyard-recursion ability");
+        var recur = granted[0];
+        recur.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        recur.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("G"));
+        recur.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+
+        var req = recur.TargetRequests.Should().ContainSingle().Subject;
+        req.Description.Should().Contain("graveyard");
+
+        // The candidate gatherer scopes to the BEARER's controller's graveyard,
+        // filtered to enchantment cards — Alice's aura is a candidate, Bob's is
+        // NOT (CR 109.5 "your graveyard"), and a non-enchantment is excluded.
+        var ctx = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+        var candidates = req.CandidateGatherer!(ctx);
+        candidates.Should().Contain(aura,
+            "the matching enchantment in the BEARER's controller's graveyard is a candidate");
+        candidates.Should().NotContain(enemyAura,
+            "'your graveyard' scopes to the ability's controller, not the opponent");
+        candidates.Should().NotContain((object)shaman,
+            "a non-enchantment card in the graveyard is excluded by the printed filter");
+
+        // Resolving with Alice's aura chosen returns it to ALICE's hand.
+        recur.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { aura } });
+        foreach (var effect in recur.Effects) effect.Execute();
+
+        aura.Zone.Should().Be(ZoneType.Hand,
+            "the re-homed ability returns the CHOSEN graveyard card to hand (CR 701.20)");
+        alice.Zones.Hand.GetCards().Should().Contain(aura,
+            "the card returns to the BEARER's controller's hand");
+        alice.Zones.Graveyard.GetCards().Should().NotContain(aura,
+            "the card left the graveyard");
+        shaman.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted card is never touched by the granted ability");
+    }
+
+    [Fact]
     public void Grant_NonMana_UnparseableBespokeAbility_GrantsNothing()
     {
         var alice = new Player("Alice", 20);

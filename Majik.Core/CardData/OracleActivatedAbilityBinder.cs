@@ -430,6 +430,40 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Return target (creature|permanent) to its owner's hand\.$",
         RegexOptions.IgnoreCase);
 
+    // The OPEN, source-independent card-type forms a graveyard-recursion ability
+    // ("Return target <X> card from your graveyard to your hand.") may reference.
+    // Each maps to an unambiguous card-type membership predicate over a card in a
+    // graveyard, with NO dependence on the source card's identity, so the
+    // candidate filter reconstructs soundly (CR 602.1c). The bare "card" form (no
+    // type word) matches any card. A typed sub-filter ("Zombie card", "Arcane
+    // card", "basic land card") that is NOT a plain card-type test is NOT matched
+    // — its candidate filter isn't reconstructed here, consistent with the
+    // restricted-target soundness boundary of the battlefield shapes. The leading
+    // optional group captures the type word ("" for the bare "card" form).
+    private const string GraveyardCardTypeForm =
+        @"(?:(creature or planeswalker|artifact or enchantment|instant or sorcery"
+        + @"|creature|artifact|enchantment|land|planeswalker|instant|sorcery|permanent) )?";
+
+    // "{cost}: Return target <X> card from your graveyard to your hand." (CR 701.20.)
+    // The graveyard->hand graveyard-recursion sibling of the battlefield->hand
+    // ReturnToHandTargetRegex bounce. A self-source graveyard-recursion body is a
+    // classic activated card-advantage shape on real creature cards (Dowsing
+    // Shaman's "{2}{G}, {T}: Return target enchantment card from your graveyard to
+    // your hand."; Lord of the Undead; Salvage Scout). Sound to re-home onto ANY
+    // permanent bearer: the BEARER is ONLY the source / cost-payer (its own
+    // {T}/mana cost); the "your graveyard" scope (CR 109.5 / 400.7 — "your" = the
+    // ability's controller) reads the BEARER's CONTROLLER's graveyard, never the
+    // exiled imprinted card's graveyard, and the chosen card returns to that
+    // controller's hand via Fx.ReturnFromGraveyardToHand — never the exiled card.
+    // Only the OPEN card-type forms (GraveyardCardTypeForm) are reconstructed; a
+    // typed sub-filter ("Zombie card", "basic land card", "Arcane card") is
+    // skipped as unsound, and a restricted cost token skips the clause. Group 1 =
+    // cost, group 2 = the optional card-type word (empty for the bare "card" form).
+    private static readonly Regex ReturnFromGraveyardToHandRegex = new(
+        @"^(" + CostList + @")\s*:\s*Return target " + GraveyardCardTypeForm
+        + @"card from your graveyard to your hand\.$",
+        RegexOptions.IgnoreCase);
+
     // "{cost}: Target creature you control gains protection from the color of
     // your choice until end of turn." (CR 702.16 / 601.2c.) Mother of Runes'
     // (and Giver of Runes / any "protection from <chosen color>" body's) shape.
@@ -912,6 +946,16 @@ public static class OracleActivatedAbilityBinder
                 if (costs == null) continue; // unsound cost token — skip
                 result.Add(BuildReturnToHandTarget(
                     costs, returnToHand.Groups[2].Value, bearer, controller));
+                continue;
+            }
+
+            var returnFromGy = ReturnFromGraveyardToHandRegex.Match(line);
+            if (returnFromGy.Success)
+            {
+                var costs = TryBuildCostList(returnFromGy.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                result.Add(BuildReturnFromGraveyardToHand(
+                    costs, returnFromGy.Groups[2].Value, bearer, controller));
                 continue;
             }
 
@@ -2119,6 +2163,122 @@ public static class OracleActivatedAbilityBinder
 
         return ability;
     }
+
+    /// <summary>
+    /// Build a return-from-graveyard-to-hand ability: "{cost}: Return target
+    /// &lt;X&gt; card from your graveyard to your hand." (CR 701.20.) The
+    /// graveyard-recursion sibling of <see cref="BuildReturnToHandTarget"/>'s
+    /// battlefield bounce. Re-homed so the BEARER is ONLY the source / cost-payer
+    /// (its own {T}/mana cost); the "your graveyard" scope (CR 109.5 / 400.7 —
+    /// "your" = the ability's controller) reads the BEARER's CONTROLLER's
+    /// graveyard, never the exiled imprinted card's, and the chosen card returns to
+    /// that controller's hand via
+    /// <see cref="Fx.ReturnFromGraveyardToHand(ICard, Majik.Core.Services.ZoneService?)"/>
+    /// — never the exiled imprinted card. The bearer need NOT be a creature (any
+    /// permanent bearer can pay to recur a chosen card), so this does not gate on
+    /// <see cref="Creature"/>. <paramref name="cardTypeForm"/> is the optional
+    /// printed type word ("enchantment", "creature", "instant or sorcery", …; empty
+    /// for the bare "card" form), mapped to a source-independent card-type
+    /// predicate. CR 608.2b — at resolution the chosen object is re-checked: it
+    /// must still be a card in the controller's graveyard whose type still matches
+    /// the printed filter, otherwise the ability fizzles cleanly. The candidate
+    /// gatherer scopes to the controller's own graveyard, filtered by the printed
+    /// type — mirroring <see cref="BuildProtectionGrant"/>'s controller-scoped
+    /// gatherer.
+    /// </summary>
+    private static ActivatedAbility BuildReturnFromGraveyardToHand(
+        List<ICost> costs,
+        string cardTypeForm,
+        Permanent bearer,
+        Player controller)
+    {
+        Func<ICard, bool> predicate = GraveyardCardFormPredicate(cardTypeForm);
+        var description = string.IsNullOrEmpty(cardTypeForm)
+            ? "target card in your graveyard"
+            : "target " + cardTypeForm.ToLowerInvariant() + " card in your graveyard";
+
+        ActivatedAbility? ability = null;
+        var returnEffect = new Effect(
+            $"Granted: return {description} to your hand",
+            () =>
+            {
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+
+                // CR 701.20 — return the CHOSEN card from the controller's
+                // graveyard to that controller's hand. CR 608.2b — re-check
+                // legality at resolution: the chosen object must still be a card
+                // in the controller's graveyard that still matches the printed
+                // filter, else fizzle (shape-only / illegal chosen target no-ops).
+                if (ability.ChosenTargets[0][0] is not ICard chosen) return;
+                if (chosen.Zone != ZoneType.Graveyard) return;
+                if (!ReferenceEquals(chosen.Owner, controller)) return;
+                if (!predicate(chosen)) return;
+
+                // Fx.ReturnFromGraveyardToHand reads chosen.Owner — which is the
+                // controller (we re-checked above), so the card returns to the
+                // BEARER's controller's hand, never the exiled imprinted card.
+                Fx.ReturnFromGraveyardToHand(chosen);
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { returnEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: description,
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    // Recurring a card from the graveyard is card advantage.
+                    Intent: BotIntent.Draw,
+                    // CR 602.1c / 109.5 — "your graveyard": the candidates are
+                    // exactly the BEARER's controller's graveyard cards matching
+                    // the printed type (re-sourced to the controller, never the
+                    // exiled imprinted card's graveyard).
+                    CandidateGatherer: _ => controller.Zones.Graveyard.GetCards()
+                        .Where(predicate)
+                        .Cast<object>()
+                        .ToList()),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Map an OPEN graveyard-card-type form (the captured group of
+    /// <see cref="ReturnFromGraveyardToHandRegex"/>) to a source-independent
+    /// card-type membership predicate. The bare "" form (the printed "Return
+    /// target card …") matches any card. Each typed form is an unambiguous type
+    /// test (CR 602.1c) with no dependence on the source card's identity, so it
+    /// re-homes soundly. Defensive default (an unrecognised form) matches any card.
+    /// </summary>
+    private static Func<ICard, bool> GraveyardCardFormPredicate(string cardTypeForm)
+        => cardTypeForm.ToLowerInvariant() switch
+        {
+            "" => _ => true,
+            "creature" => c => c.HasType(CardType.Creature),
+            "artifact" => c => c.HasType(CardType.Artifact),
+            "enchantment" => c => c.HasType(CardType.Enchantment),
+            "land" => c => c.HasType(CardType.Land),
+            "planeswalker" => c => c.HasType(CardType.Planeswalker),
+            "instant" => c => c.HasType(CardType.Instant),
+            "sorcery" => c => c.HasType(CardType.Sorcery),
+            "permanent" => c => c.HasType(CardType.Creature) || c.HasType(CardType.Artifact)
+                || c.HasType(CardType.Enchantment) || c.HasType(CardType.Land)
+                || c.HasType(CardType.Planeswalker),
+            "creature or planeswalker" =>
+                c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker),
+            "artifact or enchantment" =>
+                c => c.HasType(CardType.Artifact) || c.HasType(CardType.Enchantment),
+            "instant or sorcery" =>
+                c => c.HasType(CardType.Instant) || c.HasType(CardType.Sorcery),
+            _ => _ => true,
+        };
 
     /// <summary>
     /// Map an OPEN permanent-target form (the captured group of
