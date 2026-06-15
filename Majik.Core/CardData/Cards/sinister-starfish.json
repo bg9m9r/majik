@@ -1,0 +1,19 @@
+{
+  "name": "Sinister Starfish",
+  "types": ["Creature"],
+  "subtypes": ["Starfish"],
+  "manaCost": "{1}{B}",
+  "power": 0,
+  "toughness": 3,
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}

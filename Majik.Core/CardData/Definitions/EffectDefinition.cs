@@ -27,6 +27,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DealDamageToTriggeringPlayerEffectDef), "deal_damage_to_triggering_player")]
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
+[JsonDerivedType(typeof(MillSelfEffectDef), "mill_self")]
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
 [JsonDerivedType(typeof(ExileTargetEffectDef), "exile_target")]
@@ -252,6 +253,22 @@ public sealed class DrawCardEffectDef : EffectDefinition
 /// Underground Mortuary path).
 /// </summary>
 public sealed class SurveilSelfEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Mill N" — the controller puts the top N cards of their library into
+/// their graveyard (CR 701.13). Wraps the existing
+/// <see cref="Majik.Core.Keywords.MillAction"/> keyword action via
+/// <see cref="Majik.Core.Primitives.Fx.Mill"/> — exact parallel of
+/// <see cref="SurveilSelfEffectDef"/> but with no agent decision (the cards
+/// move unconditionally). Canonical case: a "{cost}: Mill a card."
+/// graveyard-fuel creature (Excavated Wall, Molt Tender, Skull Prophet).
+/// Milling more cards than remain mills all of them; it does NOT by itself
+/// cause the loss (that comes from drawing from an empty library — CR 104.3c).
+/// </summary>
+public sealed class MillSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
 }

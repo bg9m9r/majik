@@ -1,0 +1,21 @@
+{
+  "name": "Excavated Wall",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Wall"],
+  "manaCost": "{1}",
+  "power": 0,
+  "toughness": 4,
+  "keywords": ["Defender"],
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "mill_self", "amount": 1 }
+      ]
+    }
+  ]
+}

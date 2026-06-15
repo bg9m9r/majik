@@ -1696,6 +1696,176 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_SurveilSelf_RehomesSurveilToBearerController()
+    {
+        // agatha-oracle-shape-mill-or-surveil-tap-cost: the
+        // OracleActivatedAbilityBinder now reconstructs the self-surveil shape
+        // "{cost}: Surveil N." (Sinister Starfish "{T}: Surveil 1."). Re-homing is
+        // sound: surveil references the BEARER-CONTROLLER's own library (CR 701.42
+        // / 613.1f), never the exiled card. With no agent registered the default
+        // is all-peeked-to-graveyard (matches CardDefRuntime.BuildSurveilSelfEffect).
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{T}: Surveil 1."
+        var starfish = new Creature("Starfish Stub", "1B", 0, 3);
+        starfish.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(starfish);
+        starfish.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A card on top of Alice's library for the granted surveil to look at.
+        var topCard = new Card("Top Card", "");
+        topCard.SetOwner(alice);
+        alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Starfish Stub", "{T}: Surveil 1.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), starfish);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's surveil ability");
+        var surveilAbility = granted[0];
+        surveilAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        surveilAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        surveilAbility.TargetRequests.Should().BeEmpty(
+            "\"surveil N\" targets nothing — the controller's own library");
+
+        // Activating it surveils the BEARER-CONTROLLER's library. With no agent
+        // the default sends the peeked card to the graveyard.
+        var gyBefore = alice.Zones.Graveyard.GetCards().Count();
+        foreach (var effect in surveilAbility.Effects) effect.Execute();
+        alice.Zones.Graveyard.GetCards().Should().Contain(topCard,
+            "the no-agent surveil default puts the peeked card into the controller's graveyard");
+        alice.Zones.Graveyard.GetCards().Count().Should().Be(gyBefore + 1,
+            "exactly one card was surveiled to the graveyard");
+    }
+
+    [Fact]
+    public void Grant_NonMana_MillSelf_RehomesMillToBearerController()
+    {
+        // agatha-oracle-shape-mill-or-surveil-tap-cost: the
+        // OracleActivatedAbilityBinder now reconstructs the self-mill shape
+        // "{cost}: Mill N." (Excavated Wall "{1}, {T}: Mill a card."). Re-homing is
+        // sound: mill references the BEARER-CONTROLLER's own library (CR 701.13 /
+        // 613.1f), never the exiled card — no agent decision needed.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: "{1}, {T}: Mill a card."
+        var wall = new Creature("Wall Stub", "1", 0, 4);
+        wall.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(wall);
+        wall.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var topCard = new Card("Top Card", "");
+        topCard.SetOwner(alice);
+        alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Wall Stub", "{1}, {T}: Mill a card.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), wall);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's mill ability");
+        var millAbility = granted[0];
+        millAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        millAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("1"));
+        millAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        millAbility.TargetRequests.Should().BeEmpty(
+            "\"mill N\" targets nothing — the controller's own library");
+
+        // Activating it mills the BEARER-CONTROLLER's library.
+        foreach (var effect in millAbility.Effects) effect.Execute();
+        alice.Zones.Graveyard.GetCards().Should().Contain(topCard,
+            "the re-homed mill puts the top of the controller's library into their graveyard");
+    }
+
+    [Fact]
+    public void Grant_NonMana_TargetPlayerMill_RehomesMillToChosenPlayer()
+    {
+        // agatha-oracle-shape-mill-or-surveil-tap-cost: the
+        // OracleActivatedAbilityBinder now reconstructs the TARGETED-player mill
+        // shape "{cost}: Target player mills N." The CHOSEN player mills — re-homing
+        // is sound because mill references the chosen player's OWN library (Fx.Mill
+        // on ChosenTargets, CR 701.13 / 613.1f), never the exiled card. The BEARER
+        // is only the source / cost-payer.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var grinder = new Creature("Grinder Stub", "1U", 1, 1);
+        grinder.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(grinder);
+        grinder.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // Two cards on top of BOB's library — the chosen player mills from their
+        // OWN library, not the controller's.
+        var bobsTop = new Card("Bob's Top", "");
+        bobsTop.SetOwner(bob);
+        bob.Zones.Library.AddCard(bobsTop);
+        bobsTop.SetZone(ZoneType.Library);
+        var bobsSecond = new Card("Bob's Second", "");
+        bobsSecond.SetOwner(bob);
+        bob.Zones.Library.AddCard(bobsSecond);
+        bobsSecond.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Grinder Stub", "{T}: Target player mills two cards.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), grinder);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's target-player-mill ability");
+        var millAbility = granted[0];
+        millAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        millAbility.TargetRequests.Should().ContainSingle(
+            t => t.Description.Contains("target player"),
+            "\"target player mills N\" requests a single target player");
+
+        // Choosing BOB and resolving mills BOB's library, not Alice's.
+        millAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bob } });
+        var aliceGyBefore = alice.Zones.Graveyard.GetCards().Count();
+        foreach (var effect in millAbility.Effects) effect.Execute();
+        bob.Zones.Graveyard.GetCards().Should().Contain(new[] { bobsTop, bobsSecond },
+            "the re-homed target-player mill mills the CHOSEN player's own library");
+        alice.Zones.Graveyard.GetCards().Count().Should().Be(aliceGyBefore,
+            "the controller's library is untouched — only the chosen target player mills");
+    }
+
+    [Fact]
     public void Grant_NonMana_Fight_RehomesFightToBearerAndChosenTarget()
     {
         var alice = new Player("Alice", 20);
