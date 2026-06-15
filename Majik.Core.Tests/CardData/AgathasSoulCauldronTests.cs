@@ -1635,6 +1635,67 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_ScrySelf_RehomesScryToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability is a tap-cost scry:
+        // "{T}: Scry 2." (a common self-source library-smoothing shape — a
+        // {T}: Scry payoff). Re-homing is sound: scry references the
+        // BEARER-CONTROLLER's own library (Fx.Scry), never the exiled card —
+        // there is no "this creature" / source reference at all, so it is as
+        // sound a re-home as draw / gain-life (CR 701.20 / 613.1f). The agent
+        // decision is read off the live ResolutionContext (PR #2696's
+        // declarative scry_self verb), so no source-card identity is captured.
+        var seer = new Creature("Seer Stub", "1U", 1, 1);
+        seer.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(seer);
+        seer.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Seer Stub", "{T}: Scry 2.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), seer);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's scry ability");
+        var scryAbility = granted[0];
+        scryAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        scryAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        scryAbility.TargetRequests.Should().BeEmpty(
+            "\"scry N\" targets nothing — the controller looks at their own library");
+
+        // Set up Alice's library top: A (top), B, C (bottom). The scry-2 with
+        // the no-agent default (ResolutionContext.Legacy → all-to-bottom)
+        // sends the top 2 (A, B) to the bottom; remaining order is C, A, B.
+        var cardA = new Land("Scry A") { Owner = alice, Zone = ZoneType.Library };
+        var cardB = new Land("Scry B") { Owner = alice, Zone = ZoneType.Library };
+        var cardC = new Land("Scry C") { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(cardA);
+        alice.Zones.Library.AddCard(cardB);
+        alice.Zones.Library.AddCard(cardC);
+
+        foreach (var effect in scryAbility.Effects) effect.Execute();
+
+        var library = alice.Zones.Library.GetCards().ToList();
+        library[0].Should().BeSameAs(cardC,
+            "the re-homed scry sent the top two cards to the bottom for the bearer's controller");
+        library[1].Should().BeSameAs(cardA);
+        library[2].Should().BeSameAs(cardB);
+    }
+
+    [Fact]
     public void Grant_NonMana_Fight_RehomesFightToBearerAndChosenTarget()
     {
         var alice = new Player("Alice", 20);
