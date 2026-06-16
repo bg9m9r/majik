@@ -698,6 +698,7 @@ public sealed class RemoteAgent : IPlayerAgent
     {
         ICard card => card.InstanceId == id,
         Player player => player.Id == id,
+        Majik.Core.Spells.ISpell spell => spell.Id == id,
         _ => false,
     };
 
@@ -884,10 +885,23 @@ public sealed class RemoteAgent : IPlayerAgent
                 .OfType<Player>()
                 .Select(p => new Majik.Core.Api.Dtos.PlayerCandidateDto(p.Id, p.Name, p.LifeTotal))
                 .ToList();
+            // CR 115 — ship stack spells in the pool too (counterspell "target
+            // spell"; previously dropped by the card+player-only snapshot), so the
+            // portal can make the rendered stack chip clickable as a target.
+            // ISpell.Controller is non-null (Spell ctor rejects a null controller),
+            // so Controller.Id is safe here. _pendingTargetCandidates (above) keeps
+            // the FULL pool incl. spells, so inbound validation still matches
+            // ISpell.Id (CandidateMatchesId).
+            var stackSnapshots = candidates
+                .OfType<Majik.Core.Spells.ISpell>()
+                .Select(spell => new Majik.Core.Api.Dtos.StackCandidateDto(
+                    spell.Id, spell.Card.Name, spell.Controller.Id))
+                .ToList();
             _pendingPayload = new PromptPayload(
                 Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
                 Label: request.Description,
-                PlayerCandidates: playerSnapshots.Count > 0 ? playerSnapshots : null);
+                PlayerCandidates: playerSnapshots.Count > 0 ? playerSnapshots : null,
+                StackCandidates: stackSnapshots.Count > 0 ? stackSnapshots : null);
         }
 
         try
@@ -1468,4 +1482,12 @@ public sealed record PromptPayload(
     /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
     /// <see cref="Dtos.PromptDto.PlayerCandidates"/>.
     /// </summary>
-    IReadOnlyList<Majik.Core.Api.Dtos.PlayerCandidateDto>? PlayerCandidates = null);
+    IReadOnlyList<Majik.Core.Api.Dtos.PlayerCandidateDto>? PlayerCandidates = null,
+    /// <summary>
+    /// CR 115 — spells on the stack in the resolved target pool
+    /// (id / card name / controller id). Non-null only on targets prompts whose
+    /// pool includes >= 1 stack spell; null otherwise.
+    /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
+    /// <see cref="Dtos.PromptDto.StackCandidates"/>.
+    /// </summary>
+    IReadOnlyList<Majik.Core.Api.Dtos.StackCandidateDto>? StackCandidates = null);

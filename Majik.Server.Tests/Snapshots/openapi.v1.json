@@ -2204,6 +2204,15 @@
               }
             ]
           },
+          "stackCandidates": {
+            "items": {
+              "$ref": "#/components/schemas/StackCandidateDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "surveilView": {
             "items": {
               "$ref": "#/components/schemas/CardSnapshotDto"
@@ -2316,6 +2325,27 @@
           "eligibleInstanceIds",
           "optional",
           "label"
+        ],
+        "type": "object"
+      },
+      "StackCandidateDto": {
+        "properties": {
+          "cardName": {
+            "type": "string"
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "cardName",
+          "controllerId"
         ],
         "type": "object"
       },

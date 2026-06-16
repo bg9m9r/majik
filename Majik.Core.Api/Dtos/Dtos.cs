@@ -44,6 +44,19 @@ public sealed record PlayerDto(
 /// </summary>
 public sealed record PlayerCandidateDto(Guid Id, string Name, int Life);
 
+/// <summary>
+/// CR 115 — a SPELL on the stack offered as a clickable target on a targets
+/// prompt (counterspell "target spell"). The <see cref="Id"/> is the engine
+/// <see cref="Majik.Core.Spells.ISpell.Id"/> Guid (= the stack object id the
+/// client already renders via <see cref="StackObjectDto.Id"/>); the client
+/// echoes it back in its <c>ChooseTargetsCommand.TargetInstanceIds</c>
+/// (CandidateMatchesId matches it to the ISpell). Serialized as
+/// <c>stackCandidates</c> (camelCase) on the wire. Before this DTO, stack
+/// spells in the resolved pool were silently dropped by the card+player-only
+/// candidate snapshot, so a spell could never be chosen as a target in the UI.
+/// </summary>
+public sealed record StackCandidateDto(Guid Id, string CardName, Guid ControllerId);
+
 public sealed record ZoneDto(IReadOnlyList<CardSnapshotDto> Cards);
 
 public sealed record CardSnapshotDto(
@@ -237,7 +250,19 @@ public sealed record PromptDto(
     /// in the pool were silently dropped by the card-only candidate snapshot, so
     /// a player could never be chosen as a target in the UI.
     /// </summary>
-    IReadOnlyList<PlayerCandidateDto>? PlayerCandidates = null);
+    IReadOnlyList<PlayerCandidateDto>? PlayerCandidates = null,
+    /// <summary>
+    /// CR 115 — spells on the stack offered as legal targets on a targets prompt
+    /// (Counterspell "target spell", Negate, …). Non-null only when the resolved
+    /// target pool contains at least one stack <see cref="Majik.Core.Spells.ISpell"/>;
+    /// null on every other prompt kind and on targets prompts that offer no stack
+    /// spells. The portal makes the already-rendered stack chip's matching items
+    /// clickable, echoing the chosen <see cref="StackCandidateDto.Id"/> back in its
+    /// <c>ChooseTargetsCommand.TargetInstanceIds</c>. Before this field, spells in
+    /// the pool were silently dropped by the card+player-only candidate snapshot, so
+    /// a spell could never be chosen as a target in the UI.
+    /// </summary>
+    IReadOnlyList<StackCandidateDto>? StackCandidates = null);
 
 /// <summary>
 /// CR 601.2d / CR 119.4 — per-prompt body for a divided-damage allocation

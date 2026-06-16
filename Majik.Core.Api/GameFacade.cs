@@ -1598,7 +1598,8 @@ public sealed class GameFacade : IDisposable
             BottomCount: payload?.BottomCount,
             ChoiceView: payload?.ChoiceView,
             DamageDivisionView: payload?.DamageDivisionView,
-            PlayerCandidates: payload?.PlayerCandidates);
+            PlayerCandidates: payload?.PlayerCandidates,
+            StackCandidates: payload?.StackCandidates);
     }
 
     private void BridgeEvent(GameEvent e)
