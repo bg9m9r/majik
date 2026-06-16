@@ -40,6 +40,21 @@ namespace Majik.Core.CardData.Factories;
 ///     3. You add {B}{B} (CR 106.1) — <see cref="Player.AddManaToPool"/>.
 ///     4. You draw a card (CR 120.1).
 ///
+/// ## Re-source-safe (Agatha's Soul Cauldron group-grant)
+/// Every effect reads the resolving controller / opponents off the live
+/// <see cref="ResolutionContext"/> (<c>ctx.Controller ?? ctx.Source?.Controller
+/// ?? owner</c> for the "you" verbs; <see cref="ContextOpponents"/> for the
+/// each-opponent rider) rather than capturing the original Priest's controller,
+/// and both <see cref="SacrificeAnotherCreatureCost"/> costs re-home their
+/// captured self via <see cref="Majik.Core.Costs.IRebindableCost"/> (the {T}
+/// cost re-homes via <c>AdditionalCost.RebindSource</c>). The activated ability
+/// is therefore marked <see cref="ActivatedAbility.RebindSafe"/>, so Agatha's
+/// Soul Cauldron's group-grant can soundly <see cref="ActivatedAbility.RebindTo"/>
+/// the REAL ability onto a counter-bearing bearer (CR 707.2 / 613.1f): the
+/// BEARER is tapped, its sac costs exclude the BEARER, and the lose-life /
+/// sacrifice / add-mana / draw rider hits the bearer's controller's opponents —
+/// never the exiled Priest's.
+///
 /// ## Reads opponents from the live resolution context (the fix)
 /// The "any number of target players" rider reads the affected players from the
 /// LIVE game at RESOLUTION via <see cref="ResolutionContext.Game"/>
@@ -189,19 +204,24 @@ public static class PriestOfForgottenGodsFactory
                     $"{CardName}: each affected player loses 2 life and sacrifices a creature",
                     ctx =>
                     {
-                        var controller = card.Controller ?? owner;
+                        // RE-SOURCE-SAFE: read the activating controller off the
+                        // live ResolutionContext (the activator — equivalently the
+                        // re-homed Source's controller under Agatha) rather than
+                        // the captured `card.Controller`. On the legacy context-
+                        // less sync path (Controller/Source null) it falls back to
+                        // `owner`. So when Agatha's Soul Cauldron re-homes the REAL
+                        // ability onto a counter-bearing bearer (CR 707.2 / 613.1f),
+                        // the affected players are the BEARER's controller's
+                        // opponents, never the exiled Priest's.
+                        var controller =
+                            ctx.Controller ?? ctx.Source?.Controller ?? owner;
 
-                        var players = ctx.Game?.AllPlayers;
-                        if (players == null) return ValueTask.CompletedTask;
-
-                        foreach (var p in players)
+                        // CR 102.1 / 800.4a — every opponent of the resolving
+                        // controller still in the game, read from the live context
+                        // (ContextOpponents.Of returns empty on shape-only paths,
+                        // so the each-opponent rider is a safe no-op there).
+                        foreach (var p in ContextOpponents.Of(ctx, controller))
                         {
-                            // "Any number of target players" — v1 affects every
-                            // opponent (see class xmldoc deferral). CR 102.1 —
-                            // the controller is never a legal pick here.
-                            if (ReferenceEquals(p, controller)) continue;
-                            if (p.HasLost) continue;
-
                             // CR 119.3 — life loss happens regardless of whether
                             // the player controls a creature to sacrifice.
                             p.LoseLife(2);
@@ -249,29 +269,54 @@ public static class PriestOfForgottenGodsFactory
                         return ValueTask.CompletedTask;
                     }),
 
-                // Effect 3: you add {B}{B} (CR 106.1).
+                // Effect 3: you add {B}{B} (CR 106.1). RE-SOURCE-SAFE — the "you"
+                // is the resolving controller off the live context (the activator /
+                // re-homed bearer's controller under Agatha), falling back to
+                // `owner` on the context-less sync path.
                 new Effect(
                     $"{CardName}: you add {{B}}{{B}}",
-                    () => owner.AddManaToPool(ManaCost.Parse("{B}{B}"))),
+                    ctx =>
+                    {
+                        var controller =
+                            ctx.Controller ?? ctx.Source?.Controller ?? owner;
+                        controller.AddManaToPool(ManaCost.Parse("{B}{B}"));
+                        return ValueTask.CompletedTask;
+                    }),
 
-                // Effect 4: you draw a card (CR 120.1).
+                // Effect 4: you draw a card (CR 120.1). RE-SOURCE-SAFE — same "you"
+                // resolution as the mana add.
                 new Effect(
                     $"{CardName}: you draw a card",
-                    () =>
+                    ctx =>
                     {
-                        var top = owner.Zones.Library.GetCards().FirstOrDefault();
+                        var controller =
+                            ctx.Controller ?? ctx.Source?.Controller ?? owner;
+
+                        var top = controller.Zones.Library.GetCards().FirstOrDefault();
                         if (top == null)
                         {
                             // CR 120.3 — drawing from an empty library is noted;
                             // the SBA handles loss at the next opportunity.
-                            owner.MarkTriedToDrawFromEmptyLibrary();
-                            return;
+                            controller.MarkTriedToDrawFromEmptyLibrary();
+                            return ValueTask.CompletedTask;
                         }
-                        owner.Zones.Library.RemoveCard(top);
-                        owner.Zones.Hand.AddCard(top);
+                        controller.Zones.Library.RemoveCard(top);
+                        controller.Zones.Hand.AddCard(top);
                         top.SetZone(ZoneType.Hand);
+                        return ValueTask.CompletedTask;
                     }),
-            });
+            },
+            // RE-SOURCE-SAFE (agatha bespoke-factory migration): every effect
+            // reads the resolving controller / opponents off the live
+            // ResolutionContext (Controller/Source/ContextOpponents) rather than
+            // capturing the original Priest's controller, and both
+            // SacrificeAnotherCreatureCost costs re-home their captured self via
+            // IRebindableCost (the {T} cost re-homes via AdditionalCost.RebindSource).
+            // So Agatha's Soul Cauldron's group-grant can soundly RebindTo the REAL
+            // ability onto a counter-bearing bearer (CR 707.2 / 613.1f): the BEARER
+            // is tapped + its sac costs exclude the BEARER, and the rider hits the
+            // bearer's controller's opponents — never the exiled Priest.
+            rebindSafe: true);
 
         card.AddAbility(ability);
         return card;
