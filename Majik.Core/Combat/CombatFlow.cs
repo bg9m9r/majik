@@ -72,6 +72,20 @@ public sealed class CombatFlow
     {
         var attackPlan = await attackerAgent.DeclareAttackersAsync(ctx, attackers, ct);
 
+        // CR 508.1a / 702.43 — "attacks each combat if able". Any eligible
+        // attacker carrying the must-attack restriction that the controller's
+        // agent OMITTED is force-declared here (the agent has no discretion to
+        // hold it back). The eligible-attacker list (`attackers`) is the
+        // engine's "able to attack" gate — it has already been narrowed to
+        // untapped, non-summoning-sick (or hasted), non-defender, effectively-
+        // creature permanents controlled by the active player — so membership
+        // there means the creature CAN legally attack. Forced attackers default
+        // to attacking the defending player; the tax pass below (CR 508.1g) may
+        // still un-declare one whose only defender is a paywall it can't pay
+        // (then it was never "able" to attack — CR 508.1a). Mirrors the must-
+        // block enforcement in CombatValidator.IsValidBlockDeclaration.
+        attackPlan = ForceMustAttackers(attackPlan, attackers, defender);
+
         // CR 508.1g — "can't attack [defender] unless its controller pays
         // {cost}" (Ghostly Prison / Propaganda / Sphere of Safety). The cost
         // is part of declaring the attacker; a creature whose tax goes unpaid
@@ -339,6 +353,59 @@ public sealed class CombatFlow
         }
 
         return anyDropped ? new CombatPlan(kept) : plan;
+    }
+
+    /// <summary>
+    /// CR 508.1a / 702.43 — enforce the "attacks each combat if able" must-
+    /// attack restriction. Returns an attack plan that includes every eligible
+    /// attacker (<paramref name="eligibleAttackers"/>) carrying the
+    /// <c>"AttacksEachCombat"</c> marker — those the agent already declared are
+    /// kept as-declared (preserving the agent's chosen defender), and any the
+    /// agent OMITTED are force-added attacking the defending player. The plan is
+    /// returned unchanged when no eligible must-attacker was omitted, so the
+    /// common (no must-attack creature) path allocates nothing.
+    ///
+    /// Membership in <paramref name="eligibleAttackers"/> is the engine's "able
+    /// to attack" gate (the caller has already filtered to untapped, non-
+    /// summoning-sick/hasted, non-defender, effectively-creature permanents the
+    /// active player controls), so a creature there CAN legally be declared.
+    /// A must-attack creature that is NOT eligible (tapped, summoning sick, etc.)
+    /// is correctly left unforced (CR 508.1a — "if able").
+    /// </summary>
+    private static CombatPlan ForceMustAttackers(
+        CombatPlan plan,
+        IReadOnlyList<Permanent> eligibleAttackers,
+        Player defender)
+    {
+        var omitted = new List<Permanent>();
+        foreach (var c in eligibleAttackers)
+        {
+            if (!CombatAbilities.MustAttackEachCombat(c)) continue;
+            // Already declared (by the agent) — the agent's chosen defender
+            // stands; don't duplicate it.
+            if (plan.Attackers.Any(a => ReferenceEquals(a.Attacker, c))) continue;
+            omitted.Add(c);
+        }
+
+        if (omitted.Count == 0)
+        {
+            return plan;
+        }
+
+        var declarations = new List<Majik.Core.Players.Agents.AttackerDeclaration>(
+            plan.Attackers.Count + omitted.Count);
+        declarations.AddRange(plan.Attackers);
+        foreach (var c in omitted)
+        {
+            // CR 508.1a — a forced attacker must attack SOMETHING the active
+            // player could legally attack. The defending player is always a
+            // legal default target here (the only player in a 1v1 combat); a
+            // controller-chosen planeswalker target is an agent decision the
+            // engine can't infer, so the must-attack default is the player.
+            declarations.Add(new Majik.Core.Players.Agents.AttackerDeclaration(c, defender));
+        }
+
+        return new CombatPlan(declarations);
     }
 
     private enum DamageStep { SingleStep, FirstStrike, Regular }

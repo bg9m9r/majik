@@ -27,13 +27,13 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="KeywordAbility"/>("Annihilator", arg: 2) marker is
 ///   stamped alongside so keyword scans (CombatAbilities-style) see it.
 ///
-/// ## Deferred (v1 gap)
-/// - <b>"Attacks each combat if able" (CR 702.43 — attacks-each-turn
-///   restriction)</b>: shipped as a <see cref="KeywordAbility"/>
-///   ("AttacksEachCombat") marker only. The must-attack combat-restriction
-///   primitive isn't wired yet; the marker keeps the printed text
-///   discoverable on the bot rail. Same posture as Ward's discard-cost
-///   gap on Reality Smasher.
+/// - <b>"Attacks each combat if able" (CR 508.1a / 702.43 — the must-attack
+///   combat restriction)</b>: shipped as a <see cref="KeywordAbility"/>
+///   ("AttacksEachCombat") marker, now ENFORCED by
+///   <see cref="Majik.Core.Combat.CombatFlow"/>: an eligible creature carrying
+///   this marker is force-declared into combat at declare-attackers (CR 508.1a
+///   — "if able") even when its controller's agent omits it. Mirrors the
+///   must-block enforcement in <see cref="Majik.Core.Combat.CombatValidator"/>.
 ///
 /// ## Wiring overloads
 /// - <see cref="Create(Player)"/> — shape only. Keyword markers + an
@@ -102,10 +102,9 @@ public static class UlamogsCrusherFactory
         card.AddAbility(new KeywordAbility(
             "Annihilator", card, owner, arg: AnnihilatorValue));
 
-        // CR 702.43 — "attacks each combat if able" combat
-        // restriction. Shipped as a marker only — the must-attack
-        // primitive isn't wired yet (same posture as Reality
-        // Smasher's non-mana Ward discard rider).
+        // CR 508.1a / 702.43 — "attacks each combat if able". The marker is now
+        // ENFORCED by CombatFlow: this creature is force-declared as an attacker
+        // at declare-attackers whenever it can legally attack.
         card.AddAbility(new KeywordAbility(
             "AttacksEachCombat", card, owner));
 

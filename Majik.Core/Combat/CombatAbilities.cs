@@ -134,6 +134,26 @@ public static class CombatAbilities
     public static bool MustBeBlockedByAllAble(Permanent? c) =>
         c != null && Has(c, "MustBeBlockedByAllAble");
 
+    /// <summary>
+    /// CR 508.1a / 702.43 — the "attacks each combat if able" / "attacks this
+    /// combat if able" must-attack combat restriction. Returns true iff this
+    /// creature carries the <c>"AttacksEachCombat"</c> marker (the permanent
+    /// static — Ulamog's Crusher, Insatiable Gorgers) OR the
+    /// <c>"AttacksThisCombat"</c> marker (the one-combat instance the Legion
+    /// Warboss begin-combat token gains: "attacks this combat if able"). Either
+    /// marker is read from a printed <see cref="KeywordAbility"/> (the factory-
+    /// stamped form) or the layer-computed keyword set (a granted instance).
+    ///
+    /// Both forms impose the SAME declaration-time obligation (CR 508.1a — a
+    /// creature that must attack is declared as an attacker if it is able);
+    /// they differ only in duration, which is irrelevant to a per-combat
+    /// must-attack check. Consulted at declare-attackers so such a creature is
+    /// forced into combat even when its controller's agent omits it; mirrors
+    /// the must-block enforcement of <see cref="MustBeBlockedByAllAble"/>.
+    /// </summary>
+    public static bool MustAttackEachCombat(Permanent? c) =>
+        c != null && (Has(c, "AttacksEachCombat") || Has(c, "AttacksThisCombat"));
+
     private static bool Has(Permanent? creature, string keyword)
     {
         if (creature == null) return false;
