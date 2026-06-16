@@ -6002,4 +6002,234 @@ public class AgathasSoulCauldronTests
             .Which.Description.Should().Contain("Tap",
                 "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
     }
+
+    // -----------------------------------------------------------------------
+    // kiki-jiki-copy-token-of-target-creature-rebind — Kiki-Jiki, Mirror
+    // Breaker and Reflection of Kiki-Jiki are bespoke [CardName]-factory
+    // creatures whose sole non-mana activated ability ("{T}: Create a token
+    // that's a copy of another target nonlegendary creature you control,
+    // except it has haste. Exile/Sacrifice it at the beginning of the next
+    // end step.") is OUTSIDE the OracleActivatedAbilityBinder reconstructable
+    // set: token-COPY-of-target-creature creation (CR 706.2 snapshot + Haste
+    // grant + CR 603.7 delayed end-step removal) has no oracle-rebuild shape
+    // (the binder's RebuildActivatedAbilities takes only bearer + controller —
+    // it cannot wire a ZoneService for token ETB nor a TriggerManager for the
+    // delayed removal). So the RebindTo of the real ability is the ONLY sound
+    // re-home.
+    //
+    // The factories were migrated to read the live ResolutionContext (Source /
+    // Controller / ChosenTargets) and marked RebindSafe, so Agatha's
+    // group-grant re-homes the REAL copy ability onto a counter-bearing bearer
+    // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the BEARER's
+    // controller minted the haste copy of THEIR chosen creature, the "another /
+    // you control" legality is measured against the BEARER, and the copy lands
+    // under the bearer's controller — never sourced on the exiled Kiki/
+    // Reflection. These tests prove the re-home end-to-end (resolve with a
+    // chosen target → a haste token copy enters under the bearer's controller).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_KikiJiki_CopyTokenToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {T} copy-token-of-target-creature) is
+        // RebindSafe (mints under ResolutionContext.Source's controller, reads
+        // the live ChosenTargets, measures "another / you control" against the
+        // live source). Token-copy creation is NOT reconstructable from oracle
+        // text, so the RebindTo of the real ability is the only sound re-home.
+        var kiki = KikiJikiMirrorBreakerFactory.Create(alice);
+        var realAbilities = kiki.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Kiki-Jiki has exactly one non-mana activated ability — the {T} copy-token-maker");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Kiki-Jiki copy ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(kiki);
+        kiki.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub returns NOTHING for Kiki-Jiki so the only way the ability is
+        // granted is via RebindTo of the real ability — the oracle-rebuild
+        // fallback cannot reconstruct token-copy creation.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), kiki);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Kiki-Jiki's real {T} copy-token-maker is re-homed via RebindTo");
+        var copyMaker = granted[0];
+        copyMaker.Source.Should().BeSameAs(bearer,
+            "the re-homed copy-maker is sourced on the BEARER (CR 707.2)");
+        copyMaker.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        copyMaker.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle()
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+
+        // A nonlegendary creature the BEARER'S controller (Alice) controls, to
+        // be the copy target. (The bearer itself — "Counter Bear" — would fail
+        // the "another" check; this Bear is a distinct legal target.)
+        var bear = new Creature("Grizzly Bear", "1G", 3, 1,
+            subtypes: new[] { CardSubtype.Bear });
+        bear.SetOwner(alice);
+        bear.ChangeController(alice);
+        alice.Zones.Library.AddCard(bear);
+        zones.MoveCard(bear, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Choose the Bear as the copy target on the RE-HOMED ability — its
+        // ChosenTargets flow into ResolutionContext.ChosenTargets at resolve.
+        copyMaker.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { bear },
+        });
+
+        var copiesBefore = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Count(c => c.IsToken && c.Name == "Grizzly Bear");
+        copiesBefore.Should().Be(0, "no token copies exist before resolution");
+
+        // Resolving the re-homed copy-maker mints a haste token copy of the
+        // chosen Bear under the BEARER'S controller (Alice) — ctx.Source =
+        // bearer => its controller = Alice; the "another / nonlegendary / you
+        // control" legality is measured against the bearer, and the Bear (≠
+        // bearer, nonlegendary, Alice-controlled) passes.
+        await copyMaker.ResolveAsync(agent: null, game: null);
+
+        var copies = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken && c.Name == "Grizzly Bear")
+            .ToList();
+        copies.Should().ContainSingle(
+            "the re-homed copy-maker minted one token copy of the chosen Bear under the bearer's controller");
+        var copy = copies.Single();
+        copy.Controller.Should().BeSameAs(alice,
+            "the copy enters under the bearer's controller (Alice), not the exiled Kiki-Jiki");
+        copy.BasePower.Should().Be(3, "CR 706.2 — the token copies the Bear's printed power");
+        copy.BaseToughness.Should().Be(1, "CR 706.2 — the token copies the Bear's printed toughness");
+        copy.Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "Haste",
+                "CR 702.10 — the copy gains haste ('except it has haste')");
+        copy.HasSummoningSickness.Should().BeFalse(
+            "CR 702.10b — haste clears summoning sickness so the copy can attack immediately");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_ReflectionOfKikiJiki_CopyTokenToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Reflection of Kiki-Jiki — the {1},{T} copy-token re-skin (sacrifice
+        // instead of exile at end step). Same RebindSafe copy body as Kiki-Jiki;
+        // the RebindTo of the real ability is the only sound re-home.
+        var reflection = ReflectionOfKikiJikiFactory.Create(alice);
+        var realAbilities = reflection.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Reflection of Kiki-Jiki has exactly one non-mana activated ability — the {1},{T} copy-token-maker");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Reflection copy ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(reflection);
+        reflection.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), reflection);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Reflection's real {1},{T} copy-token-maker is re-homed via RebindTo");
+        var copyMaker = granted[0];
+        copyMaker.Source.Should().BeSameAs(bearer,
+            "the re-homed copy-maker is sourced on the BEARER (CR 707.2)");
+        copyMaker.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        copyMaker.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle()
+            .Which.Description.Should().Contain("Tap",
+                "the {T} leg of the cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+        copyMaker.Costs.OfType<ManaCostCost>().Should().ContainSingle(
+            "the {1} generic mana leg (a player-resource cost, no captured source) passes through unchanged by RebindTo");
+
+        var bear = new Creature("Grizzly Bear", "1G", 3, 1,
+            subtypes: new[] { CardSubtype.Bear });
+        bear.SetOwner(alice);
+        bear.ChangeController(alice);
+        alice.Zones.Library.AddCard(bear);
+        zones.MoveCard(bear, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        copyMaker.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { bear },
+        });
+
+        await copyMaker.ResolveAsync(agent: null, game: null);
+
+        var copies = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken && c.Name == "Grizzly Bear")
+            .ToList();
+        copies.Should().ContainSingle(
+            "the re-homed copy-maker minted one haste token copy under the bearer's controller");
+        var copy = copies.Single();
+        copy.Controller.Should().BeSameAs(alice,
+            "the copy enters under the bearer's controller (Alice), not the exiled Reflection");
+        copy.Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "Haste",
+                "CR 702.10 — the copy gains haste ('That token has haste')");
+    }
+
+    [Fact]
+    public async Task BespokeKikiCopyToken_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated copy effect still mints under its OWN source's
+        // controller on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var kiki = KikiJikiMirrorBreakerFactory.Create(alice, zones, triggers: null);
+        alice.Zones.Library.AddCard(kiki);
+        zones.MoveCard(kiki, ZoneType.Library, ZoneType.Battlefield, alice);
+        kiki.ClearSummoningSickness();
+
+        var bear = new Creature("Grizzly Bear", "1G", 3, 1,
+            subtypes: new[] { CardSubtype.Bear });
+        bear.SetOwner(alice);
+        bear.ChangeController(alice);
+        alice.Zones.Library.AddCard(bear);
+        zones.MoveCard(bear, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var copyMaker = kiki.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        copyMaker.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bear } });
+
+        await copyMaker.ResolveAsync(agent: null, game: null);
+
+        var copies = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken && c.Name == "Grizzly Bear")
+            .ToList();
+        copies.Should().ContainSingle(
+            "resolving the un-rebound copy-maker mints a haste copy under Kiki's own controller (Alice)");
+        copies.Single().Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "Haste", "the copy gains haste");
+    }
 }
