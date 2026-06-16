@@ -204,12 +204,26 @@ public static class SaiMasterThopteristFactory
         //   - Fx.DrawCards(controller, 1). Routes through the
         //     DrawCardIntent replacement bus.
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
+        // the effect draws for the live ResolutionContext.Source's CONTROLLER
+        // (this ability's own source at resolution) rather than capturing `card`,
+        // falling back to `card` / `owner` only on the context-less legacy sync
+        // path (ResolutionContext.Legacy, where Source is null). Marked RebindSafe
+        // so Agatha's Soul Cauldron re-homes this REAL ability to a counter-bearing
+        // bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the bearer's
+        // controller pays {1}{U} + sacrifices two artifacts and draws, never the
+        // exiled Sai. A "sacrifice two artifacts" cost is OUTSIDE the
+        // OracleActivatedAbilityBinder reconstructable grammar, so RebindTo of the
+        // real ability is the only sound re-home. The SacrificeTwoArtifactsCost's
+        // excludeSource still names the original Sai, but Sai is not an artifact so
+        // the exclusion is a posture-clean no-op on either source.
         var drawEffect = new Effect(
             $"{CardName}: draw a card",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
+                var controller = ctx.Source?.Controller ?? card.Controller ?? owner;
                 Majik.Core.Primitives.Fx.DrawCards(controller, 1);
+                return ValueTask.CompletedTask;
             });
 
         var drawAbility = new ActivatedAbility(
@@ -222,7 +236,8 @@ public static class SaiMasterThopteristFactory
                 // PermanentSacrificedEvent for "whenever you sacrifice …" payoffs.
                 new SacrificeTwoArtifactsCost(excludeSource: card, eventBus: eventBus),
             },
-            effects: new IEffect[] { drawEffect });
+            effects: new IEffect[] { drawEffect },
+            rebindSafe: true);
 
         card.AddAbility(drawAbility);
 

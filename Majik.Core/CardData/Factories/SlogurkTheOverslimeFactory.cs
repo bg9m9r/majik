@@ -161,28 +161,46 @@ public static class SlogurkTheOverslimeFactory
         // Priest of Fell Rites' exile-self pattern). Mana-cost portion
         // is none (no {X}, just the counter-removal cost).
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
+        // the cost half ("Remove three +1/+1 counters") AND the effect half
+        // ("Return it to its owner's hand") both act on the live
+        // ResolutionContext.Source (this ability's own source at resolution)
+        // rather than capturing `card`, falling back to `card` only on the
+        // context-less legacy sync path (ResolutionContext.Legacy, Source = null).
+        // The counter-removal cost lives in the BODY (not an ICost), so RebindTo's
+        // Stage-1 cost re-home cannot touch it — reading the cost+effect off
+        // ctx.Source is what makes the re-home sound. Marked RebindSafe so Agatha's
+        // Soul Cauldron re-homes this REAL ability to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the three +1/+1 counters
+        // are removed from the BEARER and the BEARER is bounced, never the exiled
+        // Slogurk. "Remove three counters → bounce self" is OUTSIDE the
+        // OracleActivatedAbilityBinder reconstructable set, so RebindTo of the real
+        // ability is the only sound re-home.
         var bounceEffect = new Effect(
             $"{CardName}: remove three +1/+1 counters → bounce to owner's hand",
-            () =>
+            ctx =>
             {
+                var subject = (ctx.Source as Permanent) ?? card;
+
                 // Guard the cost half — insufficient counters or
                 // off-battlefield invocations are no-op-shaped while
                 // the engine doesn't yet validate counter-pay costs
                 // pre-activation. Same posture as Priest of Fell
                 // Rites' zone-guard for its graveyard-exile-self cost.
-                if (card.Zone != ZoneType.Battlefield) return;
-                if (card.Counters.Count(CounterType.PlusOnePlusOne)
-                    < BouncePerActivationCounters) return;
+                if (subject.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                if (subject.Counters.Count(CounterType.PlusOnePlusOne)
+                    < BouncePerActivationCounters) return ValueTask.CompletedTask;
 
                 Fx.RemoveCounter(
-                    card,
+                    subject,
                     CounterType.PlusOnePlusOne,
                     BouncePerActivationCounters);
 
                 // CR 701.20 — bounce to owner's hand. ZoneService
                 // routes the publish so LTB triggers fire — including
                 // this card's own LTB (CR 603.6d / 603.10c).
-                Fx.BounceToHand(card, zoneService);
+                Fx.BounceToHand(subject, zoneService);
+                return ValueTask.CompletedTask;
             });
 
         var bounceAbility = new ActivatedAbility(
@@ -191,7 +209,8 @@ public static class SlogurkTheOverslimeFactory
             // Mana cost is empty; counter-removal cost is documented in
             // the description-only path (cost-primitive deferred).
             costs: Array.Empty<ICost>(),
-            effects: new IEffect[] { bounceEffect });
+            effects: new IEffect[] { bounceEffect },
+            rebindSafe: true);
 
         card.AddAbility(bounceAbility);
 

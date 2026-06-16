@@ -5395,4 +5395,394 @@ public class AgathasSoulCauldronTests
             .Any(k => string.Equals(k, "Flying", System.StringComparison.OrdinalIgnoreCase))
             .Should().BeTrue("the un-rebound grant gives the chosen creature Flying");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-source-migration-creature-tail-batch — six more bespoke
+    // [CardName]-factory creatures whose sole non-mana activated ability is
+    // OUTSIDE the OracleActivatedAbilityBinder reconstructable set, now migrated
+    // to read ResolutionContext.Source (+ marked RebindSafe) so Agatha's group-
+    // grant re-homes the REAL ability to a counter-bearing bearer via
+    // ActivatedAbility.RebindTo (CR 707.2 / 613.1f). Each pairs a rebind test
+    // (OracleStub empty → RebindTo is the only path) with an un-rebound sanity
+    // test (the migrated effect still acts on its own source).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Sai_DrawToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var sai = SaiMasterThopteristFactory.Create(alice);
+        var realAbilities = sai.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Sai has exactly one non-mana activated ability — {1}{U}, Sac two artifacts: Draw");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Sai draw reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(sai);
+        sai.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sai);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Sai's real draw is re-homed via RebindTo");
+        var draw = granted[0];
+        draw.Source.Should().BeSameAs(bearer,
+            "the re-homed draw is sourced on the BEARER (CR 707.2)");
+        draw.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        for (int i = 0; i < 3; i++)
+        {
+            var libCard = new Creature($"Lib {i}", "U", 1, 1);
+            libCard.SetOwner(alice);
+            alice.Zones.Library.AddCard(libCard);
+            libCard.SetZone(ZoneType.Library);
+        }
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+        await draw.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Count().Should().Be(handBefore + 1,
+            "the re-homed draw drew one card for the bearer's controller (Alice)");
+    }
+
+    [Fact]
+    public async Task BespokeSaiDraw_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        var alice = new Player("Alice", 20);
+        var sai = SaiMasterThopteristFactory.Create(alice);
+        var draw = sai.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var libCard = new Creature("Lib", "U", 1, 1);
+        libCard.SetOwner(alice);
+        alice.Zones.Library.AddCard(libCard);
+        libCard.SetZone(ZoneType.Library);
+
+        var before = alice.Zones.Hand.GetCards().Count();
+        await draw.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Count().Should().Be(before + 1,
+            "the un-rebound draw draws for its own source's controller");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_WhirlerVirtuoso_ThopterToBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var whirler = WhirlerVirtuosoFactory.Create(alice);
+        var realAbilities = whirler.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Whirler Virtuoso has exactly one non-mana activated ability — the energy token-maker");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Whirler token-maker reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(whirler);
+        whirler.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), whirler);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Whirler's real token-maker is re-homed via RebindTo");
+        var tokenMaker = granted[0];
+        tokenMaker.Source.Should().BeSameAs(bearer,
+            "the re-homed token-maker is sourced on the BEARER (CR 707.2)");
+        tokenMaker.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        var thoptersBefore = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Thopter));
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+        alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Thopter))
+            .Should().Be(thoptersBefore + 1,
+                "the re-homed token-maker minted a Thopter under the bearer's controller (Alice)");
+    }
+
+    [Fact]
+    public async Task BespokeWhirlerThopter_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var whirler = WhirlerVirtuosoFactory.Create(alice);
+        alice.Zones.Library.AddCard(whirler);
+        zones.MoveCard(whirler, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var tokenMaker = whirler.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var before = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Thopter));
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+        alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Thopter))
+            .Should().Be(before + 1,
+                "the un-rebound token-maker mints a Thopter under its own source's controller");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_PsychicFrog_CounterToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var frog = PsychicFrogFactory.Create(alice);
+        var realAbilities = frog.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Psychic Frog has exactly one wired non-mana activated ability — the discard→+1/+1");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Psychic Frog pump reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(frog);
+        frog.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), frog);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Psychic Frog's real pump is re-homed via RebindTo");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the re-homed pump is sourced on the BEARER (CR 707.2)");
+        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        await pump.ResolveAsync(agent: null, game: null);
+        bearer.Counters.Count(CounterType.PlusOnePlusOne)
+            .Should().Be(bearerCountersBefore + 1,
+                "the re-homed pump put a +1/+1 counter on the BEARER, not the exiled Frog");
+    }
+
+    [Fact]
+    public async Task BespokePsychicFrogPump_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        var alice = new Player("Alice", 20);
+        var frog = PsychicFrogFactory.Create(alice);
+        var pump = frog.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var before = frog.Counters.Count(CounterType.PlusOnePlusOne);
+        await pump.ResolveAsync(agent: null, game: null);
+        frog.Counters.Count(CounterType.PlusOnePlusOne)
+            .Should().Be(before + 1,
+                "the un-rebound pump puts a +1/+1 counter on its own source");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Slogurk_BounceToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var slogurk = SlogurkTheOverslimeFactory.Create(alice);
+        var realAbilities = slogurk.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Slogurk has exactly one non-mana activated ability — remove-3-counters bounce");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Slogurk bounce reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(slogurk);
+        slogurk.SetZone(ZoneType.Graveyard);
+
+        // Bearer needs at least three +1/+1 counters so the re-homed
+        // remove-three-counters cost is payable (it lands on the bearer).
+        var bearer = SeatedBearer(alice, effects, zones);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 3);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), slogurk);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Slogurk's real bounce is re-homed via RebindTo");
+        var bounce = granted[0];
+        bounce.Source.Should().BeSameAs(bearer,
+            "the re-homed bounce is sourced on the BEARER (CR 707.2)");
+        bounce.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
+        await bounce.ResolveAsync(agent: null, game: null);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne)
+            .Should().Be(bearerCountersBefore - 3,
+                "the re-homed bounce removed three +1/+1 counters from the BEARER");
+        bearer.Zone.Should().Be(ZoneType.Hand,
+            "the re-homed bounce returned the BEARER to its owner's hand, never the exiled Slogurk");
+    }
+
+    [Fact]
+    public async Task BespokeSlogurkBounce_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var slogurk = SlogurkTheOverslimeFactory.Create(alice, zoneService: zones, triggers: null);
+        alice.Zones.Library.AddCard(slogurk);
+        zones.MoveCard(slogurk, ZoneType.Library, ZoneType.Battlefield, alice);
+        slogurk.Counters.Add(CounterType.PlusOnePlusOne, 3);
+
+        var bounce = slogurk.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        await bounce.ResolveAsync(agent: null, game: null);
+
+        slogurk.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the un-rebound bounce removed three counters from its own source");
+        slogurk.Zone.Should().Be(ZoneType.Hand,
+            "the un-rebound bounce returned its own source to hand");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Tasigur_ReturnReadsBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Tasigur built with an all-players resolver so "target opponent" is
+        // reachable; the migration excludes the bearer's controller (you), not
+        // the captured owner.
+        var tasigur = TasigurTheGoldenFangFactory.Create(
+            alice,
+            opponentChooser: null,
+            allPlayersResolver: () => new[] { alice, bob });
+        var realAbilities = tasigur.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Tasigur has exactly one non-mana activated ability — the graveyard return");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Tasigur return reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(tasigur);
+        tasigur.SetZone(ZoneType.Graveyard);
+
+        // A nonland card already in Alice's graveyard that the return will pull
+        // back to Alice's (the bearer's controller's) hand.
+        var loot = new Creature("Salvage", "B", 2, 2);
+        loot.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(loot);
+        loot.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), tasigur);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Tasigur's real return is re-homed via RebindTo");
+        var ret = granted[0];
+        ret.Source.Should().BeSameAs(bearer,
+            "the re-homed return is sourced on the BEARER (CR 707.2)");
+        ret.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+        await ret.ResolveAsync(agent: null, game: null);
+
+        alice.Zones.Hand.GetCards().Should().Contain(loot,
+            "the re-homed return pulled a card from the bearer's controller's graveyard to their hand");
+        alice.Zones.Hand.GetCards().Count().Should().Be(handBefore + 1);
+    }
+
+    [Fact]
+    public async Task BespokeTasigurReturn_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var tasigur = TasigurTheGoldenFangFactory.Create(
+            alice,
+            opponentChooser: null,
+            allPlayersResolver: () => new[] { alice, bob });
+        alice.Zones.Library.AddCard(tasigur);
+        tasigur.SetController(alice);
+
+        var loot = new Creature("Salvage", "B", 2, 2);
+        loot.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(loot);
+        loot.SetZone(ZoneType.Graveyard);
+
+        var ret = tasigur.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        await ret.ResolveAsync(agent: null, game: null);
+        alice.Zones.Hand.GetCards().Should().Contain(loot,
+            "the un-rebound return pulls from its own source's controller's graveyard");
+    }
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_MagmaticChanneler_DigToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var channeler = MagmaticChannelerFactory.Create(alice);
+        var realAbilities = channeler.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Magmatic Channeler has exactly one non-mana activated ability — the {T} library dig");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Magmatic Channeler dig reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(channeler);
+        channeler.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), channeler);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Magmatic Channeler's real dig is re-homed via RebindTo");
+        var dig = granted[0];
+        dig.Source.Should().BeSameAs(bearer,
+            "the re-homed dig is sourced on the BEARER (CR 707.2)");
+        dig.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        dig.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle()
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+    }
 }

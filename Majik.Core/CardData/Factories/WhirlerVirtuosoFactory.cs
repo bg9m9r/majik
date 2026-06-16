@@ -140,12 +140,27 @@ public static class WhirlerVirtuosoFactory
         // Creature-only; same multi-type stamp used by Animation Module's
         // Servo).
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
+        // the effect mints the Thopter under the live ResolutionContext.Source's
+        // CONTROLLER (this ability's own source at resolution) and guards on the
+        // live source's zone, rather than capturing `card`; it falls back to
+        // `card` / `owner` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, Source = null). Marked RebindSafe so Agatha's
+        // Soul Cauldron re-homes this REAL token-maker to a counter-bearing bearer
+        // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the bearer's
+        // controller pays {E}{E}{E} and the Thopter enters under the bearer's
+        // controller, never the exiled Whirler Virtuoso. Token creation is OUTSIDE
+        // the OracleActivatedAbilityBinder reconstructable set (mirrors the Krenko
+        // token-maker migration), so RebindTo of the real ability is the only sound
+        // re-home. PayEnergyCost is a player-resource cost (no captured source),
+        // passed through unchanged by RebindTo.
         var thopterEffect = new Effect(
             $"{CardName}: create 1/1 colourless Thopter token (flying)",
-            () =>
+            ctx =>
             {
-                var controller = card.Controller ?? owner;
-                if (card.Zone != ZoneType.Battlefield) return; // CR 603.6c
+                var source = (ctx.Source as Permanent) ?? card;
+                if (source.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask; // CR 603.6c
+                var controller = source.Controller ?? card.Controller ?? owner;
 
                 var spec = new TokenFactory.TokenSpec(
                     Name: ThopterTokenName,
@@ -161,13 +176,15 @@ public static class WhirlerVirtuosoFactory
                 // TokenFactory shell only stamps Creature; layer Artifact
                 // on additively (mirrors Animation Module's Servo).
                 token.AddCardType(CardType.Artifact);
+                return ValueTask.CompletedTask;
             });
 
         var thopterAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new PayEnergyCost(ThopterEnergyCost) },
-            effects: new IEffect[] { thopterEffect });
+            effects: new IEffect[] { thopterEffect },
+            rebindSafe: true);
 
         card.AddAbility(thopterAbility);
 
