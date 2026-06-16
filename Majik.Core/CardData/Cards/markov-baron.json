@@ -1,0 +1,9 @@
+{
+  "name": "Markov Baron",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Noble"],
+  "manaCost": "{2}{B}",
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["Lifelink"]
+}
