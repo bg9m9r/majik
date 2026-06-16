@@ -256,4 +256,90 @@ public class KikiJikiMirrorBreakerTests
         _alice.Zones.Exile.GetCards().Should().Contain(token);
         _alice.Zones.Battlefield.GetCards().Should().NotContain(token);
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source-safe (agatha-kiki-jiki-token-copy-of-target-bespoke-rebind) —
+    // the {T} copy ability re-homes onto a new bearer via
+    // ActivatedAbility.RebindTo (Agatha's Soul Cauldron group-grant; CR 707.2 /
+    // 613.1f). The token-copy-of-target family.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void KikiJiki_CopyAbility_IsRebindSafe()
+    {
+        var kiki = KikiJikiMirrorBreakerFactory.Create(_alice);
+        var ability = kiki.Abilities.OfType<ActivatedAbility>().Single();
+
+        ability.RebindSafe.Should().BeTrue(
+            "the copy ability reads its source / controller / chosen target off "
+            + "ResolutionContext, so Agatha's group-grant may RebindTo it");
+    }
+
+    [Fact]
+    public void RebindTo_CopyAbility_MintsTokenUnderNewBearersController_NotOriginal()
+    {
+        // Arrange — Kiki (the printed source) plus a DIFFERENT creature (the
+        // counter-bearer Agatha re-homes the ability to), under the same
+        // controller, and a third creature to copy.
+        var kiki = KikiJikiMirrorBreakerFactory.Create(_alice, _zones, triggers: null);
+        _zones.MoveCard(kiki, ZoneType.Library, ZoneType.Battlefield, _alice);
+        kiki.HasSummoningSickness = false;
+
+        var bearer = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bearer.SetOwner(_alice);
+        bearer.SetController(_alice);
+        _zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, _alice);
+        bearer.HasSummoningSickness = false;
+
+        var elf = new Creature("Llanowar Elves", "{G}", 1, 1);
+        elf.SetOwner(_alice);
+        elf.SetController(_alice);
+        _zones.MoveCard(elf, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        var ability = kiki.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Act — re-home the ENTIRE ability onto the bearer (CR 707.2 / 613.1f).
+        var rebound = ability.RebindTo(bearer, _alice);
+        rebound.SetChosenTargets(new[] { new[] { (object)elf } });
+        rebound.Resolve();
+
+        // The re-homed copy still mints a haste token copy of the chosen
+        // creature, controlled by the bearer's controller.
+        var tokens = _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken)
+            .ToList();
+        tokens.Should().ContainSingle("the re-homed copy ability mints one token");
+        tokens[0].Name.Should().Be("Llanowar Elves", "CR 706.2 — copy of the chosen target");
+        tokens[0].Controller.Should().BeSameAs(_alice);
+    }
+
+    [Fact]
+    public void RebindTo_CopyAbility_AnotherCheck_MeasuredAgainstBearer_NotOriginal()
+    {
+        // "Another target": after RebindTo, the bearer is the source, so the
+        // bearer cannot be copied (it's "this creature"), but the original Kiki
+        // CAN be (it's no longer the source of the re-homed ability).
+        var kiki = KikiJikiMirrorBreakerFactory.Create(_alice, _zones, triggers: null);
+        _zones.MoveCard(kiki, ZoneType.Library, ZoneType.Battlefield, _alice);
+        kiki.HasSummoningSickness = false;
+
+        var bearer = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bearer.SetOwner(_alice);
+        bearer.SetController(_alice);
+        _zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, _alice);
+        bearer.HasSummoningSickness = false;
+
+        var ability = kiki.Abilities.OfType<ActivatedAbility>().Single();
+        var rebound = ability.RebindTo(bearer, _alice);
+
+        // Targeting the BEARER itself is a no-op ("another" measured against the
+        // re-homed source).
+        rebound.SetChosenTargets(new[] { new[] { (object)bearer } });
+        rebound.Resolve();
+
+        _alice.Zones.Battlefield.GetCards().OfType<Creature>()
+            .Where(c => c.IsToken).Should().BeEmpty(
+                "the re-homed 'another' restriction blocks copying the bearer itself");
+    }
 }

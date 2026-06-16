@@ -143,22 +143,39 @@ public static class KikiJikiMirrorBreakerFactory
         ActivatedAbility? tapAbility = null;
         var tapEffect = new Effect(
             $"{CardName}: create a haste token copy of another target nonlegendary creature you control, exile EOT",
-            () =>
+            ctx =>
             {
-                if (tapAbility == null) return;
-                var chosen = tapAbility.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                // RE-SOURCE-SAFE (agatha-kiki-jiki-token-copy-of-target-bespoke-rebind):
+                // read the chosen target, the live SOURCE, and the live CONTROLLER
+                // off the resolving ResolutionContext rather than the captured
+                // `tapAbility` / `card` / `owner`. After Agatha's Soul Cauldron
+                // RebindTo's this ability onto a counter-bearer (CR 707.2 / 613.1f),
+                // the rebound ability resolves with ctx.Source = the bearer,
+                // ctx.Controller = the new controller, and ctx.ChosenTargets = the
+                // bearer ability's chosen targets. The captured `tapAbility` is the
+                // ctx-less Execute() fallback only.
+                var chosen = ctx.ChosenTargets.Count > 0
+                    ? ctx.ChosenTargets
+                    : (tapAbility?.ChosenTargets
+                        ?? (IReadOnlyList<IReadOnlyList<object>>)Array.Empty<IReadOnlyList<object>>());
+                if (chosen.Count == 0 || chosen[0].Count == 0) return ValueTask.CompletedTask;
 
-                if (chosen[0][0] is not Creature original) return;
+                if (chosen[0][0] is not Creature original) return ValueTask.CompletedTask;
+
+                // The live source after a RebindTo (= the bearer); the captured
+                // `card` is the ctx-less legacy Execute() fallback only.
+                var self = (ctx.Source as Permanent) ?? card;
+                var controller = ctx.Controller ?? self.Controller ?? owner;
 
                 // CR 608.2b — resolve-time legality recheck. The printed
                 // restrictions (another / nonlegendary / you-control /
-                // still on the battlefield) gate at resolve.
-                if (original.Zone != ZoneType.Battlefield) return;
-                if (ReferenceEquals(original, card)) return;                  // "another"
-                if (original.HasSupertype(CardSupertype.Legendary)) return;   // "nonlegendary"
-                var controller = card.Controller ?? owner;
-                if (!ReferenceEquals(original.Controller, controller)) return; // "you control"
+                // still on the battlefield) gate at resolve, measured against
+                // the live source + controller so the re-homed copy means
+                // "another than the BEARER, that the BEARER's controller controls".
+                if (original.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                if (ReferenceEquals(original, self)) return ValueTask.CompletedTask;          // "another"
+                if (original.HasSupertype(CardSupertype.Legendary)) return ValueTask.CompletedTask;   // "nonlegendary"
+                if (!ReferenceEquals(original.Controller, controller)) return ValueTask.CompletedTask; // "you control"
 
                 // CR 706.2 — snapshot copiable values: name, P/T,
                 // subtypes, keyword names, colour identity. v1 lossy:
@@ -211,7 +228,11 @@ public static class KikiJikiMirrorBreakerFactory
                         });
 
                     var delayed = new DelayedTriggeredAbility(
-                        source: card,
+                        // Anchor the delayed exile to the LIVE source (= the
+                        // bearer after a RebindTo) rather than the captured Kiki,
+                        // so the re-homed copy's end-step exile is sourced from the
+                        // bearer.
+                        source: self,
                         controller: controller,
                         condition: new EventTriggerCondition<StepStartedEvent>(
                             (e, _) => e.StepType == StepStateType.End
@@ -220,6 +241,8 @@ public static class KikiJikiMirrorBreakerFactory
 
                     triggers.RegisterDelayed(delayed);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         tapAbility = new ActivatedAbility(
@@ -227,6 +250,11 @@ public static class KikiJikiMirrorBreakerFactory
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
             effects: new IEffect[] { tapEffect },
+            // Agatha's Soul Cauldron re-home soundness (CR 707.2 / 613.1f): the
+            // target gather, "another"/"you control" checks, token controller,
+            // and delayed-exile source all read the live ResolutionContext
+            // (Source / Controller / ChosenTargets), never the captured Kiki.
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(
