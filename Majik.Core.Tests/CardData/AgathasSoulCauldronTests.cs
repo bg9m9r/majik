@@ -6074,6 +6074,109 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_FloodpitsDrowner_ShufflesBearerNotExiledCard()
+    {
+        // agatha-bespoke-factory-tail-source-migration-batch — Floodpits Drowner's
+        // "{1}{U}, {T}: Shuffle THIS CREATURE and target creature with a stun
+        // counter into their owners' libraries." The "this creature" half now
+        // reads ResolutionContext.Source (the re-homed bearer under Agatha), so
+        // the granted ability shuffles the BEARER away, never the exiled Floodpits.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var floodpits = FloodpitsDrownerFactory.Create(alice);
+        var realAbilities = floodpits.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Floodpits has exactly one non-mana activated ability — the {1}{U}, {T} shuffle");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated shuffle reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(floodpits);
+        floodpits.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A stunned enemy creature for the granted ability to target — owned by
+        // Bob, so it must return to BOB's library.
+        var enemy = new Creature("Stunned Enemy", "1G", 2, 2);
+        enemy.SetOwner(bob);
+        enemy.ChangeController(bob);
+        bob.Zones.Library.AddCard(enemy);
+        zones.MoveCard(enemy, ZoneType.Library, ZoneType.Battlefield, bob);
+        enemy.Counters.Add(CounterType.Stun, 1);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), floodpits);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Floodpits' real shuffle is re-homed via RebindTo");
+        var shuffle = granted[0];
+        shuffle.Source.Should().BeSameAs(bearer,
+            "the re-homed shuffle is sourced on the BEARER (CR 707.2)");
+        shuffle.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        shuffle.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER (AdditionalCost.RebindSource)");
+
+        shuffle.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { enemy } });
+        await shuffle.ResolveAsync(agent: null, game: null);
+
+        bearer.Zone.Should().Be(ZoneType.Library,
+            "the re-homed shuffle put the BEARER into its owner's library, never the exiled Floodpits");
+        alice.Zones.Library.GetCards().Should().Contain(bearer,
+            "the bearer lands in its OWNER's library (CR 701.19)");
+        enemy.Zone.Should().Be(ZoneType.Library,
+            "the stunned target is shuffled into its owner's library");
+        bob.Zones.Library.GetCards().Should().Contain(enemy,
+            "the target lands in ITS owner's library (Bob), not the bearer's controller's");
+        floodpits.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted Floodpits is never touched by the granted ability");
+    }
+
+    [Fact]
+    public async Task BespokeFloodpitsShuffle_ShufflesOwnSourceWhenNotRebound()
+    {
+        // Un-rebound posture: the legacy ResolutionContext (Source = null) falls
+        // back to `card`, so the ability still shuffles Floodpits itself.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var floodpits = FloodpitsDrownerFactory.Create(alice);
+        alice.Zones.Library.AddCard(floodpits);
+        zones.MoveCard(floodpits, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var enemy = new Creature("Stunned Enemy", "1G", 2, 2);
+        enemy.SetOwner(bob);
+        enemy.ChangeController(bob);
+        bob.Zones.Library.AddCard(enemy);
+        zones.MoveCard(enemy, ZoneType.Library, ZoneType.Battlefield, bob);
+        enemy.Counters.Add(CounterType.Stun, 1);
+
+        var shuffle = floodpits.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        shuffle.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { enemy } });
+
+        // ResolveAsync with game: null threads ResolutionContext.Source = the
+        // ability's own (un-rebound) source AND its chosen targets, but with no
+        // Agatha re-home Source = floodpits, so it shuffles itself.
+        await shuffle.ResolveAsync(agent: null, game: null);
+
+        floodpits.Zone.Should().Be(ZoneType.Library,
+            "the un-rebound shuffle put its own source into its owner's library");
+        enemy.Zone.Should().Be(ZoneType.Library,
+            "the un-rebound shuffle also shuffled the stunned target away");
+    }
+
+    [Fact]
     public async Task Grant_RebindsBespokeFactoryCreature_Tasigur_ReturnReadsBearerController()
     {
         var alice = new Player("Alice", 20);

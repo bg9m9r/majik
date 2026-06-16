@@ -172,6 +172,22 @@ public static class FloodpitsDrownerFactory
 
     private static ActivatedAbility BuildShuffleAbility(Creature card, Player owner)
     {
+        // RE-SOURCE-SAFE (agatha-bespoke-factory-tail-source-migration-batch):
+        // "Shuffle THIS CREATURE and target stunned creature into their owners'
+        // libraries" — the "this creature" half is the ability's own source, so
+        // the effect reads the live ResolutionContext.Source (the re-homed bearer
+        // under Agatha) rather than capturing `card`, falling back to `card` only
+        // on the context-less legacy sync path (ResolutionContext.Legacy, Source =
+        // null). The {T} portion of the cost is AdditionalCost.Tap, which RebindTo
+        // Stage 1 re-homes onto the new source automatically (AdditionalCost
+        // .RebindSource). The target gatherer is NOT controller-scoped (any
+        // creature with a stun counter), so RebindController no-ops on it.
+        // Marked RebindSafe so Agatha's Soul Cauldron re-homes this REAL ability
+        // to a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+        // 613.1f): the BEARER (not the exiled Floodpits) taps + is shuffled away.
+        // "Shuffle self + stunned target into owners' libraries" is OUTSIDE the
+        // OracleActivatedAbilityBinder reconstructable set, so RebindTo of the
+        // real ability is the only sound re-home.
         var shuffleEffect = new Effect(
             "Floodpits Drowner — shuffle this and target stunned creature into owners' libraries",
             ctx =>
@@ -179,6 +195,9 @@ public static class FloodpitsDrownerFactory
                 if (ctx.ChosenTargets.Count == 0) return ValueTask.CompletedTask;
                 if (ctx.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask;
                 if (ctx.ChosenTargets[0][0] is not Permanent target) return ValueTask.CompletedTask;
+
+                // The re-homed bearer under Agatha (ctx.Source), else this card.
+                var self = (ctx.Source as Permanent) ?? card;
 
                 // CR 608.2b — re-check legality: target must still be a creature
                 // on the battlefield with a stun counter on it.
@@ -188,11 +207,12 @@ public static class FloodpitsDrownerFactory
                 if (!targetLegal) return ValueTask.CompletedTask;
 
                 // CR 701.19 — both cards go to THEIR OWNERS' libraries, then
-                // those libraries are shuffled. (Floodpits may already be gone
-                // if something removed it after the cost was paid — guard it.)
-                if (card.Zone == ZoneType.Battlefield)
+                // those libraries are shuffled. (The self permanent may already
+                // be gone if something removed it after the cost was paid — guard
+                // it. Don't double-shuffle if self IS the chosen target.)
+                if (self.Zone == ZoneType.Battlefield && !ReferenceEquals(self, target))
                 {
-                    ShuffleIntoOwnersLibrary(card);
+                    ShuffleIntoOwnersLibrary(self);
                 }
                 ShuffleIntoOwnersLibrary(target);
 
@@ -208,6 +228,7 @@ public static class FloodpitsDrownerFactory
                 AdditionalCost.Tap(card),
             },
             effects: new IEffect[] { shuffleEffect },
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(
