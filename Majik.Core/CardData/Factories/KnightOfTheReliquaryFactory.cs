@@ -153,7 +153,20 @@ public static class KnightOfTheReliquaryFactory
             $"{CardName}: sac Forest/Plains, tutor a land -> battlefield, shuffle",
             async ctx =>
             {
-                var controller = card.Controller ?? owner;
+                // RE-SOURCE-SAFE (agatha-candidate-gatherer-rebind): read the
+                // SOURCE permanent + its controller off the live
+                // ResolutionContext (CR 113.7 / 608.2g) rather than capturing
+                // `card` / `owner`. Under Agatha's Soul Cauldron this tutor is
+                // re-homed onto a counter-bearing bearer via
+                // ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the
+                // candidate-gathering for "Sacrifice a Forest or Plains" and
+                // the searched library are the BEARER's controller's — never
+                // the exiled Knight or its original owner. Falls back to
+                // `card` / `owner` on the context-less synchronous path
+                // (ctx.Source null) so the direct effect-firing tests keep
+                // working.
+                var source = ctx.Source as Creature ?? card;
+                var controller = source.Controller ?? ctx.Controller ?? owner;
 
                 // CR 117 — sacrifice cost payment (effect-closure stand-in
                 // until AdditionalCost.Sacrifice runs the move itself).
@@ -221,7 +234,18 @@ public static class KnightOfTheReliquaryFactory
             {
                 AdditionalCost.Tap(card),
             },
-            effects: new IEffect[] { tutorEffect });
+            effects: new IEffect[] { tutorEffect },
+            // RE-SOURCE-SAFE: the tutor effect reads its source + controller off
+            // the live ResolutionContext (ctx.Source / ctx.Controller), and the
+            // {T} cost re-homes onto the new source via AdditionalCost.RebindSource
+            // (Stage 1). So Agatha's Soul Cauldron may re-home the REAL ability to
+            // a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
+            // 613.1f): the bearer's controller picks which Forest/Plains to
+            // sacrifice and which library to search. A "Sacrifice a Forest or
+            // Plains: search for any land" ability is outside
+            // OracleActivatedAbilityBinder's reconstructable set, so RebindTo of
+            // the real ability is the only sound re-home.
+            rebindSafe: true);
 
         card.AddAbility(tutorAbility);
 
