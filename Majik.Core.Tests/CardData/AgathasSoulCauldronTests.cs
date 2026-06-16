@@ -2621,11 +2621,12 @@ public class AgathasSoulCauldronTests
         var zones = new Majik.Core.Services.ZoneService(bus);
 
         // A creature whose only ability is a bespoke, NON-reconstructable one:
-        // a tutor whose TYPED sub-filter ("Equipment card") is not a plain
-        // card-type test AND whose destination is the battlefield, not the hand —
-        // outside the open library-tutor-to-hand shape the binder reconstructs.
-        // Plus an "Activate only" rider on a pump (must be skipped too — sound,
-        // not broken) and an unmodellable-cost ({E}{E}) pinger.
+        // a tutor whose TYPED sub-filter ("basic land card") is not a plain
+        // card-type test — outside the open Equipment/land library-tutor shapes
+        // the binder reconstructs (the "basic" qualifier is rejected by the
+        // search-to-battlefield candidate filter). Plus an "Activate only" rider
+        // on a pump (must be skipped too — sound, not broken) and an
+        // unmodellable-cost ({E}{E}) pinger.
         var bespoke = new Creature("Bespoke Stub", "2GG", 3, 3);
         bespoke.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(bespoke);
@@ -2635,7 +2636,7 @@ public class AgathasSoulCauldronTests
 
         var cauldron = GrantingCauldron(alice, effects, bus,
             OracleStub(("Bespoke Stub",
-                "{2}, {T}: Search your library for an Equipment card, put it onto "
+                "{2}, {T}: Search your library for a basic land card, put it onto "
                 + "the battlefield, then shuffle.\n"
                 + "{G}: This creature gets +2/+2 until end of turn. Activate only as a sorcery.\n"
                 + "{E}{E}: This creature deals 2 damage to any target.")));
@@ -7194,5 +7195,159 @@ public class AgathasSoulCauldronTests
 
         bearer.Zone.Should().Be(ZoneType.Battlefield,
             "CR 113.6 — a battlefield bearer is not in a graveyard; the ability no-ops");
+    }
+
+    [Fact]
+    public void Grant_NonMana_SearchLandToBattlefield_RehomesTutorToBearersController()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+        Majik.Core.Services.ZoneServiceRegistry.Set(alice, zones);
+        try
+        {
+            // Imprinted creature whose only ability is a land tutor onto the
+            // battlefield (Knight of the Reliquary's EFFECT shape, with a
+            // reconstructable {1}{G}, {T} cost in place of the typed-sacrifice
+            // cost the binder doesn't model): "{1}{G}, {T}: Search your library
+            // for a land card, put it onto the battlefield, then shuffle."
+            // Re-homing is sound: the BEARER is only the source / cost-payer (its
+            // own {T} cost taps it); the search reads the BEARER's CONTROLLER's
+            // OWN library (CR 109.5 / 400.7 — "your" = the ability's controller),
+            // the chosen land enters that controller's battlefield, and that
+            // controller's library is shuffled — never the exiled imprinted card.
+            var reliquary = new Creature("Reliquary Stub", "1GW", 2, 2);
+            reliquary.SetOwner(alice);
+            alice.Zones.Graveyard.AddCard(reliquary);
+            reliquary.SetZone(ZoneType.Graveyard);
+
+            var bearer = SeatedBearer(alice, effects, zones);
+
+            // A land in ALICE's (the bearer's controller's) library — the only
+            // sound tutor target.
+            var aliceLand = new Land("Sacred Foundry Stub");
+            aliceLand.SetOwner(alice);
+            alice.Zones.Library.AddCard(aliceLand);
+            aliceLand.SetZone(ZoneType.Library);
+
+            // A land in BOB's library — must NEVER be tutored, because "your
+            // library" scopes to the ability's controller (Alice).
+            var bobLand = new Land("Enemy Land Stub");
+            bobLand.SetOwner(bob);
+            bob.Zones.Library.AddCard(bobLand);
+            bobLand.SetZone(ZoneType.Library);
+
+            var cauldron = GrantingCauldron(alice, effects, bus,
+                OracleStub(("Reliquary Stub",
+                    "{1}{G}, {T}: Search your library for a land card, put it onto the battlefield, then shuffle.")));
+            alice.Zones.Library.AddCard(cauldron);
+            zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+            Resolve(TapAbility(cauldron), reliquary);
+
+            var granted = GrantedActivated(bearer);
+            granted.Should().ContainSingle(
+                "the bearer gains the imprinted creature's land-tutor ability");
+            var tutor = granted[0];
+            tutor.Source.Should().BeSameAs(bearer,
+                "the granted ability is re-homed to the BEARER, not the exiled card");
+            tutor.Costs.OfType<ManaCostCost>()
+                .Should().ContainSingle(c => c.Description.Contains("G"));
+            tutor.Costs.OfType<AdditionalCost>()
+                .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                    "the re-homed {T} cost taps the BEARER");
+            tutor.TargetRequests.Should().BeEmpty(
+                "the search/pick happens at resolution — the ability targets nothing");
+
+            // Resolving (no agent registered → deterministic first-eligible land)
+            // tutors ALICE's land onto ALICE's battlefield, never Bob's.
+            foreach (var effect in tutor.Effects) effect.Execute();
+
+            aliceLand.Zone.Should().Be(ZoneType.Battlefield,
+                "the re-homed tutor puts the controller's land onto the battlefield (CR 701.19a)");
+            alice.Zones.Battlefield.GetCards().Should().Contain(aliceLand,
+                "the land enters the BEARER's controller's battlefield");
+            alice.Zones.Library.GetCards().Should().NotContain(aliceLand,
+                "the land left the controller's library");
+            bobLand.Zone.Should().Be(ZoneType.Library,
+                "'your library' scopes to the ability's controller — the opponent's land is untouched");
+            reliquary.Zone.Should().Be(ZoneType.Exile,
+                "the exiled imprinted card is never touched by the granted ability");
+        }
+        finally
+        {
+            Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
+        }
+    }
+
+    [Fact]
+    public void Grant_NonMana_SearchEquipmentToBattlefield_RehomesTutorToBearersController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+        Majik.Core.Services.ZoneServiceRegistry.Set(alice, zones);
+        try
+        {
+            // Imprinted creature whose only ability tutors an Equipment onto the
+            // battlefield: "{1}{W}, {T}: Search your library for an Equipment
+            // card, put it onto the battlefield, then shuffle." (the
+            // search-to-battlefield Equipment sibling of the land tutor). Sound to
+            // re-home: the BEARER's controller searches THEIR library for the
+            // Equipment (Artifact — Equipment subtype, CR 301.5d), it enters that
+            // controller's battlefield, and the library is shuffled.
+            var mystic = new Creature("Mystic Stub", "1W", 1, 2);
+            mystic.SetOwner(alice);
+            alice.Zones.Graveyard.AddCard(mystic);
+            mystic.SetZone(ZoneType.Graveyard);
+
+            var bearer = SeatedBearer(alice, effects, zones);
+
+            // An Equipment in ALICE's library (Artifact with the Equipment
+            // subtype) — the sound tutor target.
+            var sword = new Artifact("Sword Stub", "2",
+                subtypes: new[] { CardSubtype.Equipment });
+            sword.SetOwner(alice);
+            alice.Zones.Library.AddCard(sword);
+            sword.SetZone(ZoneType.Library);
+
+            // A non-Equipment artifact in the library — must NOT be tutored
+            // (the candidate filter is Equipment-only).
+            var rock = new Artifact("Mana Rock Stub", "2");
+            rock.SetOwner(alice);
+            alice.Zones.Library.AddCard(rock);
+            rock.SetZone(ZoneType.Library);
+
+            var cauldron = GrantingCauldron(alice, effects, bus,
+                OracleStub(("Mystic Stub",
+                    "{1}{W}, {T}: Search your library for an Equipment card, put it onto the battlefield, then shuffle.")));
+            alice.Zones.Library.AddCard(cauldron);
+            zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+            Resolve(TapAbility(cauldron), mystic);
+
+            var granted = GrantedActivated(bearer);
+            granted.Should().ContainSingle(
+                "the bearer gains the imprinted creature's Equipment-tutor ability");
+            var tutor = granted[0];
+            tutor.Source.Should().BeSameAs(bearer,
+                "the granted ability is re-homed to the BEARER, not the exiled card");
+
+            foreach (var effect in tutor.Effects) effect.Execute();
+
+            sword.Zone.Should().Be(ZoneType.Battlefield,
+                "the re-homed tutor puts the controller's Equipment onto the battlefield");
+            alice.Zones.Battlefield.GetCards().Should().Contain(sword,
+                "the Equipment enters the BEARER's controller's battlefield");
+            rock.Zone.Should().Be(ZoneType.Library,
+                "a non-Equipment artifact is excluded by the printed candidate filter");
+        }
+        finally
+        {
+            Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
+        }
     }
 }
