@@ -219,4 +219,70 @@ public class InfernoTitanFactoryTests
 
         act.Should().NotThrow("CR 608.2b — no legal targets = the ability does nothing.");
     }
+
+    // -----------------------------------------------------------------------
+    // Agent-driven divide-damage prompt at stack entry (CR 601.2d / CR 119.4)
+    // — the real triggered/activated divide-damage seam this card unblocks.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void DamageTriggers_DeclareDivisionSpecForThree()
+    {
+        var c = InfernoTitanFactory.Create(_alice);
+
+        var etb = GetEtbTrigger(c);
+        var attack = GetAttackTrigger(c);
+
+        foreach (var t in new[] { etb, attack })
+        {
+            t.DamageDivision.Should().NotBeNull(
+                "CR 601.2d — both triggers announce a divide-damage of 3.");
+            t.DamageDivision!.TotalDamage.Should().Be(3);
+            t.TargetRequests.Should().ContainSingle();
+            t.TargetRequests[0].MinTargets.Should().Be(1);
+            t.TargetRequests[0].MaxTargets.Should().Be(3);
+        }
+    }
+
+    [Fact]
+    public async Task EtbTrigger_AgentAnnouncedSplit_DealtVerbatim_ThroughTriggerManager()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new Majik.Core.Abilities.TriggerManager(stack, bus);
+        var resolver = new Majik.Core.Services.StackResolver(
+            bus, new Majik.Core.Services.ZoneService(bus));
+
+        var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob };
+        grizzly.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(grizzly);
+
+        var titan = InfernoTitanFactory.Create(_alice, triggers);
+        titan.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(titan);
+
+        var etb = GetEtbTrigger(titan);
+        triggers.EvaluateTriggers(
+            new CardMovedEvent(titan, ZoneType.Hand, ZoneType.Battlefield));
+        triggers.PendingCount.Should().Be(1);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { etb });
+        agent.QueueTargets(new object[] { _bob, grizzly });
+        agent.QueueDamageDivision(1, 2); // Bob 1, grizzly 2 (skew vs 2/1 even split)
+
+        var ctx = new Majik.Core.Game.GameContext(
+            _alice, new[] { _alice, _bob }, _alice, 1,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain, stack);
+
+        await triggers.PutPendingTriggersOnStackAsync(
+            _alice, new Dictionary<Player, Majik.Core.Players.Agents.IPlayerAgent> { [_alice] = agent }, ctx);
+
+        var bobLife = _bob.LifeTotal;
+        while (!stack.IsEmpty) resolver.ResolveTop(stack);
+
+        _bob.LifeTotal.Should().Be(bobLife - 1, "CR 601.2d — Bob took the announced 1.");
+        grizzly.Damage.Should().Be(2, "grizzly took the announced 2.");
+    }
 }

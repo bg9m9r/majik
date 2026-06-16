@@ -120,6 +120,64 @@ public static class Fx
     }
 
     /// <summary>
+    /// CR 601.2d / CR 119.4 / CR 306.7 — resolve a "deals N damage divided as
+    /// you choose among …" TRIGGERED ability off its live
+    /// <see cref="ResolutionContext"/>: deal each chosen target the amount the
+    /// controller's agent announced at stack entry
+    /// (<see cref="ResolutionContext.DamageDivision"/>), routing
+    /// Player / Creature / Planeswalker through <see cref="DealDamageAny(object,int,Creature?)"/>.
+    /// <para>
+    /// When no division was recorded (the no-agent dispatcher path, or a
+    /// single legal target) the printed <paramref name="totalDamage"/> is split
+    /// EVENLY over the chosen targets of slot <paramref name="targetSlotIndex"/>
+    /// (remainder front-loaded — <see cref="DamageDivisionDefaults.EvenSplit"/>),
+    /// preserving the historical pre-prompt behaviour. An announced split is
+    /// mapped by its <see cref="Game.DamageAllocation.TargetSlotPosition"/> onto
+    /// the live (re-resolved) slot, so a target that became illegal at
+    /// resolution (CR 608.2b) is simply skipped without shifting the others'
+    /// amounts.
+    /// </para>
+    /// </summary>
+    public static void DealDividedDamageAny(
+        ResolutionContext rc, int totalDamage, Creature? source = null, int targetSlotIndex = 0)
+    {
+        ArgumentNullException.ThrowIfNull(rc);
+        if (totalDamage <= 0) return;
+
+        var slots = rc.ChosenTargets;
+        if (targetSlotIndex < 0 || targetSlotIndex >= slots.Count) return;
+        var targets = slots[targetSlotIndex];
+        if (targets.Count == 0) return;
+
+        var perPosition = new int[targets.Count];
+        var announced = rc.DamageDivisionOrEmpty;
+        if (announced.Count > 0)
+        {
+            // CR 601.2d — map the announced split onto each slot position.
+            foreach (var alloc in announced)
+            {
+                if (alloc.TargetSlotPosition >= 0 && alloc.TargetSlotPosition < perPosition.Length)
+                {
+                    perPosition[alloc.TargetSlotPosition] = alloc.Amount;
+                }
+            }
+        }
+        else
+        {
+            // CR 119.4 — no division recorded: degenerate to the even split.
+            var even = DamageDivisionDefaults.EvenSplit(totalDamage, targets.Count);
+            for (var i = 0; i < perPosition.Length; i++) perPosition[i] = even[i];
+        }
+
+        for (var i = 0; i < targets.Count; i++)
+        {
+            var share = perPosition[i];
+            if (share <= 0) continue; // illegal-at-resolution slot or 0 allocation
+            DealDamageAny(targets[i], share, source);
+        }
+    }
+
+    /// <summary>
     /// CR 701.12 — Fight. <paramref name="a"/> and <paramref name="b"/> each
     /// deal damage equal to their (current) power to the other SIMULTANEOUSLY
     /// (CR 701.12a). This is damage, but NOT combat damage — first strike,

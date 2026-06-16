@@ -35,6 +35,17 @@ public class TriggeredAbility : ITriggeredAbility
     // resolution context (ResolutionContext.ChosenModes).
     private IReadOnlyList<int>? _chosenModes;
 
+    // CR 601.2d / CR 119.4 — deferred divide-damage announcement for a
+    // "deals N damage divided as you choose among …" TRIGGERED ability
+    // (Inferno Titan's enters-or-attacks trigger, Fury's ETB). The spec is
+    // declared at construction time (the triggered-ability analogue of the
+    // spell path's SpellDefinition.DamageDivision); the chosen per-target
+    // split is recorded after the controller's agent responds at stack-entry
+    // time (Rule 603.3, right after ChosenTargets), then threaded into
+    // ResolutionContext.DamageDivision at resolve time. Null until prompted
+    // (or when the trigger deals no divided damage).
+    private IReadOnlyList<Game.DamageAllocation>? _chosenDamageDivision;
+
     public Guid Id { get; }
     public Player Controller { get; }
     public DateTime Timestamp { get; }
@@ -103,6 +114,32 @@ public class TriggeredAbility : ITriggeredAbility
     public IReadOnlyList<int>? ChosenModes => _chosenModes;
 
     /// <summary>
+    /// CR 601.2d / CR 119.4 — the "deals N damage divided as you choose among
+    /// …" announcement this trigger carries, declared at construction time.
+    /// Null for a trigger that deals no divided damage. When present, the
+    /// engine prompts the controller's agent for the per-target split AFTER
+    /// targets are chosen (Rule 603.3, in
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/>) and records
+    /// the answer via <see cref="SetChosenDamageDivision"/> — the
+    /// triggered-ability analogue of the spell path's
+    /// <see cref="SpellDefinition.DamageDivision"/>
+    /// (<see cref="SpellCastFlow.DivideDamageAsync"/>).
+    /// </summary>
+    public DamageDivisionSpec? DamageDivision { get; }
+
+    /// <summary>
+    /// CR 601.2d — the per-target damage split chosen by the controller's agent
+    /// for this trigger's <see cref="DamageDivision"/>. Populated by
+    /// <see cref="SetChosenDamageDivision"/> before the ability is pushed onto
+    /// the stack; threaded into <see cref="ResolutionContext.DamageDivision"/>
+    /// at resolve time. Null until the engine prompts (or when the trigger is
+    /// non-divided, or a null agent records nothing — the effect body then
+    /// falls back to an even split). Each entry pairs a chosen target token
+    /// (and its position in the divided slot) with the assigned amount.
+    /// </summary>
+    public IReadOnlyList<Game.DamageAllocation>? ChosenDamageDivision => _chosenDamageDivision;
+
+    /// <summary>
     /// CR 603.3 — the player identified by THIS trigger's event as it was
     /// evaluated (the "that player" / triggering player), captured by the
     /// trigger condition the moment it matches and read back by an UNTARGETED
@@ -136,7 +173,8 @@ public class TriggeredAbility : ITriggeredAbility
         IEnumerable<ZoneType>? activeZones = null,
         IEnumerable<TargetRequest>? targetRequests = null,
         Func<bool>? activeWhen = null,
-        ModeRequest? modeRequest = null)
+        ModeRequest? modeRequest = null,
+        Game.DamageDivisionSpec? damageDivision = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -165,6 +203,7 @@ public class TriggeredAbility : ITriggeredAbility
             : targetRequests.ToList().AsReadOnly();
 
         ModeRequest = modeRequest;
+        DamageDivision = damageDivision;
 
         if (targets != null)
         {
@@ -203,7 +242,8 @@ public class TriggeredAbility : ITriggeredAbility
             activeZones: ActiveZones,
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
             activeWhen: ActiveWhen,
-            modeRequest: ModeRequest);
+            modeRequest: ModeRequest,
+            damageDivision: DamageDivision);
 
     /// <summary>
     /// Store the targets chosen by the controller's agent. Called by
@@ -224,6 +264,18 @@ public class TriggeredAbility : ITriggeredAbility
     /// <see cref="ResolutionContext.ChosenModes"/> at resolution.
     /// </summary>
     public void SetChosenModes(IReadOnlyList<int>? chosen) => _chosenModes = chosen;
+
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — store the per-target damage split chosen by the
+    /// controller's agent for this trigger's <see cref="DamageDivision"/>.
+    /// Called by <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/>
+    /// immediately after <see cref="SetChosenTargets"/> and before pushing the
+    /// ability onto the stack, mirroring <see cref="SetChosenModes"/>. The
+    /// recorded allocations are threaded into
+    /// <see cref="ResolutionContext.DamageDivision"/> at resolution.
+    /// </summary>
+    public void SetChosenDamageDivision(IReadOnlyList<Game.DamageAllocation>? chosen) =>
+        _chosenDamageDivision = chosen;
 
     public bool IsTriggered(GameEvent e)
     {
@@ -277,7 +329,11 @@ public class TriggeredAbility : ITriggeredAbility
         var rc = ResolutionContext.For(
                 Controller, agent, game, _chosenTargets, ct, source: Source as Permanent)
             with
-            { TriggeringPlayer = TriggeringPlayer, ChosenModes = _chosenModes };
+            {
+                TriggeringPlayer = TriggeringPlayer,
+                ChosenModes = _chosenModes,
+                DamageDivision = _chosenDamageDivision,
+            };
 
         // Attribute any counter performed during this ability's resolution to
         // its controller — "a spell or ability you control counters a spell"

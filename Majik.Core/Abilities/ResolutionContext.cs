@@ -151,6 +151,35 @@ public sealed record ResolutionContext(
     /// </summary>
     public int? ChosenMode => ChosenModes is { Count: > 0 } m ? m[0] : (int?)null;
 
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — the per-target damage split the controller's
+    /// agent announced for a "deals N damage divided as you choose among …"
+    /// TRIGGERED ability (Inferno Titan's enters-or-attacks trigger, Fury's
+    /// ETB), threaded from <see cref="TriggeredAbility.ChosenDamageDivision"/>
+    /// by <see cref="TriggeredAbility.ResolveAsync"/>. The engine prompts the
+    /// controller's agent for the split at STACK-ENTRY time (Rule 603.3, in
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/>) and records
+    /// it on the stack object the way <see cref="ChosenTargets"/> /
+    /// <see cref="ChosenModes"/> already are — so a divided-damage trigger
+    /// effect deals the announced amounts (per chosen target) off the live
+    /// context instead of a captured even-split closure. This is the
+    /// triggered/activated-dispatch analogue of the spell path's
+    /// <see cref="ChosenSpellParams.DamageDivision"/>.
+    /// <para>
+    /// Null on the spell path (use <see cref="ChosenSpellParams.DamageDivision"/>),
+    /// the legacy sync path, a non-divided trigger, or the no-agent dispatcher
+    /// path; effect bodies fall back to an even split in that case.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<Game.DamageAllocation>? DamageDivision { get; init; }
+
+    /// <summary>
+    /// Non-null view of <see cref="DamageDivision"/> — empty when the resolving
+    /// trigger announced no divided-damage split. See CR 601.2d.
+    /// </summary>
+    public IReadOnlyList<Game.DamageAllocation> DamageDivisionOrEmpty =>
+        DamageDivision ?? Array.Empty<Game.DamageAllocation>();
+
     private static readonly IReadOnlyDictionary<int, Player> EmptySharedSlot =
         new Dictionary<int, Player>();
 
