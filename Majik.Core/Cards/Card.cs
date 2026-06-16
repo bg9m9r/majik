@@ -346,22 +346,43 @@ public class Card : ICard
     public bool RuntimeExileCastSpendAsAnyColor { get; private set; }
 
     /// <summary>
+    /// CR 702.35c — whether the active runtime exile-cast grant is specifically
+    /// the MADNESS cast window (opened by the discard funnel
+    /// <see cref="Majik.Core.Primitives.Fx.DiscardCard"/> consulting
+    /// <see cref="Majik.Core.Keywords.MadnessCatalog"/>), as opposed to the
+    /// generic impulse-style exile-cast permission (Ragavan, Robber of the Rich,
+    /// Light Up the Stage). When <c>true</c>, paying
+    /// <see cref="RuntimeExileCastCost"/> under this grant is "paying the madness
+    /// cost", so the cast machinery stamps <see cref="WasCastForMadnessCost"/>
+    /// (and any chosen madness {X} into <see cref="MadnessCastX"/>) on this card
+    /// — the resolution-time flag a "if its madness cost was paid" ETB trigger
+    /// (Grave Scrabbler) / spell rider (Welcome to the Fold) reads. Default
+    /// <c>false</c>; the impulse-cast cards never set it, so their casts never
+    /// stamp the madness flag.
+    /// </summary>
+    public bool RuntimeExileCastIsMadness { get; private set; }
+
+    /// <summary>
     /// Stamp an exile-cast grant on this card. <paramref name="allowedCaster"/>
     /// is the player who may cast (need not be the owner); <paramref name="cost"/>
     /// is the mana cost they pay (typically the card's printed cost).
     /// <paramref name="spendAsAnyColor"/> (CR 609.4b) additionally permits the
     /// allowed caster to pay that cost as though the mana were any color (Robber
-    /// of the Rich). Idempotent — later grants overwrite earlier ones. Cleared
-    /// at EOT by the granting effect's bookkeeping.
+    /// of the Rich). <paramref name="isMadness"/> (CR 702.35c) marks this as the
+    /// madness cast window so a successful cast stamps
+    /// <see cref="WasCastForMadnessCost"/>. Idempotent — later grants overwrite
+    /// earlier ones. Cleared at EOT by the granting effect's bookkeeping.
     /// </summary>
     public void GrantRuntimeExileCast(
-        Player allowedCaster, ValueObjects.ManaCost cost, bool spendAsAnyColor = false)
+        Player allowedCaster, ValueObjects.ManaCost cost,
+        bool spendAsAnyColor = false, bool isMadness = false)
     {
         if (allowedCaster == null) throw new ArgumentNullException(nameof(allowedCaster));
         if (cost == null) throw new ArgumentNullException(nameof(cost));
         RuntimeExileCastAllowedCaster = allowedCaster;
         RuntimeExileCastCost = cost;
         RuntimeExileCastSpendAsAnyColor = spendAsAnyColor;
+        RuntimeExileCastIsMadness = isMadness;
     }
 
     /// <summary>Clear any runtime exile-cast grant on this card.</summary>
@@ -370,6 +391,60 @@ public class Card : ICard
         RuntimeExileCastAllowedCaster = null;
         RuntimeExileCastCost = null;
         RuntimeExileCastSpendAsAnyColor = false;
+        RuntimeExileCastIsMadness = false;
+    }
+
+    /// <summary>
+    /// CR 702.35c — set at madness-cast PAY time (before the
+    /// <see cref="Majik.Core.Spells.Spell"/> stack object exists), recording that
+    /// this card's cast paid its MADNESS cost rather than its normal cost. This
+    /// is the resolution-flag seam a "if its madness cost was paid" rider reads:
+    /// <list type="bullet">
+    ///   <item>Grave Scrabbler — the creature's ETB trigger ("When this creature
+    ///   enters, <b>if its madness cost was paid</b>, you may return target
+    ///   creature card …") gates on this surviving onto the resolving permanent
+    ///   (the same <see cref="Card"/> instance is the spell and the permanent).</item>
+    ///   <item>Welcome to the Fold — the sorcery's resolution reads this off
+    ///   <see cref="Majik.Core.Abilities.ResolutionContext.SourceCard"/> to switch
+    ///   to the madness-X toughness gate.</item>
+    /// </list>
+    /// Parallels <see cref="PendingCastX"/> / <see cref="PendingCastColorCounts"/>
+    /// as a per-cast, pay-time stamp; cleared by the consuming rider (or on any
+    /// later non-madness cast) so a blink / token copy never reuses it.
+    /// </summary>
+    public bool WasCastForMadnessCost { get; private set; }
+
+    /// <summary>
+    /// CR 702.35c — the value chosen for {X} when this card was cast for its
+    /// madness cost, for a madness cost that contains {X} (Welcome to the Fold's
+    /// Madness {X}{U}{U}, From Under the Floorboards' {X}{B}{B}, Avacyn's
+    /// Judgment's {X}{R}). The normal-cast {X} already lands in
+    /// <see cref="PendingCastX"/>; this captures it under the madness path too so
+    /// a "if its madness cost was paid, instead … X …" rider reads the madness X.
+    /// Null when the card was not cast for madness, or the madness cost had no
+    /// {X}.
+    /// </summary>
+    public int? MadnessCastX { get; private set; }
+
+    /// <summary>Stamp the madness-paid flag (and the chosen madness {X}, if any)
+    /// at madness-cast pay time. Called by
+    /// <see cref="Majik.Core.Game.TurnDriver"/> when the cast pays
+    /// <see cref="RuntimeExileCastCost"/> under a
+    /// <see cref="RuntimeExileCastIsMadness"/> grant.</summary>
+    public void MarkCastForMadness(int? madnessX = null)
+    {
+        WasCastForMadnessCost = true;
+        MadnessCastX = madnessX;
+    }
+
+    /// <summary>Clear the madness-paid stamp. Called by the consuming rider once
+    /// it has read the flag (Grave Scrabbler's ETB, Welcome to the Fold's
+    /// resolution), and at the start of any non-madness cast, so a later non-cast
+    /// battlefield entry (blink, token copy) or a normal cast never reuses it.</summary>
+    public void ClearCastForMadness()
+    {
+        WasCastForMadnessCost = false;
+        MadnessCastX = null;
     }
 
     /// <summary>
@@ -1796,6 +1871,7 @@ public class Card : ICard
         RuntimeExileCastAllowedCaster = src.RuntimeExileCastAllowedCaster;
         RuntimeExileCastCost = src.RuntimeExileCastCost;
         RuntimeExileCastSpendAsAnyColor = src.RuntimeExileCastSpendAsAnyColor;
+        RuntimeExileCastIsMadness = src.RuntimeExileCastIsMadness;
         RuntimeExileLandPlayAllowedPlayer = src.RuntimeExileLandPlayAllowedPlayer;
         RuntimeGraveyardNonOwnerCastAllowedCaster = src.RuntimeGraveyardNonOwnerCastAllowedCaster;
         RuntimeGraveyardNonOwnerCastCost = src.RuntimeGraveyardNonOwnerCastCost;
@@ -1813,6 +1889,8 @@ public class Card : ICard
         PendingCastColors = src.PendingCastColors;
         PendingCastColorCounts = src.PendingCastColorCounts;
         PendingCastUncounterable = src.PendingCastUncounterable;
+        WasCastForMadnessCost = src.WasCastForMadnessCost;
+        MadnessCastX = src.MadnessCastX;
         TotalManaSpentThisCast = src.TotalManaSpentThisCast;
         PendingCastTargets = src.PendingCastTargets;
     }

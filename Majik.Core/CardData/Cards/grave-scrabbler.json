@@ -1,0 +1,8 @@
+{
+  "name": "Grave Scrabbler",
+  "types": ["Creature"],
+  "subtypes": ["Zombie"],
+  "manaCost": "{3}{B}",
+  "power": 2,
+  "toughness": 2
+}

@@ -1080,6 +1080,27 @@ public sealed class TurnDriver
                 if (castCard is Majik.Core.Cards.Card concreteForColors)
                 {
                     concreteForColors.SetPendingCastColorCounts(colorCounts);
+
+                    // CR 702.35c — stamp the madness-paid flag when this cast is
+                    // paying a MADNESS exile-cast cost (the discard funnel opened
+                    // the window with a RuntimeExileCastIsMadness grant). The
+                    // resolution-flag seam a "if its madness cost was paid" rider
+                    // reads (Grave Scrabbler's ETB, Welcome to the Fold's
+                    // resolution). A non-madness cast clears any stale flag so a
+                    // normal cast / blink never reuses it. The chosen madness {X}
+                    // (Welcome to the Fold's {X}{U}{U}) rides along.
+                    var isMadnessCast =
+                        cast.AlternativeCost is Majik.Core.Costs.ExileCastAlternativeCost
+                        && concreteForColors.RuntimeExileCastIsMadness
+                        && ReferenceEquals(concreteForColors.RuntimeExileCastAllowedCaster, actor);
+                    if (isMadnessCast)
+                    {
+                        concreteForColors.MarkCastForMadness(chosenX);
+                    }
+                    else
+                    {
+                        concreteForColors.ClearCastForMadness();
+                    }
                 }
                 return true;
             }

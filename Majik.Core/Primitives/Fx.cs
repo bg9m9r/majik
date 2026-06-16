@@ -517,7 +517,8 @@ public static class Fx
                 // grant and, with a live bus, schedule its revocation at end of
                 // turn (CR 514.2); when the window closes and the card is STILL
                 // an uncast object in exile, fall it into the graveyard.
-                madnessCard.GrantRuntimeExileCast(player, madnessCost, spendAsAnyColor: false);
+                madnessCard.GrantRuntimeExileCast(
+                    player, madnessCost, spendAsAnyColor: false, isMadness: true);
 
                 void CloseMadnessWindow()
                 {
