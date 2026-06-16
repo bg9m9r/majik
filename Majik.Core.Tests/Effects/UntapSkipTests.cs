@@ -335,6 +335,94 @@ public class UntapSkipTests : IDisposable
     }
 
     // ------------------------------------------------------------------
+    // Extra-untap: "untap this permanent during each OTHER player's untap
+    // step" (Endbringer — CR 502.1 + the printed static).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Registry_ExtraUntap_ReportedForNonControllerUntapStep()
+    {
+        // Endbringer controlled by Bob, tapped, on the battlefield.
+        var endbringer = EndbringerFactory.Create(_bob, eventBus: _bus);
+        endbringer.Zone = ZoneType.Battlefield;
+        _bob.Zones.Battlefield.AddCard(endbringer);
+        _bus.Publish(new CardMovedEvent(endbringer, ZoneType.Hand, ZoneType.Battlefield));
+        endbringer.Tap();
+
+        // During ALICE's untap step it is an extra-untap candidate (Bob is
+        // "another player" relative to Alice).
+        UntapStepRestrictions.ExtraUntapsDuring(_alice).Should().Contain(endbringer);
+
+        // During BOB's OWN untap step it is NOT an extra-untap candidate —
+        // the normal pass handles its controller's own untap.
+        UntapStepRestrictions.ExtraUntapsDuring(_bob).Should().NotContain(endbringer);
+    }
+
+    [Fact]
+    public void Registry_ExtraUntap_OnlyWhenTappedAndOnBattlefield()
+    {
+        var endbringer = EndbringerFactory.Create(_bob, eventBus: _bus);
+        endbringer.Zone = ZoneType.Battlefield;
+        _bob.Zones.Battlefield.AddCard(endbringer);
+        _bus.Publish(new CardMovedEvent(endbringer, ZoneType.Hand, ZoneType.Battlefield));
+
+        // Untapped — nothing to untap, so not a candidate.
+        endbringer.IsTapped.Should().BeFalse();
+        UntapStepRestrictions.ExtraUntapsDuring(_alice).Should().NotContain(endbringer);
+
+        // Tapped — now a candidate.
+        endbringer.Tap();
+        UntapStepRestrictions.ExtraUntapsDuring(_alice).Should().Contain(endbringer);
+
+        // Leaves the battlefield — rider lifts, no longer a candidate.
+        endbringer.Zone = ZoneType.Graveyard;
+        _bus.Publish(new CardMovedEvent(endbringer, ZoneType.Battlefield, ZoneType.Graveyard));
+        UntapStepRestrictions.ExtraUntapsDuring(_alice).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Endbringer_ControlledByOpponent_UntapsDuringActivePlayersUntapStep()
+    {
+        // Endbringer controlled by Bob; Alice is the active player. During
+        // Alice's untap step the extra pass untaps Bob's Endbringer.
+        var endbringer = EndbringerFactory.Create(_bob, eventBus: _bus);
+        endbringer.Zone = ZoneType.Battlefield;
+        _bob.Zones.Battlefield.AddCard(endbringer);
+        _bus.Publish(new CardMovedEvent(endbringer, ZoneType.Hand, ZoneType.Battlefield));
+        endbringer.Tap();
+        endbringer.IsTapped.Should().BeTrue();
+
+        SeedLibrary(_alice, 3);
+        SeedLibrary(_bob, 3);
+
+        var driver = NewDriver();
+        await driver.RunTurnAsync(_alice, turnNumber: 2);
+
+        endbringer.IsTapped.Should().BeFalse(
+            "Endbringer untaps during each OTHER player's untap step (Alice's)");
+    }
+
+    [Fact]
+    public async Task OpponentVanillaCreature_StaysTapped_DuringActivePlayersUntapStep()
+    {
+        // Control: a vanilla creature Bob controls is NOT untapped during
+        // Alice's untap step — only the extra-untap rider does that.
+        var bear = new Creature("Bear", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob, Zone = ZoneType.Battlefield };
+        _bob.Zones.Battlefield.AddCard(bear);
+        bear.Tap();
+
+        SeedLibrary(_alice, 3);
+        SeedLibrary(_bob, 3);
+
+        var driver = NewDriver();
+        await driver.RunTurnAsync(_alice, turnNumber: 2);
+
+        bear.IsTapped.Should().BeTrue(
+            "an opponent's vanilla creature does not untap during the active player's untap step");
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

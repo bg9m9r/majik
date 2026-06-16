@@ -773,6 +773,25 @@ public sealed class TurnDriver
             // even for permanents whose untap was gated by a skip or cap.
             card.ResetTurnState();
         }
+
+        // CR 502.1 + the printed static — "untap this permanent during each
+        // OTHER player's untap step" (Endbringer). Permanents controlled by
+        // a non-active player that carry the extra-untap rider also untap
+        // now. Their ResetTurnState is NOT run here (that belongs to their
+        // own controller's turn-beginning); only the untap fires. Stun
+        // counters still replace the untap (CR 122.1g) as in the main pass.
+        foreach (var extra in Majik.Core.Effects.UntapStepRestrictions
+                     .ExtraUntapsDuring(active))
+        {
+            if (extra.Counters.Count(Majik.Core.Counters.CounterType.Stun) > 0)
+            {
+                extra.Counters.Remove(Majik.Core.Counters.CounterType.Stun, 1);
+            }
+            else
+            {
+                extra.Untap();
+            }
+        }
     }
 
     private void AdvanceSagas(Player active)

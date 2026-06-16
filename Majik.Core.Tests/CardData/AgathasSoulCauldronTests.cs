@@ -5353,14 +5353,15 @@ public class AgathasSoulCauldronTests
     // agatha-bespoke-factory-resolutioncontext-source-migration-endbringer-
     // reckoner — Endbringer is a bespoke [CardName]-factory creature whose
     // three activated abilities ({T}: 1 damage to any target / {C},{T}: target
-    // player draws / {C},{T}: tap target creature) are OUTSIDE the
-    // OracleActivatedAbilityBinder reconstructable set. The migration retargets
-    // each effect to read its chosen target off ResolutionContext.ChosenTargets
-    // (and the damage source / draw fallback off ctx.Source / ctx.Controller)
-    // and marks all three RebindSafe, so Agatha's group-grant re-homes the REAL
-    // abilities (and their {T} costs, auto-re-homed by RebindTo Stage 1) onto a
-    // counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) —
-    // the {T} taps the BEARER, never the exiled Endbringer.
+    // creature can't attack or block this turn / {C}{C},{T}: draw a card) are
+    // OUTSIDE the OracleActivatedAbilityBinder reconstructable set. The
+    // migration retargets each effect to read its chosen target off
+    // ResolutionContext.ChosenTargets (and the damage source / draw player off
+    // ctx.Source / ctx.Controller) and marks all three RebindSafe, so Agatha's
+    // group-grant re-homes the REAL abilities (and their {T} costs, auto-re-
+    // homed by RebindTo Stage 1) onto a counter-bearing bearer via
+    // ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the {T} taps the BEARER,
+    // never the exiled Endbringer.
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -5413,23 +5414,28 @@ public class AgathasSoulCauldronTests
         await ping.ResolveAsync(agent: null, game: null);
         victim.Damage.Should().Be(1, "the re-homed ping deals 1 damage to its chosen target");
 
-        // Resolve the re-homed TAP-TARGET against an untapped creature.
-        var tapAbility = granted.Single(a => a.Effects.Any(e =>
-            e.Description.Contains("tap target", StringComparison.OrdinalIgnoreCase)));
-        var tapVictim = new Creature("Tapped", "1G", 2, 2);
-        tapVictim.SetOwner(alice);
-        alice.Zones.Library.AddCard(tapVictim);
-        zones.MoveCard(tapVictim, ZoneType.Library, ZoneType.Battlefield, alice);
-        tapVictim.IsTapped.Should().BeFalse();
-        tapAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { tapVictim } });
-        await tapAbility.ResolveAsync(agent: null, game: null);
-        tapVictim.IsTapped.Should().BeTrue("the re-homed tap-target taps its chosen creature");
+        // Resolve the re-homed CAN'T-ATTACK-OR-BLOCK against a creature — the
+        // restriction registers on the target's own ContinuousEffectsService.
+        var restrictAbility = granted.Single(a => a.Effects.Any(e =>
+            e.Description.Contains("can't attack or block", StringComparison.OrdinalIgnoreCase)));
+        var restrictVictim = new Creature("Restricted", "1G", 2, 2);
+        restrictVictim.SetOwner(alice);
+        var victimEffects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        restrictVictim.ActiveEffects = victimEffects;
+        alice.Zones.Library.AddCard(restrictVictim);
+        zones.MoveCard(restrictVictim, ZoneType.Library, ZoneType.Battlefield, alice);
+        restrictAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { restrictVictim } });
+        await restrictAbility.ResolveAsync(agent: null, game: null);
+        victimEffects.HasRestriction(restrictVictim, Majik.Core.Effects.CombatRestriction.CannotAttack)
+            .Should().BeTrue("the re-homed restriction makes the chosen creature unable to attack");
+        victimEffects.HasRestriction(restrictVictim, Majik.Core.Effects.CombatRestriction.CannotBlock)
+            .Should().BeTrue("the re-homed restriction makes the chosen creature unable to block");
 
-        // Resolve the re-homed DRAW with no chosen target — falls back to the
-        // BEARER's controller (ResolutionContext.Controller), never the exiled
-        // Endbringer's owner via a captured closure.
+        // Resolve the re-homed DRAW — draws for the BEARER's controller
+        // (ResolutionContext.Controller), never the exiled Endbringer's owner
+        // via a captured closure. (Here owner == controller == alice.)
         var draw = granted.Single(a => a.Effects.Any(e =>
-            e.Description.Contains("draws a card", StringComparison.OrdinalIgnoreCase)));
+            e.Description.Contains("draw", StringComparison.OrdinalIgnoreCase)));
         var top = new Card("Mountain", "");
         top.SetOwner(alice);
         alice.Zones.Library.AddCard(top);

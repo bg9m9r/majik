@@ -5,7 +5,10 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -14,22 +17,25 @@ namespace Majik.Core.Tests.CardData;
 /// <summary>
 /// Tests for <see cref="EndbringerFactory"/> (Oath of the Gatewatch, {5}{C}).
 ///
-/// Oracle text:
-///   "Vigilance, reach
-///    {T}: Endbringer deals 1 damage to any target.
-///    {C}, {T}: Target player draws a card.
-///    {C}, {T}: Tap target creature."
+/// Oracle text (Scryfall, verified 2025):
+///   "Untap this creature during each other player's untap step.
+///    {T}: This creature deals 1 damage to any target.
+///    {C}, {T}: Target creature can't attack or block this turn.
+///    {C}{C}, {T}: Draw a card."
+///
+/// (The factory previously shipped a STALE oracle: "Vigilance, reach /
+/// {C},{T}: Target player draws / {C},{T}: Tap target creature." These tests
+/// exercise the rewritten current printed text.)
 ///
 /// Covers:
 ///   - Identity (5/5 Creature — Eldrazi, {5}{C}, owner / controller).
 ///   - NamedCardFactory dispatch.
-///   - Keyword markers (Vigilance + Reach).
+///   - No Vigilance / Reach markers (the stale clause is gone).
 ///   - Three activated abilities + their cost shapes.
 ///   - {T} damage resolution to a creature target.
 ///   - {T} damage resolution to a player target.
-///   - {C}{T} draw resolution moves the top of target player's library to hand.
-///   - {C}{T} tap resolution taps the chosen creature.
-///   - Tap resolution is a no-op on already-tapped target (CR 701.21b).
+///   - {C}{T} "can't attack or block" registers both combat restrictions.
+///   - {C}{C}{T} draw moves the top of controller's library to hand.
 /// </summary>
 public class EndbringerFactoryTests
 {
@@ -62,15 +68,15 @@ public class EndbringerFactoryTests
     }
 
     [Fact]
-    public void Endbringer_HasVigilanceAndReachKeywordMarkers()
+    public void Endbringer_HasNoVigilanceOrReachMarkers()
     {
+        // The stale oracle's "Vigilance, reach" line is gone in the current
+        // printing — Endbringer has no keyword markers.
         var endbringer = EndbringerFactory.Create(_alice);
         var keywords = endbringer.Abilities.OfType<KeywordAbility>().ToList();
 
-        keywords.Should().Contain(k => k.Keyword == "Vigilance",
-            "CR 702.20 — Vigilance marker");
-        keywords.Should().Contain(k => k.Keyword == "Reach",
-            "CR 702.17 — Reach marker");
+        keywords.Should().BeEmpty(
+            "current printed Endbringer has no Vigilance / Reach");
     }
 
     [Fact]
@@ -80,7 +86,7 @@ public class EndbringerFactoryTests
         var activated = endbringer.Abilities.OfType<ActivatedAbility>().ToList();
 
         activated.Should().HaveCount(3,
-            "{T}: 1 damage + {C}{T}: draw + {C}{T}: tap");
+            "{T}: 1 damage + {C}{T}: can't attack/block + {C}{C}{T}: draw");
     }
 
     [Fact]
@@ -99,29 +105,37 @@ public class EndbringerFactoryTests
     }
 
     [Fact]
-    public void Endbringer_DrawAndTapAbilities_HaveColorlessCostAndTapCost()
+    public void Endbringer_CantAttackOrBlockAbility_HasSingleColorlessAndTapCost()
     {
         var endbringer = EndbringerFactory.Create(_alice);
         var activated = endbringer.Abilities.OfType<ActivatedAbility>().ToList();
 
-        // The two {C}{T} abilities both carry exactly ManaCostCost("{C}") + Tap.
-        var manaPlusTap = activated
-            .Where(a => a.Costs.OfType<ManaCostCost>().Any())
-            .ToList();
+        var ability = activated.Single(
+            a => a.TargetRequests.Any(t => t.Description == "target creature"));
 
-        manaPlusTap.Should().HaveCount(2);
-        foreach (var ability in manaPlusTap)
-        {
-            // {C} is parsed into the generic bucket (engine-wide posture —
-            // see Eldrazi Temple gap notes); total value should still be 1.
-            ability.Costs.OfType<ManaCostCost>().Single().Cost.TotalValue
-                .Should().Be(1, "the {C} pip is a 1-mana colourless requirement");
-            ability.Costs.OfType<AdditionalCost>().Should().ContainSingle(
-                c => c.CostType == AdditionalCostType.Tap);
-        }
+        // {C} parses into the generic bucket (engine-wide posture — see
+        // Eldrazi Temple gap notes); total value should be 1.
+        ability.Costs.OfType<ManaCostCost>().Single().Cost.TotalValue
+            .Should().Be(1, "the {C} pip is a 1-mana colourless requirement");
+        ability.Costs.OfType<AdditionalCost>().Should().ContainSingle(
+            c => c.CostType == AdditionalCostType.Tap);
+    }
 
-        manaPlusTap.SelectMany(a => a.TargetRequests).Select(t => t.Description)
-            .Should().BeEquivalentTo(new[] { "target player", "target creature" });
+    [Fact]
+    public void Endbringer_DrawAbility_HasDoubleColorlessTapCostAndNoTarget()
+    {
+        var endbringer = EndbringerFactory.Create(_alice);
+        var activated = endbringer.Abilities.OfType<ActivatedAbility>().ToList();
+
+        var draw = activated.Single(
+            a => a.Effects.Any(e => e.Description.Contains("draw", StringComparison.OrdinalIgnoreCase)));
+
+        draw.TargetRequests.Should().BeEmpty("\"Draw a card.\" has no target");
+        // {C}{C} parses into the generic bucket; total value should be 2.
+        draw.Costs.OfType<ManaCostCost>().Single().Cost.TotalValue
+            .Should().Be(2, "the {C}{C} pips are a 2-mana colourless requirement");
+        draw.Costs.OfType<AdditionalCost>().Should().ContainSingle(
+            c => c.CostType == AdditionalCostType.Tap);
     }
 
     [Fact]
@@ -141,10 +155,6 @@ public class EndbringerFactoryTests
             .Single(a => !a.Costs.OfType<ManaCostCost>().Any());
 
         damage.SetChosenTargets(new[] { new object[] { grizzly } });
-
-        // The migrated effect reads ChosenTargets off the live
-        // ResolutionContext, so resolve through the ability (the live path)
-        // rather than calling effect.Execute() with the empty legacy context.
         await damage.ResolveAsync(agent: null, game: null);
 
         grizzly.Damage.Should().Be(1,
@@ -171,34 +181,9 @@ public class EndbringerFactoryTests
     }
 
     [Fact]
-    public async Task Endbringer_DrawAbility_TargetPlayerDrawsTopCard()
+    public async Task Endbringer_CantAttackOrBlock_RegistersBothRestrictionsOnTarget()
     {
-        var endbringer = EndbringerFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(endbringer);
-        endbringer.SetZone(ZoneType.Battlefield);
-
-        // Seed Bob's library with a known top card.
-        var topCard = new Instant("Lightning Bolt", "{R}");
-        topCard.SetOwner(_bob);
-        _bob.Zones.Library.AddCard(topCard);
-        topCard.SetZone(ZoneType.Library);
-
-        var draw = endbringer.Abilities.OfType<ActivatedAbility>()
-            .Single(a => a.TargetRequests.Any(t => t.Description == "target player"));
-
-        draw.SetChosenTargets(new[] { new object[] { _bob } });
-
-        var handBefore = _bob.Zones.Hand.GetCards().Count();
-        await draw.ResolveAsync(agent: null, game: null);
-
-        _bob.Zones.Hand.GetCards().Should().HaveCount(handBefore + 1);
-        _bob.Zones.Hand.GetCards().Should().Contain(topCard);
-        _bob.Zones.Library.GetCards().Should().NotContain(topCard);
-    }
-
-    [Fact]
-    public async Task Endbringer_TapAbility_TapsChosenCreature()
-    {
+        var bus = new EventBus();
         var endbringer = EndbringerFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(endbringer);
         endbringer.SetZone(ZoneType.Battlefield);
@@ -206,37 +191,70 @@ public class EndbringerFactoryTests
         var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
         grizzly.SetOwner(_bob);
         grizzly.SetController(_bob);
+        // The combat restriction lives on the target's own ContinuousEffectsService.
+        var targetEffects = new ContinuousEffectsService(bus);
+        grizzly.ActiveEffects = targetEffects;
         _bob.Zones.Battlefield.AddCard(grizzly);
         grizzly.SetZone(ZoneType.Battlefield);
 
-        var tap = endbringer.Abilities.OfType<ActivatedAbility>()
+        var ability = endbringer.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.TargetRequests.Any(t => t.Description == "target creature"));
 
-        tap.SetChosenTargets(new[] { new object[] { grizzly } });
+        ability.SetChosenTargets(new[] { new object[] { grizzly } });
+        await ability.ResolveAsync(agent: null, game: null);
 
-        grizzly.IsTapped.Should().BeFalse();
-        await tap.ResolveAsync(agent: null, game: null);
-        grizzly.IsTapped.Should().BeTrue(
-            "Fx.Tap delegates to Permanent.Tap, taps idempotently");
+        targetEffects.HasRestriction(grizzly, CombatRestriction.CannotAttack)
+            .Should().BeTrue("CR 508.1c — the target can't attack this turn");
+        targetEffects.HasRestriction(grizzly, CombatRestriction.CannotBlock)
+            .Should().BeTrue("CR 509.1c — the target can't block this turn");
     }
 
     [Fact]
-    public async Task Endbringer_TapAbility_NoOpOnNonBattlefieldTarget()
+    public async Task Endbringer_CantAttackOrBlock_NoOpOnNonBattlefieldTarget()
     {
+        var bus = new EventBus();
         var endbringer = EndbringerFactory.Create(_alice);
         var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
         grizzly.SetOwner(_bob);
         grizzly.SetController(_bob);
-        // Deliberately NOT on battlefield — the recheck (CR 608.2b)
-        // should reject this target.
+        var targetEffects = new ContinuousEffectsService(bus);
+        grizzly.ActiveEffects = targetEffects;
+        // Deliberately NOT on battlefield — CR 608.2b rejects this target.
 
-        var tap = endbringer.Abilities.OfType<ActivatedAbility>()
+        var ability = endbringer.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.TargetRequests.Any(t => t.Description == "target creature"));
 
-        tap.SetChosenTargets(new[] { new object[] { grizzly } });
+        ability.SetChosenTargets(new[] { new object[] { grizzly } });
+        await ability.ResolveAsync(agent: null, game: null);
 
-        await tap.ResolveAsync(agent: null, game: null);
-        grizzly.IsTapped.Should().BeFalse(
-            "CR 608.2b — target no longer on battlefield: effect fails silently");
+        targetEffects.HasRestriction(grizzly, CombatRestriction.CannotAttack)
+            .Should().BeFalse("CR 608.2b — off-battlefield target: effect fails silently");
+        targetEffects.HasRestriction(grizzly, CombatRestriction.CannotBlock)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Endbringer_DrawAbility_ControllerDrawsTopCard()
+    {
+        var endbringer = EndbringerFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(endbringer);
+        endbringer.SetZone(ZoneType.Battlefield);
+
+        // Seed Alice's library with a known top card.
+        var topCard = new Instant("Lightning Bolt", "{R}");
+        topCard.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var draw = endbringer.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Effects.Any(e =>
+                e.Description.Contains("draw", StringComparison.OrdinalIgnoreCase)));
+
+        var handBefore = _alice.Zones.Hand.GetCards().Count();
+        await draw.ResolveAsync(agent: null, game: null);
+
+        _alice.Zones.Hand.GetCards().Should().HaveCount(handBefore + 1);
+        _alice.Zones.Hand.GetCards().Should().Contain(topCard);
+        _alice.Zones.Library.GetCards().Should().NotContain(topCard);
     }
 }
