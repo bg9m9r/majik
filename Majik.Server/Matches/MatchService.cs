@@ -846,7 +846,15 @@ public sealed class MatchService
         // minutes later) for lifetime correctness, mirroring the watchdog +
         // clock-handoff callbacks.
         var loopTask = facade.StartFullGameAsync(firstPlayerSlot, rng: rng, autoPassPrefsProvider: prefsProvider);
-        _facadeBridge?.SuperviseLoop(match.Id, loopTask);
+        // Supervise the ACTUAL game-loop task (FullGameTask = driver.RunGameAsync),
+        // NOT the value StartFullGameAsync returns — that return is the
+        // WaitForPromptOrLoopAsync wrapper, which completes successfully as soon
+        // as the FIRST prompt settles, so it would only catch a fault before the
+        // first prompt. FullGameTask faults whenever the loop faults at ANY point
+        // (e.g. during the bot's turn, the common case), so a post-settle fault is
+        // surfaced promptly here rather than waiting on the watchdog. Fall back to
+        // the wrapper if FullGameTask is somehow null.
+        _facadeBridge?.SuperviseLoop(match.Id, facade.FullGameTask ?? loopTask);
     }
 
     /// <summary>Slice 5a — build the per-seat AutoPassPrefs provider. The
@@ -1317,10 +1325,13 @@ public sealed class MatchService
         if (match == null || match.State != MatchState.Playing) return;
 
         // Server log is the ONLY place the exception detail lives — it never
-        // crosses the wire (see the publishes below).
+        // crosses the wire (see the publishes below). Include the turn/phase the
+        // loop died at (when the facade is still resolvable) to aid stage-2
+        // triage of the underlying throw.
+        var facade = match.GameId is { } gid ? _gameFactory?.Get(gid) : null;
         _logger?.LogError(fault,
-            "Engine loop {Reason} — aborting match. MatchId={MatchId} GameId={GameId}",
-            reason, matchId, match.GameId);
+            "Engine loop {Reason} — aborting match. MatchId={MatchId} GameId={GameId} Turn={Turn} Phase={Phase}",
+            reason, matchId, match.GameId, facade?.CurrentTurn, facade?.CurrentPhase);
 
         var now = _clock.UtcNow;
         var update = MongoDB.Driver.Builders<Match>.Update
