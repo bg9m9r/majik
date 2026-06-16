@@ -277,6 +277,158 @@ public class TriggerManagerTargetingTests
         ability.ChosenModes.Should().BeNull();
     }
 
+    // -----------------------------------------------------------------------
+    // CR 601.2d / CR 119.4 — agent-driven divide-damage prompt at stack entry
+    // for a "deals N damage divided as you choose among …" TRIGGERED ability
+    // (Inferno Titan's enters-or-attacks trigger, Fury's ETB). The engine
+    // prompts AFTER target collection (Rule 603.3) and records the split on the
+    // ability, threading it into ResolutionContext.DamageDivision at resolve.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_PromptsDamageDivision_RecordsOnAbility()
+    {
+        var req = new TargetRequest("any target", 1, 3,
+            new object[] { _alice, _bob });
+        var ability = BuildEtbAbilityWithDivision(
+            _alice, new[] { req }, new DamageDivisionSpec(3, TargetSlotIndex: 0));
+
+        ((ICard)ability.Source).SetZone(ZoneType.Battlefield);
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent((ICard)ability.Source, ZoneType.Hand, ZoneType.Battlefield));
+
+        var agent = new ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { ability });
+        agent.QueueTargets(new object[] { _alice, _bob });
+        agent.QueueDamageDivision(1, 2); // Alice 1, Bob 2 — NOT the 2/1 even split
+
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+        await _manager.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        _stack.Count.Should().Be(1);
+        ability.ChosenDamageDivision.Should().NotBeNull();
+        ability.ChosenDamageDivision!.Should().HaveCount(2);
+        ability.ChosenDamageDivision[0].Should().BeEquivalentTo(
+            new { Target = _alice, TargetSlotPosition = 0, Amount = 1 });
+        ability.ChosenDamageDivision[1].Should().BeEquivalentTo(
+            new { Target = _bob, TargetSlotPosition = 1, Amount = 2 });
+    }
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_NoDamageDivisionSpec_LeavesNull()
+    {
+        var req = new TargetRequest("target player", 1, 1, new object[] { _bob });
+        var ability = BuildEtbAbilityWithTargetRequests(_alice, new[] { req });
+
+        ((ICard)ability.Source).SetZone(ZoneType.Battlefield);
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent((ICard)ability.Source, ZoneType.Hand, ZoneType.Battlefield));
+
+        var agent = new ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { ability });
+        agent.QueueTargets(new object[] { _bob });
+        // No QueueDamageDivision — ChooseDamageDivisionAsync must NOT be called.
+
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+        await _manager.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        ability.ChosenDamageDivision.Should().BeNull(
+            "a trigger that declares no DamageDivisionSpec is never prompted");
+    }
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_NoAgent_LeavesDamageDivisionNull()
+    {
+        // No agent registered: nothing is recorded, the effect body falls back
+        // to an even split — behaviour-preserving for the no-agent dispatcher.
+        var req = new TargetRequest("any target", 1, 3, new object[] { _alice, _bob });
+        var ability = BuildEtbAbilityWithDivision(
+            _alice, new[] { req }, new DamageDivisionSpec(3, TargetSlotIndex: 0));
+
+        ((ICard)ability.Source).SetZone(ZoneType.Battlefield);
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent((ICard)ability.Source, ZoneType.Hand, ZoneType.Battlefield));
+
+        await _manager.PutPendingTriggersOnStackAsync(
+            _alice, new Dictionary<Player, IPlayerAgent>(), NewContext());
+
+        ability.ChosenDamageDivision.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PutPendingTriggersOnStackAsync_AnnouncedSplit_ThreadedAndDealtVerbatim()
+    {
+        // End-to-end: the recorded split is threaded into
+        // ResolutionContext.DamageDivision and Fx.DealDividedDamageAny deals
+        // the announced amounts (Alice 1, Bob 2 — a skew the even split for two
+        // targets would NOT produce).
+        var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob, Zone = ZoneType.Battlefield };
+        _bob.Zones.Battlefield.AddCard(grizzly);
+
+        var req = new TargetRequest("any target", 1, 3,
+            new object[] { _bob, grizzly });
+
+        var source = new Creature($"Titan-{Guid.NewGuid()}", "4RR", 6, 6)
+            { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        var effect = new Effect("deal 3 divided",
+            rc => { Majik.Core.Primitives.Fx.DealDividedDamageAny(rc, 3, source); return ValueTask.CompletedTask; });
+        var ability = new TriggeredAbility(
+            source, _alice,
+            Triggers.OnEnterBattlefieldSelf(source),
+            effects: new[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[] { req },
+            damageDivision: new DamageDivisionSpec(3, TargetSlotIndex: 0));
+
+        _manager.RegisterTriggeredAbility(ability);
+        _manager.EvaluateTriggers(
+            new CardMovedEvent(source, ZoneType.Hand, ZoneType.Battlefield));
+
+        var agent = new ScriptedAgent();
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { ability });
+        agent.QueueTargets(new object[] { _bob, grizzly });
+        agent.QueueDamageDivision(1, 2); // Bob 1, Grizzly 2
+
+        var agents = new Dictionary<Player, IPlayerAgent> { [_alice] = agent };
+        await _manager.PutPendingTriggersOnStackAsync(_alice, agents, NewContext());
+
+        var bobLife = _bob.LifeTotal;
+        await ability.ResolveAsync(agent, NewContext());
+
+        _bob.LifeTotal.Should().Be(bobLife - 1, "Bob took the announced 1 damage");
+        grizzly.Damage.Should().Be(2, "Grizzly took the announced 2 damage");
+    }
+
+    [Fact]
+    public void TriggeredAbility_DamageDivision_DefaultsToNull()
+    {
+        var source = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var ability = new TriggeredAbility(source, _alice,
+            Triggers.OnEnterBattlefieldSelf(source));
+
+        ability.DamageDivision.Should().BeNull();
+        ability.ChosenDamageDivision.Should().BeNull();
+    }
+
+    private TriggeredAbility BuildEtbAbilityWithDivision(
+        Player controller,
+        IEnumerable<TargetRequest> targetRequests,
+        DamageDivisionSpec spec)
+    {
+        var source = new Creature($"Titan-{Guid.NewGuid()}", "4RR", 6, 6)
+            { Owner = controller };
+        return new TriggeredAbility(
+            source, controller,
+            Triggers.OnEnterBattlefieldSelf(source),
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: targetRequests,
+            damageDivision: spec);
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     private TriggeredAbility BuildEtbAbilityWithModeRequest(

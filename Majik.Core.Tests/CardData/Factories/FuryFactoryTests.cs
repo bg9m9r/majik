@@ -21,10 +21,11 @@ namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
 /// End-to-end tests for Fury (Modern Horizons 2, {3}{R}). Mirrors
-/// <see cref="SolitudeFactoryTests"/>: both cast paths (normal + evoke)
-/// plus shape + dispatch coverage. The ETB damage trigger reads
-/// X = cards in controller's hand at resolution and routes per the
-/// caller-supplied distribute Func (deterministic in tests).
+/// <see cref="SolitudeFactoryTests"/>: both cast paths (normal + evoke) plus
+/// shape + dispatch coverage. The ETB trigger deals a FIXED 4 damage (post-
+/// errata oracle) DIVIDED as the controller's agent announces at stack entry
+/// (CR 601.2d / CR 119.4) via the triggered/activated divide-damage seam —
+/// or per the caller-supplied distribute Func (deterministic in tests).
 /// </summary>
 [Trait("Color", "R")]
 public class FuryFactoryTests
@@ -47,6 +48,12 @@ public class FuryFactoryTests
         _resolver = new StackResolver(_bus, _zones);
     }
 
+    private GameContext Ctx() =>
+        new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
+
+    private Dictionary<Player, IPlayerAgent> Agents(IPlayerAgent a) =>
+        new() { [_alice] = a };
+
     // ── Shape + dispatch ──────────────────────────────────────────────────────
 
     [Fact]
@@ -68,130 +75,62 @@ public class FuryFactoryTests
         // Two triggered abilities: ETB damage + Evoke sacrifice.
         fury.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
     }
-    // ── ETB damage trigger ────────────────────────────────────────────────────
 
     [Fact]
-    public async Task CastForEvoke_FiveCardHand_DealsFiveDamageSplitPerDistribute()
+    public void Create_DispatchesThroughNamedFactory()
     {
-        // 5 cards remain in Alice's hand AFTER Fury leaves (we'll seed 6 then
-        // pitch one for evoke = 4 left after announcement, +1 because Fury
-        // itself also leaves hand on cast → check the resolution-time read).
-        // Simpler: seed enough so that at resolution time the hand size is
-        // exactly 5, and assert the deterministic split (3 to grizzly, 2 to bear).
-        var fury = FuryInHand(_alice);
-        var pitch = new Creature("Mountain Lion", "R", 2, 1) { Owner = _alice };
-        pitch.SetZone(ZoneType.Hand);
-        _alice.Zones.Hand.AddCard(pitch);
+        var c = NamedCardFactory.Create("Fury", _alice);
+        c.Should().BeAssignableTo<Creature>();
+        c.Name.Should().Be("Fury");
+    }
 
-        // Top up hand so at resolution (Fury + pitch already exiled / on stack)
-        // the controller hand size = 5.
-        for (var i = 0; i < 5; i++)
-        {
-            var filler = new Creature($"Filler{i}", "R", 1, 1) { Owner = _alice };
-            filler.SetZone(ZoneType.Hand);
-            _alice.Zones.Hand.AddCard(filler);
-        }
+    [Fact]
+    public void DamageTrigger_DeclaresDivisionSpecForFour()
+    {
+        var fury = FuryFactory.Create(_alice);
+        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
+            .First(t => t.TargetRequests.Count > 0);
 
-        // Two Bob creatures to take damage.
+        damageTrigger.DamageDivision.Should().NotBeNull(
+            "CR 601.2d — Fury announces a fixed-4 divide-damage at stack entry.");
+        damageTrigger.DamageDivision!.TotalDamage.Should().Be(4);
+        damageTrigger.TargetRequests[0].Description.Should()
+            .Contain("creatures and/or planeswalkers");
+    }
+
+    // ── ETB divide-damage trigger (agent-driven, CR 601.2d) ───────────────────
+
+    [Fact]
+    public async Task CastNormal_AgentAnnouncedSplit_DealtVerbatim()
+    {
         var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
-        { Owner = _bob, Controller = _bob };
+            { Owner = _bob, Controller = _bob };
         grizzly.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(grizzly);
 
         var bear = new Creature("Runeclaw Bear", "1G", 2, 2)
-        { Owner = _bob, Controller = _bob };
+            { Owner = _bob, Controller = _bob };
         bear.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(bear);
 
-        // Deterministic distribution: 3 to grizzly, 2 to bear (verifies X=5).
-        IReadOnlyDictionary<Permanent, int> Distribute(Player controller, int x)
-        {
-            x.Should().Be(5);
-            return new Dictionary<Permanent, int>
-            {
-                [grizzly] = 3,
-                [bear]    = 2,
-            };
-        }
-
-        // Recreate Fury with the distribute Func (Create takes it as a ctor arg).
-        _alice.Zones.Hand.RemoveCard(fury);
-        fury = FuryFactory.Create(_alice, Distribute);
+        var fury = FuryFactory.Create(_alice);
         fury.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(fury);
 
-        // Cast via Evoke (pitch the red Mountain Lion; no mana paid).
-        var evokeCost = new EvokeAlternativeCost(
-            ManaCost.Zero, ManaColor.Red, pitch);
-
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
-
-        await _flow.CastAsync(
-            _alice, fury,
-            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
-            agent, ctx,
-            alternativeCost: evokeCost);
-
-        _resolver.ResolveTop(_stack);
-
-        fury.Zone.Should().Be(ZoneType.Battlefield);
-        fury.EvokeWasPaid.Should().BeTrue();
-        pitch.Zone.Should().Be(ZoneType.Exile);
-
-        // Two triggers fired on ETB: damage-distribute + evoke sacrifice.
-        _triggers.PendingCount.Should().Be(2);
-
-        // Wire chosen targets on the ETB damage trigger.
-        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.TargetRequests.Count > 0);
-        damageTrigger.SetChosenTargets(new IReadOnlyList<object>[]
+        // ETB damage trigger: choose grizzly + bear, then announce 3/1.
+        agent.QueueTriggerOrder(new ITriggeredAbility[]
         {
-            new object[] { grizzly, bear },
+            fury.Abilities.OfType<TriggeredAbility>().First(t => t.TargetRequests.Count > 0),
         });
-
-        _triggers.PutPendingTriggersOnStack(_alice);
-        while (!_stack.IsEmpty) _resolver.ResolveTop(_stack);
-
-        grizzly.Damage.Should().Be(3);
-        bear.Damage.Should().Be(2);
-        // Evoke sacrifice trigger fired → Fury in graveyard.
-        fury.Zone.Should().Be(ZoneType.Graveyard);
-    }
-
-    [Fact]
-    public async Task CastNormal_KeepsFuryOnBattlefield_AndDealsDamage()
-    {
-        var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
-        { Owner = _bob, Controller = _bob };
-        grizzly.SetZone(ZoneType.Battlefield);
-        _bob.Zones.Battlefield.AddCard(grizzly);
-
-        IReadOnlyDictionary<Permanent, int> Distribute(Player _, int x) =>
-            new Dictionary<Permanent, int> { [grizzly] = x };
-
-        var fury = FuryFactory.Create(_alice, Distribute);
-        fury.SetZone(ZoneType.Hand);
-        _alice.Zones.Hand.AddCard(fury);
-
-        // Seed two extra cards so resolution-time hand size = 2.
-        for (var i = 0; i < 2; i++)
-        {
-            var filler = new Creature($"Filler{i}", "R", 1, 1) { Owner = _alice };
-            filler.SetZone(ZoneType.Hand);
-            _alice.Zones.Hand.AddCard(filler);
-        }
-
-        var agent = new ScriptedAgent();
-        agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
+        agent.QueueTargets(new object[] { grizzly, bear });
+        agent.QueueDamageDivision(3, 1); // 3 to grizzly, 1 to bear
 
         await _flow.CastAsync(
             _alice, fury,
             SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
-            agent, ctx,
-            alternativeCost: null);
+            agent, Ctx(), alternativeCost: null);
 
         _resolver.ResolveTop(_stack);
 
@@ -201,94 +140,88 @@ public class FuryFactoryTests
         // Only ETB damage trigger pending (evoke sac dropped by intervening-if).
         _triggers.PendingCount.Should().Be(1);
 
-        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.TargetRequests.Count > 0);
-        damageTrigger.SetChosenTargets(new IReadOnlyList<object>[]
-        {
-            new object[] { grizzly },
-        });
-
-        _triggers.PutPendingTriggersOnStack(_alice);
+        await _triggers.PutPendingTriggersOnStackAsync(_alice, Agents(agent), Ctx());
         while (!_stack.IsEmpty) _resolver.ResolveTop(_stack);
 
-        grizzly.Damage.Should().Be(2);
+        grizzly.Damage.Should().Be(3, "agent announced 3 on grizzly (CR 601.2d)");
+        bear.Damage.Should().Be(1, "agent announced 1 on bear");
         fury.Zone.Should().Be(ZoneType.Battlefield);
     }
 
     [Fact]
-    public async Task CastForEvoke_EmptyHand_NoDamage_StillSacrificed()
+    public async Task CastForEvoke_AgentSplit_DealtAndFurySacrificed()
     {
-        // After paying evoke (which exiles the pitch card AND moves Fury to the
-        // stack), Alice's hand is empty at ETB resolution → X = 0, the damage
-        // trigger no-ops, but the evoke sacrifice still fires.
-        var fury = FuryInHand(_alice);
+        var fury = FuryFactory.Create(_alice);
+        fury.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(fury);
+
         var pitch = new Creature("Mountain Lion", "R", 2, 1) { Owner = _alice };
         pitch.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(pitch);
 
         var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
-        { Owner = _bob, Controller = _bob };
-        grizzly.SetZone(ZoneType.Battlefield);
-        _bob.Zones.Battlefield.AddCard(grizzly);
-
-        var evokeCost = new EvokeAlternativeCost(
-            ManaCost.Zero, ManaColor.Red, pitch);
-
-        var agent = new ScriptedAgent();
-        agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
-
-        await _flow.CastAsync(
-            _alice, fury,
-            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
-            agent, ctx,
-            alternativeCost: evokeCost);
-
-        _resolver.ResolveTop(_stack);
-
-        fury.EvokeWasPaid.Should().BeTrue();
-        _triggers.PendingCount.Should().Be(2);
-
-        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
-            .First(t => t.TargetRequests.Count > 0);
-        damageTrigger.SetChosenTargets(new IReadOnlyList<object>[]
-        {
-            new object[] { grizzly },
-        });
-
-        _triggers.PutPendingTriggersOnStack(_alice);
-        while (!_stack.IsEmpty) _resolver.ResolveTop(_stack);
-
-        // Hand was empty at resolution → no damage dealt.
-        grizzly.Damage.Should().Be(0);
-        // Evoke sacrifice still resolved.
-        fury.Zone.Should().Be(ZoneType.Graveyard);
-    }
-
-    [Fact]
-    public void DefaultDistribution_DealsAllXToFirstTarget()
-    {
-        // Documents the v1 degradation: when no distribute Func is supplied,
-        // all X damage is sent to the first chosen target.
-        var fury = FuryFactory.Create(_alice);
-        fury.SetZone(ZoneType.Battlefield);
-        _alice.Zones.Battlefield.AddCard(fury);
-
-        // Seed 3 hand cards → X = 3.
-        for (var i = 0; i < 3; i++)
-        {
-            var filler = new Creature($"F{i}", "R", 1, 1) { Owner = _alice };
-            filler.SetZone(ZoneType.Hand);
-            _alice.Zones.Hand.AddCard(filler);
-        }
-
-        var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
-        { Owner = _bob, Controller = _bob };
+            { Owner = _bob, Controller = _bob };
         grizzly.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(grizzly);
 
         var bear = new Creature("Runeclaw Bear", "1G", 2, 2)
-        { Owner = _bob, Controller = _bob };
+            { Owner = _bob, Controller = _bob };
+        bear.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bear);
+
+        var evokeCost = new EvokeAlternativeCost(ManaCost.Zero, ManaColor.Red, pitch);
+
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+        // Order the two ETB triggers (damage + evoke sacrifice); pick the
+        // damage trigger first so its prompt drains first.
+        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
+            .First(t => t.TargetRequests.Count > 0);
+        var evokeTrigger = fury.Abilities.OfType<TriggeredAbility>()
+            .First(t => t.TargetRequests.Count == 0 && t != damageTrigger);
+        agent.QueueTriggerOrder(new ITriggeredAbility[] { damageTrigger, evokeTrigger });
+        agent.QueueTargets(new object[] { grizzly, bear });
+        agent.QueueDamageDivision(2, 2); // 2 to grizzly, 2 to bear
+
+        await _flow.CastAsync(
+            _alice, fury,
+            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
+            agent, Ctx(), alternativeCost: evokeCost);
+
+        _resolver.ResolveTop(_stack);
+
+        fury.Zone.Should().Be(ZoneType.Battlefield);
+        fury.EvokeWasPaid.Should().BeTrue();
+        pitch.Zone.Should().Be(ZoneType.Exile);
+
+        _triggers.PendingCount.Should().Be(2);
+
+        await _triggers.PutPendingTriggersOnStackAsync(_alice, Agents(agent), Ctx());
+        while (!_stack.IsEmpty) _resolver.ResolveTop(_stack);
+
+        grizzly.Damage.Should().Be(2);
+        bear.Damage.Should().Be(2);
+        // Evoke sacrifice trigger fired → Fury in graveyard.
+        fury.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void DefaultEvenSplit_NoAgentDivision_SplitsFourEvenly()
+    {
+        // No division recorded (direct Resolve, no stack-entry prompt) → the
+        // resolve body even-splits 4 over the chosen targets (CR 119.4):
+        // two targets → 2, 2.
+        var fury = FuryFactory.Create(_alice);
+        fury.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(fury);
+
+        var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob };
+        grizzly.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(grizzly);
+
+        var bear = new Creature("Runeclaw Bear", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob };
         bear.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(bear);
 
@@ -301,37 +234,60 @@ public class FuryFactoryTests
 
         damageTrigger.Resolve();
 
-        // All 3 damage to the first target.
-        grizzly.Damage.Should().Be(3);
-        bear.Damage.Should().Be(0);
+        grizzly.Damage.Should().Be(2, "CR 119.4 — even split of 4 over two targets");
+        bear.Damage.Should().Be(2);
     }
 
     [Fact]
-    public void EtbDamage_DealsToPlaneswalkerViaRemoveLoyalty()
+    public void Distribute_Override_HonouredOverAgentPrompt()
     {
-        // The damage trigger routes to Planeswalker.RemoveLoyalty for
-        // planeswalker targets (CR 120.3 — damage to a planeswalker is
-        // dealt to a planeswalker on the battlefield, removing that many
-        // loyalty counters).
-        var pw = new Planeswalker("Test Walker", "{2}{B}", startingLoyalty: 5)
-        { Owner = _bob, Controller = _bob };
-        pw.SetZone(ZoneType.Battlefield);
-        _bob.Zones.Battlefield.AddCard(pw);
+        var grizzly = new Creature("Grizzly Bears", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob };
+        grizzly.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(grizzly);
 
-        IReadOnlyDictionary<Permanent, int> Distribute(Player _, int x) =>
-            new Dictionary<Permanent, int> { [pw] = x };
+        var bear = new Creature("Runeclaw Bear", "1G", 2, 2)
+            { Owner = _bob, Controller = _bob };
+        bear.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bear);
+
+        IReadOnlyDictionary<Permanent, int> Distribute(IReadOnlyList<Permanent> ts, int total)
+        {
+            total.Should().Be(4);
+            return new Dictionary<Permanent, int> { [grizzly] = 3, [bear] = 1 };
+        }
 
         var fury = FuryFactory.Create(_alice, Distribute);
         fury.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(fury);
 
-        // Seed hand size = 4.
-        for (var i = 0; i < 4; i++)
+        var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
+            .First(t => t.TargetRequests.Count > 0);
+        damageTrigger.SetChosenTargets(new IReadOnlyList<object>[]
         {
-            var filler = new Creature($"F{i}", "R", 1, 1) { Owner = _alice };
-            filler.SetZone(ZoneType.Hand);
-            _alice.Zones.Hand.AddCard(filler);
-        }
+            new object[] { grizzly, bear },
+        });
+
+        damageTrigger.Resolve();
+
+        grizzly.Damage.Should().Be(3);
+        bear.Damage.Should().Be(1);
+    }
+
+    [Fact]
+    public void EtbDamage_DealsToPlaneswalkerViaRemoveLoyalty()
+    {
+        var pw = new Planeswalker("Test Walker", "{2}{B}", startingLoyalty: 5)
+            { Owner = _bob, Controller = _bob };
+        pw.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(pw);
+
+        IReadOnlyDictionary<Permanent, int> Distribute(IReadOnlyList<Permanent> ts, int total) =>
+            new Dictionary<Permanent, int> { [pw] = total };
+
+        var fury = FuryFactory.Create(_alice, Distribute);
+        fury.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(fury);
 
         var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
             .First(t => t.TargetRequests.Count > 0);
@@ -342,18 +298,15 @@ public class FuryFactoryTests
 
         damageTrigger.Resolve();
 
-        pw.Loyalty.Should().Be(1);
+        pw.Loyalty.Should().Be(1, "4 loyalty removed (5 - 4), CR 306.7");
     }
 
     [Fact]
     public void EtbDamage_DealsToEffectivePlaneswalkerBackFace_AsLoyaltyRemoval()
     {
         // CR 711 / 306.7 — a creature-front transform DFC flipped to its
-        // planeswalker BACK face is a Creature C# instance carrying a transient
-        // loyalty body (IsEffectivePlaneswalker), NOT a Planeswalker subclass.
-        // Fury's noncombat ETB damage must reduce that transient loyalty rather
-        // than mark creature damage. Ral, Monsoon Mage // Ral, Leyline Prodigy
-        // (back face loyalty 2) is the canonical effective-PW.
+        // planeswalker BACK face absorbs Fury's noncombat damage as transient
+        // loyalty removal rather than marked creature damage.
         var ces = new ContinuousEffectsService();
         var ral = RalMonsoonMageFactory.Create(_bob);
         ral.ActiveEffects = ces;
@@ -363,17 +316,12 @@ public class FuryFactoryTests
         ral.MdfcState!.Transform(); // → Ral, Leyline Prodigy, loyalty 2 PW back
         ral.IsEffectivePlaneswalker().Should().BeTrue("the back face is an effective planeswalker");
 
-        IReadOnlyDictionary<Permanent, int> Distribute(Player _, int x) =>
+        IReadOnlyDictionary<Permanent, int> Distribute(IReadOnlyList<Permanent> ts, int total) =>
             new Dictionary<Permanent, int> { [ral] = 1 };
 
         var fury = FuryFactory.Create(_alice, Distribute);
         fury.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(fury);
-
-        // Seed hand size ≥ 1 so X > 0 (allocation overrides the amount anyway).
-        var filler = new Creature("F0", "R", 1, 1) { Owner = _alice };
-        filler.SetZone(ZoneType.Hand);
-        _alice.Zones.Hand.AddCard(filler);
 
         var damageTrigger = fury.Abilities.OfType<TriggeredAbility>()
             .First(t => t.TargetRequests.Count > 0);
@@ -386,15 +334,5 @@ public class FuryFactoryTests
 
         ral.GetEffectiveLoyalty().Should().Be(1, "1 damage removes 1 loyalty from the back-face PW (CR 306.7)");
         ral.Damage.Should().Be(0, "noncombat damage to an effective PW is loyalty removal, not marked creature damage");
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private Creature FuryInHand(Player owner)
-    {
-        var f = FuryFactory.Create(owner);
-        f.SetZone(ZoneType.Hand);
-        owner.Zones.Hand.AddCard(f);
-        return f;
     }
 }

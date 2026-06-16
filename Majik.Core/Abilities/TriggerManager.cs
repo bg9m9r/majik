@@ -417,6 +417,32 @@ public class TriggerManager
                         throwOnInsufficient: false,
                         ct);
                     ta.SetChosenTargets(collected);
+
+                    // CR 601.2d / CR 119.4 — for a "deals N damage divided as
+                    // you choose among …" TRIGGERED ability (Inferno Titan's
+                    // enters-or-attacks trigger, Fury's ETB), prompt the
+                    // controller's agent for the per-target split RIGHT AFTER
+                    // targets are chosen (Rule 603.3) — the same announcement
+                    // ordering the spell path uses (SpellCastFlow.DivideDamage
+                    // runs after CR 601.2c target collection). The normalised
+                    // split is recorded on the ability and threaded into
+                    // ResolutionContext.DamageDivision at resolve time. A null
+                    // agent (none registered) records nothing, so the effect
+                    // body falls back to an even split — behaviour-preserving
+                    // for the no-agent dispatcher path.
+                    if (ta.DamageDivision is { } divSpec
+                        && agent != null
+                        && ta.Source is Cards.ICard divSource)
+                    {
+                        var slot = divSpec.TargetSlotIndex;
+                        var divTargets = slot >= 0 && slot < collected.Count
+                            ? collected[slot]
+                            : (IReadOnlyList<object>)Array.Empty<object>();
+                        var division = await Players.Agents.DamageDivisionDefaults
+                            .PromptAsync(agent, ctx, divSource, divSpec.TotalDamage, divTargets, ct)
+                            .ConfigureAwait(false);
+                        ta.SetChosenDamageDivision(division);
+                    }
                 }
 
                 _stack.Push(ability);

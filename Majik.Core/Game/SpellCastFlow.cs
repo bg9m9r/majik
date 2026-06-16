@@ -806,18 +806,11 @@ public sealed class SpellCastFlow
         var targets = collectedTargets[slot];
         if (targets.Count == 0) return null;
 
-        var proposed = await agent.ChooseDamageDivisionAsync(
-            ctx, card, spec.TotalDamage, targets, ct);
-
-        var normalized = Players.Agents.DamageDivisionDefaults.Normalize(
-            proposed, spec.TotalDamage, targets.Count);
-
-        var allocations = new List<DamageAllocation>(targets.Count);
-        for (var i = 0; i < targets.Count; i++)
-        {
-            allocations.Add(new DamageAllocation(targets[i], i, normalized[i]));
-        }
-        return allocations;
+        // CR 601.2d / CR 119.4 — shared with the triggered/activated dispatch
+        // seam (TriggerManager) so the cast-time and trigger-time announcement
+        // points never diverge.
+        return await Players.Agents.DamageDivisionDefaults.PromptAsync(
+            agent, ctx, card, spec.TotalDamage, targets, ct).ConfigureAwait(false);
     }
 
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(

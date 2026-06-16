@@ -1,3 +1,6 @@
+using Majik.Core.Cards;
+using Majik.Core.Game;
+
 namespace Majik.Core.Players.Agents;
 
 /// <summary>
@@ -83,5 +86,46 @@ public static class DamageDivisionDefaults
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — prompt <paramref name="agent"/> for the per-target
+    /// division of <paramref name="totalDamage"/> across the already-chosen
+    /// <paramref name="targets"/>, then defensively <see cref="Normalize"/> the
+    /// answer to a legal split (each ≥ 1, summing to the printed total). Returns
+    /// one <see cref="DamageAllocation"/> per chosen target (index-aligned with
+    /// <paramref name="targets"/>), or null when there is nothing to divide
+    /// (empty target slot) — in which case the resolution effect falls back to
+    /// its own even-split default.
+    /// <para>
+    /// Shared by BOTH the cast-time seam
+    /// (<see cref="Majik.Core.Game.SpellCastFlow"/>'s <c>DivideDamageAsync</c>)
+    /// and the triggered/activated dispatch seam
+    /// (<see cref="Majik.Core.Abilities.TriggerManager.PutPendingTriggersOnStackAsync"/>)
+    /// so the two announcement points never diverge.
+    /// </para>
+    /// </summary>
+    public static async System.Threading.Tasks.Task<IReadOnlyList<DamageAllocation>?> PromptAsync(
+        IPlayerAgent agent,
+        GameContext? ctx,
+        ICard source,
+        int totalDamage,
+        IReadOnlyList<object> targets,
+        System.Threading.CancellationToken ct = default)
+    {
+        if (agent is null || targets is null || targets.Count == 0) return null;
+
+        var proposed = await agent
+            .ChooseDamageDivisionAsync(ctx, source, totalDamage, targets, ct)
+            .ConfigureAwait(false);
+
+        var normalized = Normalize(proposed, totalDamage, targets.Count);
+
+        var allocations = new List<DamageAllocation>(targets.Count);
+        for (var i = 0; i < targets.Count; i++)
+        {
+            allocations.Add(new DamageAllocation(targets[i], i, normalized[i]));
+        }
+        return allocations;
     }
 }

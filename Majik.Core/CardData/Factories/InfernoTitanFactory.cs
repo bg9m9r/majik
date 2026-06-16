@@ -7,6 +7,7 @@ using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
 using Majik.Core.Zones;
@@ -59,20 +60,20 @@ namespace Majik.Core.CardData.Factories;
 ///   Planeswalker — CR 119 / CR 306.7), mirroring
 ///   <see cref="ShatterskullSmashingFactory"/>'s divided-damage primitive.
 ///
-/// ## Deferred (v1 gaps)
+/// ## Divide-damage prompt (CR 601.2d / CR 119.4)
 ///
-/// - <b>Real divide-damage prompt</b>: CR 601.2d announces the damage
-///   division as the triggered ability is put on the stack; the engine has no
-///   agent-driven division prompt yet. <see cref="DealDividedDamage"/> takes a
-///   caller-supplied <c>distribute</c> strategy (defaulting to
-///   <see cref="DefaultAllocation"/>) as the stand-in — same posture as
-///   <see cref="ShatterskullSmashingFactory"/> / <see cref="ForkedBoltFactory"/>.
-///   When no targets are supplied (shape-only test path, no live combat /
-///   stack), the trigger body is a no-op (CR 608.2b — no legal targets = the
-///   ability does nothing).
-/// - <b>Trigger-on-stack timing</b>: the effect body runs immediately when the
-///   trigger executes rather than waiting on the stack (APNAP). Same v1
-///   collapse as <see cref="GraveTitanFactory"/>.
+/// Each trigger declares a <see cref="DamageDivisionSpec"/>(3) alongside its
+/// 1..3 "any target" request, so
+/// <see cref="Services.TriggerManager.PutPendingTriggersOnStackAsync"/> prompts
+/// the controller's agent for the real per-target split RIGHT AFTER targets are
+/// chosen (Rule 603.3) — the triggered-ability analogue of the cast-time
+/// divide-damage seam (<c>SpellCastFlow.DivideDamageAsync</c>). The recorded
+/// split rides on <see cref="ResolutionContext.DamageDivision"/> and the
+/// resolve body deals the announced amounts via
+/// <see cref="Fx.DealDividedDamageAny"/>, falling back to an even split only
+/// when no agent answered (e.g. a single legal target, or the no-agent
+/// dispatcher path). The legacy <see cref="DealDividedDamage"/> /
+/// <see cref="DefaultAllocation"/> helpers remain for direct/test callers.
 /// </summary>
 [CardName("Inferno Titan")]
 public static class InfernoTitanFactory
@@ -150,36 +151,66 @@ public static class InfernoTitanFactory
         // ----------------------------------------------------------------
 
         // ETB half — CR 603.6a. Self-entering the battlefield.
-        var etbEffect = new Effect(
+        var etbTrigger = BuildDividedDamageTrigger(
+            card, owner, Triggers.OnEnterBattlefieldSelf(card),
             $"{CardName}: on enter, deal {DamageTotal} damage divided among 1..3 targets",
-            () => DealDividedDamage(System.Array.Empty<object>(), distribute));
-
-        var etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(card),
-            effects: new IEffect[] { etbEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
+            distribute);
         card.AddAbility(etbTrigger);
         triggers?.RegisterTriggeredAbility(etbTrigger);
 
         // Attack half — CR 508.1f self-match.
-        var attackEffect = new Effect(
+        var attackTrigger = BuildDividedDamageTrigger(
+            card, owner, Triggers.OnAttackSelf(card),
             $"{CardName}: on attack, deal {DamageTotal} damage divided among 1..3 targets",
-            () => DealDividedDamage(System.Array.Empty<object>(), distribute));
-
-        var attackTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnAttackSelf(card),
-            effects: new IEffect[] { attackEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
+            distribute);
         card.AddAbility(attackTrigger);
         triggers?.RegisterTriggeredAbility(attackTrigger);
 
         return card;
+    }
+
+    // CR 601.2d / CR 119.4 — build one "deals 3 damage divided as you choose
+    // among one, two, or three targets" trigger. Declares the 1..3 "any target"
+    // request + the DamageDivisionSpec(3) so TriggerManager prompts the agent
+    // for the per-target split at stack entry (Rule 603.3). The resolve body
+    // reads the announced split off the ResolutionContext and deals the amounts
+    // via Fx.DealDividedDamageAny (even split when no agent answered).
+    private static TriggeredAbility BuildDividedDamageTrigger(
+        Creature card, Player owner, ITriggerCondition condition, string description,
+        Func<IReadOnlyList<object>, int, IReadOnlyDictionary<object, int>>? distribute)
+    {
+        IEffect effect = distribute is null
+            ? new Effect(description, rc =>
+            {
+                Fx.DealDividedDamageAny(rc, DamageTotal, source: card);
+                return System.Threading.Tasks.ValueTask.CompletedTask;
+            })
+            // A caller-supplied distribute strategy (test / bespoke override)
+            // wins over the agent prompt: deal off the live ChosenTargets using
+            // the legacy helper so direct callers keep their behaviour.
+            : new Effect(description, rc =>
+            {
+                var slots = rc.ChosenTargets;
+                var targets = slots.Count > 0 ? slots[0] : System.Array.Empty<object>();
+                DealDividedDamage(targets, distribute);
+                return System.Threading.Tasks.ValueTask.CompletedTask;
+            });
+
+        return new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: condition,
+            effects: new[] { effect },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new Majik.Core.Players.Agents.TargetRequest(
+                    Description: "any target",
+                    MinTargets: 1,
+                    MaxTargets: 3,
+                    LegalCandidates: System.Array.Empty<object>()),
+            },
+            damageDivision: new DamageDivisionSpec(DamageTotal, TargetSlotIndex: 0));
     }
 
     /// <summary>
