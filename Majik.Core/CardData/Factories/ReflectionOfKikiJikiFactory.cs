@@ -136,7 +136,7 @@ public static class ReflectionOfKikiJikiFactory
         ActivatedAbility? tapAbility = null;
         var tapEffect = new Effect(
             $"{CardName}: create a haste token copy of another target nonlegendary creature you control, sacrifice EOT",
-            () => ResolveCopyTokenActivation(tapAbility, card, owner, zoneService, triggers));
+            ctx => ResolveCopyTokenActivation(ctx, tapAbility, card, owner, zoneService, triggers));
 
         tapAbility = new ActivatedAbility(
             source: card,
@@ -147,6 +147,12 @@ public static class ReflectionOfKikiJikiFactory
                 AdditionalCost.Tap(card),
             },
             effects: new IEffect[] { tapEffect },
+            // Agatha's Soul Cauldron re-home soundness (CR 707.2 / 613.1f): the
+            // target gather, "another"/"you control" checks, token controller,
+            // and delayed-sacrifice source all read the live ResolutionContext
+            // (Source / Controller / ChosenTargets), never the captured
+            // Reflection. Mirrors Kiki-Jiki, Mirror Breaker.
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(
@@ -162,42 +168,58 @@ public static class ReflectionOfKikiJikiFactory
 
     // --- Copy-token activation body (CR 706.2 / 603.7) ---------------------
 
-    private static void ResolveCopyTokenActivation(
+    private static ValueTask ResolveCopyTokenActivation(
+        ResolutionContext ctx,
         ActivatedAbility? tapAbility,
         Creature card,
         Player owner,
         ZoneService? zoneService,
         TriggerManager? triggers)
     {
-        var original = ResolveLegalTarget(tapAbility, card, owner);
-        if (original == null) return;
+        // RE-SOURCE-SAFE (agatha-kiki-jiki-token-copy-of-target-bespoke-rebind):
+        // the live SOURCE (= the bearer after a RebindTo; otherwise this
+        // Reflection) and CONTROLLER are read off the resolving context, so
+        // Agatha's group-grant re-homes the copy onto a counter-bearer.
+        var self = (ctx.Source as Permanent) ?? card;
+        var controller = ctx.Controller ?? self.Controller ?? owner;
 
-        var controller = card.Controller ?? owner;
+        var original = ResolveLegalTarget(ctx, tapAbility, self, controller);
+        if (original == null) return ValueTask.CompletedTask;
+
         var token = SpawnHasteCopyToken(original, controller, zoneService);
 
         // CR 603.7 — delayed end-step trigger sacrifices the spawned token.
         if (triggers != null)
         {
-            RegisterEndStepSacrifice(card, controller, token, zoneService, triggers);
+            RegisterEndStepSacrifice(self, controller, token, zoneService, triggers);
         }
+
+        return ValueTask.CompletedTask;
     }
 
     private static Creature? ResolveLegalTarget(
+        ResolutionContext ctx,
         ActivatedAbility? tapAbility,
-        Creature card,
-        Player owner)
+        Permanent self,
+        Player controller)
     {
-        if (tapAbility == null) return null;
-        var chosen = tapAbility.ChosenTargets;
+        // Read the chosen target off the live context (the bearer ability's
+        // targets after a RebindTo); the captured `tapAbility` is the ctx-less
+        // Execute() fallback only.
+        var chosen = ctx.ChosenTargets.Count > 0
+            ? ctx.ChosenTargets
+            : (tapAbility?.ChosenTargets
+                ?? (IReadOnlyList<IReadOnlyList<object>>)Array.Empty<IReadOnlyList<object>>());
         if (chosen.Count == 0 || chosen[0].Count == 0) return null;
         if (chosen[0][0] is not Creature original) return null;
 
         // CR 608.2b — resolve-time legality recheck (another / nonlegendary
-        // / you-control / still on the battlefield).
+        // / you-control / still on the battlefield), measured against the live
+        // source + controller so the re-homed copy means "another than the
+        // BEARER, that the BEARER's controller controls".
         if (original.Zone != ZoneType.Battlefield) return null;
-        if (ReferenceEquals(original, card)) return null;                   // "another"
+        if (ReferenceEquals(original, self)) return null;                   // "another"
         if (original.HasSupertype(CardSupertype.Legendary)) return null;    // "nonlegendary"
-        var controller = card.Controller ?? owner;
         if (!ReferenceEquals(original.Controller, controller)) return null; // "you control"
         return original;
     }
@@ -231,7 +253,7 @@ public static class ReflectionOfKikiJikiFactory
     }
 
     private static void RegisterEndStepSacrifice(
-        Creature card,
+        Permanent self,
         Player controller,
         Creature token,
         ZoneService? zoneService,
@@ -243,7 +265,9 @@ public static class ReflectionOfKikiJikiFactory
             () => SacrificeToken(token, controller, zoneService));
 
         var delayed = new DelayedTriggeredAbility(
-            source: card,
+            // Anchor the delayed sacrifice to the LIVE source (= the bearer
+            // after a RebindTo) rather than the captured Reflection.
+            source: self,
             controller: controller,
             condition: new EventTriggerCondition<StepStartedEvent>(
                 (e, _) => e.StepType == StepStateType.End && e.Timestamp > resolvedAt),
