@@ -37,14 +37,18 @@ namespace Majik.Core.CardData.Factories;
 ///   silently no-ops the opponent-drain side, the lifegain side always
 ///   fires).
 ///
+/// ## Notes
+/// - <b>Last-known-information for the dying permanent (CR 603.10)</b>:
+///   the "a creature or planeswalker you control" branch reads the dying
+///   object's controller from <see cref="CardMovedEvent.LkiController"/>
+///   — the snapshot captured at the instant of death by
+///   <see cref="Majik.Core.Services.ZoneService"/>, BEFORE the
+///   battlefield-exit controller reset (CR 110.2). So a creature you
+///   control via a control-change effect (Act of Treason / Threaten)
+///   that dies correctly fires YOUR payoff, and one an opponent has
+///   stolen from you does not.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Last-known-information for the dying permanent</b>: CR 603.10 —
-///   the moved card's controller must be read from LKI at the moment of
-///   death. The engine currently keeps <see cref="Permanent.Controller"/>
-///   on the card after the zone move, so this v1 implementation reads
-///   it directly. A future LKI snapshot pass would replace the
-///   controller read with a captured value. Same shape as The Meathook
-///   Massacre's own-dies trigger.
 /// - <b>Lifelink semantics</b>: the printed text does NOT use lifelink
 ///   — the lifegain and lifeloss are separate effects on the same
 ///   trigger (CR 119.3 — each is a discrete life-change event). This
@@ -112,7 +116,13 @@ public static class CruelCelebrantFactory
             if (e.ToZone != ZoneType.Graveyard) return false;
             if (!e.Card.HasType(CardType.Creature)
                 && !e.Card.HasType(CardType.Planeswalker)) return false;
-            return ReferenceEquals(e.Card.Controller, owner);
+            // CR 603.10 — read the dying object's controller from last-known
+            // information at the instant of death (e.LkiController), NOT off
+            // the moved card. Once a permanent leaves the battlefield the
+            // engine resets Controller back to the owner (CR 110.2), so the
+            // live read is stale for a creature controlled via a control-change
+            // effect (Act of Treason / Threaten).
+            return ReferenceEquals(e.LkiController, owner);
         });
 
         // "Each opponent" is read from the LIVE resolution context

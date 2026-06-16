@@ -132,6 +132,17 @@ public class ZoneService
         var finalToZone = intent.ToZone;
         var finalController = intent.Controller;
 
+        // CR 603.10 — capture last-known-information for the moved object's
+        // controller BEFORE any controller reset this move performs. Once a
+        // permanent leaves the battlefield the engine resets Controller back to
+        // the owner (CR 110.2), but dies / leaves-the-battlefield triggers (and
+        // "a creature you control" vs "an opponent controls" branches:
+        // The Meathook Massacre, the aristocrats death-drain cycle) must read
+        // the controller as of the instant of death, not the post-reset live
+        // value. Snapshotting here threads the correct LKI controller into the
+        // CardMovedEvent published below.
+        var lkiController = card.Controller;
+
         card.SetZone(finalToZone);
 
         if (finalController != null && finalToZone == ZoneType.Battlefield)
@@ -217,7 +228,7 @@ public class ZoneService
         // still read the in-flight stamp earlier in this method. We
         // publish CardMovedEvent FIRST so any LTB subscriber that wants
         // to consult Card.WasCast can do so before the clear runs.
-        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone));
+        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone, lkiController));
 
         if (fromZone == ZoneType.Battlefield && finalToZone != ZoneType.Battlefield
             && card is Card concreteForCastClear)

@@ -52,13 +52,14 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Discrete life events</b>: CR 119.3 — lifegain and lifeloss are
 ///   separate events; matters for lifegain-payoff / life-loss-matters
 ///   triggers downstream.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>Last-known-information for the dying creature's controller</b>:
-///   CR 603.10 — controller must be read from LKI at the moment of
-///   death. The engine currently keeps <see cref="Permanent.Controller"/>
-///   on the card after the zone move, so v1 reads it directly. Same
-///   posture as Cruel Celebrant / Meathook.
+/// - <b>Last-known-information for the dying creature's controller
+///   (CR 603.10)</b>: the "a creature you control" gate reads the dying
+///   creature's controller from <see cref="CardMovedEvent.LkiController"/>
+///   — the snapshot captured at the instant of death by
+///   <see cref="Majik.Core.Services.ZoneService"/>, BEFORE the
+///   battlefield-exit controller reset (CR 110.2). A creature controlled
+///   via a control-change effect that dies fires the correct player's
+///   payoff.
 /// </summary>
 [CardName("Zulaport Cutthroat")]
 public static class ZulaportCutthroatFactory
@@ -117,7 +118,12 @@ public static class ZulaportCutthroatFactory
             if (e.FromZone != ZoneType.Battlefield) return false;
             if (e.ToZone != ZoneType.Graveyard) return false;
             if (!e.Card.HasType(CardType.Creature)) return false;
-            return ReferenceEquals(e.Card.Controller, owner);
+            // CR 603.10 — read the dying creature's controller from last-known
+            // information at the instant of death (e.LkiController), NOT off the
+            // moved card. The engine resets Controller back to the owner on a
+            // battlefield exit (CR 110.2), so the live read is stale for a
+            // creature controlled via a control-change effect.
+            return ReferenceEquals(e.LkiController, owner);
         });
 
         // "Each opponent" is read from the LIVE resolution context
