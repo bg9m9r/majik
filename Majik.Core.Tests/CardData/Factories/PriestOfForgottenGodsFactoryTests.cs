@@ -290,4 +290,104 @@ public class PriestOfForgottenGodsFactoryTests
         bear.Zone.Should().Be(ZoneType.Graveyard,
             "the prod-built rider makes each opponent sacrifice a creature");
     }
+
+    // -----------------------------------------------------------------------
+    // RE-SOURCE-SAFE — Agatha's Soul Cauldron group-grant re-home
+    // (priest-of-forgotten-gods-sac-multi-rider-rebind). Every effect reads the
+    // resolving controller / opponents off the live ResolutionContext rather
+    // than capturing the original Priest's controller, and both sacrifice costs
+    // re-home their captured self via IRebindableCost, so the ability is
+    // RebindSafe and ActivatedAbility.RebindTo soundly re-homes it onto a
+    // counter-bearing bearer (CR 707.2 / 613.1f).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Priest_Ability_IsRebindSafe()
+    {
+        var priest = PriestOfForgottenGodsFactory.Create(_alice);
+        var ab = priest.Abilities.OfType<ActivatedAbility>().Single();
+
+        ab.RebindSafe.Should().BeTrue(
+            "every effect reads the resolving controller/opponents off the live "
+            + "ResolutionContext so the ability re-homes soundly under Agatha");
+    }
+
+    [Fact]
+    public void Priest_RebindTo_ReHomesSacrificeCostsOntoBearer()
+    {
+        var priest = PriestOfForgottenGodsFactory.Create(_alice);
+        var ability = priest.Abilities.OfType<ActivatedAbility>().Single();
+
+        var originalCosts = ability.Costs.OfType<SacrificeAnotherCreatureCost>().ToList();
+        originalCosts.Should().HaveCount(2);
+        originalCosts.Should().OnlyContain(
+            c => c.Description.Contains(PriestOfForgottenGodsFactory.CardName),
+            "the un-rebound sac costs exclude the original Priest");
+
+        var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+        bearer.SetOwner(_alice);
+        bearer.SetController(_alice);
+
+        var rehomed = ability.RebindTo(bearer, _alice);
+
+        rehomed.Source.Should().BeSameAs(bearer, "the re-homed ability is sourced on the bearer (CR 707.2)");
+        rehomed.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        var rehomedCosts = rehomed.Costs.OfType<SacrificeAnotherCreatureCost>().ToList();
+        rehomedCosts.Should().HaveCount(2);
+        rehomedCosts.Should().OnlyContain(
+            c => c.Description.Contains(bearer.Name)
+                 && !c.Description.Contains(PriestOfForgottenGodsFactory.CardName),
+            "the re-homed sac costs exclude the BEARER, not the exiled Priest");
+
+        // The {T} cost re-homes onto the bearer too (AdditionalCost.RebindSource).
+        rehomed.Costs.OfType<AdditionalCost>()
+            .Should().Contain(c => c.Description.Contains("Tap"), "the {T} cost survives the re-home");
+
+        // RebindTo is pure — the source ability's costs are untouched.
+        ability.Costs.OfType<SacrificeAnotherCreatureCost>()
+            .Should().OnlyContain(
+                c => c.Description.Contains(PriestOfForgottenGodsFactory.CardName),
+                "RebindTo did not mutate the source ability's costs");
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Priest_RebindTo_RiderHitsBearerControllersOpponents_NotExiledPriestsOwner()
+    {
+        // The exiled Priest is owned/controlled by Alice; the bearer is
+        // controlled by Bob. After RebindTo onto Bob's bearer, resolving the
+        // re-homed effects must affect BOB's opponent (Alice) and credit BOB
+        // with the {B}{B} + draw — proving the closures read the re-homed
+        // Source's controller, never the captured original owner.
+        var bob = new Player("Bob", 20);
+        var priest = PriestOfForgottenGodsFactory.Create(_alice);
+        var ability = priest.Abilities.OfType<ActivatedAbility>().Single();
+
+        var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var aliceCreature = SeedCreature(_alice, "Runeclaw Bear");
+
+        var rehomed = ability.RebindTo(bearer, bob);
+
+        var game = new GameContext(
+            self: bob,
+            allPlayers: new[] { bob, _alice },
+            activePlayer: bob,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        await rehomed.ResolveAsync(agent: null, game: game);
+
+        _alice.LifeTotal.Should().Be(18,
+            "the rider hits the bearer-controller (Bob)'s opponent, Alice");
+        aliceCreature.Zone.Should().Be(ZoneType.Graveyard,
+            "Alice sacrifices a creature");
+        bob.LifeTotal.Should().Be(20, "Bob, the bearer's controller, is never affected");
+        bob.ManaPool.Black.Should().Be(2, "Bob, the bearer's controller, adds {B}{B}");
+    }
 }
