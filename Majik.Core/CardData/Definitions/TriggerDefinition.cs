@@ -30,6 +30,8 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(WheneverAPlayerCastsSpellTriggerDef), "whenever_a_player_casts_spell")]
 [JsonDerivedType(typeof(WheneverAnOpponentSacrificesPermanentTriggerDef), "whenever_an_opponent_sacrifices_permanent")]
 [JsonDerivedType(typeof(WheneverAPlayerSacrificesPermanentTriggerDef), "whenever_a_player_sacrifices_permanent")]
+[JsonDerivedType(typeof(WheneverYouPayLifeTriggerDef), "whenever_you_pay_life")]
+[JsonDerivedType(typeof(WheneverAPlayerPaysLifeTriggerDef), "whenever_a_player_pays_life")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -593,3 +595,45 @@ public sealed class WheneverAPlayerSacrificesPermanentTriggerDef : TriggerDefini
     /// permanent (token or nontoken).</summary>
     public bool NontokenOnly { get; set; }
 }
+
+/// <summary>
+/// "Whenever you pay life, …" (CR 118.8 / CR 119.4 / CR 109.5) — the
+/// controller-scoped life-PAYMENT trigger. Fires on the dedicated
+/// <see cref="Majik.Core.Events.LifePaidEvent"/> (published by the bus-aware
+/// pay-life cost seams — <see cref="Majik.Core.Costs.AdditionalCost"/> /
+/// <see cref="Majik.Core.Costs.PayLifeCost"/> via the central
+/// <see cref="Majik.Core.Costs.CostPayment"/> path, the shock-land ETB, Bolas's
+/// Citadel's "pay life equal to its mana value") whose
+/// <see cref="Majik.Core.Events.LifePaidEvent.Player"/> is the trigger's
+/// controller (CR 109.5 — "you"). Maps to
+/// <see cref="Majik.Core.Abilities.Triggers.OnLifePaid(Majik.Core.Players.Player)"/>
+/// with the controller resolved live (<c>card.Controller</c>) so a control
+/// change carries the trigger.
+///
+/// <para>
+/// Distinct from a "whenever you lose life" / raw
+/// <see cref="Majik.Core.Events.LifeChangedEvent"/> life-decrease condition:
+/// this fires ONLY on a life PAYMENT (a cost — CR 118.8), never on burn / drain /
+/// an effect's "lose N life". No extra fields; the producer-side declarative
+/// primitive a future "whenever you pay life …" payoff binds without bespoke
+/// code (no current Modern card consumes it — verified vs the seed).
+/// </para>
+/// </summary>
+public sealed class WheneverYouPayLifeTriggerDef : TriggerDefinition { }
+
+/// <summary>
+/// "Whenever a player pays life, …" (CR 118.8 / CR 700.6 / CR 603.3) — the
+/// <b>any-player</b> mirror of <see cref="WheneverYouPayLifeTriggerDef"/>. Fires
+/// on EVERY player's life PAYMENT (the controller's own included — CR 700.6 "a
+/// player" is unrestricted, so NO controller scoping), over the dedicated
+/// <see cref="Majik.Core.Events.LifePaidEvent"/>. As it matches it STAMPS the
+/// paying player onto the resolving ability via
+/// <see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>
+/// (CR 603.3 — "that player") so a downstream untargeted player-payoff verb such
+/// as <see cref="DealDamageToTriggeringPlayerEffectDef"/> reads it back off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.TriggeringPlayer"/> at
+/// resolution. The declarative analogue of the hand-rolled cast-/sacrifice-
+/// any-player stamping triggers, over the life-payment provenance surface. No
+/// extra fields (no current Modern card consumes it — verified vs the seed).
+/// </summary>
+public sealed class WheneverAPlayerPaysLifeTriggerDef : TriggerDefinition { }
