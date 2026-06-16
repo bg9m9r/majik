@@ -29,6 +29,41 @@ internal static class DestroySpellFactory
         });
 
     /// <summary>
+    /// "Destroy target tapped creature." (Murderous Compulsion). The target
+    /// request is the shared declarative <c>tapped_creature</c> filter
+    /// (<see cref="Majik.Core.CardData.Definitions.TargetFilters.ToTargetRequest(string?, string, BotIntent, bool)"/>),
+    /// so the candidate gatherer offers exactly the TAPPED battlefield creatures
+    /// (any controller, CR 109.5) and the resolution re-check
+    /// (<see cref="Majik.Core.CardData.Definitions.TargetFilters.Matches"/>)
+    /// enforces CR 608.2b — a creature that untapped since the spell went on the
+    /// stack (e.g. in its controller's untap step) fizzles cleanly. Unlike the
+    /// generic <see cref="DestroyCreatureSpell"/>, which dropped the "tapped"
+    /// restriction entirely, this honours the printed target filter.
+    /// </summary>
+    internal static SpellDefinition DestroyTappedCreatureSpell(Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[]
+        {
+            Majik.Core.CardData.Definitions.TargetFilters.ToTargetRequest(
+                "tapped_creature", "destroy", BotIntent.Removal),
+        },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("destroy tapped creature", () =>
+            {
+                // CR 608.2b — resolution-time legality re-check via the SAME
+                // declarative filter the gatherer used (still a tapped creature
+                // on the battlefield).
+                if (Majik.Core.CardData.Definitions.TargetFilters.Matches("tapped_creature", target)
+                    && target is ICard card)
+                {
+                    OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
+                }
+            }) };
+        });
+
+    /// <summary>
     /// Fatal Push template (v1 — base clause only, revolt deferred).
     /// Destroys target creature only if its mana value is ≤ maxCmc.
     /// The card's <see cref="Card.ManaCostValue"/> drives the CMC check (Rule 202.3).

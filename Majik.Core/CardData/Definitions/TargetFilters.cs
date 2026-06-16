@@ -145,6 +145,17 @@ public static class TargetFilters
             "tapped_creature_opponent_controls" =>
                 ($"{verb} target tapped creature an opponent controls",
                     o => o is Creature c && OnBattlefield(c) && c.IsTapped),
+            // CR 109.5 / 701.7 — "tapped creature" (any controller). A TAPPED
+            // battlefield creature regardless of who controls it — the
+            // control-scope-free sibling of "tapped_creature_opponent_controls".
+            // Both the candidate gatherer and the CR 608.2b resolution re-check
+            // apply the tapped+creature predicate, so a target that has untapped
+            // (e.g. via the untap step / a granted untap) since the spell went on
+            // the stack fizzles cleanly. Canonical case: Murderous Compulsion —
+            // "Destroy target tapped creature."
+            "tapped_creature" =>
+                ($"{verb} target tapped creature",
+                    o => o is Creature c && OnBattlefield(c) && c.IsTapped),
             // CR 109.5 — control-scoped creature filters. The base predicate is
             // a battlefield creature; the "you control" / "you don't control"
             // rider is applied context-aware in the candidate gatherer

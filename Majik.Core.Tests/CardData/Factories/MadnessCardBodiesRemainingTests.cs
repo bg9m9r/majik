@@ -183,11 +183,14 @@ public class MadnessCardBodiesRemainingTests
             },
             _alice, raw => raw, stack: null);
 
-        def.Should().NotBeNull("Murderous Compulsion binds via DestroyCreatureTemplate (tapped modifier)");
+        def.Should().NotBeNull("Murderous Compulsion binds via DestroyTappedCreatureTemplate");
 
+        // CR 109.5 — the printed "tapped" filter is honoured: only a TAPPED
+        // creature is a legal target, so the bear must be tapped to be destroyed.
         var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
         bear.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(bear);
+        bear.Tap();
 
         var chosen = new ChosenSpellParams(
             null, null,
@@ -195,7 +198,7 @@ public class MadnessCardBodiesRemainingTests
             ManaPayment.Empty);
         foreach (var e in def!.EffectFactory(chosen)) e.Execute();
 
-        bear.Zone.Should().Be(ZoneType.Graveyard, "the targeted creature is destroyed");
+        bear.Zone.Should().Be(ZoneType.Graveyard, "the targeted tapped creature is destroyed (CR 701.7)");
     }
 
     [Fact]
