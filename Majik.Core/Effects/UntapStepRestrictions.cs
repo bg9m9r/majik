@@ -81,6 +81,12 @@ public static class UntapStepRestrictions
         // Each cap has an IsActive gate so "as long as <source> is untapped"
         // riders re-check at consultation time without a tap-event surface.
         internal readonly List<UntapCountCap> CountCaps = new();
+        // Extra-untap: while at least one entry targets a permanent, that
+        // permanent ALSO untaps during each OTHER player's untap step (the
+        // inverse of a skip — Endbringer's "Untap this creature during each
+        // other player's untap step", CR 502.1 + the printed static).
+        // Keyed by source token for per-source removability.
+        internal readonly List<(object Token, Permanent Target)> ExtraUntaps = new();
         internal readonly object Gate = new();
     }
 
@@ -192,9 +198,68 @@ public static class UntapStepRestrictions
     }
 
     /// <summary>
-    /// Remove every untap-skip entry (permanent, subtype, or count cap)
-    /// registered under <paramref name="token"/>. Used when the source
-    /// permanent leaves the battlefield.
+    /// Register a "<paramref name="permanent"/> untaps during each OTHER
+    /// player's untap step too" rider (CR 502.1 + the printed static —
+    /// Endbringer), keyed by <paramref name="token"/>. Idempotent for the
+    /// same (token, permanent) pair. The normal "controller's own untap
+    /// step" untap is unaffected; this only adds the extra untap during a
+    /// non-controller's untap step.
+    /// </summary>
+    public static void MarkUntapsDuringOtherUntapSteps(object token, Permanent permanent)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(permanent);
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.ExtraUntaps)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Target, permanent))
+                {
+                    return;
+                }
+            }
+            store.ExtraUntaps.Add((token, permanent));
+        }
+    }
+
+    /// <summary>
+    /// The permanents that should ALSO untap during
+    /// <paramref name="untappingPlayer"/>'s untap step despite being
+    /// controlled by another player (Endbringer's "untap this creature
+    /// during each other player's untap step"). A permanent qualifies only
+    /// when it is on the battlefield, currently tapped, and NOT controlled
+    /// by <paramref name="untappingPlayer"/> (its controller's own untap
+    /// step is handled by the normal pass). Filtering by current tap state
+    /// at call time keeps the extra pass idempotent.
+    /// </summary>
+    public static IReadOnlyList<Permanent> ExtraUntapsDuring(Player untappingPlayer)
+    {
+        ArgumentNullException.ThrowIfNull(untappingPlayer);
+        var store = Current;
+        lock (store.Gate)
+        {
+            if (store.ExtraUntaps.Count == 0) return Array.Empty<Permanent>();
+            var result = new List<Permanent>();
+            foreach (var entry in store.ExtraUntaps)
+            {
+                var p = entry.Target;
+                if (p.Zone != Zones.ZoneType.Battlefield) continue;
+                if (!p.IsTapped) continue;
+                // The permanent's OWN controller untap is the normal pass —
+                // only the "each OTHER player" steps add the extra untap.
+                if (ReferenceEquals(p.Controller, untappingPlayer)) continue;
+                if (!result.Contains(p)) result.Add(p);
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Remove every untap-skip entry (permanent, subtype, count cap, or
+    /// extra-untap) registered under <paramref name="token"/>. Used when the
+    /// source permanent leaves the battlefield.
     /// </summary>
     public static void RemoveAll(object token)
     {
@@ -205,6 +270,7 @@ public static class UntapStepRestrictions
             store.PermanentSkips.RemoveAll(e => ReferenceEquals(e.Token, token));
             store.SubtypeSkips.RemoveAll(e => ReferenceEquals(e.Token, token));
             store.CountCaps.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.ExtraUntaps.RemoveAll(e => ReferenceEquals(e.Token, token));
         }
     }
 
@@ -321,6 +387,7 @@ public static class UntapStepRestrictions
             store.PermanentSkips.Clear();
             store.SubtypeSkips.Clear();
             store.CountCaps.Clear();
+            store.ExtraUntaps.Clear();
         }
     }
 }
