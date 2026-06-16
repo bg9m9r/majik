@@ -7,6 +7,8 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -18,23 +20,27 @@ namespace Majik.Core.Tests.CardData;
 /// Unit tests for <see cref="PsychicFrogFactory"/> (Modern Horizons 3,
 /// {U}{B}).
 ///
+/// Oracle text:
+///   "Whenever this creature deals combat damage to a player or
+///    planeswalker, draw a card.
+///    Discard a card: Put a +1/+1 counter on this creature.
+///    Exile three cards from your graveyard: This creature gains flying
+///    until end of turn."
+///
 /// Covers:
-/// - Identity (name, type, mana cost, P/T, Frog + Mutant subtypes,
-///   Flying keyword marker, owner/controller).
+/// - Identity (name, type, mana cost, P/T, Frog subtype, NO printed Flying).
 /// - NamedCardFactory dispatch.
-/// - Combat-damage-to-a-player trigger: 1 damage → draw 1 + discard 1.
-/// - Combat-damage trigger does NOT fire on damage to a creature.
-/// - Activated "Discard a card: +1/+1 counter" ability cost shape +
-///   payment + counter placement.
+/// - Combat-damage-to-a-player trigger draws a card; does NOT fire on damage
+///   to a creature.
+/// - "Discard a card: +1/+1 counter" cost shape + payment + counter.
+/// - "Exile three from graveyard: gain flying EOT" cost guard + flying grant.
 /// </summary>
 public class PsychicFrogTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
 
-    // -----------------------------------------------------------------------
-    // Identity + dispatch
-    // -----------------------------------------------------------------------
+    // ── Identity + dispatch ─────────────────────────────────────────────────
 
     [Fact]
     public void PsychicFrog_Identity()
@@ -44,19 +50,16 @@ public class PsychicFrogTests
         frog.Name.Should().Be("Psychic Frog");
         frog.ManaCost.Should().Be("{U}{B}");
         frog.HasType(CardType.Creature).Should().BeTrue();
-        frog.HasSubtype(CardSubtype.Frog).Should().BeTrue(
-            "Psychic Frog is a Frog");
-        frog.HasSubtype(CardSubtype.Mutant).Should().BeFalse(
-            "Psychic Frog is a Mutant");
+        frog.HasSubtype(CardSubtype.Frog).Should().BeTrue("Psychic Frog is a Frog");
         frog.BasePower.Should().Be(1);
         frog.BaseToughness.Should().Be(2);
         frog.Owner.Should().BeSameAs(_alice);
         frog.Controller.Should().BeSameAs(_alice);
 
-        // Flying keyword marker (CR 702.9).
+        // No PRINTED Flying — Flying is only granted by the third ability.
         frog.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Flying",
-                "Flying is wired as a KeywordAbility marker");
+            .Should().NotContain(k => k.Keyword == "Flying",
+                "Psychic Frog has no printed Flying — it must pay the exile-3 ability for it");
     }
 
     [Fact]
@@ -67,68 +70,43 @@ public class PsychicFrogTests
         card.Should().BeOfType<Creature>("Psychic Frog is a Creature");
         card.Name.Should().Be("Psychic Frog");
         card.HasSubtype(CardSubtype.Frog).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mutant).Should().BeFalse();
         ((Creature)card).BasePower.Should().Be(1);
         ((Creature)card).BaseToughness.Should().Be(2);
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Flying");
         card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "combat-damage loot trigger is attached");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "discard-pump activated ability is wired");
+            "combat-damage draw trigger is attached");
+        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
+            "discard-pump + exile-3-flying activated abilities are wired");
     }
 
-    // -----------------------------------------------------------------------
-    // Combat-damage trigger — draw N + discard N
-    // -----------------------------------------------------------------------
+    // ── Combat-damage trigger — draw a card ─────────────────────────────────
 
     [Fact]
-    public void PsychicFrog_CombatDamageToPlayer_1_Damage_Draws_1_AndDiscards_1()
+    public void PsychicFrog_CombatDamageToPlayer_DrawsACard()
     {
         var frog = PsychicFrogFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(frog);
         frog.SetZone(ZoneType.Battlefield);
 
-        // Library top — should land in hand via the draw half.
         var top = new Creature("Top", "1G", 1, 1) { Owner = _alice };
         _alice.Zones.Library.AddCard(top);
         top.SetZone(ZoneType.Library);
 
-        // Pre-existing hand card — first-card pick will discard this one
-        // (the drawn card was appended at the end of the hand zone, so the
-        // deterministic "first card in hand" picker pulls the older card).
-        var oldHand = new Creature("OldHand", "1G", 1, 1) { Owner = _alice };
-        _alice.Zones.Hand.AddCard(oldHand);
-        oldHand.SetZone(ZoneType.Hand);
-
-        _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
-
-        // Fire the trigger — Psychic Frog deals 1 combat damage to Bob.
         var trigger = frog.Abilities.OfType<TriggeredAbility>().Single();
-        var dmgEvent = new CombatDamageDealtEvent(frog, _bob, 1);
+        var dmgEvent = new CombatDamageDealtEvent(frog, _bob, 3);
 
         trigger.IsTriggered(dmgEvent).Should().BeTrue(
             "Psychic Frog dealing combat damage to a player matches the trigger");
 
         foreach (var e in trigger.Effects) e.Execute();
 
-        // Net: draw 1 (top → hand), then discard 1 (oldHand → graveyard).
-        // Hand ends with exactly the drawn card.
-        _alice.Zones.Library.GetCards().Should().BeEmpty(
-            "the top card was drawn");
-        _alice.Zones.Hand.GetCards().Should().ContainSingle()
-            .Which.Should().BeSameAs(top,
-                "the drawn card is the only card left in hand");
-        _alice.Zones.Graveyard.GetCards().Should().ContainSingle()
-            .Which.Should().BeSameAs(oldHand,
-                "v1 deterministic first-card-in-hand discard picks the older card");
+        // Exactly ONE card drawn (not "draw N") — the new oracle is "draw a card".
+        _alice.Zones.Hand.GetCards().Should().ContainSingle().Which.Should().BeSameAs(top);
+        _alice.Zones.Library.GetCards().Should().BeEmpty();
     }
 
     [Fact]
     public void PsychicFrog_CombatDamageToCreature_DoesNotFire()
     {
-        // Oracle text says "deals combat damage to a player". Damage to a
-        // creature must NOT fire the loot trigger.
         var frog = PsychicFrogFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(frog);
         frog.SetZone(ZoneType.Battlefield);
@@ -144,23 +122,22 @@ public class PsychicFrogTests
         var dmgEvent = new CombatDamageDealtEvent(frog, (ICard)blocker, 1);
 
         trigger.IsTriggered(dmgEvent).Should().BeFalse(
-            "combat damage to a creature does not match — TargetPlayer is null");
+            "combat damage to a (non-planeswalker) creature does not match");
     }
 
-    // -----------------------------------------------------------------------
-    // Activated ability — Discard a card: +1/+1 counter
-    // -----------------------------------------------------------------------
+    // ── Discard a card: +1/+1 counter ───────────────────────────────────────
 
     [Fact]
     public void PsychicFrog_DiscardPump_HasDiscardACardCost_AndNoManaCost()
     {
         var frog = PsychicFrogFactory.Create(_alice);
 
-        var pump = frog.Abilities.OfType<ActivatedAbility>().Single();
-        pump.Costs.OfType<DiscardACardCost>().Should().ContainSingle(
-            "the activation cost is exactly \"discard a card\"");
+        var pump = frog.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<DiscardACardCost>().Any());
+        pump.Costs.OfType<DiscardACardCost>().Should().ContainSingle();
         pump.Costs.OfType<ManaCostCost>().Should().BeEmpty(
             "Psychic Frog's discard-pump has no mana cost");
+        pump.RebindSafe.Should().BeTrue("the pump reads ctx.Source for Agatha re-home");
     }
 
     [Fact]
@@ -170,34 +147,88 @@ public class PsychicFrogTests
         _alice.Zones.Battlefield.AddCard(frog);
         frog.SetZone(ZoneType.Battlefield);
 
-        // One card in Alice's hand — the discard cost will burn it.
         var fodder = new Creature("Fodder", "1G", 1, 1) { Owner = _alice };
         _alice.Zones.Hand.AddCard(fodder);
         fodder.SetZone(ZoneType.Hand);
 
-        var pump = frog.Abilities.OfType<ActivatedAbility>().Single();
+        var pump = frog.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.Costs.OfType<DiscardACardCost>().Any());
 
-        // Cost is payable, no counters yet.
         var discardCost = pump.Costs.OfType<DiscardACardCost>().Single();
-        discardCost.CanPay(_alice).Should().BeTrue(
-            "Alice has a card in hand → discard cost is payable");
+        discardCost.CanPay(_alice).Should().BeTrue();
         frog.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
 
-        // Pay the cost + execute the effect (resolution sequence).
         discardCost.Pay(_alice);
         foreach (var effect in pump.Effects) effect.Execute();
 
-        // Fodder went to graveyard (CR 701.16a).
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
-        _alice.Zones.Graveyard.GetCards().Should().ContainSingle()
-            .Which.Should().BeSameAs(fodder);
-
-        // +1/+1 counter landed on Psychic Frog.
+        _alice.Zones.Graveyard.GetCards().Should().ContainSingle().Which.Should().BeSameAs(fodder);
         frog.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
             "the activated ability places a +1/+1 counter");
 
-        // With no cards left in hand the cost can no longer be paid.
         discardCost.CanPay(_alice).Should().BeFalse(
             "empty hand → \"discard a card\" cannot be paid (CR 117.1)");
+    }
+
+    // ── Exile three from graveyard: gain flying EOT ─────────────────────────
+
+    [Fact]
+    public void PsychicFrog_ExileThree_GrantsFlyingUntilEndOfTurn()
+    {
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+        var frog = PsychicFrogFactory.Create(_alice, triggers: null, replacements: null, effects: effects);
+        _alice.Zones.Battlefield.AddCard(frog);
+        frog.SetZone(ZoneType.Battlefield);
+
+        // Seed three cards in the graveyard to pay the cost.
+        for (var i = 0; i < 3; i++)
+        {
+            var g = new Creature($"Grave{i}", "1G", 1, 1) { Owner = _alice };
+            _alice.Zones.Graveyard.AddCard(g);
+            g.SetZone(ZoneType.Graveyard);
+        }
+
+        var flyingAbility = frog.Abilities.OfType<ActivatedAbility>()
+            .Single(a => !a.Costs.OfType<DiscardACardCost>().Any());
+        flyingAbility.RebindSafe.Should().BeTrue();
+
+        Majik.Core.Combat.CombatAbilities.HasFlying(frog).Should().BeFalse(
+            "no flying before activation");
+
+        foreach (var effect in flyingAbility.Effects) effect.Execute();
+
+        // Three graveyard cards exiled (CR 601.2g cost), flying granted.
+        _alice.Zones.Graveyard.GetCards().Should().BeEmpty("the three cards paid the cost");
+        _alice.Zones.Exile.GetCards().Should().HaveCount(3);
+        Majik.Core.Combat.CombatAbilities.HasFlying(frog).Should().BeTrue(
+            "the ability grants flying until end of turn");
+    }
+
+    [Fact]
+    public void PsychicFrog_ExileThree_ShortGraveyard_DoesNothing()
+    {
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+        var frog = PsychicFrogFactory.Create(_alice, triggers: null, replacements: null, effects: effects);
+        _alice.Zones.Battlefield.AddCard(frog);
+        frog.SetZone(ZoneType.Battlefield);
+
+        // Only two cards — cost can't be paid (CR 601.2g).
+        for (var i = 0; i < 2; i++)
+        {
+            var g = new Creature($"Grave{i}", "1G", 1, 1) { Owner = _alice };
+            _alice.Zones.Graveyard.AddCard(g);
+            g.SetZone(ZoneType.Graveyard);
+        }
+
+        var flyingAbility = frog.Abilities.OfType<ActivatedAbility>()
+            .Single(a => !a.Costs.OfType<DiscardACardCost>().Any());
+
+        foreach (var effect in flyingAbility.Effects) effect.Execute();
+
+        _alice.Zones.Graveyard.GetCards().Should().HaveCount(2, "fewer than three → no exile");
+        Majik.Core.Combat.CombatAbilities.HasFlying(frog).Should().BeFalse(
+            "the cost wasn't paid → no flying");
     }
 }

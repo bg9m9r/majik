@@ -2,113 +2,102 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Magmatic Channeler (Core Set 2021, {1}{R}).
+/// Named-card factory for Magmatic Channeler (Modern Horizons 3, {1}{R}).
 ///
-/// Creature — Human Wizard 1/3. Oracle text:
-///   "{2}{R}, {T}: Look at the top four cards of your library. You may
-///    reveal a creature or instant card from among them and put it into
-///    your hand. Put the rest on the bottom of your library in any order.
-///    Activate only if there are four or more instant and/or sorcery cards
-///    in your graveyard."
+/// Creature — Human Wizard 1/3. Oracle text (verified against Scryfall
+/// 2026-06-16):
+///   "As long as there are four or more instant and/or sorcery cards in
+///    your graveyard, this creature gets +3/+1.
+///    {T}, Discard a card: Exile the top two cards of your library, then
+///    choose one of them. You may play that card this turn."
 ///
 /// ## Implemented (v1)
 ///
 /// - 1/3 Creature — Human Wizard at {1}{R}; owner / controller wired.
 ///   Subtypes <see cref="CardSubtype.Human"/> + <see cref="CardSubtype.Wizard"/>
 ///   (CR 205.3m).
-/// - <b>Activated ability (CR 602.1)</b>: <see cref="ActivatedAbility"/>
-///   with two costs and one effect.
+/// - <b>Dynamic conditional static (CR 613.1f / 613.4c)</b>: "gets +3/+1 as
+///   long as there are four or more instant and/or sorcery cards in your
+///   graveyard." A Layer-7c <see cref="GraveyardThresholdPumpEffect"/>
+///   registered with the <see cref="ContinuousEffectsService"/> on the
+///   runtime overload. <see cref="GraveyardThresholdPumpEffect.IsActive"/> is
+///   sampled live on every <see cref="ContinuousEffectsService.Compute(Permanent)"/>
+///   off the source's <em>controller</em>'s graveyard (CR 109.5 — "your" =
+///   the permanent's controller), so the +3/+1 turns on/off as instants and
+///   sorceries enter/leave the yard with no event subscriptions. Same
+///   live-sampled conditional-pump shape as
+///   <see cref="DragonsRageChannelerFactory"/>'s delirium static — the count
+///   reads the BEARER's controller's graveyard, which is what makes this
+///   correct when Agatha's Soul Cauldron grants the ability set away (the
+///   static itself is not granted — Agatha grants only ACTIVATED abilities —
+///   but the dynamic-count discipline is shared with the activated body
+///   below).
+/// - <b>Activated ability (CR 602.1)</b>: <see cref="ActivatedAbility"/> with
+///   a <see cref="AdditionalCost.Tap"/> ({T}) + <see cref="DiscardACardCost"/>
+///   (discard a card) cost pair and one effect.
 ///   <list type="bullet">
-///     <item><see cref="ManaCostCost"/>("{2}{R}") — the mana portion of
-///       the activation cost (CR 601.2f / CR 117.7).</item>
-///     <item><see cref="AdditionalCost.Tap"/> — the {T} symbol
-///       (CR 118.12). Combined with the mana cost the activation is
-///       atomic — if either component can't be paid the activation
-///       fails up front (CR 601.2g).</item>
+///     <item>{T} — the tap symbol (CR 602.1b). Auto-re-homed to the bearer
+///       by <see cref="ActivatedAbility.RebindTo"/> Stage 1 under Agatha.</item>
+///     <item>Discard a card — a player-resource cost with no captured source,
+///       passed through unchanged by RebindTo.</item>
 ///   </list>
-/// - <b>"Look at the top four cards of your library. You may reveal a
-///   creature or instant card from among them and put it into your hand.
-///   Put the rest on the bottom of your library in any order."</b>
-///   (CR 701.20). Resolve closure:
-///     1. Snapshot up to <see cref="PeekCount"/> cards from the top of
-///        the controller's library (fewer if the library is short — same
-///        posture as Amped Raptor's exile-top-four / Curator of
-///        Mysteries' look). Empty library is a clean no-op.
-///     2. Filter the snapshot to <see cref="CardType.Creature"/> OR
-///        <see cref="CardType.Instant"/> — the eligible reveal pool.
-///        Sorceries are excluded by the printed wording, distinct from
-///        the activation gate which counts instants + sorceries.
-///     3. Ask the controller's registered <see cref="IPlayerAgent"/>
-///        (via <see cref="AgentRegistry"/>) to pick one eligible card
-///        via <see cref="IPlayerAgent.ChooseLibraryPickAsync"/> — the
-///        printed "you may" maps to the agent returning <c>null</c> to
-///        decline. The pre-agent default is to take the first eligible
-///        card (matches every other look-and-pick factory's deterministic
-///        fallback).
-///     4. Move the pick Library → Hand via raw zone manipulation. The
-///        remaining peeked cards are moved to the bottom of the library
-///        in their snapshot order (v1: preserves the original top-to-
-///        bottom order, controller's "in any order" choice is the
-///        identity for the deterministic path; a future agent prompt
-///        for re-ordering can plug in alongside the pick).
-/// - <b>"Activate only if there are four or more instant and/or sorcery
-///   cards in your graveyard"</b> (CR 602.5b — activation restriction).
-///   <see cref="ActivatedAbility"/> does not yet expose the
-///   <see cref="Majik.Core.Abilities.ManaAbility"/>-style
-///   <c>canActivateCheck</c> hook for non-mana activations (the legacy
-///   surface only covers <see cref="ManaAbility"/> — see ChromaticStar /
-///   MoxOpal / NobleHierarch precedent). Until the
-///   <c>IActivatedAbility.CanActivate</c> predicate ships, the gate is
-///   enforced two ways:
-///     - At <em>action-enumeration time</em>: the bot's
-///       <c>ActivatedAbilityPolicy</c> / agent's legal-action probe
-///       can consult <see cref="CanActivateGraveyardGate"/> (exposed
-///       static) — same wire-up pattern as
-///       <see cref="LurrusOfTheDreamDenFactory"/>'s once-per-turn ledger.
-///     - At <em>resolve time</em>: the effect closure re-checks the
-///       graveyard threshold and short-circuits cleanly when the rule
-///       was violated. CR 602.5b says the cost is still paid (CR 117.x
-///       — the activation that bypassed the gate still resolves but
-///       with no body), so the {2}{R} + {T} payment is NOT refunded;
-///       the effect simply does nothing. This matches the
-///       <see cref="LilianaOfTheVeilFactory"/> -6 deferred body shape
-///       — the cost was paid, the body is a no-op.
+///   Resolve closure: exile the top <see cref="ExileCount"/> cards of the
+///   controller's library (CR 701.20), let the controller choose one of them
+///   via <see cref="IPlayerAgent.ChooseLibraryPickAsync"/> (deterministic
+///   first-card fallback pre-agent), and stamp a runtime exile-cast grant
+///   (<see cref="Card.GrantRuntimeExileCast"/>) on the chosen card so the
+///   controller may play it this turn for its printed mana cost (CR 118.9 —
+///   the same impulse-play primitive as <see cref="AbbotOfKeralKeepFactory"/>
+///   / <see cref="LightUpTheStageFactory"/>). The grant clears on the next
+///   Cleanup step (CR 514.2) when an <see cref="IEventBus"/> is supplied.
+///
+/// ## Re-source safety (Agatha's Soul Cauldron)
+///
+/// The activated effect resolves the searching player off the live
+/// <see cref="Majik.Core.Effects.ResolutionContext.Source"/>'s CONTROLLER
+/// (this ability's own source at resolution) rather than capturing
+/// <c>card</c>, falling back to <c>card</c> / <c>owner</c> only on the
+/// context-less legacy sync path (<see cref="ResolutionContext.Legacy"/>,
+/// Source = null). The ability is marked <c>rebindSafe: true</c> so Agatha's
+/// Soul Cauldron re-homes this REAL ability — its {T} cost auto-re-homed by
+/// RebindTo Stage 1 — to a counter-bearing bearer via
+/// <see cref="ActivatedAbility.RebindTo"/> (CR 707.2 / 613.1f): the bearer's
+/// controller taps the BEARER and digs through THEIR library, never
+/// re-reading the exiled Magmatic Channeler. The exile-top-two-and-impulse
+/// shape is OUTSIDE the <c>OracleActivatedAbilityBinder</c> reconstructable
+/// set, so RebindTo of the real ability is the only sound re-home.
 ///
 /// ## Wiring overloads
 ///
-/// - <see cref="Create(Player)"/> — card shape only. Activated ability
-///   is attached for shape observability; resolve closure runs the full
-///   look-and-pick logic against raw zones. Suitable for dispatcher /
-///   structural tests.
+/// - <see cref="Create(Player)"/> — card shape only. The activated ability is
+///   attached for shape observability; the dynamic static is NOT registered
+///   with a continuous-effects service (printed 1/3 only). Suitable for
+///   dispatcher / structural tests.
+/// - <see cref="Create(Player, IEventBus?, ContinuousEffectsService?)"/> —
+///   runtime-wired. When a continuous-effects service is supplied the +3/+1
+///   conditional pump registers / unregisters via a battlefield-zone
+///   lifecycle handler; the supplied bus drives the impulse-play EOT cleanup.
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b><see cref="ActivatedAbility.CanActivate"/> hook</b>: the
-///   action-validator pipeline does not yet consult an activation
-///   predicate on <see cref="IActivatedAbility"/>. Magmatic Channeler's
-///   graveyard threshold is exposed as a static predicate
-///   (<see cref="CanActivateGraveyardGate"/>) so callers / policies
-///   can gate enumeration; once <see cref="IActivatedAbility.CanActivate"/>
-///   ships the predicate is the natural single attachment site (same
-///   posture <see cref="ManaAbility"/>'s <c>canActivateCheck</c>
-///   already supports for the mana family).
-/// - <b>"In any order" agent prompt for re-bottoming</b>: v1 preserves
-///   the snapshot order when moving the remainder to the bottom of the
-///   library. A real "in any order" agent prompt is the same shape as
-///   <see cref="ScryAction.ScryDecision"/>'s ordering field — wire when
-///   the agent surface grows a multi-card library-place prompt.
-/// - <b>Reveal-event emission</b>: the printed "reveal a creature or
-///   instant card" should emit a <see cref="Majik.Core.Events.CardRevealedEvent"/>
-///   for the picked card so portal subscribers can flash it. Same gap
-///   as Stoneforge Mystic's ETB tutor — deferred behind the reveal-
-///   event plumbing pass.
+/// - <b>Reveal-event emission</b>: the printed "choose one of them" should
+///   emit a <see cref="Majik.Core.Events.CardRevealedEvent"/> for the chosen
+///   card so portal subscribers can flash it. Same gap as Stoneforge
+///   Mystic's ETB tutor — deferred behind the reveal-event plumbing pass.
+/// - <b>"You may play that card" includes lands</b>: the runtime exile-cast
+///   grant authorises CASTING for the printed mana cost; an exiled land would
+///   need a parallel "play this land from exile" grant. Same posture as
+///   <see cref="LightUpTheStageFactory"/>'s spell-only authorisation.
 /// </summary>
 [CardName("Magmatic Channeler")]
 public static class MagmaticChannelerFactory
@@ -117,19 +106,29 @@ public static class MagmaticChannelerFactory
     public const string PrintedManaCost = "{1}{R}";
     public const int Power = 1;
     public const int Toughness = 3;
-    public const string ActivationCost = "{2}{R}";
-    public const int PeekCount = 4;
+    public const int ExileCount = 2;
     public const int GraveyardThreshold = 4;
+    public const int PumpPower = 3;
+    public const int PumpToughness = 1;
 
     /// <summary>
-    /// Construct Magmatic Channeler. The activated look-pick-bottom
-    /// ability is attached; the activation cost ({2}{R}, {T}) is paid
-    /// atomically by the cost layer (CR 601.2g) and the resolve closure
-    /// re-checks the graveyard threshold per <see cref="CanActivateGraveyardGate"/>
-    /// (CR 602.5b — see class xmldoc for the v1 gate-enforcement
-    /// posture).
+    /// Construct Magmatic Channeler with no live wiring. The {T}, Discard-a-
+    /// card impulse-dig ability is attached; the +3/+1 conditional static is
+    /// NOT registered with a continuous-effects service (printed 1/3 only).
+    /// Suitable for dispatcher / shape tests.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) =>
+        Create(owner, eventBus: null, effects: null);
+
+    /// <summary>
+    /// Construct Magmatic Channeler with optional runtime services. When a
+    /// <see cref="ContinuousEffectsService"/> is supplied the +3/+1 conditional
+    /// pump is registered via a battlefield-zone lifecycle handler (mirrors
+    /// <see cref="DragonsRageChannelerFactory"/>). When an <see cref="IEventBus"/>
+    /// is supplied the impulse-play grant is cleared on the next Cleanup step
+    /// (CR 514.2).
+    /// </summary>
+    public static Creature Create(Player owner, IEventBus? eventBus, ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -144,157 +143,118 @@ public static class MagmaticChannelerFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Activated ability — CR 602.1.
-        //   "{2}{R}, {T}: Look at the top four cards of your library. You
-        //    may reveal a creature or instant card from among them and
-        //    put it into your hand. Put the rest on the bottom of your
-        //    library in any order."
-        //   "Activate only if there are four or more instant and/or
-        //    sorcery cards in your graveyard." — CR 602.5b activation
-        //    restriction; v1 enforced via the resolve-time guard inside
-        //    the effect closure + the public static predicate
-        //    CanActivateGraveyardGate. See class xmldoc.
+        // Dynamic conditional static — "As long as there are four or more
+        // instant and/or sorcery cards in your graveyard, this creature gets
+        // +3/+1." CR 613.1f / 613.4c. A live-sampled Layer-7c pump reading the
+        // source's controller's graveyard on every Compute (no subscriptions).
+        // Registered only on the runtime overload (effects != null); the
+        // shape-only path leaves the printed 1/3 with the ability attached.
         // ----------------------------------------------------------------
-        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
-        // the effect resolves the searching player off the live
-        // ResolutionContext.Source's CONTROLLER (this ability's own source at
-        // resolution) rather than capturing `card`, falling back to `card` /
-        // `owner` only on the context-less legacy sync path
-        // (ResolutionContext.Legacy, Source = null). Marked RebindSafe (below) so
-        // Agatha's Soul Cauldron re-homes this REAL ability — its {T} cost
-        // auto-re-homed by RebindTo Stage 1 — to a counter-bearing bearer via
-        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the bearer's controller
-        // taps the BEARER and digs through THEIR library, never re-reading the
-        // exiled Magmatic Channeler. The library-dig-and-pick shape is OUTSIDE the
-        // OracleActivatedAbilityBinder reconstructable set, so RebindTo of the real
-        // ability is the only sound re-home.
-        var activatedEffect = new Effect(
-            $"{CardName}: look at top {PeekCount}, may take a creature/instant, rest on bottom",
+        if (effects != null)
+        {
+            var lifecycle = new GraveyardThresholdLifecycle(card, owner, effects, eventBus);
+            lifecycle.Attach();
+        }
+
+        // ----------------------------------------------------------------
+        // Activated ability — CR 602.1.
+        //   "{T}, Discard a card: Exile the top two cards of your library,
+        //    then choose one of them. You may play that card this turn."
+        // The {T} + discard costs are taken by the cost layer; the exile +
+        // pick + impulse-grant are performed in the resolve closure. The
+        // searching player is read off ctx.Source's controller (re-source-
+        // safe) so Agatha's re-homed copy digs the BEARER's library.
+        // ----------------------------------------------------------------
+        var digEffect = new Effect(
+            $"{CardName}: exile top {ExileCount}, choose one, may play it this turn",
             async ctx =>
             {
                 var controller = ctx.Source?.Controller ?? card.Controller ?? owner;
-
-                // CR 602.5b — defensive re-check at resolve time. The
-                // gate should already have been enforced at activation
-                // time by the bot policy / action validator, but until
-                // IActivatedAbility.CanActivate ships an authoritative
-                // hook, the resolve-time guard is the safety net. The
-                // cost was paid by the cost layer (CR 601.2g) — short-
-                // circuiting here mirrors Liliana of the Veil's -6
-                // ultimate deferred no-op (cost paid, body skipped).
-                if (!CanActivateGraveyardGate(controller)) return;
-
                 var library = controller.Zones.Library;
 
-                // CR 701.20 — "Look at the top four cards of your library."
-                // Snapshot up to PeekCount cards (fewer if the library is
-                // short — same posture as Amped Raptor / Curator of
-                // Mysteries). Empty library = clean no-op.
-                var peeked = library.GetCards().Take(PeekCount).ToList();
-                if (peeked.Count == 0) return;
-
-                // Eligible reveal pool — Creature OR Instant. Sorceries
-                // are EXCLUDED by the printed wording (distinct from the
-                // graveyard gate which counts instants + sorceries).
-                var eligible = peeked
-                    .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Instant))
-                    .ToList();
-
-                // "You may reveal …" — controller's choice. Agent path:
-                // ChooseLibraryPickAsync (Intent embedded in the kind
-                // label). Pre-agent fallback: first eligible card (matches
-                // every other look-and-pick factory's deterministic
-                // default — Atraxa, Bonecrusher's Stomp pile, Eladamri's
-                // Call).
-                ICard? pick = null;
-                if (eligible.Count > 0)
+                // CR 701.20 — exile the top two cards (fewer if the library is
+                // short; empty library is a clean no-op).
+                var exiled = new List<Card>();
+                for (var i = 0; i < ExileCount; i++)
                 {
-                    var agent = ctx.Agent ?? AgentRegistry.Get(controller);
-                    if (agent != null)
-                    {
-                        // TODO: drop sync-over-async once IEffect.Execute
-                        // becomes async (same pattern as ConsiderFactory).
-                        pick = (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
-                            candidates: eligible,
-                            kindLabel: "creature or instant card").ConfigureAwait(false));
+                    var top = library.GetCards().FirstOrDefault();
+                    if (top is not Card concrete) break;
+                    library.RemoveCard(concrete);
+                    controller.Zones.Exile.AddCard(concrete);
+                    concrete.SetZone(ZoneType.Exile);
+                    exiled.Add(concrete);
+                }
 
-                        // Defensive — never accept a pick the candidate
-                        // pool didn't surface (a mis-wired agent could
-                        // otherwise drive a hand-add for a card outside
-                        // the look-window). Mirrors AmpedRaptor's
-                        // chooser-validation guard.
-                        if (pick != null && !eligible.Contains(pick))
+                if (exiled.Count == 0) return;
+
+                // "then choose one of them" — controller's choice. Agent path:
+                // ChooseLibraryPickAsync; deterministic first-exiled fallback
+                // pre-agent (matches every other look-and-pick factory).
+                ICard chosen = exiled[0];
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
+                if (agent != null)
+                {
+                    var pick = await agent.ChooseLibraryPickAsync(
+                        ctx: ctx.Game,
+                        candidates: exiled.Cast<ICard>().ToList(),
+                        kindLabel: "card to play this turn").ConfigureAwait(false);
+                    if (pick != null && exiled.Contains(pick))
+                    {
+                        chosen = pick;
+                    }
+                }
+
+                // CR 118.9 — "You may play that card this turn": stamp a
+                // runtime exile-cast grant on the chosen card for its printed
+                // mana cost (same impulse-play primitive as Abbot of Keral
+                // Keep / Light Up the Stage). The OTHER exiled card stays in
+                // exile with no grant.
+                if (chosen is Card concreteChosen)
+                {
+                    concreteChosen.GrantRuntimeExileCast(controller, concreteChosen.ManaCostValue);
+
+                    // CR 514.2 — "this turn" = until the next Cleanup. Clear
+                    // the grant at the next Cleanup step when a bus is wired.
+                    if (eventBus != null)
+                    {
+                        Action<StepStartedEvent>? handler = null;
+                        handler = se =>
                         {
-                            pick = null;
-                        }
-                    }
-                    else
-                    {
-                        pick = eligible[0];
-                    }
-                }
-
-                // Move the pick (if any) Library → Hand. The rest stay
-                // in the peeked list for the bottom-of-library step.
-                if (pick != null)
-                {
-                    library.RemoveCard(pick);
-                    controller.Zones.Hand.AddCard(pick);
-                    if (pick is Card concretePick)
-                    {
-                        concretePick.SetZone(ZoneType.Hand);
-                    }
-                }
-
-                // CR 701.20 — "Put the rest on the bottom of your library
-                // in any order." v1 preserves snapshot order (top → bottom
-                // becomes bottom → bottom-1 → … which is the identity for
-                // the deterministic fallback). Future agent prompt for
-                // re-ordering plugs in here — see class xmldoc.
-                foreach (var remainder in peeked)
-                {
-                    if (ReferenceEquals(remainder, pick)) continue;
-                    library.RemoveCard(remainder);
-                    library.AddCard(remainder); // Zone.AddCard appends to the bottom.
-                    if (remainder is Card concreteRemainder)
-                    {
-                        concreteRemainder.SetZone(ZoneType.Library);
+                            if (se.StepType != StepStateType.Cleanup) return;
+                            concreteChosen.ClearRuntimeExileCast();
+                            if (handler != null) eventBus.Unsubscribe(handler);
+                        };
+                        eventBus.Subscribe(handler);
                     }
                 }
             });
 
-        var activatedAbility = new ActivatedAbility(
+        var digAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
             {
-                new ManaCostCost(ActivationCost),
                 AdditionalCost.Tap(card),
+                new DiscardACardCost(),
             },
-            effects: new IEffect[] { activatedEffect },
+            effects: new IEffect[] { digEffect },
             rebindSafe: true);
 
-        card.AddAbility(activatedAbility);
+        card.AddAbility(digAbility);
 
         return card;
     }
 
     /// <summary>
-    /// CR 602.5b activation gate — "Activate only if there are four or
-    /// more instant and/or sorcery cards in your graveyard."
-    ///
-    /// Public so action-enumeration callers (bot policies, agent legal-
-    /// action probes) can gate the activation BEFORE the cost layer
-    /// fires. Counts <see cref="CardType.Instant"/> + <see cref="CardType.Sorcery"/>
-    /// cards in <paramref name="controller"/>'s graveyard (CR 205.2 /
-    /// CR 400.1) and returns <c>true</c> iff the count meets or exceeds
-    /// <see cref="GraveyardThreshold"/>. The resolve-time guard in the
-    /// effect closure invokes the same predicate as a safety net.
+    /// CR 613.4c sample — true iff <paramref name="controller"/>'s graveyard
+    /// holds <see cref="GraveyardThreshold"/>+ instant and/or sorcery cards
+    /// (CR 205.2 / 400.1). The conditional pump's
+    /// <see cref="GraveyardThresholdPumpEffect.IsActive"/> consults this on
+    /// every Compute.
     /// </summary>
-    public static bool CanActivateGraveyardGate(Player controller)
+    public static bool IsPumpActive(Player controller)
     {
         ArgumentNullException.ThrowIfNull(controller);
-
         if (controller.Zones?.Graveyard == null) return false;
 
         var count = 0;
@@ -307,5 +267,114 @@ public static class MagmaticChannelerFactory
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// CR 613.1f — Layer-7c conditional pump: +3/+1 while the source's
+    /// controller's graveyard holds 4+ instant and/or sorcery cards. The gate
+    /// is sampled live (no subscriptions) so the bonus tracks the graveyard
+    /// state at compute time.
+    /// </summary>
+    private sealed class GraveyardThresholdPumpEffect : ContinuousEffect
+    {
+        private readonly Creature _source;
+        private readonly Player _controller;
+
+        public GraveyardThresholdPumpEffect(Creature source, Player controller)
+        {
+            _source = source ?? throw new ArgumentNullException(nameof(source));
+            _controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        }
+
+        public override Layer Layer => Layer.PT_Modify;
+        public override Permanent? Source => _source;
+
+        public override bool IsActive() =>
+            _source.Zone == Majik.Core.Zones.ZoneType.Battlefield
+            && IsPumpActive(_controller);
+
+        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _source);
+
+        public override void Apply(CreatureCharacteristics chars)
+        {
+            chars.Power += PumpPower;
+            chars.Toughness += PumpToughness;
+        }
+
+        /// <summary>
+        /// Sim-only: reconstruct an identical pump bound to
+        /// <paramref name="clonedSource"/> for the search-sandbox clone.
+        /// preserves: nothing beyond target; source → clonedSource (as Creature);
+        /// controller → clonedSource.Controller.
+        /// </summary>
+        internal override ContinuousEffect? CloneForSim(
+            Permanent clonedSource,
+            System.Func<System.Collections.Generic.IReadOnlyList<Player>>? clonedPlayers)
+        {
+            if (clonedSource is not Creature clonedCreature) return null;
+            var clonedController = clonedCreature.Controller;
+            if (clonedController == null) return null;
+            return new GraveyardThresholdPumpEffect(clonedCreature, clonedController);
+        }
+    }
+
+    /// <summary>
+    /// ETB/LTB lifecycle binder for the +3/+1 conditional static. Registers
+    /// the pump when Magmatic Channeler enters the battlefield; unregisters
+    /// when it leaves. Mirrors <see cref="DragonsRageChannelerFactory"/>'s
+    /// delirium lifecycle.
+    /// </summary>
+    private sealed class GraveyardThresholdLifecycle
+    {
+        private readonly Creature _source;
+        private readonly Player _controller;
+        private readonly ContinuousEffectsService _effects;
+        private readonly IEventBus? _eventBus;
+        private readonly Action<CardMovedEvent> _handler;
+        private GraveyardThresholdPumpEffect? _registered;
+        private bool _attached;
+
+        public GraveyardThresholdLifecycle(
+            Creature source,
+            Player controller,
+            ContinuousEffectsService effects,
+            IEventBus? eventBus)
+        {
+            _source = source;
+            _controller = controller;
+            _effects = effects;
+            _eventBus = eventBus;
+            _handler = OnEvent;
+        }
+
+        public void Attach()
+        {
+            if (_attached) return;
+            _attached = true;
+            _source.ActiveEffects = _effects;
+            _eventBus?.Subscribe(_handler);
+            Sync();
+        }
+
+        private void OnEvent(CardMovedEvent e)
+        {
+            if (!ReferenceEquals(e.Card, _source)) return;
+            Sync();
+        }
+
+        private void Sync()
+        {
+            var shouldBeActive = _source.Zone == Majik.Core.Zones.ZoneType.Battlefield;
+            if (shouldBeActive && _registered == null)
+            {
+                _registered = new GraveyardThresholdPumpEffect(_source, _controller);
+                _effects.Register(_registered);
+            }
+            else if (!shouldBeActive && _registered != null)
+            {
+                _effects.Unregister(_registered);
+                _registered = null;
+            }
+        }
     }
 }
