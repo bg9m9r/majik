@@ -32,6 +32,18 @@ public sealed record PlayerDto(
     ZoneDto Library,
     ZoneDto Exile);
 
+/// <summary>
+/// CR 115 — a PLAYER offered as a legal target on a targets prompt (Lightning
+/// Bolt "any target", "target player", "target opponent", …). Shipped on
+/// <see cref="PromptDto.PlayerCandidates"/> alongside the card
+/// <see cref="PromptDto.Candidates"/> so the portal can render a player's HUD
+/// as a clickable target. The id is the engine <see cref="Players.Player.Id"/>
+/// Guid the client echoes back in its <c>ChooseTargetsCommand.TargetInstanceIds</c>
+/// (CandidateMatchesId matches it to the Player). Serialized as
+/// <c>playerCandidates</c> (camelCase) on the wire.
+/// </summary>
+public sealed record PlayerCandidateDto(Guid Id, string Name, int Life);
+
 public sealed record ZoneDto(IReadOnlyList<CardSnapshotDto> Cards);
 
 public sealed record CardSnapshotDto(
@@ -213,7 +225,19 @@ public sealed record PromptDto(
     /// defensively normalises the returned split (clamps each ≥1, reconciles
     /// the total) so a misbehaving client can never deal the wrong amount.
     /// </summary>
-    DamageDivisionViewDto? DamageDivisionView = null);
+    DamageDivisionViewDto? DamageDivisionView = null,
+    /// <summary>
+    /// CR 115 — players offered as legal targets on a targets prompt (Lightning
+    /// Bolt "any target", "target player", "target opponent", …). Non-null only
+    /// when the resolved target pool contains at least one player; null on every
+    /// other prompt kind and on targets prompts that offer only permanents. The
+    /// portal renders each player's HUD as a clickable target gated by this list,
+    /// echoing the chosen <see cref="PlayerCandidateDto.Id"/> back in its
+    /// <c>ChooseTargetsCommand.TargetInstanceIds</c>. Before this field, players
+    /// in the pool were silently dropped by the card-only candidate snapshot, so
+    /// a player could never be chosen as a target in the UI.
+    /// </summary>
+    IReadOnlyList<PlayerCandidateDto>? PlayerCandidates = null);
 
 /// <summary>
 /// CR 601.2d / CR 119.4 — per-prompt body for a divided-damage allocation

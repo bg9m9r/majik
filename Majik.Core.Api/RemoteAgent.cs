@@ -867,9 +867,18 @@ public sealed class RemoteAgent : IPlayerAgent
                 .OfType<ICard>()
                 .Select(StateSnapshotter.SnapshotCard)
                 .ToList();
+            // CR 115 — ship players in the pool too (previously dropped by the
+            // card-only snapshot), so the portal can render a player HUD as a
+            // clickable target. _pendingTargetCandidates (above) keeps the FULL
+            // pool incl. players, so inbound validation still matches Player.Id.
+            var playerSnapshots = candidates
+                .OfType<Player>()
+                .Select(p => new Majik.Core.Api.Dtos.PlayerCandidateDto(p.Id, p.Name, p.LifeTotal))
+                .ToList();
             _pendingPayload = new PromptPayload(
                 Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
-                Label: request.Description);
+                Label: request.Description,
+                PlayerCandidates: playerSnapshots.Count > 0 ? playerSnapshots : null);
         }
 
         try
@@ -1443,4 +1452,11 @@ public sealed record PromptPayload(
     /// kind. <see cref="GameFacade.BuildPrompt"/> forwards this onto
     /// <see cref="PromptDto.DamageDivisionView"/>.
     /// </summary>
-    DamageDivisionViewDto? DamageDivisionView = null);
+    DamageDivisionViewDto? DamageDivisionView = null,
+    /// <summary>
+    /// CR 115 — players in the resolved target pool (id / name / life). Non-null
+    /// only on targets prompts whose pool includes ≥1 player; null otherwise.
+    /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
+    /// <see cref="Dtos.PromptDto.PlayerCandidates"/>.
+    /// </summary>
+    IReadOnlyList<Majik.Core.Api.Dtos.PlayerCandidateDto>? PlayerCandidates = null);
