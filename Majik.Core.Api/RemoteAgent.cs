@@ -842,9 +842,25 @@ public sealed class RemoteAgent : IPlayerAgent
         var live = req.ResolveCandidates(ctx);
         _pendingChoiceCandidates = live;
         _pendingChoiceKind = req.Kind;
+
+        // Ship the candidate cards + the choice descriptor onto the wire
+        // payload (mirrors ChooseTargetsAsync). Without these the portal had
+        // nothing to render for a generic "pick one creature" prompt and the
+        // game wedged holding priority awaiting a ChoiceCommand the UI never
+        // collected (live-play bug: Yawgmoth's "Sacrifice another creature"
+        // cost, Grist, Sungold Sentinel, …). Candidates are the ICard / Permanent
+        // members of the resolved legal pool; non-card candidates (e.g. a
+        // gift recipient Player, a mode sentinel) carry no snapshot and the
+        // payload candidate list is left null for them — the existing
+        // bespoke views (gift, etc.) cover those.
+        var cardSnapshots = live
+            .OfType<ICard>()
+            .Select(StateSnapshotter.SnapshotCard)
+            .ToList();
         _pendingPayload = new PromptPayload(
-            Candidates: null,
-            Label: req.Description);
+            Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
+            Label: req.Description,
+            ChoiceView: new ChoiceViewDto(req.Kind.ToString(), req.Min, req.Max));
         try
         {
             return Prompt<IReadOnlyList<object>>(ct, typeof(ChoiceCommand));
@@ -1281,4 +1297,12 @@ public sealed record PromptPayload(
     /// null on every other prompt kind. <see cref="GameFacade.BuildPrompt"/>
     /// forwards this onto <see cref="PromptDto.BottomCount"/>.
     /// </summary>
-    int? BottomCount = null);
+    int? BottomCount = null,
+    /// <summary>
+    /// CR 700.6 / 701.x — descriptor for a generic declarative choice
+    /// (kind / min / max) surfaced via <c>ChooseAsync</c>. Non-null only on
+    /// <c>ChoiceCommand</c> prompts; the picking pool rides on
+    /// <see cref="Candidates"/>. <see cref="GameFacade.BuildPrompt"/> forwards
+    /// this onto <see cref="PromptDto.ChoiceView"/>.
+    /// </summary>
+    ChoiceViewDto? ChoiceView = null);

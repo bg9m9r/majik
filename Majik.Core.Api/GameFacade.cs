@@ -500,6 +500,12 @@ public sealed class GameFacade : IDisposable
                     var promptReq = ReferenceEquals(live, req.LegalCandidates)
                         ? req
                         : req.WithCandidates(live);
+                    // Name the source card/ability on the prompt label so the
+                    // player knows what they're choosing a target FOR (the bare
+                    // "up to one target creature" gave no clue which permanent
+                    // raised the prompt). Label-only — targeting semantics
+                    // unchanged. Mirrors TurnDriver.DispatchActivate.
+                    promptReq = promptReq.WithSourceLabel(aa.Source);
                     var chosen = await agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
                     chosenTargets.Add(chosen);
                     foreach (var obj in chosen)
@@ -1547,7 +1553,8 @@ public sealed class GameFacade : IDisposable
             SurveilView: payload?.SurveilView,
             YesNoView: payload?.YesNoView,
             RevealView: payload?.RevealView,
-            BottomCount: payload?.BottomCount);
+            BottomCount: payload?.BottomCount,
+            ChoiceView: payload?.ChoiceView);
     }
 
     private void BridgeEvent(GameEvent e)

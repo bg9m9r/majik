@@ -183,7 +183,44 @@ public sealed record PromptDto(
     /// matching <c>ChooseCardsToBottomCommand</c> carrying exactly
     /// <see cref="BottomCount"/> in-hand instance ids is dispatched on submit.
     /// </summary>
-    int? BottomCount = null);
+    int? BottomCount = null,
+    /// <summary>
+    /// CR 700.6 / 701.x — descriptor for a generic declarative choice surfaced
+    /// via <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseAsync"/>
+    /// (the "Sacrifice another creature" cost on Yawgmoth / Thran Physician,
+    /// Grist's −2 sacrifice, Sungold Sentinel, Serra's Emissary, the cast-gift
+    /// recipient, …). Non-null only on <c>ChoiceCommand</c> prompts; null on
+    /// every other prompt kind. The picking pool is shipped on the existing
+    /// <see cref="Candidates"/> field (the engine-resolved legal candidates);
+    /// the portal renders a PickOne/PickN grid over them, gated by
+    /// <see cref="ChoiceViewDto.Min"/>..<see cref="ChoiceViewDto.Max"/>, and
+    /// echoes <see cref="ChoiceViewDto.Kind"/> back in its
+    /// <c>ChoiceCommand</c>. Without this descriptor (and the candidates) the
+    /// portal had nothing to render and the game wedged holding the prompt.
+    /// </summary>
+    ChoiceViewDto? ChoiceView = null);
+
+/// <summary>
+/// CR 700.6 / 701.x — per-prompt body for a generic declarative choice
+/// surfaced on <see cref="PromptDto.ChoiceView"/>. Mirrors
+/// <see cref="Majik.Core.Players.Agents.ChoiceRequest"/> on the wire so a
+/// client can render the right picker and respond with a
+/// <c>ChoiceCommand</c>.
+/// <list type="bullet">
+/// <item><see cref="Kind"/> — the
+///   <see cref="Majik.Core.Players.Agents.ChoiceKind"/> enum name (e.g.
+///   "PickOne", "PickN"). The portal echoes this verbatim in its
+///   <c>ChoiceCommand.Kind</c> so the engine resolves the picks against the
+///   right policy.</item>
+/// <item><see cref="Min"/> / <see cref="Max"/> — inclusive bounds on how many
+///   of <see cref="PromptDto.Candidates"/> the player must pick (e.g. 1/1 for
+///   PickOne). The portal gates submission to this range.</item>
+/// </list>
+/// </summary>
+public sealed record ChoiceViewDto(
+    string Kind,
+    int Min,
+    int Max);
 
 /// <summary>
 /// CR 701.15 — per-prompt body for reveal-and-choose prompts surfaced on

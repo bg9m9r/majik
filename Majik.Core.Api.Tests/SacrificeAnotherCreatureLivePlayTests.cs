@@ -145,6 +145,20 @@ public sealed class SacrificeAnotherCreatureLivePlayTests
             "Yawgmoth's 'Sacrifice another creature' cost must prompt the controller " +
             "to choose which creature to sacrifice (CR 700.6 — the controller chooses)");
 
+        // The sacrifice-choice prompt must ship renderable candidates + a
+        // choice descriptor or the portal has nothing to draw and the game
+        // wedges (the live-play bug this fix addresses). Candidates is the
+        // sacrificeable pool, and ChoiceView carries the kind/min/max the
+        // portal echoes back in its ChoiceCommand.
+        sacPrompt!.Candidates.Should().NotBeNull(
+            "the sacrifice prompt must ship the candidate card list so the portal " +
+            "can render the choice instead of wedging");
+        sacPrompt.Candidates!.Should().NotBeEmpty();
+        sacPrompt.Candidates!.Select(c => c.InstanceId).Should().Contain(fodder.InstanceId);
+        sacPrompt.ChoiceView.Should().NotBeNull(
+            "the sacrifice prompt must carry the choice kind/min/max");
+        sacPrompt.ChoiceView!.Kind.Should().Be(ChoiceKind.PickOne.ToString());
+
         // Respond: choose the fodder creature.
         await RespondSacrificeChoice(facade, sacPrompt!, fodder.InstanceId, alice.Id);
 

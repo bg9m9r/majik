@@ -1682,6 +1682,51 @@ public class RemoteAgentTests
         (await task).Should().BeSameAs(b);
     }
 
+    // ── ChooseAsync wire payload (live-play wedge fix) ──────────────────────
+    //
+    // REGRESSION GUARD: a human activating an ability whose cost / effect
+    // prompts a generic "pick one creature" choice (Yawgmoth's "Sacrifice
+    // another creature" cost, Grist, Sungold Sentinel, …) routes through
+    // ChooseAsync. The wire PromptPayload it stashes MUST carry the candidate
+    // card snapshots + a choice descriptor (kind / min / max) so the portal
+    // can render a PickOne/PickN grid and echo the Kind back in its
+    // ChoiceCommand. The bug shipped a payload with null Candidates and no
+    // choice descriptor, so the UI had nothing to render and the game wedged.
+    [Fact]
+    public async Task ChooseAsync_PickOne_StashesCandidatesAndChoiceDescriptor()
+    {
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = _alice };
+        var elk = new Creature("Elk", "2G", 3, 3) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        var req = new ChoiceRequest(
+            Kind: ChoiceKind.PickOne,
+            Description: "Sacrifice another creature",
+            Min: 1,
+            Max: 1,
+            Candidates: new object[] { bear, elk });
+
+        _ = ((IPlayerAgent)agent).ChooseAsync(ctx, req);
+
+        var payload = agent.PendingPayload;
+        payload.Should().NotBeNull();
+        payload!.Candidates.Should().NotBeNull(
+            "the portal needs the candidate card snapshots to render the choice");
+        payload.Candidates!.Should().HaveCount(2);
+        payload.Candidates!.Select(c => c.InstanceId)
+            .Should().BeEquivalentTo(new[] { bear.InstanceId, elk.InstanceId });
+
+        payload.ChoiceView.Should().NotBeNull(
+            "the portal needs the choice kind / min / max to render PickOne/PickN " +
+            "and echo the Kind back in its ChoiceCommand");
+        payload.ChoiceView!.Kind.Should().Be(ChoiceKind.PickOne.ToString());
+        payload.ChoiceView.Min.Should().Be(1);
+        payload.ChoiceView.Max.Should().Be(1);
+
+        await Task.CompletedTask;
+    }
+
     [Fact]
     public async Task ChooseFromPile_Human_AwaitsRealChoiceCommand_NoAutoPick()
     {
