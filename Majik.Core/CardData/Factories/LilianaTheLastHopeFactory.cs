@@ -26,12 +26,12 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>+1: -2/-1 to a creature (CR 606 + CR 613.1f Layer 7c)</b>: when
 ///   <paramref name="targetCreatureResolver"/> is non-null and a non-null
 ///   <paramref name="effects"/> service is wired, registers a
-///   <see cref="PumpUntilEndOfTurnEffect"/> with (-2, -1) against the
-///   first resolved target. The printed duration is "until your next
-///   turn" — v1 uses the EOT pipeline (CR 514.2) as a near-miss; the
-///   "next-turn" extension is the same deferred surface Wrenn -1 has.
-///   No-resolver / no-effects path: legal no-op, loyalty change still
-///   applies ("up to one" — CR 700.6).
+///   <see cref="PumpUntilControllersNextTurnEffect"/> with (-2, -1) against
+///   the first resolved target. The printed duration "until your next turn"
+///   is modelled precisely (CR 514.2): the effect persists across the
+///   intervening opponent turn(s) and ends at Liliana's controller's NEXT
+///   untap step, not this turn's cleanup. No-resolver / no-effects path:
+///   legal no-op, loyalty change still applies ("up to one" — CR 700.6).
 /// - <b>-2: Return up to two creature cards from controller's graveyard
 ///   to controller's hand (CR 606 + CR 701.20)</b>: scans controller's
 ///   graveyard for cards with <see cref="CardType.Creature"/>, picks the
@@ -48,9 +48,6 @@ namespace Majik.Core.CardData.Factories;
 ///   service the emblem is structural-only (same posture as Wrenn -7).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"Until your next turn" duration</b>: modelled as EOT (CR 514.2).
-///   The extra step until the controller's next turn-end is the same
-///   missing primitive Liliana of the Veil's continuous effects flag.
 /// - <b>Target prompts</b>: <see cref="LoyaltyAbility"/> doesn't declare
 ///   <see cref="TargetRequest"/>s. +1 / -2 pick from supplied resolvers
 ///   deterministically; agent-driven choice is the same gap Karn /
@@ -136,8 +133,12 @@ public static class LilianaTheLastHopeFactory
             {
                 target.ActiveEffects = effects;
             }
-            effects.Register(new PumpUntilEndOfTurnEffect(
-                target, Plus1PowerDelta, Plus1ToughnessDelta));
+            // CR 514.2 — printed duration is "until your next turn": the
+            // controller-keyed expiry primitive (drops at Liliana's controller's
+            // next untap step, NOT this turn's cleanup).
+            var controller = liliana.Controller ?? owner;
+            effects.Register(new PumpUntilControllersNextTurnEffect(
+                target, Plus1PowerDelta, Plus1ToughnessDelta, controller));
         }));
 
         // -- -2: Return up to two target creature cards from your

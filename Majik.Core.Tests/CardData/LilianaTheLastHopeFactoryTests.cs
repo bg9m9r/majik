@@ -21,9 +21,9 @@ namespace Majik.Core.Tests.CardData;
 ///   - Card identity (Legendary Planeswalker — Liliana, starting loyalty 3,
 ///     mana cost {1}{B}{B}).
 ///   - Loyalty ability shape (three abilities: +1, -2, -7).
-///   - +1: target creature gets -2/-1 (modelled as EOT pump via
-///     PumpUntilEndOfTurnEffect; "until your next turn" is the same
-///     deferred surface Wrenn -1 has).
+///   - +1: target creature gets -2/-1 until your next turn (modelled
+///     precisely via the controller-keyed
+///     PumpUntilControllersNextTurnEffect, CR 514.2).
 ///   - +1 no-target / no-effects-service path is a legal no-op.
 ///   - -2: returns up to two creature cards from controller's graveyard
 ///     to controller's hand; skips non-creatures; honours the cap.

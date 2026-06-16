@@ -40,12 +40,14 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="ValleyFloodcallerFactory"/>'s noncreature-flash static (inverted
 ///   type predicate).
 /// - <b>+1: up to one target creature gains vigilance and reach until your next
-///   turn (CR 606 + CR 611)</b>: routed via the <paramref name="targetResolver"/>
-///   — the first offered creature gains the Vigilance + Reach
-///   <see cref="KeywordAbility"/> markers. v1 grant is structural (the keyword
-///   markers are added directly); the "until your next turn" cleanup is the same
-///   deferred surface every turn-scoped keyword grant shares. No resolver / no
-///   target ⇒ no-op (loyalty change still applies, CR 606.3).
+///   turn (CR 606 + CR 611 + CR 514.2)</b>: routed via the
+///   <paramref name="targetResolver"/> — the first offered creature gains
+///   Vigilance + Reach. When the continuous-effects service is wired the grant
+///   is a controller-keyed <see cref="GrantKeywordsUntilControllersNextTurnEffect"/>
+///   that ends precisely at Vivien's controller's next untap step; the
+///   no-service shape build falls back to structural
+///   <see cref="KeywordAbility"/> markers. No resolver / no target ⇒ no-op
+///   (loyalty change still applies, CR 606.3).
 /// - <b>−2: Look at the top three, exile one face down, you may cast it if it's
 ///   a creature spell (CR 606 + CR 701.15 + CR 601.3e)</b>: peeks the top three
 ///   (clamped to library size) via <see cref="RevealAndChoose.RevealTopAndChoose"/>,
@@ -56,9 +58,6 @@ namespace Majik.Core.CardData.Factories;
 ///   the bottom of the library.
 ///
 /// ## Deferred (v1 gaps, isolated)
-/// - <b>+1 "until your next turn" expiry</b>: the vigilance/reach grant is not
-///   auto-revoked at the controller's next turn (same turn-scoped-keyword-grant
-///   gap as the sibling planeswalker buffs).
 /// - <b>+1 target prompt</b>: <see cref="LoyaltyAbility"/> doesn't declare a
 ///   <see cref="Majik.Core.Targeting.TargetRequest"/>; the buffed creature is
 ///   picked from <paramref name="targetResolver"/>. Same gap Vivien Reid shares.
@@ -142,8 +141,27 @@ public static class VivienChampionOfTheWildsFactory
             foreach (var creature in candidates)
             {
                 if (creature == null || creature.Zone != ZoneType.Battlefield) continue;
-                GrantKeywordIfMissing(creature, Vigilance);
-                GrantKeywordIfMissing(creature, Reach);
+
+                // CR 514.2 — "until your next turn": when the continuous-effects
+                // service is wired, model the duration precisely via the
+                // controller-keyed expiry primitive (Layer 6 keyword grant that
+                // drops at Vivien's controller's next untap step). Falls back to
+                // a structural keyword-marker grant when no service is wired
+                // (pure card-shape tests) — the markers persist, matching the
+                // pre-duration posture.
+                var controller = vivien.Controller ?? owner;
+                if (continuousEffects != null)
+                {
+                    if (creature.ActiveEffects == null) creature.ActiveEffects = continuousEffects;
+                    continuousEffects.Register(
+                        new GrantKeywordsUntilControllersNextTurnEffect(
+                            creature, controller, Vigilance, Reach));
+                }
+                else
+                {
+                    GrantKeywordIfMissing(creature, Vigilance);
+                    GrantKeywordIfMissing(creature, Reach);
+                }
                 return; // "up to one target".
             }
         }));
