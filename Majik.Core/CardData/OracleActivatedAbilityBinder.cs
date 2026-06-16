@@ -257,6 +257,22 @@ namespace Majik.Core.CardData;
 ///     the chosen player mills from THEIR OWN library (CR 701.13), so the BEARER
 ///     is only the source / cost-payer, exactly the way the pinger's "target
 ///     player" leg routes a chosen-player effect.</item>
+///   <item><b>Library-tutor-to-hand</b> —
+///     <c>"{cost}: Search your library for a/an &lt;type&gt; card, [reveal it,]
+///     put it into your hand, [then] shuffle."</c> An UNTARGETED tutor (the
+///     searched card is a hidden choice, CR 115.1a). Rebuilt against the BEARER's
+///     CONTROLLER's own library: gather the matching cards, prompt the live agent
+///     via <see cref="Zones.LibrarySearch.PromptOnlyAsync"/> (deterministic
+///     first-match fallback), move the pick into THAT controller's hand, then
+///     shuffle (CR 701.19a / 701.20a / 613.1f) — the soundest library shape to
+///     re-home because there is NO "this creature" / source reference at all (the
+///     controller searches their OWN library, never the exiled imprinted card).
+///     Only the OPEN card-type forms (<see cref="GraveyardCardFormPredicate"/> —
+///     bare "card", "creature", "instant or sorcery", …) are reconstructed; a
+///     typed sub-filter ("Equipment card", "basic land card") is skipped as
+///     unsound, and a "put it onto the battlefield" land-ramp search is NOT this
+///     shape (only the "to your hand" destination is matched). Sound on any
+///     permanent bearer.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -501,6 +517,34 @@ public static class OracleActivatedAbilityBinder
     private static readonly Regex ReturnFromGraveyardToHandRegex = new(
         @"^(" + CostList + @")\s*:\s*Return target " + GraveyardCardTypeForm
         + @"card from your graveyard to your hand\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Search your library for a/an <X> card, [reveal it,] put it into
+    // your hand, [then] shuffle." (CR 701.19a — search; CR 701.20a — shuffle.)
+    // The library-tutor-to-hand sibling of the graveyard-recursion shape: instead
+    // of pulling from the graveyard, a CHOSEN (hidden, CR 115.1a) library card of
+    // the printed type is fetched to the controller's hand. A classic activated
+    // card-advantage / toolbox shape on real creature cards (Fauna Shaman's
+    // "{G}, {T}, Discard a creature card: Search your library for a creature
+    // card …" body — the search leg; equipment / kindred toolbox engines). This is
+    // the SOUNDEST library shape to re-home: the search operates on the BEARER's
+    // CONTROLLER's OWN library and the pick lands in THAT controller's hand —
+    // there is NO "this creature" / source reference at all (CR 701.19a / 613.1f),
+    // so re-homing is a clean controller-scoped tutor, never the exiled imprinted
+    // card. Only the OPEN card-type forms (GraveyardCardTypeForm — the same
+    // source-independent card-type predicates the graveyard-recursion shape uses)
+    // are reconstructed; a typed sub-filter ("Equipment card", "basic land card",
+    // "Goblin card") is NOT a plain card-type test and is skipped as unsound (its
+    // candidate filter isn't reconstructed here), consistent with the
+    // graveyard-recursion / restricted-target boundary. The "to your HAND"
+    // destination is required (a "put it onto the battlefield" search is the land
+    // ramp shape, NOT this tutor-to-hand shape, and is deliberately not matched).
+    // The optional printed "reveal it," step and the optional "then" before
+    // "shuffle" are both tolerated. Group 1 = cost, group 2 = the optional
+    // card-type word (empty for the bare "card" form).
+    private static readonly Regex TutorToHandRegex = new(
+        @"^(" + CostList + @")\s*:\s*Search your library for an? " + GraveyardCardTypeForm
+        + @"card,\s*(?:reveal it,\s*)?put it into your hand,\s*(?:then\s*)?shuffle\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: Target creature you control gains protection from the color of
@@ -1003,6 +1047,16 @@ public static class OracleActivatedAbilityBinder
                 if (costs == null) continue; // unsound cost token — skip
                 result.Add(BuildReturnFromGraveyardToHand(
                     costs, returnFromGy.Groups[2].Value, bearer, controller));
+                continue;
+            }
+
+            var tutorToHand = TutorToHandRegex.Match(line);
+            if (tutorToHand.Success)
+            {
+                var costs = TryBuildCostList(tutorToHand.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                result.Add(BuildTutorToHand(
+                    costs, tutorToHand.Groups[2].Value, bearer, controller));
                 continue;
             }
 
@@ -2369,6 +2423,96 @@ public static class OracleActivatedAbilityBinder
             });
 
         return ability;
+    }
+
+    /// <summary>
+    /// Build a library-tutor-to-hand ability: "{cost}: Search your library for
+    /// a/an &lt;X&gt; card, [reveal it,] put it into your hand, [then] shuffle."
+    /// (CR 701.19a — search; CR 701.20a — shuffle.) An untargeted effect — the
+    /// searched card is a hidden choice (CR 115.1a), not a chosen target — so no
+    /// <see cref="TargetRequest"/> is emitted (mirrors the declarative
+    /// <c>search_library</c> verb in <c>CardDefRuntime.BuildSearchLibraryEffect</c>).
+    /// Re-homed so the BEARER is ONLY the source / cost-payer (its own {T}/mana
+    /// cost); the search operates on the BEARER's CONTROLLER's OWN library and the
+    /// pick lands in THAT controller's hand (CR 701.19a / 613.1f) — there is NO
+    /// "this creature" / source reference at all, so re-homing is a clean
+    /// controller-scoped tutor, never the exiled imprinted card. Does NOT gate on
+    /// <see cref="Creature"/> (a tutor is sound on any permanent bearer — the
+    /// controller searches, not the permanent). The agent's library-pick decision
+    /// is read off the live <see cref="ResolutionContext"/> via the async-bodied
+    /// <see cref="Effect"/> ctor + <see cref="Zones.LibrarySearch.PromptOnlyAsync"/>
+    /// (falling back to <see cref="AgentRegistry"/>, then the deterministic
+    /// first-match) — exactly the way the declarative <c>search_library</c> verb
+    /// resolves it, so re-homing captures no source-card identity. The post-search
+    /// shuffle (CR 701.20a) runs whether or not a card was found.
+    /// <paramref name="cardTypeForm"/> is the optional printed type word
+    /// ("creature", "artifact", "instant or sorcery", …; empty for the bare "card"
+    /// form), mapped to the SAME source-independent card-type predicate the
+    /// graveyard-recursion shape uses (<see cref="GraveyardCardFormPredicate"/>); a
+    /// typed sub-filter ("Equipment card", "basic land card") is skipped by the
+    /// regex as unsound.
+    /// </summary>
+    private static ActivatedAbility BuildTutorToHand(
+        List<ICost> costs,
+        string cardTypeForm,
+        Permanent bearer,
+        Player controller)
+    {
+        Func<ICard, bool> predicate = GraveyardCardFormPredicate(cardTypeForm);
+        var label = string.IsNullOrEmpty(cardTypeForm)
+            ? "card"
+            : cardTypeForm.ToLowerInvariant() + " card";
+
+        var tutorEffect = new Effect(
+            $"Granted: search library for {label}, put into your hand, shuffle",
+            async (ResolutionContext rc) =>
+            {
+                // CR 701.19a — the searching player is the ability's CONTROLLER
+                // (read off the live context, else the captured controller). No
+                // source-card reference, so re-homing is trivially sound.
+                var searcher = rc.Controller ?? controller;
+
+                var candidates = searcher.Zones.Library.GetCards()
+                    .Where(predicate)
+                    .ToList();
+
+                // CR 701.19a — prompt the live agent off the resolution context
+                // (LibrarySearch falls back to the registry, then the
+                // deterministic first-match). Prompts even on zero candidates so a
+                // human searcher sees the failed search.
+                var pick = await Zones.LibrarySearch
+                    .PromptOnlyAsync(rc, searcher, candidates, label)
+                    .ConfigureAwait(false);
+
+                if (pick != null)
+                {
+                    // Move the chosen card to the searcher's hand. Route through the
+                    // registered ZoneService when one is live (so CardMovedEvent
+                    // subscribers fire), falling back to a direct zone move on the
+                    // pure-shape test path — the SAME posture as
+                    // CardDefRuntime.MoveTutoredCard.
+                    var zones = Services.ZoneServiceRegistry.Get(searcher);
+                    if (zones != null)
+                    {
+                        zones.MoveCard(pick, ZoneType.Library, ZoneType.Hand, searcher);
+                    }
+                    else
+                    {
+                        searcher.Zones.Library.RemoveCard(pick);
+                        searcher.Zones.Hand.AddCard(pick);
+                        pick.SetZone(ZoneType.Hand);
+                    }
+                }
+
+                // CR 701.20a — shuffle whether or not a card was found.
+                Zones.LibraryShuffle.ShuffleLibrary(searcher, $"search:granted:{bearer.Name}");
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { tutorEffect });
     }
 
     /// <summary>
