@@ -1,0 +1,10 @@
+{
+  "name": "War Screecher",
+  "types": ["Creature"],
+  "subtypes": ["Bird"],
+  "manaCost": "{1}{W}",
+  "power": 1,
+  "toughness": 3,
+  "keywords": ["Flying"],
+  "abilities": []
+}

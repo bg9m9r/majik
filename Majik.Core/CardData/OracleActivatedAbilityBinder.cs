@@ -44,6 +44,23 @@ namespace Majik.Core.CardData;
 ///     uses; a signed delta (a negative power/toughness leg, as on Aetherling /
 ///     Canyon Crab / Darklit Gargoyle / the Flowstone cycle) is equally sound to
 ///     re-home because the effect adds the raw signed ints to the bearer.</item>
+///   <item><b>Mass-pump-other (anthem-grant)</b> —
+///     <c>"{cost}: Other creatures you control get ±X/±Y until end of turn."</c>
+///     The controller-scoped, board-wide sibling of the targeted pump-other
+///     (War Screecher's <c>"{5}{W}, {T}: Other creatures you control get +1/+1
+///     until end of turn."</c>). Rebuilt as a NO-target
+///     <see cref="ActivatedAbility"/> whose resolution reads the BEARER's
+///     CONTROLLER (CR 109.5 / 400.7 — "you" = the ability's controller),
+///     snapshots every OTHER creature that controller controls (CR 608.2), and
+///     registers a <see cref="PumpUntilEndOfTurnEffect"/>(±X, ±Y) against each
+///     affected creature's own <see cref="Creature.ActiveEffects"/> (CR 613.1f
+///     Layer 7c; CR 514.2 expiry). Sound to re-home because the scope is
+///     "creatures YOU control" read off the BEARER's controller at resolution —
+///     never the exiled imprinted card's controller; "OTHER" (CR 601.2c)
+///     excludes the re-homed source (the bearer), so the bearer itself is not
+///     pumped. Each delta carries its own sign, so a signed mass pump is
+///     reconstructed too. Sound on any permanent bearer (an animated land can
+///     pump the rest of the board).</item>
 ///   <item><b>Pinger</b> —
 ///     <c>"{cost}: This creature deals N damage to &lt;any target | target
 ///     creature | target player&gt;."</c> Rebuilt with a 1..1
@@ -352,6 +369,28 @@ public static class OracleActivatedAbilityBinder
     // control"), consistent with the pinger / fight restricted-target boundary.
     private static readonly Regex PumpOtherRegex = new(
         @"^(" + CostList + @")\s*:\s*Target creature gets ([+-]\d+)/([+-]\d+) until end of turn\.$",
+        RegexOptions.IgnoreCase);
+
+    // "{cost}: Other creatures you control get ±X/±Y until end of turn."
+    // A controller-scoped MASS pump (anthem-grant) — the non-targeted, board-wide
+    // sibling of the targeted PumpOtherRegex. A common activated payoff on real
+    // creature cards (War Screecher's "{5}{W}, {T}: Other creatures you control
+    // get +1/+1 until end of turn."). RE-SOURCE-SAFE to reconstruct because the
+    // scope is "creatures YOU control" (CR 109.5 / 400.7 — "you" = the ability's
+    // controller): the rebuilt effect reads the BEARER's CONTROLLER at resolution
+    // and pumps each OTHER creature that controller controls, never the exiled
+    // imprinted card's controller. "OTHER" (CR 601.2c) excludes the ability's
+    // source — which re-homes to the BEARER — so the bearer itself is NOT pumped.
+    // Each PumpUntilEndOfTurnEffect (CR 613.1f Layer 7c; CR 514.2 expiry)
+    // registers against the affected creature's OWN ActiveEffects, exactly the
+    // way the targeted pump-other registers against its chosen target's
+    // ActiveEffects. Like the self/targeted pump each delta carries its OWN sign,
+    // so a signed mass pump ("+2/-1") is reconstructed too. Non-targeted (no
+    // TargetRequest): the snapshot of affected creatures is read off the live
+    // board at resolution (CR 608.2). Group 1 = cost, groups 2/3 = the signed
+    // power / toughness deltas.
+    private static readonly Regex MassPumpOtherRegex = new(
+        @"^(" + CostList + @")\s*:\s*Other creatures you control get ([+-]\d+)/([+-]\d+) until end of turn\.$",
         RegexOptions.IgnoreCase);
 
     // "{cost}: This creature deals N damage to <target form>."
@@ -848,6 +887,14 @@ public static class OracleActivatedAbilityBinder
                 continue;
             }
 
+            var massPumpOther = MassPumpOtherRegex.Match(line);
+            if (massPumpOther.Success)
+            {
+                var ability = TryBuildMassPumpOther(massPumpOther, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
             var pumpOther = PumpOtherRegex.Match(line);
             if (pumpOther.Success)
             {
@@ -1160,6 +1207,81 @@ public static class OracleActivatedAbilityBinder
             });
 
         return ability;
+    }
+
+    /// <summary>
+    /// Build a controller-scoped MASS pump (anthem-grant): "{cost}: Other
+    /// creatures you control get ±X/±Y until end of turn." (the non-targeted,
+    /// board-wide sibling of <see cref="TryBuildPumpOther"/>). Re-homed so the
+    /// BEARER is only the source / cost-payer; on resolution the effect reads the
+    /// BEARER's CONTROLLER (CR 109.5 / 400.7 — "you" = the ability's controller),
+    /// snapshots every OTHER creature that controller controls (CR 608.2), and
+    /// registers a <see cref="PumpUntilEndOfTurnEffect"/> (CR 613.1f Layer 7c;
+    /// CR 514.2 expiry) against each affected creature's OWN
+    /// <see cref="Creature.ActiveEffects"/> — never the exiled imprinted card and
+    /// never the bearer itself ("OTHER", CR 601.2c, excludes the re-homed source).
+    /// The bearer need NOT be a creature (a non-creature bearer — e.g. an
+    /// animated land — can still pay to pump the rest of the board), so this does
+    /// not gate on <see cref="Creature"/> the way self-pump does. The affected set
+    /// is read off the LIVE game when wired (<see cref="ResolutionContext.Game"/>),
+    /// scoping by control (CR 110.2 — a creature you control may live in an
+    /// opponent's battlefield zone); when no live game is wired (shape-only /
+    /// granted-ability test path) it falls back to the bearer's controller's own
+    /// battlefield zone. A creature with no <see cref="Creature.ActiveEffects"/>
+    /// (shape-only path) silently no-ops — same posture as the self / targeted
+    /// pump rebuilds. Mirrors RestlessPrairie's non-targeted anthem effect.
+    /// </summary>
+    private static ActivatedAbility? TryBuildMassPumpOther(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var p = int.Parse(match.Groups[2].Value);
+        var t = int.Parse(match.Groups[3].Value);
+
+        var pumpEffect = new Effect(
+            $"Granted: other creatures you control get +{p}/+{t} until end of turn",
+            (ResolutionContext rc) =>
+            {
+                // CR 109.5 / 400.7 — "you" = the ability's controller. Read the
+                // BEARER's controller AT RESOLUTION (the re-homed scope), never
+                // the exiled imprinted card's controller.
+                var you = bearer.Controller ?? controller;
+
+                // Snapshot the affected creatures first (CR 608.2) so any
+                // same-step zone moves don't disturb the enumeration. When a live
+                // game is wired, sweep every player's battlefield and scope by
+                // CONTROL (CR 110.2 — a creature you control can sit in an
+                // opponent's zone); else fall back to the controller's own
+                // battlefield zone (shape-only / granted-ability test path).
+                IEnumerable<Creature> battlefield = rc.Game is { } game
+                    ? game.AllPlayers.SelectMany(pl => pl.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                    : you.Zones.Battlefield.GetCards().OfType<Creature>();
+
+                var affected = battlefield
+                    .Where(c => ReferenceEquals(c.Controller, you))   // "you control"
+                    .Where(c => !ReferenceEquals(c, bearer))          // "OTHER" (CR 601.2c)
+                    .ToList();
+
+                foreach (var creature in affected)
+                {
+                    // CR 613.1f Layer 7c — register against the affected
+                    // creature's OWN effects service. A creature with no
+                    // ActiveEffects (shape-only path) silently no-ops.
+                    creature.ActiveEffects?.Register(
+                        new PumpUntilEndOfTurnEffect(creature, p, t));
+                }
+
+                return ValueTask.CompletedTask;
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { pumpEffect });
     }
 
     /// <summary>
