@@ -308,6 +308,22 @@ public static class Fx
         if (player is null) throw new ArgumentNullException(nameof(player));
         if (count <= 0) return Array.Empty<ICard>();
 
+        // CR 614.12 / CR 121.1 — quantity tier. Route the whole "draw N"
+        // instruction through the bus ONCE so count-modifying replacements
+        // (Quantum Riddler "draw that many plus one", Necrodominance "skip
+        // additional draws") can adjust the requested number before the
+        // per-card loop runs. A null result cancels the instruction (0
+        // draws). Distinct intent type from the per-card DrawCardIntent —
+        // the bus dispatches each tier only to its own subscribers.
+        if (player.Replacements != null)
+        {
+            var countIntent = new Majik.Core.Effects.DrawCountIntent(player, count);
+            var settled = player.Replacements.Apply(countIntent);
+            if (settled is null) return Array.Empty<ICard>();
+            count = settled.Count <= 0 ? 0 : settled.Count;
+            if (count <= 0) return Array.Empty<ICard>();
+        }
+
         var drawn = new List<ICard>(count);
         for (var i = 0; i < count; i++)
         {
@@ -354,6 +370,16 @@ public static class Fx
         if (player is null) throw new ArgumentNullException(nameof(player));
         ArgumentNullException.ThrowIfNull(ctx);
         if (count <= 0) return Array.Empty<ICard>();
+
+        // CR 614.12 / CR 121.1 — quantity tier (see the sync overload).
+        if (player.Replacements != null)
+        {
+            var countIntent = new Majik.Core.Effects.DrawCountIntent(player, count);
+            var settled = await player.Replacements.ApplyAsync(countIntent, ctx).ConfigureAwait(false);
+            if (settled is null) return Array.Empty<ICard>();
+            count = settled.Count <= 0 ? 0 : settled.Count;
+            if (count <= 0) return Array.Empty<ICard>();
+        }
 
         var drawn = new List<ICard>(count);
         for (var i = 0; i < count; i++)
