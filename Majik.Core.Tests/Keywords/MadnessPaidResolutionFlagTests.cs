@@ -169,6 +169,54 @@ public class MadnessPaidResolutionFlagTests
     }
 
     [Fact]
+    public void WelcomeToTheFold_NormalCast_GainsControlWhenToughness2OrLess()
+    {
+        // The base, non-madness half of the gate (CR 702.35c): "gain control of
+        // target creature if its toughness is 2 or less." A toughness-2 creature
+        // is exactly on the printed gate, so control IS gained on a normal cast.
+        var effects = new ContinuousEffectsService();
+
+        var smallBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        smallBear.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(smallBear);
+
+        var spell = (Sorcery)NamedCardFactory.Create("Welcome to the Fold", _alice);
+        spell.WasCastForMadnessCost.Should().BeFalse("cast for its printed {2}{U}{U} cost, not madness");
+
+        var chosen = new ChosenSpellParams(
+            null, null,
+            new IReadOnlyList<object>[] { new[] { (object)smallBear } },
+            ManaPayment.Empty);
+
+        WelcomeToTheFoldFactory.Resolve(_alice, chosen, o => o, effects, spell);
+
+        effects.EffectiveController(smallBear).Should().Be(_alice, "toughness 2 ≤ 2 printed gate → control gained");
+    }
+
+    [Fact]
+    public void WelcomeToTheFold_NormalCast_DoesNothingWhenTargetNoLongerCreatureOnBattlefield()
+    {
+        // CR 608.2b — at resolution the engine rechecks the target. A target that
+        // has left the battlefield (here: never on it / wrong zone) makes the
+        // spell do nothing even though its toughness would have passed the gate.
+        var effects = new ContinuousEffectsService();
+
+        var goneBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        goneBear.SetZone(ZoneType.Graveyard); // not on the battlefield at resolution
+        _bob.Zones.Graveyard.AddCard(goneBear);
+
+        var spell = (Sorcery)NamedCardFactory.Create("Welcome to the Fold", _alice);
+        var chosen = new ChosenSpellParams(
+            null, null,
+            new IReadOnlyList<object>[] { new[] { (object)goneBear } },
+            ManaPayment.Empty);
+
+        WelcomeToTheFoldFactory.Resolve(_alice, chosen, o => o, effects, spell);
+
+        effects.EffectiveController(goneBear).Should().Be(_bob, "target left the battlefield (CR 608.2b) → no control change");
+    }
+
+    [Fact]
     public void WelcomeToTheFold_MadnessCast_GainsControlIfToughnessXOrLess()
     {
         var effects = new ContinuousEffectsService();
