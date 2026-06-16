@@ -53,12 +53,20 @@ namespace Majik.Core.CardData.Factories;
 ///   4. Library shuffle (CR 701.20a) — routed through
 ///      <see cref="Majik.Core.Zones.LibraryShuffle.ShuffleLibrary"/>.
 ///
-/// ## v1 gaps
-/// - <b>"Any number" prompt</b>: the engine has no first-class "pick a
-///   subset of permanents to sacrifice" agent hook. The selector-based
-///   API is the v1 substitute. Single-arg dispatcher path = zero lands
-///   sacrificed → zero lands fetched (clean no-op, faithful to the lower
-///   bound of "any number" per CR 119.x).
+/// ## "Any number" agent hook (deferral paid down)
+/// - The engine now has a first-class "pick a subset of permanents to
+///   sacrifice" agent hook —
+///   <see cref="IPlayerAgent.ChooseSubsetToSacrificeAsync"/> (routed through
+///   the declarative <see cref="ChoiceRequest"/> /
+///   <see cref="IPlayerAgent.ChooseAsync"/> <see cref="ChoiceKind.PickN"/>
+///   sink). <see cref="BuildAgentResolveEffect"/> is the agent-driven resolve
+///   path that prompts the caster for the land subset to sacrifice
+///   ("any number" = min 0, max all controlled lands) and sacrifices exactly
+///   that subset (CR 701.16 + CR 119.x). The selector-based
+///   <see cref="BuildResolveEffect"/> overload remains for deterministic
+///   tests / scripted lines. When no agent is registered the hook's default
+///   posture sacrifices nothing (faithful "any number" lower bound — clean
+///   no-op).
 /// - <b>Untapped vs. tapped</b>: lands enter untapped per the printed
 ///   oracle. Lands with their own ETB-tapped replacements (shock lands,
 ///   bounce lands) ride through <see cref="ZoneServiceRegistry"/> when a
@@ -172,6 +180,100 @@ public static class ScapeshiftFactory
                     var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
                         ctx, caster, candidates, "land card").ConfigureAwait(false);
                     if (pick == null) break; // CR 701.19a — decline is legal.
+
+                    await MoveLibraryToBattlefieldAsync(caster, pick, ctx).ConfigureAwait(false);
+                }
+                // CR 701.20a — shuffle after the search resolves.
+                LibraryShuffle.ShuffleLibrary(caster, "scapeshift");
+            }),
+        };
+    }
+
+    /// <summary>
+    /// Build Scapeshift's resolve effect driven by the caster's
+    /// <see cref="IPlayerAgent"/> — the FIRST-CLASS "sacrifice any number of
+    /// lands" agent path (closes the v1 <c>pick-a-subset-to-sacrifice-agent-hook</c>
+    /// deferral). At resolution it:
+    /// <list type="number">
+    /// <item>Prompts the caster's agent via
+    /// <see cref="IPlayerAgent.ChooseSubsetToSacrificeAsync"/> with the lands
+    /// the caster controls on the battlefield as the candidate pool and
+    /// <c>min=0, max=pool.Count</c> ("any number" — CR 119.x). The agent
+    /// returns the subset to sacrifice; the closure sacrifices exactly that
+    /// subset (CR 701.16).</item>
+    /// <item>N = number of lands actually sacrificed.</item>
+    /// <item>Tutors up to N land cards from the caster's library onto the
+    /// battlefield via the same agent-driven per-slot
+    /// <see cref="IPlayerAgent.ChooseLibraryPickAsync"/> loop the selector
+    /// overload uses when its tutor selector is null (CR 701.19a), then
+    /// shuffles (CR 701.20a).</item>
+    /// </list>
+    /// <para>
+    /// The agent is read from the live <see cref="ResolutionContext"/>
+    /// (<see cref="ResolutionContext.Agent"/>), falling back to the caster's
+    /// <see cref="Majik.Core.Players.Agents.AgentRegistry"/> entry — the same
+    /// resolution-context agent seam <see cref="Majik.Core.Zones.LibrarySearch.PromptOnlyAsync"/>
+    /// uses. When no agent is registered (shape / dispatcher-test path) the
+    /// default <see cref="IPlayerAgent.ChooseSubsetToSacrificeAsync"/> posture
+    /// applies — sacrifice nothing (faithful "any number" lower bound), a
+    /// clean no-op. This replaces the old single-arg dispatcher path that
+    /// always sacrificed zero with no way for an agent to choose.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<IEffect> BuildAgentResolveEffect(Player caster)
+    {
+        ArgumentNullException.ThrowIfNull(caster);
+
+        return new IEffect[]
+        {
+            new Effect($"{CardName}: agent sacrifices any number of lands, tutors that many.", async ctx =>
+            {
+                var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(caster);
+
+                // ---- 1. Sacrifice phase (CR 701.16 + CR 119.x) ------------
+                var candidates = caster.Zones.Battlefield.GetCards()
+                    .Where(c => c.HasType(CardType.Land) && ReferenceEquals(c.Controller, caster))
+                    .ToList();
+
+                IReadOnlyList<ICard> chosen = Array.Empty<ICard>();
+                if (agent != null && candidates.Count > 0)
+                {
+                    // "Sacrifice any number of lands" — min 0 (CR 119.x lower
+                    // bound), max all controlled lands. Ramp intent: feeding
+                    // the land tutor is a mana-development gesture.
+                    chosen = await agent.ChooseSubsetToSacrificeAsync(
+                        ctx.Game, candidates, minCount: 0, maxCount: candidates.Count,
+                        intent: Majik.Core.Cards.BotIntent.Ramp, ct: ctx.Ct)
+                        .ConfigureAwait(false);
+                }
+
+                int sacrificed = 0;
+                var seenSac = new HashSet<ICard>();
+                var battlefield = candidates.ToHashSet();
+                foreach (var land in chosen)
+                {
+                    if (land == null) continue;
+                    if (!battlefield.Contains(land)) continue; // defence: only the offered pool
+                    if (!seenSac.Add(land)) continue;
+                    SacrificeToOwnerGraveyard(land);
+                    sacrificed++;
+                }
+
+                if (sacrificed == 0) return; // "any number" lower bound — clean no-op.
+
+                // ---- 2. Tutor phase (CR 701.19a) — agent per-slot loop ----
+                // Identical to the selector overload's null-tutorSelector path
+                // so both resolve routes tutor the same way.
+                for (int slot = 0; slot < sacrificed; slot++)
+                {
+                    var libCandidates = caster.Zones.Library.GetCards()
+                        .Where(c => c.HasType(CardType.Land))
+                        .ToList();
+                    if (libCandidates.Count == 0 && slot > 0) break;
+
+                    var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                        ctx, caster, libCandidates, "land card").ConfigureAwait(false);
+                    if (pick == null) break; // CR 701.19a — decline / nothing found is legal.
 
                     await MoveLibraryToBattlefieldAsync(caster, pick, ctx).ConfigureAwait(false);
                 }

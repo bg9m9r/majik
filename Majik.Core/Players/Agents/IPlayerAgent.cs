@@ -771,6 +771,96 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// CR 701.16 / CR 119.x — "sacrifice any number of [permanents]" subset
+    /// choice (Scapeshift, Pump-and-sac engines, any "sacrifice any number of
+    /// X" clause). Distinct from <see cref="ChooseFromBattlefieldAsync"/>,
+    /// which picks exactly one permanent: this returns a chosen MULTISET (a
+    /// subset, by reference, of <paramref name="candidates"/>) of the
+    /// permanents the chooser elects to sacrifice — possibly the empty set
+    /// (the lower bound of "any number", CR 119.x — "any number" includes
+    /// zero) or the whole set.
+    /// <para>
+    /// <paramref name="candidates"/> is pre-filtered by the calling effect to
+    /// the legal sacrifice pool (e.g. lands the chooser controls for
+    /// Scapeshift; permanents matching the named type). The agent returns the
+    /// subset to sacrifice. <paramref name="minCount"/> /
+    /// <paramref name="maxCount"/> bound the choice: "any number" passes
+    /// <c>min=0, max=candidates.Count</c>; a "sacrifice exactly N" clause
+    /// passes <c>min=max=N</c>. The engine sanitises the returned subset
+    /// (drops non-candidates + duplicates, clamps to the range) so a
+    /// misbehaving agent can never sacrifice an illegal set.
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.PickN"/> over
+    /// the candidate permanents. The pre-agent posture mirrors every other
+    /// declarative prompt: for an OPTIONAL subset (<paramref name="minCount"/>
+    /// == 0) it sacrifices NOTHING (the faithful "any number" lower bound — a
+    /// dumb/absent agent never throws away its own board); for a mandatory
+    /// floor (<paramref name="minCount"/> &gt; 0) it sacrifices the first
+    /// <paramref name="minCount"/> candidates. The result is always sanitised
+    /// to a legal subset. Smart bots / remote agents override
+    /// <see cref="ChooseAsync"/> (or this method) to choose the subset by
+    /// value.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect
+    /// closures (same sync-over-async wart as
+    /// <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<IReadOnlyList<ICard>> ChooseSubsetToSacrificeAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> candidates,
+        int minCount,
+        int maxCount,
+        BotIntent intent = BotIntent.None,
+        CancellationToken ct = default)
+    {
+        var pool = candidates ?? Array.Empty<ICard>();
+        var min = Math.Clamp(minCount, 0, pool.Count);
+        var max = Math.Clamp(maxCount, min, pool.Count);
+        if (pool.Count == 0 || max == 0) return Array.Empty<ICard>();
+
+        var req = new ChoiceRequest(
+            ChoiceKind.PickN,
+            "Sacrifice any number of permanents",
+            Min: min, Max: max,
+            Candidates: pool.Cast<object>().ToList(),
+            Intent: intent,
+            // Optional when there is no mandatory floor — an absent agent then
+            // declines (sacrifices nothing) rather than first-picking.
+            Optional: min == 0);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+
+        // Sanitise: distinct cards drawn from the candidate pool (by
+        // reference), in the agent's returned order, capped at `max`.
+        var seen = new HashSet<ICard>();
+        var picked = new List<ICard>();
+        foreach (var o in chosen)
+        {
+            if (o is not ICard c) continue;
+            if (!pool.Contains(c)) continue;
+            if (!seen.Add(c)) continue;
+            picked.Add(c);
+            if (picked.Count >= max) break;
+        }
+
+        // Enforce the mandatory floor (CR 701.16 — a "sacrifice exactly N"
+        // clause must sacrifice N). Backfill from the first unused candidates
+        // so a misbehaving / declining agent still produces a legal subset.
+        if (picked.Count < min)
+        {
+            foreach (var c in pool)
+            {
+                if (picked.Count >= min) break;
+                if (seen.Add(c)) picked.Add(c);
+            }
+        }
+        return picked;
+    }
+
+    /// <summary>
     /// Pick exactly one card from a generic "pile" of candidates that does
     /// not live in one of the engine-tracked hand / battlefield / library
     /// zones — most notably the wishboard (sideboard treated as the
