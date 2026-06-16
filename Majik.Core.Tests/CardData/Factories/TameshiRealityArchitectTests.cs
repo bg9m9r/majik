@@ -366,4 +366,133 @@ public class TameshiRealityArchitectTests
             ZoneServiceRegistry.Clear();
         }
     }
+
+    // -----------------------------------------------------------------------
+    // tameshi-resolutioncontext-source-rebindsafe-migration — the reanimation
+    // ability now reads its controller / source off the live
+    // ResolutionContext (ctx.Controller / ctx.Source) instead of capturing the
+    // authoring Tameshi card, and its candidate gatherer is a re-homeable
+    // ControllerScopedGatherer rather than a closure that captures the
+    // controller. The ability is therefore marked RebindSafe = true so Agatha's
+    // Soul Cauldron's group-grant can soundly re-home it onto a counter-bearing
+    // bearer (CR 707.2 / 613.1f). The "{X}" reanimation is OUTSIDE the
+    // OracleActivatedAbilityBinder reconstructable set, so the RebindTo of the
+    // REAL ability is the only sound re-home.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Tameshi_ReanimateAbility_IsRebindSafe()
+    {
+        var c = TameshiRealityArchitectFactory.Create(_alice);
+        ReanimateAbility(c).RebindSafe.Should().BeTrue(
+            "the reanimation effect + gatherer read source/controller off the live " +
+            "ResolutionContext, so Agatha's group-grant can soundly re-home it");
+    }
+
+    [Fact]
+    public void Tameshi_Reanimate_RebindToBearer_ReanimatesUnderBearerController()
+    {
+        ZoneServiceRegistry.Clear();
+        try
+        {
+            // Tameshi authored under Alice; Agatha re-homes its reanimation
+            // ability onto a Bob-controlled bearer. Resolution must read the
+            // BEARER's controller (Bob) off ResolutionContext, reanimating from
+            // Bob's graveyard to Bob's battlefield — never Alice's.
+            var bus = new EventBus();
+            var bobZones = new ZoneService(bus);
+            ZoneServiceRegistry.Set(_bob, bobZones);
+
+            var tameshi = TameshiRealityArchitectFactory.Create(_alice, bus, triggers: null);
+
+            var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+            bearer.SetOwner(_bob);
+            bearer.ChangeController(_bob);
+            _bob.Zones.Battlefield.AddCard(bearer);
+            bearer.SetZone(ZoneType.Battlefield);
+
+            // A mv-2 relic in BOB's graveyard (the bearer-controller's).
+            var bobRelic = new Artifact("Bob Relic", "{2}");
+            bobRelic.SetOwner(_bob);
+            bobRelic.SetController(_bob);
+            _bob.Zones.Graveyard.AddCard(bobRelic);
+            bobRelic.SetZone(ZoneType.Graveyard);
+
+            var rehomed = ReanimateAbility(tameshi).RebindTo(bearer, _bob);
+            rehomed.SetChosenX(2);
+            rehomed.SetChosenTargets(new[] { new object[] { bobRelic } });
+            ContextResolve.Resolve(rehomed, _bob, _bob, _alice);
+
+            bobRelic.Zone.Should().Be(ZoneType.Battlefield,
+                "the re-homed ability reanimates under the BEARER's controller (Bob)");
+            _bob.Zones.Battlefield.GetCards().Should().Contain(bobRelic);
+            _alice.Zones.Battlefield.GetCards().Should().NotContain(bobRelic,
+                "the reanimated card enters under Bob, not the originally-authored Alice");
+        }
+        finally
+        {
+            ZoneServiceRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Tameshi_Reanimate_RebindToBearer_GathererScopesToBearerControllerGraveyard()
+    {
+        // The re-homed candidate gatherer enumerates the BEARER's controller's
+        // graveyard artifacts/enchantments (Bob's), not the authoring Alice's.
+        var tameshi = TameshiRealityArchitectFactory.Create(_alice);
+
+        var aliceRelic = MakeGyArtifact(_alice, "{1}"); // Alice's GY.
+        var bearer = new Creature("Counter Bear", "{1}{G}", 2, 2);
+        bearer.SetOwner(_bob);
+        bearer.ChangeController(_bob);
+        var bobRelic = new Artifact("Bob Relic", "{2}");
+        bobRelic.SetOwner(_bob);
+        bobRelic.SetController(_bob);
+        _bob.Zones.Graveyard.AddCard(bobRelic);
+        bobRelic.SetZone(ZoneType.Graveyard);
+
+        var rehomed = ReanimateAbility(tameshi).RebindTo(bearer, _bob);
+        var request = rehomed.TargetRequests.Single();
+        var candidates = request.CandidateGatherer!(ContextResolve.Game(_bob, _bob, _alice));
+
+        candidates.Should().Contain(bobRelic, "the re-homed gatherer scopes to Bob's graveyard");
+        candidates.Should().NotContain(aliceRelic,
+            "the originally-authored Alice's graveyard is no longer enumerated after re-home");
+    }
+
+    [Fact]
+    public void Tameshi_Reanimate_OwnSource_NoRebind_StillReanimatesUnderController()
+    {
+        // Regression: the own-source (un-rehomed) resolution still reanimates
+        // under Tameshi's controller via ResolutionContext.Source/Controller —
+        // the migration must not break the base case.
+        ZoneServiceRegistry.Clear();
+        try
+        {
+            Seed(_alice, 3);
+            var bus = new EventBus();
+            var zones = new ZoneService(bus);
+            ZoneServiceRegistry.Set(_alice, zones);
+
+            var tameshi = TameshiRealityArchitectFactory.Create(_alice, bus, triggers: null);
+            _alice.Zones.Battlefield.AddCard(tameshi);
+            tameshi.SetZone(ZoneType.Battlefield);
+
+            var relic = MakeGyArtifact(_alice, "{2}");
+
+            var reanimate = ReanimateAbility(tameshi);
+            reanimate.SetChosenX(2);
+            reanimate.SetChosenTargets(new[] { new object[] { relic } });
+            ContextResolve.Resolve(reanimate, _alice, _alice, _bob);
+
+            relic.Zone.Should().Be(ZoneType.Battlefield,
+                "the own-source ability reanimates under Tameshi's controller (Alice)");
+            _alice.Zones.Battlefield.GetCards().Should().Contain(relic);
+        }
+        finally
+        {
+            ZoneServiceRegistry.Clear();
+        }
+    }
 }

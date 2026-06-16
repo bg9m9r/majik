@@ -137,18 +137,34 @@ public static class TameshiRealityArchitectFactory
         // targets in the activated-ability flow, so the choice-time pool is
         // X-agnostic and the resolution validates mv ≤ ChosenX, fizzling an
         // over-mv pick per CR 608.2b).
-        var targetRequest = new TargetRequest(
-            Description: "target artifact or enchantment card with mana value X or less from your graveyard",
-            MinTargets: 1,
-            MaxTargets: 1,
-            LegalCandidates: Array.Empty<object>(),
-            CandidateGatherer: ctx => GraveyardArtifactsAndEnchantments(card.Controller ?? owner));
+        //
+        // tameshi-resolutioncontext-source-rebindsafe-migration — the gatherer
+        // is a re-homeable ControllerScopedGatherer (TargetRequest.ControllerScoped)
+        // rather than a closure that captures `card`/`owner`: the controller flows
+        // in as the `who` argument (never captured), so RebindTo re-scopes "from
+        // YOUR graveyard" onto a new bearer's controller (Agatha's Soul Cauldron,
+        // CR 707.2 / 613.1f) with no behavioural drift.
+        var targetRequest = TargetRequest.ControllerScoped(
+            description: "target artifact or enchantment card with mana value X or less from your graveyard",
+            minTargets: 1,
+            maxTargets: 1,
+            controller: card.Controller ?? owner,
+            select: (who, _) => GraveyardArtifactsAndEnchantments(who));
 
         var reanimateEffect = new Effect(
             $"{CardName}: return target artifact/enchantment card with mv ≤ X from your graveyard to the battlefield",
             ctx =>
             {
-                var controller = card.Controller ?? owner;
+                // tameshi-resolutioncontext-source-rebindsafe-migration — read the
+                // controller off the live ResolutionContext (the ability's own
+                // Controller at resolution, re-homed by RebindTo) rather than the
+                // captured authoring `card`. ctx.Controller is always populated on
+                // the ability resolution path (CR 608) and is re-homed to the new
+                // bearer's controller after RebindTo. This — plus the
+                // ControllerScoped gatherer above and the player-resource
+                // ReturnALandCost (no captured source) — makes EVERY verb re-home,
+                // so the ability is marked RebindSafe = true.
+                var controller = ctx.Controller;
                 var x = ctx.ChosenX ?? 0;
 
                 // CR 608.2b — read the chosen target; re-validate at resolution.
@@ -184,7 +200,17 @@ public static class TameshiRealityArchitectFactory
             effects: new IEffect[] { reanimateEffect },
             targetRequests: new[] { targetRequest },
             // "Activate only as a sorcery." (CR 117.1a / 307.5)
-            sorcerySpeed: true));
+            sorcerySpeed: true,
+            // tameshi-resolutioncontext-source-rebindsafe-migration — every verb
+            // of this ability reads its subject off the live ResolutionContext or
+            // re-homeable seams: the effect reads ctx.Controller, the candidate
+            // gatherer is a ControllerScopedGatherer, and ReturnALandCost is a
+            // player-resource cost (operates on the paying player, captures no
+            // source). So Agatha's Soul Cauldron's group-grant can soundly
+            // RebindTo this ability onto a counter-bearing bearer (CR 707.2 /
+            // 613.1f) — necessary because the {X} reanimation is OUTSIDE the
+            // OracleActivatedAbilityBinder reconstructable set.
+            rebindSafe: true));
     }
 
     /// <summary>
