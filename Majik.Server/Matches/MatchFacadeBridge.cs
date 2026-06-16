@@ -256,11 +256,85 @@ public sealed class MatchFacadeBridge
             return;
         }
 
-        if (_onEngineErrored != null)
+        await ReportEngineErrorAsync(matchId, reason.Value, fault).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Supervise the fire-and-forget game-loop task (W6). The loop returned by
+    /// <c>GameFacade.StartFullGameAsync</c> is started fire-and-forget by
+    /// <c>MatchService.StartGameForFirstPlayer</c> — its task has no other
+    /// server-side observer, so a throw during autonomous progression (bot turn
+    /// / resolution / auto-pass, between human submits) would otherwise fault an
+    /// unobserved task → be swallowed → the loop dies silently → the human is
+    /// left un-prompted on a dead clock with no log.
+    ///
+    /// We attach a fault continuation that surfaces a faulted loop PROMPTLY (not
+    /// only at the next watchdog tick) by routing it through the same
+    /// <see cref="EngineFaultReason.Fault"/> report path the watchdog's
+    /// classifier uses (<see cref="ReportEngineErrorAsync"/> → the stored
+    /// <c>_onEngineErrored</c> callback). The Fault and Hang paths therefore
+    /// converge on the single <c>OnEngineErrorAsync</c> arbiter, whose CAS
+    /// <c>Playing → Errored</c> makes a double-report (continuation AND a later
+    /// watchdog fire) safe.
+    ///
+    /// Lives on the SINGLETON bridge (not the scoped MatchService): a fault can
+    /// occur minutes after the launch, by which time the scoped MatchService is
+    /// disposed — the continuation must outlive it, exactly like the watchdog
+    /// and the clock-handoff callback. The continuation body never throws.
+    /// </summary>
+    public void SuperviseLoop(Guid matchId, Task loopTask)
+    {
+        if (loopTask == null) return;
+
+        loopTask.ContinueWith(
+            async t =>
+            {
+                try
+                {
+                    if (!t.IsFaulted) return;
+                    var ex = t.Exception?.GetBaseException();
+                    // AWAIT the report (don't discard it): OnEngineErrorAsync's CAS
+                    // goes through RetryPolicy, which RETHROWS on durable failure
+                    // (e.g. Mongo down). Awaiting inside this try/catch means a
+                    // failed terminal-transition report is logged here rather than
+                    // becoming a swallowed UnobservedTaskException.
+                    await ReportEngineErrorAsync(matchId, EngineFaultReason.Fault, ex)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // The continuation body must NEVER let a fault escape — an
+                    // unobserved throw here would itself become a swallowed fault,
+                    // the very failure mode W6 exists to eliminate.
+                    _logger.LogError(ex,
+                        "MatchFacadeBridge: loop-supervision continuation faulted. MatchId={MatchId}",
+                        matchId);
+                }
+            },
+            TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Invoke the stored engine-error callback (production:
+    /// <c>MatchService.OnEngineErrorAsync</c> via a fresh DI scope, wired in
+    /// W7). Both supervision paths — the W5 watchdog classifier (Hang) and the
+    /// W6 fault continuation (Fault) — converge here so they share one report
+    /// seam and one downstream CAS arbiter. When the callback isn't wired
+    /// (unit tests / DI not yet configured) this just logs, so the bridge is
+    /// safe before W7 lands.
+    /// </summary>
+    private async Task ReportEngineErrorAsync(Guid matchId, EngineFaultReason reason, Exception? fault)
+    {
+        if (_onEngineErrored == null)
         {
-            await _onEngineErrored(matchId, reason.Value, fault, CancellationToken.None)
-                .ConfigureAwait(false);
+            _logger.LogError(fault,
+                "MatchFacadeBridge: engine error detected but no onEngineErrored callback is wired " +
+                "(DI not configured?). MatchId={MatchId} Reason={Reason}",
+                matchId, reason);
+            return;
         }
+
+        await _onEngineErrored(matchId, reason, fault, CancellationToken.None).ConfigureAwait(false);
     }
 
     /// <summary>

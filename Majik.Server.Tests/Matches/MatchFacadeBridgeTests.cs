@@ -1144,6 +1144,82 @@ public class MatchFacadeBridgeTests
         bridge.Detach(matchId);
     }
 
+    // -----------------------------------------------------------------------
+    // 7. Loop-supervision fault continuation (W6)
+    //
+    // SuperviseLoop attaches a fault continuation to the fire-and-forget
+    // game-loop task. A faulted loop must be surfaced PROMPTLY via the same
+    // onEngineErrored callback the watchdog (Hang) uses — both converge on the
+    // OnEngineErrorAsync arbiter. A loop that completes normally must NOT be
+    // reported.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task SuperviseLoop_FaultedTask_ReportsFaultWithBaseException()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithWatchdog(
+            hub, TimeSpan.FromSeconds(30), out var errors, out var firstError);
+        var matchId = Guid.NewGuid();
+        var boom = new InvalidOperationException("boom");
+
+        bridge.SuperviseLoop(matchId, Task.FromException(boom));
+
+        // Bounded wait for the async continuation → report path.
+        var call = await firstError.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        call.MatchId.Should().Be(matchId);
+        call.Reason.Should().Be(EngineFaultReason.Fault);
+        call.Fault.Should().BeSameAs(boom, "the base exception is threaded through to onEngineErrored");
+        errors.Should().HaveCount(1, "a single faulted loop reports exactly once");
+    }
+
+    [Fact]
+    public async Task SuperviseLoop_CompletedTask_DoesNotReport()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithWatchdog(
+            hub, TimeSpan.FromSeconds(30), out var errors, out _);
+        var matchId = Guid.NewGuid();
+
+        bridge.SuperviseLoop(matchId, Task.CompletedTask);
+
+        // Give the continuation ample time to run; it must NOT report.
+        await Task.Delay(200);
+        errors.Should().BeEmpty("a loop that completes normally is not an engine error");
+    }
+
+    [Fact]
+    public async Task SuperviseLoop_FaultedTask_NoCallbackWired_DoesNotThrow()
+    {
+        // Before W7 DI wiring, onEngineErrored may be null. SuperviseLoop must
+        // still be safe — the continuation logs and never throws.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub); // no watchdog, no onEngineErrored
+        var matchId = Guid.NewGuid();
+
+        var act = () => bridge.SuperviseLoop(matchId, Task.FromException(new InvalidOperationException("boom")));
+        act.Should().NotThrow();
+
+        // The continuation runs asynchronously; give it a moment and confirm
+        // nothing crashed the test host.
+        await Task.Delay(100);
+    }
+
+    [Fact]
+    public async Task SuperviseLoop_NullTask_IsNoOp()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithWatchdog(
+            hub, TimeSpan.FromSeconds(30), out var errors, out _);
+
+        var act = () => bridge.SuperviseLoop(Guid.NewGuid(), loopTask: null!);
+        act.Should().NotThrow();
+
+        await Task.Delay(100);
+        errors.Should().BeEmpty();
+    }
+
     [Fact]
     public void Bridge_WithoutReplayBuffer_StillWorks()
     {

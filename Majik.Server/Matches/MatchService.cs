@@ -835,7 +835,18 @@ public sealed class MatchService
         // game reproducible from (stored seed, command log) for later replay /
         // rehydration (the rehydration body itself remains out of scope).
         var rng = new Majik.Core.Random.GameRandom(match.GameSeed);
-        facade?.StartFullGameAsync(firstPlayerSlot, rng: rng, autoPassPrefsProvider: prefsProvider);
+        if (facade == null) return;
+
+        // W6: capture the fire-and-forget loop task and hand it to the
+        // SINGLETON bridge for supervision. The bridge attaches a fault
+        // continuation (SuperviseLoop) so a throw during autonomous
+        // progression surfaces as a terminal engine error instead of a silent
+        // wedge — the unobserved-task root cause. Routed through the singleton
+        // (not this scoped service, which may be disposed before a fault occurs
+        // minutes later) for lifetime correctness, mirroring the watchdog +
+        // clock-handoff callbacks.
+        var loopTask = facade.StartFullGameAsync(firstPlayerSlot, rng: rng, autoPassPrefsProvider: prefsProvider);
+        _facadeBridge?.SuperviseLoop(match.Id, loopTask);
     }
 
     /// <summary>Slice 5a — build the per-seat AutoPassPrefs provider. The
