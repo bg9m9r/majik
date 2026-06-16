@@ -4,8 +4,10 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -25,7 +27,9 @@ namespace Majik.Core.Tests.CardData;
 ///   owner/controller).
 /// - <see cref="NamedCardFactory"/> dispatcher.
 /// - Flying + Warp keyword markers attached.
-/// - Conditional draw-replacement static-ability marker attached.
+/// - Conditional additional-draw replacement (CR 614.12) — "draw that many
+///   plus one instead" while hand &lt;= 1, riding the DrawCountIntent
+///   quantity tier of the ReplacementBus; ETB/LTB lifecycle.
 /// - ETB triggered ability shape (TriggeredAbility on
 ///   <see cref="CardMovedEvent"/> to battlefield).
 /// - ETB trigger resolution: controller draws a card.
@@ -87,15 +91,101 @@ public class QuantumRiddlerTests
         keywords.Should().Contain("Warp", "Warp keyword marker attached (mechanic deferred)");
     }
 
-    [Fact]
-    public void QuantumRiddler_HasConditionalDrawReplacementStaticMarker()
-    {
-        var card = QuantumRiddlerFactory.Create(_alice);
+    // -----------------------------------------------------------------------
+    // Conditional additional-draw replacement (CR 614.12) — "As long as you
+    // have one or fewer cards in hand, if you would draw one or more cards,
+    // you draw that many cards plus one instead."
+    // -----------------------------------------------------------------------
 
-        var statics = card.Abilities.OfType<StaticAbility>().ToList();
-        statics.Should().ContainSingle(s => s.Description.Contains("one or fewer cards in hand"),
-            "the conditional additional-draw clause ships as a StaticAbility marker (v1 gap — "
-            + "CardDrawIntent not yet on the ReplacementBus)");
+    private static Card AddCardToHand(Player owner, string name = "HandCard")
+    {
+        var c = new Card(name, "");
+        c.SetOwner(owner);
+        owner.Zones.Hand.AddCard(c);
+        c.SetZone(ZoneType.Hand);
+        return c;
+    }
+
+    [Fact]
+    public void QuantumRiddler_WithEmptyHand_DrawOne_DrawsTwoInstead()
+    {
+        // Hand size 0 (<= 1), Quantum Riddler on battlefield: a draw-1
+        // instruction yields two cards (CR 614.12 — "draw that many plus
+        // one instead").
+        var bus = new EventBus();
+        _alice.AttachReplacementBus(new ReplacementBus());
+
+        var riddler = QuantumRiddlerFactory.Create(_alice, bus, triggers: null);
+        riddler.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(riddler, ZoneType.Library, ZoneType.Battlefield));
+
+        var c1 = NewCardInLibrary(_alice, "L1");
+        var c2 = NewCardInLibrary(_alice, "L2");
+
+        var drawn = Fx.DrawCards(_alice, 1);
+
+        drawn.Should().HaveCount(2, "hand was empty (<= 1) so draw-1 becomes draw-2 (CR 614.12)");
+        _alice.Zones.Hand.GetCards().Should().BeEquivalentTo(new[] { c1, c2 });
+    }
+
+    [Fact]
+    public void QuantumRiddler_WithTwoCardsInHand_DrawOne_DrawsOneOnly()
+    {
+        // Hand size 2 (> 1): clause inactive, draw-1 stays draw-1.
+        var bus = new EventBus();
+        _alice.AttachReplacementBus(new ReplacementBus());
+        AddCardToHand(_alice, "H1");
+        AddCardToHand(_alice, "H2");
+
+        var riddler = QuantumRiddlerFactory.Create(_alice, bus, triggers: null);
+        riddler.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(riddler, ZoneType.Library, ZoneType.Battlefield));
+
+        NewCardInLibrary(_alice, "L1");
+        NewCardInLibrary(_alice, "L2");
+
+        var drawn = Fx.DrawCards(_alice, 1);
+
+        drawn.Should().HaveCount(1, "hand has 2 cards (> 1) so the +1 clause is inactive");
+    }
+
+    [Fact]
+    public void QuantumRiddler_OffBattlefield_DoesNotModifyDraw()
+    {
+        var bus = new EventBus();
+        _alice.AttachReplacementBus(new ReplacementBus());
+
+        var riddler = QuantumRiddlerFactory.Create(_alice, bus, triggers: null);
+        // Never moves to the battlefield → replacement inactive.
+
+        NewCardInLibrary(_alice, "L1");
+        NewCardInLibrary(_alice, "L2");
+
+        var drawn = Fx.DrawCards(_alice, 1);
+
+        drawn.Should().HaveCount(1, "Quantum Riddler is not on the battlefield");
+    }
+
+    [Fact]
+    public void QuantumRiddler_LeftBattlefield_StopsModifyingDraw()
+    {
+        var bus = new EventBus();
+        _alice.AttachReplacementBus(new ReplacementBus());
+
+        var riddler = QuantumRiddlerFactory.Create(_alice, bus, triggers: null);
+        riddler.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(riddler, ZoneType.Library, ZoneType.Battlefield));
+
+        // Now leaves the battlefield.
+        riddler.SetZone(ZoneType.Graveyard);
+        bus.Publish(new CardMovedEvent(riddler, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        NewCardInLibrary(_alice, "L1");
+        NewCardInLibrary(_alice, "L2");
+
+        var drawn = Fx.DrawCards(_alice, 1);
+
+        drawn.Should().HaveCount(1, "Quantum Riddler left the battlefield → replacement unregistered");
     }
 
     [Fact]

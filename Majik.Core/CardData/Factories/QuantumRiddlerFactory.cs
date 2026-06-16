@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
@@ -32,22 +33,23 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Warp keyword marker</b> (CR 702.??? — Edge of Eternities) as a
 ///   <see cref="KeywordAbility"/>. Mechanic deferred — same posture as
 ///   <see cref="PinnacleEmissaryFactory"/>.
+/// - <b>Conditional additional-draw replacement (CR 614.12)</b>: "As long
+///   as you have one or fewer cards in hand, if you would draw one or more
+///   cards, you draw that many cards plus one instead." Wired via
+///   <see cref="QuantumRiddlerDrawCountReplacement"/> — an
+///   <see cref="IReplacementEffect{DrawCountIntent}"/> registered on the
+///   controller's own <see cref="ReplacementBus"/> while Quantum Riddler
+///   is on the battlefield. The replacement rides the quantity tier of the
+///   draw bus (<see cref="DrawCountIntent"/>, published once per draw
+///   instruction by <see cref="Fx.DrawCards"/>): when the controller's hand
+///   holds one or fewer cards it returns
+///   <c>intent with { Count = intent.Count + 1 }</c>; otherwise it leaves
+///   the count unchanged. Lifecycle (ETB register / LTB unregister) is
+///   driven by <see cref="QuantumRiddlerDrawReplacementEffect"/> off the
+///   supplied <see cref="IEventBus"/>, mirroring Narset / Spirit of the
+///   Labyrinth's per-draw restriction lifecycle.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Conditional draw-replacement clause</b>: "As long as you have one
-///   or fewer cards in hand, if you would draw one or more cards, you
-///   draw that many cards plus one instead." The engine has no
-///   CardDrawIntent on the <see cref="Majik.Core.Effects.ReplacementBus"/>
-///   in v1 — every replacement effect that intercepts a draw (Spirit of
-///   the Labyrinth, Alms Collector, Necrodominance's "skip additional
-///   draws", Sylvan Library's draw-three) ships as a structural
-///   <see cref="StaticAbility"/> marker until that intent shape lands.
-///   Same v1 gap as Necrodominance — see
-///   <see cref="NecrodominanceFactory"/>'s "skip additional draws"
-///   marker. When CardDrawIntent lands the marker swaps for an
-///   <see cref="IReplacementEffect"/> that bumps the requested draw count
-///   by +1 while <c>controller.Zones.Hand.Count &lt;= 1</c> AND Quantum
-///   Riddler is on the battlefield (CR 614.12).
 /// - <b>Warp alt-cost (CR 702.??? — new Edge of Eternities keyword)</b>:
 ///   deferred infra. See <see cref="PinnacleEmissaryFactory"/>'s xmldoc
 ///   for the full description of the missing primitive (Warp {cost} +
@@ -114,17 +116,23 @@ public static class QuantumRiddlerFactory
         card.AddAbility(new KeywordAbility("Warp", card, owner));
 
         // ----------------------------------------------------------------
-        // Structural-only marker — "As long as you have one or fewer
-        // cards in hand, if you would draw one or more cards, you draw
-        // that many cards plus one instead."
+        // CR 614.12 — "As long as you have one or fewer cards in hand, if
+        // you would draw one or more cards, you draw that many cards plus
+        // one instead."
         //
-        // The engine has no CardDrawIntent on the ReplacementBus in v1,
-        // so the conditional additional-draw clause ships as a
-        // declarative StaticAbility marker. When CardDrawIntent lands,
-        // swap this for a real IReplacementEffect that bumps the
-        // requested draw count by +1 while the controller's hand size
-        // is <= 1 AND Quantum Riddler is on the battlefield (CR 614.12).
-        // Same v1 gap as Necrodominance's "skip additional draws" clause.
+        // Wired as a real IReplacementEffect<DrawCountIntent> on the
+        // controller's OWN ReplacementBus while Quantum Riddler is on the
+        // battlefield. The quantity tier of the draw bus
+        // (Fx.DrawCards publishes one DrawCountIntent per draw instruction)
+        // lets the replacement bump the requested count by +1 whenever the
+        // controller's hand holds <= 1 card. ETB register / LTB unregister
+        // is driven by the lifecycle effect off the supplied event bus —
+        // mirrors Narset / Spirit of the Labyrinth's per-draw restriction.
+        //
+        // A StaticAbility marker is also attached for card-text inspection
+        // (so structural / dispatcher tests still observe the printed
+        // clause); it carries no applyEffect — the real behaviour rides the
+        // replacement.
         // ----------------------------------------------------------------
         card.AddAbility(new StaticAbility(
             source: card,
@@ -135,6 +143,12 @@ public static class QuantumRiddlerFactory
             isActiveCheck: () => card.Zone == ZoneType.Battlefield
                                   && (card.Controller?.Zones.Hand.GetCards().Count() ?? int.MaxValue) <= 1,
             applyEffect: null));
+
+        if (eventBus != null)
+        {
+            var drawLifecycle = new QuantumRiddlerDrawReplacementEffect(card, eventBus);
+            drawLifecycle.Attach();
+        }
 
         // ----------------------------------------------------------------
         // ETB triggered ability — CR 603.6a.
@@ -164,4 +178,117 @@ public static class QuantumRiddlerFactory
 
         return card;
     }
+}
+
+/// <summary>
+/// Lifecycle binder for Quantum Riddler's conditional additional-draw
+/// replacement (CR 614.12) — "As long as you have one or fewer cards in
+/// hand, if you would draw one or more cards, you draw that many cards plus
+/// one instead."
+///
+/// While Quantum Riddler is on the battlefield, registers a
+/// <see cref="QuantumRiddlerDrawCountReplacement"/> on the controller's own
+/// <see cref="ReplacementBus"/>. The replacement rides the quantity tier of
+/// the draw bus (<see cref="DrawCountIntent"/>) and bumps the requested
+/// draw count by +1 whenever the controller's hand holds one or fewer
+/// cards. ETB register / LTB unregister is driven by
+/// <see cref="CardMovedEvent"/> on the supplied event bus — mirrors
+/// <c>NarsetDrawRestrictionEffect</c> / <c>SpiritDrawRestrictionEffect</c>.
+/// </summary>
+public sealed class QuantumRiddlerDrawReplacementEffect
+{
+    private readonly ICard _source;
+    private readonly IEventBus _eventBus;
+    private QuantumRiddlerDrawCountReplacement? _registered;
+    private bool _attached;
+    private bool _currentlyActive;
+
+    public QuantumRiddlerDrawReplacementEffect(ICard source, IEventBus eventBus)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+    }
+
+    /// <summary>Subscribe to zone-change events and sync the registration
+    /// against the controller's bus. Idempotent.</summary>
+    public void Attach()
+    {
+        if (_attached) return;
+        _attached = true;
+
+        _eventBus.Subscribe<CardMovedEvent>(OnCardMoved);
+        SyncRegistration();
+    }
+
+    private void OnCardMoved(CardMovedEvent e)
+    {
+        if (!ReferenceEquals(e.Card, _source)) return;
+        SyncRegistration();
+    }
+
+    private void SyncRegistration()
+    {
+        var controller = _source.Controller;
+        var bus = controller?.Replacements;
+        var shouldBeActive = _source.Zone == ZoneType.Battlefield && bus != null;
+
+        if (shouldBeActive && !_currentlyActive)
+        {
+            _registered = new QuantumRiddlerDrawCountReplacement(controller!, _source);
+            bus!.Register(_registered);
+            _currentlyActive = true;
+        }
+        else if (!shouldBeActive && _currentlyActive)
+        {
+            if (_registered != null)
+            {
+                controller?.Replacements?.Unregister(_registered);
+            }
+            _registered = null;
+            _currentlyActive = false;
+        }
+    }
+
+    /// <summary>True while the replacement is registered.</summary>
+    public bool IsActive => _currentlyActive;
+}
+
+/// <summary>
+/// Replacement effect for Quantum Riddler's "draw that many cards plus one
+/// instead" (CR 614.12). Rides the quantity tier of the draw bus
+/// (<see cref="DrawCountIntent"/>). When the controller's hand holds one or
+/// fewer cards AND Quantum Riddler is on the battlefield, returns
+/// <c>intent with { Count = intent.Count + 1 }</c>; otherwise the intent is
+/// let through unchanged. Self-replacement, so it fires at most once per
+/// draw instruction (CR 616.1c — the bus's per-intent dedup guarantees
+/// this, avoiding an unbounded +1 cascade).
+/// </summary>
+public sealed class QuantumRiddlerDrawCountReplacement : IReplacementEffect<DrawCountIntent>
+{
+    private readonly Player _controller;
+    private readonly ICard _source;
+
+    public QuantumRiddlerDrawCountReplacement(Player controller, ICard source)
+    {
+        _controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+    }
+
+    public bool OneShot => false;
+    public object? Tag => null;
+
+    public bool Applies(DrawCountIntent intent, IReadOnlyList<object> history)
+    {
+        if (intent is null) return false;
+        if (!ReferenceEquals(intent.Player, _controller)) return false;
+        if (_source.Zone != ZoneType.Battlefield) return false;
+        // "if you would draw one or more cards" — only when a positive draw
+        // is requested.
+        if (intent.Count < 1) return false;
+        // "As long as you have one or fewer cards in hand" (CR 614.12).
+        return _controller.Zones.Hand.GetCards().Count() <= 1;
+    }
+
+    public DrawCountIntent? Replace(DrawCountIntent intent, IReadOnlyList<object> history)
+        => intent with { Count = intent.Count + 1 };
 }

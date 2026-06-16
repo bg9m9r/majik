@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
 using Majik.Core.Services;
@@ -246,6 +247,110 @@ public class FxTests
         Fx.DrawCards(p, 0).Should().BeEmpty();
         Fx.DrawCards(p, -1).Should().BeEmpty();
         p.TriedToDrawFromEmptyLibrary.Should().BeFalse();
+    }
+
+    // ------------------------------------------------------------------
+    // DrawCards — CR 614.12 quantity tier (DrawCountIntent)
+    // ------------------------------------------------------------------
+
+    private static Player PlayerWithLibrary(int libraryCount, ReplacementBus? bus = null)
+    {
+        var p = new Player("Alice", 20);
+        if (bus != null) p.AttachReplacementBus(bus);
+        for (var i = 0; i < libraryCount; i++)
+        {
+            var c = MakeCard($"L{i}");
+            p.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+        return p;
+    }
+
+    [Fact]
+    public void DrawCards_DrawCountIntent_CanIncreaseRequestedCount()
+    {
+        // A "draw that many plus one instead" replacement bumps Count;
+        // the loop then draws the modified number.
+        var bus = new ReplacementBus();
+        bus.Register(new LambdaReplacement<DrawCountIntent>(
+            applies: (i, _) => true,
+            replace: (i, _) => i with { Count = i.Count + 1 }));
+        var p = PlayerWithLibrary(5, bus);
+
+        var drawn = Fx.DrawCards(p, 1);
+
+        drawn.Should().HaveCount(2, "the count replacement bumped draw-1 to draw-2");
+    }
+
+    [Fact]
+    public void DrawCards_DrawCountIntent_CanCapAdditionalDraws()
+    {
+        // Necrodominance-style "skip additional draws" — cap at 1.
+        var bus = new ReplacementBus();
+        bus.Register(new LambdaReplacement<DrawCountIntent>(
+            applies: (i, _) => i.Count > 1,
+            replace: (i, _) => i with { Count = 1 }));
+        var p = PlayerWithLibrary(5, bus);
+
+        var drawn = Fx.DrawCards(p, 3);
+
+        drawn.Should().HaveCount(1, "the cap replacement reduced draw-3 to draw-1");
+    }
+
+    [Fact]
+    public void DrawCards_DrawCountIntent_NullCancelsWholeInstruction()
+    {
+        var bus = new ReplacementBus();
+        bus.Register(new LambdaReplacement<DrawCountIntent>(
+            applies: (i, _) => true,
+            replace: (i, _) => null));
+        var p = PlayerWithLibrary(5, bus);
+
+        var drawn = Fx.DrawCards(p, 3);
+
+        drawn.Should().BeEmpty("the count replacement cancelled the whole draw instruction");
+        // No card was drawn, so no empty-library marker either.
+        p.TriedToDrawFromEmptyLibrary.Should().BeFalse();
+    }
+
+    [Fact]
+    public void DrawCards_DrawCountIntent_FiresOncePerInstruction_NotPerCard()
+    {
+        // The +1 replacement must fire exactly once for the whole "draw N"
+        // instruction (CR 616.1c self-replacement dedup) — not once per
+        // resolved card, which would cascade.
+        var fireCount = 0;
+        var bus = new ReplacementBus();
+        bus.Register(new LambdaReplacement<DrawCountIntent>(
+            applies: (i, _) => true,
+            replace: (i, _) => { fireCount++; return i with { Count = i.Count + 1 }; }));
+        var p = PlayerWithLibrary(10, bus);
+
+        var drawn = Fx.DrawCards(p, 2);
+
+        fireCount.Should().Be(1, "the count intent is published once per draw instruction");
+        drawn.Should().HaveCount(3, "draw-2 became draw-3");
+    }
+
+    [Fact]
+    public void DrawCards_CountAndPerCardTiers_Compose()
+    {
+        // Count tier bumps 1 -> 2; per-card tier (DrawCardIntent) cancels
+        // the FIRST resolved draw. Net: 1 card lands in hand.
+        var bus = new ReplacementBus();
+        bus.Register(new LambdaReplacement<DrawCountIntent>(
+            applies: (i, _) => true,
+            replace: (i, _) => i with { Count = i.Count + 1 }));
+        var firstCancelled = false;
+        bus.Register(new LambdaReplacement<DrawCardIntent>(
+            applies: (i, _) => !firstCancelled,
+            replace: (i, _) => { firstCancelled = true; return null; }));
+        var p = PlayerWithLibrary(5, bus);
+
+        var drawn = Fx.DrawCards(p, 1);
+
+        drawn.Should().HaveCount(1,
+            "count tier made it draw-2, per-card tier cancelled one of the two");
     }
 
     // ------------------------------------------------------------------
