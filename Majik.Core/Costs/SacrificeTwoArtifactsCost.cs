@@ -31,8 +31,27 @@ namespace Majik.Core.Costs;
 ///   reference. Sai itself is NOT an artifact, so the default null is
 ///   correct — Sai cannot be picked even if the printed wording were
 ///   "any artifact you control".
+///
+/// ## Re-homable (STAGE 1)
+/// Implements <see cref="IRebindableCost"/> so
+/// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindTo"/> can re-home the
+/// captured <see cref="_excludeSource"/> when the owning ability is re-sourced
+/// onto a new permanent (CR 707.2 copy machinery / Agatha's Soul Cauldron
+/// granted abilities — CR 613.1f / 702.49). Sai's <c>{2}, Sacrifice two
+/// artifacts: Draw a card</c> is granted by Agatha's Soul Cauldron via
+/// <c>RebindTo</c> of the REAL ability (a "sacrifice two artifacts" cost is
+/// OUTSIDE the <c>OracleActivatedAbilityBinder</c> reconstructable grammar).
+/// Without this seam the re-homed cost's <see cref="_excludeSource"/> would
+/// still name the EXILED Sai rather than the bearer — a posture-clean no-op
+/// today (Sai is not an Artifact, so the original Sai is never an eligible
+/// pick anyway), but closing the seam keeps the cost's captured source
+/// consistent with the rebound ability so a future Artifact-typed exclude
+/// source re-homes correctly. <see cref="RebindTo"/> returns an equivalent
+/// cost whose <see cref="_excludeSource"/> is the new source (carrying the
+/// same event bus); the per-activation <see cref="Targets"/> state is reset on
+/// the fresh copy (it is per-activation, not structural).
 /// </summary>
-public sealed class SacrificeTwoArtifactsCost : ICost
+public sealed class SacrificeTwoArtifactsCost : ICost, IRebindableCost
 {
     /// <summary>CR 701.16 — fixed count of artifacts to sacrifice.</summary>
     public const int Count = 2;
@@ -70,6 +89,29 @@ public sealed class SacrificeTwoArtifactsCost : ICost
         _excludeSource == null
             ? "sacrifice two artifacts"
             : $"sacrifice two artifacts other than {_excludeSource.Name}";
+
+    /// <inheritdoc/>
+    public ICost RebindTo(object oldSource, object newSource)
+    {
+        // Pure: only re-home when our captured exclude-source IS the rebound
+        // ability's original source; otherwise pass through unchanged
+        // (CR 707.2). A null exclude-source carries no captured source, so it
+        // is never re-homed. A fresh copy is returned so per-activation
+        // Targets state never leaks into the source ability's cost.
+        if (_excludeSource == null || !ReferenceEquals(_excludeSource, oldSource))
+        {
+            return this;
+        }
+
+        if (newSource is not Permanent newPermanent)
+        {
+            throw new ArgumentException(
+                "SacrificeTwoArtifactsCost can only be re-homed onto a Permanent.",
+                nameof(newSource));
+        }
+
+        return new SacrificeTwoArtifactsCost(excludeSource: newPermanent, eventBus: _eventBus);
+    }
 
     /// <inheritdoc/>
     public bool CanPay(Player player)
