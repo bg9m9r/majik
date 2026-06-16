@@ -1528,6 +1528,8 @@ public static class CardDefRuntime
             LoseLifeEachOpponentEffectDef loseEach => BuildLoseLifeEachOpponentEffect(loseEach, card),
             DealDamageEachOpponentEffectDef dmgEach => BuildDealDamageEachOpponentEffect(dmgEach, card),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
+            LookTopNOneToHandRestToGraveyardEffectDef look =>
+                BuildLookTopNOneToHandRestToGraveyardEffect(look, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
             ConniveTargetEffectDef conniveTarget => BuildConniveTargetEffect(conniveTarget, card, targetRequestIndex),
             AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
@@ -1972,6 +1974,40 @@ public static class CardDefRuntime
                     controller.Zones.Hand.AddCard(pick);
                     pick.SetZone(ZoneType.Hand);
                 }
+            });
+    }
+
+    private static IEffect BuildLookTopNOneToHandRestToGraveyardEffect(
+        LookTopNOneToHandRestToGraveyardEffectDef def, ICard card, Player controller)
+    {
+        // "Look at the top N. Put one of them into your hand and the other(s)
+        // into your graveyard." (Nagging Thoughts / Sight Beyond Sight.) The
+        // pick is MANDATORY (printed "Put one of them", not "you may"), so the
+        // shared reveal-and-choose primitive is invoked with optional: false —
+        // every revealed card is eligible (no type filter), the chosen one goes
+        // to the HAND and the rest to the GRAVEYARD. RevealTopAndChooseAsync
+        // routes the moves through the registered ZoneService when present (so
+        // CardMovedEvent / graveyard-leave triggers fire), prompts the live
+        // agent off the resolution context (falling back to AgentRegistry, then
+        // the deterministic first-card auto-pick for agentless harnesses), and
+        // treats an empty / short library cleanly. CR 120.6 (reveal) + CR
+        // 116.1b (player choice) + CR 701.13 graveyard routing.
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: look at top {amount}, put one in hand, rest to graveyard",
+            async ctx =>
+            {
+                await Majik.Core.Zones.RevealAndChoose.RevealTopAndChooseAsync(
+                    ctx: ctx,
+                    caster: controller,
+                    count: amount,
+                    eligiblePredicate: _ => true,
+                    optional: false,
+                    label: $"{card.Name}: card to put into your hand",
+                    pickedDestination: ZoneType.Hand,
+                    restDestination: ZoneType.Graveyard,
+                    sourceTag: $"look-top-{amount}-one-to-hand-rest-to-graveyard")
+                    .ConfigureAwait(false);
             });
     }
 
