@@ -43,4 +43,17 @@ public class TargetCollectionCentralPoolTests
 
         TargetCollection.ResolveLivePool(req, ctx).Should().BeEmpty();
     }
+
+    [Fact]
+    public void ResolveLivePool_bot_opt_out_keeps_empty_pool()
+    {
+        // synthesizeWhenEmpty: false models a bot agent (TargetPolicy works off
+        // the empty pool). The central fallback must NOT fire — pre-filling the
+        // pool would silently change the bot's label-driven picks.
+        var (ctx, _) = TargetingTestWorld.Build();
+        var req = new TargetRequest("any target", 1, 1, Array.Empty<object>());
+
+        TargetCollection.ResolveLivePool(req, ctx, synthesizeWhenEmpty: false)
+            .Should().BeEmpty("a bot keeps the empty-pool path so TargetPolicy is unchanged");
+    }
 }

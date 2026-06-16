@@ -68,7 +68,8 @@ public static class TargetCollection
             // ships NO machine-readable pool the central TargetCandidateService
             // fills it from the description's category (incl. players) so the
             // portal can render legal targets — see ResolveLivePool.
-            var live = ResolveLivePool(req, ctx);
+            var live = ResolveLivePool(
+                req, ctx, agent?.WantsSynthesizedTargetCandidates ?? false);
             var promptReq = ReferenceEquals(live, req.LegalCandidates)
                 ? req
                 : req.WithCandidates(live);
@@ -100,12 +101,16 @@ public static class TargetCollection
     /// description's category — giving "any target"-style requests that ship no
     /// gatherer a complete legal pool (creatures, players, planeswalkers,
     /// permanents, stack spells, graveyard cards). No behaviour change when a
-    /// card already supplies candidates.
+    /// card already supplies candidates. The central fallback is applied only
+    /// when <paramref name="synthesizeWhenEmpty"/> is true (the consuming agent
+    /// opted in via IPlayerAgent.WantsSynthesizedTargetCandidates) — bots keep
+    /// the empty-pool path so their TargetPolicy heuristic is unchanged.
     /// </summary>
-    internal static IReadOnlyList<object> ResolveLivePool(TargetRequest req, GameContext ctx)
+    internal static IReadOnlyList<object> ResolveLivePool(
+        TargetRequest req, GameContext ctx, bool synthesizeWhenEmpty = true)
     {
         var live = req.ResolveCandidates(ctx);
-        if (live.Count == 0)
+        if (synthesizeWhenEmpty && live.Count == 0)
         {
             var central = TargetCandidateService.GatherCandidates(
                 req.Description, ctx, ctx.Self);

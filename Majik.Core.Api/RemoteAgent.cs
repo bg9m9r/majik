@@ -842,6 +842,15 @@ public sealed class RemoteAgent : IPlayerAgent
     /// back to resolving picks as-is — we don't over-filter requests whose
     /// legality we can't express.
     /// </summary>
+    /// <summary>
+    /// CR 115 — remote (human) players DO want the engine to synthesize a
+    /// complete legal candidate pool when a card ships none: the portal can only
+    /// render targets it is handed, so without this the human could never click a
+    /// legal target (incl. a player) for an "any target"-style spell. Bots leave
+    /// this false (their TargetPolicy heuristic works off the empty pool).
+    /// </summary>
+    public bool WantsSynthesizedTargetCandidates => true;
+
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
