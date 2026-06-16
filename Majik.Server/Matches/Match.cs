@@ -3,7 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace Majik.Server.Matches;
 
-public enum MatchState { Open, Joined, Starting, Rolling, Playing, Completed, Abandoned }
+public enum MatchState { Open, Joined, Starting, Rolling, Playing, Completed, Abandoned, Errored }
 public enum MatchVisibility { Public, Invite }
 
 /// <summary>

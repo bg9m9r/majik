@@ -1091,7 +1091,11 @@ public sealed class MatchService
         var match = await _matches.GetByIdAsync(matchId, ct);
         if (match == null) return Result.Fail<bool>(new MatchError("match-not-found"));
         if (match.Creator.Sub != callerSub) return Result.Fail<bool>(new MatchError("forbidden"));
-        if (match.State == MatchState.Playing || match.State == MatchState.Completed)
+        // Terminal states cannot be abandoned. Playing is still live;
+        // Completed/Errored are ended (Errored is the engine-fault/-hang
+        // terminal added for wedge supervision — distinct from Completed,
+        // which carries winner semantics).
+        if (match.State == MatchState.Playing || match.State == MatchState.Completed || match.State == MatchState.Errored)
             return Result.Fail<bool>(new MatchError("match-in-progress"));
         if (match.State == MatchState.Abandoned)
             return Result.Ok(true);
