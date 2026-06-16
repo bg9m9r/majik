@@ -163,6 +163,138 @@ public class CombatFlowTests
         _bob.LifeTotal.Should().BeLessThan(20, "the damage half ran (no-block agent)");
     }
 
+    [Fact]
+    public async Task MustAttackCreature_OmittedByAgent_IsForcedIntoCombat()
+    {
+        // CR 508.1a / 702.43 — a creature with "attacks each combat if able"
+        // must be declared as an attacker if it CAN legally attack. The
+        // attacking player's agent declared NO attackers; the engine must
+        // force the must-attack creature in so it taps, fires its "attacks"
+        // trigger, and deals combat damage.
+        var crusher = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
+        crusher.SetOwner(_alice); crusher.SetController(_alice); crusher.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(crusher);
+        crusher.HasSummoningSickness = false;
+        crusher.AddAbility(new Majik.Core.Abilities.KeywordAbility(
+            "AttacksEachCombat", crusher, _alice));
+
+        var attacksFired = 0;
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(_ => attacksFired++);
+
+        var flow = new CombatFlow(_bus, _sba);
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueueAttackers(CombatPlan.None); // agent declines to attack
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueBlockers(BlockPlan.None);
+
+        await flow.RunCombatAsync(
+            attacker: _alice, defender: _bob,
+            attackerAgent: aliceAgent, defenderAgent: bobAgent,
+            attackers: new[] { crusher }, blockers: Array.Empty<Creature>(),
+            ctx: NewContext());
+
+        attacksFired.Should().Be(1, "the must-attack creature was forced into combat");
+        crusher.IsTapped.Should().BeTrue("a forced attacker still taps (no vigilance)");
+        _bob.LifeTotal.Should().Be(18, "the forced attacker dealt its 2 combat damage");
+    }
+
+    [Fact]
+    public async Task MustAttackCreature_AlreadyDeclared_IsNotDuplicated()
+    {
+        // CR 508.1a — the must-attack creature the agent ALREADY declared is
+        // not force-added a second time (no double-tap / double-trigger).
+        var crusher = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
+        crusher.SetOwner(_alice); crusher.SetController(_alice); crusher.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(crusher);
+        crusher.HasSummoningSickness = false;
+        crusher.AddAbility(new Majik.Core.Abilities.KeywordAbility(
+            "AttacksEachCombat", crusher, _alice));
+
+        var attacksFired = 0;
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(_ => attacksFired++);
+
+        var flow = new CombatFlow(_bus, _sba);
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueueAttackers(new CombatPlan(new[] {
+            new Majik.Core.Players.Agents.AttackerDeclaration(crusher, _bob) }));
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueBlockers(BlockPlan.None);
+
+        await flow.RunCombatAsync(
+            attacker: _alice, defender: _bob,
+            attackerAgent: aliceAgent, defenderAgent: bobAgent,
+            attackers: new[] { crusher }, blockers: Array.Empty<Creature>(),
+            ctx: NewContext());
+
+        attacksFired.Should().Be(1, "the already-declared must-attack creature attacks exactly once");
+        _bob.LifeTotal.Should().Be(18);
+    }
+
+    [Fact]
+    public async Task MustAttackCreature_NotEligible_IsNotForced()
+    {
+        // CR 508.1a — "if able". A must-attack creature that CANNOT legally
+        // attack (here: not in the eligible-attacker list — e.g. tapped /
+        // summoning-sick) is NOT forced into combat.
+        var crusher = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
+        crusher.SetOwner(_alice); crusher.SetController(_alice); crusher.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(crusher);
+        crusher.HasSummoningSickness = false;
+        crusher.AddAbility(new Majik.Core.Abilities.KeywordAbility(
+            "AttacksEachCombat", crusher, _alice));
+
+        var attacksFired = 0;
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(_ => attacksFired++);
+
+        var flow = new CombatFlow(_bus, _sba);
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueueAttackers(CombatPlan.None);
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueBlockers(BlockPlan.None);
+
+        // Eligible list is EMPTY → crusher cannot legally attack this combat.
+        await flow.RunCombatAsync(
+            attacker: _alice, defender: _bob,
+            attackerAgent: aliceAgent, defenderAgent: bobAgent,
+            attackers: Array.Empty<Creature>(), blockers: Array.Empty<Creature>(),
+            ctx: NewContext());
+
+        attacksFired.Should().Be(0, "a must-attack creature that can't attack is not forced");
+        _bob.LifeTotal.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task AttacksThisCombatMarker_OmittedByAgent_IsForcedIntoCombat()
+    {
+        // CR 508.1a — "attacks this combat if able" (the one-combat variant the
+        // Legion Warboss Goblin token gains) imposes the same must-attack
+        // declaration obligation as the permanent "attacks each combat" static.
+        var token = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
+        token.SetOwner(_alice); token.SetController(_alice); token.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(token);
+        token.HasSummoningSickness = false;
+        token.AddAbility(new Majik.Core.Abilities.KeywordAbility(
+            "AttacksThisCombat", token, _alice));
+
+        var attacksFired = 0;
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(_ => attacksFired++);
+
+        var flow = new CombatFlow(_bus, _sba);
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueueAttackers(CombatPlan.None);
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueBlockers(BlockPlan.None);
+
+        await flow.RunCombatAsync(
+            attacker: _alice, defender: _bob,
+            attackerAgent: aliceAgent, defenderAgent: bobAgent,
+            attackers: new[] { token }, blockers: Array.Empty<Creature>(),
+            ctx: NewContext());
+
+        attacksFired.Should().Be(1, "the 'attacks this combat if able' token was forced into combat");
+        _bob.LifeTotal.Should().Be(18);
+    }
+
     private GameContext NewContext() =>
         new(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
 }

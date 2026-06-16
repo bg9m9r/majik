@@ -15,13 +15,14 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 /// - <b>5/3 Creature — Vampire Berserker at {2}{R}{R}.</b>
-/// - <b>"Attacks each combat if able" (CR 508.1c — attacks-each-combat
-///   restriction)</b>: shipped as a <see cref="KeywordAbility"/>
-///   ("AttacksEachCombat") marker, identical to the posture
-///   <see cref="UlamogsCrusherFactory"/> uses for the same printed line. The
-///   must-attack combat-restriction primitive isn't wired into the live combat
-///   step yet; the marker keeps the printed restriction discoverable on the bot
-///   / keyword-scan rail until that primitive lands.
+/// - <b>"Attacks each combat if able" (CR 508.1a / 702.43 — the must-attack
+///   combat restriction)</b>: shipped as a <see cref="KeywordAbility"/>
+///   ("AttacksEachCombat") marker that <see cref="Majik.Core.Combat.CombatFlow"/>
+///   now ENFORCES at declare-attackers: an eligible creature carrying this
+///   marker is force-declared into combat (CR 508.1a — "if able") even when its
+///   controller's agent omits it, mirroring the must-block enforcement in
+///   <see cref="Majik.Core.Combat.CombatValidator"/>. Same marker
+///   <see cref="UlamogsCrusherFactory"/> uses for the identical printed line.
 ///
 /// ## Madness (NOT wired here — intrinsic)
 /// Madness {3}{R} works intrinsically for every catalogued card (CR 702.35) via
@@ -56,9 +57,9 @@ public static class InsatiableGorgersFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 508.1c — "attacks each combat if able" combat restriction. Shipped
-        // as a marker only — the must-attack primitive isn't wired into the live
-        // combat step yet (same posture as Ulamog's Crusher's identical line).
+        // CR 508.1a / 702.43 — "attacks each combat if able". The marker is now
+        // ENFORCED by CombatFlow: this creature is force-declared as an attacker
+        // whenever it can legally attack (same posture as Ulamog's Crusher).
         card.AddAbility(new KeywordAbility("AttacksEachCombat", card, owner));
 
         return card;

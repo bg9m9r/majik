@@ -67,14 +67,17 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="GrantKeywordUntilEndOfTurnEffect"/>, clearing summoning
 ///   sickness so it can be declared as an attacker the same turn.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"attacks this combat if able"</b> (CR 508.1g — must-attack combat
+/// - <b>"attacks this combat if able"</b> (CR 508.1a — the must-attack combat
 ///   requirement). Shipped as an <c>"AttacksThisCombat"</c>
-///   <see cref="KeywordAbility"/> marker on the token only; the must-attack
-///   primitive is not wired into combat declaration yet (same posture as
-///   <see cref="UlamogsCrusherFactory"/>'s "attacks each combat if able"
-///   marker). The token is still created with Haste, so it CAN attack; it
-///   simply isn't yet forced to.
+///   <see cref="KeywordAbility"/> marker on the token, now ENFORCED by
+///   <see cref="Majik.Core.Combat.CombatFlow"/>:
+///   <see cref="Majik.Core.Combat.CombatAbilities.MustAttackEachCombat"/>
+///   recognises this marker, so the token is force-declared as an attacker
+///   whenever it can legally attack (it is created with Haste, so it can). Same
+///   enforcement path as <see cref="UlamogsCrusherFactory"/>'s permanent
+///   "attacks each combat if able" static.
+///
+/// ## Deferred (v1 gaps)
 /// - <b>Live combat-attackers provider</b>: production callers must wire the
 ///   <c>attackingCreaturesSource</c> closure for the Mentor target pool /
 ///   lesser-power recheck. When null, the Mentor trigger's pump body is a
@@ -234,10 +237,10 @@ public static class LegionWarbossFactory
     /// <paramref name="controller"/>'s control, grant it Haste until end of
     /// turn (CR 702.10 / 613.1c) and clear summoning sickness so it can be
     /// declared as an attacker the same turn. The "attacks this combat if
-    /// able" must-attack requirement (CR 508.1g) is recorded as an
-    /// "AttacksThisCombat" <see cref="KeywordAbility"/> marker only — the
-    /// must-attack primitive isn't wired into combat declaration yet (same
-    /// posture as <see cref="UlamogsCrusherFactory"/>).
+    /// able" must-attack requirement (CR 508.1a) is recorded as an
+    /// "AttacksThisCombat" <see cref="KeywordAbility"/> marker, now ENFORCED at
+    /// declare-attackers by <see cref="Majik.Core.Combat.CombatFlow"/> (same
+    /// path as <see cref="UlamogsCrusherFactory"/>).
     /// </summary>
     public static Creature CreateGoblinToken(
         Player controller,
@@ -277,9 +280,11 @@ public static class LegionWarbossFactory
             new GrantKeywordUntilEndOfTurnEffect(token, "Haste"));
         token.HasSummoningSickness = false;
 
-        // "and attacks this combat if able." CR 508.1g must-attack
-        // requirement — marker only (primitive not wired yet; same posture
-        // as Ulamog's Crusher).
+        // "and attacks this combat if able." CR 508.1a must-attack
+        // requirement — the marker is now ENFORCED by CombatFlow
+        // (CombatAbilities.MustAttackEachCombat recognises "AttacksThisCombat"),
+        // so the token is force-declared into combat when able. Same posture as
+        // Ulamog's Crusher's permanent "attacks each combat if able" static.
         token.AddAbility(new KeywordAbility("AttacksThisCombat", token, controller));
 
         return token;
