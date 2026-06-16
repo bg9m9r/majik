@@ -180,18 +180,31 @@ public static class PsychicFrogFactory
         // (no mana). +1/+1 counter via CounterCollection.Add (CR 122 /
         // 122.1c — no SBA gating, the counter is placed directly).
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
+        // the effect puts the +1/+1 counter on the live ResolutionContext.Source
+        // (this ability's own source at resolution) rather than capturing `card`,
+        // falling back to `card` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, Source = null). Marked RebindSafe so Agatha's
+        // Soul Cauldron re-homes this REAL "Discard a card: put a +1/+1 counter on
+        // it" ability to a counter-bearing bearer via ActivatedAbility.RebindTo
+        // (CR 707.2 / 613.1f): the counter lands on the BEARER, never the exiled
+        // Psychic Frog. DiscardACardCost is a player-resource cost (no captured
+        // source), passed through unchanged by RebindTo.
         var pumpEffect = new Effect(
             $"{CardName}: put a +1/+1 counter on it",
-            () =>
+            ctx =>
             {
-                CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements);
+                var subject = (ctx.Source as Permanent) ?? card;
+                CountersService.Add(subject, CounterType.PlusOnePlusOne, 1, replacements);
+                return ValueTask.CompletedTask;
             });
 
         var pumpAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new DiscardACardCost() },
-            effects: new IEffect[] { pumpEffect });
+            effects: new IEffect[] { pumpEffect },
+            rebindSafe: true);
 
         card.AddAbility(pumpAbility);
 

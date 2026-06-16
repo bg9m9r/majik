@@ -155,11 +155,24 @@ public static class MagmaticChannelerFactory
         //    the effect closure + the public static predicate
         //    CanActivateGraveyardGate. See class xmldoc.
         // ----------------------------------------------------------------
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
+        // the effect resolves the searching player off the live
+        // ResolutionContext.Source's CONTROLLER (this ability's own source at
+        // resolution) rather than capturing `card`, falling back to `card` /
+        // `owner` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, Source = null). Marked RebindSafe (below) so
+        // Agatha's Soul Cauldron re-homes this REAL ability — its {T} cost
+        // auto-re-homed by RebindTo Stage 1 — to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the bearer's controller
+        // taps the BEARER and digs through THEIR library, never re-reading the
+        // exiled Magmatic Channeler. The library-dig-and-pick shape is OUTSIDE the
+        // OracleActivatedAbilityBinder reconstructable set, so RebindTo of the real
+        // ability is the only sound re-home.
         var activatedEffect = new Effect(
             $"{CardName}: look at top {PeekCount}, may take a creature/instant, rest on bottom",
             async ctx =>
             {
-                var controller = card.Controller ?? owner;
+                var controller = ctx.Source?.Controller ?? card.Controller ?? owner;
 
                 // CR 602.5b — defensive re-check at resolve time. The
                 // gate should already have been enforced at activation
@@ -258,7 +271,8 @@ public static class MagmaticChannelerFactory
                 new ManaCostCost(ActivationCost),
                 AdditionalCost.Tap(card),
             },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            rebindSafe: true);
 
         card.AddAbility(activatedAbility);
 

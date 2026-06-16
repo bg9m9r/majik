@@ -122,11 +122,26 @@ public static class TasigurTheGoldenFangFactory
         // from a list" prompt).
         // ----------------------------------------------------------------
 
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-creature-tail-batch):
+        // "your graveyard" / "your hand" resolve to the live
+        // ResolutionContext.Source's CONTROLLER (this ability's own source at
+        // resolution) rather than the captured `owner`, falling back to `owner`
+        // only on the context-less legacy sync path (ResolutionContext.Legacy,
+        // Source = null). Marked RebindSafe so Agatha's Soul Cauldron re-homes this
+        // REAL "{B}{G}{U}: target opponent picks a card from your graveyard → your
+        // hand" ability to a counter-bearing bearer via ActivatedAbility.RebindTo
+        // (CR 707.2 / 613.1f): the return reads the BEARER'S controller's
+        // graveyard / hand, never re-reading the exiled Tasigur. The activated
+        // ability's mana cost carries no captured source; the "opponent chooses
+        // from your graveyard → your hand" shape is OUTSIDE the
+        // OracleActivatedAbilityBinder reconstructable set, so RebindTo of the real
+        // ability is the only sound re-home.
         var returnEffect = new Effect(
             "Tasigur: target opponent chooses a card in your graveyard → hand",
             async ctx =>
             {
-                var candidates = owner.Zones.Graveyard.GetCards().ToList();
+                var you = ctx.Source?.Controller ?? card.Controller ?? owner;
+                var candidates = you.Zones.Graveyard.GetCards().ToList();
                 if (candidates.Count == 0) return;
 
                 // Resolve "target opponent". If no resolver is supplied
@@ -140,10 +155,10 @@ public static class TasigurTheGoldenFangFactory
                 else if (allPlayersResolver != null)
                 {
                     var all = allPlayersResolver();
-                    opponent = all?.FirstOrDefault(p => !ReferenceEquals(p, owner));
+                    opponent = all?.FirstOrDefault(p => !ReferenceEquals(p, you));
                 }
                 if (opponent == null) return;
-                if (ReferenceEquals(opponent, owner)) return;
+                if (ReferenceEquals(opponent, you)) return;
 
                 // CR 113.3 — the opponent picks. Defer to their agent;
                 // fall back to the first card deterministically if no
@@ -162,12 +177,12 @@ public static class TasigurTheGoldenFangFactory
                 // (matches the heuristic-bot posture used elsewhere).
                 pick ??= candidates[0];
 
-                // Move the chosen card from controller's graveyard to
-                // controller's hand. Direct-zone mutation mirrors
-                // Wrenn-and-Six's +1 lands-from-graveyard return idiom
-                // — no ZoneService wiring at this dispatcher path.
-                owner.Zones.Graveyard.RemoveCard(pick);
-                owner.Zones.Hand.AddCard(pick);
+                // Move the chosen card from "your" graveyard to "your"
+                // hand (you = the live source's controller). Direct-zone
+                // mutation mirrors Wrenn-and-Six's +1 lands-from-graveyard
+                // return idiom — no ZoneService wiring at this dispatcher path.
+                you.Zones.Graveyard.RemoveCard(pick);
+                you.Zones.Hand.AddCard(pick);
                 pick.SetZone(ZoneType.Hand);
             });
 
@@ -179,7 +194,8 @@ public static class TasigurTheGoldenFangFactory
                 new ManaCostCost("{B}{G}{U}"),
             },
             effects: new IEffect[] { returnEffect },
-            sorcerySpeed: true);
+            sorcerySpeed: true,
+            rebindSafe: true);
 
         card.AddAbility(activated);
         return card;
