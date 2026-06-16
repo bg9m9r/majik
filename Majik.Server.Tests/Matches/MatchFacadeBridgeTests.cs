@@ -957,6 +957,193 @@ public class MatchFacadeBridgeTests
             "active player matches the bridge's (unseeded) clock holder");
     }
 
+    // -----------------------------------------------------------------------
+    // 6. Engine-wedge watchdog wiring (W5)
+    //
+    // The bridge arms a no-progress watchdog on Attach, Bumps it on every
+    // engine-progress signal (ForwardEvent / ForwardPrompt / bot-thinking via
+    // the public Bump), Cancels it on Detach, and on a watchdog fire classifies
+    // Fault vs Hang and reports via the onEngineErrored callback.
+    //
+    // The watchdog ITSELF is exercised at the bridge level (Attach→Bump resets,
+    // Detach cancels). The wedge CLASSIFICATION is unit-tested directly against
+    // the pure ClassifyWedge seam, because the bridge's end-to-end harness can't
+    // hand the bridge a real GameFacade with a controllable FullGameTask.
+    // -----------------------------------------------------------------------
+
+    private sealed record EngineErrorCall(Guid MatchId, EngineFaultReason Reason, Exception? Fault);
+
+    private static MatchFacadeBridge BuildBridgeWithWatchdog(
+        CaptureHub hub,
+        TimeSpan timeout,
+        out List<EngineErrorCall> errors,
+        out TaskCompletionSource<EngineErrorCall> firstError)
+    {
+        var captured = new List<EngineErrorCall>();
+        var tcs = new TaskCompletionSource<EngineErrorCall>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        errors = captured;
+        firstError = tcs;
+        var watchdog = new MatchEngineWatchdog(
+            NullLogger<MatchEngineWatchdog>.Instance, timeout);
+        return new MatchFacadeBridge(
+            hub, NullLogger<MatchFacadeBridge>.Instance, replay: null,
+            onActivePlayerChanged: null,
+            watchdog: watchdog,
+            onEngineErrored: (matchId, reason, fault, _) =>
+            {
+                var call = new EngineErrorCall(matchId, reason, fault);
+                lock (captured) captured.Add(call);
+                tcs.TrySetResult(call);
+                return Task.CompletedTask;
+            });
+    }
+
+    [Fact]
+    public async Task Watchdog_RepeatedForwardEvent_BumpsAndNeverFires()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithWatchdog(
+            hub, TimeSpan.FromMilliseconds(120), out var errors, out _);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+        var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
+
+        // Forward events faster than the timeout several times — each one
+        // bumps the watchdog, so it must never fire.
+        for (var i = 0; i < 5; i++)
+        {
+            await Task.Delay(40);
+            bridge.ForwardEvent(
+                matchId, new EventEnvelope(FakeEvent("StepStartedEvent"), PerPlayer: null), routing);
+        }
+
+        errors.Should().BeEmpty("bumps faster than the timeout keep resetting the watchdog");
+
+        // Clean up so the still-armed timer doesn't fire after the test ends.
+        bridge.Detach(matchId);
+    }
+
+    [Fact]
+    public async Task Watchdog_DetachCancels_OnEngineErroredNeverFires()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithWatchdog(
+            hub, TimeSpan.FromMilliseconds(80), out var errors, out _);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+        bridge.Detach(matchId);
+
+        // Wait well past the timeout — Detach cancelled the watchdog.
+        await Task.Delay(250);
+        errors.Should().BeEmpty("Detach cancels the watchdog before it can fire");
+    }
+
+    [Fact]
+    public void Watchdog_NotWired_AllProgressSignalsAreNoOp()
+    {
+        // The default bridge (no watchdog) must not throw on any progress
+        // signal — Bump is a best-effort no-op when unarmed/unwired.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var routing = DefaultRouting(Guid.NewGuid(), Guid.NewGuid());
+
+        var act = () =>
+        {
+            bridge.Bump(matchId);
+            bridge.ForwardEvent(matchId, new EventEnvelope(FakeEvent("X"), PerPlayer: null), routing);
+            bridge.ForwardPrompt(matchId, new PromptDto(Guid.NewGuid(), routing.AliceId, new[] { "PassPriorityCommand" }), routing);
+            bridge.Detach(matchId);
+        };
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void ClassifyWedge_FaultedLoopTask_ReturnsFaultWithInnerException()
+    {
+        var inner = new InvalidOperationException("card factory blew up mid-progression");
+        var faulted = Task.FromException(inner);
+
+        var (reason, fault) = MatchFacadeBridge.ClassifyWedge(faulted, humanPromptPending: false);
+
+        reason.Should().Be(EngineFaultReason.Fault);
+        fault.Should().BeSameAs(inner, "the inner (base) exception is threaded through for server-side logging");
+    }
+
+    [Fact]
+    public void ClassifyWedge_RunningLoop_NoHumanPrompt_ReturnsHang()
+    {
+        // A never-completing task models the loop still running (a bot
+        // decision that never returned).
+        var running = new TaskCompletionSource().Task;
+
+        var (reason, fault) = MatchFacadeBridge.ClassifyWedge(running, humanPromptPending: false);
+
+        reason.Should().Be(EngineFaultReason.Hang);
+        fault.Should().BeNull();
+    }
+
+    [Fact]
+    public void ClassifyWedge_RunningLoop_HumanPromptPending_NotAWedge()
+    {
+        // The match is legitimately waiting on a human — that's the timeout
+        // scheduler's domain, NOT a wedge.
+        var running = new TaskCompletionSource().Task;
+
+        var (reason, fault) = MatchFacadeBridge.ClassifyWedge(running, humanPromptPending: true);
+
+        reason.Should().BeNull();
+        fault.Should().BeNull();
+    }
+
+    [Fact]
+    public void ClassifyWedge_LoopCompletedNormally_NotAWedge()
+    {
+        var completed = Task.FromResult(0);
+
+        var (reason, fault) = MatchFacadeBridge.ClassifyWedge(completed, humanPromptPending: false);
+
+        reason.Should().BeNull("a cleanly-finished loop is not a wedge");
+        fault.Should().BeNull();
+    }
+
+    [Fact]
+    public void ClassifyWedge_NoLoopTask_NotAWedge()
+    {
+        // FullGameTask is null on an inert facade (StartFullGameAsync never
+        // called) — never report.
+        var (reason, fault) = MatchFacadeBridge.ClassifyWedge(loopTask: null, humanPromptPending: false);
+
+        reason.Should().BeNull();
+        fault.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Watchdog_FiresWithInertFacade_NoLoopTask_IsNotReportedAsWedge()
+    {
+        // End-to-end: an inert facade has FullGameTask == null, so when the
+        // watchdog fires the classifier finds no wedge and does NOT report.
+        // (This is the genuine "not a wedge" path at the bridge level; the
+        // Fault/Hang positive paths are covered by ClassifyWedge unit tests.)
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithWatchdog(
+            hub, TimeSpan.FromMilliseconds(80), out var errors, out _);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+
+        // Wait past the timeout so the watchdog fires + classifies.
+        await Task.Delay(250);
+        errors.Should().BeEmpty("FullGameTask is null on an inert facade → not a wedge");
+
+        bridge.Detach(matchId);
+    }
+
     [Fact]
     public void Bridge_WithoutReplayBuffer_StillWorks()
     {

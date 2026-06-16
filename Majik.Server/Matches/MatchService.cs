@@ -304,8 +304,18 @@ public sealed class MatchService
                 // hub so the frontend can show a "Bot is thinking…"
                 // indicator while the policy runs.
                 var hubForCallback = _hub;
-                Action<bool>? onBotThinking = hubForCallback != null
-                    ? thinking => hubForCallback.PublishBotThinking(matchId, thinking)
+                var bridgeForBump = _facadeBridge;
+                // Bridge the engine-internal bot-thinking signal to BOTH the
+                // SignalR hub (so the frontend can show a "Bot is thinking…"
+                // indicator) AND the no-progress watchdog (W5): a thinking bot
+                // is real engine progress, so it must Bump the watchdog or a
+                // slow-but-working bot policy would be misclassified as a Hang.
+                Action<bool>? onBotThinking = (hubForCallback != null || bridgeForBump != null)
+                    ? thinking =>
+                    {
+                        hubForCallback?.PublishBotThinking(matchId, thinking);
+                        bridgeForBump?.Bump(matchId);
+                    }
                     : null;
                 // Per-match decision sinks (SignalR diagnostics channel +
                 // replay buffer), composed into one fan-out observer. The
