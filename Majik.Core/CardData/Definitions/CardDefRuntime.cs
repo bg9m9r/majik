@@ -958,6 +958,8 @@ public static class CardDefRuntime
                 BuildWheneverAnOpponentSacrificesPermanentTrigger(oppSac, card),
             WheneverAPlayerSacrificesPermanentTriggerDef anySac =>
                 BuildWheneverAPlayerSacrificesPermanentTrigger(anySac, card),
+            WheneverYouPayLifeTriggerDef => BuildWheneverYouPayLifeTrigger(card),
+            WheneverAPlayerPaysLifeTriggerDef => BuildWheneverAPlayerPaysLifeTrigger(card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
@@ -1288,6 +1290,51 @@ public static class CardDefRuntime
             return true;
         });
     }
+
+    /// <summary>
+    /// CR 118.8 / CR 119.4 / CR 109.5 — "Whenever you pay life, …". Fires on the
+    /// dedicated <see cref="Majik.Core.Events.LifePaidEvent"/> (a life PAYMENT, a
+    /// cost — distinct from any other life decrease) whose
+    /// <see cref="Majik.Core.Events.LifePaidEvent.Player"/> is the trigger's
+    /// controller (CR 109.5 — "you"; the controller is resolved live so a control
+    /// change carries the trigger). The same predicate as
+    /// <see cref="Triggers.OnLifePaid(Majik.Core.Players.Player)"/>, but with the
+    /// controller read live off the card rather than captured (mirroring
+    /// <see cref="BuildWheneverYouGainLifeTrigger"/>).
+    /// </summary>
+    private static ITriggerCondition BuildWheneverYouPayLifeTrigger(ICard card) =>
+        new EventTriggerCondition<Majik.Core.Events.LifePaidEvent>((e, _) =>
+        {
+            var controller = card.Controller;
+            return controller is not null && ReferenceEquals(e.Player, controller);
+        });
+
+    /// <summary>
+    /// CR 118.8 / CR 700.6 / CR 603.3 — "Whenever a player pays life, …". The
+    /// <b>any-player</b> sibling of <see cref="BuildWheneverYouPayLifeTrigger"/>:
+    /// fires on the dedicated <see cref="Majik.Core.Events.LifePaidEvent"/> off
+    /// EVERY player's life payment (the controller's own included — CR 700.6 "a
+    /// player" is unrestricted, so NO controller scoping). As it matches it STAMPS
+    /// the paying player onto the resolving ability
+    /// (<see cref="Majik.Core.Abilities.TriggeredAbility.SetTriggeringPlayer"/>)
+    /// for an untargeted player-payoff verb to read back as "that player" at
+    /// resolution (CR 603.3) — the same stamping idiom as the any-player cast /
+    /// sacrifice triggers, over the life-payment provenance surface.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverAPlayerPaysLifeTrigger(ICard card) =>
+        new EventTriggerCondition<Majik.Core.Events.LifePaidEvent>((e, ability) =>
+        {
+            // CR 700.6 — "a player" is unrestricted; fires off any player's
+            // payment (no controller read needed; works even before a controller
+            // is set so the shape is inspectable).
+            // CR 603.3 — stamp "that player" (the paying player) for any untargeted
+            // resolve effect to read at resolution.
+            if (ability is Majik.Core.Abilities.TriggeredAbility ta)
+            {
+                ta.SetTriggeringPlayer(e.Player);
+            }
+            return true;
+        });
 
     /// <summary>
     /// CR 510.2 / CR 603.1 — "Whenever this creature deals combat damage to a

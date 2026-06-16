@@ -1601,4 +1601,147 @@ public class JsonTriggerConditionsTests
 
         triggers.PendingCount.Should().Be(0, "opponent life LOSS is not 'gains life' (CR 119.3)");
     }
+
+    // ------------------------------------------------------------------
+    // whenever_you_pay_life — CR 118.8 / CR 119.4 (controller-scoped life
+    // PAYMENT, distinct from a life-loss / life-decrease condition).
+    // ------------------------------------------------------------------
+
+    private const string YouPayLifeCounterJson = """
+    {
+      "name": "Test Life-Payment Payoff",
+      "types": ["Creature"],
+      "manaCost": "1B",
+      "power": 1,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_you_pay_life" },
+          "effects": [ { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void WheneverYouPayLife_FiresForController_AddsCounter()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(YouPayLifeCounterJson, triggers);
+
+        // Controller pays life as a cost (CR 118.8 — WasCost = true).
+        bus.Publish(new LifePaidEvent(_alice, 2, wasCost: true));
+
+        triggers.PendingCount.Should().Be(1, "controller paying life fires the trigger (CR 118.8)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        card.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the put_counter self effect resolves once per life-payment event (CR 122.1)");
+    }
+
+    [Fact]
+    public void WheneverYouPayLife_DoesNotFire_ForOpponentPayment()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(YouPayLifeCounterJson, triggers);
+
+        bus.Publish(new LifePaidEvent(_bob, 2, wasCost: true));
+
+        triggers.PendingCount.Should().Be(0, "'whenever YOU pay life' is controller-scoped (CR 109.5)");
+    }
+
+    [Fact]
+    public void WheneverYouPayLife_DoesNotFire_ForPlainLifeLoss()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(YouPayLifeCounterJson, triggers);
+
+        // A raw life DECREASE (burn / drain / "lose N life") is NOT a life
+        // PAYMENT — it never publishes a LifePaidEvent (CR 118.8 vs 119.3).
+        bus.Publish(new LifeChangedEvent(_alice, 20, 17));
+
+        triggers.PendingCount.Should().Be(0,
+            "life LOST to a spell/effect is not life PAID as a cost (CR 118.8)");
+    }
+
+    // ------------------------------------------------------------------
+    // whenever_a_player_pays_life — CR 118.8 / CR 700.6 / CR 603.3
+    // (any-player life PAYMENT; STAMPS the paying player as "that player").
+    // ------------------------------------------------------------------
+
+    private const string AnyPlayerPaysLifePunishJson = """
+    {
+      "name": "Test Life-Payment Punisher",
+      "types": ["Creature"],
+      "manaCost": "2R",
+      "power": 2,
+      "toughness": 2,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_a_player_pays_life" },
+          "effects": [ { "type": "deal_damage_to_triggering_player", "amount": 2 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void WheneverAPlayerPaysLife_FiresForOpponentPayment_DamagesThatPlayer()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnyPlayerPaysLifePunishJson, triggers);
+
+        // An opponent pays life — the any-player trigger fires and STAMPS the
+        // payer as "that player" (CR 603.3) for the untargeted punish verb.
+        var bobBefore = _bob.LifeTotal;
+        bus.Publish(new LifePaidEvent(_bob, 3, wasCost: true));
+
+        triggers.PendingCount.Should().Be(1, "'a player pays life' fires off any player's payment (CR 700.6)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        _bob.LifeTotal.Should().Be(bobBefore - 2,
+            "the untargeted payoff deals 2 to the STAMPED paying player (CR 603.3 'that player')");
+    }
+
+    [Fact]
+    public void WheneverAPlayerPaysLife_FiresForControllerPayment_Too()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnyPlayerPaysLifePunishJson, triggers);
+
+        // CR 700.6 — "a player" is unrestricted; the controller's OWN payment
+        // fires it too (unlike the "you"-scoped variant).
+        bus.Publish(new LifePaidEvent(_alice, 1, wasCost: true));
+
+        triggers.PendingCount.Should().Be(1,
+            "the controller's own life payment fires 'a player pays life' (CR 700.6)");
+    }
+
+    [Fact]
+    public void WheneverAPlayerPaysLife_DoesNotFire_ForPlainLifeLoss()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnyPlayerPaysLifePunishJson, triggers);
+
+        // Raw life loss never publishes a LifePaidEvent — no fire.
+        bus.Publish(new LifeChangedEvent(_bob, 20, 16));
+
+        triggers.PendingCount.Should().Be(0, "life LOSS is not life PAID (CR 118.8)");
+    }
 }
