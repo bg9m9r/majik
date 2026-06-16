@@ -2788,6 +2788,10 @@ public static class CardDefRuntime
         // single-arg posture.
         var untap = def.Untap;
         var gainsHaste = def.GainsHaste;
+        // "It gets +N/+M until end of turn" rider (Malevolent Whispers — the
+        // +2/+0 pump bundled with the Threaten steal). 0/0 = no pump.
+        var powerBonus = def.PowerBonus;
+        var toughnessBonus = def.ToughnessBonus;
         // CR 611.2b — duration. "end_of_turn" (default) = the Threaten family,
         // reverting at the cleanup step. "while_source_on_battlefield" = the
         // persistent-steal family (Sower of Temptation — "gain control of target
@@ -2872,6 +2876,16 @@ public static class CardDefRuntime
                 if (gainsHaste && permanent is Creature creature)
                 {
                     continuous.Register(new GrantKeywordUntilEndOfTurnEffect(creature, "Haste"));
+                }
+
+                // "It gets +N/+M until end of turn." (Layer 7c +P/+T, CR 613.1g;
+                // CR 514.2 expiry — the same until-EOT window as the haste grant.)
+                // Only a creature carries the engine's P/T boost; a stolen
+                // non-creature ignores the rider. Malevolent Whispers's +2/+0.
+                if ((powerBonus != 0 || toughnessBonus != 0) && permanent is Creature pumped)
+                {
+                    continuous.Register(
+                        new PumpUntilEndOfTurnEffect(pumped, powerBonus, toughnessBonus));
                 }
             });
     }

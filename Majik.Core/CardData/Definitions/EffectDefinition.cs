@@ -880,6 +880,27 @@ public sealed class GainControlEffectDef : EffectDefinition
     /// </summary>
     public string? OptionalManaCost { get; set; }
 
+    /// <summary>
+    /// Optional "and it gets +N/+0" pump rider applied to the gained creature
+    /// until end of turn (CR 514.2), under the SAME temporary window as the
+    /// control swap + untap + haste. Default <c>0</c> = no pump (the bare
+    /// Threaten / Act of Treason / Zealous Conscripts family).
+    ///
+    /// <para>Canonical case: Malevolent Whispers ({3}{R} Sorcery) — "Gain
+    /// control of target creature until end of turn. Untap that creature. It
+    /// gets +2/+0 and gains haste until end of turn." → <see cref="PowerBonus"/>
+    /// = 2, <see cref="ToughnessBonus"/> = 0. The rider rides the existing
+    /// shared <see cref="Majik.Core.Effects.PumpUntilEndOfTurnEffect"/> (Layer 7c
+    /// +P/+T, CR 613.1g) registered on the live continuous-effects service, so it
+    /// expires at the cleanup step exactly like the haste grant. Only a creature
+    /// can carry the P/T boost; a stolen non-creature ignores it.</para>
+    /// </summary>
+    public int PowerBonus { get; set; }
+
+    /// <summary>Optional until-EOT toughness boost paired with
+    /// <see cref="PowerBonus"/> (the "+N/+M" rider). Default <c>0</c>.</summary>
+    public int ToughnessBonus { get; set; }
+
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
