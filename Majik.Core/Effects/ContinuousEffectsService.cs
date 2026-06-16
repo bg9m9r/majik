@@ -137,6 +137,23 @@ public sealed class ContinuousEffectsService
     private Player? _activePlayer;
 
     /// <summary>
+    /// CR 500.1 — the live (1-based) turn number, auto-tracked off
+    /// <see cref="TurnStartedEvent"/> when wired to a bus. Stamped onto each
+    /// effect's <see cref="ContinuousEffect.CreatedOnTurn"/> at
+    /// <see cref="Register"/> time so
+    /// <see cref="ExpireAtControllersNextUntap"/> can distinguish a same-turn
+    /// registration from a prior-turn one. Zero before the first turn begins.
+    /// Also publicly settable so a test can drive the gate directly.
+    /// </summary>
+    public int CurrentTurnNumber
+    {
+        get => _currentTurnNumber;
+        set => _currentTurnNumber = value;
+    }
+
+    private int _currentTurnNumber;
+
+    /// <summary>
     /// CR 110.2 / 700.6 / 611.2c — the game's live player roster, supplied by
     /// the production game graph (<c>GameFacade</c> / <c>Game</c>) so a factory
     /// routed through the effects-aware overload (<c>Create(Player,
@@ -172,7 +189,15 @@ public sealed class ContinuousEffectsService
         // CR 500.1 / 502.1 — track the active player so a "during your turn"
         // conditional static (WhileControllersTurnPumpEffect, Skophos Reaver)
         // can read it live without a separately-threaded turn-state parameter.
-        if (e is TurnStartedEvent ts) ActivePlayer = ts.Player;
+        if (e is TurnStartedEvent ts)
+        {
+            ActivePlayer = ts.Player;
+            // CR 514.2 — track the live turn number so the controller-keyed
+            // "until your next turn" expiry sweep can tell a same-turn
+            // registration (must survive this turn's already-elapsed untap)
+            // apart from a prior-turn one (drops at this untap).
+            _currentTurnNumber = ts.TurnNumber;
+        }
 
         // CR 611.2b — a "for as long as <condition>" continuous effect ends the
         // moment its condition lapses. The most common lapse is the source
@@ -224,6 +249,11 @@ public sealed class ContinuousEffectsService
     public void Register(ContinuousEffect effect)
     {
         if (effect == null) throw new ArgumentNullException(nameof(effect));
+        // CR 514.2 — stamp the registration turn so a controller-keyed "until
+        // your next turn" effect can survive its own creation turn's untap and
+        // expire only at its controller's NEXT untap step (see
+        // ExpireAtControllersNextUntap). Harmless for all other effects.
+        effect.CreatedOnTurn = _currentTurnNumber;
         _effects.Add(effect);
         // CR 613 — an effect's existence/applicability frequently gates on its
         // SOURCE permanent's state (IsActive() ⇒ source on battlefield; "you
@@ -817,6 +847,63 @@ public sealed class ContinuousEffectsService
         _cache.Clear();
         _ptCache.Clear();
         BumpGeneration();
+    }
+
+    /// <summary>
+    /// CR 514.2 — drop every effect whose duration is "until
+    /// <paramref name="controller"/>'s next turn" now that
+    /// <paramref name="controller"/>'s turn (number
+    /// <paramref name="turnNumber"/>) has begun. Called from the untap step
+    /// (<see cref="Majik.Core.Game.TurnDriver"/>) when the active player IS the
+    /// expiry controller.
+    ///
+    /// <para>An effect created during its controller's OWN turn must NOT be
+    /// dropped by that same turn's untap step (which has already elapsed by the
+    /// time the effect resolves) — it has to persist through the intervening
+    /// opponent turn(s) and end at the controller's NEXT untap. We therefore
+    /// skip any effect whose <see cref="ContinuousEffect.CreatedOnTurn"/> equals
+    /// the current <paramref name="turnNumber"/>. This is exactly what
+    /// distinguishes "until your next turn" from "until end of turn": the former
+    /// outlives the cleanup of the turn it was created on.</para>
+    ///
+    /// <para>Fires each dropped effect's <see cref="ContinuousEffect.OnExpired"/>
+    /// teardown and publishes a <see cref="ContinuousEffectRemovedEvent"/>,
+    /// mirroring <see cref="ExpireEndOfTurn"/>.</para>
+    /// </summary>
+    public void ExpireAtControllersNextUntap(Player controller, int turnNumber)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+
+        // CR 613.6e — revoke grant lifecycles before drop (mirror of the
+        // end-of-turn sweep) so a Layer-6 ability grant releases its bearer.
+        foreach (var grant in _effects.OfType<GrantAbilityEffect>())
+        {
+            if (grant.ExpiresAtControllersNextTurn
+                && ReferenceEquals(grant.ExpiryController, controller)
+                && grant.CreatedOnTurn != turnNumber)
+            {
+                grant.Revoke();
+            }
+        }
+
+        var dropped = _effects.RemoveAll(e =>
+        {
+            if (!e.ExpiresAtControllersNextTurn) return false;
+            if (!ReferenceEquals(e.ExpiryController, controller)) return false;
+            // Same turn it was created on → its controller's untap already
+            // elapsed; keep it until the NEXT untap.
+            if (e.CreatedOnTurn == turnNumber) return false;
+            e.OnExpired();
+            _eventBus?.Publish(new ContinuousEffectRemovedEvent(e));
+            return true;
+        });
+
+        if (dropped > 0)
+        {
+            _cache.Clear();
+            _ptCache.Clear();
+            BumpGeneration();
+        }
     }
 
     /// <summary>

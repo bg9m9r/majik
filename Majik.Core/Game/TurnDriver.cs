@@ -443,6 +443,16 @@ public sealed class TurnDriver
 
         UntapStep(activePlayer);
 
+        // CR 514.2 — "until your next turn" continuous effects whose controller
+        // is the active player end now that this player's turn has begun. The
+        // sweep skips effects created on THIS turn number (their controller's
+        // untap already elapsed when they were registered), so an effect made
+        // during the controller's own turn correctly persists across the
+        // intervening opponent turn(s) and drops only at the controller's NEXT
+        // untap. (Differs from the end-of-turn sweep, which would drop them a
+        // full turn early.)
+        _continuousEffects?.ExpireAtControllersNextUntap(activePlayer, turnNumber);
+
         SetPhase(StepStateType.Upkeep);
         await PriorityRound(activePlayer, ct);
 

@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Game;
+using Majik.Core.Players;
 
 namespace Majik.Core.Effects;
 
@@ -21,6 +22,42 @@ public abstract class ContinuousEffect
 
     /// <summary>True if this effect expires in the cleanup step (CR 514).</summary>
     public virtual bool ExpiresAtEndOfTurn => false;
+
+    /// <summary>
+    /// CR 514.2 / CR 800.4-class duration — true iff this effect lasts "until
+    /// <see cref="ExpiryController"/>'s next turn" rather than merely until end
+    /// of turn. The two differ on the opposing turn(s) that immediately follow
+    /// the source's turn: an until-end-of-turn effect ends in this turn's
+    /// cleanup, whereas an "until your next turn" effect persists across those
+    /// intervening turns and ends only when its controller's own next turn
+    /// begins (drained in the untap step — see
+    /// <see cref="ContinuousEffectsService.ExpireAtControllersNextUntap"/>).
+    ///
+    /// <para>An effect that returns true here MUST also expose a non-null
+    /// <see cref="ExpiryController"/>, and MUST leave <see cref="ExpiresAtEndOfTurn"/>
+    /// false (the two durations are mutually exclusive — the end-of-turn sweep
+    /// would otherwise drop it a full turn early).</para>
+    /// </summary>
+    public virtual bool ExpiresAtControllersNextTurn => false;
+
+    /// <summary>
+    /// The player whose next turn ends this effect's duration (the controller of
+    /// the ability that created it — Liliana / Vivien / Karn "+1: … until your
+    /// next turn"). Null unless <see cref="ExpiresAtControllersNextTurn"/> is true.
+    /// </summary>
+    public virtual Player? ExpiryController => null;
+
+    /// <summary>
+    /// The 1-based turn number on which this effect was registered, stamped by
+    /// <see cref="ContinuousEffectsService.Register"/>. The controller-keyed
+    /// expiry sweep skips the untap step of the SAME turn the effect was created
+    /// on (an effect created during its controller's own turn must survive that
+    /// turn's already-elapsed untap and end at the controller's NEXT untap), so
+    /// it compares this against the live turn number. Zero until stamped (effects
+    /// built outside a live game graph — pure unit tests — that never reach the
+    /// untap sweep).
+    /// </summary>
+    internal int CreatedOnTurn { get; set; }
 
     public abstract void Apply(CreatureCharacteristics chars);
 
