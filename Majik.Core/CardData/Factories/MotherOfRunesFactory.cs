@@ -161,18 +161,23 @@ public static class MotherOfRunesFactory
             effects: new IEffect[] { grantEffect },
             targetRequests: new[]
             {
-                new TargetRequest(
-                    Description: "target creature you control",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Protection,
-                    // CR 602.1 — "target creature you control" (no "another"
-                    // exclusion); Mother of Runes is itself a legal target.
-                    CandidateGatherer: _ => owner.Zones.Battlefield.GetCards()
+                // CR 602.1 — "target creature you control" (no "another"
+                // exclusion); Mother of Runes is itself a legal target. The
+                // gatherer is CONTROLLER-SCOPED via a re-homeable
+                // ControllerScopedGatherer (not an `owner`-capturing closure)
+                // so RebindTo onto an Agatha's-Soul-Cauldron bearer re-scopes it
+                // to the BEARER's controller's board
+                // (agatha-mother-of-runes-style-candidate-gatherer-controller-rebind).
+                TargetRequest.ControllerScoped(
+                    description: "target creature you control",
+                    minTargets: 1,
+                    maxTargets: 1,
+                    controller: owner,
+                    select: (ctrl, _) => ctrl.Zones.Battlefield.GetCards()
                         .Where(c => c.HasType(CardType.Creature))
                         .Cast<object>()
-                        .ToList()),
+                        .ToList(),
+                    intent: BotIntent.Protection),
             },
             rebindSafe: true);
 

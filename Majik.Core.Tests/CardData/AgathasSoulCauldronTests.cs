@@ -2647,6 +2647,73 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —
+    // Mother of Runes' "{T}: Target creature YOU control gains protection …"
+    // is re-homed via RebindTo onto an Agatha's-Soul-Cauldron bearer. When the
+    // imprinted Mother is OWNED BY THE OPPONENT (Bob) but the bearer is
+    // controlled by Alice, the re-homed candidate gatherer must enumerate
+    // ALICE's board (the bearer's controller, CR 109.5 / 707.2), NOT Bob's
+    // (the exiled card owner's). Before the IRebindableGatherer seam the
+    // gatherer captured the exiled card's owner and gathered the wrong board.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_RebindsMotherOfRunes_GathererReadsBearerControllersBoard()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Mother of Runes is OWNED BY BOB (the opponent) and sits in his
+        // graveyard for the Cauldron to imprint. Its "you control"-scoped
+        // ability is RebindSafe, so it flows through the PRIMARY RebindTo path.
+        var mother = MotherOfRunesFactory.Create(bob);
+        bob.Zones.Graveyard.AddCard(mother);
+        mother.SetZone(ZoneType.Graveyard);
+        mother.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility).RebindSafe.Should().BeTrue();
+
+        // The bearer is ALICE's creature. Each player controls one creature so
+        // we can tell whose board the re-homed gatherer reads.
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var aliceAlly = new Creature("Alice Ally", "1G", 2, 2);
+        alice.Zones.Battlefield.AddCard(aliceAlly);
+        aliceAlly.SetZone(ZoneType.Battlefield);
+
+        var bobAlly = new Creature("Bob Ally", "1G", 2, 2);
+        bob.Zones.Battlefield.AddCard(bobAlly);
+        bobAlly.SetZone(ZoneType.Battlefield);
+
+        // Alice owns + controls the Cauldron; it imprints Bob's Mother of Runes.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), mother);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains Mother of Runes' protection-grant via RebindTo");
+        var grant = granted[0];
+        grant.Source.Should().BeSameAs(bearer, "re-homed onto the BEARER (CR 707.2)");
+
+        // The crux: the re-homed "target creature you control" gatherer reads
+        // ALICE's board (the bearer's controller), not Bob's (the exiled owner).
+        var candidates = grant.TargetRequests.Single().CandidateGatherer!(null!);
+        candidates.Should().Contain(bearer,
+            "the bearer is a creature its controller (Alice) controls");
+        candidates.Should().Contain(aliceAlly,
+            "the re-homed gatherer reads the BEARER controller's (Alice's) board");
+        candidates.Should().NotContain(bobAlly,
+            "the gatherer must NOT read the exiled card owner's (Bob's) board");
+        candidates.Should().NotContain(mother,
+            "the exiled Mother of Runes (Bob's) is not on the bearer controller's board");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-bespoke-resourcecontext-source-migration — a real BESPOKE
     // [CardName]-factory creature (Lotleth Troll) whose activated abilities
     // were migrated to read ResolutionContext.Source + marked RebindSafe now

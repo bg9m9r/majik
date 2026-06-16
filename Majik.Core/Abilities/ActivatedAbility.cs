@@ -272,7 +272,16 @@ public class ActivatedAbility : IActivatedAbility
                 })
                 : null,
             effects: _effects.Count > 0 ? _effects : null,
-            targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
+            // STAGE 1 (gatherer) — re-home each "... you control"-scoped
+            // candidate gatherer onto the NEW controller so a re-sourced
+            // "target creature YOU control" request gathers the bearer's
+            // controller's board, not the exiled card owner's
+            // (agatha-mother-of-runes-style-candidate-gatherer-controller-rebind).
+            // Requests with a static pool or a non-rebindable closure pass
+            // through unchanged (RebindController no-ops).
+            targetRequests: TargetRequests.Count > 0
+                ? TargetRequests.Select(r => r.RebindController(newController)).ToList()
+                : null,
             sorcerySpeed: IsSorcerySpeed,
             canActivateCheck: _canActivateCheck,
             rebindSafe: RebindSafe,

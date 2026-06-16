@@ -56,8 +56,67 @@ public sealed record TargetRequest(
     BotIntent Intent = BotIntent.None,
     Func<GameContext, IReadOnlyList<object>>? CandidateGatherer = null,
     int? PrintedMinTargets = null,
-    int? ModeIndex = null)
+    int? ModeIndex = null,
+    IRebindableGatherer? RebindableGatherer = null)
 {
+    /// <summary>
+    /// agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —
+    /// build a "... you control"-scoped request whose candidate gatherer is a
+    /// re-homeable <see cref="ControllerScopedGatherer"/> rather than a closure
+    /// that captures the controller. Both <see cref="CandidateGatherer"/> (so
+    /// every existing read path is unchanged) and
+    /// <see cref="RebindableGatherer"/> (so
+    /// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindTo"/> can re-scope
+    /// it onto a new bearer's controller) are wired from the SAME gatherer
+    /// object, keeping them in lockstep.
+    /// </summary>
+    public static TargetRequest ControllerScoped(
+        string description,
+        int minTargets,
+        int maxTargets,
+        Player controller,
+        Func<Player, GameContext?, IReadOnlyList<object>> select,
+        BotIntent intent = BotIntent.None,
+        int? printedMinTargets = null,
+        int? modeIndex = null)
+    {
+        var gatherer = new ControllerScopedGatherer(controller, select);
+        return new TargetRequest(
+            Description: description,
+            MinTargets: minTargets,
+            MaxTargets: maxTargets,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: intent,
+            CandidateGatherer: gatherer.Gather,
+            PrintedMinTargets: printedMinTargets,
+            ModeIndex: modeIndex,
+            RebindableGatherer: gatherer);
+    }
+
+    /// <summary>
+    /// agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —
+    /// return a copy of this request whose controller-scoped gatherer is
+    /// re-homed onto <paramref name="newController"/> (the new bearer's
+    /// controller). When this request carries a <see cref="RebindableGatherer"/>
+    /// its captured controller is swapped and BOTH
+    /// <see cref="CandidateGatherer"/> and <see cref="RebindableGatherer"/> are
+    /// re-derived from the re-homed gatherer; otherwise the request is returned
+    /// unchanged (a request with a static pool or a non-rebindable closure has
+    /// no controller to swap). Pure — never mutates this instance (CR 707.2 —
+    /// the copy is a separate object from the source ability's request).
+    /// </summary>
+    public TargetRequest RebindController(Player newController)
+    {
+        if (RebindableGatherer is null) return this;
+        var rebound = RebindableGatherer.RebindController(newController);
+        if (ReferenceEquals(rebound, RebindableGatherer)) return this;
+        return this with
+        {
+            CandidateGatherer = rebound.Gather,
+            RebindableGatherer = rebound,
+        };
+    }
+
     /// <summary>
     /// CR 601.2c — the PRINTED minimum this request demands when its mode is
     /// chosen. Defaults to <see cref="MinTargets"/> when not explicitly set,

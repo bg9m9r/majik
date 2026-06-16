@@ -163,4 +163,56 @@ public class MotherOfRunesTests
         candidates.Should().Contain(mother,
             "'target creature you control' includes Mother of Runes itself");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —
+    // when Mother of Runes' "target creature YOU control" ability is re-homed
+    // onto a new bearer controlled by a DIFFERENT player (Agatha's Soul
+    // Cauldron grant, CR 707.2 / 613.1f), the candidate gatherer must read the
+    // NEW controller's battlefield, not the exiled card's owner's. Before the
+    // IRebindableGatherer seam the gatherer captured `owner` and gathered the
+    // wrong player's board.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void MotherOfRunes_RebindTo_GathererReadsNewControllersBoard()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        // Mother of Runes owned + controlled by Alice (the would-be exiled card).
+        var mother = MotherOfRunesFactory.Create(alice);
+        alice.Zones.Battlefield.AddCard(mother);
+        mother.SetZone(ZoneType.Battlefield);
+
+        // Bob (the bearer's controller) controls a creature; Alice's board has
+        // ONLY Mother of Runes. A sound re-home must gather Bob's creature.
+        var bearer = MotherOfRunesFactory.Create(bob); // stand-in bearer creature
+        bob.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var aliceCreature = new Creature("Alice Bear", "1G", 2, 2);
+        alice.Zones.Battlefield.AddCard(aliceCreature);
+        aliceCreature.SetZone(ZoneType.Battlefield);
+
+        var bobCreature = new Creature("Bob Bear", "1G", 2, 2);
+        bob.Zones.Battlefield.AddCard(bobCreature);
+        bobCreature.SetZone(ZoneType.Battlefield);
+
+        var realAbility = mother.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Re-home onto the Bob-controlled bearer (what Agatha's grant does).
+        var rebound = realAbility.RebindTo(bearer, bob);
+
+        var candidates = rebound.TargetRequests.Single().CandidateGatherer!(null!);
+
+        candidates.Should().Contain(bobCreature,
+            "the re-homed 'target creature you control' gathers the NEW controller's board");
+        candidates.Should().Contain(bearer,
+            "the bearer itself is a creature the new controller controls");
+        candidates.Should().NotContain(aliceCreature,
+            "the gatherer must NOT read the exiled card owner's board after re-home");
+        candidates.Should().NotContain(mother,
+            "the original source's owner board is no longer the scope");
+    }
 }
