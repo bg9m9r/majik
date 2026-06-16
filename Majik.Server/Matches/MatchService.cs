@@ -1264,6 +1264,91 @@ public sealed class MatchService
     }
 
     // -----------------------------------------------------------------------
+    // OnEngineErrorAsync — engine game-loop faulted or hung (wedge supervision)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Terminal transition for an engine game-loop fault/hang: turns an
+    /// otherwise-silent wedge (the fire-and-forget loop faulting or never
+    /// returning between human submits) into a clean terminal
+    /// <see cref="MatchState.Errored"/> match plus a client surface.
+    ///
+    /// <para>Modelled on <see cref="OnTimeoutAsync"/>: idempotent load guard,
+    /// single CAS <c>Playing → Errored</c> via <see cref="RetryPolicy"/>, then
+    /// the same teardown (timer cancel, bridge detach, prefs evict) and a pair
+    /// of hub publishes. Unlike timeout there is NO winner — the match simply
+    /// ends in error.</para>
+    ///
+    /// <para>The CAS is the sole arbiter of the terminal transition, so a
+    /// concurrent concede/timeout/natural-end that already moved the match out
+    /// of Playing makes this a no-op (double-termination is impossible). The
+    /// triggering exception is logged here (server-side only) and is NEVER put
+    /// on any wire payload (info-leak posture).</para>
+    /// </summary>
+    public async Task OnEngineErrorAsync(
+        Guid matchId, EngineFaultReason reason, Exception? fault, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        // Idempotent: a concurrent Concede / Timeout / natural-end already
+        // terminated it (or it never existed). This is the double-termination
+        // guard — the CAS below is authoritative, this just avoids the wasted
+        // round-trip on the common miss.
+        if (match == null || match.State != MatchState.Playing) return;
+
+        // Server log is the ONLY place the exception detail lives — it never
+        // crosses the wire (see the publishes below).
+        _logger?.LogError(fault,
+            "Engine loop {Reason} — aborting match. MatchId={MatchId} GameId={GameId}",
+            reason, matchId, match.GameId);
+
+        var now = _clock.UtcNow;
+        var update = MongoDB.Driver.Builders<Match>.Update
+            .Set(m => m.State, MatchState.Errored)
+            .Set(m => m.UpdatedAt, now);
+
+        // Retry-with-backoff: this CAS is the only thing moving the match out
+        // of Playing on an engine fault. A transient Mongo blip here would
+        // strand the match in Playing forever (the loop is dead and won't fire
+        // again). The CAS filter (State==Playing) makes the retry idempotent:
+        // a lost-race retry that finds the match already terminal matches
+        // nothing and returns false — never a double-apply.
+        var moved = await RetryPolicy.ExecuteAsync(
+            c => _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, c),
+            _logger, $"OnEngineErrorAsync CAS (match {matchId})", ct);
+
+        // Teardown runs regardless of the CAS result (mirrors Concede #8): a
+        // CAS conflict means a concurrent terminal path already moved the
+        // match, but THIS replica still holds the timer + bridge + prefs and
+        // would leak them if we returned early. All three are idempotent, so a
+        // double-teardown across replicas is a no-op.
+        _timeoutScheduler?.Cancel(matchId);
+        // Match terminated by engine fault — no further engine traffic should
+        // surface on the hub. (Facade itself is left to MatchCleanup, exactly
+        // as OnTimeoutAsync does; the bridge just unhooks.)
+        _facadeBridge?.Detach(matchId);
+        // Terminal state — evict per-match auto-pass prefs (same posture as
+        // Concede / Timeout / Abandon).
+        _autoPassPrefs?.EvictMatch(matchId);
+
+        // Lost the race — a concurrent terminal path already published its own
+        // state-changed; don't emit a duplicate.
+        if (!moved) return;
+
+        _hub?.Publish(matchId, "match.engine-error", new
+        {
+            matchId,
+            reason = reason switch
+            {
+                EngineFaultReason.Fault => "engine-fault",
+                EngineFaultReason.Hang => "engine-hang",
+                _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unmapped EngineFaultReason"),
+            },
+        });
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Errored", transitionedAt = now });
+    }
+
+    // -----------------------------------------------------------------------
     // GetAsync
     // -----------------------------------------------------------------------
 
