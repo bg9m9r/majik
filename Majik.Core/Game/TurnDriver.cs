@@ -1215,6 +1215,29 @@ public sealed class TurnDriver
                 {
                     aa.SetChosenTargets(chosenTargets);
                 }
+
+                // CR 601.2d / CR 119.4 — for a "deals N damage divided as you
+                // choose among …" ACTIVATED ability, prompt the activating
+                // player's agent for the per-target split RIGHT AFTER targets are
+                // chosen (the same announcement ordering the spell + trigger paths
+                // use). The normalised split is recorded on the source ability and
+                // mirrored onto the stack copy by AbilityActivator, then threaded
+                // into ResolutionContext.DamageDivision at resolve time. A null spec
+                // / empty target slot records nothing, so the effect body falls
+                // back to an even split — behaviour-preserving for non-divided
+                // abilities and the no-agent dispatcher path.
+                if (aa.DamageDivision is { } divSpec
+                    && aa.Source is Majik.Core.Cards.ICard divSource)
+                {
+                    var slot = divSpec.TargetSlotIndex;
+                    var divTargets = slot >= 0 && slot < chosenTargets.Count
+                        ? chosenTargets[slot]
+                        : (IReadOnlyList<object>)Array.Empty<object>();
+                    var division = await Majik.Core.Players.Agents.DamageDivisionDefaults
+                        .PromptAsync(_agents[actor], ctx, divSource, divSpec.TotalDamage, divTargets, ct: default)
+                        .ConfigureAwait(false);
+                    aa.SetChosenDamageDivision(division);
+                }
             }
 
             // CR 700.6 / 701.17 — prompt the controller to choose WHICH creature
@@ -1335,10 +1358,30 @@ public sealed class TurnDriver
                 costs: null,
                 effects: loyalty.Effects,
                 targetRequests: loyalty.TargetRequests.Count > 0 ? loyalty.TargetRequests : null,
-                sorcerySpeed: true);
+                sorcerySpeed: true,
+                damageDivision: loyalty.DamageDivision);
             if (chosenTargets.Count > 0)
             {
                 stackObject.SetChosenTargets(chosenTargets);
+            }
+
+            // CR 601.2d / CR 119.4 — divide-damage announcement for a loyalty
+            // ability that deals N damage divided among its chosen targets. Prompt
+            // the activating player's agent for the per-target split right after
+            // targets are chosen, then record it on the stack object so resolution
+            // reads ResolutionContext.DamageDivision (even-split fallback when no
+            // spec / empty target slot). Mirrors DispatchActivate.
+            if (loyalty.DamageDivision is { } loyaltyDivSpec
+                && loyalty.Source is Majik.Core.Cards.ICard loyaltyDivSource)
+            {
+                var slot = loyaltyDivSpec.TargetSlotIndex;
+                var divTargets = slot >= 0 && slot < chosenTargets.Count
+                    ? chosenTargets[slot]
+                    : (IReadOnlyList<object>)Array.Empty<object>();
+                var division = await Majik.Core.Players.Agents.DamageDivisionDefaults
+                    .PromptAsync(_agents[actor], ctx, loyaltyDivSource, loyaltyDivSpec.TotalDamage, divTargets, ct: default)
+                    .ConfigureAwait(false);
+                stackObject.SetChosenDamageDivision(division);
             }
 
             _stack.Push(stackObject);

@@ -87,6 +87,17 @@ public sealed class LoyaltyAbility : IAbility
     public bool IsSorcerySpeed => true;
 
     /// <summary>
+    /// CR 601.2d / CR 119.4 — the "deals N damage divided as you choose among …"
+    /// announcement spec for a loyalty ability that divides damage among its
+    /// chosen targets (e.g. Chandra-style "deal N damage divided as you choose").
+    /// Carried as a template field (parallel to <see cref="TargetRequests"/>) and
+    /// copied onto the <see cref="ActivatedAbility"/> stack object the dispatch
+    /// path builds, so the live driver prompts the activating player's agent for
+    /// the per-target split. Null ⇒ the loyalty ability deals no divided damage.
+    /// </summary>
+    public Game.DamageDivisionSpec? DamageDivision { get; }
+
+    /// <summary>
     /// Stack-resolved constructor (preferred). The effects resolve off the
     /// stack; targeted effects read chosen targets / source from the live
     /// <see cref="ResolutionContext"/>.
@@ -95,7 +106,8 @@ public sealed class LoyaltyAbility : IAbility
         Permanent source,
         int loyaltyChange,
         IEnumerable<IEffect> effects,
-        IEnumerable<TargetRequest>? targetRequests = null)
+        IEnumerable<TargetRequest>? targetRequests = null,
+        Game.DamageDivisionSpec? damageDivision = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         LoyaltyChange = loyaltyChange;
@@ -103,6 +115,7 @@ public sealed class LoyaltyAbility : IAbility
         TargetRequests = targetRequests is null
             ? Array.Empty<TargetRequest>()
             : targetRequests.ToList().AsReadOnly();
+        DamageDivision = damageDivision;
     }
 
     /// <summary>
