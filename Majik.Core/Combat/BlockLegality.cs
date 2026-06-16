@@ -59,6 +59,17 @@ public static class BlockLegality
             return false;
         }
 
+        // CR 509.1b — "This creature can block only creatures with flying"
+        // (Brazen Borrower, Shacklegeist, Pinnacle Emissary's Drone token). The
+        // symmetric counterpart to the flyer check above: such a blocker may be
+        // declared only against a flying attacker.
+        if (CombatAbilities.CanBlockOnlyCreaturesWithFlying(blocker)
+            && !CombatAbilities.HasFlying(attacker))
+        {
+            reason = "blocker can block only creatures with flying; attacker has no flying";
+            return false;
+        }
+
         // CR 509.1b — any "can't be blocked except by …" restriction on the
         // attacker must be satisfied. Restrictions intersect: a would-be
         // blocker must satisfy EVERY active CantBeBlockedExceptByEffect

@@ -62,16 +62,16 @@ namespace Majik.Core.CardData.Factories;
 ///   than the caster (CR 109.5 — "an opponent" = not you) and excludes Land
 ///   (CR 305 — Land is a card type).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"This creature can block only creatures with flying"</b>: the engine
-///   has no combat-block-restriction primitive for "can only block X" yet —
-///   <see cref="Combat.CombatValidator.CanBlock"/> enforces the reverse
-///   (a flyer can only be blocked by flyers/reach) but not this "this blocker
-///   may only block flyers" rider. Documented as a known gap, identical to
-///   the Pinnacle Emissary Drone token's same printed clause (see
-///   <see cref="PinnacleEmissaryFactory"/>). Flying is stamped as a keyword
-///   marker; the restriction picks up for free once the "can only block X"
-///   primitive lands.
+/// - <b>"This creature can block only creatures with flying" (CR 509.1b)</b>:
+///   stamped as a <c>"CanBlockOnlyFlying"</c> <see cref="KeywordAbility"/>
+///   marker, read combat-side via
+///   <see cref="Combat.CombatAbilities.CanBlockOnlyCreaturesWithFlying"/>. Both
+///   <see cref="Combat.CombatValidator.CanBlock"/> and
+///   <see cref="Combat.BlockLegality.CanBlock"/> gate the block: Brazen
+///   Borrower may be declared as a blocker only against a flying attacker — the
+///   symmetric counterpart to the flyer-can-only-be-blocked-by-flyers/reach
+///   check. Shared with the Pinnacle Emissary Drone token + Shacklegeist (same
+///   printed clause).
 /// </summary>
 [CardName("Brazen Borrower")]
 public static class BrazenBorrowerFactory
@@ -85,6 +85,7 @@ public static class BrazenBorrowerFactory
 
     private const string FlashKeyword = "Flash";
     private const string FlyingKeyword = "Flying";
+    private const string CanBlockOnlyFlyingKeyword = "CanBlockOnlyFlying";
 
     /// <summary>
     /// Construct Brazen Borrower. The creature shape is materialised from the
@@ -111,6 +112,12 @@ public static class BrazenBorrowerFactory
         // CR 702.9 — Flying. Combat blocking restriction (can only be blocked
         // by flyers / reach).
         card.AddAbility(new KeywordAbility(FlyingKeyword, card, owner));
+
+        // CR 509.1b — "This creature can block only creatures with flying."
+        // The symmetric block restriction (read combat-side via
+        // CombatAbilities.CanBlockOnlyCreaturesWithFlying): Brazen Borrower may
+        // be declared as a blocker only against a flying attacker.
+        card.AddAbility(new KeywordAbility(CanBlockOnlyFlyingKeyword, card, owner));
 
         // CR 715 — attach the Petty Theft Adventure half for the cast
         // pipeline. The AdventureSpec carries the alternative characteristics

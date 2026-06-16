@@ -94,6 +94,30 @@ public class PinnacleEmissaryTests
         drone.Owner.Should().BeSameAs(_alice);
     }
 
+    [Fact]
+    public void DroneToken_CanBlockOnlyCreaturesWithFlying()
+    {
+        // CR 509.1b — "This token can block only creatures with flying."
+        var bob = new Player("Bob", 20);
+        var drone = PinnacleEmissaryFactory.CreateDroneToken(bob);
+        drone.SetController(bob);
+        drone.SetZone(ZoneType.Battlefield);
+
+        Majik.Core.Combat.CombatAbilities.CanBlockOnlyCreaturesWithFlying(drone)
+            .Should().BeTrue("the Drone carries the CanBlockOnlyFlying rider");
+
+        var validator = new Majik.Core.Combat.CombatValidator();
+
+        var ground = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Controller = _alice };
+        validator.CanBlock(drone, new Majik.Core.Combat.Attacker(ground, bob), bob)
+            .Should().BeFalse("the Drone can't block a non-flying attacker");
+
+        var flier = new Creature("Drake", "{2}{U}", 2, 2) { Controller = _alice };
+        flier.AddAbility(new KeywordAbility("Flying", flier, _alice));
+        validator.CanBlock(drone, new Majik.Core.Combat.Attacker(flier, bob), bob)
+            .Should().BeTrue("the Drone can block a flying attacker");
+    }
+
     // -----------------------------------------------------------------------
     // Cast-trigger effect — create a Drone token on artifact-spell cast
     // -----------------------------------------------------------------------

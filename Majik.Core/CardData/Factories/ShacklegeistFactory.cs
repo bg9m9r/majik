@@ -45,16 +45,15 @@ namespace Majik.Core.CardData.Factories;
 ///   battlefield controlled by an opponent (CR 608.2b), and taps it via
 ///   <see cref="Fx.Tap"/> (tapping an already-tapped permanent is a no-op,
 ///   CR 701.21b).
-///
-/// ## Deferred (v1 gaps)
-/// - <b>"This creature can block only creatures with flying"</b>: the engine
-///   has no combat-block-restriction primitive for "can only block X" yet —
-///   <see cref="Majik.Core.Combat.CombatValidator.CanBlock"/> enforces the
-///   reverse (a flyer can only be blocked by flyers/reach) but not this "this
-///   blocker may only block flyers" rider. Documented as a known gap, identical
-///   to the same printed clause on <see cref="BrazenBorrowerFactory"/>. Flying
-///   is stamped as a keyword marker; the restriction picks up for free once the
-///   "can only block X" primitive lands.
+/// - <b>"This creature can block only creatures with flying" (CR 509.1b)</b>:
+///   stamped as a <c>"CanBlockOnlyFlying"</c> <see cref="KeywordAbility"/>
+///   marker, read combat-side via
+///   <see cref="Majik.Core.Combat.CombatAbilities.CanBlockOnlyCreaturesWithFlying"/>.
+///   Both <see cref="Majik.Core.Combat.CombatValidator.CanBlock"/> and
+///   <see cref="Majik.Core.Combat.BlockLegality.CanBlock"/> gate it: Shacklegeist
+///   may be declared as a blocker only against a flying attacker — the symmetric
+///   counterpart to the flyer-can-only-be-blocked-by-flyers/reach check. Shared
+///   with <see cref="BrazenBorrowerFactory"/> + the Pinnacle Emissary Drone token.
 /// </summary>
 [CardName("Shacklegeist")]
 public static class ShacklegeistFactory
@@ -64,6 +63,7 @@ public static class ShacklegeistFactory
     public const int SpiritsToTap = 2;
 
     private const string FlyingKeyword = "Flying";
+    private const string CanBlockOnlyFlyingKeyword = "CanBlockOnlyFlying";
 
     private static readonly CardDefinition Definition =
         CardDefinitionLoader.FromEmbeddedResource(Slug);
@@ -84,6 +84,12 @@ public static class ShacklegeistFactory
         // CR 702.9 — Flying. Combat blocking restriction (can only be blocked
         // by flyers / reach).
         card.AddAbility(new KeywordAbility(FlyingKeyword, card, owner));
+
+        // CR 509.1b — "This creature can block only creatures with flying."
+        // The symmetric block restriction (read combat-side via
+        // CombatAbilities.CanBlockOnlyCreaturesWithFlying): Shacklegeist may be
+        // declared as a blocker only against a flying attacker.
+        card.AddAbility(new KeywordAbility(CanBlockOnlyFlyingKeyword, card, owner));
 
         // CR 602 — "Tap two untapped Spirits you control: Tap target creature
         // you don't control." Layered on here because the JSON ability schema

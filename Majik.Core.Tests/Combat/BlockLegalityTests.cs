@@ -42,6 +42,29 @@ public class BlockLegalityTests
     }
 
     [Fact]
+    public void CanBlockOnlyFlying_CannotBlockGroundAttacker()
+    {
+        // CR 509.1b — "This creature can block only creatures with flying."
+        var ground = Make("Bear", null, _alice);
+        var restricted = Make("Brazen Borrower", "Flying", _bob);
+        restricted.AddAbility(new KeywordAbility("CanBlockOnlyFlying", restricted, _bob));
+
+        BlockLegality.CanBlock(blocker: restricted, attacker: ground, out var reason).Should().BeFalse();
+        reason.Should().Contain("only creatures with flying");
+    }
+
+    [Fact]
+    public void CanBlockOnlyFlying_CanBlockFlyingAttacker()
+    {
+        // CR 509.1b — the restricted blocker MAY block a flying attacker.
+        var flier = Make("Drake", "Flying", _alice);
+        var restricted = Make("Brazen Borrower", "Flying", _bob);
+        restricted.AddAbility(new KeywordAbility("CanBlockOnlyFlying", restricted, _bob));
+
+        BlockLegality.CanBlock(restricted, flier, out _).Should().BeTrue();
+    }
+
+    [Fact]
     public void Defender_CannotAttack()
     {
         var wall = Make("Wall", "Defender", _alice);
