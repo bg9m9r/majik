@@ -125,13 +125,17 @@ public static class SedgemoorWitchFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 702.111 — Menace. CR 702.21 — Ward (printed: "Pay 3 life").
-        // Both shipped as keyword markers consumed by CombatValidator and the
-        // Ward-trigger primitive (same wiring as Sire of Seven Deaths). The
-        // functional life-payment rider is exposed via BuildWardEffect /
-        // WardEffect.Resolve.
+        // CR 702.111 — Menace. CR 702.21 — Ward—Pay 3 life. Menace is a
+        // keyword marker consumed by CombatValidator; Ward gets the marker PLUS
+        // the real battlefield-attached triggered ability ("Whenever this
+        // creature becomes the target of a spell or ability an opponent
+        // controls, counter it unless its controller pays 3 life") wired off
+        // the shared WardTriggerWiring helper from the bound WardEffect
+        // (PayLifeCost(3), a non-mana ward — CR 702.21c).
         card.AddAbility(new KeywordAbility("Menace", card, owner));
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(
+            BuildWardEffect(card), owner, triggers: triggers);
 
         // CR 603.1 — Magecraft (cast half): "Whenever you cast … an instant or
         // sorcery spell, create a 1/1 black and green Pest creature token with

@@ -437,6 +437,19 @@ public sealed class SpellCastFlow
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 
+        // CR 115.6 / 603.6c / 702.21e — once targets are locked (CR 601.2c) the
+        // chosen objects "become the target of" this spell. Broadcast that fact
+        // so battlefield-attached "becomes the target of a spell or ability an
+        // opponent controls" triggers fire on the live cast path — Ward
+        // (CR 702.21), Bonecrusher Giant / Goldspan Dragon's "becomes the
+        // target" pings, and the rest of the becomes-targeted family. The
+        // legacy SpellCaster service published this; the live engine routes
+        // every cast through SpellCastFlow, so without this the whole
+        // becomes-targeted family was dead on the real engine. Only fire when
+        // the spell actually chose at least one target (CR 115.6 — a spell with
+        // no targets never "becomes targeted").
+        PublishTargetsChosen(spell, collectedTargets);
+
         // Clear the pending-targets stamp — once the spell is on the stack,
         // ChosenSpellParams.Targets is authoritative.
         if (card is Card concreteToClear)
@@ -470,6 +483,53 @@ public sealed class SpellCastFlow
 
         return spell;
     }
+
+    /// <summary>
+    /// CR 115.6 / 603.6c — broadcast a <see cref="TargetsChosenEvent"/> for the
+    /// freshly-pushed <paramref name="spell"/> so "becomes the target of a
+    /// spell" triggered abilities (Ward — CR 702.21e, Bonecrusher Giant, …)
+    /// fire on the live cast path. The raw chosen objects (per-slot, CR 601.2c)
+    /// are wrapped into <see cref="ITarget"/>s by runtime kind. No-op when the
+    /// spell chose no targets (CR 115.6 — an untargeted spell never "becomes
+    /// targeted").
+    /// </summary>
+    private void PublishTargetsChosen(
+        Spells.Spell spell,
+        IReadOnlyList<IReadOnlyList<object>> collectedTargets)
+    {
+        if (collectedTargets is null || collectedTargets.Count == 0) return;
+
+        var targets = new List<Majik.Core.Targeting.ITarget>();
+        foreach (var slot in collectedTargets)
+        {
+            if (slot is null) continue;
+            foreach (var obj in slot)
+            {
+                var wrapped = WrapTarget(obj);
+                if (wrapped != null) targets.Add(wrapped);
+            }
+        }
+
+        if (targets.Count == 0) return;
+
+        _eventBus.Publish(new TargetsChosenEvent(spell, targets));
+    }
+
+    /// <summary>
+    /// Wrap a raw chosen-target object (CR 601.2c) into the engine's
+    /// <see cref="Majik.Core.Targeting.Target"/> abstraction by runtime kind so
+    /// the <see cref="TargetsChosenEvent"/> consumers (the becomes-targeted
+    /// trigger predicates) can read <c>TargetType</c> + <c>TargetObject</c>.
+    /// Returns null for an unrecognised shape (defensive — never block the cast).
+    /// </summary>
+    private static Majik.Core.Targeting.Target? WrapTarget(object obj) => obj switch
+    {
+        Permanent perm => Majik.Core.Targeting.Target.Permanent(perm),
+        Player player => Majik.Core.Targeting.Target.Player(player),
+        Spells.ISpell s => Majik.Core.Targeting.Target.Spell(s),
+        ICard card => Majik.Core.Targeting.Target.Card(card),
+        _ => null,
+    };
 
     // ---------------------------------------------------------------------
     // Per-step helpers — one extraction per CR 601.2 sub-rule (plus the

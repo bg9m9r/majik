@@ -129,13 +129,18 @@ public static class TolarianTerrorFactory
                 "sorcery card in your graveyard."));
 
         // ----------------------------------------------------------------
-        // Ward {3} (CR 702.21) — marker keyword. WardEffect exists as a
-        // standalone helper (BuildWardEffect bounds an instance to the
-        // live card) but the battlefield-attached triggered-ability
-        // surface is deferred — see class xmldoc. Same posture as Kappa
-        // Cannoneer / Reality Smasher.
+        // Ward {3} (CR 702.21) — marker keyword PLUS the real battlefield-
+        // attached triggered ability ("Whenever this creature becomes the
+        // target of a spell or ability an opponent controls, counter it
+        // unless its controller pays {3}"), wired off the shared
+        // WardTriggerWiring helper from the bound WardEffect. The trigger is
+        // attached to the card shape; TriggerManager auto-registers it when
+        // the card crosses onto the battlefield (CR 603.6a), so the ward
+        // fires on the live TargetsChosenEvent. Same posture as Reality
+        // Smasher.
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(BuildWardEffect(card), owner);
 
         return card;
     }
