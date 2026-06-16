@@ -30,6 +30,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseYesNoCommand), "chooseYesNo")]
 [JsonDerivedType(typeof(ChooseFromRevealedCommand), "chooseFromRevealed")]
 [JsonDerivedType(typeof(ChoiceCommand), "choice")]
+[JsonDerivedType(typeof(ChooseDamageDivisionCommand), "chooseDamageDivision")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -218,3 +219,35 @@ public sealed record ChoiceCommand(
     string Kind,
     IReadOnlyList<Guid> SelectedInstanceIds,
     bool YesNo = false) : GameCommand;
+
+/// <summary>
+/// CR 601.2d / CR 119.4 — response to a divided-damage allocation prompt
+/// (<see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseDamageDivisionAsync"/>).
+/// Used by Inferno Titan, Fury, Avacyn's Judgment, Arc Lightning and the rest
+/// of the "deals N damage divided as you choose among …" family.
+/// <para>
+/// <see cref="Allocations"/> carries one
+/// <see cref="DamageDivisionAllocationDto"/> per chosen target (the targets the
+/// prompt shipped on <see cref="Majik.Core.Api.Dtos.DamageDivisionViewDto.Targets"/>),
+/// each pairing the target's id with the amount the player assigned it. The
+/// engine maps each allocation back to its target SLOT by id (so client row
+/// order doesn't matter), fills any omitted target with 0, then defensively
+/// normalises the per-slot split — each target gets at least 1 and the amounts
+/// sum to exactly the printed total (CR 119.4) — so a malformed wire payload
+/// can never deal more or fewer than the printed damage.
+/// </para>
+/// </summary>
+public sealed record ChooseDamageDivisionCommand(
+    IReadOnlyList<DamageDivisionAllocationDto> Allocations) : GameCommand;
+
+/// <summary>
+/// CR 119.4 — one per-target amount in a
+/// <see cref="ChooseDamageDivisionCommand"/>. <see cref="TargetId"/> is the
+/// chosen target's id (a <c>Permanent.InstanceId</c>, or a <c>Player.Id</c>
+/// for a player target — exactly the id the prompt shipped on
+/// <see cref="Majik.Core.Api.Dtos.DamageDivisionTargetDto.TargetId"/>);
+/// <see cref="Amount"/> is the damage the player assigned it.
+/// </summary>
+public sealed record DamageDivisionAllocationDto(
+    Guid TargetId,
+    int Amount);

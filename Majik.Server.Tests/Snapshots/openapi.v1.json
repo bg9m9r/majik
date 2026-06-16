@@ -746,6 +746,70 @@
         ],
         "type": "object"
       },
+      "DamageDivisionAllocationDto": {
+        "properties": {
+          "amount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "targetId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetId",
+          "amount"
+        ],
+        "type": "object"
+      },
+      "DamageDivisionTargetDto": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "targetId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "DamageDivisionViewDto": {
+        "properties": {
+          "sourceCardName": {
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/DamageDivisionTargetDto"
+            },
+            "type": "array"
+          },
+          "totalDamage": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "sourceCardName",
+          "totalDamage",
+          "targets"
+        ],
+        "type": "object"
+      },
       "DeckCardEntryDto": {
         "properties": {
           "count": {
@@ -1016,6 +1080,9 @@
           },
           {
             "$ref": "#/components/schemas/GameCommandChoiceCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseDamageDivisionCommand"
           }
         ],
         "discriminator": {
@@ -1029,6 +1096,7 @@
             "cancelCast": "#/components/schemas/GameCommandCancelCastCommand",
             "cast": "#/components/schemas/GameCommandCastSpellCommand",
             "choice": "#/components/schemas/GameCommandChoiceCommand",
+            "chooseDamageDivision": "#/components/schemas/GameCommandChooseDamageDivisionCommand",
             "chooseFromRevealed": "#/components/schemas/GameCommandChooseFromRevealedCommand",
             "chooseLibraryPick": "#/components/schemas/GameCommandChooseLibraryPickCommand",
             "chooseSurveil": "#/components/schemas/GameCommandChooseSurveilCommand",
@@ -1243,6 +1311,29 @@
         },
         "required": [
           "cardInstanceIds"
+        ]
+      },
+      "GameCommandChooseDamageDivisionCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "chooseDamageDivision"
+            ],
+            "type": "string"
+          },
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/DamageDivisionAllocationDto"
+            },
+            "type": "array"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allocations"
         ]
       },
       "GameCommandChooseFromRevealedCommand": {
@@ -2027,6 +2118,16 @@
               },
               {
                 "$ref": "#/components/schemas/ChoiceViewDto"
+              }
+            ]
+          },
+          "damageDivisionView": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DamageDivisionViewDto"
               }
             ]
           },

@@ -43,6 +43,20 @@ public sealed class OpenApiContractDriftTests : IClassFixture<WebApplicationFact
     {
         var emitted = await FetchEmittedContractAsync();
 
+        // Regen escape hatch (mirrors MAJIK_REGEN_JSON_PARITY for the carddef
+        // golden digest): set MAJIK_REGEN_OPENAPI=1 to overwrite the committed
+        // snapshot with the freshly-normalized emitted document, then re-run
+        // without the flag to confirm green. Keeps "regenerate the snapshot" a
+        // single command (`MAJIK_REGEN_OPENAPI=1 dotnet test --filter
+        // EmittedOpenApiDocument_MatchesCommittedSnapshot`) instead of a manual
+        // curl-and-normalize. Never set in CI, so the gate still fails on
+        // unintended drift.
+        if (Environment.GetEnvironmentVariable("MAJIK_REGEN_OPENAPI") == "1")
+        {
+            await File.WriteAllTextAsync(SnapshotPath, emitted);
+            return;
+        }
+
         File.Exists(SnapshotPath).Should().BeTrue(
             $"the committed OpenAPI snapshot must exist at {SnapshotPath}. " +
             RegenInstructions());
