@@ -253,6 +253,11 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     public Guid ActivePlayerId => (_currentActivePlayer ?? _priority.CurrentPlayer ?? _alice).Id;
 
+    // Read-only turn/phase context for fault-log diagnostics (e.g. OnEngineErrorAsync).
+    // Pure exposure of the existing TurnStarted/StepStarted-fed fields; no behavior change.
+    public int CurrentTurn => _currentTurn;
+    public StepStateType CurrentPhase => _currentPhase;
+
     /// <summary>
     /// The game's replacement-effect bus. Binders (e.g. ShockLandBinder)
     /// register handlers here during deck load; ZoneService reads from it on
