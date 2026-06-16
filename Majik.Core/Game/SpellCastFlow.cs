@@ -249,6 +249,16 @@ public sealed class SpellCastFlow
         // discard / sacrifice / exile rider is paid (CR 731.1 rewind).
         var mergedAdditional = BuildAndPrecheckAdditionalCosts(definition, additionalCosts, caster);
 
+        // CR 702.51 — cast-time Convoke creature-tap prompt. When the card
+        // carries a "Convoke" keyword marker and the caller did NOT already
+        // supply a ConvokeAdditionalCost (the bot probe path pre-builds one),
+        // ask the caster's agent which untapped creatures they control to tap.
+        // The chosen creatures fold into mergedAdditional as a ConvokeAdditionalCost
+        // so the CR 601.2h payment loop taps them and ComputeAndApplyTotalCost
+        // applies the pip reduction. Runs BEFORE total-cost determination so the
+        // reduced cost reaches the mana prompt + payManaCost callback.
+        await PromptForConvokeAsync(card, caster, ctx, agent, mergedAdditional, ct);
+
         // CR 701.59 — Gift cast-time prompt (must run BEFORE target collection
         // because Gift spells upgrade their target predicate when promised).
         var giftRecipient = await PromptForGiftRecipientAsync(card, caster, ctx, agent, ct);
@@ -605,6 +615,66 @@ public sealed class SpellCastFlow
 
         return mergedAdditional;
     }
+
+    /// <summary>
+    /// CR 702.51 — cast-time Convoke prompt. If <paramref name="card"/> carries
+    /// a <see cref="KeywordAbility"/>("Convoke") marker AND no
+    /// <see cref="ConvokeAdditionalCost"/> is already in
+    /// <paramref name="mergedAdditional"/> (the bot probe / test pre-selection
+    /// path supplies one), prompt the caster's agent — via the declarative
+    /// <see cref="IPlayerAgent.ChooseAsync"/> sink, a <see cref="ChoiceKind.PickN"/>
+    /// over the caster's untapped creatures — for the creatures to tap. The
+    /// resulting <see cref="ConvokeAdditionalCost"/> is appended to
+    /// <paramref name="mergedAdditional"/> so the downstream CR 601.2h payment
+    /// loop taps the creatures (CR 702.51a) and
+    /// <see cref="ComputeAndApplyTotalCost"/> applies the pip reduction
+    /// (CR 702.51b). Declining (empty pick) is legal — convoke is optional
+    /// (CR 702.51 — "can help"); the spell is then cast at its printed cost.
+    /// No-op for any spell without the Convoke marker.
+    /// </summary>
+    private static async Task PromptForConvokeAsync(
+        ICard card,
+        Player caster,
+        GameContext ctx,
+        IPlayerAgent agent,
+        List<IAdditionalCost> mergedAdditional,
+        CancellationToken ct)
+    {
+        // Only convoke-marked spells, and only when the caller hasn't already
+        // baked the selection (probe path) — avoid double-tapping.
+        if (!HasConvokeMarker(card)) return;
+        if (mergedAdditional.OfType<ConvokeAdditionalCost>().Any()) return;
+
+        var pool = ConvokeAdditionalCost.AvailableCreatures(caster);
+        if (pool.Count == 0) return;
+
+        // CR 702.51 — optional PickN over the caster's untapped creatures.
+        // Min 0 (decline allowed), Max = whole pool.
+        var request = new ChoiceRequest(
+            ChoiceKind.PickN,
+            $"Convoke {card.Name} — choose creatures to tap (CR 702.51)",
+            Min: 0,
+            Max: pool.Count,
+            Candidates: pool.Cast<object>().ToList(),
+            Intent: BotIntent.None,
+            Optional: true);
+
+        var chosenRaw = await agent.ChooseAsync(ctx, request, ct).ConfigureAwait(false);
+        var chosen = chosenRaw.OfType<Creature>().Distinct().ToList();
+        if (chosen.Count == 0) return;
+
+        mergedAdditional.Add(new ConvokeAdditionalCost(card, chosen));
+    }
+
+    /// <summary>CR 702.51 helper — does <paramref name="card"/> carry a
+    /// <see cref="KeywordAbility"/>("Convoke") marker? Mirrors
+    /// <see cref="HasUncounterableMarker"/> and the bot probe's detector
+    /// (<see cref="Players.Agents.ConvokeAltCostProbe.DefaultIsConvokeCard"/>).
+    /// Case-insensitive.</summary>
+    private static bool HasConvokeMarker(ICard card) =>
+        card.Abilities
+            .OfType<KeywordAbility>()
+            .Any(k => string.Equals(k.Keyword, "Convoke", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>CR 601.2h — pay every accumulated non-mana additional cost
     /// (discard / sacrifice / exile / pay-life riders, plus any escalate
