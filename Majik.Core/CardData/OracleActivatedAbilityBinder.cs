@@ -5,9 +5,15 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
+using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
+using Majik.Core.Services;
+using Majik.Core.StateMachine;
+using Majik.Core.Tokens;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData;
@@ -100,6 +106,23 @@ namespace Majik.Core.CardData;
 ///     reconstructed (a restricted filter like "target creature you don't
 ///     control" is skipped, consistent with the pinger's restricted-target
 ///     boundary). Creature-only (only a creature can fight).</item>
+///   <item><b>Token-copy-of-target (hasty copy)</b> —
+///     <c>"{cost}: Create a token that's a copy of (another) target nonlegendary
+///     creature you control, except it has haste. Sacrifice it at the beginning
+///     of the next end step."</c> Kiki-Jiki, Mirror Breaker / Reflection of
+///     Kiki-Jiki's shape (CR 707.2 copy / 702.10 haste / 603.7 delayed sacrifice
+///     / 701.16). Rebuilt with a 1..1 <see cref="TargetRequest"/>; on resolution
+///     the BEARER's CONTROLLER (read off the live
+///     <see cref="ResolutionContext.Source"/> / <see cref="ResolutionContext.Controller"/>)
+///     mints a copy of the CHOSEN target — copiable values snapshotted per
+///     CR 706.2 (name, base P/T, subtypes, keyword names, colour) — with haste
+///     added, and a one-shot end-step sacrifice scheduled via the ambient
+///     <see cref="TriggerManagerRegistry"/>. Sound to re-home: the BEARER is only
+///     the source / cost-payer; the "another" / "nonlegendary" / "you control"
+///     restrictions gate at resolve (CR 608.2b) measured against the live source +
+///     controller, so the copy means "a creature the BEARER's controller controls"
+///     — never the exiled imprinted card. Mirrors the bespoke
+///     <see cref="Factories.KikiJikiMirrorBreakerFactory"/>'s re-home posture.</item>
 ///   <item><b>Tap / untap target</b> —
 ///     <c>"{cost}: Tap target creature."</c> /
 ///     <c>"{cost}: Untap target creature."</c> Rebuilt with a 1..1
@@ -584,6 +607,34 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*This creature fights target creature\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Create a token that's a copy of (another) target nonlegendary
+    // creature you control, except it has haste. Sacrifice it at the beginning of
+    // the next end step." (CR 707.2 token copy / 702.10 haste / 603.7 delayed
+    // sacrifice.) Kiki-Jiki, Mirror Breaker's "{T}: …" line and Reflection of
+    // Kiki-Jiki's "{1}, {T}: …another target…" line — the canonical "make a
+    // hasty copy of a creature you control" payoff. Re-source-safe to reconstruct:
+    // the BEARER is ONLY the source / cost-payer (its own {T}/mana cost); the
+    // token copies the CHOSEN target (a creature read off ChosenTargets) and
+    // enters under the BEARER's CONTROLLER (read off the live source at resolve),
+    // never the exiled imprinted card. The printed restrictions
+    // (another / nonlegendary / you-control / still on the battlefield) gate at
+    // RESOLVE (CR 608.2b), measured against the live bearer + its controller — so
+    // the re-homed copy means "another nonlegendary creature the BEARER's
+    // controller controls" (exactly the bespoke KikiJikiMirrorBreakerFactory's
+    // re-home posture). The optional printed "another" (CR 601.2c "another" =
+    // "different from the source") is captured so resolve can exclude the bearer.
+    // The token gains haste (CR 702.10 / "except it has haste") even when the
+    // original lacks it, and the spawn schedules a one-shot end-step sacrifice
+    // (CR 603.7 / 701.16) via the ambient TriggerManagerRegistry — shape-only
+    // paths with no live manager skip the sacrifice (the token still entered),
+    // matching the bespoke factory's two-mode posture. Group 1 = cost, group 2 =
+    // the optional "another " prefix.
+    private static readonly Regex TokenCopyOfTargetRegex = new(
+        @"^(" + CostList + @")\s*:\s*Create a token that's a copy of (another )?"
+        + @"target nonlegendary creature you control, except it has haste\.\s*"
+        + @"Sacrifice it at the beginning of the next end step\.$",
+        RegexOptions.IgnoreCase);
+
     // The OPEN, source-independent permanent-target forms a "Destroy/Exile
     // target <X>." ability may reference. Each maps to an unambiguous card-type
     // membership predicate with NO dependence on the source card's identity, so
@@ -992,6 +1043,17 @@ public static class OracleActivatedAbilityBinder
                 if (costs == null) continue; // unsound cost token — skip
                 var ability = BuildFight(costs, bearer, controller);
                 if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var tokenCopy = TokenCopyOfTargetRegex.Match(line);
+            if (tokenCopy.Success)
+            {
+                var costs = TryBuildCostList(tokenCopy.Groups[1].Value, bearer, controller);
+                if (costs == null) continue; // unsound cost token — skip
+                var requireAnother = tokenCopy.Groups[2].Success
+                    && tokenCopy.Groups[2].Value.Trim().Length > 0;
+                result.Add(BuildTokenCopyOfTarget(costs, requireAnother, bearer, controller));
                 continue;
             }
 
@@ -2210,6 +2272,160 @@ public static class OracleActivatedAbilityBinder
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal),
+            });
+
+        return ability;
+    }
+
+    /// <summary>
+    /// Build a token-copy-of-target ability:
+    /// "{cost}: Create a token that's a copy of (another) target nonlegendary
+    /// creature you control, except it has haste. Sacrifice it at the beginning of
+    /// the next end step." (CR 707.2 / 702.10 / 603.7 / 701.16.) Kiki-Jiki, Mirror
+    /// Breaker / Reflection of Kiki-Jiki's shape. Re-homed so the BEARER is ONLY
+    /// the source / cost-payer: the token copies the CHOSEN target (read off the
+    /// resolving <see cref="ResolutionContext"/>) and enters under the BEARER's
+    /// CONTROLLER (read off the live <see cref="ResolutionContext.Source"/> /
+    /// <see cref="ResolutionContext.Controller"/>, falling back to the captured
+    /// bearer/controller on the legacy synchronous path) — never the exiled
+    /// imprinted card. The printed restrictions are re-checked at RESOLVE
+    /// (CR 608.2b): the chosen target must still be a battlefield, nonlegendary
+    /// creature the live controller controls, and — when the printed
+    /// <paramref name="requireAnother"/> "another" rider is present (CR 601.2c) —
+    /// must not be the bearer itself. The token gains haste (CR 702.10 / "except it
+    /// has haste") and clears summoning sickness (CR 702.10b); the spawn schedules
+    /// a one-shot end-step sacrifice (CR 603.7 / 701.16) via the ambient
+    /// <see cref="TriggerManagerRegistry"/> (shape-only paths with no live manager
+    /// skip the sacrifice — the token still entered). The token enters via the
+    /// ambient <see cref="ZoneServiceRegistry"/> when one is wired so token-ETB
+    /// triggers (Impact Tremors / Soul Warden) fire, else via a raw zone add. The
+    /// bearer need NOT be a creature (any permanent bearer can pay to mint the
+    /// copy), so this does not gate on <see cref="Creature"/>. v1 lossy: copiable
+    /// values are snapshotted at resolve (name, base P/T, subtypes, keyword names,
+    /// colour) — the same posture as the bespoke
+    /// <see cref="Factories.KikiJikiMirrorBreakerFactory"/> and Splinter Twin.
+    /// </summary>
+    private static ActivatedAbility BuildTokenCopyOfTarget(
+        List<ICost> costs,
+        bool requireAnother,
+        Permanent bearer,
+        Player controller)
+    {
+        ActivatedAbility? ability = null;
+        var description = requireAnother
+            ? "Granted: create a haste token copy of another target nonlegendary creature you control, sacrifice it EOT"
+            : "Granted: create a haste token copy of target nonlegendary creature you control, sacrifice it EOT";
+
+        var copyEffect = new Effect(
+            description,
+            ctx =>
+            {
+                // Read the chosen target off the resolving context, falling back to
+                // the ability's recorded ChosenTargets for the legacy sync path.
+                var chosen = ctx.ChosenTargets.Count > 0
+                    ? ctx.ChosenTargets
+                    : (ability?.ChosenTargets
+                        ?? (IReadOnlyList<IReadOnlyList<object>>)Array.Empty<IReadOnlyList<object>>());
+                if (chosen.Count == 0 || chosen[0].Count == 0) return ValueTask.CompletedTask;
+                if (chosen[0][0] is not Creature original) return ValueTask.CompletedTask;
+
+                // The live source after an Agatha RebindTo (= the bearer); the
+                // captured bearer/controller are the ctx-less Execute() fallback.
+                var self = (ctx.Source as Permanent) ?? bearer;
+                var liveController = ctx.Controller ?? self.Controller ?? controller;
+
+                // CR 608.2b — resolve-time legality recheck, measured against the
+                // live source + controller (so under Agatha the re-home means
+                // "another nonlegendary creature the BEARER's controller controls").
+                if (original.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                if (requireAnother && ReferenceEquals(original, self)) return ValueTask.CompletedTask;  // "another"
+                if (original.HasSupertype(CardSupertype.Legendary)) return ValueTask.CompletedTask;     // "nonlegendary"
+                if (!ReferenceEquals(original.Controller, liveController)) return ValueTask.CompletedTask; // "you control"
+
+                // CR 706.2 — snapshot copiable values: name, base P/T, subtypes,
+                // keyword names, colour identity. v1 lossy (does not track later
+                // changes to the original — same posture as the bespoke factory).
+                var keywords = new List<string>(
+                    original.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword));
+                if (!keywords.Contains("Haste")) keywords.Add("Haste"); // CR 702.10
+
+                var colours = CardColors.GetColors(original).ToList();
+
+                var spec = new TokenFactory.TokenSpec(
+                    Name: original.Name,
+                    Power: original.BasePower,
+                    Toughness: original.BaseToughness,
+                    Subtypes: original.Subtypes.ToList(),
+                    Keywords: keywords,
+                    Colors: colours);
+
+                // CR 701.21 — prefer the ambient ZoneService (token-ETB triggers
+                // fire) when wired; else TokenFactory falls back to a raw zone add.
+                var zones = ZoneServiceRegistry.Get(liveController);
+                var token = TokenFactory.CreateOnBattlefield(spec, liveController, zones);
+
+                // CR 702.10b — haste lets the token act immediately.
+                token.HasSummoningSickness = false;
+
+                // CR 603.7 / 701.16 — schedule the one-shot end-step sacrifice of
+                // the spawned token. The live game's TriggerManager comes from the
+                // ambient registry (the binder has no triggers parameter). A
+                // shape-only path (no manager) skips the sacrifice — the token
+                // still entered, matching the bespoke factory's two-mode posture.
+                var triggers = TriggerManagerRegistry.Get();
+                if (triggers != null)
+                {
+                    var resolvedAt = LogicalClockScope.Current.NextTimestamp();
+                    var sacEffect = new Effect(
+                        "Granted: sacrifice the token copy at the next end step (CR 701.16)",
+                        () =>
+                        {
+                            // CR 603.7 / 701.16 — only act on the token if it is
+                            // still a battlefield permanent its controller controls.
+                            if (token.Zone != ZoneType.Battlefield) return;
+                            var owner = token.Controller ?? liveController;
+                            if (!owner.Zones.Battlefield.GetCards().Contains(token)) return;
+                            var sacZones = ZoneServiceRegistry.Get(owner);
+                            if (sacZones != null)
+                            {
+                                sacZones.MoveCard(token, ZoneType.Battlefield, ZoneType.Graveyard, owner);
+                            }
+                            else
+                            {
+                                owner.Zones.Battlefield.RemoveCard(token);
+                                token.SetZone(ZoneType.Graveyard);
+                            }
+                        });
+
+                    var delayed = new DelayedTriggeredAbility(
+                        source: self,
+                        controller: liveController,
+                        condition: new EventTriggerCondition<StepStartedEvent>(
+                            (e, _) => e.StepType == StepStateType.End
+                                      && e.Timestamp > resolvedAt),
+                        effects: new IEffect[] { sacEffect });
+
+                    triggers.RegisterDelayed(delayed);
+                }
+
+                return ValueTask.CompletedTask;
+            });
+
+        ability = new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { copyEffect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: requireAnother
+                        ? "another target nonlegendary creature you control"
+                        : "target nonlegendary creature you control",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Buff),
             });
 
         return ability;

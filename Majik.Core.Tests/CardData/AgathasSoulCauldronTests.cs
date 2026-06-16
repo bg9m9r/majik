@@ -3258,6 +3258,187 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public async Task Grant_NonMana_TokenCopyOfTarget_RehomesToBearer_MintsHasteCopyUnderBearersController()
+    {
+        // agatha-oracle-shape-copy-another-target-creature: the
+        // OracleActivatedAbilityBinder now reconstructs Kiki-Jiki's token-copy
+        // oracle shape "{cost}: Create a token that's a copy of (another) target
+        // nonlegendary creature you control, except it has haste. Sacrifice it at
+        // the beginning of the next end step." (CR 707.2 / 702.10 / 603.7). The
+        // imprinted creature carries the line ONLY as oracle text (no RebindSafe
+        // engine ability), so it flows through the oracle-rebuild FALLBACK rather
+        // than the bespoke Kiki RebindTo path. Re-homing is sound: the BEARER is
+        // only the source / cost-payer; the token copies the CHOSEN target (a
+        // nonlegendary creature the BEARER's controller controls), gains haste,
+        // and enters under the BEARER's controller — never the exiled imprinted
+        // card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature: an oracle-only stub with Kiki-Jiki's printed line.
+        var kikiStub = new Creature("Kiki Stub", "2RRR", 2, 2);
+        kikiStub.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(kikiStub);
+        kikiStub.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Kiki Stub",
+                "{T}: Create a token that's a copy of target nonlegendary creature "
+                + "you control, except it has haste. Sacrifice it at the beginning "
+                + "of the next end step.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), kikiStub);
+
+        var copyAbility = GrantedActivated(bearer).Single(a =>
+            a.TargetRequests.Any(t => t.Description.Contains("nonlegendary creature you control")));
+        copyAbility.Source.Should().BeSameAs(bearer, "the token-copy ability is re-homed to the BEARER");
+
+        // Another creature the bearer's controller controls — the copy target.
+        var original = new Creature("Grizzly Bears", "1G", 2, 2);
+        original.SetOwner(alice);
+        original.SetController(alice);
+        original.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(original);
+
+        var bfBefore = alice.Zones.Battlefield.GetCards().Count();
+
+        copyAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { original } });
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(bus));
+        await copyAbility.ResolveAsync(agent: null, game: game);
+
+        var minted = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken && c.Name == "Grizzly Bears")
+            .ToList();
+        minted.Should().HaveCount(1, "a single token copy of the chosen creature is minted under the bearer's controller");
+        var token = minted[0];
+        token.Controller.Should().BeSameAs(alice, "the token enters under the BEARER's controller, not the exiled card's");
+        token.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword)
+            .Should().Contain("Haste", "the copy has haste (CR 702.10) even when the original lacks it");
+        token.HasSummoningSickness.Should().BeFalse("haste clears summoning sickness on the token (CR 702.10b)");
+        alice.Zones.Battlefield.GetCards().Count().Should().Be(bfBefore + 1,
+            "exactly one token entered");
+
+        kikiStub.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted card stays in exile (under the Cauldron); the re-homed copy never touches it");
+        kikiStub.IsToken.Should().BeFalse("the imprinted source card is not the minted token");
+    }
+
+    [Fact]
+    public async Task Grant_NonMana_TokenCopyOfTarget_DelayedEndStepSacrifice_FiresViaAmbientManager()
+    {
+        // agatha-oracle-shape-copy-another-target-creature (delayed sacrifice leg):
+        // when a live TriggerManager is installed in the ambient registry (as
+        // GameDriver does at game start), the re-homed token-copy schedules a
+        // one-shot end-step sacrifice (CR 603.7 / 701.16) of the spawned token.
+        // The next End step fires the delayed trigger and the token is sacrificed
+        // to its controller's graveyard.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new Majik.Core.Abilities.TriggerManager(stack, bus);
+
+        using var triggerScope = Majik.Core.Abilities.TriggerManagerRegistry.PushScope();
+        Majik.Core.Abilities.TriggerManagerRegistry.Set(triggers);
+        using var zoneScope = Majik.Core.Services.ZoneServiceRegistry.PushScope();
+        Majik.Core.Services.ZoneServiceRegistry.Set(alice, zones);
+
+        var kikiStub = new Creature("Kiki Stub", "2RRR", 2, 2);
+        kikiStub.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(kikiStub);
+        kikiStub.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Kiki Stub",
+                "{T}: Create a token that's a copy of target nonlegendary creature "
+                + "you control, except it has haste. Sacrifice it at the beginning "
+                + "of the next end step.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), kikiStub);
+
+        var copyAbility = GrantedActivated(bearer).Single(a =>
+            a.TargetRequests.Any(t => t.Description.Contains("nonlegendary creature you control")));
+
+        var original = new Creature("Grizzly Bears", "1G", 2, 2);
+        original.SetOwner(alice);
+        original.SetController(alice);
+        original.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(original);
+
+        copyAbility.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { original } });
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: stack);
+        await copyAbility.ResolveAsync(agent: null, game: game);
+
+        var token = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Single(c => c.IsToken && c.Name == "Grizzly Bears");
+        token.Zone.Should().Be(ZoneType.Battlefield, "the token entered the battlefield");
+
+        // CR 603.7 — the next End step fires the delayed sacrifice.
+        bus.Publish(new Majik.Core.Events.StepStartedEvent(
+            Majik.Core.StateMachine.StepStateType.End, alice));
+        triggers.PutPendingTriggersOnStack(alice);
+        var resolver = new Majik.Core.Services.StackResolver(bus, zones);
+        while (!stack.IsEmpty) resolver.ResolveTop(stack);
+
+        token.Zone.Should().Be(ZoneType.Graveyard,
+            "CR 701.16 — the delayed end-step sacrifice moves the token to its controller's graveyard");
+        alice.Zones.Battlefield.GetCards().Should().NotContain(token);
+        original.Zone.Should().Be(ZoneType.Battlefield, "the copied original is untouched by the sacrifice");
+    }
+
+    [Fact]
+    public void Grant_NonMana_TokenCopyOfAnotherTarget_ReflectionShape_RebuildsWithAnotherTargetRequest()
+    {
+        // agatha-oracle-shape-copy-another-target-creature ("another" variant):
+        // Reflection of Kiki-Jiki's "{1}, {T}: Create a token that's a copy of
+        // ANOTHER target nonlegendary creature you control, except it has haste.
+        // Sacrifice it…" — the {mana},{T} cost folds and the printed "another"
+        // (CR 601.2c) is reconstructed into the target request description so the
+        // bearer is excluded at resolve.
+        var bearer = new Creature("Bearer", "1G", 2, 2);
+        var alice = new Player("Alice", 20);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+
+        var abilities = Majik.Core.CardData.OracleActivatedAbilityBinder.RebuildActivatedAbilities(
+            "{1}, {T}: Create a token that's a copy of another target nonlegendary "
+            + "creature you control, except it has haste. Sacrifice it at the "
+            + "beginning of the next end step.",
+            bearer, alice);
+
+        var copy = abilities.Single();
+        copy.Source.Should().BeSameAs(bearer);
+        copy.TargetRequests.Single().Description.Should().Be(
+            "another target nonlegendary creature you control");
+        copy.Costs.Should().HaveCount(2, "the {1} mana cost and the {T} tap cost both fold in");
+    }
+
+    [Fact]
     public async Task Grant_RebindsRealAbility_ResolvesThroughAbilityPath_AffectingBearer()
     {
         var alice = new Player("Alice", 20);
