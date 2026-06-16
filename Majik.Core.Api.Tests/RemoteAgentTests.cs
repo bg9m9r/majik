@@ -1968,4 +1968,130 @@ public class RemoteAgentTests
         agent.PendingPayload.Should().BeNull();
         agent.HasPending.Should().BeFalse();
     }
+
+    // ── ChooseDamageDivision (CR 601.2d / CR 119.4 human-seat) ──────────────
+    // The interface default even-splits the damage; a real human web player
+    // needs a per-target numeric-allocation prompt. RemoteAgent OVERRIDES
+    // ChooseDamageDivisionAsync to stash a DamageDivisionViewDto + the ordered
+    // target tokens, fire a ChooseDamageDivisionCommand prompt, and resolve
+    // the per-target amounts back into the engine's index-aligned int list.
+
+    [Fact]
+    public async Task ChooseDamageDivision_Submit_ResolvesPerTargetAmountsIndexAligned()
+    {
+        // Arc Lightning analogue: 3 damage divided among Bob + Carol. The
+        // human announces 1 on Bob, 2 on Carol — the OPPOSITE of the
+        // front-loaded even split (2/1), proving the wire amounts are honored.
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        var source = new Sorcery("Arc Lightning", "{2}{R}") { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = ((IPlayerAgent)agent).ChooseDamageDivisionAsync(
+            ctx: null,
+            source: source,
+            totalDamage: 3,
+            targets: new object[] { bob, carol });
+
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseDamageDivisionCommand));
+
+        agent.Submit(new ChooseDamageDivisionCommand(new[]
+        {
+            new DamageDivisionAllocationDto(bob.Id, 1),
+            new DamageDivisionAllocationDto(carol.Id, 2),
+        }) { PlayerId = _alice.Id });
+
+        var split = await task;
+        split.Should().Equal(1, 2);
+    }
+
+    [Fact]
+    public async Task ChooseDamageDivision_PromptPayload_ShipsViewWithOrderedTargets()
+    {
+        // The portal needs the source name, the total to divide, and one
+        // labelled row per chosen target (in the slot order the engine handed
+        // us) so it can render a numeric input per target gated to sum-to-N.
+        var bob = new Player("Bob", 20);
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = _bobOwner };
+        var source = new Sorcery("Fight with Fire", "{3}{R}{R}") { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = ((IPlayerAgent)agent).ChooseDamageDivisionAsync(
+            ctx: null,
+            source: source,
+            totalDamage: 5,
+            targets: new object[] { bob, bear });
+
+        agent.PendingPayload.Should().NotBeNull();
+        var view = agent.PendingPayload!.DamageDivisionView;
+        view.Should().NotBeNull();
+        view!.SourceCardName.Should().Be("Fight with Fire");
+        view.TotalDamage.Should().Be(5);
+        view.Targets.Should().HaveCount(2);
+        view.Targets[0].TargetId.Should().Be(bob.Id);
+        view.Targets[0].Name.Should().Be("Bob");
+        view.Targets[1].TargetId.Should().Be(bear.InstanceId);
+        view.Targets[1].Name.Should().Be("Grizzly Bears");
+    }
+
+    [Fact]
+    public async Task ChooseDamageDivision_OutOfOrderOrPartialWire_NormalisedToLegalSplit()
+    {
+        // The engine downstream (DamageDivisionDefaults.Normalize) is the
+        // safety net, but RemoteAgent must still map the wire allocations back
+        // to the ENGINE'S slot order regardless of the order the client sent
+        // them, and fill any target the client omitted with 0 (Normalize then
+        // clamps each to ≥1 + reconciles to the printed total). Here the
+        // client sends Carol before Bob and over-allocates; the result stays
+        // index-aligned with [Bob, Carol].
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        var source = new Sorcery("Arc Lightning", "{2}{R}") { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = ((IPlayerAgent)agent).ChooseDamageDivisionAsync(
+            ctx: null,
+            source: source,
+            totalDamage: 3,
+            targets: new object[] { bob, carol });
+
+        agent.Submit(new ChooseDamageDivisionCommand(new[]
+        {
+            new DamageDivisionAllocationDto(carol.Id, 2),
+            new DamageDivisionAllocationDto(bob.Id, 1),
+        }) { PlayerId = _alice.Id });
+
+        // Index 0 = Bob (1), index 1 = Carol (2) — re-ordered to engine slots.
+        (await task).Should().Equal(1, 2);
+    }
+
+    [Fact]
+    public async Task ChooseDamageDivision_PromptPayload_ClearedAfterSubmit()
+    {
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        var source = new Sorcery("Arc Lightning", "{2}{R}") { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = ((IPlayerAgent)agent).ChooseDamageDivisionAsync(
+            ctx: null,
+            source: source,
+            totalDamage: 3,
+            targets: new object[] { bob, carol });
+        agent.PendingPayload.Should().NotBeNull();
+
+        agent.Submit(new ChooseDamageDivisionCommand(new[]
+        {
+            new DamageDivisionAllocationDto(bob.Id, 2),
+            new DamageDivisionAllocationDto(carol.Id, 1),
+        }) { PlayerId = _alice.Id });
+        await task;
+
+        agent.PendingPayload.Should().BeNull();
+        agent.HasPending.Should().BeFalse();
+    }
+
+    private readonly Player _bobOwner = new("BearOwner", 20);
 }

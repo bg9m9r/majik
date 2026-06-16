@@ -198,7 +198,47 @@ public sealed record PromptDto(
     /// <c>ChoiceCommand</c>. Without this descriptor (and the candidates) the
     /// portal had nothing to render and the game wedged holding the prompt.
     /// </summary>
-    ChoiceViewDto? ChoiceView = null);
+    ChoiceViewDto? ChoiceView = null,
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — per-prompt body for a "deals N damage divided as
+    /// you choose among …" allocation prompt (Inferno Titan, Fury, Avacyn's
+    /// Judgment, Arc Lightning, …). Non-null only on
+    /// <c>ChooseDamageDivisionCommand</c> prompts; null on every other prompt
+    /// kind. The portal renders one numeric input per
+    /// <see cref="DamageDivisionViewDto.Targets"/> row (each labelled by name),
+    /// gating submission so every target gets at least 1 and the amounts sum to
+    /// exactly <see cref="DamageDivisionViewDto.TotalDamage"/> (CR 119.4), then
+    /// dispatches a <c>ChooseDamageDivisionCommand</c> carrying one
+    /// <see cref="DamageDivisionAllocationDto"/> per target. The engine still
+    /// defensively normalises the returned split (clamps each ≥1, reconciles
+    /// the total) so a misbehaving client can never deal the wrong amount.
+    /// </summary>
+    DamageDivisionViewDto? DamageDivisionView = null);
+
+/// <summary>
+/// CR 601.2d / CR 119.4 — per-prompt body for a divided-damage allocation
+/// prompt surfaced on <see cref="PromptDto.DamageDivisionView"/>. The
+/// caster already chose the <see cref="Targets"/> (CR 601.2c); the engine
+/// now needs the per-target amounts. <see cref="Targets"/> is in the engine
+/// slot order — the client must echo each target's id back in its
+/// <c>ChooseDamageDivisionCommand</c> so the engine maps the amounts to the
+/// right slot regardless of UI row order.
+/// </summary>
+public sealed record DamageDivisionViewDto(
+    string SourceCardName,
+    int TotalDamage,
+    IReadOnlyList<DamageDivisionTargetDto> Targets);
+
+/// <summary>
+/// One chosen damage-division target surfaced on
+/// <see cref="DamageDivisionViewDto.Targets"/>. <see cref="TargetId"/> is the
+/// target's instance id (a <c>Permanent.InstanceId</c>) or, for a player
+/// target, the <c>Player.Id</c>. <see cref="Name"/> is the human-readable
+/// label the portal renders next to the numeric input.
+/// </summary>
+public sealed record DamageDivisionTargetDto(
+    Guid TargetId,
+    string Name);
 
 /// <summary>
 /// CR 700.6 / 701.x — per-prompt body for a generic declarative choice

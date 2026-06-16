@@ -83,6 +83,12 @@ public sealed class RemoteAgent : IPlayerAgent
     // any creature for "target land you control", etc.) resolved unchecked.
     // Cleared on prompt resolution; replaced on each new target prompt.
     private IReadOnlyList<object>? _pendingTargetCandidates;
+    // CR 601.2d / CR 119.4 — the ordered target tokens (Player / Permanent)
+    // for the most recent divide-damage prompt, index-aligned with the engine's
+    // slot order. Stashed so Resolve can map each wire allocation back to the
+    // right slot by id and build the int[] split the engine expects. Cleared on
+    // prompt resolution; replaced on each new divide-damage prompt.
+    private IReadOnlyList<object>? _pendingDamageDivisionTargets;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -157,6 +163,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var choiceCandidates = _pendingChoiceCandidates;
         var choiceKind = _pendingChoiceKind;
         var targetCandidates = _pendingTargetCandidates;
+        var damageDivisionTargets = _pendingDamageDivisionTargets;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
@@ -168,8 +175,9 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingChoiceCandidates = null;
         _pendingChoiceKind = null;
         _pendingTargetCandidates = null;
+        _pendingDamageDivisionTargets = null;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates, damageDivisionTargets);
     }
 
     private void Resolve(
@@ -183,7 +191,8 @@ public sealed class RemoteAgent : IPlayerAgent
         int? bottomCount,
         IReadOnlyList<object>? choiceCandidates,
         ChoiceKind? choiceKind,
-        IReadOnlyList<object>? targetCandidates)
+        IReadOnlyList<object>? targetCandidates,
+        IReadOnlyList<object>? damageDivisionTargets)
     {
         switch (command)
         {
@@ -471,6 +480,41 @@ public sealed class RemoteAgent : IPlayerAgent
                 // intended this prompt; nothing further to validate.
                 ((TaskCompletionSource<bool>)tcs).SetResult(yn.Answer);
                 break;
+            case ChooseDamageDivisionCommand dd:
+            {
+                // CR 601.2d / CR 119.4 — map the wire per-target allocations
+                // back to the ENGINE'S slot order (the order we shipped on the
+                // DamageDivisionViewDto), keyed by target id, so the client's
+                // row order doesn't matter. Any target the client omitted is
+                // filled with 0; the downstream DamageDivisionDefaults.Normalize
+                // (run by SpellCastFlow / the trigger dispatch seam) then clamps
+                // each ≥1 and reconciles to the printed total — so a malformed
+                // wire payload can never deal more or fewer than the printed
+                // damage. We deliberately do NOT throw on an unknown / duplicate
+                // id here (unlike the surveil partition): a buggy client must
+                // not be able to crash a live match, and the normaliser already
+                // guarantees a legal split.
+                if (damageDivisionTargets == null)
+                {
+                    throw new InvalidOperationException(
+                        "ChooseDamageDivisionCommand resolved without a pending target list.");
+                }
+                var amountById = new Dictionary<Guid, int>();
+                foreach (var alloc in dd.Allocations)
+                {
+                    // Last-write-wins on a duplicated id (the normaliser still
+                    // makes the final split legal regardless).
+                    amountById[alloc.TargetId] = alloc.Amount;
+                }
+                var split = new int[damageDivisionTargets.Count];
+                for (var i = 0; i < damageDivisionTargets.Count; i++)
+                {
+                    var id = DamageDivisionTargetId(damageDivisionTargets[i]);
+                    split[i] = amountById.TryGetValue(id, out var amount) ? amount : 0;
+                }
+                ((TaskCompletionSource<IReadOnlyList<int>>)tcs).SetResult(split);
+                break;
+            }
             case ChooseFromRevealedCommand cr:
             {
                 // CR 701.15 — translate the wire command into the ICard the
@@ -655,6 +699,23 @@ public sealed class RemoteAgent : IPlayerAgent
         ICard card => card.InstanceId == id,
         Player player => player.Id == id,
         _ => false,
+    };
+
+    // CR 601.2d — the wire id for a divide-damage target token: a permanent /
+    // card target rides on its InstanceId; a player target on its Player.Id.
+    private static Guid DamageDivisionTargetId(object target) => target switch
+    {
+        ICard card => card.InstanceId,
+        Player player => player.Id,
+        _ => Guid.Empty,
+    };
+
+    // CR 601.2d — human-readable label for a divide-damage target row.
+    private static string DamageDivisionTargetName(object target) => target switch
+    {
+        ICard card => card.Name,
+        Player player => player.Name,
+        _ => "(unknown)",
     };
 
     /// <summary>
@@ -1215,6 +1276,75 @@ public sealed class RemoteAgent : IPlayerAgent
         }
     }
 
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — divide-damage allocation prompt (Inferno Titan,
+    /// Fury, Avacyn's Judgment, Arc Lightning, …). The interface default
+    /// even-splits the damage, which silently auto-allocated for remote (human)
+    /// players — they never saw a "how do you want to divide this?" UI. This
+    /// override stashes a <see cref="DamageDivisionViewDto"/> (source name,
+    /// total, one labelled row per already-chosen target in engine slot order)
+    /// onto the prompt payload and awaits a
+    /// <see cref="ChooseDamageDivisionCommand"/> back from the client. The
+    /// command's per-target amounts are mapped back to the engine's slot order
+    /// by id in <see cref="Resolve"/>; the downstream
+    /// <see cref="DamageDivisionDefaults.Normalize"/> (run by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> / the trigger dispatch seam)
+    /// then guarantees a legal split (each ≥1, summing to the printed total),
+    /// so a malformed wire payload can never deal the wrong amount.
+    /// <para>
+    /// Behaviour-preserving until the portal UI lands: a client that simply
+    /// echoes an even split (or one that the engine normalises to even) deals
+    /// exactly what the pre-prompt default did. The new contract surfaces the
+    /// CHOICE; it doesn't change any default damage.
+    /// </para>
+    /// </summary>
+    public Task<IReadOnlyList<int>> ChooseDamageDivisionAsync(
+        GameContext? ctx,
+        ICard source,
+        int totalDamage,
+        IReadOnlyList<object> targets,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(targets);
+        // No targets → nothing to divide; mirror the interface default (empty
+        // split) without firing a prompt the portal can't render.
+        if (targets.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+        }
+        // Mirror the other prompt overrides: stash before Prompt fires
+        // PromptRequested observers, guard by checking _pending so we don't
+        // smear stash on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        var targetRows = targets
+            .Select(t => new DamageDivisionTargetDto(
+                DamageDivisionTargetId(t),
+                DamageDivisionTargetName(t)))
+            .ToList();
+        _pendingDamageDivisionTargets = targets;
+        _pendingPayload = new PromptPayload(
+            Candidates: null,
+            Label: $"Divide {totalDamage} damage",
+            DamageDivisionView: new DamageDivisionViewDto(
+                SourceCardName: source.Name,
+                TotalDamage: totalDamage,
+                Targets: targetRows));
+        try
+        {
+            return Prompt<IReadOnlyList<int>>(ct, typeof(ChooseDamageDivisionCommand));
+        }
+        catch
+        {
+            _pendingDamageDivisionTargets = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {
         if (_pending != null)
@@ -1305,4 +1435,12 @@ public sealed record PromptPayload(
     /// <see cref="Candidates"/>. <see cref="GameFacade.BuildPrompt"/> forwards
     /// this onto <see cref="PromptDto.ChoiceView"/>.
     /// </summary>
-    ChoiceViewDto? ChoiceView = null);
+    ChoiceViewDto? ChoiceView = null,
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — divide-damage allocation prompt body (source
+    /// name, total, one labelled row per chosen target). Non-null only on
+    /// <c>ChooseDamageDivisionCommand</c> prompts; null on every other prompt
+    /// kind. <see cref="GameFacade.BuildPrompt"/> forwards this onto
+    /// <see cref="PromptDto.DamageDivisionView"/>.
+    /// </summary>
+    DamageDivisionViewDto? DamageDivisionView = null);
