@@ -539,6 +539,35 @@
         ],
         "type": "object"
       },
+      "ChoiceViewDto": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "max": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "min": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "min",
+          "max"
+        ],
+        "type": "object"
+      },
       "ContinuousEffectAddedPayload": {
         "properties": {
           "description": {
@@ -1989,6 +2018,16 @@
             "type": [
               "null",
               "array"
+            ]
+          },
+          "choiceView": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChoiceViewDto"
+              }
             ]
           },
           "expectedKinds": {

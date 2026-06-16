@@ -105,4 +105,21 @@ public sealed record TargetRequest(
     /// </summary>
     public TargetRequest WithCandidates(IReadOnlyList<object> candidates) =>
         this with { LegalCandidates = candidates };
+
+    /// <summary>
+    /// Return a copy of this request whose <see cref="Description"/> names the
+    /// activating <paramref name="source"/> card (e.g. "Yawgmoth, Thran
+    /// Physician: up to one target creature") so the player knows what they're
+    /// choosing a target FOR. Targeting semantics are untouched — only the
+    /// human-readable prompt label changes. No-ops (returns <c>this</c>) when
+    /// the source has no resolvable name or the description already leads with
+    /// it (idempotent across the GameFacade / TurnDriver dispatcher twins).
+    /// </summary>
+    public TargetRequest WithSourceLabel(object? source)
+    {
+        var name = (source as ICard)?.Name;
+        if (string.IsNullOrWhiteSpace(name)) return this;
+        if (Description.StartsWith(name + ":", StringComparison.Ordinal)) return this;
+        return this with { Description = $"{name}: {Description}" };
+    }
 }

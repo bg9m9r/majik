@@ -1169,6 +1169,11 @@ public sealed class TurnDriver
                     var promptReq = ReferenceEquals(live, req.LegalCandidates)
                         ? req
                         : req.WithCandidates(live);
+                    // Name the source card/ability on the prompt label so the
+                    // player knows what they're choosing a target FOR (label-
+                    // only; targeting semantics unchanged). Mirrors
+                    // GameFacade.DispatchActivate.
+                    promptReq = promptReq.WithSourceLabel(aa.Source);
                     var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
                     chosenTargets.Add(chosen);
                     foreach (var obj in chosen)
