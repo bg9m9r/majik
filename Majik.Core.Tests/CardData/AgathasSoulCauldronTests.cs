@@ -5763,10 +5763,10 @@ public class AgathasSoulCauldronTests
         var realAbilities = frog.Abilities.OfType<ActivatedAbility>()
             .Where(a => a is not IManaAbility)
             .ToList();
-        realAbilities.Should().ContainSingle(
-            "Psychic Frog has exactly one wired non-mana activated ability — the discard→+1/+1");
+        realAbilities.Should().HaveCount(2,
+            "Psychic Frog has two wired non-mana activated abilities — discard→+1/+1 and exile-3→flying");
         realAbilities.Should().OnlyContain(a => a.RebindSafe,
-            "the migrated Psychic Frog pump reads ResolutionContext.Source and is RebindSafe");
+            "both migrated Psychic Frog abilities read ResolutionContext.Source and are RebindSafe");
         alice.Zones.Graveyard.AddCard(frog);
         frog.SetZone(ZoneType.Graveyard);
 
@@ -5779,11 +5779,15 @@ public class AgathasSoulCauldronTests
         Resolve(TapAbility(cauldron), frog);
 
         var granted = GrantedActivated(bearer);
-        granted.Should().ContainSingle("Psychic Frog's real pump is re-homed via RebindTo");
-        var pump = granted[0];
-        pump.Source.Should().BeSameAs(bearer,
-            "the re-homed pump is sourced on the BEARER (CR 707.2)");
-        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        granted.Should().HaveCount(2,
+            "both of Psychic Frog's real abilities are re-homed via RebindTo");
+        granted.Should().OnlyContain(a => ReferenceEquals(a.Source, bearer),
+            "the re-homed abilities are sourced on the BEARER (CR 707.2)");
+        granted.Should().OnlyContain(a => a.RebindSafe,
+            "RebindTo preserves the re-source provenance");
+
+        // The discard→+1/+1 counter half is the ability under test.
+        var pump = granted.Single(a => a.Costs.OfType<Majik.Core.Costs.DiscardACardCost>().Any());
 
         var bearerCountersBefore = bearer.Counters.Count(CounterType.PlusOnePlusOne);
         await pump.ResolveAsync(agent: null, game: null);
@@ -5798,7 +5802,8 @@ public class AgathasSoulCauldronTests
         var alice = new Player("Alice", 20);
         var frog = PsychicFrogFactory.Create(alice);
         var pump = frog.Abilities.OfType<ActivatedAbility>()
-            .Single(a => a is not IManaAbility);
+            .Single(a => a is not IManaAbility
+                && a.Costs.OfType<Majik.Core.Costs.DiscardACardCost>().Any());
 
         var before = frog.Counters.Count(CounterType.PlusOnePlusOne);
         await pump.ResolveAsync(agent: null, game: null);

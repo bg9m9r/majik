@@ -5,7 +5,10 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -13,31 +16,31 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for <see cref="MagmaticChannelerFactory"/> (Core Set 2021, {1}{R}).
+/// Tests for <see cref="MagmaticChannelerFactory"/> (Modern Horizons 3, {1}{R}).
+///
+/// Oracle text:
+///   "As long as there are four or more instant and/or sorcery cards in your
+///    graveyard, this creature gets +3/+1.
+///    {T}, Discard a card: Exile the top two cards of your library, then
+///    choose one of them. You may play that card this turn."
 ///
 /// Covers:
-///   - Identity (Human Shaman 1/2, {1}{R}, owner/controller).
+///   - Identity (Human Wizard 1/3, {1}{R}, owner/controller).
 ///   - <see cref="NamedCardFactory"/> dispatcher entry.
-///   - Activated ability shape: one ICost = ManaCostCost("{2}{R}"), one
-///     AdditionalCost = Tap.
-///   - <see cref="MagmaticChannelerFactory.CanActivateGraveyardGate"/> at
-///     0 / 3 / 4 / 5 instant+sorcery cards (boundary tests around the
-///     <see cref="MagmaticChannelerFactory.GraveyardThreshold"/> of 4).
-///   - Resolve: picks an eligible creature/instant from the top 4 and
-///     puts it into hand; remainder goes to the bottom of the library.
-///   - Resolve: no eligible card → nothing moves to hand, remainder still
-///     re-bottoms.
-///   - Resolve: short library (less than 4 cards) — clean no-op when 0
-///     cards, partial peek when fewer than 4.
-///   - Resolve: graveyard gate failure short-circuits cleanly (defensive
-///     re-check; cost was paid by the cost layer).
+///   - Activated ability shape: Tap + DiscardACardCost, no mana cost.
+///   - <see cref="MagmaticChannelerFactory.IsPumpActive"/> boundary at
+///     0 / 3 / 4 / 5 instant+sorcery cards.
+///   - Dynamic +3/+1 static turns on/off with the graveyard count.
+///   - Resolve: exile top 2, choose one, stamp a play-this-turn grant on the
+///     chosen card; the other exiled card carries no grant.
+///   - Resolve: short / empty library posture.
 /// </summary>
 public class MagmaticChannelerTests
 {
     private readonly Player _alice = new("Alice", 20);
 
     [Fact]
-    public void MagmaticChanneler_Identity_HumanShaman_1_2_At_1R()
+    public void MagmaticChanneler_Identity_HumanWizard_1_3_At_1R()
     {
         var card = MagmaticChannelerFactory.Create(_alice);
 
@@ -68,205 +71,165 @@ public class MagmaticChannelerTests
     }
 
     [Fact]
-    public void MagmaticChanneler_HasOneActivatedAbility_With2RAndTapCosts()
+    public void MagmaticChanneler_HasOneActivatedAbility_With_Tap_And_DiscardCosts_NoMana()
     {
         var card = MagmaticChannelerFactory.Create(_alice);
         var ability = card.Abilities.OfType<ActivatedAbility>().Single();
 
-        var manaCost = ability.Costs.OfType<ManaCostCost>().Single();
-        manaCost.Cost.Generic.Should().Be(2);
-        manaCost.Cost.Red.Should().Be(1);
+        ability.Costs.OfType<ManaCostCost>().Should().BeEmpty(
+            "the {T}, Discard a card ability has no mana component");
         ability.Costs.OfType<AdditionalCost>()
             .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
                 "the {T} symbol is the tap cost");
+        ability.Costs.OfType<DiscardACardCost>()
+            .Should().ContainSingle("\"Discard a card\" is the second activation cost");
+        ability.RebindSafe.Should().BeTrue(
+            "the dig reads ResolutionContext.Source and is re-source-safe for Agatha");
     }
 
-    [Fact]
-    public void GraveyardGate_FalseAt0()
-    {
-        MagmaticChannelerFactory.CanActivateGraveyardGate(_alice).Should().BeFalse();
-    }
+    // ── Dynamic +3/+1 static ────────────────────────────────────────────────
 
     [Fact]
-    public void GraveyardGate_FalseAt3()
+    public void IsPumpActive_FalseAt0()
+        => MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeFalse();
+
+    [Fact]
+    public void IsPumpActive_FalseAt3()
     {
         SeedGraveyardWithSpells(_alice, instants: 2, sorceries: 1);
-        MagmaticChannelerFactory.CanActivateGraveyardGate(_alice).Should().BeFalse();
+        MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeFalse();
     }
 
     [Fact]
-    public void GraveyardGate_TrueAtThreshold4()
+    public void IsPumpActive_TrueAtThreshold4()
     {
         SeedGraveyardWithSpells(_alice, instants: 2, sorceries: 2);
-        MagmaticChannelerFactory.CanActivateGraveyardGate(_alice).Should().BeTrue();
+        MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeTrue();
     }
 
     [Fact]
-    public void GraveyardGate_TrueAt5_Over_4()
+    public void IsPumpActive_TrueAt5_Over_4()
     {
         SeedGraveyardWithSpells(_alice, instants: 3, sorceries: 2);
-        MagmaticChannelerFactory.CanActivateGraveyardGate(_alice).Should().BeTrue();
+        MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeTrue();
     }
 
     [Fact]
-    public void GraveyardGate_IgnoresNonInstantSorceryCards()
+    public void IsPumpActive_IgnoresNonInstantSorceryCards()
     {
-        AddToGraveyard(_alice, new Creature("Bear A", "{1}{G}", 2, 2));
-        AddToGraveyard(_alice, new Creature("Bear B", "{1}{G}", 2, 2));
-        AddToGraveyard(_alice, new Creature("Bear C", "{1}{G}", 2, 2));
-        AddToGraveyard(_alice, new Creature("Bear D", "{1}{G}", 2, 2));
-        AddToGraveyard(_alice, new Creature("Bear E", "{1}{G}", 2, 2));
-
-        MagmaticChannelerFactory.CanActivateGraveyardGate(_alice).Should().BeFalse(
-            "creatures don't count toward Magmatic Channeler's gate");
+        for (var i = 0; i < 5; i++)
+        {
+            AddToGraveyard(_alice, new Creature($"Bear{i}", "{1}{G}", 2, 2));
+        }
+        MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeFalse(
+            "creatures don't count toward the +3/+1 threshold");
     }
 
     [Fact]
-    public void Resolve_PicksCreature_FromTopFour_PutsToHand_RestBottom()
+    public void DynamicStatic_BelowThreshold_PrintedStats()
     {
-        var card = MagmaticChannelerFactory.Create(_alice);
-        SeatOnBattlefield(card);
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+        var card = MagmaticChannelerFactory.Create(_alice, bus, effects);
+        SeatOnBattlefield(card, bus);
 
-        // Library top → bottom:
-        //   sorc (not eligible — sorcery)
-        //   bear (eligible — creature; first eligible match wins)
-        //   inst (eligible — instant)
-        //   land (not eligible — Land)
-        var sorc = new Sorcery("Sorc", "{R}") { Owner = _alice };
-        var bear = new Creature("Bear", "{1}{G}", 2, 2) { Owner = _alice };
-        var inst = new Instant("Bolt", "{R}") { Owner = _alice };
-        var land = new Land("Plains", new[] { CardSupertype.Basic }, new[] { CardSubtype.Plains })
-            { Owner = _alice };
-        var deep = new Instant("Below", "{R}") { Owner = _alice };
-        AddToLibrary(_alice, sorc, bear, inst, land, deep);
+        SeedGraveyardWithSpells(_alice, instants: 3, sorceries: 0);
+        MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeFalse();
+        card.Power.Should().Be(1, "below 4 I/S the static is inactive");
+        card.Toughness.Should().Be(3);
+    }
 
-        // Seed graveyard so the gate passes (defensive).
-        SeedGraveyardWithSpells(_alice, instants: 4, sorceries: 0);
+    [Fact]
+    public void DynamicStatic_AtThreshold_GivesPlus3Plus1()
+    {
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+        var card = MagmaticChannelerFactory.Create(_alice, bus, effects);
+        SeatOnBattlefield(card, bus);
+
+        SeedGraveyardWithSpells(_alice, instants: 2, sorceries: 2);
+        MagmaticChannelerFactory.IsPumpActive(_alice).Should().BeTrue();
+        card.Power.Should().Be(4, "4+ I/S grants +3/+1");
+        card.Toughness.Should().Be(4);
+    }
+
+    // ── {T}, Discard a card: exile top 2, may play one ──────────────────────
+
+    [Fact]
+    public void Resolve_ExilesTopTwo_StampsPlayGrantOnChosen()
+    {
+        var bus = new EventBus();
+        var card = MagmaticChannelerFactory.Create(_alice, bus, effects: null);
+        SeatOnBattlefield(card, bus);
+
+        var first = new Instant("Bolt", "{R}") { Owner = _alice };
+        var second = new Sorcery("Recall", "{U}") { Owner = _alice };
+        var deep = new Creature("Deep", "{1}{G}", 2, 2) { Owner = _alice };
+        AddToLibrary(_alice, first, second, deep);
 
         ExecuteActivation(card);
 
-        // Bear is the first eligible (creature) — moves to hand.
-        _alice.Zones.Hand.GetCards().Should().ContainSingle().Which.Should().BeSameAs(bear);
-        bear.Zone.Should().Be(ZoneType.Hand);
+        // Top two are exiled; the deep card stays in the library.
+        _alice.Zones.Exile.GetCards().Should().Contain(new ICard[] { first, second });
+        _alice.Zones.Library.GetCards().Should().ContainSingle().Which.Should().BeSameAs(deep);
 
-        // sorc + inst + land go to the bottom of the library (in
-        // snapshot order); deep stays at the bottom (it was below the
-        // peek window).
-        var libOrder = _alice.Zones.Library.GetCards().ToList();
-        // deep was untouched (below the 4-card peek), still at position 0 here.
-        libOrder.Should().Contain(new ICard[] { deep, sorc, inst, land });
-        libOrder.Should().NotContain(bear);
+        // Deterministic fallback picks the first exiled card for the
+        // play-this-turn grant; the other exiled card carries no grant.
+        first.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
+            "the chosen card may be played this turn (CR 118.9)");
+        second.RuntimeExileCastAllowedCaster.Should().BeNull(
+            "only the chosen card gets the play-this-turn grant");
     }
 
     [Fact]
-    public void Resolve_NoEligibleCards_NoPickButRemainderRebottoms()
+    public void Resolve_PlayGrant_ClearsAtCleanup()
     {
-        var card = MagmaticChannelerFactory.Create(_alice);
-        SeatOnBattlefield(card);
+        var bus = new EventBus();
+        var card = MagmaticChannelerFactory.Create(_alice, bus, effects: null);
+        SeatOnBattlefield(card, bus);
 
-        // Library: 4 sorceries + 1 land — NONE are creature or instant.
-        var s1 = new Sorcery("S1", "{R}") { Owner = _alice };
-        var s2 = new Sorcery("S2", "{R}") { Owner = _alice };
-        var s3 = new Sorcery("S3", "{R}") { Owner = _alice };
-        var s4 = new Sorcery("S4", "{R}") { Owner = _alice };
-        var land = new Land("Plains", new[] { CardSupertype.Basic }, new[] { CardSubtype.Plains })
-            { Owner = _alice };
-        AddToLibrary(_alice, s1, s2, s3, s4, land);
-
-        SeedGraveyardWithSpells(_alice, instants: 4, sorceries: 0);
+        var first = new Instant("Bolt", "{R}") { Owner = _alice };
+        var second = new Instant("Bolt2", "{R}") { Owner = _alice };
+        AddToLibrary(_alice, first, second);
 
         ExecuteActivation(card);
+        first.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
 
-        // Hand stays empty — no eligible reveal.
-        _alice.Zones.Hand.GetCards().Should().BeEmpty();
-
-        // The 4 sorceries re-bottom (land was below the peek window,
-        // still sits at bottom; final order: land then s1..s4).
-        var lib = _alice.Zones.Library.GetCards().ToList();
-        lib.Should().HaveCount(5);
-        lib.Should().Contain(new ICard[] { land, s1, s2, s3, s4 });
+        // A Cleanup step clears the "this turn" grant (CR 514.2).
+        bus.Publish(new StepStartedEvent(StepStateType.Cleanup, _alice));
+        first.RuntimeExileCastAllowedCaster.Should().BeNull(
+            "the play-this-turn grant clears at the next Cleanup");
     }
 
     [Fact]
     public void Resolve_EmptyLibrary_NoOp()
     {
         var card = MagmaticChannelerFactory.Create(_alice);
-        SeatOnBattlefield(card);
-        SeedGraveyardWithSpells(_alice, instants: 4, sorceries: 0);
+        SeatOnBattlefield(card, eventBus: null);
 
         ExecuteActivation(card);
 
+        _alice.Zones.Exile.GetCards().Should().BeEmpty();
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
-        _alice.Zones.Library.GetCards().Should().BeEmpty();
     }
 
     [Fact]
-    public void Resolve_LibraryShorterThanFour_PeeksWhatRemains()
+    public void Resolve_ShortLibrary_ExilesWhatRemains()
     {
         var card = MagmaticChannelerFactory.Create(_alice);
-        SeatOnBattlefield(card);
+        SeatOnBattlefield(card, eventBus: null);
 
-        // Library: 2 cards (less than the 4-card peek window).
-        var inst = new Instant("Bolt", "{R}") { Owner = _alice };
-        var land = new Land("Plains", new[] { CardSupertype.Basic }, new[] { CardSubtype.Plains })
-            { Owner = _alice };
-        AddToLibrary(_alice, inst, land);
-
-        SeedGraveyardWithSpells(_alice, instants: 4, sorceries: 0);
+        var only = new Instant("Bolt", "{R}") { Owner = _alice };
+        AddToLibrary(_alice, only);
 
         ExecuteActivation(card);
 
-        // Instant moves to hand; land re-bottoms.
-        _alice.Zones.Hand.GetCards().Should().ContainSingle().Which.Should().BeSameAs(inst);
-        _alice.Zones.Library.GetCards().Should().ContainSingle().Which.Should().BeSameAs(land);
+        _alice.Zones.Exile.GetCards().Should().ContainSingle().Which.Should().BeSameAs(only);
+        only.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice,
+            "the single exiled card is the chosen one");
     }
 
-    [Fact]
-    public void Resolve_GraveyardGateFails_DefensiveShortCircuit_NoOp()
-    {
-        // Defensive — if a stale activation somehow bypassed the gate
-        // (the cost was paid by the cost layer), the resolve-time guard
-        // should short-circuit cleanly without mutating zones.
-        var card = MagmaticChannelerFactory.Create(_alice);
-        SeatOnBattlefield(card);
-
-        var inst = new Instant("Bolt", "{R}") { Owner = _alice };
-        var bear = new Creature("Bear", "{1}{G}", 2, 2) { Owner = _alice };
-        AddToLibrary(_alice, inst, bear);
-
-        // NO graveyard seeding → CanActivateGraveyardGate returns false.
-        ExecuteActivation(card);
-
-        // Nothing moved.
-        _alice.Zones.Hand.GetCards().Should().BeEmpty();
-        _alice.Zones.Library.GetCards().Should().Contain(new ICard[] { inst, bear });
-    }
-
-    [Fact]
-    public void Resolve_SorceriesInLibraryAreNotEligible_ButInstantWins()
-    {
-        // Mixed top-4: sorcery, sorcery, instant, sorcery. The instant
-        // is the only eligible reveal — confirms sorceries are
-        // EXCLUDED from the reveal pool (distinct from the gate, which
-        // counts instants AND sorceries in the graveyard).
-        var card = MagmaticChannelerFactory.Create(_alice);
-        SeatOnBattlefield(card);
-
-        var s1 = new Sorcery("S1", "{R}") { Owner = _alice };
-        var s2 = new Sorcery("S2", "{R}") { Owner = _alice };
-        var inst = new Instant("Bolt", "{R}") { Owner = _alice };
-        var s3 = new Sorcery("S3", "{R}") { Owner = _alice };
-        AddToLibrary(_alice, s1, s2, inst, s3);
-
-        SeedGraveyardWithSpells(_alice, instants: 4, sorceries: 0);
-
-        ExecuteActivation(card);
-
-        _alice.Zones.Hand.GetCards().Should().ContainSingle().Which.Should().BeSameAs(inst);
-        _alice.Zones.Library.GetCards().Should().Contain(new ICard[] { s1, s2, s3 });
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static void AddToGraveyard(Player p, ICard card)
     {
@@ -282,11 +245,11 @@ public class MagmaticChannelerTests
     {
         for (var i = 0; i < instants; i++)
         {
-            AddToGraveyard(p, new Instant($"Inst{i}", "{R}"));
+            AddToGraveyard(p, new Instant($"Inst{System.Guid.NewGuid():N}", "{R}"));
         }
         for (var i = 0; i < sorceries; i++)
         {
-            AddToGraveyard(p, new Sorcery($"Sorc{i}", "{R}"));
+            AddToGraveyard(p, new Sorcery($"Sorc{System.Guid.NewGuid():N}", "{R}"));
         }
     }
 
@@ -303,10 +266,11 @@ public class MagmaticChannelerTests
         }
     }
 
-    private static void SeatOnBattlefield(Creature card)
+    private static void SeatOnBattlefield(Creature card, EventBus? eventBus)
     {
         card.SetZone(ZoneType.Battlefield);
         card.Owner!.Zones.Battlefield.AddCard(card);
+        eventBus?.Publish(new CardMovedEvent(card, ZoneType.Library, ZoneType.Battlefield));
     }
 
     private static void ExecuteActivation(Creature card)
