@@ -853,6 +853,96 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_MassPumpOther_RehomesAnthemToBearersControllerBoard()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability is a controller-scoped mass-pump
+        // (War Screecher's "{5}{W}, {T}: Other creatures you control get +1/+1
+        // until end of turn."). Re-homing is sound: the SOURCE / cost-payer is
+        // the BEARER, and the pump applies to every OTHER creature the BEARER's
+        // controller controls — read off the bearer's controller at resolution,
+        // never the exiled imprinted card's controller (CR 613.1f Layer 7c).
+        var screecher = new Creature("Screecher Stub", "1W", 1, 3);
+        screecher.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(screecher);
+        screecher.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // Two more creatures Alice controls — both should be pumped.
+        var ally1 = new Creature("Ally One", "1G", 2, 2);
+        ally1.SetOwner(alice);
+        ally1.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally1);
+        zones.MoveCard(ally1, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally1.ActiveEffects = effects;
+
+        var ally2 = new Creature("Ally Two", "1G", 3, 3);
+        ally2.SetOwner(alice);
+        ally2.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally2);
+        zones.MoveCard(ally2, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally2.ActiveEffects = effects;
+
+        // An opponent creature — must NOT be pumped ("you control").
+        var enemy = new Creature("Enemy Bear", "1B", 2, 2);
+        enemy.SetOwner(bob);
+        enemy.ChangeController(bob);
+        bob.Zones.Library.AddCard(enemy);
+        zones.MoveCard(enemy, ZoneType.Library, ZoneType.Battlefield, bob);
+        enemy.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Screecher Stub",
+                "{5}{W}, {T}: Other creatures you control get +1/+1 until end of turn.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), screecher);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("the bearer gains the imprinted creature's mass-pump");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        pump.Costs.OfType<ManaCostCost>().Should().ContainSingle(c => c.Description.Contains("W"));
+        pump.TargetRequests.Should().BeEmpty(
+            "a controller-scoped mass-pump is non-targeted");
+
+        var ally1PowerBefore = ally1.GetPower();
+        var ally2PowerBefore = ally2.GetPower();
+        var bearerPowerBefore = bearer.GetPower();
+        var enemyPowerBefore = enemy.GetPower();
+
+        foreach (var effect in pump.Effects) effect.Execute();
+
+        ally1.GetPower().Should().Be(ally1PowerBefore + 1,
+            "every OTHER creature the bearer's controller controls is pumped");
+        ally1.GetToughness().Should().Be(3, "+1/+1 raises a base-2/2 ally's toughness to 3");
+        ally2.GetPower().Should().Be(ally2PowerBefore + 1,
+            "the second ally is pumped too");
+        bearer.GetPower().Should().Be(bearerPowerBefore,
+            "\"OTHER creatures you control\" (CR 601.2c) excludes the ability's source — " +
+            "and the source re-homes to the BEARER, so the bearer itself is NOT pumped");
+        enemy.GetPower().Should().Be(enemyPowerBefore,
+            "an opponent's creature is NOT 'a creature you control' and is untouched");
+        screecher.GetPower().Should().Be(1,
+            "the exiled imprinted card is untouched");
+
+        // CR 514.2 — the mass pump expires at cleanup.
+        effects.ExpireEndOfTurn();
+        ally1.GetPower().Should().Be(ally1PowerBefore,
+            "the granted mass pump expires at end of turn");
+        ally2.GetPower().Should().Be(ally2PowerBefore,
+            "the granted mass pump expires at end of turn");
+    }
+
+    [Fact]
     public void Grant_NonMana_SignedPump_RehomesNegativeDeltaSelfPumpToBearer()
     {
         var alice = new Player("Alice", 20);
