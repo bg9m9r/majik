@@ -274,4 +274,66 @@ public class KalitasTraitorOfGhetTests
         sacCost.CanPay(_alice).Should().BeFalse(
             "Kalitas can't sacrifice itself; no OTHER Vampire/Zombie present");
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source-safe (agatha-candidate-gatherer-rebind-bearer-controller) —
+    // the pump ability re-homes onto a new bearer via
+    // ActivatedAbility.RebindTo (Agatha's Soul Cauldron group-grant; CR 707.2
+    // / 613.1f). The "Sacrifice another Vampire or Zombie" cost re-anchors its
+    // "another" exclusion to the BEARER (not the original Kalitas), and the
+    // effect puts the two +1/+1 counters on the BEARER (ResolutionContext.Source),
+    // so a re-sourced copy strengthens the bearer and lets the bearer be
+    // sacrificed-around correctly.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PumpAbility_IsRebindSafe()
+    {
+        var k = KalitasTraitorOfGhetFactory.Create(_alice);
+        var pump = k.Abilities.OfType<ActivatedAbility>().Single();
+
+        pump.RebindSafe.Should().BeTrue(
+            "the pump reads its counter target off ResolutionContext.Source and "
+            + "its sacrifice-another cost re-anchors, so Agatha's group-grant may RebindTo it");
+    }
+
+    [Fact]
+    public void RebindTo_PumpAbility_CountersBearer_AndExcludesBearerFromSacrifice()
+    {
+        var k = KalitasTraitorOfGhetFactory.Create(_alice);
+        PlaceKalitasOnBattlefield(_alice, k);
+
+        // The bearer (a different creature Agatha re-homes the ability to) — a
+        // Vampire so it can legally be a sacrifice target for OTHER copies, but
+        // the "another" exclusion must exclude IT (not the original Kalitas).
+        var bearer = new Creature("Vampire Nighthawk", "{1}{B}{B}", 2, 3,
+            subtypes: new[] { CardSubtype.Vampire });
+        bearer.SetOwner(_alice);
+        bearer.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var pump = k.Abilities.OfType<ActivatedAbility>().Single();
+        var rebound = pump.RebindTo(bearer, _alice);
+
+        // The re-homed sacrifice-another cost must exclude the BEARER, not the
+        // original Kalitas. With only Kalitas + bearer present (both Vampires),
+        // the original Kalitas is now a legal "another" sacrifice for the
+        // bearer's rebound ability.
+        var sacCost = rebound.Costs.OfType<Majik.Core.Costs.SacrificeFilteredCost>().Single();
+        sacCost.EligiblePermanents(_alice).Should().Contain(k,
+            "the original Kalitas is 'another' creature relative to the bearer");
+        sacCost.EligiblePermanents(_alice).Should().NotContain(bearer,
+            "the bearer itself is excluded by 'another' after the re-home");
+
+        sacCost.Pay(_alice);
+
+        // The effect puts the two +1/+1 counters on the BEARER, not the
+        // original Kalitas.
+        rebound.Resolve();
+        bearer.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne).Should().Be(2,
+            "the rebound pump strengthens the bearer (ResolutionContext.Source)");
+        k.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne).Should().Be(0,
+            "the original Kalitas is untouched by the rebound ability");
+    }
 }

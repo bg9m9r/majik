@@ -145,7 +145,24 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Abilities.ResolutionContext.ChosenX"/>), so RebindTo
 ///   re-homes the REAL sweep to a bearer and it destroys permanents whose
 ///   controller the BEARER damaged — never the exiled card's stale linkage. The
-///   residual is now confined to
+///   controller-scoped batch has joined
+///   (agatha-candidate-gatherer-rebind-bearer-controller):
+///   <see cref="KalitasTraitorOfGhetFactory"/>'s "{2}{B}, Sacrifice another
+///   Vampire or Zombie: Put two +1/+1 counters on Kalitas" (the
+///   <see cref="Majik.Core.Costs.SacrificeFilteredCost"/> "another" exclusion is
+///   now a re-homeable <see cref="Majik.Core.Costs.IRebindableCost"/> anchor, not
+///   a closure capture, and the counter target reads
+///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/>),
+///   <see cref="KnightOfTheReliquaryFactory"/>'s "{T}, Sacrifice a Forest or
+///   Plains: Search your library for a land …" (the tutor reads its controller
+///   off <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> so the
+///   re-homed copy sacrifices/searches the BEARER controller's zones), and
+///   <see cref="PriestOfForgottenGodsFactory"/>'s "{T}, Sacrifice two other
+///   creatures: … You add {B}{B} and draw a card" (every effect reads "you" off
+///   <see cref="Majik.Core.Abilities.ResolutionContext.Source"/>; the two
+///   sacrifice-another costs re-home via
+///   <see cref="Majik.Core.Costs.IRebindableCost"/>) are all now
+///   <see cref="ActivatedAbility.RebindSafe"/>. The residual is now confined to
 ///   the remaining un-migrated bespoke-factory closures — every data-driven
 ///   activated ability is covered. A correct partial beats a broken "all".
 ///   Tracked: v1-deferrals.
