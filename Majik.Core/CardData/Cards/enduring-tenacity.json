@@ -1,0 +1,9 @@
+{
+  "name": "Enduring Tenacity",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Snake", "Glimmer"],
+  "manaCost": "{2}{B}{B}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
