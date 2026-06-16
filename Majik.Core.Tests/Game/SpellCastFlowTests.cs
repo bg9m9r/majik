@@ -9,6 +9,7 @@ using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.Spells;
 using Majik.Core.StateMachine;
+using Majik.Core.Targeting;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -110,6 +111,64 @@ public class SpellCastFlowTests
 
         capturedTargets.Should().ContainSingle().Which.Should().BeSameAs(bear);
         spell.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task TargetedSpell_PublishesTargetsChosenEvent_WithSpellAndChosenTargets()
+    {
+        // CR 115.6 / 603.6c — once a spell's targets are locked in (CR 601.2c)
+        // the engine must broadcast that the chosen permanents "became the
+        // target", so battlefield-attached "becomes the target of a spell"
+        // triggers (Ward — CR 702.21e, Bonecrusher Giant's Stomp, etc.) can
+        // fire. The live cast path is SpellCastFlow; without this broadcast the
+        // whole becomes-targeted family is dead on the real engine.
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _bob };
+        bear.SetController(_bob);
+        bear.Zone = ZoneType.Battlefield;
+        var bolt = new Instant("Bolt", "R") { Owner = _alice, Zone = ZoneType.Hand };
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)bear });
+        agent.QueueMana(ManaPayment.Empty);
+
+        TargetsChosenEvent? targeted = null;
+        _bus.Subscribe<TargetsChosenEvent>(e => targeted = e);
+
+        var def = new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[]
+            {
+                new TargetRequest("creature", 1, 1, new[] { (object)bear }),
+            },
+            EffectFactory: _ => Array.Empty<IEffect>());
+
+        var spell = await _flow.CastAsync(_alice, bolt, def, agent, NewContext());
+
+        targeted.Should().NotBeNull(
+            "SpellCastFlow must broadcast a TargetsChosenEvent so becomes-targeted "
+            + "triggers (Ward, CR 702.21e) fire on the live cast path");
+        targeted!.StackObject.Should().BeSameAs(spell);
+        targeted.Targets.Should().ContainSingle()
+            .Which.Should().BeOfType<Target>()
+            .Which.TargetObject.Should().BeSameAs(bear);
+    }
+
+    [Fact]
+    public async Task UntargetedSpell_DoesNotPublishTargetsChosenEvent()
+    {
+        var bolt = new Instant("Bolt", "R") { Owner = _alice, Zone = ZoneType.Hand };
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        TargetsChosenEvent? targeted = null;
+        _bus.Subscribe<TargetsChosenEvent>(e => targeted = e);
+
+        await _flow.CastAsync(_alice, bolt,
+            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
+            agent, NewContext());
+
+        targeted.Should().BeNull(
+            "an untargeted spell chooses no targets — no TargetsChosenEvent");
     }
 
     [Fact]

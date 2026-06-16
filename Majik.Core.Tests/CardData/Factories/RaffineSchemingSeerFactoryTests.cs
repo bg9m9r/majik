@@ -66,7 +66,8 @@ public class RaffineSchemingSeerFactoryTests
         var card = (Creature)NamedCardFactory.Create("Raffine, Scheming Seer", _alice);
         card.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword)
             .Should().Contain(new[] { "Flying", "Ward" });
-        card.Abilities.OfType<TriggeredAbility>().Should().ContainSingle();
+        // The connive attack trigger + the Ward {1} trigger (CR 702.21e).
+        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
     }
 
     [Fact]

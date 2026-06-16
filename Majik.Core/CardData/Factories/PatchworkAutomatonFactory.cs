@@ -151,14 +151,17 @@ public static class PatchworkAutomatonFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Ward {2} (CR 702.21) — marker keyword. WardEffect exists as a
-        // standalone helper (BuildWardEffect bounds an instance to the
-        // live card) but the battlefield-attached triggered-ability
-        // surface is deferred; the marker keeps Patchwork Automaton
-        // shape-correct alongside Kappa Cannoneer / the rest of the Ward
-        // catalog.
+        // Ward {2} (CR 702.21) — marker keyword PLUS the real battlefield-
+        // attached triggered ability ("Whenever this creature becomes the
+        // target of a spell or ability an opponent controls, counter it
+        // unless its controller pays {2}"), wired off the shared
+        // WardTriggerWiring helper from the bound WardEffect; it fires on the
+        // live TargetsChosenEvent and counters via the live ResolutionContext
+        // stack (CR 608 / 701.5b).
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(
+            BuildWardEffect(card), owner, triggers: triggers);
 
         // ----------------------------------------------------------------
         // Cast trigger — CR 603.1.

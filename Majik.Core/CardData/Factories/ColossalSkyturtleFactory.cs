@@ -113,12 +113,17 @@ public static class ColossalSkyturtleFactory
         card.AddAbility(new KeywordAbility("Flying", card, owner));
 
         // ----------------------------------------------------------------
-        // Ward {2} (CR 702.21) — marker keyword. WardEffect builder exposed
-        // via BuildWardEffect for the spell-resolution opt-in path.
-        // Battlefield-attached trigger deferred (v1 gap — same as Tolarian
-        // Terror / Kappa Cannoneer).
+        // Ward {2} (CR 702.21) — marker keyword PLUS the real battlefield-
+        // attached triggered ability ("Whenever this creature becomes the
+        // target of a spell or ability an opponent controls, counter it
+        // unless its controller pays {2}"), wired off the shared
+        // WardTriggerWiring helper from the bound WardEffect. The trigger is
+        // attached to the card shape; TriggerManager auto-registers it on the
+        // battlefield (CR 603.6a). Same posture as Reality Smasher / Tolarian
+        // Terror.
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(BuildWardEffect(card), owner);
 
         // ----------------------------------------------------------------
         // Channel 1 — {2}{G}, Discard this card (CR 702.74):

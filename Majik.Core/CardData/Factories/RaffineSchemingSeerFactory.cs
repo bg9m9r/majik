@@ -88,9 +88,15 @@ public static class RaffineSchemingSeerFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // Flying (CR 702.9) + Ward {1} (CR 702.21) keyword markers.
+        // Flying (CR 702.9) + Ward {1} (CR 702.21) keyword markers. Ward also
+        // gets the real battlefield-attached triggered ability ("Whenever this
+        // creature becomes the target of a spell or ability an opponent
+        // controls, counter it unless its controller pays {1}") via the shared
+        // WardTriggerWiring helper.
         card.AddAbility(new KeywordAbility("Flying", card, owner));
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(
+            BuildWardEffect(card), owner, triggers: triggers);
 
         BuildAttackTrigger(card, owner, triggers);
 

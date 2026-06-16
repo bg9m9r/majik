@@ -99,7 +99,16 @@ public static class SireOfSevenDeathsFactory
         card.AddAbility(new KeywordAbility("Trample", card, owner));
         card.AddAbility(new KeywordAbility("Reach", card, owner));
         card.AddAbility(new KeywordAbility("Lifelink", card, owner));
+
+        // CR 702.21 — Ward—Pay 7 life: marker keyword PLUS the real
+        // battlefield-attached triggered ability ("Whenever this creature
+        // becomes the target of a spell or ability an opponent controls,
+        // counter it unless its controller pays 7 life"), wired off the shared
+        // WardTriggerWiring helper from the bound WardEffect (PayLifeCost(7),
+        // a non-mana ward — CR 702.21c). The trigger is attached to the card
+        // shape; TriggerManager auto-registers it on the battlefield.
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(BuildWardEffect(card), owner);
 
         return card;
     }

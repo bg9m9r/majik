@@ -81,11 +81,21 @@ public class KappaCannoneerTests
         ((Creature)card).BasePower.Should().Be(4);
         ((Creature)card).BaseToughness.Should().Be(4);
 
-        // One triggered ability (artifact ETB) + two keyword markers
-        // (Improvise + Ward) — no Improvise cost-reduction primitive yet.
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "single artifact-ETB trigger");
+        // Two triggered abilities — the artifact-ETB trigger and the Ward {4}
+        // trigger (CR 702.21e) — plus two keyword markers (Improvise + Ward).
+        // No Improvise cost-reduction primitive yet.
+        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
+            "artifact-ETB trigger + Ward {4} trigger");
     }
+
+    /// <summary>
+    /// The artifact-ETB trigger — the one that fires off a
+    /// <see cref="CardMovedEvent"/> (distinct from the Ward {4} trigger, which
+    /// fires off a <see cref="Majik.Core.Domain.DomainEvents.TargetsChosenEvent"/>).
+    /// </summary>
+    private static TriggeredAbility EtbTrigger(Creature kappa) =>
+        kappa.Abilities.OfType<TriggeredAbility>().Single(t =>
+            t.Condition is Majik.Core.Abilities.EventTriggerCondition<CardMovedEvent>);
 
     // -----------------------------------------------------------------------
     // Keyword markers (deferred wiring posture)
@@ -129,7 +139,7 @@ public class KappaCannoneerTests
         solRing.SetOwner(_alice);
         solRing.SetController(_alice);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
         var moveEvent = new CardMovedEvent(
             card: solRing,
             fromZone: ZoneType.Hand,
@@ -147,7 +157,7 @@ public class KappaCannoneerTests
         // alone (no separate self-ETB branch needed).
         var kappa = KappaCannoneerFactory.Create(_alice);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
         var moveEvent = new CardMovedEvent(
             card: kappa,
             fromZone: ZoneType.Hand,
@@ -167,7 +177,7 @@ public class KappaCannoneerTests
         bear.SetOwner(_alice);
         bear.SetController(_alice);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
         var moveEvent = new CardMovedEvent(
             card: bear,
             fromZone: ZoneType.Hand,
@@ -187,7 +197,7 @@ public class KappaCannoneerTests
         oppArtifact.SetOwner(_bob);
         oppArtifact.SetController(_bob);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
         var moveEvent = new CardMovedEvent(
             card: oppArtifact,
             fromZone: ZoneType.Hand,
@@ -208,7 +218,7 @@ public class KappaCannoneerTests
         kappa.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(kappa);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
         foreach (var effect in trigger.Effects) effect.Execute();
 
         kappa.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
@@ -224,7 +234,7 @@ public class KappaCannoneerTests
         kappa.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(kappa);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
         foreach (var effect in trigger.Effects) effect.Execute();
 
         // CR 702.x — "can't be blocked this turn" surfaces as a per-turn
@@ -241,7 +251,7 @@ public class KappaCannoneerTests
         kappa.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(kappa);
 
-        var trigger = kappa.Abilities.OfType<TriggeredAbility>().Single();
+        var trigger = EtbTrigger(kappa);
 
         var act = () => { foreach (var effect in trigger.Effects) effect.Execute(); };
 

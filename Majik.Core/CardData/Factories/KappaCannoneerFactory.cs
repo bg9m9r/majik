@@ -193,12 +193,17 @@ public static class KappaCannoneerFactory
         card.AddAbility(new KeywordAbility("Improvise", card, owner));
 
         // ----------------------------------------------------------------
-        // Ward {4} (CR 702.21) — marker keyword. WardEffect exists as a
-        // standalone helper (BuildWardEffect bounds an instance to the
-        // live card) but the battlefield-attached triggered-ability
-        // surface is deferred — see class xmldoc.
+        // Ward {4} (CR 702.21) — marker keyword PLUS the real battlefield-
+        // attached triggered ability: "Whenever this creature becomes the
+        // target of a spell or ability an opponent controls, counter it
+        // unless its controller pays {4}." Wired off the shared
+        // WardTriggerWiring helper from the bound WardEffect; it fires on the
+        // live TargetsChosenEvent (SpellCastFlow / AbilityActivator) and
+        // counters via the live ResolutionContext stack (CR 608 / 701.5b).
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Ward", card, owner));
+        Majik.Core.Keywords.WardTriggerWiring.Attach(
+            BuildWardEffect(card), owner, triggers: triggers);
 
         // ----------------------------------------------------------------
         // Artifact-ETB trigger — CR 603.1 / CR 603.6a.
