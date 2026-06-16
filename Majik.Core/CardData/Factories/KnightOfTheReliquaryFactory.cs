@@ -66,6 +66,25 @@ namespace Majik.Core.CardData.Factories;
 /// untapped (printed text doesn't say "tapped"), distinct from Primeval
 /// Titan's tapped-entry rider.
 ///
+/// ### RE-SOURCE-SAFE (Agatha's Soul Cauldron)
+///
+/// Closes the <c>knight-of-the-reliquary-sac-land-fetch-rebind</c> deferral.
+/// The tutor effect reads its source / controller off the live
+/// <see cref="Majik.Core.Effects.ResolutionContext.Source"/>
+/// (<c>(ctx.Source as Creature) ?? card</c>) rather than capturing the
+/// authoring <c>card</c>, and the ability is marked
+/// <see cref="ActivatedAbility.RebindSafe"/> = true. Its {T} cost is a
+/// source-capturing <see cref="AdditionalCost"/> that
+/// <see cref="ActivatedAbility.RebindTo"/> Stage-1 re-homes via
+/// <see cref="AdditionalCost.RebindSource"/>. Agatha's Soul Cauldron therefore
+/// re-homes the REAL ability to a counter-bearing creature (CR 707.2 /
+/// 613.1f / 702.49): the bearer taps, sacrifices a Forest or Plains the
+/// BEARER's controller controls, and tutors a land from the BEARER's
+/// controller's library onto the battlefield. The "Forest or Plains"
+/// sacrifice is a typed-non-self cost the closure pays against the
+/// re-sourced controller's battlefield (no per-cost rebind seam needed —
+/// the closure already scans <c>controller</c>, now read live off ctx.Source).
+///
 /// ## Deferred (v1 gaps)
 /// - <b>Sacrifice-cost agent prompt</b>: the v1 picker takes the first
 ///   Forest / Plains on the controller's battlefield. A real implementation

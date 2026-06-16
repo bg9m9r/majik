@@ -6921,4 +6921,85 @@ public class AgathasSoulCauldronTests
         copies.Single().Abilities.OfType<KeywordAbility>()
             .Should().Contain(k => k.Keyword == "Haste", "the copy gains haste");
     }
+
+    // -----------------------------------------------------------------------
+    // knight-of-the-reliquary-sac-land-fetch-rebind — the bespoke
+    // [CardName]-factory creature whose "{T}, Sacrifice a Forest or Plains:
+    // Search your library for a land card, put it onto the battlefield, then
+    // shuffle" activated ability was migrated to read ResolutionContext.Source
+    // + marked RebindSafe. The {T} cost re-homes via AdditionalCost.RebindSource
+    // (Stage 1); the "your library" / sacrifice-a-Forest-or-Plains "you control"
+    // both read the live source's controller, so Agatha re-homes the REAL
+    // ability to a BEARER: the bearer taps + sacrifices a Forest/Plains the
+    // BEARER's controller controls + tutors into the BEARER's controller's
+    // battlefield from the BEARER's controller's library (CR 707.2 / 613.1f).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsKnightOfTheReliquaryTutor_ToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // tutor activated ability is now RebindSafe.
+        var knight = KnightOfTheReliquaryFactory.Create(alice);
+        knight.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility)
+            .RebindSafe.Should().BeTrue(
+                "the migrated Knight tutor reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(knight);
+        knight.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Imprint Knight — the bearer gains its REAL tutor ability, re-homed.
+        Resolve(TapAbility(cauldron), knight);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Knight's real tutor is re-homed via RebindTo");
+        var tutor = granted[0];
+        tutor.Source.Should().BeSameAs(bearer, "re-homed to the BEARER (CR 707.2)");
+        tutor.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // STAGE 1 — the {T} cost now caps the BEARER, not the exiled Knight.
+        tutor.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle()
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+
+        // A Forest the BEARER's controller controls (the sacrifice fodder) and a
+        // land in the BEARER's controller's library (the tutor target).
+        var forest = new Land("Forest");
+        forest.AddSubtype(CardSubtype.Forest);
+        forest.SetOwner(alice);
+        forest.SetController(alice);
+        forest.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(forest);
+
+        var fetchTarget = new Land("Stomping Ground");
+        fetchTarget.SetOwner(alice);
+        alice.Zones.Library.AddCard(fetchTarget);
+        fetchTarget.SetZone(ZoneType.Library);
+
+        // Resolve the re-homed tutor through the ability path so
+        // ResolutionContext.Source = the bearer → controller = bearer's
+        // controller drives both "your library" and the Forest/Plains sacrifice.
+        await tutor.ResolveAsync(agent: null, game: null);
+
+        forest.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed tutor sacrifices a Forest the BEARER's controller controls");
+        alice.Zones.Graveyard.GetCards().Should().Contain(forest);
+        fetchTarget.Zone.Should().Be(ZoneType.Battlefield,
+            "the re-homed tutor puts a land from the BEARER's controller's library onto the battlefield");
+        alice.Zones.Battlefield.GetCards().Should().Contain(fetchTarget);
+        knight.Zone.Should().Be(ZoneType.Exile,
+            "the imprinted Knight stays exiled (CR 702.49) — the re-home is sound, never reaching back to the exiled card");
+    }
 }
