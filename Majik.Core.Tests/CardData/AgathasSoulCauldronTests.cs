@@ -2114,6 +2114,122 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_TutorToHand_RehomesSearchToBearerController()
+    {
+        // agatha-oracle-shape-tutor-to-hand: the OracleActivatedAbilityBinder now
+        // reconstructs the library-tutor-to-hand shape "{cost}: Search your
+        // library for a <type> card, reveal it, put it into your hand, then
+        // shuffle." (a common self-source tutor leg — Fauna Shaman's creature
+        // tutor, the search-land/equipment family). Re-homing is sound: the search
+        // operates on the BEARER-CONTROLLER's OWN library (CR 701.19a / 701.20a /
+        // 613.1f), never the exiled card — there is no "this creature" / source
+        // reference at all. With no agent the deterministic first-match is taken.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability tutors a creature card to hand:
+        // "{1}{G}, {T}: Search your library for a creature card, reveal it, put it
+        // into your hand, then shuffle."
+        var sage = new Creature("Sage Stub", "1G", 2, 2);
+        sage.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(sage);
+        sage.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // Library: one creature card (the legal tutor target) + one non-creature
+        // card (must be ignored by the type filter).
+        var beast = new Creature("Tutored Beast", "3G", 3, 3);
+        beast.SetOwner(alice);
+        alice.Zones.Library.AddCard(beast);
+        beast.SetZone(ZoneType.Library);
+        var bolt = new Card("Some Spell", "");
+        bolt.SetOwner(alice);
+        alice.Zones.Library.AddCard(bolt);
+        bolt.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Sage Stub",
+                "{1}{G}, {T}: Search your library for a creature card, reveal it, "
+                + "put it into your hand, then shuffle.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sage);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's tutor-to-hand ability");
+        var tutorAbility = granted[0];
+        tutorAbility.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        tutorAbility.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("1") && c.Description.Contains("G"));
+        tutorAbility.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        tutorAbility.TargetRequests.Should().BeEmpty(
+            "a library search is a hidden choice (CR 115.1a), not a chosen target");
+
+        // Activating it searches the BEARER-CONTROLLER's library, moves the only
+        // matching (creature) card to their hand, and shuffles. With no agent the
+        // deterministic first-match (the creature card) is taken.
+        foreach (var effect in tutorAbility.Effects) effect.Execute();
+        alice.Zones.Hand.GetCards().Should().Contain(beast,
+            "the re-homed tutor puts the matching creature card into the controller's hand");
+        alice.Zones.Hand.GetCards().Should().NotContain(bolt,
+            "the type filter excludes the non-creature card");
+        alice.Zones.Library.GetCards().Should().NotContain(beast,
+            "the tutored card left the library");
+        alice.Zones.Library.GetCards().Should().Contain(bolt,
+            "the non-matching card stays in the library");
+    }
+
+    [Fact]
+    public void Grant_NonMana_TutorToHand_AnyCard_RehomesSearchToBearerController()
+    {
+        // The bare "card" (no type filter) form: "{2}, {T}: Search your library
+        // for a card, put it into your hand, then shuffle." Any card qualifies.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var sage = new Creature("Sage Stub", "2", 1, 1);
+        sage.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(sage);
+        sage.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var anyCard = new Card("Any Card", "");
+        anyCard.SetOwner(alice);
+        alice.Zones.Library.AddCard(anyCard);
+        anyCard.SetZone(ZoneType.Library);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Sage Stub",
+                "{2}, {T}: Search your library for a card, put it into your hand, "
+                + "then shuffle.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sage);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's bare-card tutor-to-hand ability");
+        var tutorAbility = granted[0];
+        tutorAbility.TargetRequests.Should().BeEmpty();
+
+        foreach (var effect in tutorAbility.Effects) effect.Execute();
+        alice.Zones.Hand.GetCards().Should().Contain(anyCard,
+            "the bare-card tutor puts any card into the controller's hand");
+    }
+
+    [Fact]
     public void Grant_NonMana_Fight_RehomesFightToBearerAndChosenTarget()
     {
         var alice = new Player("Alice", 20);
@@ -2415,9 +2531,11 @@ public class AgathasSoulCauldronTests
         var zones = new Majik.Core.Services.ZoneService(bus);
 
         // A creature whose only ability is a bespoke, NON-reconstructable one:
-        // a tutor with an unmodellable cost shape and an effect the binder
-        // doesn't know. Plus an "Activate only" rider on a pump (must be skipped
-        // too — sound, not broken).
+        // a tutor whose TYPED sub-filter ("Equipment card") is not a plain
+        // card-type test AND whose destination is the battlefield, not the hand —
+        // outside the open library-tutor-to-hand shape the binder reconstructs.
+        // Plus an "Activate only" rider on a pump (must be skipped too — sound,
+        // not broken) and an unmodellable-cost ({E}{E}) pinger.
         var bespoke = new Creature("Bespoke Stub", "2GG", 3, 3);
         bespoke.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(bespoke);
@@ -2427,8 +2545,8 @@ public class AgathasSoulCauldronTests
 
         var cauldron = GrantingCauldron(alice, effects, bus,
             OracleStub(("Bespoke Stub",
-                "{2}, {T}: Search your library for a creature card, reveal it, "
-                + "put it into your hand, then shuffle.\n"
+                "{2}, {T}: Search your library for an Equipment card, put it onto "
+                + "the battlefield, then shuffle.\n"
                 + "{G}: This creature gets +2/+2 until end of turn. Activate only as a sorcery.\n"
                 + "{E}{E}: This creature deals 2 damage to any target.")));
         alice.Zones.Library.AddCard(cauldron);
