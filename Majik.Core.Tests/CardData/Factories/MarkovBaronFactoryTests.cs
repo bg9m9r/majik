@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
+using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
@@ -31,6 +32,8 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Lord static (CR 613.7c): other controller-Vampires get +1/+1; the Baron
 ///   doesn't buff itself ("Other"); opponents' / non-Vampires unaffected.
 /// - Madness {2}{B} catalogued (CR 702.35 — supported intrinsically).
+/// - Effects-aware NamedCardFactory dispatch wires the anthem live (prod rail —
+///   the vampire-lord-anthem-static deferral pay-down).
 /// </summary>
 [Trait("Color", "M")]
 public class MarkovBaronFactoryTests
@@ -134,5 +137,28 @@ public class MarkovBaronFactoryTests
         var baron = MarkovBaronFactory.Create(_alice);
         MadnessCatalog.HasMadness(baron).Should().BeTrue();
         MadnessCatalog.CostFor(baron).Should().Be(ManaCost.Parse("{2}{B}"));
+    }
+
+    [Fact]
+    public void NamedCardFactory_EffectsAwareDispatch_WiresAnthem()
+    {
+        // Prod rail: the effects-aware NamedCardFactory.Create(name, owner,
+        // effects) overload — which DeckCardBuilder's instance-swap uses in live
+        // matches — must register the LordStaticEffect so the anthem is NOT
+        // dropped in production (the deferral's stated bug).
+        var svc = new ContinuousEffectsService();
+
+        var otherVamp = MakeVampire(_alice);
+        otherVamp.ActiveEffects = svc;
+
+        var built = NamedCardFactory.Create("Markov Baron", _alice, svc);
+        built.Should().BeOfType<Creature>();
+        var baron = (Creature)built;
+        baron.SetZone(ZoneType.Battlefield);
+        baron.ActiveEffects = svc;
+
+        otherVamp.GetPower().Should().Be(3,
+            "effects-aware dispatch registers the lord static effect on the live service");
+        otherVamp.GetToughness().Should().Be(4);
     }
 }
