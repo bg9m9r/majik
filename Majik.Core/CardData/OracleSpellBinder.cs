@@ -172,6 +172,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.ThoughtseizePatternTemplate(),
             new SpellTemplates.Templates.Bespoke.InquisitionOfKozilekPatternTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealHandMayChooseTemplate(),
+            new SpellTemplates.Templates.Bespoke.RevealHandTopBottomChosenTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealHandThenDiscardTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealHandThenExileTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealHandGraveOrHandExileTemplate(),
