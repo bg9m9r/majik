@@ -296,6 +296,30 @@ namespace Majik.Core.CardData;
 ///     unsound, and a "put it onto the battlefield" land-ramp search is NOT this
 ///     shape (only the "to your hand" destination is matched). Sound on any
 ///     permanent bearer.</item>
+///   <item><b>Search-to-battlefield (Equipment / land tutor)</b> —
+///     <c>"{cost}: Search your library for a/an &lt;Equipment|land&gt; card, put
+///     it onto the battlefield, then shuffle."</c> The library-tutor-onto-the-
+///     BATTLEFIELD sibling of the search-to-hand shape (Knight of the Reliquary's
+///     land tutor; the Stoneforge-class Equipment tutor). Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose ResolutionContext-aware resolution
+///     searches the BEARER's CONTROLLER's own library for a card matching the open
+///     card-type filter — "Equipment card" (Artifact — Equipment subtype, CR
+///     301.5d) or "land card" (Land type, CR 305) — consults the live agent off
+///     <see cref="ResolutionContext.Agent"/> (deterministic first-eligible
+///     fallback, the SAME posture as the bespoke tutor factories), moves the pick
+///     Library → Battlefield (through the controller's registered
+///     <see cref="Majik.Core.Services.ZoneService"/> when one exists so ETB
+///     triggers + replacements fire per CR 603.6a / 614; raw zone fallback
+///     otherwise), then shuffles once (CR 701.20a). Sound to re-home onto ANY
+///     permanent bearer: the search references the controller's OWN library, the
+///     card enters the controller's battlefield, and the controller's library is
+///     shuffled — NO "this creature" / source reference at all (same
+///     controller-scoped soundness class as draw / mill / surveil). The typed-
+///     sacrifice cost on Knight's printed line ("Sacrifice a Forest or Plains") is
+///     not in the cost grammar, so Knight's EXACT line is skipped — the EFFECT
+///     shape is what is reconstructed (exercised with a reconstructable cost); a
+///     non-Equipment / non-land tutor (creature / colour / "basic land") is
+///     skipped as unsound.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -330,8 +354,12 @@ namespace Majik.Core.CardData;
 ///     controls", "target attacking creature", "another target creature") —
 ///     the candidate filter isn't reconstructed; only the open
 ///     any-target / target-creature / target-player forms are rebuilt.</item>
-///   <item>Every shape not in the list above (tutors, mode-bearing abilities,
-///     token makers, anthem grants, loyalty-style, bespoke one-offs). (Scry /
+///   <item>Every shape not in the list above (general tutors with an open
+///     candidate filter we don't model, mode-bearing abilities,
+///     token makers, anthem grants, loyalty-style, bespoke one-offs). (The
+///     Equipment / land search-to-BATTLEFIELD tutor, listed in the shapes-rebuilt
+///     section, IS reconstructed — only its two open card-type filters; a general
+///     "search for a card" / typed-sub-filter tutor remains skipped. Scry /
 ///     mill / surveil, listed here previously, ARE now reconstructed above: the
 ///     library-selection shapes read their agent decision off the live
 ///     <see cref="ResolutionContext"/> the same way the declarative
@@ -949,6 +977,37 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Return this (?:card|creature) (?:from your graveyard )?to (?:its owner's|your) hand\.$",
         RegexOptions.IgnoreCase);
 
+    // "{cost}: Search your library for a/an <Equipment|land> card, put it/that
+    // card onto the battlefield, then shuffle." (CR 701.19a search / CR 701.20a
+    // shuffle.) The library-TUTOR-onto-BATTLEFIELD sibling of the search-to-hand
+    // shape (Fauna Shaman, which is bespoke + RebindTo). The canonical re-home
+    // target is Knight of the Reliquary's "Search your library for a land card,
+    // put it onto the battlefield, then shuffle." (the typed-sacrifice cost on
+    // Knight's printed line — "Sacrifice a Forest or Plains" — is NOT in the
+    // CostList grammar, so Knight's exact line is skipped; the EFFECT shape is
+    // what this binder reconstructs, exercised here with a reconstructable cost).
+    // Sound to re-home onto ANY permanent bearer: the search references the
+    // BEARER's CONTROLLER's OWN library (CR 109.5 / 400.7 — "your" = the
+    // ability's controller), the chosen card enters the controller's
+    // battlefield, and the controller's library is shuffled — never the exiled
+    // imprinted card. There is no "this creature" / source reference, so the
+    // re-home is a clean controller-scoped tutor (the same soundness class as the
+    // draw / mill / surveil controller-scoped shapes). The candidate filter is
+    // restricted to the two OPEN, source-independent card-type forms that appear
+    // on real "put onto the battlefield" tutors — "Equipment card" (Artifact —
+    // Equipment subtype membership, CR 301.5d) and "land card" (Land type
+    // membership, CR 305) — each an unambiguous predicate with no source-card
+    // dependence. A typed sub-filter ("basic land card", a creature/colour
+    // tutor) is NOT this shape and is skipped, consistent with the
+    // restricted-target soundness boundary. Group 1 = cost, group 2 = the card
+    // form ("Equipment" | "basic land" rejected | "land"). The optional
+    // "it"/"that card"/"that card" phrasing and the trailing ", then shuffle."
+    // are matched but carry no captured data.
+    private static readonly Regex SearchToBattlefieldRegex = new(
+        @"^(" + CostList + @")\s*:\s*Search your library for an? (Equipment|land) card,"
+        + @" put (?:it|that card|them) onto the battlefield, then shuffle\.$",
+        RegexOptions.IgnoreCase);
+
     // A single tap symbol inside a cost list.
     private static readonly Regex TapTokenRegex = new(@"^\{T\}$", RegexOptions.IgnoreCase);
 
@@ -1253,6 +1312,14 @@ public static class OracleActivatedAbilityBinder
             if (gyReturn.Success)
             {
                 var ability = TryBuildGraveyardReturnSelf(gyReturn, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var searchToBf = SearchToBattlefieldRegex.Match(line);
+            if (searchToBf.Success)
+            {
+                var ability = TryBuildSearchToBattlefield(searchToBf, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -1991,6 +2058,113 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { millEffect });
+    }
+
+    /// <summary>
+    /// Build a search-library-onto-battlefield ability:
+    /// "{cost}: Search your library for a/an &lt;Equipment|land&gt; card, put it
+    /// onto the battlefield, then shuffle." (CR 701.19a search / CR 701.20a
+    /// shuffle.) The tutor-onto-battlefield sibling of the search-to-hand shape.
+    /// Re-homed so the BEARER's CONTROLLER searches THEIR own library (CR 109.5 /
+    /// 400.7 — "your" = the ability's controller), the chosen card enters the
+    /// controller's battlefield, and the controller's library is shuffled — never
+    /// the exiled imprinted card. There is no "this creature" / source reference
+    /// at all, so the re-home is a clean controller-scoped tutor (same soundness
+    /// class as the draw / mill / surveil controller-scoped shapes); it does NOT
+    /// gate on <see cref="Creature"/> (any permanent bearer can pay to tutor).
+    /// <para>The ResolutionContext-aware effect body reads the controller off
+    /// <see cref="ResolutionContext.Controller"/> on the live path (else the
+    /// captured <paramref name="controller"/> on the legacy sync path), gathers the
+    /// controller's library cards matching the open card-type predicate, consults
+    /// the live agent off <see cref="ResolutionContext.Agent"/> (falling back to
+    /// <see cref="AgentRegistry"/>, then the deterministic first-eligible default —
+    /// the SAME posture as Knight of the Reliquary / Stoneforge Mystic), moves the
+    /// pick Library → Battlefield (through the controller's registered
+    /// <see cref="Majik.Core.Services.ZoneService"/> when one exists, so ETB
+    /// triggers + replacements on the tutored permanent fire per CR 603.6a / 614;
+    /// raw zone fallback otherwise), then shuffles once via
+    /// <see cref="LibraryShuffle.ShuffleLibrary"/> (CR 701.20a — even when zero
+    /// cards were found, the search still happened). The printed "reveal" signal is
+    /// the same v1 gap as every tutor factory.</para>
+    /// <paramref name="cardForm"/> is the open card-type word ("Equipment" |
+    /// "land"), mapped to a source-independent membership predicate (Artifact —
+    /// Equipment subtype, CR 301.5d / Land type, CR 305).
+    /// </summary>
+    private static ActivatedAbility? TryBuildSearchToBattlefield(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var cardForm = match.Groups[2].Value.Trim().ToLowerInvariant();
+        Func<ICard, bool> predicate = cardForm switch
+        {
+            "equipment" => c => c.HasSubtype(CardSubtype.Equipment),
+            "land" => c => c.HasType(CardType.Land),
+            _ => null!,
+        };
+        if (predicate == null) return null; // unrecognised form — skip as unsound
+
+        var searchEffect = new Effect(
+            $"Granted: search your library for a {cardForm} card -> battlefield, then shuffle",
+            async (ResolutionContext rc) =>
+            {
+                // CR 109.5 / 400.7 — "your library" = the ability's controller's
+                // library; read the live controller off the resolution context,
+                // else the captured controller (legacy sync path).
+                var searcher = rc.Controller ?? controller;
+
+                // CR 701.19a — search for a matching card. A "may"/decline + a
+                // fail-to-find are both legal; the deterministic fallback simply
+                // takes the first eligible card when no agent is registered.
+                var candidates = searcher.Zones.Library.GetCards()
+                    .Where(predicate)
+                    .ToList();
+
+                ICard? pick = null;
+                if (candidates.Count > 0)
+                {
+                    var agent = rc.Agent ?? AgentRegistry.Get(searcher);
+                    pick = agent != null
+                        ? await agent.ChooseLibraryPickAsync(
+                                rc.Game, candidates,
+                                cardForm + " card to put onto the battlefield", rc.Ct)
+                            .ConfigureAwait(false)
+                        : candidates[0];
+                }
+
+                if (pick != null)
+                {
+                    // CR 603.6a / 614 — Library → Battlefield through the
+                    // controller's ZoneService when one is registered, so ETB
+                    // triggers + replacements on the tutored permanent fire; raw
+                    // zone fallback otherwise (shape-only / unwired path).
+                    var zones = Majik.Core.Services.ZoneServiceRegistry.Get(searcher);
+                    if (zones != null)
+                    {
+                        await zones.MoveCardToAsync(
+                                pick, ZoneType.Battlefield, rc, controller: searcher)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        searcher.Zones.Library.RemoveCard(pick);
+                        searcher.Zones.Battlefield.AddCard(pick);
+                        pick.SetZone(ZoneType.Battlefield);
+                        if (pick is Permanent perm) perm.SetController(searcher);
+                    }
+                }
+
+                // CR 701.20a — one shuffle after the search resolves, whether or
+                // not a card was found.
+                LibraryShuffle.ShuffleLibrary(searcher, "granted-search-to-battlefield");
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { searchEffect });
     }
 
     /// <summary>
