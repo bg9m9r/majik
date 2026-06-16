@@ -75,6 +75,29 @@ public class BrazenBorrowerTests
     }
 
     [Fact]
+    public void BrazenBorrower_CanBlockOnlyCreaturesWithFlying()
+    {
+        // CR 509.1b — "This creature can block only creatures with flying."
+        var borrower = BrazenBorrowerFactory.Create(_bob);
+        borrower.SetController(_bob);
+        borrower.SetZone(ZoneType.Battlefield);
+
+        Majik.Core.Combat.CombatAbilities.CanBlockOnlyCreaturesWithFlying(borrower)
+            .Should().BeTrue("Brazen Borrower carries the CanBlockOnlyFlying rider");
+
+        var validator = new Majik.Core.Combat.CombatValidator();
+
+        var ground = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = _alice };
+        validator.CanBlock(borrower, new Majik.Core.Combat.Attacker(ground, _bob), _bob)
+            .Should().BeFalse("Brazen Borrower can't block a non-flying attacker");
+
+        var flier = new Creature("Drake", "2U", 2, 2) { Controller = _alice };
+        flier.AddAbility(new KeywordAbility("Flying", flier, _alice));
+        validator.CanBlock(borrower, new Majik.Core.Combat.Attacker(flier, _bob), _bob)
+            .Should().BeTrue("Brazen Borrower can block a flying attacker");
+    }
+
+    [Fact]
     public void NamedCardFactory_Dispatches_BrazenBorrower()
     {
         var card = NamedCardFactory.Create("Brazen Borrower", _alice);

@@ -203,10 +203,13 @@ public static class PinnacleEmissaryFactory
             Power: TokenPower,
             Toughness: TokenToughness,
             Subtypes: new[] { CardSubtype.Drone },
-            // Flying keyword marker. The "can block only creatures with
-            // flying" restriction is documented but unenforced — see
-            // class xmldoc.
-            Keywords: new[] { "Flying" },
+            // CR 702.9 Flying + CR 509.1b "This token can block only creatures
+            // with flying" — both stamped as keyword markers. The block
+            // restriction is read combat-side via
+            // CombatAbilities.CanBlockOnlyCreaturesWithFlying and gated in both
+            // CombatValidator.CanBlock and BlockLegality.CanBlock: the Drone may
+            // be declared as a blocker only against a flying attacker.
+            Keywords: new[] { "Flying", "CanBlockOnlyFlying" },
             // CR 105 / CR 111.4 — printed "colourless" token. Explicit
             // empty colour list stamps the colourless override on the
             // resulting Card.TokenColorsOverride.

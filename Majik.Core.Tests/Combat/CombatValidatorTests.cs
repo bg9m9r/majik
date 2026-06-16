@@ -191,6 +191,42 @@ public class CombatValidatorTests
     }
 
     [Fact]
+    public void CanBlock_CanBlockOnlyFlying_NonFlyingAttacker_ReturnsFalse()
+    {
+        // CR 509.1b — "This creature can block only creatures with flying"
+        // (Brazen Borrower, Shacklegeist, Pinnacle Emissary's Drone token). The
+        // blocker may be declared ONLY against a flying attacker; a non-flying
+        // attacker can't be blocked by it.
+        var attackingPlayer = new Player("Alice", 20);
+        var defendingPlayer = new Player("Bob", 20);
+        var groundAttacker = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = attackingPlayer };
+        var blocker = new Creature("Brazen Borrower", "1UU", 3, 1) { Controller = defendingPlayer };
+        blocker.SetZone(ZoneType.Battlefield);
+        blocker.AddAbility(new Majik.Core.Abilities.KeywordAbility("Flying", blocker, defendingPlayer));
+        blocker.AddAbility(new Majik.Core.Abilities.KeywordAbility("CanBlockOnlyFlying", blocker, defendingPlayer));
+        var attacker = new Attacker(groundAttacker, defendingPlayer);
+
+        _validator.CanBlock(blocker, attacker, defendingPlayer).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanBlock_CanBlockOnlyFlying_FlyingAttacker_ReturnsTrue()
+    {
+        // CR 509.1b — the same blocker MAY block a flying attacker.
+        var attackingPlayer = new Player("Alice", 20);
+        var defendingPlayer = new Player("Bob", 20);
+        var flyingAttacker = new Creature("Drake", "2U", 2, 2) { Controller = attackingPlayer };
+        flyingAttacker.AddAbility(new Majik.Core.Abilities.KeywordAbility("Flying", flyingAttacker, attackingPlayer));
+        var blocker = new Creature("Brazen Borrower", "1UU", 3, 1) { Controller = defendingPlayer };
+        blocker.SetZone(ZoneType.Battlefield);
+        blocker.AddAbility(new Majik.Core.Abilities.KeywordAbility("Flying", blocker, defendingPlayer));
+        blocker.AddAbility(new Majik.Core.Abilities.KeywordAbility("CanBlockOnlyFlying", blocker, defendingPlayer));
+        var attacker = new Attacker(flyingAttacker, defendingPlayer);
+
+        _validator.CanBlock(blocker, attacker, defendingPlayer).Should().BeTrue();
+    }
+
+    [Fact]
     public void CanBlock_NullCreature_ReturnsFalse()
     {
         // Arrange

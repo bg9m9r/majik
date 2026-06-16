@@ -122,6 +122,22 @@ public static class CombatAbilities
     public static bool CanBlockFlying(Permanent c) => HasFlying(c) || HasReach(c);
 
     /// <summary>
+    /// CR 509.1b — true when <paramref name="c"/> carries the
+    /// "This creature can block only creatures with flying" rider (recorded as
+    /// a <c>"CanBlockOnlyFlying"</c> <see cref="KeywordAbility"/> marker, e.g.
+    /// Brazen Borrower, Shacklegeist, Pinnacle Emissary's Drone token). This is
+    /// the SYMMETRIC counterpart to <see cref="CanBlockFlying"/>: where flying
+    /// (CR 702.9b) restricts which creatures may block a flyer, this restricts
+    /// which creatures THIS creature may block — it can be declared as a blocker
+    /// only against an attacker that has flying. Read as either a printed
+    /// <see cref="KeywordAbility"/> (the factory-stamped form) or the
+    /// layer-computed keyword set (a granted instance), like every other marker
+    /// in this class.
+    /// </summary>
+    public static bool CanBlockOnlyCreaturesWithFlying(Permanent? c) =>
+        c != null && Has(c, "CanBlockOnlyFlying");
+
+    /// <summary>
     /// CR 509.1c / 509.1g — the "all creatures able to block this creature
     /// do so" requirement (Lure / Breaker of Armies / Nemesis Mask family).
     /// Returns true iff this attacker carries the

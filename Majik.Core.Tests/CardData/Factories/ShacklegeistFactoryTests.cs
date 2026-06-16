@@ -95,6 +95,29 @@ public class ShacklegeistFactoryTests
     }
 
     [Fact]
+    public void Shacklegeist_CanBlockOnlyCreaturesWithFlying()
+    {
+        // CR 509.1b — "This creature can block only creatures with flying."
+        var geist = ShacklegeistFactory.Create(_bob);
+        geist.SetController(_bob);
+        geist.SetZone(ZoneType.Battlefield);
+
+        Majik.Core.Combat.CombatAbilities.CanBlockOnlyCreaturesWithFlying(geist)
+            .Should().BeTrue();
+
+        var validator = new Majik.Core.Combat.CombatValidator();
+
+        var ground = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Controller = _alice };
+        validator.CanBlock(geist, new Majik.Core.Combat.Attacker(ground, _bob), _bob)
+            .Should().BeFalse();
+
+        var flier = new Creature("Drake", "{2}{U}", 2, 2) { Controller = _alice };
+        flier.AddAbility(new KeywordAbility("Flying", flier, _alice));
+        validator.CanBlock(geist, new Majik.Core.Combat.Attacker(flier, _bob), _bob)
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void NamedCardFactory_Dispatches_Shacklegeist()
     {
         var card = NamedCardFactory.Create("Shacklegeist", _alice);

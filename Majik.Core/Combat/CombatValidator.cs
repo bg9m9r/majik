@@ -138,6 +138,17 @@ public class CombatValidator
             return false;
         }
 
+        // CR 509.1b — "This creature can block only creatures with flying"
+        // (Brazen Borrower, Shacklegeist, Pinnacle Emissary's Drone token). The
+        // SYMMETRIC counterpart to the flyer check above: such a blocker may be
+        // declared only against an attacker that has flying. A non-flying
+        // attacker can't be blocked by it.
+        if (CombatAbilities.CanBlockOnlyCreaturesWithFlying(creature)
+            && !CombatAbilities.HasFlying(attacker.Creature))
+        {
+            return false;
+        }
+
         // CR 702.16e — attacker with protection from blocker's colour can't
         // be blocked by that colour. Check both directions: attacker's
         // protection vs blocker, and blocker's protection vs attacker
