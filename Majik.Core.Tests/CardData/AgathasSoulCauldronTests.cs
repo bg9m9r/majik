@@ -3742,6 +3742,130 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // agatha-stoneforge-mystic-source-migration — Stoneforge Mystic is a
+    // bespoke [CardName]-factory creature whose non-mana activated ability
+    // ("{1}{W}, {T}: You may put an Equipment card from your hand onto the
+    // battlefield. Then attach it to a creature you control.") is OUTSIDE the
+    // OracleActivatedAbilityBinder reconstructable set — "put an Equipment card
+    // from your hand onto the battlefield" is not a shape the cost/effect
+    // grammar reconstructs, so the oracle-rebuild fallback emits NOTHING for it.
+    // The migration retargets the effect to read the acting player from
+    // ResolutionContext.Source's controller (rather than capturing `owner`) and
+    // marks the ability RebindSafe, so Agatha's group-grant re-homes the REAL
+    // ability ({T} cost auto-re-homes to the bearer; the {1}{W} mana cost passes
+    // through, paid by the bearer's controller) onto a counter-bearing bearer
+    // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the BEARER'S
+    // controller plays an Equipment from THEIR hand onto the battlefield and
+    // attaches it to a creature THEY control, never re-reading the exiled
+    // Stoneforge Mystic.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_StoneforgeMystic()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {1}{W},{T} put-Equipment-from-hand) is
+        // now RebindSafe (reads ResolutionContext.Source's controller). A
+        // "put an Equipment from your hand onto the battlefield" effect is NOT
+        // reconstructable from oracle text, so the RebindTo of the real ability
+        // is the only sound re-home.
+        var mystic = StoneforgeMysticFactory.Create(alice);
+        var realAbilities = mystic.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Stoneforge Mystic has exactly one non-mana activated ability — the put-Equipment");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Stoneforge Mystic ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(mystic);
+        mystic.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Stoneforge Mystic so the
+        // only way the ability is granted is via RebindTo of the real ability —
+        // the oracle-rebuild fallback cannot reconstruct a "put an Equipment
+        // from your hand onto the battlefield" effect, so if the grant still
+        // depended on it nothing would be emitted and this test would fail.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), mystic);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Stoneforge Mystic's real put-Equipment ability is re-homed via RebindTo");
+        var putEquip = granted[0];
+        putEquip.Source.Should().BeSameAs(bearer,
+            "the re-homed put-Equipment ability is sourced on the BEARER (CR 707.2)");
+        putEquip.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        putEquip.Costs.OfType<Majik.Core.Costs.AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == Majik.Core.Costs.AdditionalCostType.Tap)
+            .Which.Description.Should().Contain("Tap",
+                "the {T} cost is auto-re-homed to the bearer by RebindTo (Stage 1)");
+
+        // Stock the bearer-controller's (Alice's) HAND with an Equipment so the
+        // re-homed ability has something to put onto the battlefield.
+        var equipment = new Artifact("Library Sword", "{2}",
+            subtypes: new[] { CardSubtype.Equipment });
+        equipment.SetOwner(alice);
+        alice.Zones.Hand.AddCard(equipment);
+        equipment.SetZone(ZoneType.Hand);
+
+        // Resolving the re-homed ability reads ResolutionContext.Source = bearer,
+        // so the BEARER'S controller (Alice) puts the Equipment from THEIR hand
+        // onto the battlefield and attaches it to a creature THEY control (the
+        // bearer itself is a creature Alice controls).
+        await putEquip.ResolveAsync(agent: null, game: null);
+
+        alice.Zones.Battlefield.GetCards().Should().Contain(equipment,
+            "the re-homed ability put the bearer-controller's hand Equipment onto the battlefield");
+        alice.Zones.Hand.GetCards().Should().NotContain(equipment,
+            "the Equipment left the hand");
+        equipment.AttachedTo.Should().BeSameAs(bearer,
+            "the Equipment is attached to a creature the bearer-controller controls (CR 701.3a)");
+    }
+
+    [Fact]
+    public async Task BespokePutEquipment_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still acts on its OWN source's controller
+        // on the normal (un-rebound) resolution path —
+        // ResolutionContext.Source = the card.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var mystic = StoneforgeMysticFactory.Create(alice);
+        alice.Zones.Library.AddCard(mystic);
+        zones.MoveCard(mystic, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var putEquip = mystic.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        // An Equipment in Alice's hand + a creature she controls on the
+        // battlefield (the Stoneforge Mystic itself is a creature).
+        var equipment = new Artifact("Library Sword", "{2}",
+            subtypes: new[] { CardSubtype.Equipment });
+        equipment.SetOwner(alice);
+        alice.Zones.Hand.AddCard(equipment);
+        equipment.SetZone(ZoneType.Hand);
+
+        await putEquip.ResolveAsync(agent: null, game: null);
+
+        alice.Zones.Battlefield.GetCards().Should().Contain(equipment,
+            "resolving the un-rebound ability puts its own source's controller's hand Equipment onto the battlefield");
+        equipment.AttachedTo.Should().NotBeNull(
+            "the Equipment is attached to a creature the source's controller controls");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-grant-next-bespoke-closure-resourcecontext-migration — Arcbound
     // Ravager is a bespoke [CardName]-factory creature whose sole non-mana
     // activated ability ("Sacrifice an artifact: Put a +1/+1 counter on this

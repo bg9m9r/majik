@@ -141,45 +141,74 @@ public static class StoneforgeMysticFactory
         // ZoneService so ETB triggers + replacements on the Equipment
         // fire (PR #165).
         // v1 picker is deterministic — see class xmldoc.
+        //
+        // RE-SOURCE-SAFE (agatha-stoneforge-mystic-source-migration): the
+        // acting player is the controller of the LIVE ResolutionContext.Source
+        // (the ability's own Source at resolution) rather than the captured
+        // `card`/`owner`, falling back to `card`'s controller only on the
+        // context-less legacy sync path. Marked RebindSafe below so Agatha's
+        // Soul Cauldron re-homes the REAL put-Equipment-onto-battlefield
+        // ability to a counter-bearing bearer via ActivatedAbility.RebindTo
+        // (CR 707.2 / 613.1f) — the BEARER'S controller plays an Equipment from
+        // THEIR hand onto the battlefield and attaches it to a creature THEY
+        // control, never the exiled Stoneforge Mystic. The {T} cost auto-re-homes
+        // (RebindTo Stage 1); the {1}{W} mana cost passes through and is paid by
+        // the bearer's controller (the activating player), which is sound.
+        // "Put an Equipment card from your hand onto the battlefield" is outside
+        // OracleActivatedAbilityBinder's reconstructable set, so RebindTo of the
+        // real ability is the only sound re-home.
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             "Stoneforge Mystic: put Equipment from hand to battlefield, then attach",
-            () =>
+            ctx =>
             {
+                // The acting player = the controller of the live source at
+                // resolution (CR 117.x). Fall back to the captured card's
+                // controller / owner on the context-less legacy sync path.
+                var player = (ctx.Source as Permanent)?.Controller
+                    ?? card.Controller ?? owner;
+
                 // Choose the Equipment at resolution time (CR 117.1a).
-                var equipment = owner.Zones.Hand.GetCards()
+                var equipment = player.Zones.Hand.GetCards()
                     .OfType<Permanent>()
                     .FirstOrDefault(p => p.HasSubtype(CardSubtype.Equipment));
 
                 // "You may …" + "if you can't, …" — declining or having no
                 // Equipment in hand resolves as a no-op (CR 605.1 / 117.x —
                 // a may-effect with no valid execution simply does nothing).
-                if (equipment == null) return;
+                if (equipment == null) return default;
 
-                // Move hand → battlefield. Prefer ZoneService so ETB
-                // triggers / replacements on the Equipment fire (CR 603.6a,
-                // CR 614). Fall back to raw zone manipulation when no
-                // service is wired (test / shape path).
-                if (zoneService != null)
+                // Move hand → battlefield. Prefer the player's registered
+                // ZoneService so ETB triggers / replacements on the Equipment
+                // fire (CR 603.6a, CR 614). The ctor-captured zoneService is
+                // used when the acting player IS this card's owner (legacy
+                // path); otherwise consult the registry for the acting player.
+                // Fall back to raw zone manipulation when no service is wired
+                // (test / shape path).
+                var service = ReferenceEquals(player, owner)
+                    ? (zoneService ?? ZoneServiceRegistry.Get(player))
+                    : ZoneServiceRegistry.Get(player);
+                if (service != null)
                 {
-                    zoneService.MoveCard(equipment, ZoneType.Hand, ZoneType.Battlefield, owner);
+                    service.MoveCard(equipment, ZoneType.Hand, ZoneType.Battlefield, player);
                 }
                 else
                 {
-                    owner.Zones.Hand.RemoveCard(equipment);
-                    owner.Zones.Battlefield.AddCard(equipment);
+                    player.Zones.Hand.RemoveCard(equipment);
+                    player.Zones.Battlefield.AddCard(equipment);
                     equipment.SetZone(ZoneType.Battlefield);
-                    equipment.SetController(owner);
+                    equipment.SetController(player);
                 }
 
-                // Then attach to a creature the controller controls
+                // Then attach to a creature the acting player controls
                 // (CR 701.3a). v1 picks the first creature deterministically.
-                var bearer = owner.Zones.Battlefield.GetCards()
+                var bearer = player.Zones.Battlefield.GetCards()
                     .OfType<Creature>()
-                    .FirstOrDefault(c => ReferenceEquals(c.Controller, owner));
-                if (bearer == null) return; // No creature → Equipment sits unattached.
+                    .FirstOrDefault(c => ReferenceEquals(c.Controller, player));
+                if (bearer == null) return default; // No creature → Equipment sits unattached.
 
                 equipment.AttachTo(bearer);
+                return default;
             });
 
         var activatedAbility = new ActivatedAbility(
@@ -190,7 +219,8 @@ public static class StoneforgeMysticFactory
                 new ManaCostCost("{1}{W}"),
                 AdditionalCost.Tap(card),
             },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            rebindSafe: true);
 
         card.AddAbility(activatedAbility);
 
