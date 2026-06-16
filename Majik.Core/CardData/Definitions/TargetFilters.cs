@@ -382,6 +382,55 @@ public static class TargetFilters
     }
 
     /// <summary>
+    /// CR 114.6 / 608.2b — build the 1..1 "target spell that targets only a
+    /// single creature" request for the change-the-target redirection family
+    /// (Muck Drubb). Like <see cref="SpellOnStackRequest"/> the candidate pool
+    /// is the live STACK, filtered to spells whose chosen targets are EXACTLY
+    /// one object and that object is a creature
+    /// (<see cref="SpellTargetsSingleCreature"/>). The resolving redirection
+    /// ability is itself the top stack object and is excluded naturally — it is
+    /// not an <see cref="Majik.Core.Spells.ISpell"/>. The same predicate
+    /// double-gates the CR 608.2b resolution re-check.
+    /// </summary>
+    public static TargetRequest SpellTargetingSingleCreatureRequest() =>
+        new TargetRequest(
+            Description: "target spell that targets only a single creature",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Counter,
+            CandidateGatherer: GatherSpellsTargetingSingleCreature);
+
+    private static IReadOnlyList<object> GatherSpellsTargetingSingleCreature(GameContext ctx)
+    {
+        var result = new List<object>();
+        foreach (var obj in ctx.Stack.GetAll())
+        {
+            if (SpellTargetsSingleCreature(obj))
+            {
+                result.Add(obj);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// CR 114.6 / 608.2b — does <paramref name="target"/> still satisfy "spell
+    /// that targets only a single creature" at resolution? The object must be a
+    /// concrete <see cref="Majik.Core.Spells.Spell"/> on the stack whose
+    /// <see cref="Majik.Core.Spells.Spell.ChosenTargets"/> is EXACTLY one entry
+    /// and that single entry is a <see cref="Creature"/>. A non-spell (the
+    /// chosen object left the stack), a spell with zero or multiple targets, or
+    /// a spell whose lone target is not a creature never matches.
+    /// </summary>
+    public static bool SpellTargetsSingleCreature(object? target)
+    {
+        if (target is not Majik.Core.Spells.Spell spell) return false;
+        if (spell.ChosenTargets.Count != 1) return false;
+        return spell.ChosenTargets[0] is Creature;
+    }
+
+    /// <summary>
     /// CR 608.2b — does <paramref name="target"/> still satisfy the counter
     /// verb's type rider at resolution? A non-spell (the chosen object left the
     /// stack and is no longer an <see cref="Majik.Core.Spells.ISpell"/>) never
