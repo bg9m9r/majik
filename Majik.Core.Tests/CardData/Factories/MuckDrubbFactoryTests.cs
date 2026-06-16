@@ -146,6 +146,79 @@ public class MuckDrubbFactoryTests
     }
 
     // -----------------------------------------------------------------------
+    // End-to-end NON-LOSSY proof — the redirected spell's EFFECT lands on
+    // Muck Drubb, not just its ChosenTargets bookkeeping.
+    //
+    // This is the load-bearing distinction from the older lossy
+    // SpellRedirector stub (whose pre-built effect closures baked in their
+    // original target, so the damage still hit the original creature even
+    // after ChosenTargets was rewritten). The SpellTargetRedirector seam is
+    // real because Spell.ResolveAsync reads ChosenTargets LIVE at resolution
+    // time (Spell.cs — the snapshot into ResolutionContext is taken only when
+    // the spell itself begins resolving). Muck Drubb's ETB ability resolves
+    // FIRST (on top of the stack), rewrites the slot, then the redirected
+    // spell resolves and reads the new slot.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Etb_RedirectedSpellEffect_ActuallyLandsOnMuckDrubb()
+    {
+        var m = MuckDrubbFactory.Create(_alice, _stack);
+        m.Zone = ZoneType.Battlefield;
+        var etb = m.Abilities.OfType<TriggeredAbility>().Single();
+
+        // A real single-creature-target damage spell: its effect reads its
+        // OWN live ChosenTargets[0] at resolution and deals 3 damage there —
+        // exactly how the modern SpellDefinition / ResolutionContext path
+        // resolves a "deal damage to target creature" body.
+        var aliceBear = new Creature("Alice's Bear", "{1}{G}", 2, 2)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var boltCard = new Instant("Lightning Bolt", "{R}") { Owner = _bob, Controller = _bob };
+        var boltSpell = new Majik.Core.Spells.Spell(
+            boltCard,
+            _bob,
+            effects: new IEffect[]
+            {
+                new Effect("Lightning Bolt — 3 damage to target creature", rc =>
+                {
+                    // Read the LIVE chosen target at resolution time (CR 608.2g).
+                    if (rc.ChosenTargets.Count > 0
+                        && rc.ChosenTargets[0].Count > 0
+                        && rc.ChosenTargets[0][0] is Creature target)
+                    {
+                        target.TakeDamage(3);
+                    }
+                    return ValueTask.CompletedTask;
+                }),
+            });
+        boltSpell.ChosenTargets.Add(aliceBear);
+
+        // Bob's Bolt is on the stack; Muck Drubb's ETB ability resolves on top.
+        _stack.Push(boltSpell);
+        etb.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { boltSpell },
+        });
+
+        // 1) ETB redirect resolves first (top of stack).
+        foreach (var eff in etb.Effects) eff.Execute();
+
+        // 2) Then the redirected Bolt resolves and reads its now-rewritten slot.
+        await boltSpell.ResolveAsync(agent: null, game: null);
+
+        m.Damage.Should().Be(3,
+            because: "the redirected spell's EFFECT (not just its ChosenTargets) "
+                + "now lands on Muck Drubb — the non-lossy SpellTargetRedirector "
+                + "guarantee (CR 114.6 + live ChosenTargets read at ResolveAsync)");
+        aliceBear.Damage.Should().Be(0,
+            because: "the original creature was redirected away before the spell resolved");
+    }
+
+    // -----------------------------------------------------------------------
     // Candidate gate — only spells that target EXACTLY one creature qualify
     // -----------------------------------------------------------------------
 
