@@ -1,0 +1,9 @@
+{
+  "name": "Nightshade Assassin",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Assassin"],
+  "manaCost": "{2}{B}{B}",
+  "power": 2,
+  "toughness": 1,
+  "keywords": ["First strike"]
+}
