@@ -177,6 +177,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.RevealHandGraveOrHandExileTemplate(),
             new SpellTemplates.Templates.Bespoke.MalevolentRumblePatternTemplate(),
             new SpellTemplates.Templates.Bespoke.ExpressiveIterationTemplate(),
+            new SpellTemplates.Templates.Bespoke.WelcomeToTheFoldTemplate(),
             new SpellTemplates.Templates.Bespoke.BrainstormTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealUntilNonlandDamageTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealUntilArtifactToBattlefieldTemplate(),
