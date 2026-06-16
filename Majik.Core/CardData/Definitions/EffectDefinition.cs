@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(LoseLifeEachOpponentEffectDef), "lose_life_each_opponent")]
 [JsonDerivedType(typeof(DealDamageEachOpponentEffectDef), "deal_damage_each_opponent")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
+[JsonDerivedType(typeof(LookTopNOneToHandRestToGraveyardEffectDef), "look_top_n_one_to_hand_rest_to_graveyard")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
 [JsonDerivedType(typeof(ConniveTargetEffectDef), "connive_target")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
@@ -1122,6 +1123,44 @@ public sealed class MillThenPickFirstMatchingToHandEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public List<string> MatchingTypes { get; set; } = new();
+}
+
+/// <summary>
+/// "Look at the top N cards of your library. Put one of them into your hand
+/// and the other(s) into your graveyard." (CR 120.6 reveal / CR 116.1b player
+/// choice). The declarative serialization of the Nagging Thoughts / Sight
+/// Beyond Sight dig-into-graveyard shape onto the shared
+/// <see cref="Majik.Core.Zones.RevealAndChoose.RevealTopAndChooseAsync"/>
+/// primitive — the SAME look-and-pick sink the Impulse template (<see
+/// cref="Majik.Core.CardData.SpellTemplates.Templates.Library.LookAtTopPutOneInHandTemplate"/>)
+/// already routes through, lifted to a JSON-expressible verb.
+///
+/// <para>
+/// Unlike <see cref="MillThenPickFirstMatchingToHandEffectDef"/> (which MILLS
+/// the cards to the graveyard first and then rescues a matching one) this verb
+/// LOOKS — the cards never touch the graveyard until the controller has chosen
+/// — and the pick is MANDATORY (the printed text says "Put one of them into
+/// your hand", not "you may"). At resolution it peeks the top
+/// <see cref="Amount"/> cards, PROMPTS the controller's agent to choose exactly
+/// one for the hand (reusing the reveal-and-choose prompt — milled cards are
+/// the "revealed" pile, all are eligible), then routes every UNPICKED looked-at
+/// card to the graveyard.
+/// </para>
+///
+/// <para>
+/// No agent (bot self-play / agentless harness): the deterministic fallback in
+/// <see cref="Majik.Core.Zones.RevealAndChoose"/> auto-picks the first (top)
+/// card. A short library (fewer than <see cref="Amount"/>) looks at what is
+/// there; an empty library is a clean no-op (no card to hand, none to the
+/// graveyard) — the spell text never reaches a draw clause, so no
+/// draw-from-empty SBA fires.
+/// </para>
+/// </summary>
+public sealed class LookTopNOneToHandRestToGraveyardEffectDef : EffectDefinition
+{
+    /// <summary>How many cards to look at (default 2 — Nagging Thoughts /
+    /// Sight Beyond Sight; "the top two cards of your library").</summary>
+    public int Amount { get; set; } = 2;
 }
 
 /// <summary>
