@@ -44,12 +44,19 @@ namespace Majik.Core.CardData.Factories;
 /// <c>Source</c>, so the upkeep tax stops firing the instant the artifact
 /// leaves play, and "sacrifice THIS artifact" sacrifices the bearer.</para>
 ///
+/// <para><b>Cost-payment prompt</b>: at resolution the bearer-controller's
+/// agent is prompted "Pay {1} to keep this artifact?" via the shared
+/// <see cref="Majik.Core.Primitives.UpkeepPayUnlessConsequence"/> primitive
+/// (CR 117.1); on "yes" + affordable {1} is drained, on "no" / can't-afford
+/// the sacrifice tail fires. The legacy / shape-only sync path keeps the
+/// deterministic "pay if able" posture — same wiring Stasis / Mana Vault /
+/// the pact cycle now share.</para>
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Cost-payment prompt</b>: there is no agent "do you want to pay {1}?"
-///   prompt yet — same posture as <see cref="StasisFactory"/> / Mana Vault /
-///   the pact cycle. v1 auto-pays the {1} if the bearer-controller's pool can
-///   cover it; otherwise the sacrifice tail fires. Real "may pay" deferred
-///   until the agent grows a yes/no cost prompt.
+/// - <b>No in-trigger tap-lands step</b>: the {1} is paid from whatever is
+///   already in the bearer-controller's pool when the granted trigger
+///   resolves — the decision flows through the agent prompt, but there is no
+///   resolution-time "tap a land for {1}" sub-prompt.
 /// - <b>Production membership = all battlefields.</b> The effects-aware
 ///   instance-swap route (<c>NamedCardFactory.Create(name, owner, effects)</c>)
 ///   reaches only a 2-arg <c>Create(Player, ContinuousEffectsService)</c>
@@ -168,27 +175,28 @@ public static class KatakiWarsWageFactory
             ?? throw new InvalidOperationException(
                 "Cannot grant Kataki's upkeep tax: artifact has no controller.");
 
-        var taxEffect = new Effect(
+        // CR 701.16 / CR 117.1 — "sacrifice this artifact unless you pay {1}".
+        // "you" is the artifact's CURRENT controller as the ability resolves
+        // (control may have changed since the grant). At resolution that
+        // controller's agent is prompted "Pay {1}?" via the shared
+        // Majik.Core.Primitives.UpkeepPayUnlessConsequence primitive; on "yes"
+        // + affordable {1} is drained, on "no" / can't-afford the artifact is
+        // sacrificed. The legacy / shape-only sync path keeps "pay if able".
+        var taxEffect = Majik.Core.Primitives.UpkeepPayUnlessConsequence.Build(
             "Kataki: at upkeep, sacrifice this artifact unless you pay {1}",
-            () =>
+            bearerController,
+            ManaCost.Parse(UpkeepTax),
+            consequence: () =>
             {
-                if (bearer.Zone != ZoneType.Battlefield) return;
-
-                // The artifact's CURRENT controller pays (control may have
-                // changed since the grant). CR 701.16 — "you" in the granted
-                // ability is the artifact's controller as the ability resolves.
+                // Sacrifice — Battlefield -> Graveyard (CR 701.16). Raw zone
+                // move, same shape as StasisFactory's upkeep tail.
                 var payer = bearer.Controller ?? bearerController;
-                var cost = ManaCost.Parse(UpkeepTax);
-
-                if (!payer.PayMana(cost))
-                {
-                    // Sacrifice — Battlefield -> Graveyard (CR 701.16). Raw
-                    // zone move, same shape as StasisFactory's upkeep tail.
-                    payer.Zones.Battlefield.RemoveCard(bearer);
-                    payer.Zones.Graveyard.AddCard(bearer);
-                    bearer.SetZone(ZoneType.Graveyard);
-                }
-            });
+                payer.Zones.Battlefield.RemoveCard(bearer);
+                payer.Zones.Graveyard.AddCard(bearer);
+                bearer.SetZone(ZoneType.Graveyard);
+            },
+            promptText: "Pay {1} to keep this artifact?",
+            guard: () => bearer.Zone == ZoneType.Battlefield);
 
         var tax = new TriggeredAbility(
             source: bearer,

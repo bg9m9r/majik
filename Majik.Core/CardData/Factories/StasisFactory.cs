@@ -32,11 +32,14 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Upkeep pay-or-sacrifice trigger (CR 603.1 / CR 500.4)</b>: a
 ///   <see cref="TriggeredAbility"/> over <see cref="StepStartedEvent"/>
 ///   filtered to (Upkeep, controller). At resolution the effect attempts
-///   <see cref="Player.PayMana"/> with {U} against the controller's mana
-///   pool. If the payment succeeds Stasis stays; if it fails the effect
-///   sacrifices Stasis (Battlefield → Graveyard). v1 "may" collapses to
-///   pay-if-able — same posture as <see cref="ManaVaultFactory"/>'s
-///   upkeep trigger and the pact cycle.
+///   the shared
+///   <see cref="Majik.Core.Primitives.UpkeepPayUnlessConsequence"/>
+///   primitive: at resolution the controller's agent is asked "Pay {U} to
+///   keep Stasis?" (CR 117.1); on "yes" + affordable {U} is drained and
+///   Stasis stays, on "no" / can't-afford the effect sacrifices Stasis
+///   (Battlefield → Graveyard). The legacy / shape-only sync path keeps the
+///   deterministic "pay if able" posture — same wiring Mana Vault / Kataki /
+///   the pact cycle now share.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>"Skip the untap step" wholesale</b>: the engine has no
@@ -44,11 +47,10 @@ namespace Majik.Core.CardData.Factories;
 ///   count-cap primitive with MaxCount=0. Functionally equivalent
 ///   (no permanent untaps under Stasis) and re-uses the same registry
 ///   wiring Static Orb / Winter Orb / Smoke ride on.
-/// - <b>Cost-payment prompt</b>: there's no agent prompt for "do you
-///   want to pay {U}?" yet — same gap as Mana Vault / pact cycle. v1
-///   auto-pays if the controller's pool has {U}; otherwise the sacrifice
-///   tail fires. Real prompt deferred until <see cref="IPlayerAgent"/>
-///   grows a ChooseYesNoAsync surface.
+/// - <b>No in-trigger tap-lands step</b>: the {U} is paid from whatever is
+///   already in the controller's pool when the trigger resolves — the
+///   decision to pay now flows through the agent prompt, but there is still
+///   no resolution-time "tap a land for {U}" sub-prompt.
 /// </summary>
 [CardName("Stasis")]
 public static class StasisFactory
@@ -91,28 +93,29 @@ public static class StasisFactory
 
         // ----------------------------------------------------------------
         // Upkeep trigger — CR 603.1, CR 500.4. "At the beginning of your
-        // upkeep, sacrifice Stasis unless you pay {U}." v1 auto-pays from
-        // the controller's mana pool if able; on failure, move Stasis
-        // Battlefield → Graveyard (sacrifice).
+        // upkeep, sacrifice Stasis unless you pay {U}." At resolution the
+        // controller's agent is prompted "Pay {U}?" via the shared
+        // Majik.Core.Primitives.UpkeepPayUnlessConsequence primitive
+        // (CR 117.1); on "yes" + affordable the {U} is drained, on "no" /
+        // can't-afford the sacrifice tail fires (Battlefield → Graveyard).
+        // The legacy / shape-only sync path preserves "pay if able".
         // ----------------------------------------------------------------
-        var upkeepEffect = new Effect(
+        var controllerSeat = owner;
+        var upkeepEffect = Majik.Core.Primitives.UpkeepPayUnlessConsequence.Build(
             "Stasis: at upkeep, sacrifice unless you pay {U}",
-            () =>
+            controllerSeat,
+            ManaCost.Parse("U"),
+            consequence: () =>
             {
-                if (card.Zone != ZoneType.Battlefield) return;
-
-                var controller = card.Controller ?? owner;
-                var cost = ManaCost.Parse("U");
-
-                if (!controller.PayMana(cost))
-                {
-                    // Sacrifice — Battlefield → Graveyard. Raw zone move
-                    // (same shape as NihilSpellbombFactory.SacrificeSelf).
-                    controller.Zones.Battlefield.RemoveCard(card);
-                    controller.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
-                }
-            });
+                var sacrificer = card.Controller ?? controllerSeat;
+                // Sacrifice — Battlefield → Graveyard. Raw zone move (same
+                // shape as NihilSpellbombFactory.SacrificeSelf).
+                sacrificer.Zones.Battlefield.RemoveCard(card);
+                sacrificer.Zones.Graveyard.AddCard(card);
+                card.SetZone(ZoneType.Graveyard);
+            },
+            promptText: "Pay {U} to keep Stasis?",
+            guard: () => card.Zone == ZoneType.Battlefield);
 
         var upkeepTrigger = new TriggeredAbility(
             source: card,

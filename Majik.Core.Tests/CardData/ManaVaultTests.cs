@@ -5,7 +5,9 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -142,6 +144,78 @@ public class ManaVaultTests
         foreach (var e in trigger.Effects) e.Execute();
 
         _alice.LifeTotal.Should().Be(lifeBefore, "the intervening 'if tapped' check fails — no payment, no damage");
+    }
+
+    [Fact]
+    public async Task ManaVault_Upkeep_Tapped_AgentDeclinesPrompt_TakesDamageDespiteHavingMana()
+    {
+        // CR 117.1 — the "you may pay {4}" is a real agent decision. Alice CAN
+        // afford {4}, but her agent says no at resolution → 1 damage despite
+        // the available mana (the prompt, not auto-pay, now governs).
+        AgentRegistry.Clear();
+        try
+        {
+            var vault = ManaVaultFactory.Create(_alice);
+            _alice.Zones.Battlefield.AddCard(vault);
+            vault.SetZone(ZoneType.Battlefield);
+            vault.Tap();
+            _alice.AddManaToPool(ManaCost.Parse("4"));
+
+            var agent = new ScriptedAgent();
+            agent.QueueYesNo(false);                 // "No, don't pay {4}."
+            AgentRegistry.Set(_alice, agent);
+
+            var game = new GameContext(
+                _alice, new[] { _alice, _bob }, _alice, 1,
+                StepStateType.Upkeep, new Majik.Core.Stack.Stack());
+            var rc = ResolutionContext.For(_alice, agent, game, chosenTargets: null);
+
+            var lifeBefore = _alice.LifeTotal;
+            var trigger = vault.Abilities.OfType<TriggeredAbility>().Single();
+            foreach (var e in trigger.Effects) await e.ExecuteAsync(rc);
+
+            _alice.LifeTotal.Should().Be(lifeBefore - 1,
+                "Alice's agent declined to pay {4}, so Mana Vault deals 1 damage even though she could afford it");
+            _alice.ManaPool.Total.Should().Be(4, "no mana was spent because Alice declined");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task ManaVault_Upkeep_Tapped_AgentAcceptsPrompt_PaysAndNoDamage()
+    {
+        AgentRegistry.Clear();
+        try
+        {
+            var vault = ManaVaultFactory.Create(_alice);
+            _alice.Zones.Battlefield.AddCard(vault);
+            vault.SetZone(ZoneType.Battlefield);
+            vault.Tap();
+            _alice.AddManaToPool(ManaCost.Parse("4"));
+
+            var agent = new ScriptedAgent();
+            agent.QueueYesNo(true);                  // "Yes, pay {4}."
+            AgentRegistry.Set(_alice, agent);
+
+            var game = new GameContext(
+                _alice, new[] { _alice, _bob }, _alice, 1,
+                StepStateType.Upkeep, new Majik.Core.Stack.Stack());
+            var rc = ResolutionContext.For(_alice, agent, game, chosenTargets: null);
+
+            var lifeBefore = _alice.LifeTotal;
+            var trigger = vault.Abilities.OfType<TriggeredAbility>().Single();
+            foreach (var e in trigger.Effects) await e.ExecuteAsync(rc);
+
+            _alice.LifeTotal.Should().Be(lifeBefore, "Alice paid {4}, so no damage");
+            _alice.ManaPool.Total.Should().Be(0, "PayMana({4}) consumed the pool");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
     }
 
     [Fact]

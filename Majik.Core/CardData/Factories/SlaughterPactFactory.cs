@@ -36,10 +36,19 @@ namespace Majik.Core.CardData.Factories;
 ///   pool; on failure <see cref="Player.MarkLost"/> flags the controller
 ///   (CR 104.3 / CR 118.3 — "if you don't, you lose the game").
 ///
+/// ## Cost-payment prompt
+/// At upkeep the caster's agent is prompted "Pay {2}{B} or lose the game?"
+/// via the shared
+/// <see cref="Majik.Core.Primitives.UpkeepPayUnlessConsequence"/> primitive
+/// (CR 117.1); on "yes" + affordable {2}{B} is drained, on "no" /
+/// can't-afford the caster loses (CR 104.3 / CR 118.3). The legacy /
+/// shape-only sync path keeps the deterministic "pay if able" posture.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Cost-payment prompt</b>: production callers pre-stage the
-///   controller's mana pool to model "yes, I pay". The v1 trigger reads
-///   whatever mana is already in the pool — no in-trigger tap-lands prompt.
+/// - <b>No in-trigger tap-lands step</b>: the {2}{B} is paid from whatever
+///   is already in the caster's pool when the delayed trigger resolves — the
+///   decision flows through the agent prompt, but there is no resolution-time
+///   "tap a land for {2}{B}" sub-prompt.
 ///
 /// Indestructible (CR 702.12) and regeneration shields (CR 701.15) are
 /// handled by <see cref="OracleSpellBinder.MoveToGraveyard"/>'s
@@ -127,16 +136,20 @@ public static class SlaughterPactFactory
                         var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                         var pactCost = ManaCost.Parse(DelayedUpkeepCost);
 
-                        var payOrLoseEffect = new Effect(
+                        // CR 117.1 — at upkeep the caster's agent is prompted
+                        // "Pay {2}{B}?" via the shared
+                        // Majik.Core.Primitives.UpkeepPayUnlessConsequence
+                        // primitive; on "yes" + affordable {2}{B} is drained,
+                        // on "no" / can't-afford the caster loses the game
+                        // (CR 104.3 / CR 118.3). The legacy / shape-only sync
+                        // path keeps the deterministic "pay if able" posture.
+                        var payOrLoseEffect = Majik.Core.Primitives.UpkeepPayUnlessConsequence.Build(
                             $"Slaughter Pact: pay {DelayedUpkeepCost} at upkeep or lose the game",
-                            () =>
-                            {
-                                if (caster.HasLost) return;
-                                if (!caster.PayMana(pactCost))
-                                {
-                                    caster.MarkLost();
-                                }
-                            });
+                            caster,
+                            pactCost,
+                            consequence: caster.MarkLost,
+                            promptText: $"Pay {DelayedUpkeepCost} or lose the game?",
+                            guard: () => !caster.HasLost);
 
                         var delayed = new DelayedTriggeredAbility(
                             source: caster,
