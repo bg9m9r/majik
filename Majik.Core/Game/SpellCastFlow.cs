@@ -418,6 +418,30 @@ public sealed class SpellCastFlow
         if (definition.TargetRequests is { Count: > 0 } reqs)
         {
             spell.RetargetRequests = reqs.ToArray();
+
+            // CR 608.2b — stamp a category-derived legality predicate ONLY when
+            // the spell doesn't already carry one, so the resolution recheck in
+            // StackResolver stays honest for the many TargetRequests that ship
+            // only a free-text Description (no per-card predicate). Derived from
+            // the FIRST targeted request whose description maps to a real
+            // category; cards that set their own predicate are untouched. This
+            // is the single stamp point — the only place a Spell is reachable
+            // next to its target requests. The shared
+            // TargetCollection.CollectAsync is also used by abilities / triggers
+            // which carry no Spell, so it must NOT stamp.
+            if (spell.TargetLegalityPredicate == null)
+            {
+                foreach (var tr in reqs)
+                {
+                    var pred = Majik.Core.Targeting.TargetCandidateService
+                        .BuildLegalityPredicate(tr.Description);
+                    if (pred != null)
+                    {
+                        spell.TargetLegalityPredicate = pred;
+                        break;
+                    }
+                }
+            }
         }
 
         // CR 608.2 / 715.3d / 118 / 702.138b / 702.62d / 702.33b / 702.115 /

@@ -64,8 +64,12 @@ public static class TargetCollection
         {
             // Resolve any lazy CandidateGatherer against the live ctx, then
             // hand the agent the merged candidate list. Static LegalCandidates
-            // pass through unchanged (ReferenceEquals fast-path).
-            var live = req.ResolveCandidates(ctx);
+            // pass through unchanged (ReferenceEquals fast-path). When the card
+            // ships NO machine-readable pool the central TargetCandidateService
+            // fills it from the description's category (incl. players) so the
+            // portal can render legal targets — see ResolveLivePool.
+            var live = ResolveLivePool(
+                req, ctx, agent?.WantsSynthesizedTargetCandidates ?? false);
             var promptReq = ReferenceEquals(live, req.LegalCandidates)
                 ? req
                 : req.WithCandidates(live);
@@ -86,5 +90,32 @@ public static class TargetCollection
         }
 
         return collected;
+    }
+
+    /// <summary>
+    /// CR 115 — resolve the live candidate pool for a single request. First
+    /// resolves the request's own <see cref="Players.Agents.TargetRequest.CandidateGatherer"/>
+    /// (bespoke "you control" / color / power filters always win). ONLY when
+    /// that yields an EMPTY pool does it fall back to the central
+    /// <see cref="TargetCandidateService.GatherCandidates"/> for the
+    /// description's category — giving "any target"-style requests that ship no
+    /// gatherer a complete legal pool (creatures, players, planeswalkers,
+    /// permanents, stack spells, graveyard cards). No behaviour change when a
+    /// card already supplies candidates. The central fallback is applied only
+    /// when <paramref name="synthesizeWhenEmpty"/> is true (the consuming agent
+    /// opted in via IPlayerAgent.WantsSynthesizedTargetCandidates) — bots keep
+    /// the empty-pool path so their TargetPolicy heuristic is unchanged.
+    /// </summary>
+    internal static IReadOnlyList<object> ResolveLivePool(
+        TargetRequest req, GameContext ctx, bool synthesizeWhenEmpty = true)
+    {
+        var live = req.ResolveCandidates(ctx);
+        if (synthesizeWhenEmpty && live.Count == 0)
+        {
+            var central = TargetCandidateService.GatherCandidates(
+                req.Description, ctx, ctx.Self);
+            if (central.Count > 0) return central;
+        }
+        return live;
     }
 }

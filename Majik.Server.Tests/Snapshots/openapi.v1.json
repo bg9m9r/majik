@@ -1984,6 +1984,31 @@
         ],
         "type": "object"
       },
+      "PlayerCandidateDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "life": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "life"
+        ],
+        "type": "object"
+      },
       "PlayerDto": {
         "properties": {
           "battlefield": {
@@ -2150,6 +2175,15 @@
           "libraryView": {
             "items": {
               "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "playerCandidates": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerCandidateDto"
             },
             "type": [
               "null",

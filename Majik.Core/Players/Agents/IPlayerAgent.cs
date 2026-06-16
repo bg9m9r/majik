@@ -34,6 +34,19 @@ public interface IPlayerAgent
         GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default);
 
     /// <summary>
+    /// CR 115 — whether this agent wants the engine to SYNTHESIZE a complete
+    /// legal candidate pool (via <c>TargetCandidateService</c>) for a targets
+    /// request that ships no machine-readable pool. Human / remote agents need
+    /// it (the portal can only render an explicit candidate list). Bots opt OUT
+    /// (default false) — their <c>TargetPolicy</c> already does label-driven
+    /// synthesis off an EMPTY pool (burn → face, removal → biggest creature),
+    /// and pre-filling the pool would silently change those picks (a sampled
+    /// in-sim burn would target a creature instead of the face). Keeping bots on
+    /// the empty-pool path preserves their behaviour exactly.
+    /// </summary>
+    bool WantsSynthesizedTargetCandidates => false;
+
+    /// <summary>
     /// Pick targets satisfying the request (cardinality + legality).
     /// </summary>
     Task<IReadOnlyList<object>> ChooseTargetsAsync(
