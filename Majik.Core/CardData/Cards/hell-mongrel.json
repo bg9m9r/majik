@@ -1,0 +1,9 @@
+{
+  "name": "Hell Mongrel",
+  "types": ["Creature"],
+  "subtypes": ["Nightmare", "Dog"],
+  "manaCost": "{3}{B}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}

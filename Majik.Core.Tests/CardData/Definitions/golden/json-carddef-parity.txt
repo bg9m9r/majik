@@ -19618,6 +19618,57 @@
   "mdfc": null,
   "colors": []
 }
+==== hell-mongrel ====
+{
+  "name": "Hell Mongrel",
+  "manaCost": "{3}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Dog",
+    "Nightmare"
+  ],
+  "power": 4,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== helping-hand ====
 {
   "name": "Helping Hand",
