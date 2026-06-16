@@ -33,10 +33,12 @@ namespace Majik.Core.CardData.Factories;
 ///   controller — same v1 simplification as Manabarbs / Dark Confidant
 ///   where ability damage routes through <see cref="Player.LoseLife"/>
 ///   rather than a full <see cref="DamageDealtEvent"/>).
-/// - The "you may" defaults to auto-pay when the controller has the mana
-///   available; absent enough mana, the damage path fires. This mirrors
-///   every other pact-style "pay {X} or else" the engine already ships
-///   (Slaughter Pact / Pact of Negation / Pact of the Titan).
+/// - The "you may" is a real agent decision: at resolution the controller's
+///   agent is prompted "Pay {4}?" via the shared
+///   <see cref="Majik.Core.Primitives.UpkeepPayUnlessConsequence"/>
+///   primitive. On "yes" + affordable the {4} is drained and no damage is
+///   dealt; on "no" / can't-afford the damage path fires. Same wiring the
+///   pact cycle / Stasis / Kataki now share.
 ///
 /// - <b>"Doesn't untap during your untap step" static (CR 502.1)</b>:
 ///   wired via <see cref="DoesNotUntapStaticEffect"/>. On enter-the-
@@ -51,12 +53,10 @@ namespace Majik.Core.CardData.Factories;
 ///   working unchanged.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Cost-payment prompt</b>: same surface gap as Slaughter Pact /
-///   Pact of Negation — there's no agent prompt yet for "do you want to
-///   pay this {4}?", so production callers pre-stage the controller's
-///   mana pool. The trigger consumes whatever mana is already in the
-///   pool; if {4}-worth is sitting there, it's paid, otherwise the damage
-///   fires. The "may" is therefore implicit-pay-if-able.
+/// - <b>No in-trigger tap-lands step</b>: the {4} is paid from whatever is
+///   already in the controller's pool when the trigger resolves — the
+///   decision to pay now flows through the agent prompt, but there is still
+///   no resolution-time "tap a land for {4}" sub-prompt.
 /// - <b>Full <see cref="DamageDealtEvent"/> route</b>: the 1 damage goes
 ///   through <see cref="Player.LoseLife"/>; subscribers that care about
 ///   damage prevention won't see Mana Vault's ping. Same scope decision
@@ -110,25 +110,21 @@ public static class ManaVaultFactory
         // mana pool (auto-pay-if-able v1); on failure, deal 1 damage to
         // the controller via Player.LoseLife.
         // ----------------------------------------------------------------
-        var upkeepEffect = new Effect(
+        // At resolution the controller's agent is prompted "Pay {4}?" via the
+        // shared Majik.Core.Primitives.UpkeepPayUnlessConsequence primitive
+        // (CR 117.1). On "yes" + affordable {4} is drained and no damage is
+        // dealt; on "no" / can't-afford the controller loses 1 life (Mana
+        // Vault's ping, routed through Player.LoseLife per the Dark Confidant /
+        // Manabarbs scope decision). The printed "if tapped" intervening-if
+        // (CR 603.4) is the guard; the legacy / shape-only sync path keeps the
+        // deterministic "pay if able" posture.
+        var upkeepEffect = Majik.Core.Primitives.UpkeepPayUnlessConsequence.Build(
             "Mana Vault: at upkeep if tapped, pay {4} or take 1 damage",
-            () =>
-            {
-                if (card.Zone != ZoneType.Battlefield) return;
-                if (!card.IsTapped) return;
-
-                var controller = card.Controller ?? owner;
-                var cost = ManaCost.Parse("4");
-
-                // Auto-pay if the pool has enough; LoseLife(1) on failure.
-                // The v1 "may" collapses to "pay-if-able"; the prompt
-                // surface to decline is the same gap shared with the
-                // pact-cycle factories.
-                if (!controller.PayMana(cost))
-                {
-                    controller.LoseLife(1);
-                }
-            });
+            owner,
+            ManaCost.Parse("4"),
+            consequence: () => (card.Controller ?? owner).LoseLife(1),
+            promptText: "Pay {4} to keep Mana Vault tapped without taking 1 damage?",
+            guard: () => card.Zone == ZoneType.Battlefield && card.IsTapped);
 
         var upkeepTrigger = new TriggeredAbility(
             source: card,

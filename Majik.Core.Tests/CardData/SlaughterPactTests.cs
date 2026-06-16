@@ -207,6 +207,109 @@ public class SlaughterPactTests
     }
 
     // -----------------------------------------------------------------------
+    // Live agent prompt at upkeep (CR 117.1): a controller who CAN pay but
+    // whose agent declines loses the game; one who accepts pays + survives.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task NextUpkeep_AgentDeclinesPrompt_LosesDespiteHavingMana()
+    {
+        AgentRegistry.Clear();
+        try
+        {
+            var bus = new EventBus();
+            var stack = new Majik.Core.Stack.Stack(bus);
+            var triggers = new TriggerManager(stack, bus);
+
+            var goblin = new Creature("Goblin Guide", "{R}", power: 2, toughness: 2)
+            {
+                Owner = _bob,
+                Controller = _bob,
+            };
+            _bob.Zones.Battlefield.AddCard(goblin);
+            goblin.SetZone(ZoneType.Battlefield);
+
+            var def = SlaughterPactFactory.BuildDefinition(
+                _alice, targetResolver: o => o, triggers: triggers);
+            var chosen = new ChosenSpellParams(
+                ModeIndex: null, X: null,
+                Targets: new[] { new object[] { goblin } },
+                Mana: ManaPayment.Empty);
+            foreach (var effect in def.EffectFactory(chosen)) effect.Execute();
+
+            // Alice CAN pay {2}{B}, but her agent will decline at resolution.
+            _alice.AddManaToPool(ManaCost.Parse("{2}{B}"));
+            var agent = new ScriptedAgent();
+            agent.QueueYesNo(false);                 // "No, don't pay the pact."
+            AgentRegistry.Set(_alice, agent);
+
+            bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
+            triggers.PendingCount.Should().Be(1);
+
+            var game = new GameContext(
+                _alice, new[] { _alice, _bob }, _alice, 2,
+                StepStateType.Upkeep, stack);
+            triggers.PutPendingTriggersOnStack(_alice);
+            await stack.Pop()!.ResolveAsync(agent, game);
+
+            _alice.HasLost.Should().BeTrue(
+                "Alice's agent declined to pay {2}{B}, so she loses despite having the mana (CR 117.1 / 118.3)");
+            _alice.ManaPool.Total.Should().Be(3, "no mana was spent because she declined");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task NextUpkeep_AgentAcceptsPrompt_PaysAndSurvives()
+    {
+        AgentRegistry.Clear();
+        try
+        {
+            var bus = new EventBus();
+            var stack = new Majik.Core.Stack.Stack(bus);
+            var triggers = new TriggerManager(stack, bus);
+
+            var goblin = new Creature("Goblin Guide", "{R}", power: 2, toughness: 2)
+            {
+                Owner = _bob,
+                Controller = _bob,
+            };
+            _bob.Zones.Battlefield.AddCard(goblin);
+            goblin.SetZone(ZoneType.Battlefield);
+
+            var def = SlaughterPactFactory.BuildDefinition(
+                _alice, targetResolver: o => o, triggers: triggers);
+            var chosen = new ChosenSpellParams(
+                ModeIndex: null, X: null,
+                Targets: new[] { new object[] { goblin } },
+                Mana: ManaPayment.Empty);
+            foreach (var effect in def.EffectFactory(chosen)) effect.Execute();
+
+            _alice.AddManaToPool(ManaCost.Parse("{2}{B}"));
+            var agent = new ScriptedAgent();
+            agent.QueueYesNo(true);                  // "Yes, pay the pact."
+            AgentRegistry.Set(_alice, agent);
+
+            bus.Publish(new StepStartedEvent(StepStateType.Upkeep, _alice));
+            var game = new GameContext(
+                _alice, new[] { _alice, _bob }, _alice, 2,
+                StepStateType.Upkeep, stack);
+            triggers.PutPendingTriggersOnStack(_alice);
+            await stack.Pop()!.ResolveAsync(agent, game);
+
+            _alice.HasLost.Should().BeFalse("Alice paid the pact cost in full");
+            _alice.ManaPool.Total.Should().Be(0, "PayMana({2}{B}) consumed the pool");
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Only the controller's upkeep triggers the delayed pact.
     // -----------------------------------------------------------------------
 

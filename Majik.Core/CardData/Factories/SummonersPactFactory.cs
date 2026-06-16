@@ -49,12 +49,20 @@ namespace Majik.Core.CardData.Factories;
 ///   mana pool; on failure <see cref="Player.MarkLost"/> flags the
 ///   controller (CR 104.3 / CR 118.3 — "if you don't, you lose the game").
 ///
+/// ## Cost-payment prompt
+/// At upkeep the caster's agent is prompted "Pay {2}{G}{G} or lose the game?"
+/// via the shared
+/// <see cref="Majik.Core.Primitives.UpkeepPayUnlessConsequence"/> primitive
+/// (CR 117.1); on "yes" + affordable {2}{G}{G} is drained, on "no" /
+/// can't-afford the caster loses (CR 104.3 / CR 118.3). The legacy /
+/// shape-only sync path keeps the deterministic "pay if able" posture.
+///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Cost-payment prompt</b>: production callers pre-stage the
-///   controller's mana pool to model "yes, I pay". The v1 trigger reads
-///   whatever mana is already in the pool — no in-trigger tap-lands
-///   prompt. Same gap as the rest of the Pact cycle.
+/// - <b>No in-trigger tap-lands step</b>: the {2}{G}{G} is paid from
+///   whatever is already in the caster's pool when the delayed trigger
+///   resolves — the decision flows through the agent prompt, but there is no
+///   resolution-time "tap a land for {2}{G}{G}" sub-prompt.
 /// - <b>Live zone move</b>: the Library → Hand move is direct zone
 ///   mutation. No <c>ZoneService</c> threading because no public ETB
 ///   triggers fire on cards moving to hand (CR 603.6 trigger sources are
@@ -159,13 +167,18 @@ public static class SummonersPactFactory
         var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var pactCost = ManaCost.Parse(DelayedUpkeepCost);
 
-        var payOrLoseEffect = new Effect(
+        // CR 117.1 — at upkeep the caster's agent is prompted "Pay {2}{G}{G}?"
+        // via the shared Majik.Core.Primitives.UpkeepPayUnlessConsequence
+        // primitive; on "yes" + affordable {2}{G}{G} is drained, on "no" /
+        // can't-afford the caster loses (CR 104.3 / CR 118.3). The legacy /
+        // shape-only sync path keeps "pay if able".
+        var payOrLoseEffect = Majik.Core.Primitives.UpkeepPayUnlessConsequence.Build(
             $"Summoner's Pact: pay {DelayedUpkeepCost} at upkeep or lose the game",
-            () =>
-            {
-                if (caster.HasLost) return;
-                if (!caster.PayMana(pactCost)) caster.MarkLost();
-            });
+            caster,
+            pactCost,
+            consequence: caster.MarkLost,
+            promptText: $"Pay {DelayedUpkeepCost} or lose the game?",
+            guard: () => !caster.HasLost);
 
         var delayed = new DelayedTriggeredAbility(
             source: caster,
