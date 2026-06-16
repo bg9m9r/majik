@@ -47,13 +47,14 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Identical body math to Blood Artist's trigger</b>: differs only
 ///   in cost ({3}{B} vs {1}{B}), stats (2/2 vs 0/1), and Flying.
 ///   Modulo cost/stats, the trigger is line-for-line Blood Artist.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>Last-known-information for the dying permanent's
-///   controller</b>: CR 603.10 — controller must be read from LKI at
-///   the moment of death. v1 reads <see cref="Permanent.Controller"/>
-///   off the moved card directly. Same posture as Blood Artist /
-///   Cruel Celebrant / Meathook.
+/// - <b>Last-known-information (CR 603.10)</b>: not load-bearing here —
+///   like Blood Artist, Falkenrath Noble drains on EVERY creature death
+///   and gains life for its own controller, so it never reads the dying
+///   object's controller. The LKI controller snapshot
+///   (<see cref="CardMovedEvent.LkiController"/>) captured by
+///   <see cref="Majik.Core.Services.ZoneService"/> exists for the
+///   controller-gated aristocrats (Cruel Celebrant / Zulaport / Meathook);
+///   this card is unaffected by it.
 /// </summary>
 [CardName("Falkenrath Noble")]
 public static class FalkenrathNobleFactory

@@ -30,10 +30,10 @@ namespace Majik.Core.CardData.Factories;
 ///   "a creature" because the Artist is itself a creature — the union
 ///   reduces to one predicate (same shape as Cruel Celebrant's
 ///   self-or-other collapse, but here the union spans ALL creatures, not
-///   just controlled ones). CR 603.10 — the dying card's snapshot is
-///   read off <see cref="Permanent.Controller"/> (the engine keeps
-///   controller across the zone move; identical posture to The Meathook
-///   Massacre's dies-triggers).
+///   just controlled ones). The trigger fires on EVERY creature death
+///   regardless of controller, so — unlike Cruel Celebrant / Zulaport /
+///   Meathook — it never branches on the dying object's controller and
+///   is insensitive to the CR 603.10 LKI question.
 /// - <b>Drain side</b>: on resolution drains 1 from the chosen target
 ///   player and gains 1 life to the controller. The target is supplied
 ///   by an optional <paramref name="targetResolver"/> (mirrors
@@ -60,15 +60,13 @@ namespace Majik.Core.CardData.Factories;
 ///   are separate life-change events. This matters for lifegain-payoff
 ///   triggers (Heliod, Sun-Crowned) and life-loss-matters effects
 ///   (Sanguine Bond / Vito) — neither side has lifelink semantics.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>Last-known-information for the dying permanent</b>: CR 603.10 —
-///   the moved card's controller must be read from LKI at the moment of
-///   death. The engine currently keeps <see cref="Permanent.Controller"/>
-///   on the card after the zone move, so this v1 implementation reads
-///   it directly. A future LKI snapshot pass would replace the
-///   controller read with a captured value. Same posture as Cruel
-///   Celebrant / Meathook.
+/// - <b>Last-known-information (CR 603.10)</b>: not load-bearing here —
+///   Blood Artist drains on EVERY creature death and gains life for its
+///   own controller, so it never reads the dying object's controller.
+///   The LKI controller snapshot (<see cref="CardMovedEvent.LkiController"/>)
+///   captured by <see cref="Majik.Core.Services.ZoneService"/> exists for
+///   the controller-gated aristocrats (Cruel Celebrant / Zulaport /
+///   Meathook); this card is unaffected by it.
 /// </summary>
 [CardName("Blood Artist")]
 public static class BloodArtistFactory

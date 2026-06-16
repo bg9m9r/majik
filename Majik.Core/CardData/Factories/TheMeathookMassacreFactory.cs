@@ -54,13 +54,17 @@ namespace Majik.Core.CardData.Factories;
 ///   the ETB-on-the-stack model is faithful, but the X stamp lives on
 ///   the card and is consumed eagerly. Same shape as Chalice of the
 ///   Void.
-/// - <b>Last-known-information for "a creature you control dies"</b>:
-///   CR 603.10 — at the moment of death, the dying creature is no
-///   longer on the battlefield, so its controller must be read from
-///   LKI. The engine currently keeps <see cref="Permanent.Controller"/>
-///   on the card after the zone move, so this v1 implementation reads
-///   it directly. A future LKI snapshot pass would replace the
-///   controller read with a captured value.
+///
+/// ## Notes
+/// - <b>Last-known-information for the controller branches (CR 603.10)</b>:
+///   both dies-triggers branch on the dying creature's controller read
+///   from <see cref="CardMovedEvent.LkiController"/> — the snapshot
+///   captured at the instant of death by
+///   <see cref="Majik.Core.Services.ZoneService"/>, BEFORE the
+///   battlefield-exit controller reset (CR 110.2). A creature an opponent
+///   has stolen from you (Act of Treason) that dies correctly counts as
+///   "a creature an opponent controls"; one you have stolen counts as "a
+///   creature you control".
 /// </summary>
 [CardName("The Meathook Massacre")]
 public static class TheMeathookMassacreFactory
@@ -165,16 +169,18 @@ public static class TheMeathookMassacreFactory
         //    life."
         // Fires on CardMovedEvent Battlefield → Graveyard for any
         // Creature whose controller is NOT the Massacre's controller.
-        // CR 603.10 — controller is read off the moved card (engine
-        // keeps Permanent.Controller across the zone move, so the LKI
-        // snapshot is effectively the live read).
+        // CR 603.10 — controller is read from the LKI snapshot
+        // (e.LkiController) captured at the instant of death, not the
+        // post-reset live card.
         // ----------------------------------------------------------------
         var oppDiesCondition = new EventTriggerCondition<CardMovedEvent>((e, _) =>
         {
             if (e.FromZone != ZoneType.Battlefield) return false;
             if (e.ToZone != ZoneType.Graveyard) return false;
             if (!e.Card.HasType(CardType.Creature)) return false;
-            return !ReferenceEquals(e.Card.Controller, owner);
+            // CR 603.10 — controller read from last-known information at the
+            // instant of death (e.LkiController), NOT the post-reset live card.
+            return !ReferenceEquals(e.LkiController, owner);
         });
 
         var oppDiesEffect = new Effect(
@@ -207,7 +213,9 @@ public static class TheMeathookMassacreFactory
             if (e.FromZone != ZoneType.Battlefield) return false;
             if (e.ToZone != ZoneType.Graveyard) return false;
             if (!e.Card.HasType(CardType.Creature)) return false;
-            return ReferenceEquals(e.Card.Controller, owner);
+            // CR 603.10 — controller read from last-known information at the
+            // instant of death (e.LkiController), NOT the post-reset live card.
+            return ReferenceEquals(e.LkiController, owner);
         });
 
         var ownDiesEffect = new Effect(
