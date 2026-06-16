@@ -9,6 +9,8 @@ using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
 
+using GameContext = Majik.Core.Game.GameContext;
+
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
@@ -215,5 +217,115 @@ public class GoblinWelderTests
         welded.Should().BeFalse("no battlefield artifact + no graveyard artifact → no-op");
         alice.Zones.Battlefield.GetCards().Should().BeEmpty();
         alice.Zones.Graveyard.GetCards().Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // Agatha's Soul Cauldron re-home (CR 707.2 / 613.1f) — the imprinted
+    // Goblin Welder's {T}: weld ability is granted to a counter-bearing
+    // creature via ActivatedAbility.RebindTo. Two properties are proven:
+    //
+    //   1. The ability is RebindSafe (provenance flag preserved across the
+    //      re-home) — the weld effect body captures NO authoring permanent /
+    //      player; it scans ctx.Game.AllPlayers, so it is source-independent.
+    //   2. The {T} activation cost re-homes onto the BEARER — the tap taps the
+    //      counter-bearer, never the exiled Goblin Welder (Stage 1
+    //      AdditionalCost.RebindSource).
+    //   3. Resolving the re-homed ability still performs the weld off the live
+    //      game context, exactly as the original (source-independence proof).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void GoblinWelder_ActivatedAbility_IsRebindSafe()
+    {
+        var welder = GoblinWelderFactory.Create(_alice, zoneService: null, eventBus: null);
+
+        var ability = welder.Abilities.OfType<ActivatedAbility>().Single();
+
+        ability.RebindSafe.Should().BeTrue(
+            "the weld effect body reads its player universe off the live "
+            + "ResolutionContext (ctx.Game.AllPlayers) and captures no authoring "
+            + "source, so Agatha's Soul Cauldron may soundly re-home it (CR 707.2)");
+    }
+
+    [Fact]
+    public void GoblinWelder_RebindTo_RehomesTapCostOntoBearer_NotExiledWelder()
+    {
+        var alice = new Player("Alice", 20);
+
+        // The original Goblin Welder is exiled under Agatha's Soul Cauldron.
+        var welder = GoblinWelderFactory.Create(alice, zoneService: null, eventBus: null);
+        welder.SetZone(ZoneType.Exile);
+
+        // A counter-bearing creature on the battlefield receives the grant.
+        var bearer = new Creature("Bearer", "1G", 3, 3);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var original = welder.Abilities.OfType<ActivatedAbility>().Single();
+        var rebound = original.RebindTo(bearer, alice);
+
+        rebound.RebindSafe.Should().BeTrue("RebindTo preserves the provenance flag");
+
+        var tapCost = rebound.Costs.OfType<AdditionalCost>().Single();
+        tapCost.Permanent.Should().BeSameAs(bearer,
+            "the {T} cost re-homes onto the bearer — Agatha taps the counter-bearer, "
+            + "never the exiled Goblin Welder (Stage 1 AdditionalCost.RebindSource)");
+    }
+
+    [Fact]
+    public async Task GoblinWelder_RebindTo_ReboundAbility_StillWeldsOffLiveGameContext()
+    {
+        // The Goblin Welder is OWNED by Bob, but is exiled under Agatha's Soul
+        // Cauldron and granted to ALICE's counter-bearing creature. The weld
+        // pair belongs to Alice. A source-independent body scans the live game
+        // (ctx.Game.AllPlayers, which includes Alice) and welds Alice's pair; a
+        // body that captured the welder's original owner (Bob) would scan Bob,
+        // find nothing, and no-op — so this proves source-independence.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        // Alice has a (battlefield artifact, graveyard artifact) pair to weld.
+        var battlefieldArt = new Artifact("Bottle Gnomes", "{3}");
+        battlefieldArt.SetOwner(alice);
+        battlefieldArt.SetController(alice);
+        alice.Zones.Battlefield.AddCard(battlefieldArt);
+        battlefieldArt.SetZone(ZoneType.Battlefield);
+
+        var graveyardArt = new Artifact("Memnite", "{0}");
+        graveyardArt.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(graveyardArt);
+        graveyardArt.SetZone(ZoneType.Graveyard);
+
+        // The Goblin Welder itself (owned by Bob) is exiled (Agatha). The weld
+        // ability is re-homed onto Alice's counter-bearing creature.
+        var welder = GoblinWelderFactory.Create(bob, zoneService: null, eventBus: null);
+        welder.SetZone(ZoneType.Exile);
+
+        var bearer = new Creature("Bearer", "1G", 3, 3);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var rebound = welder.Abilities.OfType<ActivatedAbility>().Single()
+            .RebindTo(bearer, alice);
+
+        // Resolve the re-homed ability through the real effect body, threading
+        // a live game context (the weld body reads players off ctx.Game).
+        var game = new GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+
+        await rebound.ResolveAsync(agent: null, game: game);
+
+        battlefieldArt.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed weld still sacrifices the battlefield artifact (source-independent)");
+        graveyardArt.Zone.Should().Be(ZoneType.Battlefield,
+            "the re-homed weld still reanimates the graveyard artifact off the live game context");
+        alice.Zones.Battlefield.GetCards().Should().Contain(graveyardArt);
     }
 }
