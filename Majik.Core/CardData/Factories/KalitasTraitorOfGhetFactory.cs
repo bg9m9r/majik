@@ -254,11 +254,35 @@ public static class KalitasTraitorOfGhetFactory
         // Cost = ManaCostCost("{2}{B}") + a filtered sacrifice (another —
         // i.e. NOT Kalitas itself — Vampire OR Zombie the controller
         // controls). Effect = place two +1/+1 counters on Kalitas
-        // (CR 122 / CR 121.6) via Fx.PlaceCounter.
+        // (CR 122 / CR 121.6).
+        //
+        // RE-SOURCE-SAFE (agatha-kalitas-sac-counter-exile-rider-rebind):
+        //   * EFFECT — reads the live ResolutionContext.Source (the ability's
+        //     own source at resolution) rather than capturing `card`, so when
+        //     Agatha's Soul Cauldron re-homes the ability the two +1/+1
+        //     counters land on the BEARER, never the exiled Kalitas. Falls
+        //     back to `card` only on the context-less legacy sync path. This
+        //     is the self-counter-on-bearer reconstructable shape shared with
+        //     Arcbound Ravager / Steel Overseer.
+        //   * COST — the "Sacrifice another Vampire or Zombie" exclusion now
+        //     captures `card` EXPLICITLY via the SacrificeFilteredCost
+        //     excludeSelf seam (IRebindableCost), so RebindTo re-homes the
+        //     "another" exclusion onto the new bearer — the bearer can't
+        //     sacrifice ITSELF, but the original Kalitas becomes a legal
+        //     sacrifice for the bearer's copy (CR 707.2 / 701.16). The mana
+        //     cost carries no source and passes through unchanged.
+        //   * rebindSafe: true — every effect reads its subject off the
+        //     context and every source-capturing cost re-homes, so the whole
+        //     ability is SOUND to RebindTo (the Agatha grant gates on this).
         // ----------------------------------------------------------------
         var pumpEffect = new Effect(
             $"{CardName}: put two +1/+1 counters on self",
-            () => Fx.PlaceCounter(card, CounterType.PlusOnePlusOne, PumpCounters));
+            ctx =>
+            {
+                var subject = (ctx.Source as Permanent) ?? card;
+                Fx.PlaceCounter(subject, CounterType.PlusOnePlusOne, PumpCounters);
+                return ValueTask.CompletedTask;
+            });
 
         var pumpAbility = new ActivatedAbility(
             source: card,
@@ -267,12 +291,13 @@ public static class KalitasTraitorOfGhetFactory
             {
                 new ManaCostCost(PumpActivationCost),
                 new SacrificeFilteredCost(
-                    p => !ReferenceEquals(p, card)
-                         && (p.HasSubtype(CardSubtype.Vampire) || p.HasSubtype(CardSubtype.Zombie)),
+                    p => p.HasSubtype(CardSubtype.Vampire) || p.HasSubtype(CardSubtype.Zombie),
                     "sacrifice another Vampire or Zombie",
-                    eventBus),
+                    eventBus,
+                    excludeSelf: card),
             },
-            effects: new IEffect[] { pumpEffect });
+            effects: new IEffect[] { pumpEffect },
+            rebindSafe: true);
 
         card.AddAbility(pumpAbility);
 

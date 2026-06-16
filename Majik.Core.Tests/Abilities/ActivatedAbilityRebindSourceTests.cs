@@ -292,6 +292,69 @@ public class ActivatedAbilityRebindSourceTests
     }
 
     [Fact]
+    public async Task Kalitas_PumpAbility_RebindsToBearer_SacAnotherExcludesBearer_CountersOnBearer()
+    {
+        // Arrange — the real Kalitas pump ability ("{2}{B}, Sacrifice another
+        // Vampire or Zombie: Put two +1/+1 counters on Kalitas"), re-homed
+        // onto a bearer (as Agatha's Soul Cauldron would grant it). This is
+        // the agatha-kalitas-sac-counter-exile-rider-rebind payoff: the
+        // sac-another exclusion follows the BEARER and the counters land on
+        // the BEARER, never the original Kalitas.
+        var kalitas = KalitasTraitorOfGhetFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(kalitas);
+        kalitas.SetZone(ZoneType.Battlefield);
+
+        // The bearer is itself a Zombie — so without re-homing the "another"
+        // exclusion, it would be wrongly excluded from / wrongly able to pay
+        // the cost. After RebindTo, the BEARER is the excluded self.
+        var bearer = new Creature("Walking Corpse", "1B", 2, 2,
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Zombie })
+        { Controller = _alice };
+        bearer.SetOwner(_alice);
+        _alice.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        // A second Zombie to actually sacrifice for the cost.
+        var fodder = new Creature("Diregraf Ghoul", "B", 2, 2,
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Zombie })
+        { Controller = _alice };
+        fodder.SetOwner(_alice);
+        _alice.Zones.Battlefield.AddCard(fodder);
+        fodder.SetZone(ZoneType.Battlefield);
+
+        var pump = kalitas.Abilities.OfType<ActivatedAbility>().Single();
+        pump.RebindSafe.Should().BeTrue(
+            "every effect reads its subject off the context and the sac-another " +
+            "cost re-homes, so the whole ability is sound to RebindTo (the Agatha grant gates on this)");
+
+        var rebound = pump.RebindTo(bearer, _alice);
+        var sac = rebound.Costs.OfType<SacrificeFilteredCost>().Single();
+
+        // The rebound cost excludes the BEARER (not the original Kalitas): the
+        // bearer can't sacrifice itself, but the original Kalitas IS now a legal
+        // sacrifice for the bearer's copy. Eligible set = {Kalitas (a Vampire),
+        // fodder (a Zombie)} — NOT the bearer.
+        var eligible = sac.EligiblePermanents(_alice);
+        eligible.Should().NotContain(bearer, "the bearer is the new 'another' exclusion");
+        eligible.Should().Contain(fodder);
+        eligible.Should().Contain(kalitas,
+            "the original Kalitas is just another Vampire to the re-homed ability");
+
+        // Act — choose the fodder Zombie, pay the sac cost, then resolve.
+        sac.ChoosePermanent(fodder);
+        foreach (var cost in rebound.Costs.OfType<SacrificeFilteredCost>()) cost.Pay(_alice);
+        await rebound.ResolveAsync(agent: null, game: null);
+
+        // Assert — fodder sacrificed; the two +1/+1 counters landed on the
+        // BEARER (ctx.Source), and the original Kalitas is untouched.
+        fodder.Zone.Should().Be(ZoneType.Graveyard);
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(
+            KalitasTraitorOfGhetFactory.PumpCounters);
+        kalitas.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the exiled/re-homed Kalitas never receives the counters");
+    }
+
+    [Fact]
     public async Task SpikeFeeder_GainLifeAbility_RebindsToBearer_SpendsBearerCounter()
     {
         // Arrange — the real Spike Feeder lifegain ability, re-homed onto a
