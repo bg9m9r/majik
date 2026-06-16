@@ -3229,6 +3229,218 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // agatha-sai-whirler-sac-artifact-token-maker-rebind — Sai, Master
+    // Thopterist's "{2}, Sacrifice two artifacts: Draw a card" is a bespoke
+    // [CardName]-factory activated ability whose draw effect reads
+    // ResolutionContext.Source's controller and whose "Sacrifice two artifacts"
+    // cost is OUTSIDE the OracleActivatedAbilityBinder reconstructable grammar
+    // (its cost grammar is mana pips + {T} + "Sacrifice this creature" only).
+    // The migration marked the ability RebindSafe; the residual gap was the
+    // SacrificeTwoArtifactsCost — a bare ICost capturing the original Sai as its
+    // excludeSource — which did NOT implement IRebindableCost and so carried the
+    // EXILED Sai's reference across RebindTo unchanged. Closing that seam lets
+    // RebindTo (Stage 1) re-home the cost onto the bearer, and the draw verb
+    // reads the bearer's controller, so Agatha's group-grant re-homes the REAL
+    // ability onto a counter-bearing bearer (CR 707.2 / 613.1f) — the bearer's
+    // controller pays {2} + sacrifices two artifacts and draws, never the
+    // exiled Sai.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_Sai_DrawCardToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability ("{2}, Sacrifice two artifacts: Draw a
+        // card") is RebindSafe (draws for ResolutionContext.Source's
+        // controller). Its "Sacrifice two artifacts" cost is NOT reconstructable
+        // from oracle text, so the RebindTo of the real ability is the only
+        // sound re-home.
+        var sai = SaiMasterThopteristFactory.Create(alice);
+        var realAbilities = sai.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Sai has exactly one non-mana activated ability — the draw-a-card");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Sai ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(sai);
+        sai.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING for Sai so the only way the
+        // ability is granted is via RebindTo of the real ability — the
+        // oracle-rebuild fallback cannot reconstruct the "Sacrifice two
+        // artifacts" cost.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), sai);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Sai's real {2},Sac-two-artifacts draw is re-homed via RebindTo");
+        var draw = granted[0];
+        draw.Source.Should().BeSameAs(bearer,
+            "the re-homed draw is sourced on the BEARER (CR 707.2)");
+        draw.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // The SacrificeTwoArtifactsCost re-homed its excludeSource onto the
+        // BEARER via IRebindableCost (Stage 1) — its Description now names the
+        // bearer, not the exiled Sai.
+        var sacCost = draw.Costs.OfType<SacrificeTwoArtifactsCost>().Should().ContainSingle(
+            "the sacrifice-two-artifacts cost is preserved and re-homed by RebindTo (Stage 1)").Subject;
+        sacCost.Description.Should().Contain(bearer.Name,
+            "the re-homed cost's excludeSource names the BEARER, not the exiled Sai");
+        sacCost.Description.Should().NotContain(SaiMasterThopteristFactory.CardName,
+            "the original Sai is no longer the cost's captured exclude-source");
+
+        // Stock the bearer-controller's (Alice's) library so the draw is
+        // observable.
+        for (int i = 0; i < 3; i++)
+        {
+            var libCard = new Creature($"Lib {i}", "G", 1, 1);
+            libCard.SetOwner(alice);
+            alice.Zones.Library.AddCard(libCard);
+            libCard.SetZone(ZoneType.Library);
+        }
+
+        var handBefore = alice.Zones.Hand.GetCards().Count();
+
+        // Resolving the re-homed draw draws ONE for the BEARER'S controller
+        // (Alice) — ResolutionContext.Source = bearer => its controller = Alice.
+        await draw.ResolveAsync(agent: null, game: null);
+
+        var handAfter = alice.Zones.Hand.GetCards().Count();
+        handAfter.Should().Be(handBefore + 1,
+            "the re-homed draw drew one card for the bearer's controller (Alice)");
+    }
+
+    [Fact]
+    public void Grant_RebindsBespokeFactoryCreature_Sai_SacCostExcludesBearerNotExiledSai()
+    {
+        // Direct unit-level check of the cost re-home seam (IRebindableCost):
+        // RebindTo of Sai's "Sacrifice two artifacts" cost re-homes its
+        // captured excludeSource from the original Sai onto the new bearer.
+        var alice = new Player("Alice", 20);
+
+        var sai = SaiMasterThopteristFactory.Create(alice);
+        var ability = sai.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var originalCost = ability.Costs.OfType<SacrificeTwoArtifactsCost>().Single();
+        originalCost.Description.Should().Contain(SaiMasterThopteristFactory.CardName,
+            "the un-rebound cost excludes the original Sai");
+
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+
+        var rehomed = ability.RebindTo(bearer, alice);
+
+        var rehomedCost = rehomed.Costs.OfType<SacrificeTwoArtifactsCost>().Single();
+        rehomedCost.Should().NotBeSameAs(originalCost,
+            "RebindTo returns a fresh cost copy so per-activation state never leaks");
+        rehomedCost.Description.Should().Contain(bearer.Name,
+            "the re-homed cost excludes the BEARER (its captured source is the new bearer)");
+        rehomedCost.Description.Should().NotContain(SaiMasterThopteristFactory.CardName,
+            "the original Sai is no longer the cost's captured exclude-source");
+
+        // The original ability's cost is untouched (RebindTo is pure).
+        originalCost.Description.Should().Contain(SaiMasterThopteristFactory.CardName,
+            "RebindTo did not mutate the source ability's cost");
+    }
+
+    // -----------------------------------------------------------------------
+    // agatha-sai-whirler-sac-artifact-token-maker-rebind — Whirler Virtuoso's
+    // "Pay {E}{E}: Create a 1/1 colorless Thopter artifact creature token with
+    // flying" is a bespoke [CardName]-factory activated ability. Token creation
+    // is OUTSIDE the OracleActivatedAbilityBinder reconstructable set (mirrors
+    // the Krenko token-maker migration). The migration retargets the effect to
+    // mint under ResolutionContext.Source's controller and marks the ability
+    // RebindSafe; its PayEnergyCost is a player-resource cost (no captured
+    // source), passed through unchanged by RebindTo (Stage 1). So Agatha's
+    // group-grant re-homes the REAL token-maker onto a counter-bearing bearer
+    // (CR 707.2 / 613.1f) — the bearer's controller pays {E}{E} and the Thopter
+    // enters under the bearer's controller, never the exiled Whirler Virtuoso.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_WhirlerVirtuoso_ThopterMakerToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its sole
+        // non-mana activated ability (the {E}{E} Thopter-maker) is RebindSafe
+        // (mints under ResolutionContext.Source's controller). Token creation is
+        // NOT reconstructable from oracle text, so the RebindTo of the real
+        // ability is the only sound re-home.
+        var whirler = WhirlerVirtuosoFactory.Create(alice);
+        var realAbilities = whirler.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Whirler Virtuoso has exactly one non-mana activated ability — the {E}{E} token-maker");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Whirler Virtuoso ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(whirler);
+        whirler.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub returns NOTHING for Whirler Virtuoso so the only way the
+        // ability is granted is via RebindTo of the real ability — the
+        // oracle-rebuild fallback cannot reconstruct token creation.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), whirler);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "Whirler Virtuoso's real {E}{E} token-maker is re-homed via RebindTo");
+        var tokenMaker = granted[0];
+        tokenMaker.Source.Should().BeSameAs(bearer,
+            "the re-homed token-maker is sourced on the BEARER (CR 707.2)");
+        tokenMaker.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        tokenMaker.Costs.OfType<PayEnergyCost>().Should().ContainSingle(
+            "the PayEnergyCost (player-resource cost, no captured source) is passed through unchanged by RebindTo (Stage 1)");
+
+        var thoptersBefore = alice.Zones.Battlefield.GetCards()
+            .Count(c => c.HasSubtype(CardSubtype.Thopter));
+
+        // Resolving the re-homed token-maker mints a Thopter under the BEARER'S
+        // controller (Alice) — ResolutionContext.Source = bearer => its
+        // controller = Alice. The bearer is on the battlefield, so the
+        // CR 603.6c-style live-source guard passes.
+        await tokenMaker.ResolveAsync(agent: null, game: null);
+
+        var thoptersAfter = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.HasSubtype(CardSubtype.Thopter))
+            .ToList();
+        thoptersAfter.Count.Should().Be(thoptersBefore + 1,
+            "the re-homed token-maker minted one Thopter under the bearer's controller (Alice)");
+        var thopter = thoptersAfter.Single();
+        thopter.Controller.Should().BeSameAs(alice,
+            "the Thopter enters under the bearer's controller, not the exiled Whirler Virtuoso");
+        thopter.HasType(CardType.Artifact).Should().BeTrue(
+            "the minted Thopter is an Artifact Creature (CR 111.1)");
+        thopter.Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "Flying", "the Thopter has flying (CR 702.9)");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-grant-imprinted-arbitrary-bespoke-closure-rehome — Griselbrand is
     // a bespoke [CardName]-factory creature whose sole activated ability ("Pay 7
     // life: Draw seven cards") is OUTSIDE the OracleActivatedAbilityBinder
