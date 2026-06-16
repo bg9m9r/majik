@@ -112,6 +112,103 @@ public class MadnessCardBodiesRemainingTests
         }
     }
 
+    // ── Terminal Agony / Ichor Slick: [CardName] factory bodies ─────────────
+    // The prod cast path already binds both via the template registry
+    // (DestroyCreatureTemplate / DebuffCreatureTemplate — covered below), but
+    // IsImplemented is derived from the [CardName] factory registry, so each
+    // card needs a real factory class to flip on. These factories mirror
+    // MurderousCompulsionFactory: a thin SpellDefinition over the existing
+    // declarative verb (destroy-target-creature / -N/-N-until-EOT). Madness is
+    // engine-intrinsic via MadnessCatalog — not wired in the factory.
+
+    [Fact]
+    public void TerminalAgony_Identity_Sorcery2BR_AndMadnessBR()
+    {
+        var card = NamedCardFactory.Create("Terminal Agony", _alice);
+
+        card.Should().BeOfType<Sorcery>();
+        card.Name.Should().Be("Terminal Agony");
+        card.ManaCost.Should().Be("{2}{B}{R}");
+        card.HasType(CardType.Sorcery).Should().BeTrue();
+        card.Owner.Should().BeSameAs(_alice);
+        card.Controller.Should().BeSameAs(_alice);
+
+        MadnessCatalog.HasMadness(card).Should().BeTrue();
+        MadnessCatalog.CostFor(card).Should().Be(ManaCost.Parse("{B}{R}"));
+    }
+
+    [Fact]
+    public void TerminalAgony_Factory_DestroysTargetCreature()
+    {
+        var def = TerminalAgonyFactory.BuildDefinition(targetResolver: t => t);
+        def.TargetRequests.Should().HaveCount(1, "destroy target creature is a single 1..1 request");
+
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        bear.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bear);
+
+        var chosen = new ChosenSpellParams(
+            null, null,
+            new IReadOnlyList<object>[] { new[] { (object)bear } },
+            ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        bear.Zone.Should().Be(ZoneType.Graveyard, "the targeted creature is destroyed (CR 701.7)");
+    }
+
+    [Fact]
+    public void IchorSlick_Identity_Sorcery2B_AndMadness3B()
+    {
+        var card = NamedCardFactory.Create("Ichor Slick", _alice);
+
+        card.Should().BeOfType<Sorcery>();
+        card.Name.Should().Be("Ichor Slick");
+        card.ManaCost.Should().Be("{2}{B}");
+        card.HasType(CardType.Sorcery).Should().BeTrue();
+        card.Owner.Should().BeSameAs(_alice);
+        card.Controller.Should().BeSameAs(_alice);
+
+        MadnessCatalog.HasMadness(card).Should().BeTrue();
+        MadnessCatalog.CostFor(card).Should().Be(ManaCost.Parse("{3}{B}"));
+    }
+
+    [Fact]
+    public void IchorSlick_Factory_ShrinksTargetCreatureMinus3Minus3()
+    {
+        var def = IchorSlickFactory.BuildDefinition();
+        def.TargetRequests.Should().HaveCount(1, "the -3/-3 grant is a single 1..1 'target creature' request");
+
+        // A 3/3 so the -3/-3 takes the printed stats to 0/0 — we read the
+        // modified stats off ActiveEffects directly (no SBA loop here).
+        var ogre = new Creature("Hill Giant", "{3}{R}", 3, 3)
+        {
+            Owner = _bob,
+            Controller = _bob,
+            ActiveEffects = new Majik.Core.Effects.ContinuousEffectsService(),
+        };
+        ogre.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(ogre);
+
+        var chosen = new ChosenSpellParams(
+            null, null,
+            new IReadOnlyList<object>[] { new[] { (object)ogre } },
+            ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        ogre.GetPower().Should().Be(0, "Ichor Slick grants -3/-3 until end of turn (CR 611)");
+        ogre.GetToughness().Should().Be(0);
+    }
+
+    [Fact]
+    public void TerminalAgonyAndIchorSlick_AreImplemented()
+    {
+        foreach (var name in new[] { "Terminal Agony", "Ichor Slick" })
+        {
+            ImplementedCardNames.Contains(name).Should().BeTrue(
+                $"{name}'s [CardName] factory body is shipped this slice");
+        }
+    }
+
     // ── Spells: bind via the template registry from seed oracle text ────────
 
     [Fact]
