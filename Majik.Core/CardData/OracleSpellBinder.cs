@@ -75,6 +75,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Destroy.DestroyUpToArtifactEnchantmentTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyNonlandPermanentTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyArtifactEnchantmentTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyTappedCreatureTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyCreatureTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyLandTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyPermanentTemplate(),
