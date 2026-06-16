@@ -35,6 +35,10 @@ public sealed class MatchEngineWatchdog
         _noProgress = noProgress;
     }
 
+    /// <summary>Visible for tests — the configured no-progress timeout, so the
+    /// W7 DI binding of <c>Watchdog:NoProgressSeconds</c> can be asserted.</summary>
+    internal TimeSpan NoProgressTimeout => _noProgress;
+
     /// <summary>Begin tracking <paramref name="matchId"/> and schedule the timer.
     /// If the timeout elapses with no <see cref="Bump"/>/<see cref="Cancel"/>,
     /// <paramref name="onWedged"/> is invoked exactly once. Arming an

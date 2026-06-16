@@ -57,6 +57,15 @@ public static class MatchRegistration
         // OnPriorityPassedAsync — same pattern as MatchTimeoutScheduler
         // below. Without it the holder set in PlayDrawAsync freezes forever
         // and the wrong player's clock burns.
+        // Engine-wedge watchdog (W3/W7). Per-match no-progress timer the bridge
+        // arms on Attach, bumps on every engine event (and bot-thinking), and
+        // cancels on Detach. NoProgressSeconds is config-bound (default 90); a
+        // hang fires onEngineErrored(Hang). Singleton so the same per-match timer
+        // dict is shared across requests (matches the other schedulers above).
+        var watchdogNoProgressSeconds = config.GetValue<int>("Watchdog:NoProgressSeconds", 90);
+        services.AddSingleton(sp => new MatchEngineWatchdog(
+            sp.GetRequiredService<ILogger<MatchEngineWatchdog>>(),
+            watchdogNoProgressSeconds));
         services.AddSingleton<MatchFacadeBridge>(sp =>
             new MatchFacadeBridge(
                 sp.GetRequiredService<IMatchHubPublisher>(),
@@ -70,6 +79,18 @@ public static class MatchRegistration
                     // compare-and-swap guard so out-of-order handoffs can't
                     // double-bill the same seat (C1).
                     await svc.OnPriorityPassedAsync(matchId, newHolderSub, ct, expectedPrevHolderSub);
+                },
+                watchdog: sp.GetRequiredService<MatchEngineWatchdog>(),
+                // W7 — route engine fault/hang to the scoped MatchService via a
+                // fresh DI scope (the singleton bridge can't hold the scoped
+                // service). Same pattern as onActivePlayerChanged / the timeout
+                // scheduler below. OnEngineErrorAsync CAS-transitions Playing →
+                // Errored exactly once; double-termination races no-op.
+                onEngineErrored: async (matchId, reason, fault, ct) =>
+                {
+                    using var scope = sp.CreateScope();
+                    var svc = scope.ServiceProvider.GetRequiredService<MatchService>();
+                    await svc.OnEngineErrorAsync(matchId, reason, fault, ct);
                 }));
         // Bot-match scheduler: drives the bot's roll + play/draw follow-up
         // with brief delays so the SignalR-fed UI lingers on Rolling long
