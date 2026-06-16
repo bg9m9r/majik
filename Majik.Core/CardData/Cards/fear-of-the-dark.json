@@ -1,0 +1,10 @@
+{
+  "name": "Fear of the Dark",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Nightmare"],
+  "manaCost": "{4}{B}",
+  "power": 5,
+  "toughness": 5,
+  "colors": ["B"],
+  "abilities": []
+}
