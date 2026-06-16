@@ -31,6 +31,18 @@ public class ActivatedAbility : IActivatedAbility
     // reuse a stale value.
     private int? _chosenX;
 
+    // CR 601.2d / CR 119.4 — deferred divide-damage announcement for a
+    // "deals N damage divided as you choose among …" ACTIVATED / loyalty
+    // ability (the activated-ability analogue of the trigger path's
+    // TriggeredAbility.DamageDivision and the spell path's
+    // SpellDefinition.DamageDivision). The spec is declared at construction
+    // time; the chosen per-target split is recorded after the activating
+    // player's agent responds at dispatch time (CR 601.2d, right after
+    // ChosenTargets — TurnDriver/GameFacade DispatchActivate + DispatchLoyalty),
+    // then threaded into ResolutionContext.DamageDivision at resolve time. Null
+    // until prompted (or when the ability deals no divided damage).
+    private IReadOnlyList<Game.DamageAllocation>? _chosenDamageDivision;
+
     public Guid Id { get; }
     public Player Controller { get; }
     public DateTime Timestamp { get; }
@@ -145,6 +157,32 @@ public class ActivatedAbility : IActivatedAbility
     public int? ChosenX => _chosenX;
 
     /// <summary>
+    /// CR 601.2d / CR 119.4 — the "deals N damage divided as you choose among …"
+    /// announcement spec for an ACTIVATED / loyalty ability. Declared at
+    /// construction (the activated-ability analogue of
+    /// <see cref="TriggeredAbility.DamageDivision"/> and
+    /// <see cref="SpellDefinition.DamageDivision"/>). The live driver's
+    /// dispatcher (TurnDriver / GameFacade DispatchActivate + DispatchLoyalty)
+    /// spots it, prompts the activating player's agent for the per-target split
+    /// right after targets are chosen (CR 601.2d), and records the answer via
+    /// <see cref="SetChosenDamageDivision"/>. Null ⇒ the ability deals no
+    /// divided damage and no division prompt is raised.
+    /// </summary>
+    public DamageDivisionSpec? DamageDivision { get; }
+
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — the per-target division announced by the
+    /// activating player's agent for this ability's <see cref="DamageDivision"/>.
+    /// Populated by <see cref="SetChosenDamageDivision"/> at dispatch time
+    /// (mirrored onto the stack copy by <see cref="Services.AbilityActivator"/>),
+    /// then threaded into <see cref="ResolutionContext.DamageDivision"/> at
+    /// resolution. Null when no division was prompted (no spec, no agent, or an
+    /// empty target slot) — the resolution effect falls back to its own even
+    /// split.
+    /// </summary>
+    public IReadOnlyList<Game.DamageAllocation>? ChosenDamageDivision => _chosenDamageDivision;
+
+    /// <summary>
     /// STAGE 2/3 (re-sourceable abilities) — provenance flag asserting that
     /// EVERY effect of this ability reads its source / subject off the live
     /// <see cref="ResolutionContext"/> (its own <see cref="ResolutionContext.Source"/>,
@@ -178,7 +216,8 @@ public class ActivatedAbility : IActivatedAbility
         bool sorcerySpeed = false,
         Func<bool>? canActivateCheck = null,
         bool rebindSafe = false,
-        Func<GameContext, bool>? canActivateCheckCtx = null)
+        Func<GameContext, bool>? canActivateCheckCtx = null,
+        DamageDivisionSpec? damageDivision = null)
     {
         if (source == null)
         {
@@ -199,6 +238,7 @@ public class ActivatedAbility : IActivatedAbility
         Timestamp = DateTime.UtcNow;
         IsSorcerySpeed = sorcerySpeed;
         RebindSafe = rebindSafe;
+        DamageDivision = damageDivision;
         _canActivateCheck = canActivateCheck;
         _canActivateCheckCtx = canActivateCheckCtx;
         _resolutionState = ResolutionState.NotResolving();
@@ -276,7 +316,11 @@ public class ActivatedAbility : IActivatedAbility
             sorcerySpeed: IsSorcerySpeed,
             canActivateCheck: _canActivateCheck,
             rebindSafe: RebindSafe,
-            canActivateCheckCtx: _canActivateCheckCtx);
+            canActivateCheckCtx: _canActivateCheckCtx,
+            // CR 601.2d — a re-sourced copy still deals the same divided damage;
+            // the chosen split is re-announced per activation, so only the
+            // declarative SPEC carries over (not the per-activation _chosenDamageDivision).
+            damageDivision: DamageDivision);
 
     /// <summary>
     /// Store the targets chosen by the activating player's agent. Called by
@@ -298,6 +342,17 @@ public class ActivatedAbility : IActivatedAbility
     /// the resolution effect reads.
     /// </summary>
     public void SetChosenX(int x) => _chosenX = x;
+
+    /// <summary>
+    /// CR 601.2d / CR 119.4 — record the per-target damage division announced by
+    /// the activating player's agent for this ability's <see cref="DamageDivision"/>.
+    /// Called by the live dispatcher (TurnDriver / GameFacade DispatchActivate +
+    /// DispatchLoyalty) right after target collection, before the ability is put
+    /// on the stack; threaded into <see cref="ResolutionContext.DamageDivision"/>
+    /// at resolution. Null clears any prior split (no-op fallback to even split).
+    /// </summary>
+    public void SetChosenDamageDivision(IReadOnlyList<Game.DamageAllocation>? chosen) =>
+        _chosenDamageDivision = chosen;
 
     public void Resolve() => ResolveAsync(null, null).GetAwaiter().GetResult();
 
@@ -326,7 +381,15 @@ public class ActivatedAbility : IActivatedAbility
         // context (CR 113.7) rather than capturing a specific permanent.
         var rc = ResolutionContext.For(
             Controller, agent, game, _chosenTargets, ct, source: Source as Cards.Permanent,
-            chosenX: _chosenX);
+            chosenX: _chosenX)
+            with
+            {
+                // CR 601.2d / CR 119.4 — thread the agent-announced per-target
+                // split (recorded at dispatch) so the deal-damage effect reads
+                // ResolutionContext.DamageDivision instead of an even-split
+                // fallback. Null on a non-divided ability / no-agent path.
+                DamageDivision = _chosenDamageDivision,
+            };
 
         // Attribute any counter performed during this ability's resolution to
         // its controller — "a spell or ability you control counters a spell"

@@ -123,7 +123,8 @@ public class AbilityActivator
             targetRequests: sourceAbility?.TargetRequests,
             sorcerySpeed: ability.IsSorcerySpeed,
             canActivateCheck: sourceAbility?.CanActivateCheck,
-            canActivateCheckCtx: sourceAbility?.CanActivateCheckCtx);
+            canActivateCheckCtx: sourceAbility?.CanActivateCheckCtx,
+            damageDivision: sourceAbility?.DamageDivision);
         if (sourceAbility != null && sourceAbility.ChosenTargets.Count > 0)
         {
             activatedAbility.SetChosenTargets(sourceAbility.ChosenTargets);
@@ -135,6 +136,15 @@ public class AbilityActivator
         if (sourceAbility?.ChosenX is { } chosenX)
         {
             activatedAbility.SetChosenX(chosenX);
+        }
+        // CR 601.2d / CR 119.4 — mirror the per-activation chosen damage division
+        // onto the stack object so its resolution effect deals the announced split
+        // (ResolutionContext.DamageDivision) instead of an even-split fallback.
+        // Parallel to the ChosenTargets / ChosenX copies above (CR 602.4 — the
+        // stack object carries the same characteristics as the original).
+        if (sourceAbility?.ChosenDamageDivision is { } chosenDivision)
+        {
+            activatedAbility.SetChosenDamageDivision(chosenDivision);
         }
 
         // Add ability to stack

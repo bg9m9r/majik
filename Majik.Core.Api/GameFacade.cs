@@ -526,6 +526,26 @@ public sealed class GameFacade : IDisposable
                 {
                     aa.SetChosenTargets(chosenTargets);
                 }
+
+                // CR 601.2d / CR 119.4 — divide-damage announcement for a "deals
+                // N damage divided as you choose among …" ACTIVATED ability.
+                // Prompt the activating player's agent for the per-target split
+                // right after targets are chosen; recorded on the source ability,
+                // mirrored onto the stack copy by AbilityActivator, threaded into
+                // ResolutionContext.DamageDivision at resolve time. Even-split
+                // fallback when no spec / empty slot. Mirrors TurnDriver.
+                if (aa.DamageDivision is { } divSpec
+                    && aa.Source is Majik.Core.Cards.ICard divSource)
+                {
+                    var slot = divSpec.TargetSlotIndex;
+                    var divTargets = slot >= 0 && slot < chosenTargets.Count
+                        ? chosenTargets[slot]
+                        : (IReadOnlyList<object>)Array.Empty<object>();
+                    var division = await Majik.Core.Players.Agents.DamageDivisionDefaults
+                        .PromptAsync(agents[actor], ctx, divSource, divSpec.TotalDamage, divTargets, ct: default)
+                        .ConfigureAwait(false);
+                    aa.SetChosenDamageDivision(division);
+                }
             }
 
             // CR 700.6 / 701.17 — if a "Sacrifice another creature" / "Sacrifice
@@ -630,10 +650,27 @@ public sealed class GameFacade : IDisposable
                 costs: null,
                 effects: loyalty.Effects,
                 targetRequests: loyalty.TargetRequests.Count > 0 ? loyalty.TargetRequests : null,
-                sorcerySpeed: true);
+                sorcerySpeed: true,
+                damageDivision: loyalty.DamageDivision);
             if (chosenTargets.Count > 0)
             {
                 stackObject.SetChosenTargets(chosenTargets);
+            }
+
+            // CR 601.2d / CR 119.4 — divide-damage announcement for a loyalty
+            // ability dealing N damage divided among its chosen targets. Mirrors
+            // TurnDriver.DispatchLoyalty / GameFacade.DispatchActivate.
+            if (loyalty.DamageDivision is { } loyaltyDivSpec
+                && loyalty.Source is Majik.Core.Cards.ICard loyaltyDivSource)
+            {
+                var slot = loyaltyDivSpec.TargetSlotIndex;
+                var divTargets = slot >= 0 && slot < chosenTargets.Count
+                    ? chosenTargets[slot]
+                    : (IReadOnlyList<object>)Array.Empty<object>();
+                var division = await Majik.Core.Players.Agents.DamageDivisionDefaults
+                    .PromptAsync(agents[actor], ctx, loyaltyDivSource, loyaltyDivSpec.TotalDamage, divTargets, ct: default)
+                    .ConfigureAwait(false);
+                stackObject.SetChosenDamageDivision(division);
             }
 
             _stack.Push(stackObject);
