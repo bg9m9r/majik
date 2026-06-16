@@ -45,10 +45,23 @@ namespace Majik.Core.Costs;
 /// deterministic posture, used by factory-direct tests / bot convenience
 /// wiring).</para>
 /// </summary>
-public sealed class SacrificeFilteredCost : ICost, IChoosePermanentToSacrificeCost
+public sealed class SacrificeFilteredCost : ICost, IChoosePermanentToSacrificeCost, IRebindableCost
 {
     private readonly Func<Permanent, bool> _filter;
     private readonly IEventBus? _eventBus;
+
+    /// <summary>
+    /// STAGE 1 (re-sourceable abilities) — the permanent the "another"
+    /// clause excludes from the eligible set (CR 701.16 — "Sacrifice
+    /// <i>another</i> Vampire or Zombie" excludes the ability's own source).
+    /// Captured EXPLICITLY (rather than baked into <see cref="_filter"/>) so
+    /// <see cref="RebindTo"/> can swap it onto a new bearer: when Agatha's
+    /// Soul Cauldron re-homes Kalitas's pump onto a different creature, the
+    /// "another" exclusion must exclude the NEW bearer, not the original
+    /// Kalitas. Null ⇒ no exclusion (the source may pay itself — Scavenger
+    /// Grounds is itself a Desert).
+    /// </summary>
+    private readonly Permanent? _excludeSelf;
 
     /// <summary>
     /// The chosen permanent to sacrifice. May be pre-set by the agent;
@@ -72,11 +85,21 @@ public sealed class SacrificeFilteredCost : ICost, IChoosePermanentToSacrificeCo
     /// <param name="eventBus">Optional event bus — publishes a
     /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
     /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
-    public SacrificeFilteredCost(Func<Permanent, bool> filter, string description, IEventBus? eventBus = null)
+    /// <param name="excludeSelf">Optional permanent the "another" clause
+    /// excludes from the eligible set (CR 701.16). Captured explicitly so
+    /// <see cref="RebindTo"/> can re-home it onto a new bearer (Agatha's Soul
+    /// Cauldron grant — CR 707.2). Null ⇒ no exclusion (the source may pay
+    /// itself when it matches the filter).</param>
+    public SacrificeFilteredCost(
+        Func<Permanent, bool> filter,
+        string description,
+        IEventBus? eventBus = null,
+        Permanent? excludeSelf = null)
     {
         _filter = filter ?? throw new ArgumentNullException(nameof(filter));
         Description = description ?? "sacrifice a permanent";
         _eventBus = eventBus;
+        _excludeSelf = excludeSelf;
     }
 
     /// <summary>
@@ -95,7 +118,34 @@ public sealed class SacrificeFilteredCost : ICost, IChoosePermanentToSacrificeCo
         new(p => p.HasSubtype(subtype), $"sacrifice a {subtype}", eventBus);
 
     private bool IsEligible(Permanent p) =>
-        p.Zone == ZoneType.Battlefield && _filter(p);
+        p.Zone == ZoneType.Battlefield
+        && !ReferenceEquals(p, _excludeSelf)
+        && _filter(p);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// STAGE 1 (re-sourceable abilities) — re-home the "another" exclusion
+    /// (<see cref="_excludeSelf"/>) onto <paramref name="newSource"/> when (and
+    /// only when) it is reference-equal to <paramref name="oldSource"/>. Used by
+    /// <see cref="Majik.Core.Abilities.ActivatedAbility.RebindTo"/> so a re-sourced
+    /// "Sacrifice another &lt;type&gt;" cost excludes the NEW bearer, not the
+    /// original permanent (CR 707.2 / 701.16). The <see cref="_filter"/> predicate
+    /// (the "Vampire or Zombie" subtype test) carries no source and passes through
+    /// unchanged. Pure — the original cost is unmutated.
+    /// </remarks>
+    public ICost RebindTo(object oldSource, object newSource)
+    {
+        if (_excludeSelf is null || !ReferenceEquals(_excludeSelf, oldSource))
+        {
+            return this;
+        }
+
+        return new SacrificeFilteredCost(
+            _filter,
+            Description,
+            _eventBus,
+            excludeSelf: newSource as Permanent);
+    }
 
     /// <inheritdoc/>
     public IReadOnlyList<Permanent> EligiblePermanents(Player player)
