@@ -9,6 +9,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
@@ -288,5 +289,84 @@ public class KnightOfTheReliquaryFactoryTests
         _alice.Zones.Library.GetCards().Should().Contain(land,
             "no sacrifice → no tutor");
         _alice.Zones.Battlefield.GetCards().Should().NotContain(land);
+    }
+
+    // -----------------------------------------------------------------------
+    // Agatha re-source — the tutor ability reads the BEARER's controller off
+    // ResolutionContext.Source (CR 707.2 / 613.1f). The sac cost sacrifices a
+    // Forest/Plains the BEARER's controller controls; the search ranges the
+    // BEARER's controller's library; the tutored land enters under the
+    // BEARER's controller — never the exiled Knight or its original owner.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void TutorAbility_IsRebindSafe()
+    {
+        // The {T}, Sacrifice a Forest/Plains: tutor a land ability reads its
+        // source + controller off the live ResolutionContext, so Agatha's Soul
+        // Cauldron may re-home it to a bearer via ActivatedAbility.RebindTo.
+        var knight = KnightOfTheReliquaryFactory.Create(_alice);
+        var ability = knight.Abilities.OfType<ActivatedAbility>().Single();
+        ability.RebindSafe.Should().BeTrue(
+            "the re-sourced tutor reads ResolutionContext.Source for the bearer's controller "
+            + "(which Forest/Plains to sacrifice, whose library to search).");
+    }
+
+    [Fact]
+    public void TutorAbility_Rebound_SacsBearerControllersLand_SearchesBearerControllersLibrary()
+    {
+        // Knight is OWNED by Alice but its ability is granted (via Agatha) to a
+        // bearer Bob controls. On resolution the BEARER's controller (Bob) pays
+        // the sac cost and searches Bob's library — Alice is untouched.
+        var knight = KnightOfTheReliquaryFactory.Create(_alice, _effects, _bus, _zones);
+
+        var bearer = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bearer.SetOwner(_bob);
+        bearer.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        // Bob controls a Forest to sacrifice.
+        var bobForest = new Land("Forest", subtypes: new[] { CardSubtype.Forest });
+        bobForest.SetOwner(_bob);
+        bobForest.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(bobForest);
+        bobForest.SetZone(ZoneType.Battlefield);
+
+        // Bob's library holds the land to tutor.
+        var bobLand = new Land("Wasteland");
+        bobLand.SetOwner(_bob);
+        _bob.Zones.Library.AddCard(bobLand);
+        bobLand.SetZone(ZoneType.Library);
+
+        // Alice ALSO controls a Forest + a library land — these must NOT be
+        // touched by the rebound ability (the seam reads the bearer's
+        // controller, not Knight's owner).
+        var aliceForest = new Land("Forest", subtypes: new[] { CardSubtype.Forest });
+        aliceForest.SetOwner(_alice);
+        aliceForest.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(aliceForest);
+        aliceForest.SetZone(ZoneType.Battlefield);
+
+        var aliceLand = new Land("Bayou");
+        aliceLand.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(aliceLand);
+        aliceLand.SetZone(ZoneType.Library);
+
+        var ability = knight.Abilities.OfType<ActivatedAbility>().Single();
+        var rebound = ability.RebindTo(bearer, _bob);
+
+        ContextResolve.Resolve(rebound, _bob, _bob, _alice);
+
+        // Bob's Forest sacrificed; Bob's land tutored to Bob's battlefield.
+        _bob.Zones.Graveyard.GetCards().Should().Contain(bobForest);
+        _bob.Zones.Battlefield.GetCards().Should().Contain(bobLand);
+        _bob.Zones.Library.GetCards().Should().NotContain(bobLand);
+
+        // Alice's permanents untouched.
+        _alice.Zones.Battlefield.GetCards().Should().Contain(aliceForest);
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(aliceForest);
+        _alice.Zones.Library.GetCards().Should().Contain(aliceLand);
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(aliceLand);
     }
 }
