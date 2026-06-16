@@ -304,8 +304,18 @@ public sealed class MatchService
                 // hub so the frontend can show a "Bot is thinking…"
                 // indicator while the policy runs.
                 var hubForCallback = _hub;
-                Action<bool>? onBotThinking = hubForCallback != null
-                    ? thinking => hubForCallback.PublishBotThinking(matchId, thinking)
+                var bridgeForBump = _facadeBridge;
+                // Bridge the engine-internal bot-thinking signal to BOTH the
+                // SignalR hub (so the frontend can show a "Bot is thinking…"
+                // indicator) AND the no-progress watchdog (W5): a thinking bot
+                // is real engine progress, so it must Bump the watchdog or a
+                // slow-but-working bot policy would be misclassified as a Hang.
+                Action<bool>? onBotThinking = (hubForCallback != null || bridgeForBump != null)
+                    ? thinking =>
+                    {
+                        hubForCallback?.PublishBotThinking(matchId, thinking);
+                        bridgeForBump?.Bump(matchId);
+                    }
                     : null;
                 // Per-match decision sinks (SignalR diagnostics channel +
                 // replay buffer), composed into one fan-out observer. The
@@ -825,7 +835,26 @@ public sealed class MatchService
         // game reproducible from (stored seed, command log) for later replay /
         // rehydration (the rehydration body itself remains out of scope).
         var rng = new Majik.Core.Random.GameRandom(match.GameSeed);
-        facade?.StartFullGameAsync(firstPlayerSlot, rng: rng, autoPassPrefsProvider: prefsProvider);
+        if (facade == null) return;
+
+        // W6: capture the fire-and-forget loop task and hand it to the
+        // SINGLETON bridge for supervision. The bridge attaches a fault
+        // continuation (SuperviseLoop) so a throw during autonomous
+        // progression surfaces as a terminal engine error instead of a silent
+        // wedge — the unobserved-task root cause. Routed through the singleton
+        // (not this scoped service, which may be disposed before a fault occurs
+        // minutes later) for lifetime correctness, mirroring the watchdog +
+        // clock-handoff callbacks.
+        var loopTask = facade.StartFullGameAsync(firstPlayerSlot, rng: rng, autoPassPrefsProvider: prefsProvider);
+        // Supervise the ACTUAL game-loop task (FullGameTask = driver.RunGameAsync),
+        // NOT the value StartFullGameAsync returns — that return is the
+        // WaitForPromptOrLoopAsync wrapper, which completes successfully as soon
+        // as the FIRST prompt settles, so it would only catch a fault before the
+        // first prompt. FullGameTask faults whenever the loop faults at ANY point
+        // (e.g. during the bot's turn, the common case), so a post-settle fault is
+        // surfaced promptly here rather than waiting on the watchdog. Fall back to
+        // the wrapper if FullGameTask is somehow null.
+        _facadeBridge?.SuperviseLoop(match.Id, facade.FullGameTask ?? loopTask);
     }
 
     /// <summary>Slice 5a — build the per-seat AutoPassPrefs provider. The
@@ -1091,7 +1120,11 @@ public sealed class MatchService
         var match = await _matches.GetByIdAsync(matchId, ct);
         if (match == null) return Result.Fail<bool>(new MatchError("match-not-found"));
         if (match.Creator.Sub != callerSub) return Result.Fail<bool>(new MatchError("forbidden"));
-        if (match.State == MatchState.Playing || match.State == MatchState.Completed)
+        // Terminal states cannot be abandoned. Playing is still live;
+        // Completed/Errored are ended (Errored is the engine-fault/-hang
+        // terminal added for wedge supervision — distinct from Completed,
+        // which carries winner semantics).
+        if (match.State == MatchState.Playing || match.State == MatchState.Completed || match.State == MatchState.Errored)
             return Result.Fail<bool>(new MatchError("match-in-progress"));
         if (match.State == MatchState.Abandoned)
             return Result.Ok(true);
@@ -1257,6 +1290,94 @@ public sealed class MatchService
         _hub?.Publish(matchId, "match.timed-out", new { matchId, loserSub, winnerSub = winner });
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
+    }
+
+    // -----------------------------------------------------------------------
+    // OnEngineErrorAsync — engine game-loop faulted or hung (wedge supervision)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Terminal transition for an engine game-loop fault/hang: turns an
+    /// otherwise-silent wedge (the fire-and-forget loop faulting or never
+    /// returning between human submits) into a clean terminal
+    /// <see cref="MatchState.Errored"/> match plus a client surface.
+    ///
+    /// <para>Modelled on <see cref="OnTimeoutAsync"/>: idempotent load guard,
+    /// single CAS <c>Playing → Errored</c> via <see cref="RetryPolicy"/>, then
+    /// the same teardown (timer cancel, bridge detach, prefs evict) and a pair
+    /// of hub publishes. Unlike timeout there is NO winner — the match simply
+    /// ends in error.</para>
+    ///
+    /// <para>The CAS is the sole arbiter of the terminal transition, so a
+    /// concurrent concede/timeout/natural-end that already moved the match out
+    /// of Playing makes this a no-op (double-termination is impossible). The
+    /// triggering exception is logged here (server-side only) and is NEVER put
+    /// on any wire payload (info-leak posture).</para>
+    /// </summary>
+    public async Task OnEngineErrorAsync(
+        Guid matchId, EngineFaultReason reason, Exception? fault, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        // Idempotent: a concurrent Concede / Timeout / natural-end already
+        // terminated it (or it never existed). This is the double-termination
+        // guard — the CAS below is authoritative, this just avoids the wasted
+        // round-trip on the common miss.
+        if (match == null || match.State != MatchState.Playing) return;
+
+        // Server log is the ONLY place the exception detail lives — it never
+        // crosses the wire (see the publishes below). Include the turn/phase the
+        // loop died at (when the facade is still resolvable) to aid stage-2
+        // triage of the underlying throw.
+        var facade = match.GameId is { } gid ? _gameFactory?.Get(gid) : null;
+        _logger?.LogError(fault,
+            "Engine loop {Reason} — aborting match. MatchId={MatchId} GameId={GameId} Turn={Turn} Phase={Phase}",
+            reason, matchId, match.GameId, facade?.CurrentTurn, facade?.CurrentPhase);
+
+        var now = _clock.UtcNow;
+        var update = MongoDB.Driver.Builders<Match>.Update
+            .Set(m => m.State, MatchState.Errored)
+            .Set(m => m.UpdatedAt, now);
+
+        // Retry-with-backoff: this CAS is the only thing moving the match out
+        // of Playing on an engine fault. A transient Mongo blip here would
+        // strand the match in Playing forever (the loop is dead and won't fire
+        // again). The CAS filter (State==Playing) makes the retry idempotent:
+        // a lost-race retry that finds the match already terminal matches
+        // nothing and returns false — never a double-apply.
+        var moved = await RetryPolicy.ExecuteAsync(
+            c => _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, c),
+            _logger, $"OnEngineErrorAsync CAS (match {matchId})", ct);
+
+        // Teardown runs regardless of the CAS result (mirrors Concede #8): a
+        // CAS conflict means a concurrent terminal path already moved the
+        // match, but THIS replica still holds the timer + bridge + prefs and
+        // would leak them if we returned early. All three are idempotent, so a
+        // double-teardown across replicas is a no-op.
+        _timeoutScheduler?.Cancel(matchId);
+        // Match terminated by engine fault — no further engine traffic should
+        // surface on the hub. (Facade itself is left to MatchCleanup, exactly
+        // as OnTimeoutAsync does; the bridge just unhooks.)
+        _facadeBridge?.Detach(matchId);
+        // Terminal state — evict per-match auto-pass prefs (same posture as
+        // Concede / Timeout / Abandon).
+        _autoPassPrefs?.EvictMatch(matchId);
+
+        // Lost the race — a concurrent terminal path already published its own
+        // state-changed; don't emit a duplicate.
+        if (!moved) return;
+
+        _hub?.Publish(matchId, "match.engine-error", new
+        {
+            matchId,
+            reason = reason switch
+            {
+                EngineFaultReason.Fault => "engine-fault",
+                EngineFaultReason.Hang => "engine-hang",
+                _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unmapped EngineFaultReason"),
+            },
+        });
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Errored", transitionedAt = now });
     }
 
     // -----------------------------------------------------------------------

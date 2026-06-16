@@ -79,6 +79,8 @@ public sealed class MatchFacadeBridge
     private readonly ILogger<MatchFacadeBridge> _logger;
     private readonly MatchReplayBuffer? _replay;
     private readonly ClockHandoffCallback? _onActivePlayerChanged;
+    private readonly MatchEngineWatchdog? _watchdog;
+    private readonly Func<Guid, EngineFaultReason, Exception?, CancellationToken, Task>? _onEngineErrored;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
 
     // Prod-safe desync observability (Slice 4b #3). The DEBUG-only
@@ -120,12 +122,16 @@ public sealed class MatchFacadeBridge
         IMatchHubPublisher hub,
         ILogger<MatchFacadeBridge> logger,
         MatchReplayBuffer? replay = null,
-        ClockHandoffCallback? onActivePlayerChanged = null)
+        ClockHandoffCallback? onActivePlayerChanged = null,
+        MatchEngineWatchdog? watchdog = null,
+        Func<Guid, EngineFaultReason, Exception?, CancellationToken, Task>? onEngineErrored = null)
     {
         _hub = hub;
         _logger = logger;
         _replay = replay;
         _onActivePlayerChanged = onActivePlayerChanged;
+        _watchdog = watchdog;
+        _onEngineErrored = onEngineErrored;
     }
 
     /// <summary>Visible for tests.</summary>
@@ -183,7 +189,198 @@ public sealed class MatchFacadeBridge
             // Lost the race against another Attach for the same matchId —
             // dispose what we just created so we don't leak.
             attachment.Dispose();
+            return;
         }
+
+        // Arm the no-progress watchdog (W5). The watchdog is a dumb timer
+        // (W3); when it elapses with no intervening Bump it invokes this
+        // closure, which inspects the live facade to classify Fault vs Hang
+        // and reports via _onEngineErrored. Best-effort — null when the
+        // watchdog isn't wired (unit tests / non-bot paths).
+        _watchdog?.Arm(matchId, () => ClassifyAndReportAsync(matchId));
+    }
+
+    /// <summary>
+    /// Engine-progress signal (W5). Resets the per-match no-progress
+    /// watchdog so a match that is genuinely making progress is never
+    /// flagged as hung. Best-effort + idempotent (the watchdog no-ops if
+    /// the match isn't armed) and never throws — called from the bot-thinking
+    /// forwarding path in <c>MatchService</c> (a thinking bot is real
+    /// progress; see also the Bumps at the top of <see cref="ForwardEvent"/>
+    /// / <see cref="ForwardPrompt"/>).
+    /// </summary>
+    public void Bump(Guid matchId)
+    {
+        try { _watchdog?.Bump(matchId); }
+        catch { /* best-effort progress signal — never perturb the caller. */ }
+    }
+
+    /// <summary>
+    /// Watchdog-fire handler (W5): the no-progress window elapsed for
+    /// <paramref name="matchId"/>. Inspect the live facade to decide whether
+    /// this is a genuine wedge and, if so, classify it:
+    /// <list type="bullet">
+    ///   <item><see cref="EngineFaultReason.Fault"/> — the fire-and-forget
+    ///   loop task completed faulted (a throw during autonomous progression);
+    ///   the inner exception is passed through (server-side log only).</item>
+    ///   <item><see cref="EngineFaultReason.Hang"/> — the loop is still
+    ///   running with no pending human prompt (a bot decision never returned).</item>
+    /// </list>
+    /// When the loop completed normally, or a human prompt IS pending (the
+    /// match is legitimately waiting on a human, which is
+    /// <see cref="MatchTimeoutScheduler"/>'s domain), this is NOT a wedge:
+    /// no report is made and the watchdog is re-armed (Bump) so a later
+    /// genuine stall is still caught. Tolerant of a concurrently-detached
+    /// match (the attachment is gone → no-op).
+    /// </summary>
+    private async Task ClassifyAndReportAsync(Guid matchId)
+    {
+        if (!_attachments.TryGetValue(matchId, out var attachment)) return;
+
+        Task? loopTask = attachment.Facade.FullGameTask;
+        bool humanPromptPending = HasPendingHumanPrompt(matchId);
+
+        var (reason, fault) = ClassifyWedge(loopTask, humanPromptPending);
+        if (reason == null)
+        {
+            // Not a wedge (loop finished cleanly, or a human prompt is
+            // pending). Re-arm so a later genuine stall is still caught.
+            // NOTE: must Arm (not Bump) — the watchdog removes its entry
+            // before invoking this callback (W3), so Bump would be a no-op
+            // against a now-absent entry. Re-Arm only while still attached
+            // (a concurrent Detach already Cancel'd the watchdog).
+            if (_attachments.ContainsKey(matchId))
+            {
+                _watchdog?.Arm(matchId, () => ClassifyAndReportAsync(matchId));
+            }
+            return;
+        }
+
+        await ReportEngineErrorAsync(matchId, reason.Value, fault).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Supervise the fire-and-forget game-loop task (W6). The loop returned by
+    /// <c>GameFacade.StartFullGameAsync</c> is started fire-and-forget by
+    /// <c>MatchService.StartGameForFirstPlayer</c> — its task has no other
+    /// server-side observer, so a throw during autonomous progression (bot turn
+    /// / resolution / auto-pass, between human submits) would otherwise fault an
+    /// unobserved task → be swallowed → the loop dies silently → the human is
+    /// left un-prompted on a dead clock with no log.
+    ///
+    /// We attach a fault continuation that surfaces a faulted loop PROMPTLY (not
+    /// only at the next watchdog tick) by routing it through the same
+    /// <see cref="EngineFaultReason.Fault"/> report path the watchdog's
+    /// classifier uses (<see cref="ReportEngineErrorAsync"/> → the stored
+    /// <c>_onEngineErrored</c> callback). The Fault and Hang paths therefore
+    /// converge on the single <c>OnEngineErrorAsync</c> arbiter, whose CAS
+    /// <c>Playing → Errored</c> makes a double-report (continuation AND a later
+    /// watchdog fire) safe.
+    ///
+    /// Lives on the SINGLETON bridge (not the scoped MatchService): a fault can
+    /// occur minutes after the launch, by which time the scoped MatchService is
+    /// disposed — the continuation must outlive it, exactly like the watchdog
+    /// and the clock-handoff callback. The continuation body never throws.
+    /// </summary>
+    public void SuperviseLoop(Guid matchId, Task loopTask)
+    {
+        if (loopTask == null) return;
+
+        loopTask.ContinueWith(
+            async t =>
+            {
+                try
+                {
+                    if (!t.IsFaulted) return;
+                    var ex = t.Exception?.GetBaseException();
+                    // AWAIT the report (don't discard it): OnEngineErrorAsync's CAS
+                    // goes through RetryPolicy, which RETHROWS on durable failure
+                    // (e.g. Mongo down). Awaiting inside this try/catch means a
+                    // failed terminal-transition report is logged here rather than
+                    // becoming a swallowed UnobservedTaskException.
+                    await ReportEngineErrorAsync(matchId, EngineFaultReason.Fault, ex)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // The continuation body must NEVER let a fault escape — an
+                    // unobserved throw here would itself become a swallowed fault,
+                    // the very failure mode W6 exists to eliminate.
+                    _logger.LogError(ex,
+                        "MatchFacadeBridge: loop-supervision continuation faulted. MatchId={MatchId}",
+                        matchId);
+                }
+            },
+            TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Invoke the stored engine-error callback (production:
+    /// <c>MatchService.OnEngineErrorAsync</c> via a fresh DI scope, wired in
+    /// W7). Both supervision paths — the W5 watchdog classifier (Hang) and the
+    /// W6 fault continuation (Fault) — converge here so they share one report
+    /// seam and one downstream CAS arbiter. When the callback isn't wired
+    /// (unit tests / DI not yet configured) this just logs, so the bridge is
+    /// safe before W7 lands.
+    /// </summary>
+    private async Task ReportEngineErrorAsync(Guid matchId, EngineFaultReason reason, Exception? fault)
+    {
+        if (_onEngineErrored == null)
+        {
+            _logger.LogError(fault,
+                "MatchFacadeBridge: engine error detected but no onEngineErrored callback is wired " +
+                "(DI not configured?). MatchId={MatchId} Reason={Reason}",
+                matchId, reason);
+            return;
+        }
+
+        await _onEngineErrored(matchId, reason, fault, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Pure wedge classifier (internal seam — unit-tested directly because the
+    /// bridge's end-to-end harness can't supply a facade with a controllable
+    /// <c>FullGameTask</c>). Returns the reason + triggering exception, or
+    /// <c>(null, null)</c> when the observed state is NOT a wedge:
+    /// <list type="bullet">
+    ///   <item>loop task faulted → (<see cref="EngineFaultReason.Fault"/>, inner exception);</item>
+    ///   <item>loop still running AND no human prompt pending →
+    ///   (<see cref="EngineFaultReason.Hang"/>, null);</item>
+    ///   <item>otherwise (loop completed normally, or a human prompt is
+    ///   pending) → (null, null) — not a wedge.</item>
+    /// </list>
+    /// </summary>
+    internal static (EngineFaultReason? Reason, Exception? Fault) ClassifyWedge(
+        Task? loopTask, bool humanPromptPending)
+    {
+        if (loopTask is { IsFaulted: true } faulted)
+        {
+            return (EngineFaultReason.Fault, faulted.Exception?.GetBaseException());
+        }
+
+        if (loopTask is { IsCompleted: false } && !humanPromptPending)
+        {
+            return (EngineFaultReason.Hang, null);
+        }
+
+        // Loop completed normally, never started, or a human prompt is
+        // pending — none of these is a wedge.
+        return (null, null);
+    }
+
+    /// <summary>True iff a human (non-bot) prompt is currently buffered for
+    /// <paramref name="matchId"/>. A pending human prompt means the match is
+    /// legitimately waiting on a person, NOT wedged — that's the timeout
+    /// scheduler's domain, so the watchdog must suppress a Hang report. Bot
+    /// prompts are never buffered (see <see cref="ForwardPrompt"/>), so any
+    /// entry here is a human seat by construction.</summary>
+    private bool HasPendingHumanPrompt(Guid matchId)
+    {
+        foreach (var key in _bufferedPrompts.Keys)
+        {
+            if (key.MatchId == matchId) return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -199,6 +396,12 @@ public sealed class MatchFacadeBridge
     /// </summary>
     public void Detach(Guid matchId)
     {
+        // Cancel the no-progress watchdog (W5) — a terminal state is reached
+        // via every Detach call site, so a still-armed timer would later fire
+        // a spurious wedge report against a match that is already gone.
+        // Idempotent + best-effort.
+        _watchdog?.Cancel(matchId);
+
         if (_attachments.TryRemove(matchId, out var attachment))
         {
             attachment.Dispose();
@@ -380,6 +583,11 @@ public sealed class MatchFacadeBridge
     //     unmasked variant never reaches the opponent.
     internal void ForwardEvent(Guid matchId, EventEnvelope envelope, PromptRouting routing)
     {
+        // Engine progress signal (W5): every forwarded event resets the
+        // no-progress watchdog. Best-effort + never throws (a throw here
+        // would be swallowed by EventBus SafeInvoke anyway).
+        Bump(matchId);
+
         // Capture BEFORE publish so a hub-publish fault doesn't lose the
         // record from the replay log. Capture is best-effort — the buffer
         // swallows its own exceptions, so the live broadcast can't be
@@ -686,6 +894,10 @@ public sealed class MatchFacadeBridge
     // the input PromptDto.PlayerId.
     internal void ForwardPrompt(Guid matchId, PromptDto prompt, PromptRouting routing)
     {
+        // Engine progress signal (W5): a fresh prompt is real progress, reset
+        // the no-progress watchdog. Best-effort + never throws.
+        Bump(matchId);
+
         try
         {
             string? recipient = routing.ResolveRecipientSub(prompt.PlayerId);
