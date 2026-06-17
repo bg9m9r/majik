@@ -26,18 +26,31 @@ public sealed class MatchTimeoutScheduler
         Cancel(matchId);
         var due = Math.Max(0, remainingMillis);
         var cts = new CancellationTokenSource();
+        // Capture the token BEFORE publishing the entry, while this cts is still
+        // private to this thread, so a racing Cancel/Schedule that disposes it
+        // can't make reading cts.Token (here or in the Task.Run body) throw
+        // ObjectDisposedException. (Latent here because Schedule is called
+        // rarely, but kept consistent with MatchEngineWatchdog.)
+        var token = cts.Token;
         var entry = new Entry(holderSub, cts);
         _entries[matchId] = entry;
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(due), cts.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(due), token);
                 _entries.TryRemove(matchId, out _);
                 await _onTimeout(matchId, holderSub, CancellationToken.None);
             }
             catch (TaskCanceledException) { /* expected on Cancel/replace */ }
             catch (OperationCanceledException) { /* expected on Cancel/replace */ }
+            catch (ObjectDisposedException)
+            {
+                // A racing Cancel/Schedule disposed the cts before Task.Delay
+                // could register on the captured token; a newer timer is already
+                // armed (or the match was cancelled), so this stale task is a
+                // correct no-op — same as a cancellation, never an error.
+            }
             catch (Exception ex)
             {
                 // The timeout callback (OnTimeoutAsync) threw — e.g. the

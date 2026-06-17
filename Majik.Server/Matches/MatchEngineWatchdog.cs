@@ -72,13 +72,20 @@ public sealed class MatchEngineWatchdog
     private void Start(Guid matchId, Func<Task> onWedged)
     {
         var cts = new CancellationTokenSource();
+        // Capture the token BEFORE publishing the entry, while this cts is still
+        // private to this thread and guaranteed alive. Once it's in _entries a
+        // racing Bump/Cancel can dispose it, and reading cts.Token (here or in
+        // the Task.Run body) would then throw ObjectDisposedException — the prod
+        // watchdog storm. Capturing first closes that race; the captured token
+        // is already cancelled-or-not regardless of the cts's later disposal.
+        var token = cts.Token;
         var entry = new Entry(onWedged, cts);
         _entries[matchId] = entry;
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(_noProgress, cts.Token);
+                await Task.Delay(_noProgress, token);
                 // Remove the entry before firing so a later Bump/Cancel is a
                 // clean no-op and the callback runs exactly once.
                 _entries.TryRemove(matchId, out _);
@@ -86,6 +93,13 @@ public sealed class MatchEngineWatchdog
             }
             catch (TaskCanceledException) { /* expected on Bump/Cancel/Arm-replace */ }
             catch (OperationCanceledException) { /* expected on Bump/Cancel/Arm-replace */ }
+            catch (ObjectDisposedException)
+            {
+                // A racing Bump/Cancel disposed the cts before Task.Delay could
+                // register on the captured token. That means a newer timer is
+                // already armed (or the match was cancelled), so this stale task
+                // is a correct no-op — same as a cancellation, never an error.
+            }
             catch (Exception ex)
             {
                 // The onWedged callback (classify-and-report) threw. Observe +
