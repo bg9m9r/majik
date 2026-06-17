@@ -4,6 +4,8 @@ using Majik.Core.Abilities;
 using Majik.Core.Api;
 using Majik.Core.Api.Dtos;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
@@ -419,5 +421,76 @@ public class StateSnapshotterTests
         loyaltyAbilities.Select(a => a.Description).Should().BeEquivalentTo("+1", "-2", "-5");
         loyaltyAbilities.Should().OnlyContain(a => a.Id != null && a.Id != Guid.Empty);
         loyaltyAbilities.Select(a => a.Id).Should().OnlyHaveUniqueItems();
+    }
+
+    // -----------------------------------------------------------------------
+    // CR 613.1c / 613.7b — a permanent's snapshotted Types must reflect the
+    // LAYER-COMPUTED effective types, not the printed type list. An animated
+    // land / manland (Earthbend'd Forest, Creeping Tar Pit, Karn-animated
+    // artifact, etc.) is a creature via a Layer-4 type-changing continuous
+    // effect; the portal buckets a card to the creature row iff its `types`
+    // contains "Creature", so a printed-only Types list keeps the animated
+    // land stuck in the land row and unable to attack. The fix mirrors what
+    // Permanent.IsEffectivelyCreature consults: ActiveEffects.Compute(perm).Types.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Snapshot_AnimatedLand_TypesContainCreature_WithAnimatedBody()
+    {
+        var alice = new Player("Alice", 20);
+        var svc = new ContinuousEffectsService();
+        var land = new Land("Mutavault")
+        {
+            Owner = alice,
+            Controller = alice,
+            Zone = ZoneType.Battlefield,
+            ActiveEffects = svc,
+        };
+        alice.Zones.Battlefield.AddCard(land);
+
+        // Manland: animate into a 2/2 Elemental that is still a land (Layer-4
+        // Creature grant + Layer-7b set-base P/T), exactly as Earthbend does.
+        AnimateLandEffect.Register(svc, land, CardSubtype.Elemental, 2, 2, grantsHaste: true);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var landDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == land.InstanceId);
+
+        landDto.Types.Should().Contain("Creature",
+            "the Layer-4 animate grant makes the land effectively a creature (CR 613.1c)");
+        landDto.Types.Should().Contain("Land", "it is still a land");
+        landDto.Power.Should().Be(2, "the animated body's P/T is serialized");
+        landDto.Toughness.Should().Be(2);
+    }
+
+    [Fact]
+    public void Snapshot_PlainLand_TypesAreLandOnly_NoCreature()
+    {
+        // Regression guard: an unanimated land snapshots with printed Types
+        // (["Land"]) — the fallback path (ActiveEffects null or no grant) is
+        // unchanged and does NOT spuriously add Creature.
+        var alice = new Player("Alice", 20);
+        var svc = new ContinuousEffectsService();
+        var land = new Land("Forest")
+        {
+            Owner = alice,
+            Controller = alice,
+            Zone = ZoneType.Battlefield,
+            ActiveEffects = svc,
+        };
+        alice.Zones.Battlefield.AddCard(land);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var landDto = dto.Players.Single(p => p.Id == alice.Id)
+            .Battlefield.Cards.Single(c => c.InstanceId == land.InstanceId);
+
+        landDto.Types.Should().Equal("Land");
+        landDto.Types.Should().NotContain("Creature");
     }
 }

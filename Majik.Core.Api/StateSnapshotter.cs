@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Api.Dtos;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
@@ -126,7 +127,7 @@ public static class StateSnapshotter
             InstanceId: card.InstanceId,
             Name: card.Name,
             ManaCost: card.ManaCost,
-            Types: card.CardTypes.Select(t => t.ToString()).ToList(),
+            Types: EffectiveTypes(card).Select(t => t.ToString()).ToList(),
             Power: f.Power,
             Toughness: f.Toughness,
             Tapped: f.Tapped,
@@ -136,6 +137,33 @@ public static class StateSnapshotter
             Counters: f.Counters,
             ImprintedCards: imprinted);
     }
+
+    /// <summary>
+    /// CR 613.1c / 613.7b — the card's EFFECTIVE (layer-computed) card types,
+    /// not its printed list. An animated land / manland (Earthbend'd Forest,
+    /// Creeping Tar Pit, Karn-animated artifact, …) becomes a creature via a
+    /// Layer-4 type-changing continuous effect, but its printed
+    /// <see cref="ICard.CardTypes"/> still says only "Land"/"Artifact". The
+    /// portal buckets a card to the creature row iff its <c>types</c> contains
+    /// "Creature", so the snapshot must serialize the computed types or the
+    /// animated land stays stuck in the land row and can never be shown as an
+    /// attacker.
+    ///
+    /// This mirrors exactly what <see cref="Permanent.IsEffectivelyCreature"/>
+    /// consults: for a <see cref="Permanent"/> with a non-null
+    /// <see cref="Permanent.ActiveEffects"/> it returns
+    /// <c>ActiveEffects.Compute(perm).Types</c>; otherwise (non-permanent, or a
+    /// permanent whose layer service is not wired up — e.g. a cloned game) it
+    /// falls back to the printed <see cref="ICard.CardTypes"/>. Type-changing
+    /// effects only apply on the battlefield (the only zone where
+    /// continuous effects function), so this battlefield-scoped computed path is
+    /// both correct and minimal — non-battlefield cards have a null
+    /// <c>ActiveEffects</c> and take the printed-types fallback unchanged.
+    /// </summary>
+    private static IEnumerable<CardType> EffectiveTypes(ICard card) =>
+        card is Permanent { ActiveEffects: { } fx } perm
+            ? fx.Compute(perm).Types
+            : card.CardTypes;
 
     /// <summary>
     /// PLAN 04 — the live permanent/creature fields a snapshot and an
@@ -158,6 +186,21 @@ public static class StateSnapshotter
         {
             power = c.Power;
             toughness = c.Toughness;
+        }
+        // CR 613.1c / 613.7b — an animated land / manland is NOT a Creature
+        // runtime instance (it stays a Land/Artifact), so the branch above
+        // misses its P/T. When such a permanent is effectively a creature via a
+        // Layer-4 type-changing continuous effect, Compute(perm) yields a
+        // CreatureCharacteristics carrying the animated body's P/T (the same
+        // CreatureCharacteristics the combat / SBA paths read). Surface it so
+        // the snapshot reports e.g. an Earthbend'd land as a 1/1, not a P/T-less
+        // land. Real Creatures keep the c.Power/c.Toughness path above (which
+        // already consults the layer system).
+        else if (card is Permanent { ActiveEffects: { } fx } animated
+                 && fx.Compute(animated) is CreatureCharacteristics cc)
+        {
+            power = cc.Power;
+            toughness = cc.Toughness;
         }
 
         IReadOnlyDictionary<string, int> counters = EmptyCounters;
