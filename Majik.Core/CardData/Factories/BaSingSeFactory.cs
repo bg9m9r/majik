@@ -29,7 +29,7 @@ namespace Majik.Core.CardData.Factories;
 /// reach (its AnimateLine keys on "this land becomes …", but Earthbend targets
 /// ANOTHER land you control). No NEW engine mechanic is needed: the Earthbend
 /// keyword action is already a built primitive
-/// (<see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>,
+/// (<see cref="EarthbendAction.Apply(Permanent, Player, int, ContinuousEffectsService?)"/>,
 /// used by Badgermole Cub + Dai Li Indoctrination) — it animates the target
 /// land to a 0/0 creature with haste that's still a land (no creature subtype),
 /// puts N +1/+1 counters on it (so an N/N), and attaches the one-shot "when it
@@ -58,7 +58,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (CR 117.1a / 307.5), a "target land you control" <see cref="TargetRequest"/>
 ///   (1..1 over the controller's battlefield lands — the source land is itself a
 ///   legal target), and a resolution body that CR-608.2b-rechecks the chosen
-///   land then routes to <see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>.
+///   land then routes to <see cref="EarthbendAction.Apply(Permanent, Player, int, ContinuousEffectsService?)"/>.
 ///
 /// ## Rules notes
 /// - Earthbend's animate has no duration (CR 701.59) — it persists while the

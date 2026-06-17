@@ -29,7 +29,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TriggeredAbility"/> with a unified
 ///   <see cref="TargetRequest"/> for "target land you control". On
 ///   resolution it routes the chosen land through
-///   <see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>
+///   <see cref="EarthbendAction.Apply(Permanent, Player, int, ContinuousEffectsService?)"/>
 ///   — the land gets a +1/+1 counter and is animated into a 0/0
 ///   creature with haste that's still a land (so a 0/0 base +1/+1 = 1/1,
 ///   surfacing through the layer system's creature-row upgrade). The live
@@ -98,7 +98,12 @@ public static class BadgermoleCubFactory
                 var chosen = etbTrigger.ChosenTargets;
                 if (chosen.Count == 0 || chosen[0].Count == 0) return;
 
-                if (chosen[0][0] is not Land land) return;
+                // "target land you control" — any permanent whose types
+                // include Land, INCLUDING a Land Creature (Dryad Arbor) built
+                // as a Creature C# instance. Filter on the land TYPE, not the
+                // Land C# class (CR 701.59).
+                if (chosen[0][0] is not Permanent land
+                    || !land.HasType(CardType.Land)) return;
                 // CR 608.2b — target must still be a land the controller
                 // controls on the battlefield at resolution.
                 if (land.Zone != ZoneType.Battlefield) return;
@@ -127,11 +132,15 @@ public static class BadgermoleCubFactory
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.None,
                     // "target land you control" — only the controller's lands.
+                    // Filter on the land TYPE, not the Land C# class, so a Land
+                    // Creature the controller controls (Dryad Arbor, built as a
+                    // Creature instance) is offered too (CR 701.59 / 115.4).
                     CandidateGatherer: ctx =>
                     {
                         var controller = card.Controller ?? owner;
                         return controller.Zones.Battlefield.GetCards()
-                            .OfType<Land>()
+                            .OfType<Permanent>()
+                            .Where(p => p.HasType(CardType.Land))
                             .Cast<object>()
                             .ToList();
                     }),
