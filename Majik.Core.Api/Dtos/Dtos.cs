@@ -262,7 +262,19 @@ public sealed record PromptDto(
     /// the pool were silently dropped by the card+player-only candidate snapshot, so
     /// a spell could never be chosen as a target in the UI.
     /// </summary>
-    IReadOnlyList<StackCandidateDto>? StackCandidates = null);
+    IReadOnlyList<StackCandidateDto>? StackCandidates = null,
+    /// <summary>
+    /// CR 701.20 — peeked top N of the scrying player's library on a scry
+    /// prompt, in top-to-bottom order. The client surfaces each card with two
+    /// choices ("to bottom" vs "keep on top") and assembles a
+    /// <c>ChooseScryCommand</c> partitioning the peeked set. Non-null only on
+    /// scry prompts; null on every other prompt kind. Privacy: shipped
+    /// per-recipient like <see cref="LibraryView"/> / <see cref="SurveilView"/>,
+    /// never broadcast to opponents or spectators. Mirrors
+    /// <see cref="SurveilView"/> exactly (scry's "bottom" replaces surveil's
+    /// "graveyard").
+    /// </summary>
+    IReadOnlyList<CardSnapshotDto>? ScryView = null);
 
 /// <summary>
 /// CR 601.2d / CR 119.4 — per-prompt body for a divided-damage allocation

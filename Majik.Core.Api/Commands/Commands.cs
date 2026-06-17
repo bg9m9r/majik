@@ -27,6 +27,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseCardsToBottomCommand), "bottom")]
 [JsonDerivedType(typeof(ChooseLibraryPickCommand), "chooseLibraryPick")]
 [JsonDerivedType(typeof(ChooseSurveilCommand), "chooseSurveil")]
+[JsonDerivedType(typeof(ChooseScryCommand), "chooseScry")]
 [JsonDerivedType(typeof(ChooseYesNoCommand), "chooseYesNo")]
 [JsonDerivedType(typeof(ChooseFromRevealedCommand), "chooseFromRevealed")]
 [JsonDerivedType(typeof(ChoiceCommand), "choice")]
@@ -161,6 +162,26 @@ public sealed record ChooseLibraryPickCommand(Guid? SelectedInstanceId) : GameCo
 /// </summary>
 public sealed record ChooseSurveilCommand(
     IReadOnlyList<Guid> ToGraveyardInstanceIds,
+    IReadOnlyList<Guid> TopOrderInstanceIds) : GameCommand;
+
+/// <summary>
+/// CR 701.20 — response to a scry prompt
+/// (<see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseScryDecisionAsync"/>).
+/// The engine peeked N cards from the top of the scrying player's library and
+/// shipped them in the prompt envelope's <c>ScryView</c> (top-to-bottom order).
+/// The client partitions those N cards into two disjoint lists:
+/// <list type="bullet">
+/// <item><see cref="ToBottomInstanceIds"/> — the InstanceIds the player chose
+/// to put on the BOTTOM of their library (CR 701.20).</item>
+/// <item><see cref="TopOrderInstanceIds"/> — the remaining peeked cards in the
+/// order the player wants them on top of the library, where index 0 becomes the
+/// new top (CR 701.20).</item>
+/// </list>
+/// The engine rejects payloads that don't partition the peeked set exactly once
+/// (mirrors <see cref="ChooseSurveilCommand"/>, "bottom" replacing "graveyard").
+/// </summary>
+public sealed record ChooseScryCommand(
+    IReadOnlyList<Guid> ToBottomInstanceIds,
     IReadOnlyList<Guid> TopOrderInstanceIds) : GameCommand;
 
 /// <summary>
