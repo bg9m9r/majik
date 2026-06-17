@@ -51,14 +51,18 @@ public static class EarthbendAction
     /// Returns the targeted land, or <c>null</c> if <paramref name="n"/> &lt;= 0
     /// or the controller has no lands on the battlefield.
     /// </summary>
-    public static Land? Apply(Player controller, int n, ContinuousEffectsService? effects = null)
+    public static Permanent? Apply(Player controller, int n, ContinuousEffectsService? effects = null)
     {
         if (controller == null) throw new ArgumentNullException(nameof(controller));
         if (n <= 0) return null;
 
+        // "target land you control" = any permanent whose CURRENT card types
+        // include Land — a plain Land, an animated land, OR a Land Creature
+        // built as a Creature C# instance (Dryad Arbor). Filter on the land
+        // TYPE, not the Land C# class (CR 701.59 / 115.4).
         var land = controller.Zones.Battlefield.GetCards()
-            .OfType<Land>()
-            .FirstOrDefault();
+            .OfType<Permanent>()
+            .FirstOrDefault(p => p.HasType(CardType.Land));
         if (land == null) return null;
 
         Apply(land, controller, n, effects);
@@ -68,9 +72,13 @@ public static class EarthbendAction
     /// <summary>
     /// Apply Earthbend N to an explicit <paramref name="land"/> (the unified
     /// targeting pipeline's chosen "target land you control"). No-op when
-    /// <paramref name="n"/> &lt;= 0.
+    /// <paramref name="n"/> &lt;= 0. The target is typed as a
+    /// <see cref="Permanent"/> rather than the <see cref="Land"/> C# class so a
+    /// Land Creature (Dryad Arbor — a <see cref="Creature"/> instance that is
+    /// also a land) is a legal Earthbend target, per CR 701.59 ("target land
+    /// you control" is any permanent whose types include Land).
     /// </summary>
-    public static void Apply(Land land, Player controller, int n, ContinuousEffectsService? effects = null)
+    public static void Apply(Permanent land, Player controller, int n, ContinuousEffectsService? effects = null)
     {
         if (land == null) throw new ArgumentNullException(nameof(land));
         if (controller == null) throw new ArgumentNullException(nameof(controller));

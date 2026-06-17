@@ -34,7 +34,7 @@ namespace Majik.Core.CardData.Factories;
 ///     filter (CR 701.16 reveal + agent pick via
 ///     <see cref="IPlayerAgent.ChooseFromHandAsync"/>).
 ///   - Mode 1 is <b>Earthbend 2</b> (CR 701.59) routed through the shared
-///     <see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>
+///     <see cref="EarthbendAction.Apply(Permanent, Player, int, ContinuousEffectsService?)"/>
 ///     keyword action (same one driving <see cref="BadgermoleCubFactory"/> /
 ///     <see cref="NahiriTheHarbingerFactory"/>).
 /// No new engine mechanic is required.
@@ -58,7 +58,7 @@ namespace Majik.Core.CardData.Factories;
 ///   request; on resolution the chosen land is animated into a 0/0 Elemental
 ///   creature with haste that's still a land, gets two +1/+1 counters
 ///   (→ a 2/2), and a delayed "return tapped on death/exile" trigger is
-///   attached — all via <see cref="EarthbendAction.Apply(Land, Player, int, ContinuousEffectsService?)"/>.
+///   attached — all via <see cref="EarthbendAction.Apply(Permanent, Player, int, ContinuousEffectsService?)"/>.
 ///   The live <see cref="ContinuousEffectsService"/> drives the animate layer;
 ///   when none is wired (shape-only test path) the counters + return trigger
 ///   still apply.
