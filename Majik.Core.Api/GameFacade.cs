@@ -1435,6 +1435,11 @@ public sealed class GameFacade : IDisposable
                 ToGraveyardInstanceIds = Cards(c.ToGraveyardInstanceIds),
                 TopOrderInstanceIds = Cards(c.TopOrderInstanceIds),
             },
+            ChooseScryCommand c => c with
+            {
+                ToBottomInstanceIds = Cards(c.ToBottomInstanceIds),
+                TopOrderInstanceIds = Cards(c.TopOrderInstanceIds),
+            },
             ChooseFromRevealedCommand c => c with
             {
                 InstanceId = c.InstanceId is { } id ? Card(id) : null,
@@ -1599,7 +1604,8 @@ public sealed class GameFacade : IDisposable
             ChoiceView: payload?.ChoiceView,
             DamageDivisionView: payload?.DamageDivisionView,
             PlayerCandidates: payload?.PlayerCandidates,
-            StackCandidates: payload?.StackCandidates);
+            StackCandidates: payload?.StackCandidates,
+            ScryView: payload?.ScryView);
     }
 
     private void BridgeEvent(GameEvent e)

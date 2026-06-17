@@ -1073,6 +1073,9 @@
             "$ref": "#/components/schemas/GameCommandChooseSurveilCommand"
           },
           {
+            "$ref": "#/components/schemas/GameCommandChooseScryCommand"
+          },
+          {
             "$ref": "#/components/schemas/GameCommandChooseYesNoCommand"
           },
           {
@@ -1099,6 +1102,7 @@
             "chooseDamageDivision": "#/components/schemas/GameCommandChooseDamageDivisionCommand",
             "chooseFromRevealed": "#/components/schemas/GameCommandChooseFromRevealedCommand",
             "chooseLibraryPick": "#/components/schemas/GameCommandChooseLibraryPickCommand",
+            "chooseScry": "#/components/schemas/GameCommandChooseScryCommand",
             "chooseSurveil": "#/components/schemas/GameCommandChooseSurveilCommand",
             "chooseYesNo": "#/components/schemas/GameCommandChooseYesNoCommand",
             "mana": "#/components/schemas/GameCommandChooseManaCommand",
@@ -1431,6 +1435,38 @@
         },
         "required": [
           "modeIndex"
+        ]
+      },
+      "GameCommandChooseScryCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "chooseScry"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "toBottomInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "topOrderInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "toBottomInstanceIds",
+          "topOrderInstanceIds"
         ]
       },
       "GameCommandChooseSurveilCommand": {
@@ -2202,6 +2238,15 @@
               {
                 "$ref": "#/components/schemas/RevealView"
               }
+            ]
+          },
+          "scryView": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
             ]
           },
           "stackCandidates": {

@@ -46,6 +46,12 @@ public sealed class RemoteAgent : IPlayerAgent
     // and resolve each InstanceId back to an ICard. Cleared on prompt
     // resolution; replaced on each new surveil prompt.
     private IReadOnlyList<ICard>? _pendingSurveilPeeked;
+    // Engine-supplied peeked-card list for the most recent SCRY prompt
+    // (CR 701.20). Mirrors _pendingSurveilPeeked: stashed so Submit can
+    // validate the wire ChooseScryCommand's partition (ToBottom ∪ TopOrder)
+    // matches the offered set exactly and resolve each InstanceId back to an
+    // ICard. Cleared on prompt resolution; replaced on each new scry prompt.
+    private IReadOnlyList<ICard>? _pendingScryPeeked;
     // Engine-supplied eligible-card list for the most recent reveal-and-
     // choose prompt (CR 701.15 — Malevolent Rumble, Impulse, Sleight of
     // Hand, See the Unwritten and friends). Stashed so Submit can resolve
@@ -157,6 +163,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var triggerOrder = _pendingTriggerOrder;
         var libraryCandidates = _pendingLibraryCandidates;
         var surveilPeeked = _pendingSurveilPeeked;
+        var scryPeeked = _pendingScryPeeked;
         var revealedEligible = _pendingRevealedEligible;
         var revealedOptional = _pendingRevealedOptional;
         var bottomCount = _pendingBottomCount;
@@ -169,6 +176,7 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingTriggerOrder = null;
         _pendingLibraryCandidates = null;
         _pendingSurveilPeeked = null;
+        _pendingScryPeeked = null;
         _pendingRevealedEligible = null;
         _pendingRevealedOptional = false;
         _pendingBottomCount = null;
@@ -177,7 +185,7 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingTargetCandidates = null;
         _pendingDamageDivisionTargets = null;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates, damageDivisionTargets);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, scryPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates, damageDivisionTargets);
     }
 
     private void Resolve(
@@ -186,6 +194,7 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<ITriggeredAbility>? triggerOrder,
         IReadOnlyList<ICard>? libraryCandidates,
         IReadOnlyList<ICard>? surveilPeeked,
+        IReadOnlyList<ICard>? scryPeeked,
         IReadOnlyList<ICard>? revealedEligible,
         bool revealedOptional,
         int? bottomCount,
@@ -471,6 +480,52 @@ public sealed class RemoteAgent : IPlayerAgent
                 }
                 ((TaskCompletionSource<SurveilAction.SurveilDecision>)tcs).SetResult(
                     new SurveilAction.SurveilDecision(toGy, top));
+                break;
+            }
+            case ChooseScryCommand scry:
+            {
+                // CR 701.20 — partition the peeked top-N into bottom /
+                // top-order buckets and ship a ScryDecision back to the engine.
+                // Validate the wire payload covers the peeked set exactly once
+                // (no duplicates, no extras, no missing peeked card) — mirrors
+                // the ChooseSurveilCommand validation ("bottom" replaces
+                // "graveyard").
+                if (scryPeeked == null)
+                {
+                    throw new InvalidOperationException(
+                        "ChooseScryCommand resolved without a pending peeked-card list.");
+                }
+                var scryById = scryPeeked.ToDictionary(c => c.InstanceId);
+                var scrySeen = new HashSet<Guid>();
+                var toBottom = new List<ICard>(scry.ToBottomInstanceIds.Count);
+                foreach (var id in scry.ToBottomInstanceIds)
+                {
+                    if (!scryById.TryGetValue(id, out var bottomCard))
+                        throw new InvalidOperationException(
+                            $"ChooseScryCommand ToBottom references unknown instance {id}.");
+                    if (!scrySeen.Add(id))
+                        throw new InvalidOperationException(
+                            $"ChooseScryCommand listed instance {id} more than once.");
+                    toBottom.Add(bottomCard);
+                }
+                var scryTop = new List<ICard>(scry.TopOrderInstanceIds.Count);
+                foreach (var id in scry.TopOrderInstanceIds)
+                {
+                    if (!scryById.TryGetValue(id, out var topCard))
+                        throw new InvalidOperationException(
+                            $"ChooseScryCommand TopOrder references unknown instance {id}.");
+                    if (!scrySeen.Add(id))
+                        throw new InvalidOperationException(
+                            $"ChooseScryCommand listed instance {id} more than once.");
+                    scryTop.Add(topCard);
+                }
+                if (scrySeen.Count != scryPeeked.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"ChooseScryCommand partitioned {scrySeen.Count} cards but engine peeked {scryPeeked.Count}.");
+                }
+                ((TaskCompletionSource<ScryAction.ScryDecision>)tcs).SetResult(
+                    new ScryAction.ScryDecision(toBottom, scryTop));
                 break;
             }
             case ChooseYesNoCommand yn:
@@ -1090,11 +1145,52 @@ public sealed class RemoteAgent : IPlayerAgent
             $"Defender {defenderId} is neither a known player nor a Planeswalker.");
     }
 
-    // TODO (v2): wire the Scry prompt through the command channel
-    // (ChooseScryCommand) once the prompt system is updated to handle
-    // sync-over-async in effect closures.
-    public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
-        => throw new NotImplementedException("Scry prompt wired in v2 (effect async refactor).");
+    /// <summary>
+    /// CR 701.20 — scry prompt. The <see cref="IPlayerAgent"/> default
+    /// all-to-bottom posture is wrong for a HUMAN seat, and the previous
+    /// RemoteAgent override THREW <see cref="NotImplementedException"/> — so
+    /// ANY scry resolving for the human seat (the prod binder-chain scry
+    /// effect <c>await</c>s this during stack resolution) threw out of the
+    /// resolution, faulting the priority loop (a no-progress wedge: fail-fast
+    /// crash in DEBUG, swallowed in Release leaving the loop awaiting a task
+    /// that never completes). Surveil was wired but scry was not — this closes
+    /// that gap, exactly mirroring <see cref="ChooseSurveilDecisionAsync"/>:
+    /// snapshot the engine-peeked top-N onto the prompt payload so the portal
+    /// can render the scry modal, then await a <see cref="ChooseScryCommand"/>
+    /// back from the client. The command's <c>ToBottomInstanceIds</c> /
+    /// <c>TopOrderInstanceIds</c> are validated against the peeked set in
+    /// <see cref="Resolve"/> before constructing the
+    /// <see cref="ScryAction.ScryDecision"/>.
+    /// </summary>
+    public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> peeked,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(peeked);
+        // Mirror ChooseSurveilDecisionAsync: stash before Prompt fires
+        // PromptRequested observers, guard by checking _pending so we don't
+        // smear stash on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        var snapshots = peeked.Select(StateSnapshotter.SnapshotCard).ToList();
+        _pendingScryPeeked = peeked;
+        _pendingPayload = new PromptPayload(
+            Label: peeked.Count == 1 ? "scry 1" : $"scry {peeked.Count}",
+            ScryView: snapshots);
+        try
+        {
+            return Prompt<ScryAction.ScryDecision>(ct, typeof(ChooseScryCommand));
+        }
+        catch
+        {
+            _pendingScryPeeked = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     /// <summary>
     /// CR 701.42 — surveil prompt. Default in <see cref="IPlayerAgent"/>
@@ -1490,4 +1586,13 @@ public sealed record PromptPayload(
     /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
     /// <see cref="Dtos.PromptDto.StackCandidates"/>.
     /// </summary>
-    IReadOnlyList<Majik.Core.Api.Dtos.StackCandidateDto>? StackCandidates = null);
+    IReadOnlyList<Majik.Core.Api.Dtos.StackCandidateDto>? StackCandidates = null,
+    /// <summary>
+    /// CR 701.20 — peeked top-N of the scrying player's library, in
+    /// top-to-bottom order. Non-null only on scry prompts; null on every
+    /// other prompt kind. Privacy posture matches <see cref="SurveilView"/>:
+    /// shipped per-recipient, never broadcast.
+    /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
+    /// <see cref="PromptDto.ScryView"/>.
+    /// </summary>
+    IReadOnlyList<CardSnapshotDto>? ScryView = null);
