@@ -1537,6 +1537,13 @@ public sealed class MatchService
         var seatId = callerSub == match.Creator.Sub ? facade.Alice.Id : facade.Bob.Id;
         command = command with { PlayerId = seatId };
 
+        // Capture the prompt this command is about to resolve BEFORE submitting.
+        // SubmitAsync does not return until the engine reaches the NEXT prompt;
+        // if that next prompt is for the SAME seat it is re-buffered during the
+        // await, so we must ack only the prompt we actually resolved (identity)
+        // — never the fresh replacement (field wedge match 9ea6f60a).
+        var resolvedPrompt = _facadeBridge?.PeekBufferedPrompt(matchId, callerSub);
+
         try
         {
             await facade.SubmitAsync(command, ct);
@@ -1579,8 +1586,12 @@ public sealed class MatchService
             }
         }
 
-        // ACK the buffered prompt so a late JoinMatch doesn't replay it.
-        _facadeBridge?.AckPrompt(matchId, callerSub);
+        // ACK only the prompt we resolved so a late JoinMatch doesn't replay a
+        // stale one — but if SubmitAsync already re-buffered a FRESH same-seat
+        // prompt, leave it intact (compare-and-remove by identity inside
+        // AckPrompt). Clearing it here unconditionally was the field wedge:
+        // a reconnecting human saw "no active prompt" forever (match 9ea6f60a).
+        _facadeBridge?.AckPrompt(matchId, callerSub, resolvedPrompt);
         return Result.Ok(true);
     }
 

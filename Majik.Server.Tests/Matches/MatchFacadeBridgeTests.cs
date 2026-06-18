@@ -1,4 +1,10 @@
 using System.Text.Json;
+using Majik.Bot;
+using Majik.Core.Api.Commands;
+using Majik.Core.CardData;
+using Majik.Core.Cards.Types;
+using Majik.Core.Game;
+using Majik.Core.Random;
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Dtos;
@@ -578,6 +584,63 @@ public class MatchFacadeBridgeTests
         // receive the acked prompt.
         bridge.ReplayPromptIfAny(matchId, "creator-sub", "conn-1");
         hub.Connection.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AckPrompt_WithResolvedPrompt_DoesNotClobberFreshSameSeatPrompt()
+    {
+        // Unit-level lock on the field-wedge fix: when AckPrompt is handed the
+        // prompt it resolved but the buffer has since been REPLACED by a fresh
+        // same-seat prompt (ForwardPrompt during SubmitAsync), the fresh prompt
+        // must survive — only an exact-identity match is cleared.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+        var routing = new MatchFacadeBridge.PromptRouting(
+            aliceId, bobId, "creator-sub", "opponent-sub");
+
+        var resolved = new PromptDto(Guid.NewGuid(), aliceId, new[] { "PassPriorityCommand" });
+        var fresh = new PromptDto(Guid.NewGuid(), aliceId, new[] { "DeclareBlockersCommand" });
+
+        bridge.ForwardPrompt(matchId, resolved, routing); // engine raised + buffered
+        bridge.ForwardPrompt(matchId, fresh, routing);    // SubmitAsync raised the NEXT one
+
+        // MatchService acks the prompt it RESOLVED (resolved), not the fresh one.
+        bridge.AckPrompt(matchId, "creator-sub", resolved);
+
+        bridge.PeekBufferedPrompt(matchId, "creator-sub").Should().BeSameAs(fresh,
+            "AckPrompt must clear only the exact prompt it resolved; the freshly " +
+            "raised same-seat prompt must survive for a reconnecting client");
+
+        bridge.ReplayPromptIfAny(matchId, "creator-sub", "conn-1");
+        hub.Connection.Should().ContainSingle(c => c.ConnectionId == "conn-1");
+        ((PromptDto)hub.Connection[0].Payload).Should().BeSameAs(fresh);
+    }
+
+    [Fact]
+    public void AckPrompt_WithResolvedPrompt_ClearsWhenBufferIsThatPrompt()
+    {
+        // The complementary case: no fresh same-seat follow-up was raised, so the
+        // buffer still holds the resolved prompt — it MUST be cleared so a rejoin
+        // doesn't replay an already-answered prompt.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+        var routing = new MatchFacadeBridge.PromptRouting(
+            aliceId, bobId, "creator-sub", "opponent-sub");
+
+        var resolved = new PromptDto(Guid.NewGuid(), aliceId, new[] { "PassPriorityCommand" });
+        bridge.ForwardPrompt(matchId, resolved, routing);
+
+        bridge.AckPrompt(matchId, "creator-sub", resolved);
+
+        bridge.PeekBufferedPrompt(matchId, "creator-sub").Should().BeNull(
+            "an answered prompt with no fresh follow-up must be cleared so a " +
+            "rejoin does not replay it");
     }
 
     [Fact]
@@ -1238,4 +1301,130 @@ public class MatchFacadeBridgeTests
         act.Should().NotThrow();
         hub.Group.Should().ContainSingle();
     }
+
+    // -----------------------------------------------------------------------
+    // REGRESSION: AckPrompt must not destroy the FRESHLY-RAISED prompt.
+    //
+    // Field wedge (match 9ea6f60a / GameId 845d0800): the engine raised a
+    // DeclareBlockers decision for the HUMAN, the client showed "no active
+    // prompt", the human could only Pass (rejected: "Engine expected
+    // DeclareBlockersCommand, got PassPriorityCommand"), and the match hung.
+    //
+    // ROOT CAUSE: MatchService.ExecuteCommandOnLocalFacadeAsync does
+    //     await facade.SubmitAsync(command);   // (A)
+    //     _facadeBridge.AckPrompt(matchId, callerSub);   // (B)
+    // GameFacade.SubmitAsync does NOT return until the engine has reached the
+    // NEXT prompt and PulsePromptSignal fired. When that next prompt is for the
+    // SAME seat (human passes -> bot acts -> engine immediately needs the
+    // human's blockers decision), the SubscribePrompts->ForwardPrompt handler
+    // BUFFERS the new prompt during (A). Then (B) AckPrompt unconditionally
+    // clears the buffered prompt for that recipient -- destroying the NEW one,
+    // not the resolved OLD one. A client that reconnects (SignalR auto-reconnect
+    // -> JoinMatch -> ReplayPromptIfAny) then finds an empty buffer: "no active
+    // prompt", forever.
+    //
+    // This test drives the prod ordering against a REAL facade + bridge and
+    // asserts a reconnecting client still receives the freshly-raised prompt.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public async Task SubmitThenAck_FreshSameSeatPrompt_SurvivesForReconnect()
+    {
+        var repo = new EmbeddedCardRepository();
+        var aliceDeck = new List<ICard>();
+        for (var i = 0; i < 40; i++) aliceDeck.Add(new Land("Forest"));
+        var bobDeck = new List<ICard>();
+        for (var i = 0; i < 40; i++) bobDeck.Add(new Land("Island"));
+
+        const int seed = 4242;
+        using var idScope = DeterministicIdScope.Push(new DeterministicIdSource(seed));
+        var facade = GameFacade.Create("Alice", "Bob", aliceDeck, bobDeck, cardRepo: repo);
+        // Bob is a bot so only the HUMAN (Alice) seat is wire-driven, exactly
+        // like a human-vs-bot match.
+        facade.ReplaceBobAgent(new BotPlayerAgent(facade.Bob, new BotConfig("Midrange")));
+
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        const string creatorSub = "creator-sub";
+        bridge.Attach(matchId, creatorSub, "bot:midrange", facade);
+
+        await facade.StartFullGameAsync(
+            firstPlayerSlot: 0, maxTurns: 2,
+            rng: new GameRandom(seed), logicalClock: new LogicalClock());
+        var game = facade.FullGameTask!;
+
+        // Mirror MatchService.ExecuteCommandOnLocalFacadeAsync ordering exactly:
+        // SubmitAsync (A) waits for the engine to reach the next prompt, then
+        // AckPrompt (B) runs. Drive Alice's seat passively until the buffer ends
+        // up holding a same-seat prompt that survives (or is wrongly destroyed
+        // by) the Ack.
+        PromptDto? lastAlicePrompt = null;
+        var creatorSeen = false;
+        for (var step = 0; step < 200 && !game.IsCompleted; step++)
+        {
+            // Read the buffered prompt for the creator (what a reconnect would
+            // replay). The engine has, by SubmitAsync's contract, already raised
+            // the next prompt before the prior SubmitAsync returned.
+            var buffered = bridge.PeekBufferedPrompt(matchId, creatorSub);
+            if (buffered == null)
+            {
+                // No prompt currently owed to the human -> nothing to submit.
+                // Let the loop settle briefly; if it never owes Alice a prompt
+                // the scenario isn't reached this iteration.
+                await Task.Delay(5);
+                if (bridge.PeekBufferedPrompt(matchId, creatorSub) == null) break;
+                buffered = bridge.PeekBufferedPrompt(matchId, creatorSub)!;
+            }
+
+            creatorSeen = true;
+            lastAlicePrompt = buffered;
+
+            // Mirror MatchService: capture the prompt being resolved BEFORE submit.
+            var resolved = bridge.PeekBufferedPrompt(matchId, creatorSub);
+
+            var cmd = RespondPassive(buffered) with { PlayerId = facade.Alice.Id };
+            try { await facade.SubmitAsync(cmd); }   // (A)
+            catch { break; }
+
+            // After (A) the engine has reached the next prompt. If it was raised
+            // for ALICE again, ForwardPrompt has re-buffered it. (B) then runs —
+            // acking ONLY the prompt we resolved (identity), per the fix.
+            var bufferedAfterSubmit = bridge.PeekBufferedPrompt(matchId, creatorSub);
+            bridge.AckPrompt(matchId, creatorSub, resolved);   // (B)
+
+            if (bufferedAfterSubmit != null && bufferedAfterSubmit != buffered)
+            {
+                // The decisive moment: SubmitAsync raised a NEW same-seat prompt
+                // and buffered it. A reconnecting client must still be able to
+                // replay it after the Ack.
+                bridge.ReplayPromptIfAny(matchId, creatorSub, "reconnect-conn");
+
+                hub.Connection.Should().Contain(
+                    c => c.ConnectionId == "reconnect-conn" && c.Event == "prompt",
+                    "AckPrompt(B) runs AFTER SubmitAsync(A) has already buffered the " +
+                    "engine's NEXT same-seat prompt; clearing the buffer here destroys " +
+                    "the FRESH prompt, so a reconnecting human sees 'no active prompt' " +
+                    "forever (field wedge match 9ea6f60a)");
+                return; // reproduced + asserted
+            }
+        }
+
+        creatorSeen.Should().BeTrue("the human seat must have been owed at least one prompt");
+        // If we never hit a same-seat follow-up this seed, the regression window
+        // wasn't reached; the assertion above is the load-bearing one.
+    }
+
+    private static GameCommand RespondPassive(PromptDto prompt)
+    {
+        var k = prompt.ExpectedKinds;
+        if (k.Contains(nameof(MulliganCommand))) return new MulliganCommand(Keep: true);
+        if (k.Contains(nameof(ChooseCardsToBottomCommand)))
+            return new ChooseCardsToBottomCommand(Array.Empty<Guid>());
+        if (k.Contains(nameof(DeclareAttackersCommand)))
+            return new DeclareAttackersCommand(Array.Empty<AttackerDeclarationDto>());
+        if (k.Contains(nameof(DeclareBlockersCommand)))
+            return new DeclareBlockersCommand(Array.Empty<BlockerDeclarationDto>());
+        return new PassPriorityCommand();
+    }
+
 }

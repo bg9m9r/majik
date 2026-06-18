@@ -436,22 +436,57 @@ public sealed class MatchFacadeBridge
     }
 
     /// <summary>
-    /// Drop the buffered prompt (if any) for the given recipient on the
-    /// given match. Called from <c>MatchService.SubmitCommandAsync</c>
-    /// after the engine has accepted a command — that command resolves
-    /// the TCS the engine is waiting on, so the previously-published
-    /// prompt is no longer authoritative. If the engine then emits a
-    /// fresh prompt for the same recipient, <see cref="ForwardPrompt"/>
-    /// will rebuffer it.
+    /// Drop the buffered prompt for the given recipient on the given match
+    /// — but ONLY the specific (now-resolved) prompt, never a fresh
+    /// replacement. Called from <c>MatchService.ExecuteCommandOnLocalFacadeAsync</c>
+    /// after the engine has accepted a command — that command resolves the
+    /// TCS the engine is waiting on, so the prompt it resolved is no longer
+    /// authoritative and must not survive for a late rejoin.
+    ///
+    /// <para>CRITICAL ORDERING (field wedge match 9ea6f60a): the caller awaits
+    /// <see cref="GameFacade.SubmitAsync"/> BEFORE calling this, and SubmitAsync
+    /// does not return until the engine has reached the NEXT prompt. When that
+    /// next prompt is for the SAME recipient (human passes → bot acts → engine
+    /// immediately needs the human's blockers decision), the
+    /// <see cref="ForwardPrompt"/> handler has ALREADY replaced the buffer with
+    /// that fresh prompt by the time this runs. An unconditional
+    /// <c>TryRemove</c> would then destroy the FRESH prompt, leaving a
+    /// reconnecting client (SignalR auto-reconnect → JoinMatch →
+    /// <see cref="ReplayPromptIfAny"/>) with "no active prompt" forever. So we
+    /// remove ONLY when the buffered prompt is still the exact one we resolved
+    /// (reference identity — each <see cref="ForwardPrompt"/> buffers a distinct
+    /// <see cref="PromptDto"/> instance); a fresh replacement is left intact.</para>
+    ///
+    /// <para>When <paramref name="resolvedPrompt"/> is null (legacy callers /
+    /// tests that don't track the resolved prompt) the old unconditional clear
+    /// is preserved.</para>
     ///
     /// No-ops on bot recipients (no buffer to clear) and on
     /// unrecognized (matchId, sub) pairs (concurrent Detach can race).
     /// </summary>
-    public void AckPrompt(Guid matchId, string recipientSub)
+    public void AckPrompt(Guid matchId, string recipientSub, PromptDto? resolvedPrompt = null)
     {
         if (string.IsNullOrEmpty(recipientSub)) return;
         if (recipientSub.StartsWith("bot:", StringComparison.Ordinal)) return;
-        _bufferedPrompts.TryRemove((matchId, recipientSub), out _);
+
+        var key = (matchId, recipientSub);
+        if (resolvedPrompt == null)
+        {
+            // Legacy unconditional clear (no resolved-prompt identity supplied).
+            _bufferedPrompts.TryRemove(key, out _);
+            return;
+        }
+
+        // Compare-and-remove: clear ONLY if the buffer still holds the exact
+        // prompt this command resolved. If SubmitAsync already re-buffered a
+        // fresh same-seat prompt (different instance), leave it for the rejoin
+        // replay — never clobber an unanswered, freshly-raised prompt.
+        if (_bufferedPrompts.TryGetValue(key, out var buffered)
+            && ReferenceEquals(buffered, resolvedPrompt))
+        {
+            _bufferedPrompts.TryRemove(
+                new KeyValuePair<(Guid, string), PromptDto>(key, buffered));
+        }
     }
 
     /// <summary>
