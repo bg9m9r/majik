@@ -1414,6 +1414,171 @@ public class MatchFacadeBridgeTests
         // wasn't reached; the assertion above is the load-bearing one.
     }
 
+    // -----------------------------------------------------------------------
+    // REGRESSION (turn-1 field wedge — matches 74fb3159 / 18f2f499): two prod
+    // matches hung with NO progress at Turn 1 PreCombatMain (watchdog aborted,
+    // no exception). Same root cause as the declare-blockers wedge above, just
+    // triggered at the START of the game by the MULLIGAN KEEP:
+    //
+    //   1. Engine's FIRST prompt to the human (Alice) is the opening MULLIGAN
+    //      decision. ForwardPrompt buffers it.
+    //   2. Human KEEPs -> MatchService submits MulliganCommand(Keep:true).
+    //      GameFacade.SubmitAsync does not return until the engine reaches the
+    //      NEXT prompt, which (Alice on the play) is the Turn 1 PreCombatMain
+    //      PRIORITY prompt for the SAME seat. ForwardPrompt buffers that fresh
+    //      prompt during the submit.
+    //   3. The keep's AckPrompt then runs. Old (pre-#3014) code did an
+    //      unconditional TryRemove -> it destroyed the fresh Turn-1 prompt.
+    //   4. A client reloading right as the game starts (extremely common
+    //      timing) reconnects -> JoinMatch -> ReplayPromptIfAny finds an EMPTY
+    //      buffer: "no active prompt" at Turn 1 PreCombatMain, forever.
+    //
+    // This test drives the EXACT prod ordering for the mulligan-keep -> first
+    // main same-seat handoff and asserts a reconnecting client still replays
+    // the fresh Turn-1 priority prompt.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public async Task MulliganKeep_ThenFirstMainSameSeatPrompt_SurvivesForReconnect()
+    {
+        var repo = new EmbeddedCardRepository();
+        var aliceDeck = new List<ICard>();
+        for (var i = 0; i < 40; i++) aliceDeck.Add(new Land("Forest"));
+        var bobDeck = new List<ICard>();
+        for (var i = 0; i < 40; i++) bobDeck.Add(new Land("Island"));
+
+        const int seed = 4242;
+        using var idScope = DeterministicIdScope.Push(new DeterministicIdSource(seed));
+        var facade = GameFacade.Create("Alice", "Bob", aliceDeck, bobDeck, cardRepo: repo);
+        // Bob is a bot so only the HUMAN (Alice) seat is wire-driven, exactly
+        // like a human-vs-bot match.
+        facade.ReplaceBobAgent(new BotPlayerAgent(facade.Bob, new BotConfig("Midrange")));
+
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        const string creatorSub = "creator-sub";
+        // Alice (creator/human) plays first, so her mulligan-keep is immediately
+        // followed by her own Turn-1 PreCombatMain priority prompt.
+        bridge.Attach(matchId, creatorSub, "bot:midrange", facade);
+
+        await facade.StartFullGameAsync(
+            firstPlayerSlot: 0, maxTurns: 2,
+            rng: new GameRandom(seed), logicalClock: new LogicalClock());
+        var game = facade.FullGameTask!;
+
+        // The engine's FIRST decision owed to the human is the opening mulligan.
+        // Spin briefly until ForwardPrompt has buffered it (the engine raised it
+        // on the driver task during StartFullGameAsync).
+        PromptDto? mulliganPrompt = null;
+        for (var i = 0; i < 200 && mulliganPrompt == null; i++)
+        {
+            var b = bridge.PeekBufferedPrompt(matchId, creatorSub);
+            if (b != null && b.ExpectedKinds.Contains(nameof(MulliganCommand)))
+            {
+                mulliganPrompt = b;
+                break;
+            }
+            await Task.Delay(5);
+        }
+
+        mulliganPrompt.Should().NotBeNull(
+            "the engine's first decision owed to the human seat is the opening " +
+            "mulligan, and ForwardPrompt buffers it");
+
+        // Mirror MatchService.ExecuteCommandOnLocalFacadeAsync EXACTLY:
+        // capture the prompt being resolved BEFORE submit, await SubmitAsync
+        // (which returns only once the engine has reached the next prompt),
+        // then AckPrompt with the resolved prompt.
+        var resolved = bridge.PeekBufferedPrompt(matchId, creatorSub);
+        resolved.Should().BeSameAs(mulliganPrompt);
+
+        await facade.SubmitAsync(new MulliganCommand(Keep: true) { PlayerId = facade.Alice.Id }); // (A)
+
+        // After the KEEP, the engine has reached the NEXT prompt. Alice is on
+        // the play, so that next prompt is HER Turn-1 PreCombatMain priority
+        // decision — a fresh same-seat prompt ForwardPrompt re-buffered during
+        // SubmitAsync.
+        var bufferedAfterSubmit = bridge.PeekBufferedPrompt(matchId, creatorSub);
+        bufferedAfterSubmit.Should().NotBeNull();
+        bufferedAfterSubmit.Should().NotBeSameAs(
+            mulliganPrompt,
+            "the keep resolved the mulligan; the engine immediately raised a " +
+            "DIFFERENT same-seat prompt (Turn-1 PreCombatMain priority)");
+
+        bridge.AckPrompt(matchId, creatorSub, resolved); // (B)
+
+        // The decisive assertion: after the keep's Ack, the fresh Turn-1 prompt
+        // MUST still be buffered, so a reconnecting client (SignalR
+        // auto-reconnect / page reload right after game start -> JoinMatch ->
+        // ReplayPromptIfAny) still receives it. The pre-#3014 unconditional
+        // TryRemove destroyed it here, producing the Turn-1 "no active prompt"
+        // wedge (matches 74fb3159 / 18f2f499).
+        bridge.PeekBufferedPrompt(matchId, creatorSub).Should().NotBeNull(
+            "AckPrompt(B) for the mulligan-keep must not clobber the freshly-raised " +
+            "Turn-1 PreCombatMain prompt buffered by SubmitAsync(A)");
+
+        bridge.ReplayPromptIfAny(matchId, creatorSub, "reconnect-conn");
+
+        hub.Connection.Should().Contain(
+            c => c.ConnectionId == "reconnect-conn" && c.Event == "prompt",
+            "a client reloading right after game start must still replay the " +
+            "fresh Turn-1 PreCombatMain prompt — otherwise the match wedges at " +
+            "Turn 1 with 'no active prompt' (field matches 74fb3159 / 18f2f499)");
+    }
+
+    // -----------------------------------------------------------------------
+    // REGRESSION (turn-1, no-prior-submit variant): the VERY FIRST prompt of
+    // the game (opening mulligan) — no command has been submitted/acked yet —
+    // must be replayable by a client that reconnects before answering it. This
+    // is the simplest possible reload-at-game-start case: the buffer was filled
+    // by ForwardPrompt and nothing has cleared it, so ReplayPromptIfAny must
+    // push it to the reconnecting connection.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public async Task FirstPromptOfGame_NoPriorSubmit_ReplaysOnReconnect()
+    {
+        var repo = new EmbeddedCardRepository();
+        var aliceDeck = new List<ICard>();
+        for (var i = 0; i < 40; i++) aliceDeck.Add(new Land("Forest"));
+        var bobDeck = new List<ICard>();
+        for (var i = 0; i < 40; i++) bobDeck.Add(new Land("Island"));
+
+        const int seed = 4242;
+        using var idScope = DeterministicIdScope.Push(new DeterministicIdSource(seed));
+        var facade = GameFacade.Create("Alice", "Bob", aliceDeck, bobDeck, cardRepo: repo);
+        facade.ReplaceBobAgent(new BotPlayerAgent(facade.Bob, new BotConfig("Midrange")));
+
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        const string creatorSub = "creator-sub";
+        bridge.Attach(matchId, creatorSub, "bot:midrange", facade);
+
+        await facade.StartFullGameAsync(
+            firstPlayerSlot: 0, maxTurns: 2,
+            rng: new GameRandom(seed), logicalClock: new LogicalClock());
+
+        // Wait for the engine's first prompt (opening mulligan) to be buffered.
+        // Crucially, submit NOTHING — simulate a client that reloads the page
+        // before it ever answers the opening decision.
+        PromptDto? first = null;
+        for (var i = 0; i < 200 && first == null; i++)
+        {
+            first = bridge.PeekBufferedPrompt(matchId, creatorSub);
+            if (first == null) await Task.Delay(5);
+        }
+
+        first.Should().NotBeNull("the engine raises the opening mulligan as the first prompt");
+
+        // Reconnect (JoinMatch -> ReplayPromptIfAny) BEFORE any submit/ack.
+        bridge.ReplayPromptIfAny(matchId, creatorSub, "reconnect-conn");
+
+        hub.Connection.Should().Contain(
+            c => c.ConnectionId == "reconnect-conn" && c.Event == "prompt",
+            "a client that reconnects before answering the first prompt of the " +
+            "game must still replay it — no submit has cleared the buffer");
+    }
+
     private static GameCommand RespondPassive(PromptDto prompt)
     {
         var k = prompt.ExpectedKinds;
