@@ -37,7 +37,12 @@ namespace Majik.Core.CardData.Factories;
 ///   effect reads its source / controller off the live
 ///   <see cref="ResolutionContext.Source"/> (<c>(ctx.Source as Permanent)?.Controller
 ///   ?? card.Controller ?? owner</c>) rather than capturing the authoring
-///   <c>card</c>, and the ability is marked
+///   <c>card</c>, and the candidate gatherer is a re-homeable
+///   <see cref="Majik.Core.Players.Agents.ControllerScopedGatherer"/>
+///   (<see cref="TargetRequest.ControllerScoped"/>) — so
+///   <see cref="ActivatedAbility.RebindTo"/> re-scopes "your graveyard" onto the
+///   new bearer's controller rather than enumerating the exiled controller's.
+///   The ability is marked
 ///   <see cref="ActivatedAbility.RebindSafe"/> = true. Its {T} cost is a
 ///   source-capturing <see cref="AdditionalCost.Tap"/> that
 ///   <see cref="ActivatedAbility.RebindTo"/> Stage-1 re-homes via
@@ -98,13 +103,22 @@ public static class DowsingShamanFactory
         // CR 601.2c — the chosen target is read at resolution from
         // ResolutionContext.ChosenTargets[0][0]; the candidate pool is the
         // controller's graveyard ENCHANTMENT cards (CR 109.5 / 110.4).
-        var targetRequest = new TargetRequest(
-            Description: "target enchantment card from your graveyard",
-            MinTargets: 1,
-            MaxTargets: 1,
-            LegalCandidates: Array.Empty<object>(),
-            Intent: BotIntent.Draw,
-            CandidateGatherer: _ => GraveyardEnchantmentCards(card.Controller ?? owner));
+        //
+        // agatha-mother-of-runes-style-controller-scoped-candidate-gatherer-tail —
+        // the gatherer is a re-homeable ControllerScopedGatherer
+        // (TargetRequest.ControllerScoped) rather than a closure that captures
+        // `card`/`owner`: the controller flows in as the `who` argument (never
+        // captured), so RebindTo re-scopes "from YOUR graveyard" onto a new
+        // bearer's controller (Agatha's Soul Cauldron, CR 707.2 / 613.1f) with
+        // no behavioural drift. This mirrors the {T} cost's
+        // AdditionalCost.RebindSource (Stage 1) — every verb now re-homes.
+        var targetRequest = TargetRequest.ControllerScoped(
+            description: "target enchantment card from your graveyard",
+            minTargets: 1,
+            maxTargets: 1,
+            controller: card.Controller ?? owner,
+            select: (who, _) => GraveyardEnchantmentCards(who),
+            intent: BotIntent.Draw);
 
         var recurEffect = new Effect(
             $"{CardName}: return target enchantment card from your graveyard to your hand",
