@@ -23,7 +23,7 @@ public class GameSnapshotTests
     }
 
     [Fact]
-    public async Task SaveSnapshotBytes_RoundTripsViaJson()
+    public async Task SaveSnapshot_RoundTripsViaJsonBytes()
     {
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
@@ -31,7 +31,7 @@ public class GameSnapshotTests
         await facade.SubmitAsync(new PassPriorityCommand { PlayerId = state.Players[0].Id });
         await facade.SubmitAsync(new PassPriorityCommand { PlayerId = state.Players[1].Id });
 
-        var bytes = facade.SaveSnapshotBytes();
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(facade.SaveSnapshot());
         var restored = JsonSerializer.Deserialize<GameSnapshot>(bytes);
 
         restored.Should().NotBeNull();
