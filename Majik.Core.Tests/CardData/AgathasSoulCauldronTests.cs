@@ -6573,6 +6573,109 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_CausticCaterpillar_SacrificesBearerDestroysTarget()
+    {
+        // agatha-bespoke-source-migration-tail — Caustic Caterpillar's
+        // "Sacrifice this creature: Destroy target artifact or enchantment."
+        // The "this creature" half now reads ResolutionContext.Source (the
+        // re-homed bearer under Agatha), and the AdditionalCost.Sacrifice cost
+        // re-homes via AdditionalCost.RebindSource. So Agatha's group-grant
+        // re-homes the REAL ability to the BEARER: the BEARER is sacrificed and
+        // the chosen artifact is destroyed, never the exiled Caterpillar.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var caterpillar = CausticCaterpillarFactory.Create(alice);
+        var realAbilities = caterpillar.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Caustic Caterpillar has exactly one non-mana activated ability — the sac-then-destroy");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Caterpillar ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(caterpillar);
+        caterpillar.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A target artifact on the battlefield to be destroyed (owned by Bob,
+        // so it lands in BOB's graveyard).
+        var trinket = new Artifact("Bob's Trinket", "{2}");
+        trinket.SetOwner(bob);
+        trinket.ChangeController(bob);
+        bob.Zones.Library.AddCard(trinket);
+        zones.MoveCard(trinket, ZoneType.Library, ZoneType.Battlefield, bob);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), caterpillar);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Caterpillar's real sac-then-destroy is re-homed via RebindTo");
+        var sac = granted[0];
+        sac.Source.Should().BeSameAs(bearer,
+            "the re-homed ability is sourced on the BEARER (CR 707.2)");
+        sac.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        sac.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice,
+                "the re-homed Sacrifice cost targets the BEARER (AdditionalCost.RebindSource)");
+        sac.TargetRequests.Should().ContainSingle(t =>
+            t.Description.Contains("artifact") && t.Description.Contains("enchantment"));
+
+        sac.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { trinket } });
+        await sac.ResolveAsync(agent: null, game: null);
+
+        bearer.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed sacrifice put the BEARER into its owner's graveyard, never the exiled Caterpillar");
+        alice.Zones.Graveyard.GetCards().Should().Contain(bearer,
+            "the bearer is sacrificed to its OWNER's graveyard (CR 701.16)");
+        trinket.Zone.Should().Be(ZoneType.Graveyard,
+            "the chosen artifact is destroyed (CR 701.7)");
+        bob.Zones.Graveyard.GetCards().Should().Contain(trinket,
+            "the destroyed artifact lands in ITS owner's graveyard (Bob)");
+        caterpillar.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted Caterpillar is never touched by the granted ability");
+    }
+
+    [Fact]
+    public void BespokeCausticCaterpillar_SacrificesOwnSourceWhenNotRebound()
+    {
+        // Un-rebound posture: the legacy ResolutionContext (Source = the
+        // ability's own un-rebound source) sacrifices Caustic Caterpillar
+        // itself and destroys the chosen target — the legacy sync path
+        // (ab.Resolve()) is unchanged by the migration.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var trinket = new Artifact("Bob's Trinket", "{2}");
+        trinket.SetOwner(bob);
+        trinket.SetController(bob);
+        bob.Zones.Battlefield.AddCard(trinket);
+        trinket.SetZone(ZoneType.Battlefield);
+
+        var caterpillar = CausticCaterpillarFactory.Create(alice);
+        alice.Zones.Battlefield.AddCard(caterpillar);
+        caterpillar.SetZone(ZoneType.Battlefield);
+
+        var sac = caterpillar.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+        sac.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { trinket } });
+        sac.Resolve();
+
+        caterpillar.Zone.Should().Be(ZoneType.Graveyard,
+            "the un-rebound ability sacrifices its own source");
+        alice.Zones.Graveyard.GetCards().Should().Contain(caterpillar);
+        trinket.Zone.Should().Be(ZoneType.Graveyard,
+            "the un-rebound ability still destroys the chosen artifact");
+        bob.Zones.Graveyard.GetCards().Should().Contain(trinket);
+    }
+
+    [Fact]
     public async Task Grant_RebindsBespokeFactoryCreature_Tasigur_ReturnReadsBearerController()
     {
         var alice = new Player("Alice", 20);

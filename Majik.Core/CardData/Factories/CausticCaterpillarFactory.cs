@@ -57,6 +57,23 @@ namespace Majik.Core.CardData.Factories;
 ///   carries <see cref="BotIntent.Removal"/> so the bot's target picker
 ///   ranks artifact / enchantment removal correctly; agent-side activation
 ///   prompting still relies on the generic ActivatedAbility surface.
+///
+/// ## Agatha re-home (agatha-bespoke-source-migration-tail)
+/// The sac-then-destroy ability is <see cref="ActivatedAbility.RebindSafe"/>:
+/// its "Sacrifice THIS CREATURE" half reads
+/// <see cref="Majik.Core.Abilities.ResolutionContext.Source"/> (the re-homed
+/// bearer under Agatha's Soul Cauldron) instead of capturing <c>card</c>, and
+/// the "destroy target artifact or enchantment" half reads
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/>. The
+/// <see cref="AdditionalCost.Sacrifice"/> cost re-homes onto the new source via
+/// <see cref="AdditionalCost.RebindSource"/> (Stage 1). So Agatha's Soul
+/// Cauldron re-homes the REAL ability to a counter-bearing bearer via
+/// <see cref="ActivatedAbility.RebindTo"/> (CR 707.2 / 613.1f): the BEARER is
+/// sacrificed and the chosen artifact / enchantment is destroyed — never the
+/// exiled Caterpillar. "Sacrifice self + destroy target artifact/enchantment"
+/// is outside <see cref="Majik.Core.CardData.OracleActivatedAbilityBinder"/>'s
+/// reconstructable set, so RebindTo of the real ability is the only sound
+/// re-home.
 /// </summary>
 [CardName("Caustic Caterpillar")]
 public static class CausticCaterpillarFactory
@@ -114,37 +131,61 @@ public static class CausticCaterpillarFactory
         // CR 608.2b — resolution-time guard ensures the chosen target is
         // still a legal artifact / enchantment on the battlefield.
         // CR 701.7 — destroy via MoveToGraveyard(Destroy).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-tail): the
+        // "Sacrifice THIS CREATURE" half is the ability's own source, so the
+        // effect reads the live ResolutionContext.Source (the re-homed bearer
+        // under Agatha's Soul Cauldron) rather than capturing `card`, falling
+        // back to `card` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, Source = null). The "destroy target
+        // artifact or enchantment" half reads ctx.ChosenTargets (the chosen
+        // permanent), not the source, so it re-homes unchanged. The sole cost
+        // is an AdditionalCost.Sacrifice that RebindTo Stage 1 re-homes onto the
+        // new source automatically (AdditionalCost.RebindSource). Marked
+        // RebindSafe below so Agatha's Soul Cauldron re-homes this REAL
+        // sac-then-destroy ability to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the BEARER (not the
+        // exiled Caterpillar) is sacrificed, and the chosen artifact /
+        // enchantment is destroyed. "Sacrifice self + destroy target
+        // artifact/enchantment" is OUTSIDE the OracleActivatedAbilityBinder
+        // reconstructable set, so RebindTo of the real ability is the only sound
+        // re-home.
         // ----------------------------------------------------------------
-        ActivatedAbility? sacAbility = null;
         var sacEffect = new Effect(
             $"{CardName}: sacrifice self + destroy target artifact/enchantment",
-            () =>
+            ctx =>
             {
-                SacrificeSelf(card, owner, eventBus);
+                // The re-homed bearer under Agatha (ctx.Source), else this card
+                // on the context-less legacy sync path.
+                var self = (ctx.Source as Creature) ?? card;
+                SacrificeSelf(self, owner, eventBus);
 
-                if (sacAbility == null
-                    || sacAbility.ChosenTargets.Count == 0
-                    || sacAbility.ChosenTargets[0].Count == 0)
+                if (ctx.ChosenTargets.Count == 0 || ctx.ChosenTargets[0].Count == 0)
                 {
-                    return;
+                    return ValueTask.CompletedTask;
                 }
 
-                if (sacAbility.ChosenTargets[0][0] is not Permanent target) return;
+                if (ctx.ChosenTargets[0][0] is not Permanent target)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
                 // CR 608.2b — illegal-target check at resolution.
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
                 if (!target.HasType(CardType.Artifact)
                     && !target.HasType(CardType.Enchantment))
                 {
-                    return;
+                    return ValueTask.CompletedTask;
                 }
 
                 // CR 701.7 — destroy. Indestructible (CR 702.12) cancels;
                 // active regeneration shield (CR 701.15) is consumed.
                 OracleSpellBinder.MoveToGraveyard(target, ZoneMoveReason.Destroy);
+
+                return ValueTask.CompletedTask;
             });
 
-        sacAbility = new ActivatedAbility(
+        var sacAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[]
@@ -152,6 +193,7 @@ public static class CausticCaterpillarFactory
                 AdditionalCost.Sacrifice(card, eventBus),
             },
             effects: new IEffect[] { sacEffect },
+            rebindSafe: true,
             targetRequests: new[]
             {
                 new TargetRequest(
