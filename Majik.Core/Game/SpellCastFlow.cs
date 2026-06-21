@@ -664,6 +664,68 @@ public sealed class SpellCastFlow
             throw new InvalidOperationException(
                 $"Cannot cast {card.Name} as Adventure: sorcery-speed restriction (CR 117.1 / 715.3b).");
         }
+
+        // CR 601.2a / 113.6 / 601.3 — from-zone cast-restriction enforcement.
+        // This is the cast-from-zone-provenance-stamping seam: every cast path
+        // (hand, flashback / jump-start / aftermath from the graveyard,
+        // cascade / suspend's last counter / foretell from exile, Bolas's
+        // Citadel from the top of the library) funnels through CastAsync, and
+        // ValidateCastingPermissionAndAltCost runs BEFORE any zone move — so
+        // card.Zone here is the spell's TRUE origin zone (CR 601.2a captures it
+        // before "the player moves the spell from where it is to the stack").
+        // Reading it live and enforcing the from-zone gates here is exactly the
+        // provenance the ActionValidator's CheckCastZoneGates needs: previously
+        // the validator's from-zone axis only fired for callers that hand-built
+        // a CastSpellAction.FromZone, which no production caster did, so the
+        // restriction no-opped on this axis in live games. These three gates
+        // mirror ActionValidator.CheckCastZoneGates one-for-one.
+        EnforceFromZoneRestrictions(card, caster);
+    }
+
+    /// <summary>
+    /// CR 601.2a / 113.6 / 601.3 — reject a cast whose live origin zone
+    /// (<see cref="ICard.Zone"/>, read before the CR 601.2a move to the stack)
+    /// is blocked on the from-zone axis. Mirrors
+    /// <see cref="Majik.Core.Rules.ActionValidator"/>'s
+    /// <c>CheckCastZoneGates</c>:
+    /// <list type="bullet">
+    /// <item>card-baked restricted zones — CR 601.2a / 117.6 (Hogaak);</item>
+    /// <item>cast-from-hand-only player restriction — CR 113.6 / 601.3
+    ///       (Drannith Magistrate);</item>
+    /// <item>global cast-from-zone block — CR 601.3 (Grafdigger's Cage).</item>
+    /// </list>
+    /// Throws so the CR 731.1 rewind in <see cref="CastAsync"/> returns the
+    /// card unchanged (the throw happens before any zone move).
+    /// </summary>
+    private static void EnforceFromZoneRestrictions(ICard card, Player caster)
+    {
+        var fromZone = card.Zone;
+
+        // CR 601.2a / 117.6 — card-baked restricted zones (Hogaak).
+        if (card is Card concreteCard
+            && concreteCard.RestrictedCastZones.Contains(fromZone))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: it can't be cast from {fromZone} (CR 601.2a).");
+        }
+
+        // CR 113.6 / 601.3 — cast-from-hand-only player restriction
+        // (Drannith Magistrate: opponents can only cast from their hands).
+        if (fromZone != ZoneType.Hand
+            && Majik.Core.Rules.CastingRestrictions.MustCastFromHand(caster))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: {caster.Name} can't cast spells from {fromZone} "
+                + "(CR 113.6 — cast-from-hand-only restriction).");
+        }
+
+        // CR 601.3 — global cast-from-zone block (Grafdigger's Cage).
+        if (Majik.Core.Rules.CastingRestrictions.IsCastFromZoneGloballyBlocked(fromZone))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: players can't cast spells from {fromZone} "
+                + "(CR 601.3 — global cast-from-zone block).");
+        }
     }
 
     /// <summary>CR 702.138a — Escape alt-cost's bundled "exile N other
