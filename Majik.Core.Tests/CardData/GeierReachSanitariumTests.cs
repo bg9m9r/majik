@@ -145,9 +145,7 @@ public class GeierReachSanitariumTests
     [Fact]
     public void GeierReachSanitarium_Activated_AllPlayers_EachDrawsThenDiscards()
     {
-        var land = GeierReachSanitariumFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var land = GeierReachSanitariumFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
 
@@ -157,7 +155,9 @@ public class GeierReachSanitariumTests
         SeedHand(_bob, 1);
 
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
-        foreach (var e in ability.Effects) e.Execute();
+        // "Each player draws then discards" reads ctx.Game.AllPlayers at
+        // resolution — resolve with a live GameContext over both players.
+        ResolveWithGame(ability, _alice, _alice, _bob);
 
         // Each: lib -1 (drew), hand net unchanged (drew 1, discarded 1),
         // graveyard +1.
@@ -188,5 +188,19 @@ public class GeierReachSanitariumTests
             "drawing from an empty library flags the SBA loss (CR 704.5b)");
         _alice.Zones.Graveyard.GetCards().Count().Should().Be(1,
             "still discards one card from the existing hand");
+    }
+
+    private static void ResolveWithGame(
+        ActivatedAbility ability, Player controller, params Player[] players)
+    {
+        var game = new Majik.Core.Game.GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        ability.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

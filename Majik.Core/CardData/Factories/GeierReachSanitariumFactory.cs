@@ -54,10 +54,12 @@ namespace Majik.Core.CardData.Factories;
 ///   choice is the same deferred gap as Faithless Looting / Liliana of the
 ///   Veil). An empty hand discards nothing (CR 701.16a — discard up to one).
 /// - <b>APNAP order</b> (CR 101.4): "each player" effects resolve in APNAP
-///   order. The caller supplies <paramref name="allPlayersResolver"/> in the
-///   order the effect should iterate (typically turn order) — same posture as
-///   Etched Oracle / the wheel family. When no resolver is supplied only the
-///   controller draws + discards (single-arg dispatcher path).
+///   order. The effect reads every player off the live resolution context
+///   (<c>ctx.Game.AllPlayers</c>) at resolution and iterates in that order —
+///   same posture as Etched Oracle / the wheel family. When no live game is
+///   wired (shape-only / legacy sync path) only the controller draws +
+///   discards (#2551 land cleanup — no captured resolver, so correct on the
+///   routed prod build).
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>Player-chosen discard</b>: <see cref="Fx.Discard"/> takes the
@@ -76,24 +78,15 @@ public static class GeierReachSanitariumFactory
         CardDefinitionLoader.FromEmbeddedResource(Slug);
 
     /// <summary>
-    /// Construct Geier Reach Sanitarium with no live each-player wiring — the
-    /// activated ability draws + discards for the controller only (single-arg
-    /// dispatcher path). Suitable for shape / <see cref="NamedCardFactory"/>
-    /// dispatch tests.
-    /// </summary>
-    public static Land Create(Player owner) => Create(owner, allPlayersResolver: null);
-
-    /// <summary>
     /// Construct Geier Reach Sanitarium. The {T}: Add {C} mana ability comes
     /// from the embedded JSON; the "{2}, {T}: Each player draws a card, then
-    /// discards a card" activated ability is layered on structurally. When
-    /// <paramref name="allPlayersResolver"/> is supplied the activated ability
-    /// makes every player draw a card (all draws first), then every player
-    /// discards a card; otherwise only the controller draws + discards.
+    /// discards a card" activated ability is layered on structurally. The
+    /// activated ability reads every player off the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution and makes each draw a card
+    /// (all draws first), then each discards a card; when no live game is wired
+    /// (shape-only / legacy sync path) only the controller draws + discards.
     /// </summary>
-    public static Land Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Land Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -109,9 +102,14 @@ public static class GeierReachSanitariumFactory
         // ----------------------------------------------------------------
         var effect = new Effect(
             $"{CardName}: each player draws a card, then discards a card",
-            () =>
+            ctx =>
             {
-                var players = allPlayersResolver?.Invoke()
+                // "Each player" — read every player from the LIVE game at
+                // resolution (ctx.Game.AllPlayers). No captured resolver, so
+                // correct on the routed prod build (#2551 land cleanup). When
+                // no live game is wired (shape-only / legacy sync path) the
+                // controller is the only player affected.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { land.Controller ?? owner };
 
                 // CR 121.1 — every player completes their draw before any
@@ -119,14 +117,18 @@ public static class GeierReachSanitariumFactory
                 // the discard.
                 foreach (var p in players)
                 {
+                    if (p == null) continue;
                     Fx.DrawCards(p, DrawCount);
                 }
 
                 // CR 701.16 — then every player discards a card.
                 foreach (var p in players)
                 {
+                    if (p == null) continue;
                     Fx.Discard(p, DiscardCount);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         land.AddAbility(new ActivatedAbility(

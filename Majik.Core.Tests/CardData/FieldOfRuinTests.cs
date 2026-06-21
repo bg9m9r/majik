@@ -74,8 +74,7 @@ public class FieldOfRuinTests
         _bob.Zones.Battlefield.AddCard(target);
         target.SetZone(ZoneType.Battlefield);
 
-        var fieldOfRuin = FieldOfRuinFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var fieldOfRuin = FieldOfRuinFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(fieldOfRuin);
         fieldOfRuin.SetZone(ZoneType.Battlefield);
 
@@ -116,8 +115,7 @@ public class FieldOfRuinTests
         _alice.Zones.Battlefield.AddCard(ownLand);
         ownLand.SetZone(ZoneType.Battlefield);
 
-        var fieldOfRuin = FieldOfRuinFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var fieldOfRuin = FieldOfRuinFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(fieldOfRuin);
         fieldOfRuin.SetZone(ZoneType.Battlefield);
 
@@ -174,8 +172,7 @@ public class FieldOfRuinTests
         _bob.Zones.Battlefield.AddCard(target);
         target.SetZone(ZoneType.Battlefield);
 
-        var fieldOfRuin = FieldOfRuinFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var fieldOfRuin = FieldOfRuinFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(fieldOfRuin);
         fieldOfRuin.SetZone(ZoneType.Battlefield);
 
@@ -192,7 +189,9 @@ public class FieldOfRuinTests
         {
             new object[] { target },
         });
-        activated.Resolve();
+        // The each-player tutor half reads ctx.Game.AllPlayers at resolution —
+        // resolve with a live GameContext over both players.
+        ResolveWithGame(activated, _alice, _alice, _bob);
 
         // Both players' basics moved to the battlefield.
         alicePlains.Zone.Should().Be(ZoneType.Battlefield);
@@ -230,8 +229,7 @@ public class FieldOfRuinTests
         _bob.Zones.Battlefield.AddCard(target);
         target.SetZone(ZoneType.Battlefield);
 
-        var fieldOfRuin = FieldOfRuinFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var fieldOfRuin = FieldOfRuinFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(fieldOfRuin);
         fieldOfRuin.SetZone(ZoneType.Battlefield);
 
@@ -248,10 +246,24 @@ public class FieldOfRuinTests
         {
             new object[] { target },
         });
-        Action act = () => activated.Resolve();
+        Action act = () => ResolveWithGame(activated, _alice, _alice, _bob);
         act.Should().NotThrow();
 
         bobMountain.Zone.Should().Be(ZoneType.Battlefield);
         _bob.Zones.Battlefield.GetCards().Should().Contain(bobMountain);
+    }
+
+    private static void ResolveWithGame(
+        ActivatedAbility ability, Player controller, params Player[] players)
+    {
+        var game = new Majik.Core.Game.GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        ability.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }
