@@ -2621,12 +2621,12 @@ public class AgathasSoulCauldronTests
         var zones = new Majik.Core.Services.ZoneService(bus);
 
         // A creature whose only ability is a bespoke, NON-reconstructable one:
-        // a tutor whose TYPED sub-filter ("basic land card") is not a plain
-        // card-type test — outside the open Equipment/land library-tutor shapes
-        // the binder reconstructs (the "basic" qualifier is rejected by the
-        // search-to-battlefield candidate filter). Plus an "Activate only" rider
-        // on a pump (must be skipped too — sound, not broken) and an
-        // unmodellable-cost ({E}{E}) pinger.
+        // a tutor whose TYPED sub-filter ("Goblin card") is not a plain
+        // card-type test — outside the open Equipment/land/basic-land
+        // library-tutor shapes the binder reconstructs (a kindred sub-filter is
+        // rejected by the search-to-battlefield candidate filter). Plus an
+        // "Activate only" rider on a pump (must be skipped too — sound, not
+        // broken) and an unmodellable-cost ({E}{E}) pinger.
         var bespoke = new Creature("Bespoke Stub", "2GG", 3, 3);
         bespoke.SetOwner(alice);
         alice.Zones.Graveyard.AddCard(bespoke);
@@ -2636,7 +2636,7 @@ public class AgathasSoulCauldronTests
 
         var cauldron = GrantingCauldron(alice, effects, bus,
             OracleStub(("Bespoke Stub",
-                "{2}, {T}: Search your library for a basic land card, put it onto "
+                "{2}, {T}: Search your library for a Goblin card, put it onto "
                 + "the battlefield, then shuffle.\n"
                 + "{G}: This creature gets +2/+2 until end of turn. Activate only as a sorcery.\n"
                 + "{E}{E}: This creature deals 2 damage to any target.")));
@@ -7344,6 +7344,174 @@ public class AgathasSoulCauldronTests
                 "the Equipment enters the BEARER's controller's battlefield");
             rock.Zone.Should().Be(ZoneType.Library,
                 "a non-Equipment artifact is excluded by the printed candidate filter");
+        }
+        finally
+        {
+            Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // knight-of-the-reliquary-typed-sac-tutor-grammar
+    //
+    // Two closes of the search-to-battlefield soundness boundary explicitly
+    // deferred at the search-to-battlefield close (#2981):
+    //
+    //  (A) COST GRAMMAR — a typed-sacrifice cost token, "Sacrifice a
+    //      <subtype> [or <subtype>]" (CR 701.16), reusing the typed-non-self
+    //      SacrificeFilteredCost primitive shipped for Phyrexia's Core /
+    //      Ramunap Ruins (#2831). This closes Knight of the Reliquary's EXACT
+    //      printed line — "{T}, Sacrifice a Forest or Plains: Search your
+    //      library for a land card, put it onto the battlefield, then shuffle."
+    //      — which the binder previously skipped because the cost was unmodelled.
+    //
+    //  (B) EFFECT SHAPE — the search-to-battlefield candidate filter is
+    //      broadened with the "basic land card" typed sub-filter (CR 305 land +
+    //      CR 205.4 Basic supertype), so a "Search your library for a basic land
+    //      card, put it onto the battlefield, then shuffle" tutor is now
+    //      reconstructed too (only basic lands are eligible targets).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void OracleBinder_ReconstructsTypedSacrificeCost_KnightExactLine()
+    {
+        var alice = new Player("Alice", 20);
+
+        // The bearer the re-homed ability sources on — on the battlefield (the
+        // Cauldron's only grantee). Knight's EXACT printed activated line, now
+        // fully reconstructable: the typed-sacrifice cost ("Sacrifice a Forest
+        // or Plains") + the {T} tap + the land-tutor-to-battlefield effect.
+        var bearer = new Creature("Reliquary Stub", "1GW", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(bearer);
+
+        var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+            .RebuildActivatedAbilities(
+                "{T}, Sacrifice a Forest or Plains: Search your library for a land "
+                + "card, put it onto the battlefield, then shuffle.",
+                bearer, alice);
+
+        rebuilt.Should().ContainSingle(
+            "the typed-sacrifice cost grammar + the land-tutor effect shape now "
+            + "reconstruct Knight of the Reliquary's exact printed line");
+        var tutor = rebuilt[0];
+
+        tutor.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the {T} cost taps the bearer");
+        tutor.Costs.OfType<SacrificeFilteredCost>()
+            .Should().ContainSingle(
+                "the 'Sacrifice a Forest or Plains' cost is a typed-non-self "
+                + "SacrificeFilteredCost over the controller's battlefield");
+
+        // A Plains the controller controls (the sacrifice fodder — proves the
+        // OR-branch of the typed filter matches Plains, not just Forest) and a
+        // land in the controller's library (the tutor target).
+        var plains = new Land("Plains");
+        plains.AddSubtype(CardSubtype.Plains);
+        plains.SetOwner(alice);
+        plains.SetController(alice);
+        plains.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(plains);
+
+        var fetchTarget = new Land("Stomping Ground Stub");
+        fetchTarget.SetOwner(alice);
+        alice.Zones.Library.AddCard(fetchTarget);
+        fetchTarget.SetZone(ZoneType.Library);
+
+        // Pay the sacrifice cost, then resolve the tutor effect.
+        var sacCost = tutor.Costs.OfType<SacrificeFilteredCost>().Single();
+        sacCost.CanPay(alice).Should().BeTrue("a Plains the controller controls is eligible");
+        sacCost.Pay(alice);
+
+        foreach (var effect in tutor.Effects) effect.Execute();
+
+        plains.Zone.Should().Be(ZoneType.Graveyard,
+            "the typed-sacrifice cost sacrifices a Plains the controller controls (CR 701.16)");
+        fetchTarget.Zone.Should().Be(ZoneType.Battlefield,
+            "the land tutor puts a land from the controller's library onto the battlefield");
+    }
+
+    [Fact]
+    public void OracleBinder_TypedSacrificeCost_RejectsNonControlledSubtype()
+    {
+        var alice = new Player("Alice", 20);
+
+        var bearer = new Creature("Reliquary Stub", "1GW", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.SetController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(bearer);
+
+        var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+            .RebuildActivatedAbilities(
+                "{T}, Sacrifice a Forest or Plains: Search your library for a land "
+                + "card, put it onto the battlefield, then shuffle.",
+                bearer, alice);
+
+        rebuilt.Should().ContainSingle();
+        var sacCost = rebuilt[0].Costs.OfType<SacrificeFilteredCost>().Single();
+
+        // The controller controls a Mountain — NOT a Forest or Plains, so the
+        // typed-sacrifice cost is unpayable (CR 701.16 — no eligible permanent).
+        var mountain = new Land("Mountain");
+        mountain.AddSubtype(CardSubtype.Mountain);
+        mountain.SetOwner(alice);
+        mountain.SetController(alice);
+        mountain.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(mountain);
+
+        sacCost.CanPay(alice).Should().BeFalse(
+            "a Mountain is neither a Forest nor a Plains — the typed cost can't be paid");
+    }
+
+    [Fact]
+    public void OracleBinder_ReconstructsBasicLandSearchToBattlefield()
+    {
+        var alice = new Player("Alice", 20);
+        var zones = new Majik.Core.Services.ZoneService(new Majik.Core.Events.EventBus());
+        Majik.Core.Services.ZoneServiceRegistry.Set(alice, zones);
+        try
+        {
+            var bearer = new Creature("Basic Ramp Stub", "1G", 2, 2);
+            bearer.SetOwner(alice);
+            bearer.SetController(alice);
+            bearer.SetZone(ZoneType.Battlefield);
+            alice.Zones.Battlefield.AddCard(bearer);
+
+            // A BASIC land (Land + Basic supertype) — the only sound target for
+            // the "basic land card" typed sub-filter.
+            var basic = new Land("Forest");
+            basic.AddSupertype(CardSupertype.Basic);
+            basic.AddSubtype(CardSubtype.Forest);
+            basic.SetOwner(alice);
+            alice.Zones.Library.AddCard(basic);
+            basic.SetZone(ZoneType.Library);
+
+            // A NONBASIC land (Land, no Basic supertype) — must NOT be tutored.
+            var nonbasic = new Land("Stomping Ground Stub");
+            nonbasic.SetOwner(alice);
+            alice.Zones.Library.AddCard(nonbasic);
+            nonbasic.SetZone(ZoneType.Library);
+
+            var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+                .RebuildActivatedAbilities(
+                    "{1}{G}, {T}: Search your library for a basic land card, put it "
+                    + "onto the battlefield, then shuffle.",
+                    bearer, alice);
+
+            rebuilt.Should().ContainSingle(
+                "the search-to-battlefield shape now reconstructs the 'basic land "
+                + "card' typed sub-filter");
+
+            foreach (var effect in rebuilt[0].Effects) effect.Execute();
+
+            basic.Zone.Should().Be(ZoneType.Battlefield,
+                "the basic land is a legal target for the 'basic land card' filter");
+            nonbasic.Zone.Should().Be(ZoneType.Library,
+                "a nonbasic land is excluded by the 'basic land card' candidate filter");
         }
         finally
         {

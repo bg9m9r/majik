@@ -296,15 +296,16 @@ namespace Majik.Core.CardData;
 ///     unsound, and a "put it onto the battlefield" land-ramp search is NOT this
 ///     shape (only the "to your hand" destination is matched). Sound on any
 ///     permanent bearer.</item>
-///   <item><b>Search-to-battlefield (Equipment / land tutor)</b> —
-///     <c>"{cost}: Search your library for a/an &lt;Equipment|land&gt; card, put
-///     it onto the battlefield, then shuffle."</c> The library-tutor-onto-the-
-///     BATTLEFIELD sibling of the search-to-hand shape (Knight of the Reliquary's
-///     land tutor; the Stoneforge-class Equipment tutor). Rebuilt as a no-target
-///     <see cref="ActivatedAbility"/> whose ResolutionContext-aware resolution
-///     searches the BEARER's CONTROLLER's own library for a card matching the open
-///     card-type filter — "Equipment card" (Artifact — Equipment subtype, CR
-///     301.5d) or "land card" (Land type, CR 305) — consults the live agent off
+///   <item><b>Search-to-battlefield (Equipment / land / basic-land tutor)</b> —
+///     <c>"{cost}: Search your library for a/an &lt;Equipment|basic land|land&gt;
+///     card, put it onto the battlefield, then shuffle."</c> The library-tutor-
+///     onto-the-BATTLEFIELD sibling of the search-to-hand shape (Knight of the
+///     Reliquary's land tutor; the Stoneforge-class Equipment tutor). Rebuilt as a
+///     no-target <see cref="ActivatedAbility"/> whose ResolutionContext-aware
+///     resolution searches the BEARER's CONTROLLER's own library for a card
+///     matching the card-type filter — "Equipment card" (Artifact — Equipment
+///     subtype, CR 301.5d), "land card" (Land type, CR 305), or "basic land card"
+///     (Land type + Basic supertype, CR 205.4) — consults the live agent off
 ///     <see cref="ResolutionContext.Agent"/> (deterministic first-eligible
 ///     fallback, the SAME posture as the bespoke tutor factories), moves the pick
 ///     Library → Battlefield (through the controller's registered
@@ -314,12 +315,13 @@ namespace Majik.Core.CardData;
 ///     permanent bearer: the search references the controller's OWN library, the
 ///     card enters the controller's battlefield, and the controller's library is
 ///     shuffled — NO "this creature" / source reference at all (same
-///     controller-scoped soundness class as draw / mill / surveil). The typed-
-///     sacrifice cost on Knight's printed line ("Sacrifice a Forest or Plains") is
-///     not in the cost grammar, so Knight's EXACT line is skipped — the EFFECT
-///     shape is what is reconstructed (exercised with a reconstructable cost); a
-///     non-Equipment / non-land tutor (creature / colour / "basic land") is
-///     skipped as unsound.</item>
+///     controller-scoped soundness class as draw / mill / surveil). As of the
+///     knight-of-the-reliquary-typed-sac-tutor-grammar close, the typed-sacrifice
+///     cost on Knight's printed line ("Sacrifice a Forest or Plains") IS in the
+///     cost grammar (see "Cost grammar" below), so Knight's EXACT line now
+///     reconstructs end-to-end. A non-Equipment / non-land tutor (creature /
+///     colour / a kindred sub-filter like "Goblin card") is still skipped as
+///     unsound.</item>
 /// </list>
 ///
 /// <h3>Cost grammar</h3>
@@ -332,6 +334,12 @@ namespace Majik.Core.CardData;
 /// <c>"{T}:"</c>, <c>"{2}:"</c>, and <c>"{1}{U}:"</c> are all handled. The
 /// <c>"Sacrifice this creature:"</c> cost becomes
 /// <see cref="AdditionalCost.Sacrifice"/>(bearer). A
+/// <c>"Sacrifice a/an &lt;subtype&gt; [or &lt;subtype&gt;]"</c> typed-sacrifice
+/// leg (CR 701.16 — "Sacrifice a Forest or Plains" on Knight of the Reliquary)
+/// becomes a <see cref="SacrificeFilteredCost"/> over the controller's
+/// battlefield (the same typed-non-self primitive Ramunap Ruins / Scavenger
+/// Grounds use); an unrecognised subtype word makes the leg unsound and the
+/// clause is skipped. A
 /// <c>"Remove N +1/+1 counters from this creature"</c> leg becomes
 /// <see cref="AdditionalCost.RemoveCounters"/>(bearer, +1/+1, N) — the
 /// re-source-safe counter-removal additional cost (CR 118.3) that rebinds onto
@@ -347,7 +355,11 @@ namespace Majik.Core.CardData;
 ///   <item>Non-mana / non-tap / non-sacrifice cost tokens — energy
 ///     (<c>{E}</c>), Phyrexian (<c>{R/P}</c>), snow (<c>{S}</c>), <c>{X}</c>,
 ///     "Pay N life", "Discard a card", "Remove a counter", etc. — the cost
-///     can't be reconstructed soundly, so the whole clause is skipped.</item>
+///     can't be reconstructed soundly, so the whole clause is skipped. (A
+///     <c>"Sacrifice this creature"</c> cost and a typed-sacrifice cost
+///     <c>"Sacrifice a/an &lt;subtype&gt; [or &lt;subtype&gt;]"</c> ARE modelled
+///     — see the cost-grammar section; an unrecognised subtype word still
+///     skips the clause.)</item>
 ///   <item>"Activate only …" riders (sorcery-speed, "only if", "only once each
 ///     turn") — the gating predicate isn't reconstructable here.</item>
 ///   <item>Restricted damage targets ("target creature defending player
@@ -357,9 +369,10 @@ namespace Majik.Core.CardData;
 ///   <item>Every shape not in the list above (general tutors with an open
 ///     candidate filter we don't model, mode-bearing abilities,
 ///     token makers, anthem grants, loyalty-style, bespoke one-offs). (The
-///     Equipment / land search-to-BATTLEFIELD tutor, listed in the shapes-rebuilt
-///     section, IS reconstructed — only its two open card-type filters; a general
-///     "search for a card" / typed-sub-filter tutor remains skipped. Scry /
+///     Equipment / land / basic-land search-to-BATTLEFIELD tutor, listed in the
+///     shapes-rebuilt section, IS reconstructed — its Equipment / land / basic-land
+///     card-type filters; a general "search for a card" or kindred-sub-filter
+///     ("Goblin card") tutor remains skipped. Scry /
 ///     mill / surveil, listed here previously, ARE now reconstructed above: the
 ///     library-selection shapes read their agent decision off the live
 ///     <see cref="ResolutionContext"/> the same way the declarative
@@ -388,13 +401,41 @@ public static class OracleActivatedAbilityBinder
     // counter-removal token contains no comma, so the ", " split is safe.
     private const string RemoveCountersToken =
         @"Remove (?:a|one|two|three|four|five|\d+) \+1/\+1 counters? from this creature";
+
+    // A typed-sacrifice cost token (CR 701.16) — "Sacrifice a/an <subtype>
+    // [or <subtype>]". A re-source-safe additional cost: it sacrifices ONE
+    // permanent of the named subtype(s) the BEARER's CONTROLLER controls, with
+    // NO dependence on the source card's identity, so re-homing onto a new
+    // bearer is sound (it scans the new controller's battlefield). Rides the
+    // typed-non-self SacrificeFilteredCost primitive — the same rail
+    // Phyrexia's Core / Ramunap Ruins / Scavenger Grounds use (#2831). The
+    // canonical case is Knight of the Reliquary's "Sacrifice a Forest or
+    // Plains". The subtype word(s) are validated against CardSubtype in
+    // TryBuildCostList; an unrecognised subtype makes the token unsound and the
+    // clause is skipped. The token contains no comma, so the ", " cost-list
+    // split is safe. Only the single- and two-subtype OR forms are matched (a
+    // type/"another"-qualified sacrifice — "Sacrifice an artifact",
+    // "Sacrifice another creature" — is NOT this token and is handled, or
+    // skipped, elsewhere).
+    private const string SacrificeTypedToken =
+        @"Sacrifice an? [A-Za-z]+(?: or [A-Za-z]+)?";
+
     private const string CostToken =
-        @"(?:\{T\}|(?:\{(?:\d+|[WUBRGC])\})+|" + RemoveCountersToken + @")";
+        @"(?:\{T\}|(?:\{(?:\d+|[WUBRGC])\})+|" + RemoveCountersToken
+        + @"|" + SacrificeTypedToken + @")";
     private const string CostList = CostToken + @"(?:\s*,\s*" + CostToken + @")*";
 
     // Matches a single counter-removal cost token and captures its count word.
     private static readonly Regex RemoveCountersTokenRegex = new(
         @"^Remove (a|one|two|three|four|five|\d+) \+1/\+1 counters? from this creature$",
+        RegexOptions.IgnoreCase);
+
+    // Matches a single typed-sacrifice cost token and captures its subtype
+    // word(s). Group 1 = first subtype, group 2 = optional second subtype
+    // (empty when the cost names a single subtype). Both words are validated
+    // against CardSubtype in TryBuildCostList before the cost is folded.
+    private static readonly Regex SacrificeTypedTokenRegex = new(
+        @"^Sacrifice an? ([A-Za-z]+)(?: or ([A-Za-z]+))?$",
         RegexOptions.IgnoreCase);
 
     // Spelled-out small counts that appear on real "Remove N +1/+1 counters"
@@ -977,34 +1018,35 @@ public static class OracleActivatedAbilityBinder
         @"^(" + CostList + @")\s*:\s*Return this (?:card|creature) (?:from your graveyard )?to (?:its owner's|your) hand\.$",
         RegexOptions.IgnoreCase);
 
-    // "{cost}: Search your library for a/an <Equipment|land> card, put it/that
-    // card onto the battlefield, then shuffle." (CR 701.19a search / CR 701.20a
-    // shuffle.) The library-TUTOR-onto-BATTLEFIELD sibling of the search-to-hand
-    // shape (Fauna Shaman, which is bespoke + RebindTo). The canonical re-home
-    // target is Knight of the Reliquary's "Search your library for a land card,
-    // put it onto the battlefield, then shuffle." (the typed-sacrifice cost on
-    // Knight's printed line — "Sacrifice a Forest or Plains" — is NOT in the
-    // CostList grammar, so Knight's exact line is skipped; the EFFECT shape is
-    // what this binder reconstructs, exercised here with a reconstructable cost).
-    // Sound to re-home onto ANY permanent bearer: the search references the
-    // BEARER's CONTROLLER's OWN library (CR 109.5 / 400.7 — "your" = the
-    // ability's controller), the chosen card enters the controller's
-    // battlefield, and the controller's library is shuffled — never the exiled
-    // imprinted card. There is no "this creature" / source reference, so the
-    // re-home is a clean controller-scoped tutor (the same soundness class as the
-    // draw / mill / surveil controller-scoped shapes). The candidate filter is
-    // restricted to the two OPEN, source-independent card-type forms that appear
-    // on real "put onto the battlefield" tutors — "Equipment card" (Artifact —
-    // Equipment subtype membership, CR 301.5d) and "land card" (Land type
-    // membership, CR 305) — each an unambiguous predicate with no source-card
-    // dependence. A typed sub-filter ("basic land card", a creature/colour
-    // tutor) is NOT this shape and is skipped, consistent with the
+    // "{cost}: Search your library for a/an <Equipment|basic land|land> card, put
+    // it/that card onto the battlefield, then shuffle." (CR 701.19a search /
+    // CR 701.20a shuffle.) The library-TUTOR-onto-BATTLEFIELD sibling of the
+    // search-to-hand shape (Fauna Shaman, which is bespoke + RebindTo). The
+    // canonical re-home target is Knight of the Reliquary's "Search your library
+    // for a land card, put it onto the battlefield, then shuffle." — and as of
+    // the knight-of-the-reliquary-typed-sac-tutor-grammar close the typed-
+    // sacrifice cost on Knight's printed line ("Sacrifice a Forest or Plains") IS
+    // in the CostList grammar (SacrificeTypedToken), so Knight's EXACT printed
+    // line now reconstructs end-to-end (cost + effect). Sound to re-home onto ANY
+    // permanent bearer: the search references the BEARER's CONTROLLER's OWN
+    // library (CR 109.5 / 400.7 — "your" = the ability's controller), the chosen
+    // card enters the controller's battlefield, and the controller's library is
+    // shuffled — never the exiled imprinted card. There is no "this creature" /
+    // source reference, so the re-home is a clean controller-scoped tutor (the
+    // same soundness class as the draw / mill / surveil controller-scoped shapes).
+    // The candidate filter is restricted to the OPEN, source-independent card-type
+    // forms that appear on real "put onto the battlefield" tutors — "Equipment
+    // card" (Artifact — Equipment subtype membership, CR 301.5d), "land card"
+    // (Land type membership, CR 305), and "basic land card" (Land type + Basic
+    // supertype, CR 205.4) — each an unambiguous predicate with no source-card
+    // dependence. A non-Equipment / non-land tutor or a kindred sub-filter
+    // ("Goblin card") is NOT this shape and is skipped, consistent with the
     // restricted-target soundness boundary. Group 1 = cost, group 2 = the card
-    // form ("Equipment" | "basic land" rejected | "land"). The optional
-    // "it"/"that card"/"that card" phrasing and the trailing ", then shuffle."
-    // are matched but carry no captured data.
+    // form ("Equipment" | "basic land" | "land"); "basic land" precedes "land" in
+    // the alternation so it is preferred. The optional "it"/"that card" phrasing
+    // and the trailing ", then shuffle." are matched but carry no captured data.
     private static readonly Regex SearchToBattlefieldRegex = new(
-        @"^(" + CostList + @")\s*:\s*Search your library for an? (Equipment|land) card,"
+        @"^(" + CostList + @")\s*:\s*Search your library for an? (Equipment|basic land|land) card,"
         + @" put (?:it|that card|them) onto the battlefield, then shuffle\.$",
         RegexOptions.IgnoreCase);
 
@@ -2100,6 +2142,11 @@ public static class OracleActivatedAbilityBinder
         Func<ICard, bool> predicate = cardForm switch
         {
             "equipment" => c => c.HasSubtype(CardSubtype.Equipment),
+            // CR 305 land + CR 205.4 Basic supertype — a "basic land card" is a
+            // land that ALSO carries the Basic supertype (a nonbasic land such
+            // as a shock/fetch is excluded). An unambiguous, source-independent
+            // predicate, so the candidate filter reconstructs soundly.
+            "basic land" => c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic),
             "land" => c => c.HasType(CardType.Land),
             _ => null!,
         };
@@ -3284,6 +3331,38 @@ public static class OracleActivatedAbilityBinder
                 continue;
             }
 
+            var sacTyped = SacrificeTypedTokenRegex.Match(token);
+            if (sacTyped.Success)
+            {
+                // CR 701.16 — a typed-sacrifice cost ("Sacrifice a Forest or
+                // Plains"). Validate the subtype word(s) against CardSubtype;
+                // an unrecognised subtype makes the cost unmodellable, so skip
+                // the whole clause as unsound. Re-source-safe: the
+                // SacrificeFilteredCost scans the BEARER's CONTROLLER's
+                // battlefield (CR 109.5 / 400.7 — the cost is paid by the
+                // ability's controller), with no source-card dependence.
+                var first = ParseSubtype(sacTyped.Groups[1].Value);
+                if (first is null) return null;
+
+                CardSubtype? second = null;
+                if (sacTyped.Groups[2].Success && sacTyped.Groups[2].Value.Length > 0)
+                {
+                    second = ParseSubtype(sacTyped.Groups[2].Value);
+                    if (second is null) return null;
+                }
+
+                var a = first.Value;
+                var description = second is { } b
+                    ? $"sacrifice a {a} or {b}"
+                    : $"sacrifice a {a}";
+                Func<Permanent, bool> filter = second is { } sub
+                    ? p => p.HasSubtype(a) || p.HasSubtype(sub)
+                    : p => p.HasSubtype(a);
+
+                costs.Add(new SacrificeFilteredCost(filter, description));
+                continue;
+            }
+
             // A run of one or more mana pips we can model exactly, written
             // CONCATENATED the way real oracle text spells a multi-symbol cost:
             // {N} generic and/or W/U/B/R/G/C coloured pips (e.g. "{1}{U}",
@@ -3314,4 +3393,15 @@ public static class OracleActivatedAbilityBinder
         // parsed a malformed line. (All real shapes have at least a {T} or mana.)
         return costs.Count > 0 ? costs : null;
     }
+
+    /// <summary>
+    /// Map an oracle subtype word ("Forest", "Plains", "Desert", …) to its
+    /// <see cref="CardSubtype"/>, or null when the word is not a known subtype
+    /// (which makes a typed-sacrifice cost unmodellable, so the clause is
+    /// skipped as unsound). Same posture as
+    /// <c>SubtypeEntersTappedBinder.ParseSubtype</c> /
+    /// <c>ConditionalEntersTappedBinder.ParseSubtype</c>.
+    /// </summary>
+    private static CardSubtype? ParseSubtype(string raw) =>
+        Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s) ? s : null;
 }
