@@ -28,10 +28,11 @@ namespace Majik.Bot.Decks;
 /// Source: MTGGoldfish Modern list 7828188 (60-card mainboard). Sideboard NOT
 /// wired in v1.
 ///
-/// Tameshi, Reality Architect is registered as a known partial implementation
-/// (KnownPartialImplementations) for its activated land-from-graveyard ability;
-/// its draw trigger is implemented. The deck-implementation audit treats it as a
-/// registered partial, not a gap.
+/// Tameshi, Reality Architect is FULLY implemented (no longer a registered
+/// partial): both its once-per-turn noncreature-bounce draw trigger AND its
+/// "{X}{W}, Return a land you control to hand" activated artifact/enchantment
+/// reanimation ability are emitted, the latter via the per-activation X ledger
+/// (ResolutionContext.ChosenX). It was removed from KnownPartialImplementations.
 /// </summary>
 internal static class AzoriusLotusBelcherDeck
 {

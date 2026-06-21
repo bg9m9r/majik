@@ -66,7 +66,7 @@ public sealed class BelcherCoverageTests
             ["Stern Scolding"]            = (Role.Protection,    "not-combo-relevant: cheap counter"),
             ["Orim's Chant"]              = (Role.Protection,    "not-combo-relevant: tax/lock the opponent turn"),
             ["Suppression Ray"]           = (Role.Protection,    "not-combo-relevant: tax/lock"),
-            ["Tameshi, Reality Architect"] = (Role.Protection,   "not-combo-relevant: grind/backup (registered partial)"),
+            ["Tameshi, Reality Architect"] = (Role.Protection,   "not-combo-relevant: grind/backup (fully implemented)"),
         };
 
     [Fact]
