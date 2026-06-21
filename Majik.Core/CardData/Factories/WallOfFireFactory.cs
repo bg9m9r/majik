@@ -92,27 +92,43 @@ public static class WallOfFireFactory
         // uses the stack per CR 605.1 / CR 602.2). The cost is one red
         // mana (ManaCostCost("{R}")). No target: the ability modifies Wall
         // of Fire itself. On resolution a PumpUntilEndOfTurnEffect(+1, 0)
-        // is registered against card.ActiveEffects (Layer 7c). Multiple
-        // activations stack: each {R} paid registers an independent +1/+0
-        // for the turn (CR 613.1f). No sorcery-speed restriction printed
-        // — instant speed (CR 602.5a default).
+        // is registered against the source's ActiveEffects (Layer 7c).
+        // Multiple activations stack: each {R} paid registers an independent
+        // +1/+0 for the turn (CR 613.1f). No sorcery-speed restriction
+        // printed — instant speed (CR 602.5a default).
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-creature-activated-ability-
+        // incremental-audit-tail): "Wall of Fire" is read off the live
+        // ResolutionContext.Source (the ability's own source at resolution),
+        // and the PumpUntilEndOfTurnEffect is BUILT against that subject at
+        // resolution rather than capturing `card` at author time. Falls back
+        // to the authored `card` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy). Marked RebindSafe below so Agatha's
+        // Soul Cauldron re-homes the REAL firebreathing to a counter-bearing
+        // bearer via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the
+        // BEARER gets +1/+0, never the exiled Wall of Fire.
         // ----------------------------------------------------------------
         var pumpEffect = new Effect(
             $"{CardName}: +1/+0 until end of turn ({{R}} firebreathing)",
-            () =>
+            ctx =>
             {
+                // "Wall of Fire" = the live re-homed source, falling back to
+                // the authored card on the context-less sync path.
+                var subject = (ctx.Source as Creature) ?? card;
+
                 // CR 613.1f Layer 7c — power modification. null ActiveEffects
-                // = shape-only test path; pump silently no-ops (same posture
-                // as SteelHellkiteFactory's {2}: +1/+0 ability).
-                card.ActiveEffects?.Register(
-                    new PumpUntilEndOfTurnEffect(card, 1, 0));
+                // = shape-only test path; pump silently no-ops.
+                subject.ActiveEffects?.Register(
+                    new PumpUntilEndOfTurnEffect(subject, 1, 0));
+                return ValueTask.CompletedTask;
             });
 
         card.AddAbility(new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(FirebreathingCost) },
-            effects: new IEffect[] { pumpEffect }));
+            effects: new IEffect[] { pumpEffect },
+            rebindSafe: true));
 
         return card;
     }
