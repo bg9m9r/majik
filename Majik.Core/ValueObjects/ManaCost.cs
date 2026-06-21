@@ -274,6 +274,54 @@ public class ManaCost : IEquatable<ManaCost>
             HybridPips, PhyrexianPips, Colorless);
     }
 
+    /// <summary>
+    /// CR 702.102b / CR 712.4 — combine this cost with <paramref name="other"/>
+    /// into a single cost that is the SUM of both, component by component. Used
+    /// to build a split card's <b>Fuse</b> cost — "the combined mana cost of
+    /// both halves" — from its two halves' printed costs (CR 702.102b), and any
+    /// other place two printed costs must be paid together as one.
+    ///
+    /// <para>Every component adds: generic, each color, colorless ({C}) pips,
+    /// and the hybrid / Phyrexian pip lists concatenate (a fused
+    /// {1}{W/B} // {4}{B/R}{B/R} demands {5} generic plus all three hybrid
+    /// pips). <see cref="HasX"/> is OR-ed — a fused cost with an X half still
+    /// carries an X to announce (CR 601.2b).</para>
+    ///
+    /// <para>Pure — neither operand is mutated (CR 712 — the combined cost is a
+    /// fresh object). Note string-concatenating two cost strings and re-parsing
+    /// is NOT equivalent: <see cref="Parse"/> collapses adjacent generic
+    /// clusters ("{1}…{4}" → "14"), so the field-wise sum here is the only
+    /// correct combiner.</para>
+    /// </summary>
+    public ManaCost Combine(ManaCost other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        var hybrid = HybridPips.Count == 0
+            ? other.HybridPips
+            : other.HybridPips.Count == 0
+                ? HybridPips
+                : HybridPips.Concat(other.HybridPips).ToList();
+
+        var phyrexian = PhyrexianPips.Count == 0
+            ? other.PhyrexianPips
+            : other.PhyrexianPips.Count == 0
+                ? PhyrexianPips
+                : PhyrexianPips.Concat(other.PhyrexianPips).ToList();
+
+        return new ManaCost(
+            Generic + other.Generic,
+            White + other.White,
+            Blue + other.Blue,
+            Black + other.Black,
+            Red + other.Red,
+            Green + other.Green,
+            HasX || other.HasX,
+            hybrid,
+            phyrexian,
+            Colorless + other.Colorless);
+    }
+
     /// <summary>Construct a new ManaCost with a different generic component
     /// (other components preserved). Used by cost-reduction effects. Generic
     /// reduction never eats {C} colorless pips (they remain part of Generic as a

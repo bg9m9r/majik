@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Services;
 
@@ -48,14 +49,18 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Call face</b> — create four 1/1 white Bird tokens with flying
 ///   (CR 111 / CR 702.9), delegated to <see cref="CallFactory.BuildResolveEffect"/>.
 ///
-/// ## Deferred (v1 gap — shared with Wear // Tear / Push // Pull)
-/// - <b>Fuse</b> (CR 702.102): the engine has no general split-cast / fuse
-///   surface yet, so the combined object exposes the front (Beck) cost and each
-///   half is castable independently via its own <c>[CardName]</c> factory
-///   (<see cref="BeckFactory"/> / <see cref="CallFactory"/>). The classic
-///   fuse line (Call's four Birds each drawing a card off the Beck trigger)
-///   is exercisable by resolving Beck then Call against the same
-///   <see cref="TriggerManager"/> + <see cref="ZoneService"/>.
+/// ## Fuse (CR 702.102) — IMPLEMENTED
+/// - <b>Fuse</b>: the split card cast surface (<see cref="SplitCardCast"/> +
+///   <see cref="Majik.Core.Costs.FuseAlternativeCost"/>) composes both halves
+///   into one fused <see cref="SpellDefinition"/>
+///   (<see cref="BuildFusedDefinition"/>) paid at the combined cost
+///   {4}{G}{W}{U}{U} (CR 702.102b, <see cref="FuseCost"/>). On resolution the
+///   spell registers Beck's creature-ETB delayed trigger THEN creates Call's
+///   four Birds (CR 702.102e) — so each of the four Birds entering off Call
+///   sees the live Beck trigger and may draw a card (the classic fuse line).
+///   Each half is still independently castable via its own <c>[CardName]</c>
+///   factory (<see cref="BeckFactory"/> / <see cref="CallFactory"/>); the
+///   single-half combined object continues to carry the front (Beck) cost.
 /// </summary>
 [CardName("Beck // Call")]
 public static class BeckCallFactory
@@ -105,4 +110,44 @@ public static class BeckCallFactory
         Player caster,
         ZoneService? zoneService = null)
         => CallFactory.BuildResolveEffect(caster, zoneService);
+
+    /// <summary>
+    /// CR 702.102 — Fuse. Build the FUSED <see cref="SpellDefinition"/> casting
+    /// BOTH halves as one split spell: register Beck's turn-scoped "whenever a
+    /// creature enters this turn, you may draw a card" repeating delayed trigger
+    /// (CR 603.7e) AND create four 1/1 white Bird tokens with flying (Call), in
+    /// printed order (CR 702.102e). This is the CLASSIC fuse line — because
+    /// Beck's trigger is registered BEFORE Call's Birds enter, each of the four
+    /// Birds entering off Call sees the live Beck trigger and may draw a card.
+    /// Both halves are untargeted, so the fused definition carries no target
+    /// requests. Pair with <see cref="FuseCost"/> for the combined cost
+    /// (CR 702.102b).
+    /// </summary>
+    /// <param name="caster">Spell controller — trigger owner + token
+    /// controller.</param>
+    /// <param name="triggers">Optional TriggerManager for Beck's delayed
+    /// trigger.</param>
+    /// <param name="zoneService">Optional ZoneService so each Bird publishes its
+    /// ETB (so Beck's trigger sees them enter).</param>
+    /// <param name="mayDraw">Optional "you may draw" gate for Beck's trigger.</param>
+    public static SpellDefinition BuildFusedDefinition(
+        Player caster,
+        TriggerManager? triggers = null,
+        ZoneService? zoneService = null,
+        Func<bool>? mayDraw = null)
+    {
+        ArgumentNullException.ThrowIfNull(caster);
+        var beck = SpellDefinition.Vanilla(
+            _ => BuildBeckResolveEffect(caster, triggers, mayDraw));
+        var call = SpellDefinition.Vanilla(
+            _ => BuildCallResolveEffect(caster, zoneService));
+        return SplitCardCast.BuildFusedDefinition(
+            beck, call,
+            $"{BeckFactory.CardName} — creature-ETB draw trigger",
+            $"{CallFactory.CardName} — four 1/1 flying Birds");
+    }
+
+    /// <summary>CR 702.102b — the combined Fuse mana cost {4}{G}{W}{U}{U}.</summary>
+    public static Majik.Core.ValueObjects.ManaCost FuseCost() =>
+        SplitCardCast.FuseCost(BeckManaCost, CallManaCost);
 }

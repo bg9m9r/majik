@@ -49,13 +49,18 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TearFactory.BuildDefinition"/> (CR 701.7 Destroy; CR 608.2b
 ///   illegal-target re-check).
 ///
-/// ## Deferred (v1 gaps — shared with Fire // Ice / Boom // Bust)
-/// - <b>Fuse</b> (CR 702.102) — casting BOTH halves from hand as one split
-///   spell. The engine has no split-cast / fuse cast surface yet, so the Fuse
-///   keyword is informational only; the combined object exposes the front
-///   (Wear) cost and each half is castable independently via its own
-///   <c>[CardName]</c> factory (<see cref="WearFactory"/> /
-///   <see cref="TearFactory"/>).
+/// ## Fuse (CR 702.102) — IMPLEMENTED
+/// - <b>Fuse</b> — casting BOTH halves from hand as one split spell. The split
+///   card cast surface (<see cref="SplitCardCast"/> + the combined-cost gate
+///   <see cref="Majik.Core.Costs.FuseAlternativeCost"/>) composes the two halves
+///   into one fused <see cref="SpellDefinition"/> (<see cref="BuildFusedDefinition"/>):
+///   targets for both halves are collected through one cast pass (CR 702.102c),
+///   the combined cost {1}{R}{W} is paid (CR 702.102b, <see cref="FuseCost"/>),
+///   and on resolution the spell destroys target artifact (Wear) AND target
+///   enchantment (Tear) in printed order (CR 702.102e). Each half is still
+///   independently castable via its own <c>[CardName]</c> factory
+///   (<see cref="WearFactory"/> / <see cref="TearFactory"/>); the single-half
+///   combined object continues to carry the front (Wear) cost.
 /// </summary>
 [CardName("Wear // Tear")]
 public static class WearTearFactory
@@ -110,4 +115,28 @@ public static class WearTearFactory
         ArgumentNullException.ThrowIfNull(resolver);
         return TearFactory.BuildDefinition(resolver);
     }
+
+    /// <summary>
+    /// CR 702.102 — Fuse. Build the FUSED <see cref="SpellDefinition"/> casting
+    /// BOTH halves as one split spell: destroy target artifact (Wear) AND
+    /// destroy target enchantment (Tear), in printed order (CR 702.102e), with
+    /// targets for both halves collected through one cast pass (CR 702.102c).
+    /// Pair with <see cref="FuseCost"/> for the combined mana cost
+    /// (CR 702.102b).
+    /// </summary>
+    /// <param name="resolver">Resolves each chosen target token to the live
+    /// game object (shared by both halves).</param>
+    public static SpellDefinition BuildFusedDefinition(Func<object, object> resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        return SplitCardCast.BuildFusedDefinition(
+            BuildWearDefinition(resolver),
+            BuildTearDefinition(resolver),
+            $"{WearFactory.CardName} — destroy target artifact",
+            $"{TearFactory.CardName} — destroy target enchantment");
+    }
+
+    /// <summary>CR 702.102b — the combined Fuse mana cost {1}{R}{W}.</summary>
+    public static Majik.Core.ValueObjects.ManaCost FuseCost() =>
+        SplitCardCast.FuseCost(WearManaCost, TearManaCost);
 }
