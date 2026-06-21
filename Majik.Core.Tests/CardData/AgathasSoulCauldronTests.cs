@@ -671,6 +671,68 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_ImprintedWakerOfWaves_DoesNotGrantHandZoneDiscardSelfAbility()
+    {
+        // CR 702.49 / CR 112.6 soundness boundary. Waker of Waves's only
+        // activated ability is "{1}{U}, Discard this card: Look at the top two
+        // cards of your library …" — a HAND-ZONE-ONLY ability (cost = discard
+        // the card from hand, CR 702.74a). It can NEVER function from a
+        // battlefield bearer: the imprinted card is in EXILE, not the
+        // bearer-controller's hand, so the DiscardSelfCost is unpayable and a
+        // re-homed copy pointed at the bearer is nonsensical. Agatha's grant must
+        // therefore emit NOTHING for it — explicitly, not by the accident that
+        // the Waker factory leaves the ability RebindSafe=false.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL Waker of Waves in Alice's graveyard (so the Cauldron can exile +
+        // imprint it). Built via its named factory so it carries the actual
+        // "{1}{U}, Discard this card:" ActivatedAbility with a DiscardSelfCost.
+        var waker = WakerOfWavesFactory.Create(alice);
+        alice.Zones.Graveyard.AddCard(waker);
+        waker.SetZone(ZoneType.Graveyard);
+
+        // A creature you control WITH a +1/+1 counter — a grant bearer.
+        var bearer = new Creature("Counter Bear", "1G", 2, 2);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.Counters.Add(CounterType.PlusOnePlusOne, 1);
+        bearer.ClearSummoningSickness();
+        alice.Zones.Library.AddCard(bearer);
+        zones.MoveCard(bearer, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Waker of Waves",
+                "Creatures your opponents control get -1/-0.\n"
+                + "{1}{U}, Discard this card: Look at the top two cards of your "
+                + "library. Put one of them into your hand and the other into "
+                + "your graveyard.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        // Exile + imprint the Waker.
+        Resolve(TapAbility(cauldron), waker);
+        cauldron.ImprintedCards.Should().Contain(waker,
+            "Waker is a creature card, so it is imprinted (CR 702.49)");
+
+        // The bearer gains NOTHING that carries a DiscardSelfCost — the
+        // hand-zone-only ability is not (and cannot be) re-homed.
+        bearer.Abilities.OfType<ActivatedAbility>()
+            .SelectMany(a => a.Costs.OfType<DiscardSelfCost>())
+            .Should().BeEmpty(
+                "a hand-zone-only 'Discard this card' ability is never granted to a "
+                + "battlefield bearer (CR 702.49 / CR 112.6)");
+
+        // And specifically nothing re-homed pointing at either the bearer or the
+        // exiled Waker.
+        bearer.Abilities.OfType<ActivatedAbility>()
+            .Should().NotContain(a => a.Costs.OfType<DiscardSelfCost>().Any(),
+                "Agatha emits nothing for the imprinted creature's hand-zone activation");
+    }
+
+    [Fact]
     public void Grant_AppliesToCreatureYouControlButOpponentOwns()
     {
         var alice = new Player("Alice", 20);
