@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Costs;
@@ -34,7 +35,7 @@ namespace Majik.Core.Costs;
 /// <see cref="Targets"/> is set, every nominated card must be in the
 /// caster's hand or the cost is illegal (CR 117.1).
 /// </summary>
-public sealed class DiscardXCardsAdditionalCost : IAdditionalCost
+public sealed class DiscardXCardsAdditionalCost : IChooseAdditionalCostPayment
 {
     /// <summary>
     /// Optional pre-supplied set of cards to discard. When null, all cards
@@ -99,5 +100,41 @@ public sealed class DiscardXCardsAdditionalCost : IAdditionalCost
 
         Discarded = discarded;
         return true;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// CR 601.2h — prompt the caster for the multiset of cards to discard
+    /// (choosing X by the count), AFTER target choice (CR 601.2c). An optional
+    /// <see cref="ChoiceKind.PickN"/> over the caster's hand: X may legally be
+    /// zero (CR 117.1), so the minimum is 0. Returns null when the hand is
+    /// empty (nothing to discard — X is forced to 0) OR when
+    /// <see cref="Targets"/> is already pre-set by a caller (bot probe / test),
+    /// so the pre-supplied selection wins and no double-prompt occurs.
+    /// </remarks>
+    public ChoiceRequest? BuildChoiceRequest(Player caster)
+    {
+        if (caster == null) return null;
+        if (Targets != null) return null;
+        var hand = caster.Zones.Hand.GetCards().ToList();
+        if (hand.Count == 0) return null;
+
+        return new ChoiceRequest(
+            Kind: ChoiceKind.PickN,
+            Description: $"Choose cards to discard ({Description})",
+            Min: 0,
+            Max: hand.Count,
+            Candidates: hand.Cast<object>().ToList(),
+            Intent: BotIntent.None,
+            Optional: true);
+    }
+
+    /// <inheritdoc/>
+    public void ApplyChoice(IReadOnlyList<object> chosen)
+    {
+        // CR 117.1 — an empty pick means X = 0 (discard nothing). Record the
+        // empty set explicitly so Pay discards exactly the chosen multiset
+        // rather than falling back to the whole-hand v1 default.
+        Targets = chosen?.OfType<ICard>().ToList() ?? new List<ICard>();
     }
 }

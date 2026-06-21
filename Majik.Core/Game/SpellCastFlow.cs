@@ -333,6 +333,20 @@ public sealed class SpellCastFlow
         // caller (TurnDriver) already prompted, otherwise prompt the agent.
         var mana = preChosenMana ?? await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
 
+        // CR 601.2h — prompt the caster for the payment of any chooser-bearing
+        // additional cost (a typed sacrifice — "sacrifice an artifact or
+        // creature"; a variable discard — "discard X cards") at THIS point,
+        // AFTER target collection (CR 601.2c) and immediately before the
+        // PayAdditionalCosts loop below. Firing the prompt here — not at the
+        // early CanPay pre-check (BuildAndPrecheckAdditionalCosts, CR 601.2f) —
+        // means a targeting failure (which throws inside CollectTargetsAsync
+        // above) rewinds the cast (CR 731.1) without ever asking "which
+        // permanent / cards do you use?". The pick is stamped onto each cost so
+        // the synchronous PayAdditionalCosts consumes exactly the chosen
+        // object(s) instead of the legacy first-eligible / whole-hand auto-pick.
+        await AdditionalCostChooserPrompt.PromptForChoicesAsync(
+            mergedAdditional, caster, agent, ctx, ct).ConfigureAwait(false);
+
         // CR 601.2h — pay the non-mana additional costs (discard / sacrifice /
         // exile / pay-life riders, plus any escalate instances) NOW, after
         // target collection (CR 601.2c) and total-cost determination
