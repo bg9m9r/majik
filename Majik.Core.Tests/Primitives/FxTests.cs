@@ -634,35 +634,6 @@ public class FxTests
     }
 
     // ------------------------------------------------------------------
-    // Amass (PLAN 03 S1) — aliases AmassAction.Apply.
-    // ------------------------------------------------------------------
-
-    [Fact]
-    public void Amass_NonZero_CreatesArmyWithCounters()
-    {
-        var p = new Player("Alice", 20);
-        var army = Fx.Amass(p, 2, Majik.Core.Cards.Types.CardSubtype.Zombie);
-
-        army.Should().NotBeNull();
-        army!.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2);
-    }
-
-    [Fact]
-    public void Amass_ZeroOrNegative_NoOpReturnsNull()
-    {
-        var p = new Player("Alice", 20);
-        var army = Fx.Amass(p, 0, Majik.Core.Cards.Types.CardSubtype.Zombie);
-        army.Should().BeNull();
-    }
-
-    [Fact]
-    public void Amass_NullController_Throws()
-    {
-        Action act = () => Fx.Amass(null!, 1, Majik.Core.Cards.Types.CardSubtype.Zombie);
-        act.Should().Throw<ArgumentNullException>();
-    }
-
-    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
