@@ -132,14 +132,22 @@ public static class MoggWarMarshalFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 702.49 — Echo {1}{R}. Description-only marker (no upkeep
-        // sac-unless-pay loop yet; no echo primitive). Same posture as
-        // Cumulative Upkeep / Vanishing markers before their enforcement
-        // layers shipped.
+        // CR 702.49 — Echo {1}{R}. Description-only marker kept for keyword
+        // observability (parameterised-keyword surface).
         card.AddAbility(new KeywordAbility(
             keyword: "Echo",
             source: card,
             controller: owner));
+
+        // CR 702.49a — the live Echo triggered ability: "At the beginning of
+        // your upkeep, if this came under your control since the beginning of
+        // your last upkeep, sacrifice it unless you pay {1}{R}." Built via the
+        // shared Echo primitive (one-shot upkeep pay-or-sacrifice). Registers
+        // with the TriggerManager when supplied so it actually fires.
+        var echoTrigger = Majik.Core.Keywords.EchoFactory.Build(
+            card, Majik.Core.ValueObjects.ManaCost.Parse(EchoCost));
+        card.AddAbility(echoTrigger);
+        triggers?.RegisterTriggeredAbility(echoTrigger);
 
         // ----------------------------------------------------------------
         // Shared "create a 1/1 red Goblin creature token" effect. Used by
