@@ -260,10 +260,15 @@ public static class KnightOfTheReliquaryFactory
             // (Stage 1). So Agatha's Soul Cauldron may re-home the REAL ability to
             // a counter-bearing bearer via ActivatedAbility.RebindTo (CR 707.2 /
             // 613.1f): the bearer's controller picks which Forest/Plains to
-            // sacrifice and which library to search. A "Sacrifice a Forest or
-            // Plains: search for any land" ability is outside
-            // OracleActivatedAbilityBinder's reconstructable set, so RebindTo of
-            // the real ability is the only sound re-home.
+            // sacrifice and which library to search. As of the
+            // knight-of-the-reliquary-typed-sac-tutor-grammar close,
+            // OracleActivatedAbilityBinder DOES reconstruct this exact line (the
+            // typed-sacrifice cost grammar + the land-search-to-battlefield
+            // effect shape), so a re-home of the oracle-rebuilt ability would
+            // also be sound; this bespoke factory keeps RebindTo of the REAL
+            // ability as the prod re-home (preserving its routed-cost +
+            // self-pump wiring) — the binder reconstruction is the fallback for
+            // oracle-text-only cards that share the shape.
             rebindSafe: true);
 
         card.AddAbility(tutorAbility);
