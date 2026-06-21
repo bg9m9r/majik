@@ -19,10 +19,16 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Whenever an opponent sacrifices an artifact, this creature deals 2
 ///    damage to them."
 ///
-/// Covers identity and the opponent-sacrifices-an-artifact trigger over
-/// <see cref="PermanentSacrificedEvent"/>: it fires only when an OPPONENT
-/// sacrifices an ARTIFACT (not the controller's own sacrifice, not a
-/// non-artifact), and on resolution deals 2 damage to that opponent.
+/// Vengeful Tracker is shipped as a DECLARATIVE card
+/// (<c>CardData/Cards/vengeful-tracker.json</c>) — the first SHIPPED card to
+/// consume the opponent-scoped <c>whenever_an_opponent_sacrifices_permanent</c>
+/// trigger over <see cref="PermanentSacrificedEvent"/> paired with the untargeted
+/// <c>deal_damage_to_triggering_player</c> payoff. These tests cover identity,
+/// <see cref="NamedCardFactory"/> dispatch (the generated JSON-factory arm), and
+/// the opponent-sacrifices-an-artifact trigger predicate: it fires only when an
+/// OPPONENT sacrifices an ARTIFACT (not the controller's own sacrifice, not a
+/// non-artifact), including a token artifact, and on resolution deals 2 damage to
+/// that opponent.
 /// </summary>
 public class VengefulTrackerFactoryTests
 {
@@ -43,6 +49,8 @@ public class VengefulTrackerFactoryTests
         c.BaseToughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
+
+        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
 
     [Fact]
@@ -89,7 +97,7 @@ public class VengefulTrackerFactoryTests
         var e = new PermanentSacrificedEvent(artifact, _alice, wasToken: false);
 
         SacTrigger(vt).IsTriggered(e).Should().BeFalse(
-            "Vengeful Tracker only triggers on an OPPONENT's sacrifice");
+            "Vengeful Tracker only triggers on an OPPONENT's sacrifice (CR 102.2)");
     }
 
     [Fact]
@@ -106,29 +114,7 @@ public class VengefulTrackerFactoryTests
         var e = new PermanentSacrificedEvent(creature, _bob, wasToken: false);
 
         SacTrigger(vt).IsTriggered(e).Should().BeFalse(
-            "the sacrificed permanent must be an artifact");
-    }
-
-    [Fact]
-    public void Trigger_OnResolution_Deals2DamageToTheSacrificingOpponent()
-    {
-        var vt = VengefulTrackerFactory.Create(_alice);
-        _alice.Zones.Battlefield.AddCard(vt);
-        vt.SetZone(ZoneType.Battlefield);
-
-        var artifact = new Artifact("Bottle Cap", "{1}");
-        artifact.SetOwner(_bob);
-        artifact.SetController(_bob);
-
-        var e = new PermanentSacrificedEvent(artifact, _bob, wasToken: false);
-        var trigger = SacTrigger(vt);
-        trigger.IsTriggered(e).Should().BeTrue();
-
-        foreach (var eff in trigger.Effects) eff.Execute();
-
-        _bob.LifeTotal.Should().Be(18,
-            "Vengeful Tracker deals 2 damage to the opponent who sacrificed the artifact");
-        _alice.LifeTotal.Should().Be(20, "only the sacrificing opponent takes damage");
+            "the sacrificed permanent must be an artifact (CR 205.2)");
     }
 
     [Fact]
@@ -148,6 +134,54 @@ public class VengefulTrackerFactoryTests
 
         SacTrigger(vt).IsTriggered(e).Should().BeTrue(
             "Vengeful Tracker has no nontoken restriction — a Treasure token counts");
+    }
+
+    [Fact]
+    public void Trigger_StampsSacrificingOpponentAsThem()
+    {
+        // CR 603.3 — the trigger records the sacrificing opponent ("them") on the
+        // ability as it matches, for the untargeted payoff to read at resolution.
+        var vt = VengefulTrackerFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(vt);
+        vt.SetZone(ZoneType.Battlefield);
+
+        var artifact = new Artifact("Bottle Cap", "{1}");
+        artifact.SetOwner(_bob);
+        artifact.SetController(_bob);
+
+        var trigger = SacTrigger(vt);
+        trigger.IsTriggered(new PermanentSacrificedEvent(artifact, _bob, wasToken: false))
+            .Should().BeTrue();
+
+        trigger.TriggeringPlayer.Should().BeSameAs(_bob,
+            "the trigger stamps the sacrificing opponent as 'them' (CR 603.3)");
+    }
+
+    [Fact]
+    public void Trigger_OnResolution_Deals2DamageToTheSacrificingOpponent()
+    {
+        // The "deals 2 damage to them" payoff is untargeted (reads the stamped
+        // triggering player) so resolution must go through the stack, not a raw
+        // Effect.Execute().
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+
+        var vt = VengefulTrackerFactory.Create(_alice, triggers);
+        _alice.Zones.Battlefield.AddCard(vt);
+        vt.SetZone(ZoneType.Battlefield);
+
+        var artifact = new Artifact("Bottle Cap", "{1}");
+        artifact.SetOwner(_bob);
+        artifact.SetController(_bob);
+
+        bus.Publish(new PermanentSacrificedEvent(artifact, _bob, wasToken: false));
+        triggers.PutPendingTriggersOnStack(_alice);
+        while (stack.Pop() is { } top) top.Resolve();
+
+        _bob.LifeTotal.Should().Be(18,
+            "Vengeful Tracker deals 2 damage to the opponent who sacrificed the artifact (CR 603.3 'them')");
+        _alice.LifeTotal.Should().Be(20, "only the sacrificing opponent takes damage");
     }
 
     [Fact]
