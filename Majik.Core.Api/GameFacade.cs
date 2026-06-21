@@ -733,8 +733,7 @@ public sealed class GameFacade : IDisposable
     /// Without it, TurnDriver.DispatchCast hits the "no SpellDef for
     /// instant/sorcery" branch and rotates the card back into hand — the
     /// card is never actually cast. The resolver mirrors what
-    /// TriggerPlayground wires for its bot vs bot face-off (and what
-    /// MatchService implicitly relied on via the card repo) so every
+    /// MatchService implicitly relied on via the card repo so every
     /// instant/sorcery whose oracle text matches an OracleSpellBinder
     /// template gets a runnable SpellDefinition. Returns null when no card
     /// repo was supplied at <see cref="Create"/> time — tests that build

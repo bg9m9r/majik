@@ -13,7 +13,7 @@ Solution: `Majik.sln`. Top-level projects:
 - `Majik.Core.SourceGen/` — Roslyn source generator that emits the `[CardName]` -> factory dispatch table consumed by `Majik.Core`.
 - `Majik.Server/` — ASP.NET Core host. REST + SignalR `/hubs/match` + OpenAPI.
 - `Majik.Bot/` — game-playing bot (EV search, decision policies).
-- `Majik.Console/` — diagnostic CLI. Three subcommands: `play-triggers` (triggered-ability playground), `export-modern-cards` (regenerates the embedded card seed), and `tune-bot-weights` (offline self-play optimizer for `ArchetypeWeights`). Not a gameplay UI.
+- `Majik.Console/` — diagnostic CLI. Subcommands: `export-modern-cards` (regenerates the embedded card seed) and `tune-bot-weights` (offline self-play optimizer for `ArchetypeWeights`). Not a gameplay UI.
 - `Majik.*.Tests/` — xUnit + FluentAssertions + Moq. 20,000+ tests across the engine, API, server, and bot suites. `Majik.Bot.Tests.Integration` exists for bot-vs-bot smoke but is mostly skipped — treat it as supplementary.
 
 ## Common commands
@@ -25,7 +25,6 @@ dotnet test  Majik.Core.Tests/Majik.Core.Tests.csproj
 dotnet test  --filter "FullyQualifiedName~StateBasedActionsTests.LegendRule"
 dotnet test  --filter "FullyQualifiedName=Majik.Core.Tests.Rules.LegendRuleTests.LegendRule_AppliesOnlyToCreaturesAndPlaneswalkers"
 
-dotnet run --project Majik.Console -- play-triggers [etb|apnap|intervening-if|delayed|all]
 dotnet run --project Majik.Console -- export-modern-cards <path-to-scryfall-all-cards.json>
 ```
 
