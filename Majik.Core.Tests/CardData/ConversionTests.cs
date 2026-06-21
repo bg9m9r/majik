@@ -8,6 +8,7 @@ using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -84,5 +85,80 @@ public class ConversionTests
         abilities[0].ManaGenerated.White.Should().Be(1);
         abilities[0].ManaGenerated.Red.Should().Be(0);
         abilities[0].ManaGenerated.Green.Should().Be(0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Upkeep "sacrifice unless you pay {W}{W}" (CR 603.1 / CR 117.1)
+    // -----------------------------------------------------------------------
+
+    private static TriggeredAbility GetUpkeepTrigger(Enchantment c) =>
+        c.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<StepStartedEvent>);
+
+    [Fact]
+    public void Conversion_HasUpkeepTrigger_FiringOnControllersUpkeep()
+    {
+        var conv = ConversionFactory.Create(_alice);
+        conv.SetZone(ZoneType.Battlefield);
+
+        var upkeep = GetUpkeepTrigger(conv);
+        upkeep.IsTriggered(new StepStartedEvent(StepStateType.Upkeep, _alice))
+            .Should().BeTrue("Conversion taxes at its controller's upkeep (CR 603.1).");
+    }
+
+    [Fact]
+    public void Conversion_Upkeep_Sacrifices_WhenControllerCannotPay()
+    {
+        var conv = ConversionFactory.Create(_alice);
+        conv.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(conv);
+
+        // Empty pool — Alice cannot pay {W}{W}; Conversion is sacrificed.
+        var upkeep = GetUpkeepTrigger(conv);
+        foreach (var e in upkeep.Effects) e.Execute();
+
+        conv.Zone.Should().Be(ZoneType.Graveyard,
+            "unpaid {W}{W} sacrifices Conversion (Battlefield -> Graveyard).");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(conv);
+    }
+
+    [Fact]
+    public void Conversion_Upkeep_Keeps_WhenControllerPaysWW()
+    {
+        var conv = ConversionFactory.Create(_alice);
+        conv.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(conv);
+
+        _alice.AddManaToPool(ManaCost.Parse("{W}{W}"));
+
+        var upkeep = GetUpkeepTrigger(conv);
+        foreach (var e in upkeep.Effects) e.Execute();
+
+        conv.Zone.Should().Be(ZoneType.Battlefield,
+            "paying {W}{W} keeps Conversion on the battlefield.");
+    }
+
+    [Fact]
+    public void Conversion_Upkeep_IsRecurring_FiresEveryUpkeep()
+    {
+        var conv = ConversionFactory.Create(_alice);
+        conv.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(conv);
+
+        var upkeep = GetUpkeepTrigger(conv);
+
+        // Unlike Echo's one-shot gate, Conversion's tax recurs: pay one turn,
+        // it must still fire (and be payable) the next.
+        _alice.AddManaToPool(ManaCost.Parse("{W}{W}"));
+        foreach (var e in upkeep.Effects) e.Execute();
+        conv.Zone.Should().Be(ZoneType.Battlefield);
+
+        upkeep.CanBePutOnStack().Should().BeTrue(
+            "Conversion's upkeep tax is recurring (no one-shot lift, unlike Echo).");
+
+        _alice.AddManaToPool(ManaCost.Parse("{W}{W}"));
+        foreach (var e in upkeep.Effects) e.Execute();
+        conv.Zone.Should().Be(ZoneType.Battlefield,
+            "paying again the next upkeep keeps it.");
     }
 }

@@ -40,11 +40,20 @@ public class MoggWarMarshalTests
     private static TriggeredAbility GetEtbTrigger(Creature c) =>
         c.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.ActiveZones.Count == 1
-                && t.ActiveZones.Contains(ZoneType.Battlefield));
+                && t.ActiveZones.Contains(ZoneType.Battlefield)
+                // The ETB trigger fires on CardMovedEvent (the echo trigger,
+                // which is the other single-Battlefield-zone trigger, fires on
+                // StepStartedEvent).
+                && t.Condition is EventTriggerCondition<CardMovedEvent>);
 
     private static TriggeredAbility GetDiesTrigger(Creature c) =>
         c.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.ActiveZones.Contains(ZoneType.Graveyard));
+
+    private static TriggeredAbility GetEchoTrigger(Creature c) =>
+        c.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is
+                EventTriggerCondition<Majik.Core.Events.StepStartedEvent>);
 
     // -----------------------------------------------------------------------
     // Identity + dispatch
@@ -92,8 +101,88 @@ public class MoggWarMarshalTests
             .FirstOrDefault(k => string.Equals(k.Keyword, "Echo",
                 System.StringComparison.OrdinalIgnoreCase));
         echoMarker.Should().NotBeNull(
-            "Echo {1}{R} is wired as a description-only KeywordAbility marker " +
-            "(CR 702.49 — upkeep sac-unless-pay loop is deferred).");
+            "Echo {1}{R} surfaces a description-only KeywordAbility marker " +
+            "(CR 702.49) alongside the live upkeep trigger.");
+    }
+
+    // -----------------------------------------------------------------------
+    // Echo live behaviour (CR 702.49a) — first-upkeep sacrifice-unless-pay
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void MoggWarMarshal_EchoTrigger_FiresOnControllersUpkeep()
+    {
+        var mwm = MoggWarMarshalFactory.Create(_alice);
+        mwm.SetZone(ZoneType.Battlefield);
+
+        var echo = GetEchoTrigger(mwm);
+        var aliceUpkeep = new Majik.Core.Events.StepStartedEvent(
+            Majik.Core.StateMachine.StepStateType.Upkeep, _alice);
+        echo.IsTriggered(aliceUpkeep).Should().BeTrue(
+            "Echo fires at the controller's upkeep (CR 702.49a).");
+
+        var bobUpkeep = new Majik.Core.Events.StepStartedEvent(
+            Majik.Core.StateMachine.StepStateType.Upkeep, _bob);
+        echo.IsTriggered(bobUpkeep).Should().BeFalse(
+            "Echo is 'your upkeep' only — an opponent's upkeep does not fire it.");
+    }
+
+    [Fact]
+    public void MoggWarMarshal_Echo_SacrificesSelf_WhenControllerCannotPay()
+    {
+        var mwm = MoggWarMarshalFactory.Create(_alice);
+        mwm.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mwm);
+
+        // Alice's pool is empty — she cannot pay the {1}{R} echo cost.
+        var echo = GetEchoTrigger(mwm);
+        foreach (var e in echo.Effects) e.Execute();
+
+        mwm.Zone.Should().Be(ZoneType.Graveyard,
+            "unpaid echo sacrifices the permanent (Battlefield -> Graveyard, CR 702.49a).");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(mwm);
+    }
+
+    [Fact]
+    public void MoggWarMarshal_Echo_KeepsSelf_WhenControllerPaysEchoCost()
+    {
+        var mwm = MoggWarMarshalFactory.Create(_alice);
+        mwm.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mwm);
+
+        // Give Alice {1}{R} so the legacy "pay if able" path keeps it.
+        _alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("{1}{R}"));
+
+        var echo = GetEchoTrigger(mwm);
+        foreach (var e in echo.Effects) e.Execute();
+
+        mwm.Zone.Should().Be(ZoneType.Battlefield,
+            "paying the echo cost keeps the permanent on the battlefield.");
+    }
+
+    [Fact]
+    public void MoggWarMarshal_Echo_FiresOnlyOnce_LiftsAfterFirstUpkeep()
+    {
+        var mwm = MoggWarMarshalFactory.Create(_alice);
+        mwm.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mwm);
+        _alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("{1}{R}"));
+
+        var echo = GetEchoTrigger(mwm);
+
+        // Before resolution the intervening-if (CR 603.4 / CR 702.49a) admits it.
+        echo.CanBePutOnStack().Should().BeTrue(
+            "the first qualifying upkeep arms Echo.");
+
+        // First upkeep: pay the echo cost — echo resolves once.
+        foreach (var e in echo.Effects) e.Execute();
+        mwm.Zone.Should().Be(ZoneType.Battlefield);
+
+        // Subsequent upkeeps: Echo no longer fires (it 'came under control
+        // since the last upkeep' is now false — the one-shot flag is cleared).
+        echo.CanBePutOnStack().Should().BeFalse(
+            "Echo fires only on the FIRST upkeep after entering (CR 702.49a); " +
+            "after it resolves once the intervening-if suppresses it forever.");
     }
 
     // -----------------------------------------------------------------------
@@ -101,13 +190,14 @@ public class MoggWarMarshalTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void MoggWarMarshal_HasTwoTriggers_OneEtb_OneDies()
+    public void MoggWarMarshal_HasThreeTriggers_OneEtb_OneDies_OneEcho()
     {
         var mwm = MoggWarMarshalFactory.Create(_alice);
 
         var triggers = mwm.Abilities.OfType<TriggeredAbility>().ToList();
-        triggers.Should().HaveCount(2,
-            "one ETB trigger + one dies trigger sharing the same token-creation body.");
+        triggers.Should().HaveCount(3,
+            "one ETB trigger + one dies trigger (shared token body) + one Echo " +
+            "upkeep trigger (CR 702.49a).");
 
         // ETB trigger: ActiveZones = {Battlefield} only.
         var etb = GetEtbTrigger(mwm);
