@@ -233,4 +233,72 @@ public class ScavengingOozeTests
         alice.LifeTotal.Should().Be(21, "Alice (the controller) gains the life, not Bob");
         bob.LifeTotal.Should().Be(20);
     }
+
+    // -----------------------------------------------------------------------
+    // Re-source (Agatha's Soul Cauldron grant) — RebindSafe + RebindTo.
+    //
+    // Deferral pay-down: agatha-scavenging-ooze-source-migration-rebindsafe.
+    // The bespoke exile-pump-lifegain ability reads its subject ("Scavenging
+    // Ooze" = the source) off ResolutionContext.Source and "you" off
+    // ctx.Controller, and is marked RebindSafe. So when Agatha's Soul Cauldron
+    // re-homes the imprinted Ooze's ability onto a counter-bearing bearer
+    // (ActivatedAbility.RebindTo — CR 707.2 / 613.1f), resolving the rebound
+    // copy must put the +1/+1 counter on the BEARER and gain the BEARER's
+    // controller the life — never re-reading the exiled original Ooze.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void ScavengingOoze_ActivatedAbility_IsMarkedRebindSafe()
+    {
+        var ooze = ScavengingOozeFactory.Create(_alice);
+        var ability = ooze.Abilities.OfType<ActivatedAbility>().Single();
+
+        ability.RebindSafe.Should().BeTrue(
+            "the exile-pump-lifegain ability reads its subject off "
+            + "ResolutionContext.Source and 'you' off ctx.Controller, so it is "
+            + "sound for Agatha's Soul Cauldron to re-home via RebindTo");
+    }
+
+    [Fact]
+    public void ScavengingOoze_RebindToBearer_PumpsBearer_AndBearerControllerGainsLife()
+    {
+        var alice = new Player("Alice", 20);
+
+        // The original Ooze is exiled (imprinted under Agatha's Soul Cauldron);
+        // it is NOT on the battlefield.
+        var ooze = ScavengingOozeFactory.Create(alice);
+        ooze.SetZone(ZoneType.Exile);
+
+        // A creature card sits in Alice's graveyard to scavenge.
+        var deadBear = new Creature("Dead Bear", "1G", 2, 2);
+        deadBear.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(deadBear);
+        deadBear.SetZone(ZoneType.Graveyard);
+
+        // The counter-bearing bearer that gains the imprinted ability.
+        var bearer = new Creature("Bearer", "1G", 3, 3);
+        bearer.SetOwner(alice);
+        bearer.ChangeController(alice);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        // Agatha re-homes the imprinted Ooze's ability onto the bearer.
+        var rebound = ooze.Abilities.OfType<ActivatedAbility>().Single()
+            .RebindTo(bearer, alice);
+        rebound.RebindSafe.Should().BeTrue("RebindTo preserves the provenance flag");
+
+        // Resolve through the live game path so ResolutionContext.Source = bearer.
+        ContextResolve.Resolve(rebound, alice, alice);
+
+        alice.Zones.Exile.GetCards().Should().Contain(deadBear,
+            "the re-homed ability still exiles a creature card from the graveyard");
+        deadBear.Zone.Should().Be(ZoneType.Exile);
+
+        bearer.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "the re-homed +1/+1 counter goes on the BEARER (ResolutionContext.Source)");
+        ooze.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0,
+            "the exiled original Ooze is never touched by the re-homed ability");
+
+        alice.LifeTotal.Should().Be(21,
+            "the bearer's controller gains the life (ctx.Controller)");
+    }
 }
