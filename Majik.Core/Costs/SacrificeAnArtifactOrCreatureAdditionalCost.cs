@@ -2,6 +2,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Costs;
@@ -39,9 +40,17 @@ namespace Majik.Core.Costs;
 ///   exclude any specific permanent; first eligible wins. Deadly Dispute is an
 ///   Instant, not a permanent, so it can never sacrifice itself.
 /// </summary>
-public sealed class SacrificeAnArtifactOrCreatureAdditionalCost : IAdditionalCost
+public sealed class SacrificeAnArtifactOrCreatureAdditionalCost : IChooseAdditionalCostPayment
 {
     private readonly IEventBus? _eventBus;
+
+    /// <summary>
+    /// The caster's chosen permanent to sacrifice (CR 601.2f — "the caster
+    /// chooses the permanent at announcement"). Stamped by
+    /// <see cref="ApplyChoice"/> from the cast pipeline's CR 601.2h chooser
+    /// prompt; null falls back to the legacy first-eligible auto-pick.
+    /// </summary>
+    private Permanent? _chosen;
 
     /// <param name="eventBus">Optional event bus — publishes a
     /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
@@ -84,14 +93,55 @@ public sealed class SacrificeAnArtifactOrCreatureAdditionalCost : IAdditionalCos
     {
         if (caster == null) return false;
 
-        var pick = caster.Zones.Battlefield.GetCards()
-            .OfType<Permanent>()
-            .FirstOrDefault(IsArtifactOrCreature);
+        // CR 601.2f — honour the caster's CR 601.2h chooser pick when it is
+        // still a legal sacrifice; otherwise fall back to the first eligible
+        // permanent (the legacy deterministic default, used by tests / bots
+        // that don't supply a choice, and as a defensive guard if the chosen
+        // permanent left the battlefield between choice and payment).
+        var pick = _chosen != null
+            && caster.Zones.Battlefield.GetCards().Contains(_chosen)
+            && IsArtifactOrCreature(_chosen)
+                ? _chosen
+                : caster.Zones.Battlefield.GetCards()
+                    .OfType<Permanent>()
+                    .FirstOrDefault(IsArtifactOrCreature);
         if (pick == null) return false;
 
         SacrificeCostHelper.Sacrifice(caster, pick, _eventBus);
         Sacrificed = pick;
         return true;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// CR 601.2h — prompt the caster to choose which artifact-or-creature to
+    /// sacrifice, AFTER target choice (CR 601.2c). Returns null (no prompt)
+    /// when zero or one eligible permanent exists — the cost picks the forced
+    /// choice itself.
+    /// </remarks>
+    public ChoiceRequest? BuildChoiceRequest(Player caster)
+    {
+        if (caster == null) return null;
+        var eligible = caster.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(IsArtifactOrCreature)
+            .ToList();
+        if (eligible.Count <= 1) return null;
+
+        return new ChoiceRequest(
+            Kind: ChoiceKind.PickOne,
+            Description: $"Choose a permanent to sacrifice ({Description})",
+            Min: 1,
+            Max: 1,
+            Candidates: eligible.Cast<object>().ToList(),
+            Intent: BotIntent.None,
+            Optional: false);
+    }
+
+    /// <inheritdoc/>
+    public void ApplyChoice(IReadOnlyList<object> chosen)
+    {
+        _chosen = chosen?.OfType<Permanent>().FirstOrDefault();
     }
 
     private static bool IsArtifactOrCreature(Permanent p) =>
