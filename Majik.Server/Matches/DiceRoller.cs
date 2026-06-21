@@ -13,22 +13,4 @@ public sealed class DiceRoller
     }
 
     public int RollSingle() => _rng.NextInt(1, 7);
-
-    [Obsolete("Use RollSingle() and orchestrate per-player rolls in MatchService.")]
-    public MatchRoll Roll(string creatorSub, string opponentSub)
-    {
-        while (true)
-        {
-            var c = _rng.NextInt(1, 7);
-            var o = _rng.NextInt(1, 7);
-            if (c == o) continue;
-            var winner = c > o ? creatorSub : opponentSub;
-            return new MatchRoll
-            {
-                CreatorRoll = c,
-                OpponentRoll = o,
-                WinnerSub = winner,
-            };
-        }
-    }
 }

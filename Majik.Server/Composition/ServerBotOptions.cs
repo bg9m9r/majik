@@ -7,8 +7,8 @@ namespace Majik.Server.Composition;
 ///
 /// <para>
 /// <b>Default = <c>heuristic</c>:</b> dev and tests keep today's cheap
-/// deterministic brain unless the deployment opts in. (This is a cost /
-/// playtest default, NOT a rehydration constraint — see the next paragraph.)
+/// deterministic brain unless the deployment opts in (a cost / playtest
+/// default).
 /// </para>
 ///
 /// <para>
@@ -22,28 +22,6 @@ namespace Majik.Server.Composition;
 /// hidden zones are determinized — never peeked. The K-world determinized
 /// decision fits the same budget (measured 1.4–1.65 s on one core; world
 /// materialization is ~1 ms/world).
-/// </para>
-///
-/// <para>
-/// <b>Rehydration is wall-clock-safe (deferral #14, paid down):</b> a
-/// wall-clock-capped search is not deterministic across runs, but rehydration
-/// no longer RE-COMPUTES bot decisions. Every bot answer is durably recorded
-/// at the <c>IPlayerAgent</c> boundary (<c>RecordingPlayerAgent</c> →
-/// <c>EnginePersistenceCoordinator.RecordBotDecisionAsync</c>); on a replica
-/// restart the rehydrate path
-/// (<c>MatchService.TryRehydrateAndRegisterAsync</c>) loads the recorded
-/// stream whole and a <c>ScriptedPlayerAgent</c> replays every bot prompt
-/// VERBATIM (codec-decoded against the rebuilt facade's live objects), then
-/// falls through to a fresh recording wrapper at the live edge. NOTHING is
-/// recomputed, so the wall-clock-budgeted <c>mcts</c> strategy rehydrates
-/// id-identically regardless of iteration-count variance
-/// (<c>BotMatchRehydrationTests.MctsBotMatch_Rehydrates_IdenticallyToTheCrashedOriginal</c>).
-/// A corrupt / truncated stream still stops the replay GRACEFULLY (the desync
-/// guard throws inside the replay → the match is lost, never wedged;
-/// <c>PerturbedBotDecision_FailsRehydrationGracefully_NoWedgeNoCrash</c>).
-/// The remaining heuristic default is purely a cost / strength-playtest
-/// choice — flipping <c>Strategy=mcts</c> live no longer risks rehydrate
-/// divergence.
 /// </para>
 /// </summary>
 public sealed class ServerBotOptions
@@ -93,19 +71,6 @@ public sealed class ServerBotOptions
     public int SearchConcurrency { get; set; } = 1;
 
     /// <summary>
-    /// How far each MCTS rollout plays the sandbox out before evaluating (env
-    /// <c>Bot__RolloutDepth</c>; only read when <see cref="Strategy"/> is
-    /// <c>mcts</c>). One of <c>"LeafEval"</c> (no playout — eval at the
-    /// decision point, the cheapest variant), <c>"EndOfTurn"</c> (remainder of
-    /// the current turn only) or <c>"FullTurnPlus"</c> (current turn plus one
-    /// full turn) — case-insensitive, validated against
-    /// <see cref="Majik.Bot.Search.RolloutDepth"/> at registration. Default
-    /// <c>"FullTurnPlus"</c> = today's behaviour; this is the #2596
-    /// rollout-cost lever, flipped to a probe-gate winner via config only.
-    /// </summary>
-    public string RolloutDepth { get; set; } = "FullTurnPlus";
-
-    /// <summary>
     /// Tree-state reuse inside each MCTS search (env
     /// <c>Bot__TreeStateReuse</c>; only read when <see cref="Strategy"/> is
     /// <c>mcts</c>). When true the UCT loop snapshot-caches tree-node states
@@ -131,29 +96,6 @@ public sealed class ServerBotOptions
     /// conversion error crashes the boot, mirroring <see cref="TreeStateReuse"/>).
     /// </summary>
     public bool RootBlockSearch { get; set; } = true;
-
-    /// <summary>
-    /// Upper clamp (<c>kMax</c>) on the determinized world count K (env
-    /// <c>Bot__MaxWorlds</c>; only read when <see cref="Strategy"/> is
-    /// <c>mcts</c>). Null (the default) keeps the engine default of 8. NOTE: K
-    /// still DERIVES from the budget split — <c>K = clamp(round(MaxMctsBudgetMs /
-    /// PerWorldBudgetMs), 1, MaxWorlds)</c> — so raising this alone changes
-    /// nothing unless <see cref="PerWorldBudgetMs"/> is small enough for the
-    /// budget to want that many worlds. Must be &gt; 0 when set.
-    /// </summary>
-    public int? MaxWorlds { get; set; }
-
-    /// <summary>
-    /// Per-world wall-clock budget (ms) for the determinized K-world split (env
-    /// <c>Bot__PerWorldBudgetMs</c>; only read when <see cref="Strategy"/> is
-    /// <c>mcts</c>). Null (the default) keeps the engine default of 400 ms. K =
-    /// clamp(round(MaxMctsBudgetMs / this), 1, <see cref="MaxWorlds"/>), and the
-    /// per-world iteration cap scales by the SAME perWorld/total fraction — at
-    /// the live 1500 ms / cap 800: the default 400 → K=4 × ~213 iters/world;
-    /// 200 + <c>Bot__MaxWorlds=8</c> → K=8 × ~107 iters/world (the K-tuning
-    /// probe winner shape). Must be &gt; 0 when set.
-    /// </summary>
-    public int? PerWorldBudgetMs { get; set; }
 
     /// <summary>
     /// Fail fast on a bad knob (called at registration so a typo'd env var
@@ -183,28 +125,6 @@ public sealed class ServerBotOptions
         {
             throw new ArgumentException(
                 $"Bot__SearchConcurrency must be >= 1 (got {SearchConcurrency}).");
-        }
-
-        if (MaxWorlds is <= 0)
-        {
-            throw new ArgumentException(
-                $"Bot__MaxWorlds must be positive (got {MaxWorlds}).");
-        }
-
-        if (PerWorldBudgetMs is <= 0)
-        {
-            throw new ArgumentException(
-                $"Bot__PerWorldBudgetMs must be positive (got {PerWorldBudgetMs}).");
-        }
-
-        // Validate against the enum NAMES (case-insensitive) — never numeric
-        // values — mirroring SearchStrategy.ParseRolloutDepth's fail-fast.
-        if (!Enum.GetNames<Majik.Bot.Search.RolloutDepth>()
-                .Any(n => n.Equals(RolloutDepth, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new ArgumentException(
-                $"Unknown Bot__RolloutDepth '{RolloutDepth}' — expected 'LeafEval', " +
-                "'EndOfTurn' or 'FullTurnPlus'.");
         }
     }
 }
