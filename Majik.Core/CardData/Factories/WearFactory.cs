@@ -61,11 +61,13 @@ namespace Majik.Core.CardData.Factories;
 ///   with <see cref="ZoneMoveReason.Destroy"/> (CR 701.7) so indestructible
 ///   (CR 702.12) / regeneration (CR 701.15) shields are honoured.
 ///
-/// ## Deferred (v1 gap — shared with Fire // Ice)
-/// - <b>Fuse</b> (CR 702.102) — casting BOTH halves from hand as one split
-///   spell. The engine has no split-cast / fuse cast surface yet, so the Fuse
-///   keyword is informational only; each half is castable independently via
-///   its own <c>[CardName]</c> factory.
+/// ## Fuse (CR 702.102) — IMPLEMENTED
+/// - <b>Fuse</b> — casting BOTH halves from hand as one split spell is now
+///   wired via <see cref="WearTearFactory.BuildFusedDefinition"/> +
+///   <see cref="Majik.Core.Game.SplitCardCast"/> /
+///   <see cref="Majik.Core.Costs.FuseAlternativeCost"/>. This single-half
+///   factory is unchanged: each half is still independently castable via its
+///   own <c>[CardName]</c> factory.
 /// </summary>
 [CardName("Wear")]
 public static class WearFactory

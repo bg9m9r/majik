@@ -45,11 +45,13 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="CaptainsCallFactory"/> (three Soldiers) and the Bird-token
 ///   shape used by <see cref="BattleScreechFactory"/>.
 ///
-/// ## Deferred (v1 gap — shared with Wear // Tear)
-/// - <b>Fuse</b> (CR 702.102) — casting BOTH halves from hand as one split
-///   spell. The engine has no split-cast / fuse cast surface yet, so the Fuse
-///   keyword is informational only; each half is castable independently via
-///   its own <c>[CardName]</c> factory.
+/// ## Fuse (CR 702.102) — IMPLEMENTED
+/// - <b>Fuse</b> — casting BOTH halves from hand as one split spell is now
+///   wired via <see cref="BeckCallFactory.BuildFusedDefinition"/> +
+///   <see cref="Majik.Core.Game.SplitCardCast"/> /
+///   <see cref="Majik.Core.Costs.FuseAlternativeCost"/>. This single-half
+///   factory is unchanged: each half is still independently castable via its
+///   own <c>[CardName]</c> factory.
 /// </summary>
 [CardName("Call")]
 public static class CallFactory
