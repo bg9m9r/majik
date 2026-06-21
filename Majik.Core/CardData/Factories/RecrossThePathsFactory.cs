@@ -37,12 +37,14 @@ namespace Majik.Core.CardData.Factories;
 ///   "In any order" is resolved deterministically as reveal order (a lossy v1
 ///   simplification shared with the rest of the reveal-onto-battlefield
 ///   family).
-/// - <b>Clause 2 — Clash with an opponent (CR 701.32):</b> routes through the
-///   <see cref="ClashAction.ClashAsync"/> engine primitive — the caster and one
-///   opponent each reveal the top of their library, choose top-or-bottom, and
-///   the greater mana value wins (CR 701.32a). The opponent is the single other
-///   player in a two-player game (CR 109.1); a multiplayer "choose which
-///   opponent" prompt is a v1 simplification (first opponent).
+/// - <b>Clause 2 — Clash with an opponent (CR 701.32 / 601.2c):</b> routes
+///   through the <see cref="ClashAction.ClashAsync"/> engine primitive — the
+///   caster and one CHOSEN opponent each reveal the top of their library,
+///   choose top-or-bottom, and the greater mana value wins (CR 701.32a). The
+///   opponent is picked via the caster's
+///   <see cref="Players.Agents.IPlayerAgent.ChoosePlayerAsync"/> over the live
+///   <see cref="ContextOpponents"/> enumeration (CR 102.1 / 800.4a): forced in
+///   the two-player engine target, a real choice in a 3+ player match.
 /// - <b>"If you win, return Recross to its owner's hand" (CR 608.3 override):</b>
 ///   when the caster wins the clash, the resolve body stamps
 ///   <see cref="Card.MarkReturnToHandOnResolution"/> on the spell card so
@@ -50,10 +52,6 @@ namespace Majik.Core.CardData.Factories;
 ///   owner's hand instead of the graveyard.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Multiplayer opponent choice</b>: "clash with an opponent" picks the
-///   first opponent rather than prompting; correct for the two-player matches
-///   the engine ships. A choose-the-opponent prompt would route through the
-///   declarative <see cref="Players.Agents.IPlayerAgent.ChooseAsync"/> sink.
 /// - <b>Reveal events</b>: the reveal-until-land pile and the clash reveals do
 ///   not publish a dedicated reveal event — same posture as every other
 ///   reveal-and-choose factory (Grisly Salvage, Malevolent Rumble).
@@ -119,12 +117,17 @@ public static class RecrossThePathsFactory
                     // battlefield, the rest on the bottom of the library.
                     RevealUntilLandToBattlefield(caster);
 
-                    // CLAUSE 2 — Clash with an opponent (CR 701.32). Pick the
-                    // single opponent (two-player default, CR 109.1).
-                    var opponent = FindOpponent(caster, ctx.Game);
+                    // CLAUSE 2 — Clash with an opponent (CR 701.32 / 601.2c).
+                    // The caster CHOOSES which opponent to clash with — routed
+                    // through the agent's ChoosePlayerAsync over the live
+                    // ContextOpponents enumeration (CR 102.1 / 800.4a). In the
+                    // two-player matches the engine ships there is exactly one
+                    // opponent, so the pick is forced; in a 3+ player game the
+                    // agent picks a specific opponent instead of the first.
+                    var casterAgent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(caster);
+                    var opponent = await ChooseClashOpponentAsync(caster, casterAgent, ctx).ConfigureAwait(false);
                     if (opponent is null) return; // No opponent — no clash.
 
-                    var casterAgent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(caster);
                     var opponentAgent = Majik.Core.Players.Agents.AgentRegistry.Get(opponent);
 
                     var result = await ClashAction.ClashAsync(
@@ -201,13 +204,25 @@ public static class RecrossThePathsFactory
     }
 
     /// <summary>
-    /// CR 109.1 — the opponent for "clash with an opponent": the single other
-    /// player (two-player default). Falls back to <see langword="null"/> when
-    /// the game context isn't available or no opponent exists.
+    /// CR 601.2c / CR 701.32 — choose the opponent for "clash with an
+    /// opponent". The caster's agent picks one opponent from the live
+    /// <see cref="ContextOpponents"/> enumeration (CR 102.1 / 800.4a — every
+    /// in-game opponent of the caster, read off the resolution context). In the
+    /// two-player engine target there is exactly one opponent, so the pick is
+    /// forced; the surface lets a 3+ player match pick a specific opponent
+    /// instead of the historical first-opponent shortcut. Returns
+    /// <see langword="null"/> only when no opponent exists (no game context, or
+    /// every opponent has left the game) — then the clash clause no-ops.
     /// </summary>
-    private static Player? FindOpponent(Player caster, GameContext? game)
+    private static async Task<Player?> ChooseClashOpponentAsync(
+        Player caster, Players.Agents.IPlayerAgent? agent, ResolutionContext ctx)
     {
-        if (game is null) return null;
-        return game.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, caster));
+        if (ctx.Game is null) return null;
+        var opponents = ContextOpponents.Of(ctx, caster).ToList();
+        if (opponents.Count == 0) return null;
+        if (agent is null) return opponents[0];
+        return await agent.ChoosePlayerAsync(
+            ctx.Game, opponents, $"{CardName}: choose an opponent to clash with",
+            Cards.BotIntent.None, ctx.Ct).ConfigureAwait(false);
     }
 }

@@ -119,6 +119,68 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// CR 601.2c / CR 109.1 — choose ONE player from a candidate pool. The
+    /// "choose a player" / "choose an opponent" surface for effects that name a
+    /// player without targeting them: "Clash with an opponent" (Recross the
+    /// Paths, CR 701.32), "target opponent"-style picks, and the wider
+    /// choose-a-player family. The calling effect pre-filters
+    /// <paramref name="candidates"/> to the legal set (typically the resolving
+    /// player's opponents, read off the live
+    /// <see cref="Majik.Core.CardData.Factories.ContextOpponents"/> enumeration,
+    /// CR 102.1 / 800.4a). The agent picks exactly one.
+    /// <para>
+    /// In the two-player matches the engine ships there is only one opponent, so
+    /// every agent — including the deterministic default — returns it. The
+    /// surface exists so a future multiplayer match (or a smart bot / remote
+    /// agent in a 3+ player game) can pick a SPECIFIC opponent instead of the
+    /// historical first-opponent shortcut. Routes through the single declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.PickOne"/>, so
+    /// scripted / heuristic / remote agents that override <see cref="ChooseAsync"/>
+    /// drive the pick with no per-card wiring.
+    /// </para>
+    /// <para>
+    /// Default implementation returns the first candidate (the deterministic
+    /// pre-agent posture — identical to the old
+    /// <c>AllPlayers.FirstOrDefault(p =&gt; p != caster)</c> shortcut). Returns
+    /// <see langword="null"/> only when the candidate pool is empty (no legal
+    /// player — e.g. every opponent has left the game, CR 800.4a), which the
+    /// calling effect treats as "no player to choose, no-op".
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> on the v1
+    /// sync-over-async closure path (same wart as
+    /// <see cref="ChooseScryDecisionAsync"/>); the default
+    /// <see cref="ChooseAsync"/> never dereferences it.
+    /// </para>
+    /// </summary>
+    async Task<Player?> ChoosePlayerAsync(
+        GameContext? ctx,
+        IReadOnlyList<Player> candidates,
+        string label,
+        BotIntent intent = BotIntent.None,
+        CancellationToken ct = default)
+    {
+        var pool = candidates ?? Array.Empty<Player>();
+        if (pool.Count == 0) return null;
+        // Single legal player (the two-player engine target) — no decision.
+        if (pool.Count == 1) return pool[0];
+
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, label, Min: 1, Max: 1,
+            Candidates: pool.Cast<object>().ToList(),
+            Intent: intent, Optional: false);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        // Sanitise: the pick must be one of the offered candidates (by
+        // reference). A misbehaving / empty result falls back to the first
+        // candidate (the deterministic pre-agent posture).
+        foreach (var o in chosen)
+        {
+            if (o is Player p && pool.Contains(p)) return p;
+        }
+        return pool[0];
+    }
+
+    /// <summary>
     /// Choose the value of X for a variable cost.
     /// </summary>
     Task<int> ChooseXAsync(
