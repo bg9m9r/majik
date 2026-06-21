@@ -7761,4 +7761,124 @@ public class AgathasSoulCauldronTests
             Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
         }
     }
+
+    // -----------------------------------------------------------------------
+    // general-typed-subfilter-library-tutor-binder-grammar: the EFFECT-side
+    // search/tutor grammar now reconstructs a general TYPED SUB-FILTER ("basic
+    // land card", "Equipment card", a kindred subtype like "Squirrel card") in
+    // the search-to-HAND shape, not only the open plain card-type forms. The
+    // tutor-to-hand destination accepts a card of ANY type, so a sub-filter
+    // predicate (CR 305 + CR 205.4 for basic land; CR 301.5d subtype membership
+    // for Equipment / kindred) is sound to reconstruct here — it rides the same
+    // controller-scoped LibrarySearch path, never the exiled imprinted card.
+    // Headline unblock: Journeyer's Kite ("{3}, {T}: Search your library for a
+    // basic land card, reveal it, put it into your hand, then shuffle.").
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void OracleBinder_ReconstructsBasicLandTutorToHand_JourneyersKiteLine()
+    {
+        var alice = new Player("Alice", 20);
+        var zones = new Majik.Core.Services.ZoneService(new Majik.Core.Events.EventBus());
+        Majik.Core.Services.ZoneServiceRegistry.Set(alice, zones);
+        try
+        {
+            var bearer = new Creature("Kite Stub", "2", 1, 1);
+            bearer.SetOwner(alice);
+            bearer.SetController(alice);
+            bearer.SetZone(ZoneType.Battlefield);
+            alice.Zones.Battlefield.AddCard(bearer);
+
+            // A BASIC land (Land + Basic supertype) — the only legal target for
+            // the "basic land card" typed sub-filter.
+            var basic = new Land("Plains");
+            basic.AddSupertype(CardSupertype.Basic);
+            basic.AddSubtype(CardSubtype.Plains);
+            basic.SetOwner(alice);
+            alice.Zones.Library.AddCard(basic);
+            basic.SetZone(ZoneType.Library);
+
+            // A NONBASIC land (Land, no Basic supertype) — must NOT be tutored.
+            var nonbasic = new Land("Stomping Ground Stub");
+            nonbasic.SetOwner(alice);
+            alice.Zones.Library.AddCard(nonbasic);
+            nonbasic.SetZone(ZoneType.Library);
+
+            var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+                .RebuildActivatedAbilities(
+                    "{3}, {T}: Search your library for a basic land card, reveal it, "
+                    + "put it into your hand, then shuffle.",
+                    bearer, alice);
+
+            rebuilt.Should().ContainSingle(
+                "the tutor-to-hand shape now reconstructs the 'basic land card' "
+                + "typed sub-filter (Journeyer's Kite's printed line)");
+            var tutor = rebuilt[0];
+            tutor.TargetRequests.Should().BeEmpty(
+                "a library search is a hidden choice (CR 115.1a), not a chosen target");
+
+            foreach (var effect in tutor.Effects) effect.Execute();
+
+            alice.Zones.Hand.GetCards().Should().Contain(basic,
+                "the basic land is a legal target for the 'basic land card' filter");
+            alice.Zones.Hand.GetCards().Should().NotContain(nonbasic,
+                "a nonbasic land is excluded by the 'basic land card' candidate filter");
+            alice.Zones.Library.GetCards().Should().Contain(nonbasic,
+                "the non-matching nonbasic land stays in the library");
+        }
+        finally
+        {
+            Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
+        }
+    }
+
+    [Fact]
+    public void OracleBinder_ReconstructsKindredSubtypeTutorToHand()
+    {
+        var alice = new Player("Alice", 20);
+        var zones = new Majik.Core.Services.ZoneService(new Majik.Core.Events.EventBus());
+        Majik.Core.Services.ZoneServiceRegistry.Set(alice, zones);
+        try
+        {
+            var bearer = new Creature("Dragon Caller Stub", "1R", 2, 2);
+            bearer.SetOwner(alice);
+            bearer.SetController(alice);
+            bearer.SetZone(ZoneType.Battlefield);
+            alice.Zones.Battlefield.AddCard(bearer);
+
+            // A Dragon creature (the legal kindred target) + a non-Dragon creature
+            // (excluded by the subtype filter).
+            var dragon = new Creature("Wyrm Stub", "4RR", 5, 5);
+            dragon.AddSubtype(CardSubtype.Dragon);
+            dragon.SetOwner(alice);
+            alice.Zones.Library.AddCard(dragon);
+            dragon.SetZone(ZoneType.Library);
+
+            var other = new Creature("Bear Stub", "1G", 2, 2);
+            other.SetOwner(alice);
+            alice.Zones.Library.AddCard(other);
+            other.SetZone(ZoneType.Library);
+
+            var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+                .RebuildActivatedAbilities(
+                    "{3}{R}, {T}: Search your library for a Dragon card, reveal it, "
+                    + "put it into your hand, then shuffle.",
+                    bearer, alice);
+
+            rebuilt.Should().ContainSingle(
+                "the tutor-to-hand shape now reconstructs a kindred subtype "
+                + "sub-filter ('Dragon card')");
+
+            foreach (var effect in rebuilt[0].Effects) effect.Execute();
+
+            alice.Zones.Hand.GetCards().Should().Contain(dragon,
+                "the Dragon is a legal target for the 'Dragon card' filter");
+            alice.Zones.Hand.GetCards().Should().NotContain(other,
+                "a non-Dragon is excluded by the kindred sub-filter");
+        }
+        finally
+        {
+            Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
+        }
+    }
 }
