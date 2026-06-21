@@ -847,6 +847,66 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public void Grant_NonMana_SteelHellkitePumpHalf_RehomesViaBinderFallback_SweepSkipped()
+    {
+        // agatha-steel-hellkite-pump-half-source-migration — Steel Hellkite's
+        // {2}:+1/+0 pump half is soundly re-homable, while its {X} destroy-sweep
+        // is NOT generally reconstructable from oracle text (it carries an
+        // "Activate only once each turn" rider AND an {X} cost, both outside the
+        // OracleActivatedAbilityBinder soundness boundary). This locks in the
+        // BINDER-FALLBACK path the deferral sketch named: feeding Steel
+        // Hellkite's EXACT printed oracle text to RebuildActivatedAbilities
+        // re-homes ONLY the +1/+0 pump onto the bearer and correctly skips the
+        // destroy-sweep line (the bespoke RebindTo primary path, exercised in
+        // Grant_RebindsBespokeFactoryCreature_SteelHellkite_BothAbilitiesToBearer,
+        // is what re-homes the sweep — the binder is the fallback for the pump).
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // Steel Hellkite's EXACT printed oracle text (verified vs Scryfall):
+        //   Flying
+        //   {2}: This creature gets +1/+0 until end of turn.
+        //   {X}: Destroy each nonland permanent … Activate only once each turn.
+        const string steelHellkiteOracle =
+            "Flying\n"
+            + "{2}: This creature gets +1/+0 until end of turn.\n"
+            + "{X}: Destroy each nonland permanent with mana value X whose "
+            + "controller was dealt combat damage by this creature this turn. "
+            + "Activate only once each turn.";
+
+        var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+            .RebuildActivatedAbilities(steelHellkiteOracle, bearer, alice);
+
+        // Only the pump half is reconstructed; Flying (keyword line) and the
+        // {X} destroy-sweep ("Activate only once each turn" rider + {X} cost)
+        // are correctly skipped by the binder's soundness boundary.
+        rebuilt.Should().ContainSingle(
+            "the binder reconstructs ONLY Steel Hellkite's soundly re-homable "
+            + "+1/+0 pump half; the {X} destroy-sweep is skipped as unsound.");
+
+        var pump = rebuilt[0];
+        pump.Source.Should().BeSameAs(bearer,
+            "the re-homed pump is sourced on the BEARER, not the exiled card (CR 707.2).");
+        pump.Costs.OfType<ManaCostCost>().Should()
+            .ContainSingle(c => c.Description.Contains("2"),
+                "the pump costs {2}.");
+
+        // Activating the re-homed pump bumps the BEARER's power (CR 613.1f
+        // Layer 7c). Base 2/2 + the SeatedBearer +1/+1 counter = 3/3 before.
+        var powerBefore = bearer.GetPower();
+        var toughnessBefore = bearer.GetToughness();
+        foreach (var effect in pump.Effects) effect.Execute();
+        bearer.GetPower().Should().Be(powerBefore + 1,
+            "the re-homed +1/+0 pump bumps the BEARER's power, not the exiled Steel Hellkite's.");
+        bearer.GetToughness().Should().Be(toughnessBefore,
+            "+1/+0 leaves toughness unchanged.");
+    }
+
+    [Fact]
     public void Grant_NonMana_PumpOther_RehomesTargetedPumpToChosenCreature()
     {
         var alice = new Player("Alice", 20);
