@@ -227,6 +227,57 @@ public class PriestOfFellRitesTests
             "the exiled Priest's controller's graveyard is untouched");
     }
 
+    // agatha-mother-of-runes-style-controller-scoped-candidate-gatherer-tail —
+    // the re-homed candidate gatherer (a ControllerScopedGatherer) enumerates
+    // the BEARER's controller's graveyard creature cards, not the exiled
+    // Priest's authoring controller's. Before the migration the plain closure
+    // gatherer captured the authoring controller and RebindController no-op'd,
+    // so a re-homed ability offered the WRONG player's graveyard as candidates.
+    [Fact]
+    public void PriestOfFellRites_ReanimateAbility_RebindToBearer_GathererScopesToBearerControllerGraveyard()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var priest = PriestOfFellRitesFactory.Create(alice);
+        var ability = ReanimateAbility(priest);
+
+        // A creature card in BOB's graveyard (the bearer's controller).
+        var bobZombie = new Creature("Walking Corpse", "1B", 2, 2);
+        bobZombie.SetOwner(bob);
+        bob.Zones.Graveyard.AddCard(bobZombie);
+        bobZombie.SetZone(ZoneType.Graveyard);
+
+        // A decoy in ALICE's graveyard (the exiled Priest's authoring controller).
+        var aliceDecoy = new Creature("Decoy Ogre", "2R", 3, 3);
+        aliceDecoy.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(aliceDecoy);
+        aliceDecoy.SetZone(ZoneType.Graveyard);
+
+        var bearer = new Creature("Bearer Beast", "2G", 3, 3);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+        bearer.SetZone(ZoneType.Battlefield);
+        bob.Zones.Battlefield.AddCard(bearer);
+
+        var rebound = ability.RebindTo(bearer, bob);
+
+        var ctx = new Majik.Core.Game.GameContext(
+            self: bob,
+            allPlayers: new[] { alice, bob },
+            activePlayer: bob,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+
+        var candidates = rebound.TargetRequests.Single().CandidateGatherer!(ctx);
+
+        candidates.Should().Contain(bobZombie,
+            "the re-homed gatherer scopes to the BEARER's controller's graveyard (Bob's)");
+        candidates.Should().NotContain((object)aliceDecoy,
+            "the exiled Priest's authoring controller's graveyard is no longer enumerated");
+    }
+
     [Fact]
     public void PriestOfFellRites_ReanimateAbility_RebindToBearer_RehomesTapAndSacrificeCosts()
     {

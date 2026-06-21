@@ -145,12 +145,21 @@ public static class PriestOfFellRitesFactory
         // CR 601.2c — the chosen target is read at resolution from
         // ResolutionContext.ChosenTargets[0][0]; the candidate pool is the
         // controller's graveyard creature CARDS (CR 110.4).
-        var targetRequest = new TargetRequest(
-            Description: "target creature card from your graveyard",
-            MinTargets: 1,
-            MaxTargets: 1,
-            LegalCandidates: Array.Empty<object>(),
-            CandidateGatherer: _ => GraveyardCreatureCards(card.Controller ?? owner));
+        //
+        // agatha-mother-of-runes-style-controller-scoped-candidate-gatherer-tail —
+        // the gatherer is a re-homeable ControllerScopedGatherer
+        // (TargetRequest.ControllerScoped) rather than a closure that captures
+        // `card`/`owner`: the controller flows in as the `who` argument (never
+        // captured), so RebindTo re-scopes "from YOUR graveyard" onto a new
+        // bearer's controller (Agatha's Soul Cauldron, CR 707.2 / 613.1f) with
+        // no behavioural drift — matching the Tap / Sacrifice costs that already
+        // re-home via AdditionalCost.RebindSource (Stage 1).
+        var targetRequest = TargetRequest.ControllerScoped(
+            description: "target creature card from your graveyard",
+            minTargets: 1,
+            maxTargets: 1,
+            controller: card.Controller ?? owner,
+            select: (who, _) => GraveyardCreatureCards(who));
 
         var reanimateEffect = new Effect(
             $"{CardName}: return target creature card from your graveyard to the battlefield",
