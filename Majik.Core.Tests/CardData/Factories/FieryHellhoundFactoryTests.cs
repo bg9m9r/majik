@@ -6,7 +6,11 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Zones;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.Factories;
@@ -238,6 +242,52 @@ public class FieryHellhoundFactoryTests
         var act = () => { foreach (var effect in pump.Effects) effect.Execute(); };
         act.Should().NotThrow(
             "effect body guards on null ActiveEffects — shape-only callers safe");
+    }
+
+    // -----------------------------------------------------------------------
+    // RebindSafe — source-indirect re-home (Agatha / copy-effects gate)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void FieryHellhound_FirebreathingAbility_IsMarkedRebindSafe()
+    {
+        var card = FieryHellhoundFactory.Create(_alice);
+        var pump = card.Abilities.OfType<ActivatedAbility>().Single();
+
+        pump.RebindSafe.Should().BeTrue(
+            "the firebreathing effect reads ResolutionContext.Source (ctx.Source as Creature) "
+            + "so it pumps the BEARER when re-homed via ActivatedAbility.RebindTo (CR 707.2)");
+    }
+
+    [Fact]
+    public async Task FieryHellhound_FirebreathingRebindsToBearer_PumpsBearerNotOriginal()
+    {
+        // Fiery Hellhound is exiled (e.g. imprinted under Agatha's Soul Cauldron).
+        var hellhound = FieryHellhoundFactory.Create(_alice);
+        hellhound.SetZone(ZoneType.Exile);
+
+        // Bearer is on the battlefield and has an effects service.
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+        var bearer = new Creature("Bearer", "1G", 3, 3) { Controller = _alice };
+        bearer.SetZone(ZoneType.Battlefield);
+        bearer.ActiveEffects = effects;
+
+        var ability = hellhound.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        // Re-home via RebindTo (the Agatha grant mechanism, CR 707.2 / 613.1f).
+        var rebound = ability.RebindTo(bearer, _alice);
+        rebound.RebindSafe.Should().BeTrue("RebindTo preserves the provenance flag");
+
+        var bearerPowerBefore = bearer.GetPower();
+        await rebound.ResolveAsync(agent: null, game: null);
+
+        bearer.GetPower().Should().Be(bearerPowerBefore + 1,
+            "re-homed firebreathing pumps the BEARER (+1/+0) because the effect reads "
+            + "ResolutionContext.Source (= bearer) not the captured exiled hellhound");
+        hellhound.GetPower().Should().Be(2,
+            "the exiled Fiery Hellhound is untouched");
     }
 
     // -----------------------------------------------------------------------
