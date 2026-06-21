@@ -111,6 +111,19 @@ namespace Majik.Core.CardData.Factories;
 ///       pips and {T}.</item>
 ///   </list>
 ///
+/// ## Soundness boundary — HAND-ZONE-ONLY activated abilities (NOT a gap)
+/// An imprinted creature's activated ability that functions ONLY from the hand —
+/// cost = "Discard this card" (a <see cref="DiscardSelfCost"/>; CR 702.74a), e.g.
+/// Waker of Waves's "{1}{U}, Discard this card: Look at the top two cards of your
+/// library …" — is INTRINSICALLY non-re-homeable. CR 702.49 grants only abilities
+/// the bearer can use, and a creature you control with a +1/+1 counter is on the
+/// BATTLEFIELD (CR 112.6): the discard-self cost can never be paid from a
+/// battlefield bearer (the imprinted card is in EXILE; the bearer is not a card in
+/// hand to discard). The grant therefore emits NOTHING for such an ability —
+/// encoded EXPLICITLY in <see cref="IsHandZoneOnlyActivation"/>, so the correct
+/// "never granted" outcome no longer relies on the accident that the Waker factory
+/// happens to leave the ability <see cref="ActivatedAbility.RebindSafe"/> = false.
+///
 /// ## Deferred (precise remaining gap)
 /// - <b>Bespoke <c>[CardName]</c>-factory activated abilities</b> whose effect
 ///   closures still capture the original card (so they are NOT
@@ -447,6 +460,22 @@ public static class AgathasSoulCauldronFactory
             var rebound = imprinted.Abilities
                 .OfType<ActivatedAbility>()
                 .Where(a => a is not IManaAbility && a.RebindSafe)
+                // CR 702.49 / CR 112.6 — a granted activated ability only
+                // FUNCTIONS where the bearer that has it can use it: a creature
+                // you control with a +1/+1 counter is on the BATTLEFIELD, so the
+                // grant can only confer abilities that function from the
+                // battlefield. An imprinted creature's HAND-ZONE-ONLY activated
+                // ability — cost = "Discard this card" (a DiscardSelfCost whose
+                // Self is the exiled card; CR 702.74a) — is intrinsically
+                // non-re-homeable: it can never be paid from a battlefield bearer
+                // (the card is in EXILE, not the bearer-controller's hand), and a
+                // re-homed copy pointed at the bearer is nonsensical (the bearer
+                // is not in hand to discard). Waker of Waves's "{1}{U}, Discard
+                // this card: …" is the canonical case. Exclude it EXPLICITLY here
+                // — the existing RebindSafe filter happens to drop it today only
+                // because the Waker factory leaves the ability RebindSafe=false,
+                // an accident this boundary no longer relies on.
+                .Where(a => !IsHandZoneOnlyActivation(a, imprinted))
                 .Select(a => a.RebindTo(bearer, controller))
                 .ToList();
 
@@ -473,6 +502,25 @@ public static class AgathasSoulCauldronFactory
         }
         return granted;
     }
+
+    /// <summary>
+    /// CR 702.49 / CR 112.6 soundness boundary — true iff
+    /// <paramref name="ability"/> is a HAND-ZONE-ONLY activated ability of the
+    /// imprinted card (its cost includes "Discard this card", a
+    /// <see cref="DiscardSelfCost"/> whose <see cref="DiscardSelfCost.Self"/> is
+    /// <paramref name="imprinted"/> itself). Such an ability functions only from
+    /// the hand (CR 702.74a): the cost can never be paid by a battlefield bearer
+    /// (the imprinted card is in EXILE, and the bearer is not a card in the
+    /// controller's hand to discard), so the grant must emit NOTHING for it
+    /// rather than re-home an unpayable / nonsensical copy. This makes the
+    /// "never granted" outcome an EXPLICIT rules decision, not an accident of the
+    /// <see cref="ActivatedAbility.RebindSafe"/> filter. Waker of Waves's
+    /// "{1}{U}, Discard this card: …" is the canonical case.
+    /// </summary>
+    private static bool IsHandZoneOnlyActivation(ActivatedAbility ability, ICard imprinted)
+        => ability.Costs
+            .OfType<DiscardSelfCost>()
+            .Any(c => ReferenceEquals(c.Self, imprinted));
 
     /// <summary>
     /// CR 702.49 leave-the-battlefield teardown for the imprint linkage. When
