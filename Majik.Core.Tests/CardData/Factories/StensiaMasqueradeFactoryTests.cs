@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
+using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
@@ -182,5 +183,44 @@ public class StensiaMasqueradeFactoryTests
 
         effects.Compute(enemyVamp).Keywords.Should().NotContain("First strike",
             "\"attacking creatures YOU control\" — an opponent's attacker isn't granted first strike (CR 109.4)");
+    }
+
+    [Fact]
+    public void ProdRail_EffectsAwareDispatch_RegistersFirstStrikeAnthem()
+    {
+        // Prod rail: the effects-aware NamedCardFactory.Create(name, owner,
+        // effects) overload is EXACTLY the entry point DeckCardBuilder's routed
+        // (approach-B instance-swap) build calls for a non-Land permanent with a
+        // real [CardName] factory (CR 613.7c). This is the production cast/build
+        // path — proving the "Attacking creatures you control have first strike"
+        // anthem is registered HERE (not only via a directly-supplied
+        // ContinuousEffectsService overload) is the deferral's stated concern.
+        var registry = new CombatMembershipRegistry();
+        using var scope = CombatMembershipRegistryProvider.PushScope(registry);
+
+        var bus = new Majik.Core.Tests.Helpers.TestEventBus();
+        var effects = new ContinuousEffectsService(bus);
+
+        // Build via the effects-aware dispatcher BY NAME — the prod rail.
+        var built = NamedCardFactory.Create("Stensia Masquerade", _alice, effects);
+        built.Should().BeOfType<Enchantment>();
+        var card = (Enchantment)built;
+        PlaceOnBattlefield(card, _alice);
+
+        var vamp = NewVampire("Vampire Nighthawk", _alice);
+        vamp.ActiveEffects = effects;
+
+        // Not attacking → no first strike.
+        CombatAbilities.HasFirstStrike(vamp).Should().BeFalse(
+            "the static grants first strike only to ATTACKING creatures (CR 508.1)");
+
+        // Declared as an attacker → the prod-registered anthem grants first
+        // strike (CR 702.7 / CR 613.1f), confirming the instance-swap dispatch
+        // wired the continuous effect.
+        registry.RecordAttacker(vamp);
+        bus.Publish(new CreatureAttacksEvent(vamp, _bob));
+        effects.Compute(vamp).Keywords.Should().Contain("First strike",
+            "the effects-aware prod dispatch registered the attacking-creatures first-strike anthem");
+        CombatAbilities.HasFirstStrike(vamp).Should().BeTrue();
     }
 }
