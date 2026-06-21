@@ -58,8 +58,8 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>"You have no maximum hand size for the rest of the game."</b>
 ///   (CR 402.2 — the 7-card maximum hand size; CR 103.5 / cleanup-step
 ///   discard). The engine does not yet enforce a maximum hand size at all:
-///   <see cref="Majik.Core.Game.Phases.CleanupStep.DiscardToHandSize"/> is
-///   not wired into the cleanup step (it is never invoked with a limit), so
+///   <c>TurnDriver</c>'s cleanup step discards excess cards only against the
+///   default 7-card limit (it is never invoked with a raised limit), so
 ///   no player is ever forced to discard down to 7. With no maximum hand
 ///   size to remove, this rider is a no-op against the current engine — the
 ///   observable draw is fully modelled. When a real maximum-hand-size

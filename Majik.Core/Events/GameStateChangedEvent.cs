@@ -3,7 +3,7 @@ using Majik.Core.StateMachine;
 namespace Majik.Core.Events;
 
 /// <summary>
-/// Fired by <see cref="GameStateMachine"/> when the top-level game
+/// Fired when the top-level game
 /// lifecycle state transitions (Initializing → Mulligan → Playing →
 /// GameOver). Carries the typed <see cref="GameStateType"/>.
 /// <para>

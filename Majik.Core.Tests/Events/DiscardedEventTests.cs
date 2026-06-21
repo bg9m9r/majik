@@ -3,7 +3,6 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Events;
-using Majik.Core.Game.Phases;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
 using Majik.Core.Zones;
@@ -130,47 +129,6 @@ public class DiscardedEventTests
         {
             EventBusRegistry.Clear();
         }
-    }
-
-    // -----------------------------------------------------------------------
-    // Route 3 — cleanup-step max-hand-size trim (CR 514.1)
-    // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CleanupStep_DiscardToHandSize_PublishesDiscardedEvent_PerCard()
-    {
-        var bus = new EventBus();
-        var captured = new List<DiscardedEvent>();
-        bus.Subscribe<DiscardedEvent>(captured.Add);
-
-        var zoneService = new Majik.Core.Services.ZoneService();
-        // 9 cards in hand, max 7 → 2 discards.
-        for (var i = 0; i < 9; i++) NewCardInHand(_alice, $"H{i}");
-
-        var cleanup = new CleanupStep(bus, zoneService);
-        cleanup.DiscardToHandSize(_alice, maxHandSize: 7);
-
-        captured.Should().HaveCount(2, "two cards over the 7-card max");
-        captured.Should().OnlyContain(e => e.Player == _alice);
-        captured.Should().OnlyContain(e => !e.WasCost, "a cleanup trim is not a cost");
-        _alice.Zones.Hand.GetCards().Should().HaveCount(7);
-        _alice.Zones.Graveyard.GetCards().Should().HaveCount(2);
-    }
-
-    [Fact]
-    public void CleanupStep_DiscardToHandSize_UnderMax_PublishesNothing()
-    {
-        var bus = new EventBus();
-        var captured = new List<DiscardedEvent>();
-        bus.Subscribe<DiscardedEvent>(captured.Add);
-
-        var zoneService = new Majik.Core.Services.ZoneService();
-        for (var i = 0; i < 5; i++) NewCardInHand(_alice, $"H{i}");
-
-        var cleanup = new CleanupStep(bus, zoneService);
-        cleanup.DiscardToHandSize(_alice, maxHandSize: 7);
-
-        captured.Should().BeEmpty("5 cards is under the 7-card max — no discard");
     }
 
     // -----------------------------------------------------------------------

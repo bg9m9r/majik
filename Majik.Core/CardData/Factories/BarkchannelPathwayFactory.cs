@@ -24,7 +24,7 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="BranchloftPathwayFactory"/> / <see cref="BoulderloftPathwayFactory"/>.
 /// Both Pathway faces are plain "{T}: Add &lt;C&gt;" lands with no ETB-tapped
 /// clause and no other text — so neither face needs a
-/// <see cref="Majik.Core.Abilities.ReplacementEffect"/>.
+/// replacement effect.
 ///
 /// ## Card identity comes from JSON
 ///

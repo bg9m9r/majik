@@ -24,7 +24,7 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="AgadeemsAwakeningFactory"/> /
 /// <see cref="AgadeemTheUndercryptFactory"/>. Unlike that pair, BOTH Pathway
 /// faces are plain "{T}: Add &lt;C&gt;" lands with no ETB-tapped clause and no
-/// other text — so neither face needs a <see cref="Majik.Core.Abilities.ReplacementEffect"/>.
+/// other text — so neither face needs a replacement effect.
 ///
 /// ## Card identity comes from JSON
 ///
