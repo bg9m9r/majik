@@ -290,10 +290,17 @@ namespace Majik.Core.CardData;
 ///     shuffle (CR 701.19a / 701.20a / 613.1f) — the soundest library shape to
 ///     re-home because there is NO "this creature" / source reference at all (the
 ///     controller searches their OWN library, never the exiled imprinted card).
-///     Only the OPEN card-type forms (<see cref="GraveyardCardFormPredicate"/> —
-///     bare "card", "creature", "instant or sorcery", …) are reconstructed; a
-///     typed sub-filter ("Equipment card", "basic land card") is skipped as
-///     unsound, and a "put it onto the battlefield" land-ramp search is NOT this
+///     BOTH the OPEN plain card-type forms (<see cref="GraveyardCardFormPredicate"/>
+///     — bare "card", "creature", "instant or sorcery", …) AND a general TYPED
+///     SUB-FILTER ("basic land card", "Equipment card", a kindred subtype like
+///     "Dragon card") are reconstructed via <see cref="SearchToHandFormPredicate"/>
+///     — the hand destination accepts a card of ANY type, so a sub-filter is a
+///     sound, source-independent candidate filter (CR 305 + CR 205.4 for basic
+///     land; CR 301.5d / 308.2 subtype membership otherwise). This is the
+///     EFFECT-side grammar paid down in
+///     general-typed-subfilter-library-tutor-binder-grammar; the headline unblock
+///     is Journeyer's Kite's "basic land card" hand tutor. An unrecognised form is
+///     skipped, and a "put it onto the battlefield" land-ramp search is NOT this
 ///     shape (only the "to your hand" destination is matched). Sound on any
 ///     permanent bearer.</item>
 ///   <item><b>Search-to-battlefield (Equipment / land / basic-land tutor)</b> —
@@ -623,19 +630,31 @@ public static class OracleActivatedAbilityBinder
     // CONTROLLER's OWN library and the pick lands in THAT controller's hand —
     // there is NO "this creature" / source reference at all (CR 701.19a / 613.1f),
     // so re-homing is a clean controller-scoped tutor, never the exiled imprinted
-    // card. Only the OPEN card-type forms (GraveyardCardTypeForm — the same
+    // card. BOTH the OPEN plain card-type forms (GraveyardCardTypeForm — the same
     // source-independent card-type predicates the graveyard-recursion shape uses)
-    // are reconstructed; a typed sub-filter ("Equipment card", "basic land card",
-    // "Goblin card") is NOT a plain card-type test and is skipped as unsound (its
-    // candidate filter isn't reconstructed here), consistent with the
-    // graveyard-recursion / restricted-target boundary. The "to your HAND"
-    // destination is required (a "put it onto the battlefield" search is the land
-    // ramp shape, NOT this tutor-to-hand shape, and is deliberately not matched).
+    // AND a general TYPED SUB-FILTER ("basic land card", "Equipment card", a
+    // kindred subtype like "Squirrel card") are reconstructed here: the
+    // tutor-to-HAND destination accepts a card of ANY type, so a sub-filter
+    // predicate (CR 305 land + CR 205.4 Basic supertype for "basic land"; CR
+    // 301.5d / 308.2 subtype membership for "Equipment" / kindred) is an
+    // unambiguous, source-independent candidate filter that re-homes soundly — it
+    // rides the SAME controller-scoped LibrarySearch path, never the exiled
+    // imprinted card. (This is the EFFECT-side typed-sub-filter grammar paid down
+    // in general-typed-subfilter-library-tutor-binder-grammar; the headline unblock
+    // is Journeyer's Kite's "basic land card" hand tutor.) The captured form word
+    // is validated in SearchToHandFormPredicate; an unrecognised word makes the
+    // form unsound and the clause is skipped (the bf-tutor's kindred-skip boundary
+    // is unchanged — putting an arbitrary kindred card onto the battlefield is the
+    // separate, harder soundness case). The "to your HAND" destination is required
+    // (a "put it onto the battlefield" search is the ramp shape, NOT this
+    // tutor-to-hand shape, and is matched by SearchToBattlefieldRegex instead).
     // The optional printed "reveal it," step and the optional "then" before
-    // "shuffle" are both tolerated. Group 1 = cost, group 2 = the optional
-    // card-type word (empty for the bare "card" form).
+    // "shuffle" are both tolerated. Group 1 = cost, group 2 = the optional form
+    // word(s) (empty for the bare "card" form) — a plain card-type, "basic land",
+    // or a single subtype word.
     private static readonly Regex TutorToHandRegex = new(
-        @"^(" + CostList + @")\s*:\s*Search your library for an? " + GraveyardCardTypeForm
+        @"^(" + CostList + @")\s*:\s*Search your library for an? "
+        + @"(?:(basic land|[A-Za-z]+(?: or [A-Za-z]+)?) )?"
         + @"card,\s*(?:reveal it,\s*)?put it into your hand,\s*(?:then\s*)?shuffle\.$",
         RegexOptions.IgnoreCase);
 
@@ -1240,8 +1259,10 @@ public static class OracleActivatedAbilityBinder
             {
                 var costs = TryBuildCostList(tutorToHand.Groups[1].Value, bearer, controller);
                 if (costs == null) continue; // unsound cost token — skip
-                result.Add(BuildTutorToHand(
-                    costs, tutorToHand.Groups[2].Value, bearer, controller));
+                var tutor = BuildTutorToHand(
+                    costs, tutorToHand.Groups[2].Value, bearer, controller);
+                if (tutor == null) continue; // unrecognised typed sub-filter — skip as unsound
+                result.Add(tutor);
                 continue;
             }
 
@@ -2961,13 +2982,14 @@ public static class OracleActivatedAbilityBinder
     /// typed sub-filter ("Equipment card", "basic land card") is skipped by the
     /// regex as unsound.
     /// </summary>
-    private static ActivatedAbility BuildTutorToHand(
+    private static ActivatedAbility? BuildTutorToHand(
         List<ICost> costs,
         string cardTypeForm,
         Permanent bearer,
         Player controller)
     {
-        Func<ICard, bool> predicate = GraveyardCardFormPredicate(cardTypeForm);
+        var predicate = SearchToHandFormPredicate(cardTypeForm);
+        if (predicate == null) return null; // unrecognised typed sub-filter — skip as unsound
         var label = string.IsNullOrEmpty(cardTypeForm)
             ? "card"
             : cardTypeForm.ToLowerInvariant() + " card";
@@ -3054,6 +3076,67 @@ public static class OracleActivatedAbilityBinder
                 c => c.HasType(CardType.Instant) || c.HasType(CardType.Sorcery),
             _ => _ => true,
         };
+
+    /// <summary>
+    /// Map a tutor-to-HAND form (the captured group of
+    /// <see cref="TutorToHandRegex"/>) to a source-independent candidate
+    /// predicate. Unlike the bare graveyard/battlefield forms, the hand tutor
+    /// accepts a general TYPED SUB-FILTER, because its destination (the searching
+    /// player's hand) takes a card of ANY type — so a sub-filter is sound to
+    /// reconstruct here (CR 701.19a; CR 613.1f — no source-card dependence):
+    /// <list type="bullet">
+    ///   <item>the bare "" form ("Search your library for a card") matches any
+    ///     card;</item>
+    ///   <item>the OPEN plain card-type forms (creature/artifact/…/the "X or Y"
+    ///     pairs) delegate to <see cref="GraveyardCardFormPredicate"/>;</item>
+    ///   <item>"basic land" → Land (CR 305) + Basic supertype (CR 205.4);</item>
+    ///   <item>any single CardSubtype word ("Equipment", a kindred subtype such as
+    ///     "Squirrel" / "Dragon", a basic-land subtype) → subtype membership
+    ///     (CR 301.5d / 308.2), validated via <see cref="ParseSubtype"/>.</item>
+    /// </list>
+    /// Returns <c>null</c> for an unrecognised form so the clause is skipped as
+    /// unsound (the binder never emits a tutor whose candidate filter it cannot
+    /// reconstruct). The set of recognised plain card-type words is kept in lockstep
+    /// with <see cref="GraveyardCardFormPredicate"/> so a "creature card" hand
+    /// tutor reconstructs identically whether or not it is also a subtype.
+    /// </summary>
+    private static Func<ICard, bool>? SearchToHandFormPredicate(string form)
+    {
+        var f = form.Trim().ToLowerInvariant();
+        switch (f)
+        {
+            case "":
+            case "creature":
+            case "artifact":
+            case "enchantment":
+            case "land":
+            case "planeswalker":
+            case "instant":
+            case "sorcery":
+            case "permanent":
+            case "creature or planeswalker":
+            case "artifact or enchantment":
+            case "instant or sorcery":
+                return GraveyardCardFormPredicate(f);
+            case "basic land":
+                // CR 305 land + CR 205.4 Basic supertype — only basic lands match.
+                return c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
+        }
+
+        // A single subtype word — "Equipment" (CR 301.5d) or a kindred / land
+        // subtype (CR 308.2 / 305.6), e.g. "Squirrel", "Dragon", "Forest". Sound
+        // for the hand tutor: subtype membership is unambiguous and carries no
+        // source-card dependence. An "X or Y" form that is not one of the open
+        // card-type pairs above is not a single subtype word, so it falls through
+        // to the unrecognised case (returns null → the clause is skipped).
+        if (!f.Contains(' '))
+        {
+            var sub = ParseSubtype(form.Trim());
+            if (sub is { } s) return c => c.HasSubtype(s);
+        }
+
+        return null; // unrecognised typed sub-filter — skip the clause as unsound
+    }
 
     /// <summary>
     /// Map an OPEN permanent-target form (the captured group of
