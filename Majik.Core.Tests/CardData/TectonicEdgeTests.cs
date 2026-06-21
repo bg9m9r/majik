@@ -80,7 +80,7 @@ public class TectonicEdgeTests
         }
 
         TectonicEdgeFactory
-            .OpponentControlsFourOrMoreLands(_alice, () => new[] { _alice, _bob })
+            .OpponentControlsFourOrMoreLands(_alice, new[] { _alice, _bob })
             .Should().BeTrue();
     }
 
@@ -98,7 +98,7 @@ public class TectonicEdgeTests
         }
 
         TectonicEdgeFactory
-            .OpponentControlsFourOrMoreLands(_alice, () => new[] { _alice, _bob })
+            .OpponentControlsFourOrMoreLands(_alice, new[] { _alice, _bob })
             .Should().BeFalse();
     }
 
@@ -112,8 +112,7 @@ public class TectonicEdgeTests
             MakeLand(_bob, $"Mountain{i}");
         }
 
-        var tectonicEdge = TectonicEdgeFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var tectonicEdge = TectonicEdgeFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(tectonicEdge);
         tectonicEdge.SetZone(ZoneType.Battlefield);
 
@@ -129,7 +128,7 @@ public class TectonicEdgeTests
         {
             new object[] { target },
         });
-        activated.Resolve();
+        ResolveWithGame(activated, _alice, _alice, _bob);
 
         target.Zone.Should().Be(ZoneType.Graveyard);
         _bob.Zones.Graveyard.GetCards().Should().Contain(target);
@@ -149,8 +148,7 @@ public class TectonicEdgeTests
             MakeLand(_bob, $"Mountain{i}");
         }
 
-        var tectonicEdge = TectonicEdgeFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var tectonicEdge = TectonicEdgeFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(tectonicEdge);
         tectonicEdge.SetZone(ZoneType.Battlefield);
 
@@ -165,7 +163,7 @@ public class TectonicEdgeTests
         {
             new object[] { target },
         });
-        activated.Resolve();
+        ResolveWithGame(activated, _alice, _alice, _bob);
 
         target.Zone.Should().Be(ZoneType.Battlefield);
         tectonicEdge.Zone.Should().Be(ZoneType.Graveyard);
@@ -189,8 +187,7 @@ public class TectonicEdgeTests
             MakeLand(_bob, $"Mountain{i}");
         }
 
-        var tectonicEdge = TectonicEdgeFactory.Create(_alice,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var tectonicEdge = TectonicEdgeFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(tectonicEdge);
         tectonicEdge.SetZone(ZoneType.Battlefield);
 
@@ -205,9 +202,23 @@ public class TectonicEdgeTests
         {
             new object[] { basic },
         });
-        activated.Resolve();
+        ResolveWithGame(activated, _alice, _alice, _bob);
 
         basic.Zone.Should().Be(ZoneType.Battlefield);
         tectonicEdge.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    private static void ResolveWithGame(
+        ActivatedAbility ability, Player controller, params Player[] players)
+    {
+        var game = new Majik.Core.Game.GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        ability.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

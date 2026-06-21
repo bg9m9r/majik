@@ -211,21 +211,6 @@ public sealed class ResolverNullInertEffectAuditTests
             // Teferi, Hero of Dominaria was removed earlier (agent-target infra).
         };
 
-    /// <summary>
-    /// Card factories whose card type is <c>Land</c>. Lands are NOT routed through
-    /// <c>NamedCardFactory.Create</c> on the production build —
-    /// <c>GameFacade.BuildDeckCard</c> gates the named-factory instance-swap on
-    /// <c>!shell.HasType(CardType.Land)</c> (lands go through the data/binder
-    /// path). A resolver-null <c>Func</c> on a land factory is therefore not
-    /// inert-on-prod via that mechanism (the single-arg <c>Create</c> is
-    /// test-only), so the gate excludes <c>Land</c>-returning factories. The same
-    /// fragile pattern should still be cleaned up, but it is not part of this
-    /// inert-on-prod bug class. Detected by a literal "public static Land Create"
-    /// signature in the source.
-    /// </summary>
-    private static bool IsLandFactory(string source)
-        => source.Contains("public static Land Create", StringComparison.Ordinal);
-
     [Fact]
     public void RealFactories_HaveNoResolverNullInertEffects()
     {
@@ -247,10 +232,16 @@ public sealed class ResolverNullInertEffectAuditTests
             var violations = ResolverNullInertEffectAudit.Analyze(source, name);
             if (violations.Count == 0) continue;
 
-            // Lands are not routed through NamedCardFactory.Create on prod, so a
-            // resolver-null Func on a land factory isn't inert-on-prod via that
-            // mechanism (test-only single-arg Create). Out of this bug class.
-            if (IsLandFactory(source)) continue;
+            // NOTE: Land factories were previously excluded here (lands skip the
+            // NamedCardFactory.Create instance-swap on prod via
+            // GameFacade.BuildDeckCard's !HasType(Land) gate, so a resolver-null
+            // Func on a land factory was fragile-but-not-inert-on-prod). That
+            // exclusion has been retired (#2551 land cleanup): the 5 land
+            // factories that carried the pattern — Blast Zone, Field of Ruin,
+            // Geier Reach Sanitarium, Scavenger Grounds, Tectonic Edge — now read
+            // their players off the live ResolutionContext (ctx.Game.AllPlayers)
+            // and declare no captured Func<…Player…> resolver param, so the gate
+            // scans them like every other factory.
 
             if (Allowlist.ContainsKey(name)) continue; // documented exemption / backlog.
 

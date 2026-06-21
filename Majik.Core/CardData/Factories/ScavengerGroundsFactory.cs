@@ -40,16 +40,13 @@ namespace Majik.Core.CardData.Factories;
 ///   graveyard (CR 406.2 — the cards go to their owners' exile zones).
 ///
 /// ## All-graveyards sweep scoping
-/// When <paramref name="allPlayersResolver"/> is supplied, the sweep exiles
-/// every reachable player's graveyard in resolver order; without it only the
-/// controller's graveyard is swept (same posture as
-/// <see cref="SentinelTotemFactory"/> / <see cref="RelicOfProgenitusFactory"/>).
+/// The sweep exiles every player's graveyard read off the live resolution
+/// context (<c>ctx.Game.AllPlayers</c>) at resolution; when no live game is
+/// wired (shape-only / legacy sync path) only the controller's graveyard is
+/// swept (#2551 land cleanup — no captured resolver, so correct on the routed
+/// prod build).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Live "all players" enumeration</b>: no <c>Player.AllPlayers</c>
-///   accessor at v1 — the cross-player sweep is resolver-injected (shared with
-///   Sentinel Totem / Relic of Progenitus). The dispatcher path sweeps only the
-///   controller's graveyard.
 /// - <b>"Sacrifice a Desert" agent prompt</b>: the filtered sacrifice cost
 ///   deterministically picks the first eligible Desert when the agent has not
 ///   pre-set a target — the same prompting MVP every sibling sacrifice-picker
@@ -62,23 +59,13 @@ public static class ScavengerGroundsFactory
     public const string Slug = "scavenger-grounds";
 
     /// <summary>
-    /// Construct Scavenger Grounds. The sweep is scoped to the controller only
-    /// (no allPlayersResolver). This is the overload
-    /// <see cref="NamedCardFactory"/> dispatches to.
-    /// </summary>
-    public static Land Create(Player owner) => Create(owner, allPlayersResolver: null);
-
-    /// <summary>
-    /// Construct Scavenger Grounds with an optional live "all players" resolver
-    /// for the sacrifice ability's "exile all graveyards" sweep.
+    /// Construct Scavenger Grounds. The sacrifice ability's "exile all
+    /// graveyards" sweep reads every player off the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution; when no live game is wired
+    /// (shape-only / legacy sync path) only the controller's graveyard is swept.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Live enumerator of every player whose
-    /// graveyard the sweep should reach. Without a resolver only the
-    /// controller's graveyard is swept.</param>
-    public static Land Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Land Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -95,13 +82,18 @@ public static class ScavengerGroundsFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: exile all graveyards",
-            () =>
+            ctx =>
             {
-                var players = allPlayersResolver?.Invoke()
+                // "Exile all graveyards" — read every player from the LIVE game
+                // at resolution (ctx.Game.AllPlayers). No captured resolver, so
+                // correct on the routed prod build (#2551 land cleanup). When no
+                // live game is wired only the controller's graveyard is swept.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { land.Controller ?? owner };
 
                 foreach (var p in players)
                 {
+                    if (p == null) continue;
                     var graveyardCards = p.Zones.Graveyard.GetCards().ToList();
                     foreach (var card in graveyardCards)
                     {
@@ -110,6 +102,8 @@ public static class ScavengerGroundsFactory
                         card.SetZone(ZoneType.Exile);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         var sweepAbility = new ActivatedAbility(

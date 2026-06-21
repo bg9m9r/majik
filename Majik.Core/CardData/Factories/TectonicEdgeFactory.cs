@@ -85,21 +85,17 @@ public static class TectonicEdgeFactory
     /// many lands for the destroy ability to be activatable.</summary>
     public const int OpponentLandThreshold = 4;
 
-    public static Land Create(Player owner) => Create(owner, allPlayersResolver: null);
-
     /// <summary>
-    /// Construct Tectonic Edge.
+    /// Construct Tectonic Edge. The resolve-time activation-gate guard
+    /// (CR 602.5b — "an opponent controls four or more lands") counts each
+    /// opponent's lands off the LIVE resolution context
+    /// (<c>ctx.Game.AllPlayers</c>) at resolution. When no live game is wired
+    /// (shape-only / legacy sync path) the gate cannot be evaluated and the
+    /// destroy half is suppressed at resolution (fail-closed; the
+    /// self-sacrifice still stands).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Late-bound enumerator of all players
-    /// in the game. Used by the resolve-time activation-gate guard to count
-    /// each opponent's lands (CR 602.5b). May be null — in that case the gate
-    /// cannot be evaluated and the destroy half is suppressed at resolution
-    /// (fail-closed; the self-sacrifice still stands). Mirrors Field of
-    /// Ruin's <c>allPlayersResolver</c> posture.</param>
-    public static Land Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Land Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -120,9 +116,9 @@ public static class TectonicEdgeFactory
         ActivatedAbility? destroyAbility = null;
         var destroyEffect = new Effect(
             $"{CardName}: destroy target nonbasic land (opponent controls 4+ lands)",
-            () =>
+            ctx =>
             {
-                if (destroyAbility == null) return;
+                if (destroyAbility == null) return ValueTask.CompletedTask;
 
                 // Self-sacrifice — Wasteland / Field of Ruin posture
                 // (AdditionalCost.Sacrifice is a stub today; the cost was
@@ -136,29 +132,34 @@ public static class TectonicEdgeFactory
                 // activation time by the bot policy / action validator via
                 // OpponentControlsFourOrMoreLands, but until
                 // IActivatedAbility.CanActivate ships an authoritative hook
-                // this is the safety net. Fail-closed: if no player list is
-                // wired we cannot prove an opponent has four lands, so the
-                // destroy half is skipped (the cost was paid; the body is a
-                // no-op — Magmatic Channeler posture).
+                // this is the safety net. Read every player off the LIVE
+                // context (ctx.Game.AllPlayers) — no captured resolver, so
+                // correct on the routed prod build (#2551 land cleanup).
+                // Fail-closed: if no live game is wired we cannot prove an
+                // opponent has four lands, so the destroy half is skipped (the
+                // cost was paid; the body is a no-op — Magmatic Channeler
+                // posture).
                 var controller = land.Controller ?? owner;
-                if (!OpponentControlsFourOrMoreLands(controller, allPlayersResolver))
+                if (!OpponentControlsFourOrMoreLands(controller, ctx.Game?.AllPlayers))
                 {
-                    return;
+                    return ValueTask.CompletedTask;
                 }
 
                 // Destroy half — gate the chosen target (CR 608.2b — illegal
                 // target → the destroy does nothing for that target).
-                if (destroyAbility.ChosenTargets.Count == 0) return;
-                if (destroyAbility.ChosenTargets[0].Count == 0) return;
+                if (destroyAbility.ChosenTargets.Count == 0) return ValueTask.CompletedTask;
+                if (destroyAbility.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask;
 
                 var chosen = destroyAbility.ChosenTargets[0][0];
-                if (chosen is not ICard target) return;
-                if (!target.HasType(CardType.Land)) return;
-                if (target.HasSupertype(CardSupertype.Basic)) return;
-                if (target.Owner == null) return;
-                if (target.Zone != ZoneType.Battlefield) return;
+                if (chosen is not ICard target) return ValueTask.CompletedTask;
+                if (!target.HasType(CardType.Land)) return ValueTask.CompletedTask;
+                if (target.HasSupertype(CardSupertype.Basic)) return ValueTask.CompletedTask;
+                if (target.Owner == null) return ValueTask.CompletedTask;
+                if (target.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
 
                 DestroyToOwnersGraveyard(target);
+
+                return ValueTask.CompletedTask;
             });
 
         destroyAbility = new ActivatedAbility(
@@ -199,16 +200,16 @@ public static class TectonicEdgeFactory
     /// </summary>
     /// <param name="controller">The activating player (Tectonic Edge's
     /// controller). Their own lands are excluded.</param>
-    /// <param name="allPlayersResolver">Late-bound enumerator of all players.
-    /// When null the gate cannot be evaluated and returns <c>false</c>
-    /// (fail-closed).</param>
+    /// <param name="players">The live player list (typically
+    /// <c>ctx.Game.AllPlayers</c> at resolution, or the bot's
+    /// <c>GameContext.AllPlayers</c> at action-enumeration time). When null the
+    /// gate cannot be evaluated and returns <c>false</c> (fail-closed).</param>
     public static bool OpponentControlsFourOrMoreLands(
         Player controller,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        IReadOnlyList<Player>? players)
     {
         ArgumentNullException.ThrowIfNull(controller);
 
-        var players = allPlayersResolver?.Invoke();
         if (players == null) return false;
 
         foreach (var p in players)

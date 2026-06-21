@@ -73,21 +73,15 @@ public static class FieldOfRuinFactory
         new(StringComparer.OrdinalIgnoreCase)
         { "Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes" };
 
-    public static Land Create(Player owner) => Create(owner, allPlayersResolver: null);
-
     /// <summary>
-    /// Construct Field of Ruin.
+    /// Construct Field of Ruin. The destroy half runs against the chosen
+    /// target; the each-player tutor half reads every player off the LIVE
+    /// resolution context (<c>ctx.Game.AllPlayers</c>) at resolution. When no
+    /// live game is wired (shape-only / legacy sync path) the tutor half
+    /// no-ops (no player list to walk).
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Late-bound enumerator of all
-    /// players in the game (active player first by convention — CR
-    /// 101.4). May be null — the destroy half still runs against the
-    /// chosen target, but the each-player tutor half no-ops (no player
-    /// list to walk). Mirrors Ashiok's <c>allPlayersResolver</c>
-    /// posture.</param>
-    public static Land Create(
-        Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    public static Land Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -108,9 +102,9 @@ public static class FieldOfRuinFactory
         ActivatedAbility? destroyAbility = null;
         var destroyEffect = new Effect(
             $"{CardName}: destroy target nonbasic land an opponent controls; each player tutors a basic to battlefield",
-            () =>
+            ctx =>
             {
-                if (destroyAbility == null) return;
+                if (destroyAbility == null) return ValueTask.CompletedTask;
 
                 // Self-sacrifice — Wasteland posture (AdditionalCost.Sacrifice
                 // is a stub today; the cost was declared at activation, the
@@ -139,14 +133,19 @@ public static class FieldOfRuinFactory
                 // Each-player tutor half (CR 701.19a) — runs unconditionally
                 // (the destroy and the tutor are joined with a period in
                 // the oracle; an illegal destroy doesn't suppress the
-                // tutor).
-                var players = allPlayersResolver?.Invoke();
-                if (players == null) return;
+                // tutor). Read every player off the LIVE context
+                // (ctx.Game.AllPlayers) at resolution — no captured resolver,
+                // so correct on the routed prod build (#2551 land cleanup).
+                // No live game → tutor half no-ops.
+                var players = ctx.Game?.AllPlayers;
+                if (players == null) return ValueTask.CompletedTask;
 
                 foreach (var p in players)
                 {
                     TutorBasicLandToBattlefield(p);
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         destroyAbility = new ActivatedAbility(

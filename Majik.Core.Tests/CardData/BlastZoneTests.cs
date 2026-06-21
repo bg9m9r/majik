@@ -129,10 +129,7 @@ public class BlastZoneTests
     [Fact]
     public void BlastZone_ChargeActivation_AddsXChargeCounters()
     {
-        var land = BlastZoneFactory.Create(
-            _alice,
-            chargeXValueProvider: () => 3,
-            allPlayersResolver: null);
+        var land = BlastZoneFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
 
@@ -146,7 +143,10 @@ public class BlastZoneTests
             c.CostType == AdditionalCostType.Tap,
             "the second cost is the tap rider");
 
-        foreach (var e in chargeAbility.Effects) e.Execute();
+        // X is read off the live ResolutionContext (ctx.ChosenX), threaded from
+        // ActivatedAbility.ChosenX set at activation — no captured Func.
+        chargeAbility.SetChosenX(3);
+        ResolveWithGame(chargeAbility, _alice, _alice);
 
         land.Counters.Count(CounterType.Charge).Should().Be(3,
             "X = 3 → put three charge counters on Blast Zone");
@@ -155,16 +155,15 @@ public class BlastZoneTests
     [Fact]
     public void BlastZone_ChargeActivation_WithX0_AddsNoCounters()
     {
-        var land = BlastZoneFactory.Create(
-            _alice,
-            chargeXValueProvider: () => 0,
-            allPlayersResolver: null);
+        var land = BlastZoneFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
 
         var chargeAbility = land.Abilities.OfType<ActivatedAbility>()
             .First(a => !a.IsSorcerySpeed);
 
+        // No SetChosenX → ctx.ChosenX is null → X = 0 (pay {0}{0}{T} for no
+        // counters; legal but useless). Legacy sync resolve suffices.
         foreach (var e in chargeAbility.Effects) e.Execute();
 
         land.Counters.Count(CounterType.Charge).Should().Be(0,
@@ -199,10 +198,7 @@ public class BlastZoneTests
     {
         // Seed Blast Zone with 2 charge counters then sweep — mv-2 targets
         // across both battlefields die; lands + non-matching mv survive.
-        var land = BlastZoneFactory.Create(
-            _alice,
-            chargeXValueProvider: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var land = BlastZoneFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
         land.Counters.Add(CounterType.Charge, 2);
@@ -241,7 +237,9 @@ public class BlastZoneTests
 
         var sweep = land.Abilities.OfType<ActivatedAbility>()
             .Single(a => a.IsSorcerySpeed);
-        foreach (var e in sweep.Effects) e.Execute();
+        // The sweep reads every player's battlefield off ctx.Game.AllPlayers —
+        // resolve with a live GameContext over both players.
+        ResolveWithGame(sweep, _alice, _alice, _bob);
 
         aliceBear.Zone.Should().Be(ZoneType.Graveyard, "mv-2 creature destroyed");
         _alice.Zones.Graveyard.GetCards().Should().Contain(aliceBear);
@@ -274,5 +272,19 @@ public class BlastZoneTests
             "the sacrifice cost moves Blast Zone to its owner's graveyard (CR 701.16)");
         _alice.Zones.Graveyard.GetCards().Should().Contain(land);
         _alice.Zones.Battlefield.GetCards().Should().NotContain(land);
+    }
+
+    private static void ResolveWithGame(
+        ActivatedAbility ability, Player controller, params Player[] players)
+    {
+        var game = new Majik.Core.Game.GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        ability.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

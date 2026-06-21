@@ -100,12 +100,12 @@ public class ScavengerGroundsFactoryTests
         bobCard.SetZone(ZoneType.Graveyard);
         bob.Zones.Graveyard.AddCard(bobCard);
 
-        var land = ScavengerGroundsFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, bob });
+        var land = ScavengerGroundsFactory.Create(_alice);
 
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
-        ability.Resolve();
+        // The "exile all graveyards" sweep reads ctx.Game.AllPlayers at
+        // resolution — resolve with a live GameContext over both players.
+        ResolveWithGame(ability, _alice, _alice, bob);
 
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty("Alice's graveyard is exiled");
         bob.Zones.Graveyard.GetCards().Should().BeEmpty("Bob's graveyard is exiled too (all graveyards)");
@@ -126,5 +126,19 @@ public class ScavengerGroundsFactoryTests
 
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
         _alice.Zones.Exile.GetCards().Should().Contain(dead);
+    }
+
+    private static void ResolveWithGame(
+        ActivatedAbility ability, Player controller, params Player[] players)
+    {
+        var game = new Majik.Core.Game.GameContext(
+            self: controller,
+            allPlayers: players,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+        ability.ResolveAsync(agent: null, game: game).AsTask().GetAwaiter().GetResult();
     }
 }

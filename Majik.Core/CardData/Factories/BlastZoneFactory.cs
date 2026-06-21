@@ -66,10 +66,10 @@ namespace Majik.Core.CardData.Factories;
 ///       posture as Engineered Explosives / Pernicious Deed / Mishra's
 ///       Bauble); the effect closure performs the zone move so visible
 ///       state matches CR 701.16.</item>
-///     <item>Sweep iterates every battlefield supplied by the
-///       <paramref name="allPlayersResolver"/> (falls back to the
-///       controller-only path when null). For each card on the
-///       battlefield: if it is not a Land and its mana value equals the
+///     <item>Sweep iterates every battlefield read off the live resolution
+///       context (<c>ctx.Game.AllPlayers</c>; falls back to the
+///       controller-only path when no live game is wired). For each card on
+///       the battlefield: if it is not a Land and its mana value equals the
 ///       charge counter count on Blast Zone (sampled BEFORE the sac so
 ///       the count is correct), destroy it (move to its owner's
 ///       graveyard).</item>
@@ -83,15 +83,13 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>true</c> here so
 ///   <see cref="Rules.ActionValidator"/> rejects out-of-phase activations
 ///   (CR 117.1a / 307.5).
-/// - <b>Charge-counter activation X-value provenance</b>: same gap as
-///   Engineered Explosives' Sunburst — no per-activation X ledger. The
-///   v1 approximation accepts a caller-supplied
-///   <c>chargeXValueProvider</c>; production callers wire this from the
-///   cast / activation context.
+/// - <b>Charge-counter activation X value</b>: read off the live resolution
+///   context (<see cref="ResolutionContext.ChosenX"/>, threaded from
+///   <c>ActivatedAbility.ChosenX</c> set at activation). Null/none → 0.
 /// - <b>"Can't be regenerated" rider</b>: implicit at v1 — no regenerate
 ///   prompt exists.
 /// - <b>Multi-battlefield scan</b>: same shape as Pernicious Deed —
-///   <paramref name="allPlayersResolver"/> drives scope. Null → owner-only.
+///   <c>ctx.Game.AllPlayers</c> drives scope. No live game → owner-only.
 /// </summary>
 [CardName("Blast Zone")]
 public static class BlastZoneFactory
@@ -101,12 +99,14 @@ public static class BlastZoneFactory
     /// <summary>
     /// Construct Blast Zone with no live runtime wiring. The ETB charge-
     /// counter trigger is attached for shape observability; the
-    /// charge-counter activation resolves with X = 0; the sweep scans
-    /// only the controller's battlefield. Suitable for shape / dispatcher
-    /// tests.
+    /// charge-counter activation resolves with the activation-time X read off
+    /// the resolution context (<c>ctx.ChosenX</c>, 0 when none); the sweep
+    /// scans every player's battlefield read off <c>ctx.Game.AllPlayers</c>
+    /// (controller-only when no live game is wired). Suitable for shape /
+    /// dispatcher tests.
     /// </summary>
     public static Land Create(Player owner) =>
-        Create(owner, chargeXValueProvider: null, allPlayersResolver: null, eventBus: null);
+        Create(owner, eventBus: null);
 
     /// <summary>
     /// Effects-aware overload the <b>production</b> <c>GameFacade</c> routed
@@ -118,22 +118,7 @@ public static class BlastZoneFactory
     /// cost-payer — the seam aristocrat payoffs read.
     /// </summary>
     public static Land Create(Player owner, ContinuousEffectsService? effects) =>
-        Create(owner, chargeXValueProvider: null, allPlayersResolver: null, eventBus: effects?.EventBus);
-
-    /// <summary>
-    /// Construct Blast Zone. When <paramref name="chargeXValueProvider"/>
-    /// is supplied, the {X}{X}, {T} activated ability adds that many
-    /// charge counters at resolution (callers wire this to the
-    /// activation-time X value). When <paramref name="allPlayersResolver"/>
-    /// is supplied, the sweep scans every player's battlefield for
-    /// nonland permanents with mv = charge counters; otherwise only the
-    /// controller's battlefield is scanned.
-    /// </summary>
-    public static Land Create(
-        Player owner,
-        Func<int>? chargeXValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver) =>
-        Create(owner, chargeXValueProvider, allPlayersResolver, eventBus: null);
+        Create(owner, eventBus: effects?.EventBus);
 
     /// <summary>
     /// Canonical builder. <paramref name="eventBus"/> (when non-null) is
@@ -141,11 +126,19 @@ public static class BlastZoneFactory
     /// resolve-path sweep closure so the sacrifice publishes a
     /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a). Null preserves the
     /// legacy publish-nothing posture.
+    ///
+    /// <para>
+    /// The {X}{X}, {T} charge-counter activation reads its X off the live
+    /// resolution context (<see cref="ResolutionContext.ChosenX"/>, threaded
+    /// from <c>ActivatedAbility.ChosenX</c>), and the {3}, {T}, Sacrifice sweep
+    /// reads every player's battlefield off <c>ctx.Game.AllPlayers</c> — no
+    /// captured resolver, so both are correct on the routed prod build (#2551
+    /// land cleanup; the prod build dispatches the single-arg overload, which
+    /// previously left both captured Funcs null and the effect bodies inert).
+    /// </para>
     /// </summary>
     public static Land Create(
         Player owner,
-        Func<int>? chargeXValueProvider,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -192,12 +185,18 @@ public static class BlastZoneFactory
         // ----------------------------------------------------------------
         var chargeEffect = new Effect(
             $"{CardName}: add X charge counters ({{X}}{{X}}, {{T}})",
-            () =>
+            ctx =>
             {
-                if (land.Zone != ZoneType.Battlefield) return;
-                var x = chargeXValueProvider?.Invoke() ?? 0;
-                if (x <= 0) return;
+                if (land.Zone != ZoneType.Battlefield) return ValueTask.CompletedTask;
+                // Read the activation-time X off the live context
+                // (ResolutionContext.ChosenX, threaded from
+                // ActivatedAbility.ChosenX). Null/none → 0 (pay {0}{0}{T} for no
+                // counters; legal but useless). No captured Func, so correct on
+                // the routed prod build (#2551 land cleanup).
+                var x = ctx.ChosenX ?? 0;
+                if (x <= 0) return ValueTask.CompletedTask;
                 land.Counters.Add(CounterType.Charge, x);
+                return ValueTask.CompletedTask;
             });
 
         land.AddAbility(new ActivatedAbility(
@@ -224,7 +223,7 @@ public static class BlastZoneFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: destroy each nonland permanent with mv = charge counters",
-            () =>
+            ctx =>
             {
                 // Snapshot the charge count BEFORE the sacrifice — once
                 // Blast Zone is in the graveyard its Counters bag is
@@ -256,11 +255,16 @@ public static class BlastZoneFactory
                     }
                 }
 
-                var players = allPlayersResolver?.Invoke()
+                // "Each nonland permanent" — read every player's battlefield
+                // off the LIVE context (ctx.Game.AllPlayers). No captured
+                // resolver, so correct on the routed prod build (#2551 land
+                // cleanup). Controller-only fallback when no live game is wired.
+                var players = ctx.Game?.AllPlayers
                     ?? (IReadOnlyList<Player>)new[] { owner };
 
                 foreach (var p in players)
                 {
+                    if (p == null) continue;
                     // Snapshot — we mutate the battlefield list inside
                     // the loop. Mirror Pernicious Deed's pattern.
                     var victims = p.Zones.Battlefield.GetCards()
@@ -282,6 +286,8 @@ public static class BlastZoneFactory
                         v.SetZone(ZoneType.Graveyard);
                     }
                 }
+
+                return ValueTask.CompletedTask;
             });
 
         land.AddAbility(new ActivatedAbility(
