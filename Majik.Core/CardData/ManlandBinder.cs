@@ -8,6 +8,7 @@ using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Zones;
+using static Majik.Core.CardData.SpellTemplates.SpellTemplateHelpers;
 
 namespace Majik.Core.CardData;
 
@@ -1124,16 +1125,12 @@ public static class ManlandBinder
     private static IReadOnlyList<object> GatherOtherCreatures(
         Land land, Majik.Core.Game.GameContext ctx)
     {
-        var result = new List<object>();
-        foreach (var p in ctx.AllPlayers)
-        {
-            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                if (ReferenceEquals(c, land)) continue;
-                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
-            }
-        }
-        return result;
+        return ctx.AllPlayers
+            .SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Creature>())
+            .Where(c => !ReferenceEquals(c, land))
+            .Distinct()
+            .Cast<object>()
+            .ToList();
     }
 
     /// <summary>CR 601.2c — every card in any player's graveyard.</summary>
@@ -1448,14 +1445,6 @@ public static class ManlandBinder
         return Enum.TryParse(token, ignoreCase: true, out subtype);
     }
 
-    private static int WordToInt(string s) =>
-        s.ToLowerInvariant() switch
-        {
-            "a" or "an" or "one" => 1,
-            "two" => 2, "three" => 3, "four" => 4, "five" => 5,
-            "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
-            _ => int.TryParse(s, out var n) ? n : 0,
-        };
 
     /// <summary>
     /// CR 305.1 / Svogthos CDA — the number of creature cards in the animated

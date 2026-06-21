@@ -21,7 +21,8 @@ public sealed class BotPlayerAgent : IPlayerAgent
 
     public BotPlayerAgent(Player self, BotConfig config, Action<bool>? onThinking = null)
     {
-        _self = self ?? throw new ArgumentNullException(nameof(self));
+        ArgumentNullException.ThrowIfNull(self);
+        _self = self;
         _onThinking = onThinking;
         // "frozen-fb1" — FB1, the frozen-baseline ladder's permanent reference
         // opponent: a byte-identical snapshot of the live heuristic vendored
@@ -56,8 +57,10 @@ public sealed class BotPlayerAgent : IPlayerAgent
     /// </summary>
     internal BotPlayerAgent(Player self, IBotStrategy strategy, Action<bool>? onThinking = null)
     {
-        _self = self ?? throw new ArgumentNullException(nameof(self));
-        _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+        ArgumentNullException.ThrowIfNull(self);
+        ArgumentNullException.ThrowIfNull(strategy);
+        _self = self;
+        _strategy = strategy;
         _onThinking = onThinking;
     }
 

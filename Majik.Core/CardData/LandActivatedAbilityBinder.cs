@@ -17,6 +17,7 @@ using Majik.Core.Services;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
+using static Majik.Core.CardData.SpellTemplates.SpellTemplateHelpers;
 
 namespace Majik.Core.CardData;
 
@@ -2280,11 +2281,11 @@ public static class LandActivatedAbilityBinder
 
     private static IReadOnlyList<object> GatherAllCreatures(GameContext ctx)
     {
-        var result = new List<object>();
-        foreach (var p in ctx.AllPlayers)
-            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
-                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
-        return result;
+        return ctx.AllPlayers
+            .SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Creature>())
+            .Distinct()
+            .Cast<object>()
+            .ToList();
     }
 
     // Eiganjo, Seat of the Empire (Channel) — "target attacking or blocking
@@ -2359,11 +2360,4 @@ public static class LandActivatedAbilityBinder
         return result;
     }
 
-    private static int WordToInt(string s) =>
-        s.ToLowerInvariant() switch
-        {
-            "a" or "an" or "one" => 1,
-            "two" => 2, "three" => 3, "four" => 4, "five" => 5,
-            _ => int.TryParse(s, out var n) ? n : 0,
-        };
 }

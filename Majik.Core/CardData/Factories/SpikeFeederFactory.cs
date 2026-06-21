@@ -211,11 +211,11 @@ public static class SpikeFeederFactory
     /// on the battlefield across all players in the live game.</summary>
     private static IReadOnlyList<object> GatherCreatures(Majik.Core.Game.GameContext ctx)
     {
-        var result = new List<object>();
-        foreach (var p in ctx.AllPlayers)
-            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
-                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
-        return result;
+        return ctx.AllPlayers
+            .SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Creature>())
+            .Distinct()
+            .Cast<object>()
+            .ToList();
     }
 
     /// <summary>
