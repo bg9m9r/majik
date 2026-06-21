@@ -102,6 +102,22 @@ public class TriggeredAbility : ITriggeredAbility
     public ModeRequest? ModeRequest { get; }
 
     /// <summary>
+    /// CR 603.5 / CR 117.x — the "you may" gate this trigger carries, declared
+    /// at construction time. Null for a MANDATORY trigger ("whenever X, do Y").
+    /// When present, the trigger is OPTIONAL ("whenever X, you may do Y"): at
+    /// resolution (CR 603.5 — the choice to perform a "may" instruction is made
+    /// as the ability resolves) the controller's agent is prompted yes/no via
+    /// <see cref="IPlayerAgent.ChooseYesNoAsync(string,Cards.BotIntent,System.Threading.CancellationToken)"/>;
+    /// on a NO the effects are skipped entirely (the ability resolves as a
+    /// no-op). When no agent is available to prompt (the dispatcher / shape
+    /// path) the action is auto-taken — behaviour-preserving for every "you may"
+    /// trigger written before this gate shipped, all of which resolved
+    /// mandatorily. The triggered-ability analogue of the binder-bound optional
+    /// yes/no prompt (#2720) but for bespoke-factory triggers.
+    /// </summary>
+    public OptionalTriggerPrompt? OptionalPrompt { get; }
+
+    /// <summary>
     /// The mode index(es) chosen by the controller's agent for this modal
     /// trigger (CR 700.2d). Populated by <see cref="SetChosenModes"/> before
     /// the ability is pushed onto the stack; threaded into
@@ -174,7 +190,8 @@ public class TriggeredAbility : ITriggeredAbility
         IEnumerable<TargetRequest>? targetRequests = null,
         Func<bool>? activeWhen = null,
         ModeRequest? modeRequest = null,
-        Game.DamageDivisionSpec? damageDivision = null)
+        Game.DamageDivisionSpec? damageDivision = null,
+        OptionalTriggerPrompt? optionalPrompt = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -204,6 +221,7 @@ public class TriggeredAbility : ITriggeredAbility
 
         ModeRequest = modeRequest;
         DamageDivision = damageDivision;
+        OptionalPrompt = optionalPrompt;
 
         if (targets != null)
         {
@@ -243,7 +261,8 @@ public class TriggeredAbility : ITriggeredAbility
             targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
             activeWhen: ActiveWhen,
             modeRequest: ModeRequest,
-            damageDivision: DamageDivision);
+            damageDivision: DamageDivision,
+            optionalPrompt: OptionalPrompt);
 
     /// <summary>
     /// Store the targets chosen by the controller's agent. Called by
@@ -334,6 +353,30 @@ public class TriggeredAbility : ITriggeredAbility
                 ChosenModes = _chosenModes,
                 DamageDivision = _chosenDamageDivision,
             };
+
+        // CR 603.5 / CR 117.x — an OPTIONAL ("you may") trigger asks its
+        // controller at resolution whether to perform the instruction. On a NO
+        // the ability resolves as a no-op (no effects run). The agent is the
+        // resolver-supplied one, falling back to the controller's registered
+        // agent (the AgentRegistry seam the v1 binder closures already use). No
+        // agent at all ⇒ auto-take, preserving the legacy mandatory-resolution
+        // posture every pre-gate "you may" trigger relied on.
+        if (OptionalPrompt is { } may)
+        {
+            var promptAgent = agent
+                ?? Players.Agents.AgentRegistry.Get(Controller);
+            if (promptAgent != null)
+            {
+                var perform = await promptAgent
+                    .ChooseYesNoAsync(may.Question, may.Intent, ct)
+                    .ConfigureAwait(false);
+                if (!perform)
+                {
+                    _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
+                    return;
+                }
+            }
+        }
 
         // Attribute any counter performed during this ability's resolution to
         // its controller — "a spell or ability you control counters a spell"

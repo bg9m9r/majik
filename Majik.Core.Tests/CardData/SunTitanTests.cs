@@ -8,6 +8,7 @@ using Majik.Core.Combat;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -131,6 +132,68 @@ public class SunTitanTests
         giant.Zone.Should().Be(ZoneType.Graveyard,
             "Hill Giant has mv 4 — outside the ≤ 3 cap, must remain in graveyard");
         alice.Zones.Battlefield.GetCards().Should().NotContain(giant);
+    }
+
+    // -----------------------------------------------------------------------
+    // "You may" optional gate (CR 603.5)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SunTitan_EtbTrigger_IsOptional()
+    {
+        var titan = SunTitanFactory.Create(_alice);
+        var etb = titan.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardMovedEvent>);
+
+        etb.OptionalPrompt.Should().NotBeNull(
+            "CR 603.5 — 'whenever Sun Titan enters …, you may return …' is an optional trigger");
+        etb.OptionalPrompt!.Value.Intent.Should().Be(BotIntent.Reanimate);
+    }
+
+    [Fact]
+    public async Task SunTitan_EtbTrigger_DeclinedAtResolution_DoesNotReanimate()
+    {
+        var alice = new Player("Alice", 20);
+
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2);
+        bear.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear);
+        bear.SetZone(ZoneType.Graveyard);
+
+        var titan = SunTitanFactory.Create(alice);
+        var etb = titan.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardMovedEvent>);
+
+        // CR 603.5 — the controller declines the "you may" at resolution.
+        var agent = new ScriptedAgent();
+        agent.QueueYesNo(false);
+        await etb.ResolveAsync(agent, game: null);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard,
+            "the controller declined the optional reanimate — the trigger resolves as a no-op");
+        alice.Zones.Battlefield.GetCards().Should().NotContain(bear);
+    }
+
+    [Fact]
+    public async Task SunTitan_EtbTrigger_AcceptedAtResolution_Reanimates()
+    {
+        var alice = new Player("Alice", 20);
+
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2);
+        bear.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear);
+        bear.SetZone(ZoneType.Graveyard);
+
+        var titan = SunTitanFactory.Create(alice);
+        var etb = titan.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.Condition is EventTriggerCondition<CardMovedEvent>);
+
+        var agent = new ScriptedAgent();
+        agent.QueueYesNo(true);
+        await etb.ResolveAsync(agent, game: null);
+
+        bear.Zone.Should().Be(ZoneType.Battlefield,
+            "the controller accepted the optional reanimate at resolution");
     }
 
     // -----------------------------------------------------------------------
