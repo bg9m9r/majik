@@ -32,9 +32,9 @@ public static class StateSnapshotter
         // stale snapshots. Defaults to 0 for callers that don't track seq.
         long seq = 0)
     {
-        if (players == null) throw new ArgumentNullException(nameof(players));
-        if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
-        if (stack == null) throw new ArgumentNullException(nameof(stack));
+        ArgumentNullException.ThrowIfNull(players);
+        ArgumentNullException.ThrowIfNull(activePlayer);
+        ArgumentNullException.ThrowIfNull(stack);
 
         return new GameStateDto(
             GameId: gameId,
@@ -291,14 +291,13 @@ public static class StateSnapshotter
                 c = true;
             }
         }
-        var sb = new System.Text.StringBuilder(6);
-        if (w) sb.Append('W');
-        if (u) sb.Append('U');
-        if (b) sb.Append('B');
-        if (r) sb.Append('R');
-        if (g) sb.Append('G');
-        if (c) sb.Append('C');
-        return sb.ToString();
+        return string.Concat(
+            w ? "W" : "",
+            u ? "U" : "",
+            b ? "B" : "",
+            r ? "R" : "",
+            g ? "G" : "",
+            c ? "C" : "");
     }
 
     private static AbilityDto SnapshotAbility(IAbility ability) => ability switch

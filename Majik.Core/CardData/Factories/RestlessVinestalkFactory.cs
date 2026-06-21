@@ -239,17 +239,13 @@ public static class RestlessVinestalkFactory
     /// </summary>
     private static IReadOnlyList<object> GatherOtherCreatures(Land self)
     {
-        var result = new List<object>();
-        foreach (var p in new[] { self.Owner, self.Controller })
-        {
-            if (p == null) continue;
-            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                if (ReferenceEquals(c, self)) continue;
-                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
-            }
-        }
-        return result;
+        return new[] { self.Owner, self.Controller }
+            .Where(p => p != null)
+            .SelectMany(p => p!.Zones.Battlefield.GetCards().OfType<Creature>())
+            .Where(c => !ReferenceEquals(c, self))
+            .Distinct()
+            .Cast<object>()
+            .ToList();
     }
 
     /// <summary>

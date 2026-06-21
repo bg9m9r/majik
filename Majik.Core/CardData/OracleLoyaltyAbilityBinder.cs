@@ -7,6 +7,7 @@ using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Tokens;
 using Majik.Core.Zones;
+using static Majik.Core.CardData.SpellTemplates.SpellTemplateHelpers;
 
 namespace Majik.Core.CardData;
 
@@ -257,18 +258,4 @@ public static class OracleLoyaltyAbilityBinder
         }
     }
 
-    private static int WordToInt(string s) => s.ToLowerInvariant() switch
-    {
-        "a" or "an" or "one" => 1,
-        "two" => 2,
-        "three" => 3,
-        "four" => 4,
-        "five" => 5,
-        "six" => 6,
-        "seven" => 7,
-        "eight" => 8,
-        "nine" => 9,
-        "ten" => 10,
-        _ => int.TryParse(s, out var v) ? v : 0,
-    };
 }

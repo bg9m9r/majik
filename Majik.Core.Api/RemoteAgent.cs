@@ -106,7 +106,8 @@ public sealed class RemoteAgent : IPlayerAgent
         Func<Guid, ICard?>? cardLookup = null,
         Func<Guid, Player?>? playerLookup = null)
     {
-        _player = player ?? throw new ArgumentNullException(nameof(player));
+        ArgumentNullException.ThrowIfNull(player);
+        _player = player;
         _cardLookup = cardLookup;
         _playerLookup = playerLookup;
     }
@@ -138,7 +139,7 @@ public sealed class RemoteAgent : IPlayerAgent
 
     public void Submit(GameCommand command)
     {
-        if (command == null) throw new ArgumentNullException(nameof(command));
+        ArgumentNullException.ThrowIfNull(command);
 
         if (command.PlayerId != _player.Id)
         {

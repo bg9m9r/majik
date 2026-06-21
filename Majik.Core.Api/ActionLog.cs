@@ -17,7 +17,7 @@ public sealed class ActionLog
 
     public void Append(GameCommand command)
     {
-        if (command == null) throw new ArgumentNullException(nameof(command));
+        ArgumentNullException.ThrowIfNull(command);
         _actions.Add(new LoggedAction(DateTime.UtcNow, command));
     }
 

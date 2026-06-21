@@ -175,15 +175,11 @@ public static class DesertFactory
     /// </summary>
     private static IReadOnlyList<object> GatherCreatures(Land self)
     {
-        var result = new List<object>();
-        foreach (var p in new[] { self.Owner, self.Controller })
-        {
-            if (p == null) continue;
-            foreach (var c in p.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                if (!result.Any(r => ReferenceEquals(r, c))) result.Add(c);
-            }
-        }
-        return result;
+        return new[] { self.Owner, self.Controller }
+            .Where(p => p != null)
+            .SelectMany(p => p!.Zones.Battlefield.GetCards().OfType<Creature>())
+            .Distinct()
+            .Cast<object>()
+            .ToList();
     }
 }

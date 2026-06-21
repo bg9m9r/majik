@@ -1069,7 +1069,7 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     public async Task SubmitAsync(GameCommand command, CancellationToken ct = default)
     {
-        if (command == null) throw new ArgumentNullException(nameof(command));
+        ArgumentNullException.ThrowIfNull(command);
 
         var agent = command.PlayerId == _alice.Id ? _aliceAgent
                   : command.PlayerId == _bob.Id ? _bobAgent
@@ -1151,20 +1151,21 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     private IReadOnlyDictionary<Guid, string> BuildInstanceNameMap()
     {
-        var map = new Dictionary<Guid, string>();
-        foreach (var player in new[] { _alice, _bob })
+        var zoneTypes = new[]
         {
-            foreach (var zoneType in new[]
-                     {
-                         ZoneType.Hand, ZoneType.Battlefield, ZoneType.Graveyard,
-                         ZoneType.Library, ZoneType.Exile, ZoneType.Stack,
-                     })
-            {
-                foreach (var card in player.Zones.GetZone(zoneType).GetCards())
-                {
-                    map[card.InstanceId] = card.Name;
-                }
-            }
+            ZoneType.Hand, ZoneType.Battlefield, ZoneType.Graveyard,
+            ZoneType.Library, ZoneType.Exile, ZoneType.Stack,
+        };
+        // Last-wins on a duplicate InstanceId, matching the original nested-loop
+        // indexer assignment. (A card lives in exactly one zone, so InstanceIds
+        // are unique here in practice; the indexer keeps the prior semantics
+        // rather than throwing as ToDictionary would on a collision.)
+        var map = new Dictionary<Guid, string>();
+        foreach (var card in new[] { _alice, _bob }
+                     .SelectMany(player => zoneTypes
+                         .SelectMany(zoneType => player.Zones.GetZone(zoneType).GetCards())))
+        {
+            map[card.InstanceId] = card.Name;
         }
         return map;
     }

@@ -41,12 +41,9 @@ public sealed class ReplacementBus
     public IReplacementEffect<TIntent>? FindByTag<TIntent>(object tag) where TIntent : class
     {
         if (tag == null) return null;
-        foreach (var raw in _effects)
-        {
-            if (raw is not IReplacementEffect<TIntent> eff) continue;
-            if (ReferenceEquals(eff.Tag, tag)) return eff;
-        }
-        return null;
+        return _effects
+            .OfType<IReplacementEffect<TIntent>>()
+            .FirstOrDefault(eff => ReferenceEquals(eff.Tag, tag));
     }
 
     /// <summary>

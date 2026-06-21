@@ -14,7 +14,7 @@ public static class SpectatorSnapshot
 {
     public static GameStateDto Load(byte[] blob)
     {
-        if (blob == null) throw new ArgumentNullException(nameof(blob));
+        ArgumentNullException.ThrowIfNull(blob);
 
         return JsonSerializer.Deserialize<GameStateDto>(blob)
             ?? throw new InvalidOperationException("Snapshot deserialized as null.");

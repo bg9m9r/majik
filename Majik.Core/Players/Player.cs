@@ -298,8 +298,7 @@ public class Player
     /// </summary>
     public int RemoveAllCounters()
     {
-        var total = PoisonCounters + EnergyCounters;
-        foreach (var n in _otherCounters.Values) total += n;
+        var total = PoisonCounters + EnergyCounters + _otherCounters.Values.Sum();
         PoisonCounters = 0;
         EnergyCounters = 0;
         _otherCounters.Clear();
