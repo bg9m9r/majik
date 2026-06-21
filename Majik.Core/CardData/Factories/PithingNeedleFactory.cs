@@ -1,6 +1,7 @@
 using Majik.Core.Cards;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 
 namespace Majik.Core.CardData.Factories;
@@ -36,12 +37,28 @@ namespace Majik.Core.CardData.Factories;
 ///   replacement, not after. The Needle's effect treats the resolution
 ///   point of the ETB as the prompt moment, which is observationally
 ///   equivalent in the engine's current ETB pipeline.
-/// - <b>Agent-prompt integration</b>: <see cref="Majik.Core.Players.Agents.IPlayerAgent"/>
-///   doesn't yet declare a ChooseCardName prompt. Until that lands, the
-///   factory accepts a <c>Func&lt;Player, string&gt;</c> selector closure
-///   — bots and tests supply the chosen name directly. When the prompt
-///   lands, the selector signature stays; the closure simply forwards to
-///   <c>agent.ChooseCardNameAsync(...)</c>.
+/// ## Agent-prompt integration (CR 614.12 / CR 201.4)
+/// The deferral <c>choose-card-name-agent-surface</c> is paid down: the
+/// production single-arg <see cref="Create(Player)"/> (and the
+/// <see cref="Create(Player, Majik.Core.Game.GameContext?, IEventBus?)"/>
+/// overload) install an agent-prompting <c>nameSelector</c> that resolves the
+/// chosen name through
+/// <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseCardNameAsync"/> via
+/// <see cref="Majik.Core.CardData.CardNameChoice"/> — the opponents' visible
+/// "known threats" pool, most-threatening-first. The
+/// <c>Func&lt;Player, string&gt;</c> selector overload remains for tests that
+/// want to supply a fixed name.
+///
+/// ## Deferred (v1 gaps)
+/// - <b>"As ~ enters" choice timing</b>: CR 614.12 (replacement effect on
+///   ETB) — the choice is technically made as part of the ETB replacement,
+///   not after. The Needle resolves the name at the ETB Sync point, which is
+///   observationally equivalent in the engine's current ETB pipeline.
+/// - <b>Remote free-text name entry</b>: a remote (human) agent's
+///   <c>ChooseCardNameAsync</c> currently lands on the suggested-name default
+///   (boxed strings don't round-trip the ChoiceCommand id map), the same
+///   posture as <c>ChooseColorAsync</c>; a dedicated wire command is a
+///   follow-up.
 /// </summary>
 [CardName("Pithing Needle")]
 public static class PithingNeedleFactory
@@ -50,12 +67,33 @@ public static class PithingNeedleFactory
     public const string Cost = "{1}";
 
     /// <summary>
-    /// Construct a Pithing Needle with no selector wired. Suitable for
-    /// card-shape / dispatcher tests — the printed static will not
-    /// register any name restriction.
+    /// Construct a Pithing Needle whose ETB name choice is resolved through
+    /// the controller's <see cref="Majik.Core.Players.Agents.IPlayerAgent"/>
+    /// (the production posture — pays down the
+    /// <c>choose-card-name-agent-surface</c> deferral). The printed static
+    /// prompts <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseCardNameAsync"/>
+    /// at resolution via <see cref="CardNameChoice"/>. When no agent is
+    /// registered for the owner (a pure shape / dispatcher test with no game),
+    /// the choice returns empty and the static stays inert — the same
+    /// observable behaviour the old null-selector single-arg build had.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, nameSelector: null, eventBus: null);
+        Create(owner, game: null, eventBus: null);
+
+    /// <summary>
+    /// Production-shaped overload: resolve the chosen name through the owner's
+    /// agent at ETB. <paramref name="game"/> is threaded into
+    /// <see cref="CardNameChoice"/> so the agent's suggestion pool is the
+    /// opponents' visible "known threats" (most-threatening first). May be null
+    /// (no live game → empty suggestion pool, agent falls back).
+    /// </summary>
+    public static Artifact Create(Player owner, GameContext? game, IEventBus? eventBus)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        Func<Player, string> selector = chooser =>
+            CardNameChoice.ChooseSync(game, chooser, CardNameChoice.AnyCardNameLabel);
+        return Create(owner, nameSelector: selector, eventBus: eventBus);
+    }
 
     /// <summary>
     /// Construct a Pithing Needle whose printed static is fully wired

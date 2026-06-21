@@ -2,6 +2,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 
 namespace Majik.Core.CardData.Factories;
@@ -33,14 +34,26 @@ namespace Majik.Core.CardData.Factories;
 ///   as the Mage leaves the battlefield via
 ///   <see cref="Majik.Core.Events.CardMovedEvent"/> on the supplied bus.
 ///
+/// ## Agent-prompt integration (CR 614.12 / CR 201.4)
+/// The deferral <c>choose-card-name-agent-surface</c> is paid down: the
+/// production single-arg <see cref="Create(Player)"/> (and the
+/// <see cref="Create(Player, Majik.Core.Game.GameContext?, IEventBus?)"/>
+/// overload) resolve the chosen NONLAND name through
+/// <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseCardNameAsync"/> via
+/// <see cref="Majik.Core.CardData.CardNameChoice"/> — the opponents' visible
+/// nonland "known threats" pool, most-threatening-first. The
+/// <c>string chosenName</c> overload remains for tests that supply a fixed name.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Agent-prompt integration</b>:
-///   <see cref="Majik.Core.Players.Agents.IPlayerAgent"/> doesn't yet
-///   declare a ChooseCardName prompt. Until that lands, callers supply the
-///   name directly to the factory overload.
-/// - <b>"nonland card name" validation</b>: the chosen name is accepted as
-///   a raw string; enforcement that it isn't a basic land name is deferred
-///   (rules-layer validation, not mechanical).
+/// - <b>"As ~ enters" choice timing</b>: the name is resolved when the factory
+///   builds the lifecycle (matching the pre-existing chosenName overload's
+///   construction-time posture) rather than strictly as part of the ETB
+///   replacement (CR 614.12) — observationally equivalent in the current ETB
+///   pipeline.
+/// - <b>"nonland card name" validation</b>: the chosen name is accepted as a
+///   raw string; the suggestion pool excludes lands, but enforcement that an
+///   agent-overriding name isn't a basic land is deferred (rules-layer, not
+///   mechanical).
 /// </summary>
 [CardName("Meddling Mage")]
 public static class MeddlingMageFactory
@@ -51,12 +64,33 @@ public static class MeddlingMageFactory
     public const int Toughness = 2;
 
     /// <summary>
-    /// Construct a Meddling Mage with no chosen name. Suitable for
-    /// card-shape / dispatcher tests — the printed static will not block
-    /// any casts.
+    /// Construct a Meddling Mage whose ETB name choice is resolved through the
+    /// controller's <see cref="Majik.Core.Players.Agents.IPlayerAgent"/> (the
+    /// production posture — pays down the
+    /// <c>choose-card-name-agent-surface</c> deferral). Prompts
+    /// <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseCardNameAsync"/>
+    /// at ETB via <see cref="CardNameChoice"/> with the "nonland card name"
+    /// constraint. When no agent is registered (a pure shape / dispatcher test
+    /// with no game) the choice returns empty and the static stays inert — the
+    /// same observable behaviour the old empty-name single-arg build had.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, chosenName: string.Empty, eventBus: null);
+        Create(owner, game: null, eventBus: null);
+
+    /// <summary>
+    /// Production-shaped overload: resolve the chosen NONLAND name through the
+    /// owner's agent at ETB. <paramref name="game"/> is threaded into
+    /// <see cref="CardNameChoice"/> so the agent's suggestion pool is the
+    /// opponents' visible nonland "known threats" (most-threatening first). May
+    /// be null (no live game → empty suggestion pool, agent falls back).
+    /// </summary>
+    public static Creature Create(Player owner, GameContext? game, IEventBus? eventBus)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        var chosen = CardNameChoice.ChooseSync(
+            game, owner, CardNameChoice.NonlandCardNameLabel, nonlandOnly: true);
+        return Create(owner, chosenName: chosen, eventBus: eventBus);
+    }
 
     /// <summary>
     /// Construct a Meddling Mage with <paramref name="chosenName"/> as the
