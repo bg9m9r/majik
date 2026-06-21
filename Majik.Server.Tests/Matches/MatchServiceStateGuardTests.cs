@@ -40,7 +40,7 @@ public class MatchServiceStateGuardTests : IClassFixture<TestMongoFixture>
             hub: null,
             timeoutScheduler: null,
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
     }
 
     [Fact]

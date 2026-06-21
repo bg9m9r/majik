@@ -62,7 +62,7 @@ public class MatchServiceBotFlowTests : IClassFixture<TestMongoFixture>
             new DiceRoller(rng), new StubDeckLoader(), new SystemClock(),
             pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             botScheduler: scheduler);
         scheduler.Bind(svc);
         return (svc, pub, scheduler);
@@ -229,7 +229,7 @@ public class MatchServiceBotFlowTests : IClassFixture<TestMongoFixture>
             hub: null,
             timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             botScheduler: captureScheduler);
 
         var created = await svc.CreateAsync("u-alice",

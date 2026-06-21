@@ -35,7 +35,7 @@ public class MatchServiceCreateTests : IClassFixture<TestMongoFixture>
             hub: null,
             timeoutScheduler: null,
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class MatchServiceCreateTests : IClassFixture<TestMongoFixture>
             new DiceRoller(new SystemRandomSource()),
             new StubDeckLoader(), new SystemClock(),
             hub: null, timeoutScheduler: null, gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
         return (svc, matchRepo);
     }
 }

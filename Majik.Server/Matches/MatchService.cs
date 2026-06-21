@@ -67,7 +67,7 @@ public sealed class MatchService
         DeckRepository? deckRepo = null,
         DeckValidationService? deckValidator = null,
         ILogger<MatchService>? logger = null,
-        IDeckOwnershipPolicy? deckOwnershipPolicy = null,
+        bool allowMissingDeckPlumbing = false,
         MatchFacadeBridge? facadeBridge = null,
         MatchReplayBuffer? replayBuffer = null,
         IBotMatchScheduler? botScheduler = null,
@@ -94,14 +94,13 @@ public sealed class MatchService
         // skipped the per-owner check in ResolveDeckSnapshotAsync, which
         // let any caller quote any deck id and have the match service
         // treat it as theirs. Tests that genuinely use StubDeckLoader
-        // inject AllowStubDeckOwnershipPolicy to opt back into the
+        // pass allowMissingDeckPlumbing: true to opt back into the
         // unchecked path.
-        var policy = deckOwnershipPolicy ?? new StrictDeckOwnershipPolicy();
-        if ((_deckRepo == null || _deckValidator == null) && !policy.AllowMissingDeckPlumbing)
+        if ((_deckRepo == null || _deckValidator == null) && !allowMissingDeckPlumbing)
         {
             throw new InvalidOperationException(
                 "MatchService requires DeckRepository and DeckValidationService " +
-                "(strict deck-ownership policy). Inject AllowStubDeckOwnershipPolicy " +
+                "(strict deck-ownership policy). Pass allowMissingDeckPlumbing: true " +
                 "in tests that intentionally use the stub deck loader.");
         }
     }
