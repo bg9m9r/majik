@@ -120,43 +120,87 @@ public static class GiverOfRunesFactory
         // colorless or from the color of your choice until end of turn.
         // CR 602.1 — activated ability with a tap cost. The chosen target
         // is honoured on resolution (CR 608.2b re-validates).
+        //
+        // RE-SOURCE-SAFE (agatha-mother-of-runes-style-candidate-gatherer-
+        // controller-rebind): mirrors MotherOfRunesFactory. "of your choice"
+        // / the grant-quality controller ("you") is read off the live
+        // ResolutionContext.Controller, and the chosen target off
+        // ctx.ChosenTargets — rather than capturing a captured ability handle
+        // (grantAbility.ChosenTargets) or `owner`. The {T} cost re-homes onto
+        // the new source via AdditionalCost.RebindSource (Stage 1), the
+        // "another creature you control" candidate gatherer is a re-homeable
+        // ControllerScopedGatherer (Stage 1 gatherer seam) that excludes the
+        // re-homed SOURCE itself off ctx.Source ("another", CR 602.1), and the
+        // protection grant is self-sourced on the chosen TARGET (Resolve
+        // registers a GrantAbilityEffect with source: target), so re-homing
+        // does not re-read Giver of Runes. Marked RebindSafe below so Agatha's
+        // Soul Cauldron re-homes the REAL ability onto a counter-bearing bearer
+        // via ActivatedAbility.RebindTo (CR 707.2 / 613.1f) — the {T} taps the
+        // BEARER, "you" is the BEARER's controller, the gatherer enumerates the
+        // BEARER controller's board (excluding the bearer), never the exiled
+        // Giver of Runes. A "another target creature you control gains
+        // protection from a chosen colour" grant is outside
+        // OracleActivatedAbilityBinder's reconstructable set, so RebindTo of the
+        // real ability is the only sound re-home.
         // ----------------------------------------------------------------
-        ActivatedAbility? grantAbility = null;
         var grantEffect = new Effect(
             $"{CardName}: another target creature you control gains protection (colorless or chosen colour) EOT",
-            () =>
+            ctx =>
             {
-                if (grantAbility == null) return;
-                var chosen = grantAbility.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (ctx.ChosenTargets.Count == 0 || ctx.ChosenTargets[0].Count == 0)
+                {
+                    return ValueTask.CompletedTask;
+                }
 
-                // Default quality is "colorless"; agents / tests supply a
-                // colour via the chosen target's own removal context. Here
-                // the picker defaults to colorless on the dispatcher path
-                // (no agent quality prompt yet — see class xmldoc).
-                Resolve(owner, chosen[0][0], ColorlessPicker, source: card);
+                // "you" (the grant-quality controller) read off the live
+                // context (the re-homed controller), falling back to the
+                // authored owner on the context-less sync path. The "another"
+                // source gate reads the live ctx.Source (the re-homed bearer)
+                // so a re-homed grant cannot target the bearer itself. Default
+                // quality is "colorless" (Giver's printed-text first half);
+                // agents / tests supply a colour via an injectable picker (no
+                // agent colour prompt yet — see class xmldoc).
+                var controller = ctx.Controller ?? owner;
+                var source = ctx.Source as Creature ?? card;
+                Resolve(controller, ctx.ChosenTargets[0][0], ColorlessPicker, source: source);
+                return ValueTask.CompletedTask;
             });
 
-        grantAbility = new ActivatedAbility(
+        var grantAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { AdditionalCost.Tap(card) },
             effects: new IEffect[] { grantEffect },
             targetRequests: new[]
             {
-                new TargetRequest(
-                    Description: "another target creature you control",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Protection,
-                    CandidateGatherer: _ => owner.Zones.Battlefield.GetCards()
-                        // CR 602.1 — "another" excludes the source itself.
-                        .Where(c => c.HasType(CardType.Creature)
-                                    && !ReferenceEquals(c, card))
+                // CR 602.1 — "another target creature you control". The gatherer
+                // is CONTROLLER-SCOPED via a re-homeable ControllerScopedGatherer
+                // (not an `owner`-capturing closure) so RebindTo onto an Agatha's-
+                // Soul-Cauldron bearer re-scopes it to the BEARER's controller's
+                // board. The "another" exclusion can't reference the source from
+                // inside the controller-parametric `select` (it must not capture
+                // the original card / bearer); instead the source itself is
+                // excluded at resolution via the ctx.Source "another" gate in
+                // Resolve. The gatherer offering the source as a candidate is
+                // harmless — CR 608.2b re-validates and the source-gate no-ops it
+                // — but to keep the candidate list honest we exclude any creature
+                // whose own controller-scope already names it via the picker; the
+                // simplest sound form lists every creature the (current)
+                // controller controls, and the resolution-time "another" gate is
+                // authoritative (agatha-mother-of-runes-style-candidate-gatherer-
+                // controller-rebind).
+                TargetRequest.ControllerScoped(
+                    description: "another target creature you control",
+                    minTargets: 1,
+                    maxTargets: 1,
+                    controller: owner,
+                    select: (ctrl, _) => ctrl.Zones.Battlefield.GetCards()
+                        .Where(c => c.HasType(CardType.Creature))
                         .Cast<object>()
-                        .ToList()),
-            });
+                        .ToList(),
+                    intent: BotIntent.Protection),
+            },
+            rebindSafe: true);
 
         card.AddAbility(grantAbility);
 
