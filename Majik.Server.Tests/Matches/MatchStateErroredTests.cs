@@ -67,7 +67,7 @@ public class MatchStateErroredTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource()), new StubDeckLoader(), new SystemClock(),
             null, timeoutScheduler: null, gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
         var result = await svc.AbandonAsync("stub-alice", match.Id, CancellationToken.None);
 

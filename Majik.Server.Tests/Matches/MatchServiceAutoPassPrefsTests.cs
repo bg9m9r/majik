@@ -48,7 +48,7 @@ public class MatchServiceAutoPassPrefsTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource(6, 2)), new StubDeckLoader(), new SystemClock(),
             null, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             autoPassPrefs: store);
 
         var created = await svc.CreateAsync("stub-alice",
@@ -221,7 +221,7 @@ public class MatchServiceAutoPassPrefsTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource(6, 2)), new StubDeckLoader(), new SystemClock(),
             null, timeoutScheduler: null, gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             autoPassPrefs: store);
 
         var created = await svc.CreateAsync("stub-alice",

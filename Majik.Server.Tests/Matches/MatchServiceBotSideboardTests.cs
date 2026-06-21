@@ -59,7 +59,7 @@ public class MatchServiceBotSideboardTests : IClassFixture<TestMongoFixture>
             new NullPublisher(),
             timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: gameFactory,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             botScheduler: scheduler);
         scheduler.Bind(svc);
 

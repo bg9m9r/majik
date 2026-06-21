@@ -92,7 +92,7 @@ public class MatchServiceReliabilityTests : IClassFixture<TestMongoFixture>
             pub,
             timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
     // -----------------------------------------------------------------------
     // #2 — retry succeeds after N transient Mongo faults; match reaches Completed.

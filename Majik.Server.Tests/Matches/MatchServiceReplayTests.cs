@@ -57,7 +57,7 @@ public sealed class MatchServiceReplayTests : IClassFixture<TestMongoFixture>
             hub: null,
             timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             replayBuffer: buf);
 
         var created = await svc.CreateAsync("stub-alice",

@@ -95,7 +95,7 @@ public class BotMatchSchedulerGuardTests : IClassFixture<TestMongoFixture>
             hub: null,
             timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy()));
+            allowMissingDeckPlumbing: true));
         return services.BuildServiceProvider();
     }
 

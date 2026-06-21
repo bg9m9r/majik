@@ -51,7 +51,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource(6, 2)), new StubDeckLoader(), new SystemClock(),
             pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),
@@ -87,7 +87,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource(6, 2)), new StubDeckLoader(), new SystemClock(),
             null, timeoutScheduler: null, gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),
@@ -172,7 +172,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource()), new StubDeckLoader(), new SystemClock(),
             null, timeoutScheduler: null, gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),
@@ -212,7 +212,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource()), new StubDeckLoader(), new SystemClock(),
             pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),
@@ -274,7 +274,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource()), new StubDeckLoader(), new SystemClock(),
             null, timeoutScheduler: null, gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
+            allowMissingDeckPlumbing: true);
 
         var result = await svc.AbandonAsync("stub-alice", match.Id, CancellationToken.None);
 
@@ -339,7 +339,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
             new CapturePublisher(),
             timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
             gameFactory: null,
-            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            allowMissingDeckPlumbing: true,
             facadeBridge: bridge);
 
         // Insert a Playing match directly and attach the bridge for it, as the
