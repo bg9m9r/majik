@@ -7881,4 +7881,70 @@ public class AgathasSoulCauldronTests
             Majik.Core.Services.ZoneServiceRegistry.Remove(alice);
         }
     }
+
+    // agatha-mother-of-runes-style-controller-scoped-candidate-gatherer-rebind —
+    // the GENERALIZED seam: the DATA-DRIVEN reconstructable protection-grant
+    // ("Target creature YOU control gains protection …", the Mother of Runes /
+    // Giver of Runes shape) built by OracleActivatedAbilityBinder must carry a
+    // re-homeable controller-scoped candidate gatherer — NOT a closure that
+    // captures the authoring controller — so re-sourcing it onto a bearer
+    // controlled by a DIFFERENT player (Agatha's grant, CR 707.2 / 613.1f)
+    // re-scopes "you control" to the NEW controller's board. This is the
+    // reusable primitive the specific MotherOfRunesFactory slice (#2987) only
+    // proved for the bespoke factory; here it must hold on the reconstructable
+    // path Agatha actually uses for arbitrary imprinted cards.
+    [Fact]
+    public void OracleBinder_ProtectionGrant_RehomesYouControlGathererToBearersController()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        // The imprinted (would-be exiled) card, authored under Alice.
+        var imprinted = new Creature("Runes Stub", "{W}", 2, 2);
+        imprinted.SetOwner(alice);
+        imprinted.SetController(alice);
+        imprinted.SetZone(ZoneType.Graveyard);
+        alice.Zones.Graveyard.AddCard(imprinted);
+
+        // Reconstruct the "you control"-scoped protection-grant from oracle text
+        // (authoring controller = Alice).
+        var rebuilt = Majik.Core.CardData.OracleActivatedAbilityBinder
+            .RebuildActivatedAbilities(
+                "{T}: Target creature you control gains protection from the "
+                + "color of your choice until end of turn.",
+                imprinted, alice);
+
+        rebuilt.Should().ContainSingle(
+            "the protection-grant 'you control' shape reconstructs from oracle text");
+        var authored = rebuilt[0];
+
+        // Bob is the bearer's controller; Bob controls a creature, Alice another.
+        var bearer = new Creature("Cauldron Bearer", "{2}", 2, 2);
+        bearer.SetOwner(bob);
+        bearer.SetController(bob);
+        bob.Zones.Battlefield.AddCard(bearer);
+        bearer.SetZone(ZoneType.Battlefield);
+
+        var aliceCreature = new Creature("Alice Bear", "1G", 2, 2);
+        alice.Zones.Battlefield.AddCard(aliceCreature);
+        aliceCreature.SetZone(ZoneType.Battlefield);
+
+        var bobCreature = new Creature("Bob Bear", "1G", 2, 2);
+        bob.Zones.Battlefield.AddCard(bobCreature);
+        bobCreature.SetZone(ZoneType.Battlefield);
+
+        // Agatha re-homes the reconstructed ability onto the Bob-controlled bearer.
+        var rebound = authored.RebindTo(bearer, bob);
+
+        var candidates = rebound.TargetRequests.Single().CandidateGatherer!(null!);
+
+        candidates.Should().Contain(bobCreature,
+            "the re-homed 'target creature you control' gathers the NEW "
+            + "controller's (Bob's) board");
+        candidates.Should().Contain(bearer,
+            "the bearer is a creature Bob controls and a legal 'you control' target");
+        candidates.Should().NotContain(aliceCreature,
+            "the gatherer must NOT read the exiled card owner's (Alice's) board "
+            + "after re-home — that is the controller-scoped-gatherer-rebind bug");
+    }
 }

@@ -3342,20 +3342,38 @@ public static class OracleActivatedAbilityBinder
             effects: new IEffect[] { grantEffect },
             targetRequests: new[]
             {
-                new TargetRequest(
-                    Description: "target creature you control",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Protection,
-                    // CR 602.1 — "target creature you control": the candidates are
-                    // exactly the BEARER's controller-side battlefield creatures
-                    // (re-sourced to the controller, never the exiled card).
-                    CandidateGatherer: _ => controller.Zones.Battlefield.GetCards()
+                // CR 602.1 — "target creature you control": the candidates are
+                // exactly the controller-side battlefield creatures. Built via the
+                // re-homeable controller-scoped gatherer (NOT a closure capturing
+                // `controller`) so when Agatha re-sources this ability onto a
+                // bearer controlled by a DIFFERENT player (CR 707.2 / 613.1f),
+                // ActivatedAbility.RebindTo re-scopes "you control" to the NEW
+                // controller's board rather than the exiled card owner's
+                // (agatha-mother-of-runes-style-controller-scoped-candidate-gatherer-rebind).
+                // The `select` projection takes the controller as its argument and
+                // captures nothing, so the same projection re-reads the rebound
+                // controller's creatures with no behavioural drift.
+                TargetRequest.ControllerScoped(
+                    description: "target creature you control",
+                    minTargets: 1,
+                    maxTargets: 1,
+                    controller: controller,
+                    select: (you, _) => you.Zones.Battlefield.GetCards()
                         .Where(c => c.HasType(CardType.Creature))
                         .Cast<object>()
-                        .ToList()),
-            });
+                        .ToList(),
+                    intent: BotIntent.Protection),
+            },
+            // RebindSafe — every part of this ability re-homes soundly under
+            // ActivatedAbility.RebindTo: the COST taps the bearer (re-homed via
+            // the AdditionalCost/IRebindableCost seam), the controller-scoped
+            // candidate GATHERER above re-scopes "you control" to the new
+            // controller, and the EFFECT self-sources the protection grant on the
+            // CHOSEN target (source = target = chosen, never the bearer / exiled
+            // card). So Agatha's grant path re-homes the imprinted card's REAL
+            // protection ability via RebindTo rather than the oracle-rebuild
+            // fallback (CR 707.2 / 613.1f).
+            rebindSafe: true);
 
         return ability;
     }
