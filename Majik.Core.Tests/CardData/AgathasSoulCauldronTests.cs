@@ -2034,6 +2034,122 @@ public class AgathasSoulCauldronTests
             "the re-homed \"you gain 3 life\" ability gains 3 for the bearer's controller");
     }
 
+    /// <summary>Resolve a granted ability's effects through a live
+    /// <see cref="ResolutionContext"/> carrying a <see cref="Majik.Core.Game.GameContext"/>
+    /// so a controller-scoped each-opponent group effect can enumerate the live
+    /// opponent set off <c>ctx.Game.AllPlayers</c> (CR 109.5 / 608.2).</summary>
+    private static void ResolveGrantedWithGame(
+        ActivatedAbility ability, Player controller, params Player[] allPlayers)
+    {
+        var ctx = new ResolutionContext(
+            Controller: controller,
+            Agent: null,
+            Game: new Majik.Core.Game.GameContext(
+                controller, allPlayers, controller, 1,
+                Majik.Core.StateMachine.StepStateType.PreCombatMain,
+                new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus())),
+            ChosenTargets: System.Array.Empty<IReadOnlyList<object>>());
+        foreach (var effect in ability.Effects)
+            effect.ExecuteAsync(ctx).AsTask().GetAwaiter().GetResult();
+    }
+
+    [Fact]
+    public void Grant_NonMana_LoseLifeEachOpponent_RehomesDrainToBearersControllerOpponents()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Imprinted creature whose only ability drains each opponent (Archers'
+        // Parapet's "{1}{B}, {T}: Each opponent loses 1 life."). Re-homing is
+        // sound: the drain references the BEARER's CONTROLLER's OPPONENTS, read
+        // off the live game at resolution (CR 109.5 / 608.2), never the exiled
+        // imprinted card — there is no "this creature" / source reference at all,
+        // so it is as sound a re-home as gain-life (CR 119.3 / 613.1f).
+        var wall = new Creature("Parapet Stub", "1G", 0, 5);
+        wall.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(wall);
+        wall.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Parapet Stub", "{1}{B}, {T}: Each opponent loses 1 life.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), wall);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's each-opponent drain ability");
+        var drain = granted[0];
+        drain.Source.Should().BeSameAs(bearer,
+            "the granted ability is re-homed to the BEARER, not the exiled card");
+        drain.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
+                "the re-homed {T} cost taps the BEARER");
+        drain.Costs.OfType<ManaCostCost>()
+            .Should().ContainSingle(c => c.Description.Contains("B"),
+                "the {1}{B} mana cost is folded into a single ManaCostCost");
+        drain.TargetRequests.Should().BeEmpty(
+            "an each-opponent group effect (CR 608.2) announces no target");
+
+        var aliceBefore = alice.LifeTotal;
+        var bobBefore = bob.LifeTotal;
+        ResolveGrantedWithGame(drain, alice, alice, bob);
+
+        bob.LifeTotal.Should().Be(bobBefore - 1,
+            "the bearer's controller's opponent loses 1 life (CR 109.5)");
+        alice.LifeTotal.Should().Be(aliceBefore,
+            "the controller is not an opponent and is untouched");
+    }
+
+    [Fact]
+    public void Grant_NonMana_LoseLifeEachOpponent_DrainsEveryOpponent_NotJustOne()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Engine Rat's "{5}{B}: Each opponent loses 2 life." — a pure mana-cost
+        // (no {T}) each-opponent drain. Multi-opponent table: EVERY opponent of
+        // the bearer's controller loses 2 (CR 109.5), and the controller does
+        // not (it is not its own opponent).
+        var rat = new Creature("Rat Stub", "B", 1, 1);
+        rat.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(rat);
+        rat.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus,
+            OracleStub(("Rat Stub", "{5}{B}: Each opponent loses 2 life.")));
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), rat);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains the imprinted creature's each-opponent drain ability");
+        var drain = granted[0];
+        drain.Costs.OfType<AdditionalCost>()
+            .Should().NotContain(c => c.CostType == AdditionalCostType.Tap,
+                "Engine Rat's drain has no {T} in its cost");
+
+        ResolveGrantedWithGame(drain, alice, alice, bob, carol);
+
+        bob.LifeTotal.Should().Be(18, "each opponent loses 2 life");
+        carol.LifeTotal.Should().Be(18, "EVERY opponent is drained, not just one");
+        alice.LifeTotal.Should().Be(20, "the controller is not an opponent");
+    }
+
     [Fact]
     public void Grant_NonMana_ScrySelf_RehomesScryToBearerController()
     {
