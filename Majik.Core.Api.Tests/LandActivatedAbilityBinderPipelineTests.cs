@@ -569,6 +569,144 @@ public class LandActivatedAbilityBinderPipelineTests
         candidates.Should().NotContain(basic, "a basic land is not a legal target for a 'nonbasic land' destroy");
     }
 
+    // ----------------------------------------------------------------------
+    // Tectonic Edge — CR 602.5b activation gate "Activate only if an opponent
+    // controls four or more lands". The gate counts an OPPONENT's lands off the
+    // LIVE game roster (ctx.AllPlayers) — exactly the leg the [CardName]
+    // factory used to capture a build-time allPlayersResolver for (and which
+    // prod, building lands through the binder chain, never supplies). It must
+    // bind through the context-aware CanActivateCheckCtx seam (#2710 family).
+    // (v1-deferrals resolver-null-continuous-effect-predicate-on-land-factories)
+    // ----------------------------------------------------------------------
+    [Fact]
+    public void Prod_TectonicEdge_BindsContextAwareOpponentFourLandsGate()
+    {
+        const string oracle =
+            "{T}: Add {C}.\n" +
+            "{1}, {T}, Sacrifice this land: Destroy target nonbasic land. Activate only if an opponent controls four or more lands.";
+        var repo = new FakeCardRepo();
+        repo.Add("Tectonic Edge", "Land", oracleText: oracle, colors: "");
+        var land = new Land("Tectonic Edge", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+
+        var ability = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.TargetRequests.Count > 0);
+
+        // The context-aware gate must be wired (not the resolver-blind Func<bool>).
+        ability.CanActivateCheckCtx.Should().NotBeNull(
+            "Tectonic Edge's CR 602.5b opponent-four-lands gate reads the live roster");
+
+        // 0 opponent lands → gate CLOSED.
+        ability.CanActivateNow(Ctx(facade)).Should().BeFalse(
+            "no opponent controls four lands");
+
+        // 3 opponent lands → still CLOSED.
+        for (var i = 0; i < 3; i++)
+        {
+            var l = new Land("Mountain", new[] { CardSupertype.Basic }, new[] { CardSubtype.Mountain });
+            l.SetOwner(facade.Bob); l.SetController(facade.Bob);
+            facade.Bob.Zones.Battlefield.AddCard(l); l.SetZone(ZoneType.Battlefield);
+        }
+        ability.CanActivateNow(Ctx(facade)).Should().BeFalse("only three opponent lands");
+
+        // 4th opponent land → gate OPEN.
+        var fourth = new Land("Mountain", new[] { CardSupertype.Basic }, new[] { CardSubtype.Mountain });
+        fourth.SetOwner(facade.Bob); fourth.SetController(facade.Bob);
+        facade.Bob.Zones.Battlefield.AddCard(fourth); fourth.SetZone(ZoneType.Battlefield);
+        ability.CanActivateNow(Ctx(facade)).Should().BeTrue(
+            "an opponent now controls four or more lands");
+    }
+
+    [Fact]
+    public void Prod_TectonicEdge_GateIgnoresOwnLands()
+    {
+        const string oracle =
+            "{T}: Add {C}.\n" +
+            "{1}, {T}, Sacrifice this land: Destroy target nonbasic land. Activate only if an opponent controls four or more lands.";
+        var repo = new FakeCardRepo();
+        repo.Add("Tectonic Edge", "Land", oracleText: oracle, colors: "");
+        var land = new Land("Tectonic Edge", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+
+        // Alice (the activator) controls many lands; Bob controls none.
+        for (var i = 0; i < 6; i++)
+        {
+            var l = new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest });
+            l.SetOwner(facade.Alice); l.SetController(facade.Alice);
+            facade.Alice.Zones.Battlefield.AddCard(l); l.SetZone(ZoneType.Battlefield);
+        }
+
+        var ability = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.TargetRequests.Count > 0);
+        ability.CanActivateNow(Ctx(facade)).Should().BeFalse(
+            "the controller's OWN lands never satisfy the opponent-four-lands gate (CR 602.5b)");
+    }
+
+    // ----------------------------------------------------------------------
+    // Field of Ruin — the "Each player searches their library for a basic land
+    // card, puts it onto the battlefield, then shuffles" rider (CR 701.19a /
+    // 701.20a). MANDATORY, walks the LIVE roster (ctx.AllPlayers) — the leg the
+    // factory captured an allPlayersResolver for. Distinct from Demolition
+    // Field's "That land's controller MAY ... You MAY ..." both-player riders.
+    // (v1-deferrals resolver-null-continuous-effect-predicate-on-land-factories)
+    // ----------------------------------------------------------------------
+    [Fact]
+    public async Task Prod_FieldOfRuin_EachPlayerTutorsBasicToBattlefield()
+    {
+        const string oracle =
+            "{T}: Add {C}.\n" +
+            "{2}, {T}, Sacrifice this land: Destroy target nonbasic land an opponent controls. Each player searches their library for a basic land card, puts it onto the battlefield, then shuffles.";
+        var repo = new FakeCardRepo();
+        repo.Add("Field of Ruin", "Land", oracleText: oracle, colors: "");
+        var land = new Land("Field of Ruin", null, null);
+
+        var (facade, live) = BuildThroughProd(land, repo);
+        OnBattlefield(facade, land);
+
+        // Give Bob a library with a basic land + a nonbasic target on board.
+        var bobLibBasic = new Land("Mountain", new[] { CardSupertype.Basic }, new[] { CardSubtype.Mountain });
+        bobLibBasic.SetOwner(facade.Bob);
+        facade.Bob.Zones.Library.AddCard(bobLibBasic); bobLibBasic.SetZone(ZoneType.Library);
+
+        var bobNonbasic = new Land("Mishra's Factory", null, null);
+        bobNonbasic.SetOwner(facade.Bob); bobNonbasic.SetController(facade.Bob);
+        facade.Bob.Zones.Battlefield.AddCard(bobNonbasic); bobNonbasic.SetZone(ZoneType.Battlefield);
+
+        var aliceBfBefore = facade.Alice.Zones.Battlefield.GetCards()
+            .OfType<Land>().Count(l => l.HasSupertype(CardSupertype.Basic));
+
+        var ability = live.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a.TargetRequests.Count > 0);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { bobNonbasic });
+        // Each player picks the first basic in their library (PromptOnlyAsync
+        // default). Drive the effect through the prod resolution path.
+        var collected = await TargetCollection.CollectAsync(
+            ability.TargetRequests, ability.Source as ICard, Ctx(facade), agent);
+        ability.SetChosenTargets(collected);
+        foreach (var e in ability.Effects)
+            await e.ExecuteAsync(ResolutionContext.For(facade.Alice, agent, Ctx(facade), null));
+
+        // Destroy half fired.
+        facade.Bob.Zones.Graveyard.GetCards().Should().Contain(bobNonbasic);
+
+        // Each-player tutor half: Bob's basic moved to the battlefield.
+        facade.Bob.Zones.Battlefield.GetCards().Should().Contain(bobLibBasic,
+            "the each-player tutor puts each player's chosen basic onto the battlefield");
+        bobLibBasic.Zone.Should().Be(ZoneType.Battlefield);
+
+        // Alice (the active player) also tutors — at least one new basic entered.
+        var aliceBfAfter = facade.Alice.Zones.Battlefield.GetCards()
+            .OfType<Land>().Count(l => l.HasSupertype(CardSupertype.Basic));
+        aliceBfAfter.Should().BeGreaterThan(aliceBfBefore,
+            "the active player also searches their library for a basic and puts it onto the battlefield");
+    }
+
     // ======================================================================
     // 7b. SEARCH-FOR-BASIC (Panorama cycle) — reuses the fetch effect path
     // ======================================================================

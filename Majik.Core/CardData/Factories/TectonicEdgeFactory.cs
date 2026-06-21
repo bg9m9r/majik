@@ -61,14 +61,22 @@ namespace Majik.Core.CardData.Factories;
 ///       This mirrors the Magmatic Channeler / Liliana -6 deferred-no-op
 ///       posture (cost paid, body skipped).
 ///
+/// ## Prod activation gate (CR 602.5b) — now context-aware
+/// Lands are NEVER routed through their [CardName] factory in prod (they build
+/// through the binder chain — see <c>named-factory-vs-binder-chain</c>). The
+/// production "Activate only if an opponent controls four or more lands" gate
+/// therefore lives in <see cref="LandActivatedAbilityBinder"/>, wired through
+/// <see cref="ActivatedAbility"/>'s context-aware <c>canActivateCheckCtx</c>
+/// seam: it counts each OPPONENT's lands off the LIVE roster
+/// (<see cref="Game.GameContext.AllPlayers"/>) at activation/enumeration time —
+/// NO captured build-time resolver (#2710 context-aware-predicate family,
+/// v1-deferrals resolver-null-continuous-effect-predicate-on-land-factories).
+/// Consumed by <c>AbilityActivator</c>, <c>ActionValidator</c>, and the bot's
+/// <c>LegalActionEnumerator</c>. This factory's
+/// <see cref="OpponentControlsFourOrMoreLands"/> predicate + captured-resolver
+/// resolve-time guard remain only for the test-only factory path.
+///
 /// ## Deferred (v1 gaps — shared with the Magmatic Channeler / Verge family)
-/// - <b><c>IActivatedAbility.CanActivate</c> hook</b>: the action-validator
-///   pipeline does not yet consult an activation predicate on
-///   <see cref="IActivatedAbility"/> (only the
-///   <see cref="ActivatedAbility.IsSorcerySpeed"/> rider is wired). Tectonic
-///   Edge's opponent-land threshold is exposed as a static predicate so
-///   callers can gate enumeration; once the generic hook ships the predicate
-///   is the natural single attachment site.
 /// - <b>AdditionalCost.Sacrifice</b>: self-sac payment is inlined into the
 ///   resolution closure until the shared primitive ships a zone-move
 ///   side-effect.

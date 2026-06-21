@@ -322,6 +322,24 @@ public static class LandActivatedAbilityBinder
         @"You\s+may\s+search\s+your\s+library\s+for\s+a\s+basic\s+land\s+card\s*,\s*put\s+it\s+onto\s+the\s+battlefield",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Field of Ruin's MANDATORY each-player search-for-basic rider that rides
+    // after "Destroy target nonbasic land an opponent controls." (CR 701.19a /
+    // 701.20a): "Each player searches their library for a basic land card, puts
+    // it onto the battlefield, then shuffles." Distinct from Demolition Field's
+    // two "MAY search" riders — this is not a "may", it walks EVERY player off
+    // the LIVE roster (ctx.AllPlayers). The basics enter UNTAPPED (no "tapped").
+    private static readonly Regex EachPlayerSearchBasic = new(
+        @"Each\s+player\s+searches\s+their\s+library\s+for\s+a\s+basic\s+land\s+card\s*,\s*puts?\s+it\s+onto\s+the\s+battlefield",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Tectonic Edge's CR 602.5b activation gate: "Activate only if an opponent
+    // controls four or more lands." The threshold counts an OPPONENT's lands off
+    // the live game roster, so it binds through the context-aware
+    // canActivateCheckCtx seam (reads ctx.AllPlayers — no captured resolver).
+    private static readonly Regex OpponentControlsNLandsGate = new(
+        @"Activate\s+only\s+if\s+an\s+opponent\s+controls\s+(?<n>one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+or\s+more\s+lands",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // Boseiju, Who Endures' Channel follow-up (CR 701.19a / 701.20a): after the
     // destroy, "That player may search their library for a land card WITH A
     // BASIC LAND TYPE, put it onto the battlefield, then shuffle." Distinct from
@@ -1000,11 +1018,15 @@ public static class LandActivatedAbilityBinder
         {
             var nonbasicOnly = destm.Groups["nonbasic"].Success;
             var opponentOnly = destm.Groups["opp"].Success;
-            // Demolition Field's both-players search-for-basic rider: detect the
-            // "controller may search" + "you may search" follow-up clauses on
+            // Demolition Field's both-players search-for-basic rider + Field of
+            // Ruin's mandatory each-player rider: detect the follow-up clauses on
             // the SAME ability so they sequence after the destroy.
             var searchRider = ParseDestroyBasicSearchRider(effectText);
-            BindDestroyTargetLand(land, controller, cost, nonbasicOnly, opponentOnly, searchRider, eventBus);
+            // Tectonic Edge's CR 602.5b gate ("Activate only if an opponent
+            // controls four or more lands") — context-aware (reads ctx.AllPlayers).
+            var gate = BuildOpponentControlsNLandsGate(effectText, land, controller);
+            BindDestroyTargetLand(
+                land, controller, cost, nonbasicOnly, opponentOnly, searchRider, eventBus, gate);
             return true;
         }
 
@@ -1824,17 +1846,73 @@ public static class LandActivatedAbilityBinder
     // the destroyed land's controller and the activator each "may search …
     // for a basic land card, put it onto the battlefield, then shuffle".
     private readonly record struct DestroyBasicSearchRider(
-        bool DestroyedControllerSearches, bool ActivatorSearches)
+        bool DestroyedControllerSearches, bool ActivatorSearches, bool EachPlayerSearches)
     {
-        public bool Any => DestroyedControllerSearches || ActivatorSearches;
+        public bool Any => DestroyedControllerSearches || ActivatorSearches || EachPlayerSearches;
     }
 
-    /// <summary>Detect Demolition Field's both-players search-for-basic rider in
-    /// the effect clause that follows the destroy half.</summary>
+    /// <summary>Detect the search-for-basic rider that follows the destroy half.
+    /// Demolition Field prints two "MAY search" clauses (destroyed-land's
+    /// controller + activator); Field of Ruin prints one MANDATORY "Each player
+    /// searches …" clause that walks the live roster.</summary>
     private static DestroyBasicSearchRider ParseDestroyBasicSearchRider(string effectText)
         => new(
             DestroyedControllerSearchBasic.IsMatch(effectText),
-            ActivatorSearchBasic.IsMatch(effectText));
+            ActivatorSearchBasic.IsMatch(effectText),
+            EachPlayerSearchBasic.IsMatch(effectText));
+
+    /// <summary>
+    /// CR 602.5b activation gate — "Activate only if an opponent controls N or
+    /// more lands" (Tectonic Edge prints N = four). Returns a context-aware
+    /// predicate (reads the live roster off <see cref="GameContext.AllPlayers"/>)
+    /// so it binds through <see cref="ActivatedAbility"/>'s
+    /// <c>canActivateCheckCtx</c> seam — NOT a captured build-time resolver
+    /// (#2710 context-aware-predicate family). The threshold counts an OPPONENT's
+    /// lands (CR 305 — any permanent with the land card type; basics count); the
+    /// controller's own lands never satisfy the gate. Returns <c>null</c> when
+    /// the effect text carries no such gate (the common Ghost Quarter / Field of
+    /// Ruin / Demolition Field shapes are ungated).
+    /// </summary>
+    private static Func<GameContext, bool>? BuildOpponentControlsNLandsGate(
+        string effectText, Land land, Player controller)
+    {
+        var m = OpponentControlsNLandsGate.Match(effectText);
+        if (!m.Success) return null;
+
+        var threshold = ParseLandThresholdWord(m.Groups["n"].Value);
+
+        return ctx =>
+        {
+            var you = land.Controller ?? controller;
+            foreach (var p in ctx.AllPlayers)
+            {
+                if (p == null || ReferenceEquals(p, you)) continue;
+                var lands = p.Zones.Battlefield.GetCards()
+                    .Count(c => c.HasType(CardType.Land));
+                if (lands >= threshold) return true;
+            }
+            return false;
+        };
+    }
+
+    private static int ParseLandThresholdWord(string word)
+    {
+        if (int.TryParse(word, out var n)) return n;
+        return word.ToLowerInvariant() switch
+        {
+            "one" => 1,
+            "two" => 2,
+            "three" => 3,
+            "four" => 4,
+            "five" => 5,
+            "six" => 6,
+            "seven" => 7,
+            "eight" => 8,
+            "nine" => 9,
+            "ten" => 10,
+            _ => 4,
+        };
+    }
 
     // ----------------------------------------------------------------------
     // Destroy target [nonbasic] land [an opponent controls] — Ghost Quarter /
@@ -1843,19 +1921,33 @@ public static class LandActivatedAbilityBinder
     // nonbasic / opponent-controlled per the printed clause).
     //
     // Demolition Field's both-players search-for-basic rider (CR 701.19 /
-    // CR 701.20a) NOW BINDS here (v1-deferrals demolition-field-search-rider):
+    // CR 701.20a) BINDS here (v1-deferrals demolition-field-search-rider):
     // after the destroy, the destroyed land's controller (only if a land was
     // actually destroyed — CR 608.2b illegal-target → no "that land's
     // controller") then the activator each "may search their/your library for a
     // basic land card, put it onto the battlefield, then shuffle". The basics
     // enter UNTAPPED (Demolition Field prints no "tapped"). Each is a "may"
     // search routed through the player's IPlayerAgent (decline / empty library
-    // still shuffles, CR 701.20a). The other timing gates (Tectonic Edge's
-    // "opponent controls four or more lands") remain deferred.
+    // still shuffles, CR 701.20a).
+    //
+    // Field of Ruin's MANDATORY each-player rider NOW BINDS too (v1-deferrals
+    // resolver-null-continuous-effect-predicate-on-land-factories): "Each player
+    // searches their library for a basic land card, puts it onto the battlefield,
+    // then shuffles." Every player off the LIVE roster (ctx.Game.AllPlayers)
+    // tutors — the leg the [CardName] factory used to gate on a build-time
+    // allPlayersResolver (which prod, building lands through the binder chain,
+    // never supplied). The active player tutors first (CR 101.4 APNAP — the
+    // facade's player order is turn order).
+    //
+    // Tectonic Edge's CR 602.5b activation gate ("Activate only if an opponent
+    // controls four or more lands") ALSO BINDS now via the context-aware
+    // canActivateCheckCtx seam (reads opponents off ctx.AllPlayers — no captured
+    // resolver). #2710 context-aware-predicate family.
     // ----------------------------------------------------------------------
     private static void BindDestroyTargetLand(
         Land land, Player controller, string cost,
-        bool nonbasicOnly, bool opponentOnly, DestroyBasicSearchRider rider = default, IEventBus? eventBus = null)
+        bool nonbasicOnly, bool opponentOnly, DestroyBasicSearchRider rider = default,
+        IEventBus? eventBus = null, Func<GameContext, bool>? canActivateCheckCtx = null)
     {
         var costs = BuildCosts(land, cost, out _, eventBus);
 
@@ -1893,11 +1985,27 @@ public static class LandActivatedAbilityBinder
                 {
                     await TutorBasicLandUntapped(ctx, land.Controller ?? controller).ConfigureAwait(false);
                 }
+
+                // Field of Ruin's mandatory "Each player searches their library
+                // for a basic land card, puts it onto the battlefield, then
+                // shuffles" (CR 701.19a / 701.20a) — walk every player off the
+                // LIVE roster in turn order (active player first, CR 101.4). The
+                // search is mandatory (not a "may"), but an empty library / no
+                // basic still shuffles. Reads ctx.Game.AllPlayers, not a captured
+                // resolver.
+                if (rider.EachPlayerSearches && ctx.Game?.AllPlayers is { } roster)
+                {
+                    foreach (var pl in roster)
+                    {
+                        await TutorBasicLandUntapped(ctx, pl).ConfigureAwait(false);
+                    }
+                }
             });
 
         ability = new ActivatedAbility(
             source: land, controller: controller, costs: costs,
             effects: new IEffect[] { effect },
+            canActivateCheckCtx: canActivateCheckCtx,
             targetRequests: new[]
             {
                 new TargetRequest(
