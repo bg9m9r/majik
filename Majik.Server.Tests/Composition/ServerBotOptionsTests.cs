@@ -84,49 +84,18 @@ public class ServerBotOptionsTests
         act.Should().NotThrow();
     }
 
-    // ── RolloutDepth (rollout-truncation knob) ─────────────────────────────────
-
     [Fact]
-    public void DefaultOptions_RolloutDepth_IsFullTurnPlus_AndStaysNullUnderHeuristic()
+    public void MctsOptions_RolloutDepth_PinnedToFullTurnPlus()
     {
-        new ServerBotOptions().RolloutDepth.Should().Be("FullTurnPlus",
-            "the code default is today's full playout — zero behaviour change");
+        // RolloutDepth is no longer a config knob — it is pinned to the engine
+        // default ("FullTurnPlus") under mcts and stays null under heuristic.
+        var cfg = FactoryWith(new ServerBotOptions { Strategy = "mcts" })
+            .BuildBotConfig("Burn", decisionSink: null);
+        cfg.RolloutDepth.Should().Be("FullTurnPlus");
 
-        var cfg = FactoryWith(null).BuildBotConfig("Burn", decisionSink: null);
-        cfg.RolloutDepth.Should().BeNull(
-            "the heuristic strategy never rolls out — only mcts threads the depth");
-    }
-
-    [Fact]
-    public void MctsOptions_BuildBotConfig_CarriesRolloutDepth()
-    {
-        var factory = FactoryWith(new ServerBotOptions
-        {
-            Strategy = "mcts",
-            RolloutDepth = "EndOfTurn",
-        });
-
-        factory.BuildBotConfig("Burn", decisionSink: null)
-            .RolloutDepth.Should().Be("EndOfTurn",
-                "the live flip of a probe-gate winner is config-only (Bot__RolloutDepth)");
-    }
-
-    [Fact]
-    public void MctsOptions_WithRolloutDepth_BotPlayerAgent_Constructs()
-    {
-        // Proves the wired depth string parses downstream (SearchStrategy
-        // fails fast at construction on an unknown RolloutDepth).
-        var factory = FactoryWith(new ServerBotOptions
-        {
-            Strategy = "mcts",
-            RolloutDepth = "LeafEval",
-        });
-        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
-
-        var seat = new Majik.Core.Players.Player("Bob", 20);
-        var act = () => new Majik.Bot.BotPlayerAgent(seat, cfg);
-
-        act.Should().NotThrow();
+        FactoryWith(null).BuildBotConfig("Burn", decisionSink: null)
+            .RolloutDepth.Should().BeNull(
+                "the heuristic strategy never rolls out");
     }
 
     // ── TreeStateReuse (tree-state reuse knob) ─────────────────────────────────
@@ -219,93 +188,21 @@ public class ServerBotOptionsTests
         act.Should().NotThrow();
     }
 
-    // ── MaxWorlds / PerWorldBudgetMs (determinized world-split knobs) ──────────
+    // ── MaxWorlds / PerWorldBudgetMs (determinized world-split, pinned) ────────
 
     [Fact]
-    public void DefaultOptions_WorldSplitKnobs_AreNull_AndStayNullUnderHeuristic()
+    public void MctsOptions_WorldSplitKnobs_PinnedToEngineDefaults()
     {
-        var options = new ServerBotOptions();
-        options.MaxWorlds.Should().BeNull(
-            "null = the engine default (kMax 8) — zero behaviour change");
-        options.PerWorldBudgetMs.Should().BeNull(
-            "null = the engine default (400 ms per world → K=4 at the live 1500 ms) — " +
-            "zero behaviour change");
+        // MaxWorlds / PerWorldBudgetMs are no longer config knobs — both are
+        // pinned null (the engine defaults: kMax 8 / 400 ms) under mcts.
+        var cfg = FactoryWith(new ServerBotOptions { Strategy = "mcts" })
+            .BuildBotConfig("Burn", decisionSink: null);
 
-        var cfg = FactoryWith(null).BuildBotConfig("Burn", decisionSink: null);
-        cfg.MaxWorlds.Should().BeNull(
-            "the heuristic strategy never determinizes — only mcts threads the knob");
-        cfg.PerWorldBudgetMs.Should().BeNull(
-            "the heuristic strategy never determinizes — only mcts threads the knob");
-    }
-
-    [Fact]
-    public void MctsOptions_BuildBotConfig_CarriesWorldSplitKnobs()
-    {
-        var factory = FactoryWith(new ServerBotOptions
-        {
-            Strategy = "mcts",
-            MaxWorlds = 8,
-            PerWorldBudgetMs = 200,
-        });
-
-        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
-
-        cfg.MaxWorlds.Should().Be(8,
-            "the live flip of a K-tuning probe winner is config-only (Bot__MaxWorlds)");
-        cfg.PerWorldBudgetMs.Should().Be(200,
-            "the live flip of a K-tuning probe winner is config-only (Bot__PerWorldBudgetMs)");
-    }
-
-    [Fact]
-    public void HeuristicOptions_WorldSplitKnobs_StayNullEvenWhenSet()
-    {
-        // mcts-only: a heuristic deployment with stray world-split env vars must
-        // not thread them (mirrors the SearchConcurrency / RolloutDepth /
-        // TreeStateReuse mcts-only rule).
-        var factory = FactoryWith(new ServerBotOptions
-        {
-            Strategy = "heuristic",
-            MaxWorlds = 8,
-            PerWorldBudgetMs = 200,
-        });
-
-        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
-
-        cfg.MaxWorlds.Should().BeNull();
-        cfg.PerWorldBudgetMs.Should().BeNull();
-    }
-
-    [Fact]
-    public void MctsOptions_WithWorldSplitKnobs_BotPlayerAgent_Constructs()
-    {
-        // Proves the wired knobs resolve downstream (SearchStrategy threads them
-        // into the determinized split at construction).
-        var factory = FactoryWith(new ServerBotOptions
-        {
-            Strategy = "mcts",
-            MaxWorlds = 8,
-            PerWorldBudgetMs = 200,
-        });
-        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
-
-        var seat = new Majik.Core.Players.Player("Bob", 20);
-        var act = () => new Majik.Bot.BotPlayerAgent(seat, cfg);
-
-        act.Should().NotThrow();
+        cfg.MaxWorlds.Should().BeNull("pinned to the engine default kMax 8");
+        cfg.PerWorldBudgetMs.Should().BeNull("pinned to the engine default 400 ms");
     }
 
     // ── Fail fast on a bad knob ────────────────────────────────────────────────
-
-    [Theory]
-    [InlineData("warpspeed")]
-    [InlineData("")]
-    public void UnknownRolloutDepth_Throws(string bad)
-    {
-        var act = () => FactoryWith(new ServerBotOptions { RolloutDepth = bad });
-
-        act.Should().Throw<ArgumentException>().WithMessage($"*'{bad}'*",
-            "a typo'd Bot__RolloutDepth must fail at registration and NAME the bad value");
-    }
 
     [Fact]
     public void UnknownStrategy_Throws()
@@ -329,36 +226,6 @@ public class ServerBotOptionsTests
         });
 
         act.Should().Throw<ArgumentException>();
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void NonPositiveMaxWorlds_Throws(int maxWorlds)
-    {
-        var act = () => FactoryWith(new ServerBotOptions
-        {
-            Strategy = "mcts",
-            MaxWorlds = maxWorlds,
-        });
-
-        act.Should().Throw<ArgumentException>().WithMessage("*MaxWorlds*",
-            "a nonsensical Bot__MaxWorlds must fail at registration and NAME the knob");
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void NonPositivePerWorldBudgetMs_Throws(int perWorldBudgetMs)
-    {
-        var act = () => FactoryWith(new ServerBotOptions
-        {
-            Strategy = "mcts",
-            PerWorldBudgetMs = perWorldBudgetMs,
-        });
-
-        act.Should().Throw<ArgumentException>().WithMessage("*PerWorldBudgetMs*",
-            "a nonsensical Bot__PerWorldBudgetMs must fail at registration and NAME the knob");
     }
 
     [Theory]
@@ -428,18 +295,6 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
-    public void AddMajikEngine_BotSection_BindsRolloutDepth()
-    {
-        var factory = ResolveFactory(
-            ("Bot:Strategy", "mcts"),
-            ("Bot:RolloutDepth", "EndOfTurn"));
-
-        factory.BuildBotConfig("Burn", decisionSink: null)
-            .RolloutDepth.Should().Be("EndOfTurn",
-                "env Bot__RolloutDepth must reach the installed bot");
-    }
-
-    [Fact]
     public void AddMajikEngine_BotSection_BindsTreeStateReuse()
     {
         var factory = ResolveFactory(
@@ -464,41 +319,6 @@ public class ServerBotOptionsTests
     }
 
     [Fact]
-    public void AddMajikEngine_BotSection_BindsWorldSplitKnobs()
-    {
-        var factory = ResolveFactory(
-            ("Bot:Strategy", "mcts"),
-            ("Bot:MaxWorlds", "8"),
-            ("Bot:PerWorldBudgetMs", "200"));
-
-        var cfg = factory.BuildBotConfig("Burn", decisionSink: null);
-
-        cfg.MaxWorlds.Should().Be(8,
-            "env Bot__MaxWorlds must reach the installed bot");
-        cfg.PerWorldBudgetMs.Should().Be(200,
-            "env Bot__PerWorldBudgetMs must reach the installed bot");
-    }
-
-    [Fact]
-    public void AddMajikEngine_NonPositivePerWorldBudgetMs_FailsFastAtRegistration()
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Bot:Strategy"] = "mcts",
-                ["Bot:PerWorldBudgetMs"] = "0",
-            })
-            .Build();
-
-        var services = new ServiceCollection();
-        services.AddLogging();
-        var act = () => services.AddMajikEngine(configuration);
-
-        act.Should().Throw<ArgumentException>(
-            "a zero Bot__PerWorldBudgetMs env var must crash the boot, not the first vs-bot match");
-    }
-
-    [Fact]
     public void AddMajikEngine_NonBooleanTreeStateReuse_FailsFastAtRegistration()
     {
         var configuration = new ConfigurationBuilder()
@@ -512,21 +332,6 @@ public class ServerBotOptionsTests
         act.Should().Throw<InvalidOperationException>(
             "a typo'd Bot__TreeStateReuse env var must crash the boot (config-binder " +
             "conversion failure), not the first vs-bot match");
-    }
-
-    [Fact]
-    public void AddMajikEngine_UnknownRolloutDepth_FailsFastAtRegistration()
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Bot:RolloutDepth"] = "wat" })
-            .Build();
-
-        var services = new ServiceCollection();
-        services.AddLogging();
-        var act = () => services.AddMajikEngine(configuration);
-
-        act.Should().Throw<ArgumentException>(
-            "a typo'd Bot__RolloutDepth env var must crash the boot, not the first vs-bot match");
     }
 
     [Fact]
@@ -546,20 +351,15 @@ public class ServerBotOptionsTests
             "the gate defaults ON (1 search at a time) when prod flips to mcts — " +
             "no extra env var needed");
         cfg.RolloutDepth.Should().Be("FullTurnPlus",
-            "the rollout-depth default is today's full playout — the probe gate " +
-            "flips it later via Bot__RolloutDepth only");
+            "rollout depth is pinned to the engine default (full playout)");
         cfg.TreeStateReuse.Should().BeFalse(
-            "the tree-reuse default is today's root-replay loop — the probe gate " +
-            "flips it later via Bot__TreeStateReuse only");
+            "the tree-reuse code default is the root-replay loop — render.yaml " +
+            "flips it ON live via Bot__TreeStateReuse");
         cfg.RootBlockSearch.Should().BeTrue(
             "root block search ships ON under mcts — Bot__RootBlockSearch=false " +
             "is the kill switch back to the BlockCombatEval path");
-        cfg.MaxWorlds.Should().BeNull(
-            "the world-split defaults are today's 400 ms / kMax 8 — the probe gate " +
-            "flips them later via Bot__MaxWorlds / Bot__PerWorldBudgetMs only");
-        cfg.PerWorldBudgetMs.Should().BeNull(
-            "the world-split defaults are today's 400 ms / kMax 8 — the probe gate " +
-            "flips them later via Bot__MaxWorlds / Bot__PerWorldBudgetMs only");
+        cfg.MaxWorlds.Should().BeNull("pinned to the engine default kMax 8");
+        cfg.PerWorldBudgetMs.Should().BeNull("pinned to the engine default 400 ms");
     }
 
     [Fact]

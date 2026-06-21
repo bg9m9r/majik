@@ -80,18 +80,18 @@ public sealed class ServerGameFactory
     /// <c>SearchConcurrency</c> is set ONLY under <c>mcts</c> (default 1): live
     /// searches on the 1-vCPU box queue on the process-wide gate instead of
     /// splitting the core; the heuristic strategy never searches, so it stays
-    /// null (ungated) there. <c>RolloutDepth</c> is likewise set ONLY under
-    /// <c>mcts</c> (default "FullTurnPlus" = today's playout): the heuristic
-    /// never rolls out, so it stays null there. <c>TreeStateReuse</c> follows
-    /// the same rule (default false = today's root-replay loop): the
+    /// null (ungated) there. <c>RolloutDepth</c> is pinned to the engine
+    /// default "FullTurnPlus" under <c>mcts</c> (it was never config-overridden
+    /// in any deployment): the heuristic never rolls out, so it stays null
+    /// there. <c>TreeStateReuse</c> follows the same rule (default false =
+    /// today's root-replay loop; <c>Bot__TreeStateReuse=true</c> in prod): the
     /// heuristic never searches, so it stays null there.
     /// <c>RootBlockSearch</c> follows the same rule (default TRUE — root
     /// block search ships on; <c>Bot__RootBlockSearch=false</c> is the kill
     /// switch pinning the legacy <c>BlockCombatEval</c> path): the heuristic
     /// never searches blocks, so it stays null there. <c>MaxWorlds</c> /
-    /// <c>PerWorldBudgetMs</c> follow the same rule (default null = today's
-    /// kMax 8 / 400 ms determinized world split): the heuristic never
-    /// determinizes, so they stay null there.
+    /// <c>PerWorldBudgetMs</c> are pinned null (the engine defaults — kMax 8 /
+    /// 400 ms determinized world split — never config-overridden).
     /// Internal so tests can assert the exact installed config without digging
     /// the agent out of a facade.
     /// </summary>
@@ -106,8 +106,10 @@ public sealed class ServerGameFactory
             SearchConcurrency: _botOptions.Strategy == "mcts"
                 ? _botOptions.SearchConcurrency
                 : null,
+            // RolloutDepth's old config default — the knob was never set away
+            // from "FullTurnPlus" in any deployment, so this is byte-identical.
             RolloutDepth: _botOptions.Strategy == "mcts"
-                ? _botOptions.RolloutDepth
+                ? "FullTurnPlus"
                 : null,
             TreeStateReuse: _botOptions.Strategy == "mcts"
                 ? _botOptions.TreeStateReuse
@@ -115,12 +117,10 @@ public sealed class ServerGameFactory
             RootBlockSearch: _botOptions.Strategy == "mcts"
                 ? _botOptions.RootBlockSearch
                 : null,
-            MaxWorlds: _botOptions.Strategy == "mcts"
-                ? _botOptions.MaxWorlds
-                : null,
-            PerWorldBudgetMs: _botOptions.Strategy == "mcts"
-                ? _botOptions.PerWorldBudgetMs
-                : null);
+            // MaxWorlds / PerWorldBudgetMs were never set in any deployment;
+            // null = the engine defaults (kMax 8 / 400 ms), byte-identical.
+            MaxWorlds: null,
+            PerWorldBudgetMs: null);
 
     /// <summary>
     /// vs-Bot match: install the Bob-seat <see cref="Majik.Bot.BotPlayerAgent"/>

@@ -44,9 +44,6 @@ public sealed class MatchService
     private readonly ServerGameFactory? _gameFactory;
     private readonly DeckRepository? _deckRepo;
     private readonly DeckValidationService? _deckValidator;
-    private readonly IMatchOwnership? _ownership;
-    private readonly IMatchCommandForwarder? _forwarder;
-    private readonly IInstanceIdProvider? _instanceIds;
     private readonly MatchFacadeBridge? _facadeBridge;
     private readonly MatchReplayBuffer? _replayBuffer;
     private readonly IBotMatchScheduler _botScheduler;
@@ -56,10 +53,6 @@ public sealed class MatchService
     // callers / tests), and the loop falls back to its always-prompt
     // pre-Slice-5a behaviour.
     private readonly AutoPassPrefsStore? _autoPassPrefs;
-    // PLAN 08 (body) — durable command-log + checkpoint + claim→rehydrate
-    // orchestrator. Null (or its Enabled flag off, the default) → no durable
-    // writes + no rehydrate; the server behaves exactly as today.
-    private readonly Persistence.EnginePersistenceCoordinator? _persistence;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -73,19 +66,14 @@ public sealed class MatchService
         ServerGameFactory? gameFactory,
         DeckRepository? deckRepo = null,
         DeckValidationService? deckValidator = null,
-        IMatchOwnership? ownership = null,
-        IMatchCommandForwarder? forwarder = null,
-        IInstanceIdProvider? instanceIds = null,
         ILogger<MatchService>? logger = null,
         IDeckOwnershipPolicy? deckOwnershipPolicy = null,
         MatchFacadeBridge? facadeBridge = null,
         MatchReplayBuffer? replayBuffer = null,
         IBotMatchScheduler? botScheduler = null,
-        AutoPassPrefsStore? autoPassPrefs = null,
-        Persistence.EnginePersistenceCoordinator? persistence = null)
+        AutoPassPrefsStore? autoPassPrefs = null)
     {
         _autoPassPrefs = autoPassPrefs;
-        _persistence = persistence;
         _matches = matches;
         _profiles = profiles;
         _dice = dice;
@@ -96,9 +84,6 @@ public sealed class MatchService
         _gameFactory = gameFactory;
         _deckRepo = deckRepo;
         _deckValidator = deckValidator;
-        _ownership = ownership;
-        _forwarder = forwarder;
-        _instanceIds = instanceIds;
         _facadeBridge = facadeBridge;
         _replayBuffer = replayBuffer;
         _botScheduler = botScheduler ?? NullBotMatchScheduler.Instance;
@@ -339,41 +324,23 @@ public sealed class MatchService
                 // without a declared sideboard (a clean no-op). Folded INTO
                 // the under-id-scope build so the sideboard cards' object ids
                 // stay reproducible for id-identical rehydration (PLAN 08).
-                // Bot-decision persistence — when the engine-persistence flag
-                // is ON, wrap the bot agent in a recorder so every answer is
-                // durably appended (awaited) before it is returned. Append /
-                // encode failures are a logged degrade, never a live-game
-                // failure (mirrors RecordCommandAsync's swallow posture).
-                var botRecorder = BuildBotDecisionRecorder(matchId);
-
-                facade = CreateFacadeUnderIdScope(matchSeed,
-                    () =>
-                    {
-                        var f = _gameFactory.Create(
-                            creator.Handle, botPlayer.Handle,
-                            creatorDeck, botDeck,
-                            botSeatArchetype: bot.Archetype,
-                            onBotThinking: onBotThinking,
-                            extraDecisionSink: extraSinkArg,
-                            botDecisionRecorder: botRecorder,
-                            onBotRecordingDegraded: ex => _logger?.LogWarning(ex,
-                                "Bot-decision recording degraded (unsupported answer shape); " +
-                                "the live game continues unrecorded from here. MatchId={MatchId}",
-                                matchId));
-                        if (botSideboard.Count > 0)
-                        {
-                            f.PopulateSideboard(f.Bob, botSideboard);
-                        }
-                        return f;
-                    });
+                var f = _gameFactory.Create(
+                    creator.Handle, botPlayer.Handle,
+                    creatorDeck, botDeck,
+                    botSeatArchetype: bot.Archetype,
+                    onBotThinking: onBotThinking,
+                    extraDecisionSink: extraSinkArg);
+                if (botSideboard.Count > 0)
+                {
+                    f.PopulateSideboard(f.Bob, botSideboard);
+                }
+                facade = f;
                 // Wire the engine→SignalR bridge before any engine work
                 // can fire events (StartFullGameAsync happens later). The
                 // bridge holds the IDisposable subscriptions; teardown
                 // in the catch block / terminal-state handlers calls
                 // Detach.
                 _facadeBridge?.Attach(matchId, creator.Sub, botPlayer.Sub, facade);
-                if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
-                if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
             }
             catch (DeckLoadException ex)
             {
@@ -414,8 +381,6 @@ public sealed class MatchService
                     {
                         _facadeBridge?.Detach(matchId);
                         _gameFactory.Delete(facade.GameId);
-                        if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
-                        if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
                     }
                     catch (Exception cleanupEx)
                     {
@@ -510,8 +475,6 @@ public sealed class MatchService
                     // rollback.
                     _facadeBridge?.Detach(matchId);
                     _gameFactory.Delete(facade.GameId);
-                    if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
-                    if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
                 }
                 catch (Exception facEx)
                 {
@@ -620,13 +583,8 @@ public sealed class MatchService
             {
                 var creatorDeck = await _decks.LoadAsync(match.Creator.DeckId, ct);
                 var opponentDeck = await _decks.LoadAsync(opponent.DeckId, ct);
-                // PLAN 08 (body) — when persistence is ON, build the facade (incl.
-                // its deck-card instances) under a per-game deterministic id scope
-                // seeded from the pinned match seed, so the ORIGINAL game's ids are
-                // reproducible and a later rehydrate comes out id-identical. Flag
-                // off → no scope → today's random Guid ids (unchanged behaviour).
-                var facade = CreateFacadeUnderIdScope(match.GameSeed,
-                    () => _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck));
+                var facade = _gameFactory.Create(
+                    match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck);
                 // Wire the engine→SignalR bridge as soon as the facade
                 // exists. Subsequent state transitions (Joined→Starting→
                 // Rolling) only fire match.* publisher events, but the
@@ -637,8 +595,6 @@ public sealed class MatchService
                 await _matches.TryAtomicUpdateAsync(matchId, MatchState.Joined,
                     Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
                     ct);
-                if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
-                if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
             }
             catch (DeckLoadException ex)
             {
@@ -757,30 +713,6 @@ public sealed class MatchService
     /// commands).</summary>
     private static int NewGameSeed() => System.Random.Shared.Next();
 
-    /// <summary>
-    /// PLAN 08 (body) — run <paramref name="create"/> under a per-game
-    /// deterministic id scope seeded from <paramref name="seed"/> when engine
-    /// persistence is ON, so every id minted while the facade + its deck cards
-    /// are constructed is seed-derived and reproducible (the property a later
-    /// id-identical rehydrate needs). When persistence is OFF the create runs
-    /// outside any scope — ids fall back to random <c>Guid.NewGuid()</c>, exactly
-    /// today's behaviour. Either way the live facade is returned unchanged.
-    /// </summary>
-    private GameFacade CreateFacadeUnderIdScope(int seed, Func<GameFacade> create)
-    {
-        if (_persistence is not { Enabled: true }) return create();
-        // ONE id source spans both the board build (pushed as the ambient scope
-        // here) AND the later run: pin it on the facade so StartFullGameAsync
-        // forwards the SAME instance into the driver, keeping a single monotonic
-        // counter. A rehydrate likewise uses one scope across board+run, so the
-        // two id sequences line up byte-for-byte.
-        var source = new Majik.Core.Game.DeterministicIdSource(seed);
-        using var idScope = Majik.Core.Game.DeterministicIdScope.Push(source);
-        var facade = create();
-        facade.UsePinnedIdSource(source);
-        return facade;
-    }
-
     /// <summary>Boot the engine for the just-decided first-player slot and
     /// wire the Slice 5a auto-pass prefs provider so the engine can short-
     /// circuit the human's priority prompt when prefs match.</summary>
@@ -886,50 +818,6 @@ public sealed class MatchService
             // explicitly PUT a prefs snapshot for this (matchId, sub).
             if (!prefsStore.Has(prefsMatchId, sub)) return null;
             return prefsStore.Get(prefsMatchId, sub);
-        };
-    }
-
-    /// <summary>
-    /// Extract the bot archetype from an opponent sub. vs-bot opponents are
-    /// synthesized with <c>Sub = "bot:&lt;archetype&gt;"</c> (see
-    /// <see cref="CreateBotMatchAsync"/>); a human opponent's sub does not carry
-    /// the prefix. Returns the archetype for a bot seat, or null for a
-    /// human/absent opponent — so the rehydration path only re-installs a
-    /// BotPlayerAgent when the original match actually had one.
-    /// </summary>
-    private static string? BotArchetypeFromSub(string? sub) =>
-        sub != null && sub.StartsWith("bot:", StringComparison.Ordinal)
-            ? sub["bot:".Length..]
-            : null;
-
-    /// <summary>
-    /// Bot-decision persistence — the durable recorder handed to
-    /// <see cref="Composition.ServerGameFactory"/> for the Bob (bot) seat.
-    /// Null when engine persistence is OFF, so the factory installs today's
-    /// bare BotPlayerAgent (byte-identical flag-off path). The append goes
-    /// through <see cref="Persistence.EnginePersistenceCoordinator.RecordBotDecisionAsync"/>
-    /// (idempotent on (matchId, botSeq)); a store failure is swallowed +
-    /// logged — the live decision already happened, so failing the game for a
-    /// persistence hiccup would be strictly worse (mirrors the
-    /// RecordCommandAsync posture).
-    /// </summary>
-    private Func<Majik.Core.Api.BotReplay.BotDecisionRecord, Task>? BuildBotDecisionRecorder(
-        Guid matchId)
-    {
-        if (_persistence is not { Enabled: true }) return null;
-        var persistence = _persistence;
-        return async record =>
-        {
-            try
-            {
-                await persistence.RecordBotDecisionAsync(matchId, record, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex,
-                    "Durable bot-decision append failed (decision already applied in-process). " +
-                    "MatchId={MatchId} BotSeq={BotSeq}", matchId, record.BotSeq);
-            }
         };
     }
 
@@ -1145,8 +1033,6 @@ public sealed class MatchService
         {
             _gameFactory.Delete(gid);
         }
-        if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
-        if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
         // Slice 5a — abandon is terminal; evict prefs (matches the
         // Concede / Timeout posture so the store sheds the same set of
         // entries regardless of which terminal path was taken).
@@ -1475,29 +1361,13 @@ public sealed class MatchService
         if (CommandValidator.Validate(command) is { } boundsError)
             return Result.Fail<bool>(boundsError);
 
-        // Fast path: this replica owns the facade in-process.
+        // This replica owns the facade in-process (single-process server — the
+        // facade always lives here for a live match on this node).
         var facade = _gameFactory!.Get(gid);
         if (facade != null)
         {
             return await ExecuteCommandOnLocalFacadeAsync(match!, facade, command, callerSub, matchId, gid, ct);
         }
-
-        // PLAN 08 (body) — registry MISS but the match is live (Playing) in the
-        // durable store: this replica may be able to rehydrate the crashed game.
-        // Gated behind the persistence flag (off by default → skipped entirely).
-        if (_persistence is { Enabled: true })
-        {
-            var (rehydrated, transient) =
-                await TryRehydrateAndDispatchAsync(match!, command, callerSub, matchId, gid, ct);
-            if (rehydrated != null) return rehydrated;
-            // A transient "rehydrating, retry" supersedes the cross-replica
-            // fallback — the claim winner is (re)building; the caller retries.
-            if (transient != null) return transient;
-        }
-
-        // Cross-replica fallback: another replica owns the facade.
-        if (await TryForwardCommandToRemoteOwnerAsync(matchId, callerSub, command, ct))
-            return Result.Ok(true);
 
         return Result.Fail<bool>(new MatchError("game-not-started"));
     }
@@ -1565,26 +1435,6 @@ public sealed class MatchService
                 "invalid-command",
                 "The command was not valid for the current game state."));
         }
-        // PLAN 08 (body) — durably record the accepted command + periodic
-        // checkpoint (flag-gated; no-op when persistence is off). Seq = the
-        // command's 1-based position in the facade's append-only action log —
-        // monotonic + contiguous + identical to the replay order, so it keys the
-        // idempotent durable log directly. Failures here must not fail the
-        // command (the engine already applied it), so swallow + log.
-        if (_persistence is { Enabled: true })
-        {
-            try
-            {
-                var seq = facade.Log.Actions.Count;
-                await _persistence.RecordCommandAsync(matchId, facade, seq, command, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex,
-                    "Durable command-log append failed (command already applied in-process). " +
-                    "MatchId={MatchId} GameId={GameId}", matchId, gid);
-            }
-        }
 
         // ACK only the prompt we resolved so a late JoinMatch doesn't replay a
         // stale one — but if SubmitAsync already re-buffered a FRESH same-seat
@@ -1593,189 +1443,6 @@ public sealed class MatchService
         // a reconnecting human saw "no active prompt" forever (match 9ea6f60a).
         _facadeBridge?.AckPrompt(matchId, callerSub, resolvedPrompt);
         return Result.Ok(true);
-    }
-
-    /// <summary>Cross-replica fallback: look up ownership in Redis and
-    /// forward via pub/sub. Best-effort: a stale own-instance claim will
-    /// just time out and fall back to the caller-retry path.</summary>
-    private async Task<bool> TryForwardCommandToRemoteOwnerAsync(
-        Guid matchId, string callerSub, GameCommand command, CancellationToken ct)
-    {
-        if (_ownership == null || _forwarder == null || _instanceIds == null) return false;
-        var owner = await _ownership.GetOwnerAsync(matchId, ct);
-        if (owner == null || owner == _instanceIds.Value) return false;
-
-        var delivered = await _forwarder.SendAsync(matchId, callerSub, command, ct);
-        if (delivered) return true;
-        _logger?.LogWarning(
-            "Forwarded command to remote owner failed/timed-out. MatchId={MatchId} Owner={Owner}",
-            matchId, owner);
-        return false;
-    }
-
-    /// <summary>
-    /// PLAN 08 (body) — claim→rehydrate. On a registry miss for a live match,
-    /// try to win the ownership claim (the SETNX serialization point, so only the
-    /// winner rehydrates — no split-brain). On a win, reconstruct the in-flight
-    /// game from the durable command-log + latest checkpoint via
-    /// <see cref="Persistence.EnginePersistenceCoordinator.TryRehydrateAsync"/>,
-    /// register it under the ORIGINAL match game id, attach the engine→SignalR
-    /// bridge, then dispatch the just-arrived command locally.
-    ///
-    /// <para>Returns <c>(rehydrated, null)</c> on a successful rebuild+dispatch.
-    /// Returns <c>(null, transient)</c> with a retry signal when the rebuild would
-    /// race another claim winner, or when a concurrent rehydrate already
-    /// registered the facade between our claim and our register (the caller
-    /// retries and hits the now-live fast path). Returns <c>(null, null)</c> when
-    /// there's nothing to rehydrate (no durable log) or we didn't win the claim,
-    /// so the caller falls through to the cross-replica forward / not-started
-    /// path unchanged.</para>
-    /// </summary>
-    private async Task<(Result<bool>? Rehydrated, Result<bool>? Transient)>
-        TryRehydrateAndDispatchAsync(
-            Match match, GameCommand command, string callerSub, Guid matchId, Guid gid,
-            CancellationToken ct)
-    {
-        // Shared rebuild → claim → register → attach-bridge step (also used by
-        // the GET-state self-heal path). On a successful rebuild the resumed
-        // full-game loop is already live; here we additionally dispatch the
-        // command that triggered the rehydrate.
-        var (rehydrated, transient) =
-            await TryRehydrateAndRegisterAsync(match, matchId, gid, ct);
-        if (rehydrated == null) return (null, transient);
-
-        // Dispatch the command that triggered the rehydrate against the now-live
-        // facade — the same local path a normal command takes.
-        return (await ExecuteCommandOnLocalFacadeAsync(
-            match, rehydrated, command, callerSub, matchId, gid, ct), null);
-    }
-
-    /// <summary>
-    /// Shared "rebuild + claim + register + attach bridge" used by BOTH the
-    /// command path (<see cref="TryRehydrateAndDispatchAsync"/>) and the
-    /// GET-state self-heal path (<see cref="GetGameStateAsync"/>). The only
-    /// difference between the two callers is what happens AFTER a successful
-    /// rebuild: the command path dispatches the just-arrived command; the GET
-    /// path simply serves the resumed facade's state (the resumed full-game loop
-    /// drives the bot forward on its own — that is what unwedges a crashed
-    /// bot-turn match with no human command to trigger a rebuild).
-    ///
-    /// <para>Returns <c>(facade, null)</c> on a successful rebuild+register.
-    /// Returns <c>(null, transient)</c> with a retry signal when a concurrent
-    /// rehydrate already registered the facade between our claim and our register
-    /// (the caller retries and hits the now-live fast path). Returns
-    /// <c>(null, null)</c> when there's nothing to rehydrate (no durable log) or
-    /// we didn't win the ownership claim, so the caller falls through to its
-    /// existing cross-replica / not-started behaviour unchanged.</para>
-    /// </summary>
-    private async Task<(GameFacade? Facade, Result<bool>? Transient)>
-        TryRehydrateAndRegisterAsync(
-            Match match, Guid matchId, Guid gid, CancellationToken ct)
-    {
-        if (_persistence is not { Enabled: true } || _gameFactory == null)
-            return (null, null);
-
-        // Only the claim winner may rehydrate. With no Redis this always wins
-        // (single process); with Redis the SETNX serializes the rebuild to one
-        // replica. If we don't win, another replica owns / is rebuilding — let
-        // the cross-replica forward handle it.
-        if (_ownership != null && !await _ownership.TryClaimAsync(matchId, ct))
-            return (null, null);
-
-        GameFacade rehydrated;
-        try
-        {
-            // Reconstruct the initial decks from the persisted per-seat snapshots
-            // (card-name lists) so the rebuilt board matches the original. The
-            // seed + deck composition together make the shuffle reproducible.
-            var creatorNames = match.Creator.DeckSnapshot ?? new List<string>();
-            var opponentNames = match.Opponent?.DeckSnapshot ?? new List<string>();
-            var creatorDeck = await _decks.LoadFromCardNamesAsync(creatorNames, ct);
-            var opponentDeck = await _decks.LoadFromCardNamesAsync(opponentNames, ct);
-
-            // vs-bot match: re-install the bot seat on the rehydrated facade.
-            // The bot opponent is synthesized with Sub = "bot:<archetype>"
-            // (see CreateBotMatchAsync); the archetype is the suffix. Without
-            // re-installing, the rehydrated bot seat falls back to the default
-            // RemoteAgent and the prompt-driven replay dequeues human commands
-            // against bot prompts → desync. The replay guarantee is
-            // RECORD/REPLAY, not same-seed recompute: the match's recorded
-            // bot-decision stream is loaded whole (botSeq 0..N) and a
-            // ScriptedPlayerAgent answers every replayed bot prompt VERBATIM —
-            // wall-clock-nondeterministic MCTS rehydrates identically. Past
-            // the live edge the script falls through to a fresh recording
-            // wrapper continuing the stream at botSeq = records.Count.
-            var botArchetype = BotArchetypeFromSub(match.Opponent?.Sub);
-            var botScript = botArchetype != null
-                ? await _persistence.ReadBotDecisionsAsync(matchId, ct)
-                : Array.Empty<Majik.Core.Api.BotReplay.BotDecisionRecord>();
-            var botRecorder = botArchetype != null ? BuildBotDecisionRecorder(matchId) : null;
-
-            // Bug fix — re-wire the per-match SignalR bot-decision sink on the
-            // rehydrate path (built the SAME way as the create path, applying the
-            // same NullBotDecisionSink short-circuit as extraSinkArg). Without
-            // this the rehydrated facade published decisions to no one and the
-            // portal's bot-decisions panel stayed empty for the rest of the match.
-            var perMatchSink = BuildPerMatchBotDecisionSink(_hub, _replayBuffer, matchId);
-            var extraSinkArg = ReferenceEquals(perMatchSink, Majik.Bot.Diagnostics.NullBotDecisionSink.Instance)
-                ? null
-                : perMatchSink;
-
-            var rebuilt = await _persistence.TryRehydrateAsync(
-                matchId,
-                match.GameSeed,
-                buildFreshFacade: () => _gameFactory.BuildUnregisteredFacade(
-                    match.Creator.Handle, match.Opponent?.Handle ?? "Opponent",
-                    creatorDeck, opponentDeck, botSeatArchetype: botArchetype,
-                    botReplayScript: botScript,
-                    botDecisionRecorder: botRecorder,
-                    onBotRecordingDegraded: ex => _logger?.LogWarning(ex,
-                        "Bot-decision recording degraded post-rehydrate (unsupported answer " +
-                        "shape). MatchId={MatchId}", matchId),
-                    extraDecisionSink: extraSinkArg),
-                ct);
-
-            if (rebuilt == null)
-            {
-                // Nothing durably logged → nothing to rehydrate. Release the
-                // claim we speculatively took so we don't strand ownership.
-                if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
-                return (null, null);
-            }
-            rehydrated = rebuilt;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex,
-                "Rehydration failed. MatchId={MatchId} GameId={GameId}", matchId, gid);
-            if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
-            return (null, null);
-        }
-
-        // Serve state under the ORIGINAL match game id (registry + portal key
-        // on it), then register. A losing race (someone registered between our
-        // claim and here) → dispose our rebuild + tell the caller to retry into
-        // the now-live fast path.
-        rehydrated.OverrideGameId(gid);
-        if (!_gameFactory.RegisterRehydrated(gid, rehydrated))
-        {
-            rehydrated.Dispose();
-            return (null, Result.Ok(true));
-        }
-
-        // Attach the engine→SignalR bridge so subsequent engine events reach the
-        // wire, and re-arm cross-replica command listening for this owner.
-        _facadeBridge?.Attach(matchId, match.Creator.Sub, match.Opponent?.Sub ?? string.Empty, rehydrated);
-        if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
-
-        _logger?.LogInformation(
-            "Rehydrated crashed game on this replica. MatchId={MatchId} GameId={GameId}",
-            matchId, gid);
-
-        // The resumed full-game loop is live (GameFacade.Rehydrate restarted it);
-        // hand the registered facade back to the caller, which either dispatches
-        // the triggering command (command path) or serves its state (GET path).
-        return (rehydrated, null);
     }
 
     // -----------------------------------------------------------------------
@@ -1800,34 +1467,14 @@ public sealed class MatchService
         var facade = _gameFactory.Get(gid);
         if (facade == null)
         {
-            // Facade missing on this replica. Before giving up, try to SELF-HEAL:
-            // when persistence is on and the match is live, this GET is a
-            // rehydration trigger. This is what unwedges a crashed/redeployed
-            // human-vs-bot match on the BOT's turn — no human command arrives to
-            // drive the command-path rehydrate, so without this the match froze
-            // at its last snapshot. The same rebuild→claim→register→attach-bridge
-            // flow the command path uses runs here; there is just no command to
-            // dispatch afterwards — the resumed full-game loop drives the bot
-            // forward on its own. Losers of the ownership claim / no durable log
-            // fall through to the existing game-not-started behaviour below.
-            if (match.State == MatchState.Playing && _persistence is { Enabled: true })
-            {
-                var (rehydrated, _) = await TryRehydrateAndRegisterAsync(match, matchId, gid, ct);
-                facade = rehydrated ?? _gameFactory.Get(gid);
-            }
-
-            if (facade == null)
-            {
-                // Still missing — legitimately game-not-started from this node's
-                // perspective (cross-replica request the owner is another
-                // instance, no durable log, or the engine isn't booted yet). Log
-                // so the bot-match "No game state." regression (PR #168 follow-up)
-                // is observable in prod instead of silently dead.
-                _logger?.LogWarning(
-                    "GetGameStateAsync: facade missing on this replica. MatchId={MatchId} GameId={GameId} CallerSub={CallerSub}",
-                    matchId, gid, callerSub);
-                return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
-            }
+            // Facade missing on this single-process node — legitimately
+            // game-not-started (the engine isn't booted yet, or it was already
+            // torn down). Log so the bot-match "No game state." regression
+            // (PR #168 follow-up) is observable in prod instead of silently dead.
+            _logger?.LogWarning(
+                "GetGameStateAsync: facade missing on this replica. MatchId={MatchId} GameId={GameId} CallerSub={CallerSub}",
+                matchId, gid, callerSub);
+            return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
         }
 
         // CR 706 — return the per-viewer snapshot so the opponent's hand
