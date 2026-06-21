@@ -39,4 +39,36 @@ public class BotPlayerAgentTests
         await agent.ChoosePriorityActionAsync(s.Context);
         calls.Should().Equal(new[] { true, false });
     }
+
+    // CR 614.12 / CR 201.4 — "choose a card name": the bot names the top-ranked
+    // suggested threat (the engine hands the pool most-threatening-first), and
+    // falls back to the supplied fallback when no threats are visible.
+    [Fact]
+    public async Task ChooseCardName_NamesTopSuggestedThreat()
+    {
+        var s = new BotTestScenario();
+        var agent = new BotPlayerAgent(s.Self, new BotConfig("Burn"));
+
+        var name = await agent.ChooseCardNameAsync(
+            s.Context,
+            suggested: new[] { "Griselbrand", "Tarmogoyf" },
+            constraintLabel: "a card name");
+
+        name.Should().Be("Griselbrand");
+    }
+
+    [Fact]
+    public async Task ChooseCardName_NoSuggestions_ReturnsFallback()
+    {
+        var s = new BotTestScenario();
+        var agent = new BotPlayerAgent(s.Self, new BotConfig("Burn"));
+
+        var name = await agent.ChooseCardNameAsync(
+            s.Context,
+            suggested: System.Array.Empty<string>(),
+            constraintLabel: "a card name",
+            fallback: "");
+
+        name.Should().BeEmpty();
+    }
 }

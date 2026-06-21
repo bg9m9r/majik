@@ -322,6 +322,87 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// CR 614.12 / CR 201.4 — "as this enters / as you cast this, choose a
+    /// card name" (Meddling Mage, Pithing Needle, Sorcerous Spyglass, Sanctum
+    /// Prelate, The Stone Brain, Cavern of Souls, Phyrexian Revoker, …). The
+    /// chooser names ANY card (CR 201.4 — a player names a card by stating a
+    /// name printed on a Magic card; the name needn't correspond to a card any
+    /// player owns or that is in any zone), so unlike a target / library pick
+    /// there is no engine-enumerable legal pool — the choice is a free-form
+    /// string.
+    /// <para>
+    /// <paramref name="suggested"/> is an OPTIONAL hint pool the engine surveys
+    /// at prompt time (typically the names of cards the chooser can currently
+    /// see on opponents' sides — battlefield, stack, revealed hands — i.e. the
+    /// "known threats" a sensible name would shut off). It is NOT a legality
+    /// restriction (the chooser may still name something not in the list); it
+    /// exists so the bot default and a remote UI have a ranked starting set.
+    /// May be empty.
+    /// </para>
+    /// <para>
+    /// <paramref name="constraintLabel"/> is human-readable ("a nonland card
+    /// name", "a card name") for prompt UIs and documents any printed
+    /// restriction the calling card imposes (Meddling Mage's "nonland",
+    /// Sanctum Prelate's mana-value rider is handled separately). Enforcement
+    /// of the restriction is the calling effect's concern — this surface
+    /// returns whatever name the agent chose.
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.PickOne"/> over
+    /// the boxed <paramref name="suggested"/> names, classified
+    /// <see cref="BotIntent.Counter"/> (naming a card to shut it off is a
+    /// disruptive / hate play). When the agent returns a usable string that is what's
+    /// chosen; otherwise it falls back to the first suggested name, then to
+    /// <paramref name="fallback"/>. This mirrors <see cref="ChooseColorAsync"/>:
+    /// boxed non-card candidates don't round-trip through the
+    /// <see cref="ChoiceCommand"/> id map, so a remote (human) agent that hasn't
+    /// shipped a dedicated name-entry command lands on the deterministic
+    /// suggested-name default — strictly better than the pre-surface no-op
+    /// (which named nothing and left the static inert). Smart bots / remote
+    /// agents override to name by value / wire entry.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect /
+    /// replacement closures that don't have a <see cref="GameContext"/> handy
+    /// (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<string> ChooseCardNameAsync(
+        GameContext? ctx,
+        IReadOnlyList<string> suggested,
+        string constraintLabel,
+        string fallback = "",
+        CancellationToken ct = default)
+    {
+        var pool = suggested ?? Array.Empty<string>();
+        if (pool.Count > 0)
+        {
+            var req = new ChoiceRequest(
+                ChoiceKind.PickOne,
+                $"Choose {constraintLabel}",
+                Min: 1, Max: 1,
+                Candidates: pool.Cast<object>().ToList(),
+                Intent: BotIntent.Counter,
+                Optional: false);
+            var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+            if (chosen.Count > 0 && chosen[0] is string s && !string.IsNullOrEmpty(s))
+            {
+                return s;
+            }
+            // Agent returned nothing usable (e.g. a remote agent whose boxed
+            // string didn't round-trip the ChoiceCommand id map) — fall back to
+            // the top-ranked suggested name rather than the inert empty default.
+            return pool[0];
+        }
+
+        // No suggestion pool at all — the deterministic pre-agent posture is the
+        // supplied fallback (empty string = "name nothing", which leaves the
+        // static inert; callers that always want a non-empty name pass one).
+        return fallback;
+    }
+
+    /// <summary>
     /// Pick a mode index for a modal spell or ability.
     /// <paramref name="modeIntents"/> is parallel to <paramref name="modes"/>
     /// when populated, carrying each mode's

@@ -167,6 +167,28 @@ public sealed class BotPlayerAgent : IPlayerAgent
         CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickMode(ctx, _self, modes), ct);
 
+    /// <summary>
+    /// CR 614.12 / CR 201.4 — "choose a card name" heuristic. The engine
+    /// surveys the chooser's known information and hands us a
+    /// <paramref name="suggested"/> pool ranked most-threatening-first (cards
+    /// the opponent has visible on the battlefield / stack / revealed hand).
+    /// The simple, robust posture: name the TOP-ranked suggested card — the
+    /// most-threatening known name, which is exactly what a name-a-card hate
+    /// piece (Meddling Mage / Pithing Needle / Sanctum Prelate) wants to shut
+    /// off. When the engine surfaced no known threats we fall back to the
+    /// supplied <paramref name="fallback"/> (the pre-agent inert default — name
+    /// nothing rather than guess blindly), which keeps existing bot games byte-
+    /// identical on boards with no visible opposing cards.
+    /// </summary>
+    public Task<string> ChooseCardNameAsync(
+        GameContext? ctx,
+        IReadOnlyList<string> suggested,
+        string constraintLabel,
+        string fallback = "",
+        CancellationToken ct = default)
+        => WrapAsync(() =>
+            suggested is { Count: > 0 } pool ? pool[0] : fallback, ct);
+
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
         => WrapAsync(() => _strategy.OrderTriggers(ctx, mine), ct);
 
