@@ -1,0 +1,21 @@
+{
+  "name": "Archers' Parapet",
+  "types": ["Creature"],
+  "subtypes": ["Wall"],
+  "manaCost": "{1}{G}",
+  "power": 0,
+  "toughness": 5,
+  "keywords": ["Defender"],
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}{B}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "lose_life_each_opponent", "amount": 1 }
+      ]
+    }
+  ]
+}

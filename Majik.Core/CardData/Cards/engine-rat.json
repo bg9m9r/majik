@@ -1,0 +1,20 @@
+{
+  "name": "Engine Rat",
+  "types": ["Creature"],
+  "subtypes": ["Zombie", "Rat"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 1,
+  "keywords": ["Deathtouch"],
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{5}{B}" }
+      ],
+      "effects": [
+        { "type": "lose_life_each_opponent", "amount": 2 }
+      ]
+    }
+  ]
+}

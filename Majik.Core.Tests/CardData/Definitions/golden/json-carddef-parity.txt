@@ -1548,6 +1548,60 @@
   "mdfc": null,
   "colors": []
 }
+==== archers-parapet ====
+{
+  "name": "Archers\u0027 Parapet",
+  "manaCost": "{1}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Wall"
+  ],
+  "power": 0,
+  "toughness": 5,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Defender"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== archon-of-emeria ====
 {
   "name": "Archon of Emeria",
@@ -12644,6 +12698,61 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== engine-rat ====
+{
+  "name": "Engine Rat",
+  "manaCost": "{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Rat",
+    "Zombie"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Deathtouch"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:ManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
 }
 ==== engulf-the-shore ====
 {

@@ -237,6 +237,25 @@ namespace Majik.Core.CardData;
 ///     controller-scoped operation. Count is "a"/"one" ⇒ 1, the spelled-out
 ///     "two"/"three", or a bare digit; an unrecognised count is skipped. Sound
 ///     on any permanent bearer, not just creatures.</item>
+///   <item><b>Each-opponent drain (life loss)</b> —
+///     <c>"{cost}: Each opponent loses N life."</c> A controller-scoped GROUP
+///     drain (CR 119.3 / 109.5 / 608.2 — no target slot). Rebuilt as a no-target
+///     <see cref="ActivatedAbility"/> whose resolution reads the BEARER's
+///     CONTROLLER's OPPONENT set live off <see cref="ResolutionContext.Game"/>
+///     and routes N life loss to each through <see cref="Fx.LoseLife"/> — the
+///     SAME primitive the declarative <c>lose_life_each_opponent</c> verb
+///     (<see cref="Definitions.LoseLifeEachOpponentEffectDef"/>) uses. Like draw /
+///     gain-life this is one of the soundest re-homes: "each opponent" is read off
+///     the controller at resolution (CR 109.5 / 400.7 — "opponent" is relative to
+///     the ability's controller), with NO "this creature" / source reference at
+///     all, so re-homing is a clean controller-scoped operation, never the exiled
+///     imprinted card's controller. The pure single-clause form is reconstructed
+///     (Archers' Parapet's <c>"{1}{B}, {T}: Each opponent loses 1 life."</c>;
+///     Engine Rat's pure-mana <c>"{5}{B}: Each opponent loses 2 life."</c>); a
+///     compound "… and you gain N life" / variable "… for each &lt;X&gt;" drain is
+///     skipped (its second clause / variable amount isn't reconstructed here).
+///     Count "a"/"one" ⇒ 1, the spelled-out "two"/"three", or a bare digit; an
+///     unrecognised count is skipped. Sound on any permanent bearer.</item>
 ///   <item><b>Scry-self</b> —
 ///     <c>"{cost}: Scry N."</c> Rebuilt as a no-target
 ///     <see cref="ActivatedAbility"/> whose resolution scries over the BEARER's
@@ -912,6 +931,33 @@ public static class OracleActivatedAbilityBinder
             ["three"] = 3,
         };
 
+    // "{cost}: Each opponent loses N life." (CR 119.3 / 109.5.) A controller-
+    // scoped GROUP drain — every OPPONENT of the ability's controller loses N
+    // life (no target slot, CR 608.2). One of the most common activated drain
+    // payoffs on real creature cards (Archers' Parapet's "{1}{B}, {T}: Each
+    // opponent loses 1 life."; Engine Rat's pure-mana "{5}{B}: Each opponent
+    // loses 2 life."). RE-SOURCE-SAFE to reconstruct: "each opponent" is read off
+    // the BEARER's CONTROLLER's opponent set at resolution (CR 109.5 / 400.7 —
+    // "opponent" is relative to the ability's controller), never the exiled
+    // imprinted card's controller; the drain has NO "this creature" / source
+    // reference at all, so re-homing is a clean controller-scoped operation —
+    // exactly as sound as gain-life / draw, and it routes through the SAME
+    // Fx.LoseLife primitive the declarative lose_life_each_opponent verb uses
+    // (CardDefRuntime.BuildLoseLifeEachOpponentEffect). Non-targeted: the opponent
+    // set is resolved LIVE off rc.Game.AllPlayers at resolution (a control change
+    // carries the ability, CR 109.5). The pure "Each opponent loses N life." form
+    // is matched; a compound "… and you gain N life" / "… for each <X>" drain is
+    // NOT this shape (its second clause / variable amount isn't reconstructed
+    // here) and is skipped, consistent with the single-clause soundness boundary.
+    // Does NOT gate on Creature (a drain is sound on any permanent bearer — the
+    // controller's opponents lose life, not the permanent). Count is "a"/"one" ⇒ 1,
+    // a spelled-out "two"/"three" (reusing LifeCountWords), or a bare digit; an
+    // unrecognised count word makes the clause unsound and is skipped. Group 1 =
+    // cost, group 2 = count token.
+    private static readonly Regex LoseLifeEachOpponentRegex = new(
+        @"^(" + CostList + @")\s*:\s*Each opponent loses (a|one|two|three|\d+) life\.$",
+        RegexOptions.IgnoreCase);
+
     // "{cost}: Scry N." (CR 701.20.) A self-source scry is a common activated
     // library-smoothing shape on real creature cards (a {T}: Scry payoff). Sound
     // to re-home: scry references the BEARER's CONTROLLER's OWN library
@@ -1335,6 +1381,14 @@ public static class OracleActivatedAbilityBinder
             if (gainLife.Success)
             {
                 var ability = TryBuildGainLife(gainLife, bearer, controller);
+                if (ability != null) result.Add(ability);
+                continue;
+            }
+
+            var loseLifeEachOpp = LoseLifeEachOpponentRegex.Match(line);
+            if (loseLifeEachOpp.Success)
+            {
+                var ability = TryBuildLoseLifeEachOpponent(loseLifeEachOpp, bearer, controller);
                 if (ability != null) result.Add(ability);
                 continue;
             }
@@ -1945,6 +1999,71 @@ public static class OracleActivatedAbilityBinder
             controller: controller,
             costs: costs,
             effects: new IEffect[] { gainEffect });
+    }
+
+    /// <summary>
+    /// Build an each-opponent drain ability: "{cost}: Each opponent loses N life."
+    /// (CR 119.3 / 109.5.) A controller-scoped GROUP effect (CR 608.2) — no target
+    /// slot. Re-homed so the OPPONENT set is read off the BEARER's CONTROLLER at
+    /// resolution (CR 109.5 / 400.7 — "opponent" is relative to the ability's
+    /// controller), never the exiled imprinted card; the drain has NO "this
+    /// creature" / source reference at all, so re-homing is a clean
+    /// controller-scoped operation — as sound as gain-life / draw, routed through
+    /// the SAME <see cref="Fx.LoseLife"/> primitive the declarative
+    /// <c>lose_life_each_opponent</c> verb uses
+    /// (<c>CardDefRuntime.BuildLoseLifeEachOpponentEffect</c>). Does NOT gate on
+    /// <see cref="Creature"/> (a drain is sound on any permanent bearer — the
+    /// controller's opponents lose life, not the permanent). The opponent set is
+    /// resolved LIVE off <see cref="ResolutionContext.Game"/> at resolution (a
+    /// control change carries the ability, CR 109.5); the controller is read off
+    /// <see cref="ResolutionContext.Controller"/> when present, else the captured
+    /// <paramref name="controller"/> (the legacy sync path). The count is "a"/"one"
+    /// ⇒ 1, a spelled-out "two"/"three" (reusing <see cref="LifeCountWords"/>), or
+    /// a bare digit; an unrecognised count word is skipped (returns null).
+    /// </summary>
+    private static ActivatedAbility? TryBuildLoseLifeEachOpponent(
+        Match match, Permanent bearer, Player controller)
+    {
+        var costs = TryBuildCostList(match.Groups[1].Value, bearer, controller);
+        if (costs == null) return null; // unsound cost token — skip
+
+        var countToken = match.Groups[2].Value.Trim();
+        int amount;
+        if (!LifeCountWords.TryGetValue(countToken, out amount)
+            && !int.TryParse(countToken, out amount))
+        {
+            return null; // unrecognised count — skip as unsound
+        }
+        if (amount <= 0) return null;
+
+        var drainEffect = new Effect(
+            $"Granted: each opponent loses {amount} life",
+            (ResolutionContext rc) =>
+            {
+                // CR 109.5 / 400.7 — "opponent" is relative to the ability's
+                // controller. Read the BEARER's controller AT RESOLUTION (the
+                // re-homed scope), never the exiled imprinted card's controller.
+                var you = rc.Controller ?? bearer.Controller ?? controller;
+                if (you == null || rc.Game == null) return ValueTask.CompletedTask;
+
+                // The opponent set is resolved LIVE off the game (CR 109.5 — a
+                // control change carries the ability), exactly the way the
+                // declarative lose_life_each_opponent verb enumerates it. Each
+                // drain routes through the shared Fx.LoseLife primitive.
+                foreach (var player in rc.Game.AllPlayers)
+                {
+                    if (ReferenceEquals(player, you)) continue;
+                    Fx.LoseLife(player, amount);
+                }
+
+                return ValueTask.CompletedTask;
+            });
+
+        return new ActivatedAbility(
+            source: bearer,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { drainEffect });
     }
 
     /// <summary>
