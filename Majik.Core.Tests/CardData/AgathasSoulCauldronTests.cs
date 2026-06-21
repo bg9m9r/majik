@@ -2923,6 +2923,146 @@ public class AgathasSoulCauldronTests
     }
 
     // -----------------------------------------------------------------------
+    // agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —
+    // Giver of Runes is Mother of Runes' near-twin: "{T}: ANOTHER target
+    // creature YOU control gains protection from colorless or from the color
+    // of your choice …". Its "another creature you control" candidate gatherer
+    // is CONTROLLER-SCOPED. After the same migration Mother of Runes received,
+    // it is built via TargetRequest.ControllerScoped (a re-homeable gatherer,
+    // NOT an `owner`-capturing closure), its grant reads ctx.ChosenTargets /
+    // ctx.Controller, and the ability is RebindSafe. When the imprinted Giver
+    // is OWNED BY THE OPPONENT (Bob) but the bearer is controlled by Alice, the
+    // re-homed gatherer must enumerate ALICE's board (the bearer's controller,
+    // CR 109.5 / 707.2), excluding the BEARER itself ("another"), NOT Bob's
+    // (the exiled card owner's). Before the IRebindableGatherer migration the
+    // gatherer captured Bob and Giver fell to the oracle-rebuild fallback,
+    // which CANNOT reconstruct a chosen-colour protection grant — so Agatha
+    // produced nothing.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Grant_RebindsGiverOfRunes_GathererReadsBearerControllersBoard()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // Giver of Runes is OWNED BY BOB (the opponent) and sits in his
+        // graveyard for the Cauldron to imprint. Its "another creature you
+        // control"-scoped ability is RebindSafe, so it flows through the
+        // PRIMARY RebindTo path.
+        var giver = GiverOfRunesFactory.Create(bob);
+        bob.Zones.Graveyard.AddCard(giver);
+        giver.SetZone(ZoneType.Graveyard);
+        giver.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility).RebindSafe.Should().BeTrue(
+                "the migrated Giver of Runes grant reads ResolutionContext.ChosenTargets/Controller and is RebindSafe");
+
+        // The bearer is ALICE's creature. Each player controls one creature so
+        // we can tell whose board the re-homed gatherer reads.
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var aliceAlly = new Creature("Alice Ally", "1G", 2, 2);
+        alice.Zones.Battlefield.AddCard(aliceAlly);
+        aliceAlly.SetZone(ZoneType.Battlefield);
+
+        var bobAlly = new Creature("Bob Ally", "1G", 2, 2);
+        bob.Zones.Battlefield.AddCard(bobAlly);
+        bobAlly.SetZone(ZoneType.Battlefield);
+
+        // Alice owns + controls the Cauldron; it imprints Bob's Giver of Runes.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), giver);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains Giver of Runes' protection-grant via RebindTo");
+        var grant = granted[0];
+        grant.Source.Should().BeSameAs(bearer, "re-homed onto the BEARER (CR 707.2)");
+
+        // The crux: the re-homed "another creature you control" gatherer reads
+        // ALICE's board (the bearer's controller), not Bob's (the exiled owner).
+        // (The "another" exclusion of the source itself is enforced at
+        // resolution via the ctx.Source gate — mirroring Mother of Runes, whose
+        // controller-parametric gatherer likewise lists every controller
+        // creature; see the resolution test below.)
+        var candidates = grant.TargetRequests.Single().CandidateGatherer!(null!);
+        candidates.Should().Contain(aliceAlly,
+            "the re-homed gatherer reads the BEARER controller's (Alice's) board");
+        candidates.Should().NotContain(bobAlly,
+            "the gatherer must NOT read the exiled card owner's (Bob's) board");
+        candidates.Should().NotContain(giver,
+            "the exiled Giver of Runes (Bob's) is not on the bearer controller's board");
+    }
+
+    // -----------------------------------------------------------------------
+    // agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —
+    // Giver of Runes' re-homed grant, RESOLVED, gives the CHOSEN target (a
+    // creature the BEARER's controller controls) protection — self-sourced on
+    // the target, so the re-home does not re-read the exiled Giver.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsGiverOfRunes_ProtectionGrantToChosenAllyOfBearerController()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var giver = GiverOfRunesFactory.Create(alice);
+        giver.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility).RebindSafe.Should().BeTrue();
+        alice.Zones.Graveyard.AddCard(giver);
+        giver.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // A second Alice creature is the chosen target ("another" — not the
+        // bearer/source). Wire its ActiveEffects so the grant registers.
+        var ally = new Creature("Alice Ally", "1G", 2, 2);
+        ally.SetOwner(alice);
+        ally.ChangeController(alice);
+        alice.Zones.Library.AddCard(ally);
+        zones.MoveCard(ally, ZoneType.Library, ZoneType.Battlefield, alice);
+        ally.ActiveEffects = effects;
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), giver);
+
+        var grant = GrantedActivated(bearer).Single();
+        grant.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { ally } });
+
+        Majik.Core.Rules.Protection.HasProtectionFromColor(ally, Majik.Core.ValueObjects.ManaColor.White)
+            .Should().BeFalse("the ally has no protection before the grant resolves");
+
+        await grant.ResolveAsync(agent: null, game: null);
+
+        // Default colour is "colorless" (Giver's printed-text first half);
+        // assert the chosen ally received SOME protection marker via the
+        // self-sourced grant. Colorless protection is stored but the WUBRG
+        // helper only maps colours, so check the ability presence directly.
+        ally.Abilities.OfType<Majik.Core.Abilities.ProtectionAbility>().Should().NotBeEmpty(
+            "the re-homed grant gives the chosen ally (a creature the bearer controller controls) protection, self-sourced on the target");
+
+        // CR 602.1 — "another" gate reads the live ctx.Source (the re-homed
+        // bearer), so the bearer itself cannot receive the grant even if chosen.
+        grant.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { bearer } });
+        await grant.ResolveAsync(agent: null, game: null);
+        bearer.Abilities.OfType<Majik.Core.Abilities.ProtectionAbility>().Should().BeEmpty(
+            "the \"another\" gate (read off ctx.Source = the bearer) rejects the source itself (CR 602.1)");
+    }
+
+    // -----------------------------------------------------------------------
     // agatha-bespoke-resourcecontext-source-migration — a real BESPOKE
     // [CardName]-factory creature (Lotleth Troll) whose activated abilities
     // were migrated to read ResolutionContext.Source + marked RebindSafe now
