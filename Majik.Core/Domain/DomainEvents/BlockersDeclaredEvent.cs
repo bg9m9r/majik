@@ -10,7 +10,7 @@ public class BlockersDeclaredEvent : GameEvent
     public Majik.Core.Combat.Combat Combat { get; }
 
     public BlockersDeclaredEvent(Majik.Core.Combat.Combat combat)
-        : base(EventType.BlockersDeclared)
+        : base()
     {
         Combat = combat ?? throw new ArgumentNullException(nameof(combat));
     }

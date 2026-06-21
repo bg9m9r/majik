@@ -24,7 +24,7 @@ public class LibraryShuffledEvent : GameEvent
     public int CardCount { get; }
 
     public LibraryShuffledEvent(Players.Player player, string reason, int cardCount)
-        : base(EventType.LibraryShuffled)
+        : base()
     {
         Player = player;
         Reason = reason;

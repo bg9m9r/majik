@@ -51,7 +51,7 @@ public class CounterAddedEvent : GameEvent
     public Players.Player? Controller { get; }
 
     public CounterAddedEvent(Permanent target, CounterType type, int amount)
-        : base(EventType.CounterAdded)
+        : base()
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         CounterType = type ?? throw new ArgumentNullException(nameof(type));

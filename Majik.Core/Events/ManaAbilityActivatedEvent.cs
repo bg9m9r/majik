@@ -34,7 +34,7 @@ public class ManaAbilityActivatedEvent : GameEvent
 
     public ManaAbilityActivatedEvent(
         IManaAbility ability, Player player, ManaCost manaGenerated)
-        : base(EventType.ManaAdded)
+        : base()
     {
         Ability = ability ?? throw new ArgumentNullException(nameof(ability));
         Player = player ?? throw new ArgumentNullException(nameof(player));

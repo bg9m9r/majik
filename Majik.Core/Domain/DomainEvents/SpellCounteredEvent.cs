@@ -39,7 +39,7 @@ public class SpellCounteredEvent : GameEvent
     public Player? CounteringController { get; }
 
     public SpellCounteredEvent(ISpell counteredSpell, Player? counteringController)
-        : base(EventType.Triggered)
+        : base()
     {
         CounteredSpell = counteredSpell ?? throw new ArgumentNullException(nameof(counteredSpell));
         CounteringController = counteringController;

@@ -38,7 +38,7 @@ public class CardCycledEvent : GameEvent
     public Players.Player Player { get; }
 
     public CardCycledEvent(ICard card, Players.Player player)
-        : base(EventType.CardCycled)
+        : base()
     {
         Card = card ?? throw new ArgumentNullException(nameof(card));
         Player = player ?? throw new ArgumentNullException(nameof(player));

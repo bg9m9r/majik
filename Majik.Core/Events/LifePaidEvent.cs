@@ -63,7 +63,7 @@ public class LifePaidEvent : GameEvent
     public bool WasCost { get; }
 
     public LifePaidEvent(Player player, int amount, bool wasCost)
-        : base(EventType.LifePaid)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         if (amount <= 0)

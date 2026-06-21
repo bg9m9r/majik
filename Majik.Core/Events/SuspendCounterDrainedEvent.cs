@@ -26,7 +26,7 @@ public sealed class SuspendCounterDrainedEvent : GameEvent
     public Player Owner { get; }
 
     public SuspendCounterDrainedEvent(ICard card, Player owner)
-        : base(EventType.SuspendCounterDrained)
+        : base()
     {
         Card = card ?? throw new ArgumentNullException(nameof(card));
         Owner = owner ?? throw new ArgumentNullException(nameof(owner));

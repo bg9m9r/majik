@@ -14,7 +14,7 @@ public class SpellCastEvent : GameEvent
     public ISpell Spell { get; }
 
     public SpellCastEvent(ISpell spell) 
-        : base(EventType.Triggered)
+        : base()
     {
         Spell = spell ?? throw new ArgumentNullException(nameof(spell));
     }

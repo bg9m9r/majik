@@ -18,12 +18,7 @@ public abstract class GameEvent
     /// </summary>
     public Guid EventId { get; }
 
-    /// <summary>
-    /// Type of event.
-    /// </summary>
-    public EventType Type { get; }
-
-    protected GameEvent(EventType type)
+    protected GameEvent()
     {
         // Determinism (PLAN 08 prerequisite): the event's relative ordering
         // value comes from the per-game logical clock, not wall-clock. The
@@ -33,6 +28,5 @@ public abstract class GameEvent
         // internally consistent on replay. Same construction order as UtcNow.
         Timestamp = LogicalClockScope.Current.NextTimestamp();
         EventId = Guid.NewGuid();
-        Type = type;
     }
 }

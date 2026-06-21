@@ -6,7 +6,7 @@ namespace Majik.Core.Events;
 public class GameStartedEvent : GameEvent
 {
     public GameStartedEvent() 
-        : base(EventType.GameStarted)
+        : base()
     {
     }
 }

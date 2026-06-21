@@ -8,7 +8,7 @@ namespace Majik.Core.Domain.DomainEvents;
 public class StackClearedEvent : GameEvent
 {
     public StackClearedEvent() 
-        : base(EventType.PhaseEnded)
+        : base()
     {
     }
 }

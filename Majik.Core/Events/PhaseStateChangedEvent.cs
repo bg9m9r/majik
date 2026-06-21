@@ -15,7 +15,7 @@ public class PhaseStateChangedEvent : GameEvent
     public PhaseStateType CurrentState { get; }
 
     public PhaseStateChangedEvent(PhaseStateType? previousState, PhaseStateType currentState)
-        : base(EventType.PhaseStarted)
+        : base()
     {
         PreviousState = previousState;
         CurrentState = currentState;

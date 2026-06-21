@@ -21,7 +21,7 @@ public class GameStateChangedEvent : GameEvent
     public GameStateType CurrentState { get; }
 
     public GameStateChangedEvent(GameStateType? previousState, GameStateType currentState)
-        : base(EventType.GameStateChanged)
+        : base()
     {
         PreviousState = previousState;
         CurrentState = currentState;

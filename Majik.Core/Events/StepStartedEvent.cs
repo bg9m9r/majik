@@ -19,7 +19,7 @@ public class StepStartedEvent : GameEvent
     public Player Player { get; }
 
     public StepStartedEvent(StepStateType stepType, Player player) 
-        : base(EventType.StepStarted)
+        : base()
     {
         StepType = stepType;
         Player = player ?? throw new ArgumentNullException(nameof(player));

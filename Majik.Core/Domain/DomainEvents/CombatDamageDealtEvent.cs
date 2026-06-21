@@ -29,7 +29,6 @@ public class CombatDamageDealtEvent : DamageDealtEvent
 
     public CombatDamageDealtEvent(Permanent source, ICard? target, int amount, bool isFirstStrike = false)
         : base(
-            EventType.CombatDamageDealt,
             sourceCard: source ?? throw new ArgumentNullException(nameof(source)),
             sourcePlayer: null,
             targetCard: target is Player ? null : target,
@@ -44,7 +43,6 @@ public class CombatDamageDealtEvent : DamageDealtEvent
 
     public CombatDamageDealtEvent(Permanent source, Player targetPlayer, int amount, bool isFirstStrike = false)
         : base(
-            EventType.CombatDamageDealt,
             sourceCard: source ?? throw new ArgumentNullException(nameof(source)),
             sourcePlayer: null,
             targetCard: null,

@@ -14,7 +14,7 @@ public class TriggeredAbilityCounteredEvent : GameEvent
     public string Reason { get; }
 
     public TriggeredAbilityCounteredEvent(ITriggeredAbility ability, string reason)
-        : base(EventType.Triggered)
+        : base()
     {
         Ability = ability ?? throw new ArgumentNullException(nameof(ability));
         Reason = reason ?? throw new ArgumentNullException(nameof(reason));

@@ -40,7 +40,7 @@ public class PermanentTappedEvent : GameEvent
     public Player? CausedBy { get; }
 
     public PermanentTappedEvent(Permanent permanent, Player? causedBy = null)
-        : base(EventType.Tapped)
+        : base()
     {
         Permanent = permanent ?? throw new ArgumentNullException(nameof(permanent));
         CausedBy = causedBy;

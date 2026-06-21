@@ -10,7 +10,7 @@ public class AttackersDeclaredEvent : GameEvent
     public Majik.Core.Combat.Combat Combat { get; }
 
     public AttackersDeclaredEvent(Majik.Core.Combat.Combat combat)
-        : base(EventType.AttackersDeclared)
+        : base()
     {
         Combat = combat ?? throw new ArgumentNullException(nameof(combat));
     }

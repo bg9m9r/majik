@@ -25,7 +25,7 @@ public class CreatureAttacksEvent : GameEvent
     public object DefendingPlayerOrPlaneswalker { get; }
 
     public CreatureAttacksEvent(Permanent attacker, object defendingPlayerOrPlaneswalker)
-        : base(EventType.PhaseEnded)
+        : base()
     {
         Attacker = attacker ?? throw new ArgumentNullException(nameof(attacker));
         DefendingPlayerOrPlaneswalker = defendingPlayerOrPlaneswalker

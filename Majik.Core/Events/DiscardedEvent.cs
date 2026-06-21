@@ -68,7 +68,7 @@ public class DiscardedEvent : GameEvent
     public bool WasCost { get; }
 
     public DiscardedEvent(Player player, ICard card, bool wasCost)
-        : base(EventType.Discarded)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         Card = card ?? throw new ArgumentNullException(nameof(card));

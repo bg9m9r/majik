@@ -12,7 +12,7 @@ public class TriggeredAbilityTriggeredEvent : GameEvent
     public GameEvent TriggeringEvent { get; }
 
     public TriggeredAbilityTriggeredEvent(ITriggeredAbility ability, GameEvent triggeringEvent)
-        : base(EventType.TriggeredAbilityTriggered)
+        : base()
     {
         Ability = ability ?? throw new ArgumentNullException(nameof(ability));
         TriggeringEvent = triggeringEvent ?? throw new ArgumentNullException(nameof(triggeringEvent));

@@ -15,9 +15,9 @@ public class GameInvariantObserverTests
     // A minimal event used to drive matching.
     private sealed class PingEvent : GameEvent
     {
-        // EventType.Triggered is an existing enum member; the PingCondition
-        // gates on `e is PingEvent` so the type value is irrelevant for matching.
-        public PingEvent() : base(EventType.Triggered) { }
+        // The PingCondition gates on `e is PingEvent`, so this minimal event
+        // needs no extra ctor state.
+        public PingEvent() { }
     }
 
     // A trigger condition that matches PingEvent.

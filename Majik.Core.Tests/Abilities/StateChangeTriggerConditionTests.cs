@@ -59,7 +59,7 @@ public class StateChangeTriggerConditionTests
         // State-change triggers are never event-driven; TriggerManager
         // evaluates them via a separate path during SBA passes.
         var cond = new StateChangeTriggerCondition(() => true);
-        var fakeEvent = new Mock<Majik.Core.Events.GameEvent>(Majik.Core.Events.EventType.Triggered).Object;
+        var fakeEvent = new Mock<Majik.Core.Events.GameEvent>().Object;
 
         cond.Matches(fakeEvent, _ability.Object).Should().BeFalse();
     }

@@ -54,7 +54,7 @@ public class PermanentSacrificedEvent : GameEvent
     public bool WasToken { get; }
 
     public PermanentSacrificedEvent(ICard sacrificedCard, Player sacrificingPlayer, bool wasToken)
-        : base(EventType.PermanentSacrificed)
+        : base()
     {
         SacrificedCard = sacrificedCard ?? throw new ArgumentNullException(nameof(sacrificedCard));
         SacrificingPlayer = sacrificingPlayer ?? throw new ArgumentNullException(nameof(sacrificingPlayer));

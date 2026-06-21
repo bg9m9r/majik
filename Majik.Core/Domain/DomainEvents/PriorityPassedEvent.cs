@@ -14,7 +14,7 @@ public class PriorityPassedEvent : GameEvent
     public Player Player { get; }
 
     public PriorityPassedEvent(Player player) 
-        : base(EventType.PhaseEnded)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
     }

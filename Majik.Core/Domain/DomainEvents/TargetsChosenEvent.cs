@@ -20,7 +20,7 @@ public class TargetsChosenEvent : GameEvent
     public IReadOnlyList<ITarget> Targets { get; }
 
     public TargetsChosenEvent(IStackObject stackObject, IEnumerable<ITarget> targets) 
-        : base(EventType.Triggered)
+        : base()
     {
         StackObject = stackObject ?? throw new ArgumentNullException(nameof(stackObject));
         Targets = targets?.ToList().AsReadOnly() ?? throw new ArgumentNullException(nameof(targets));
