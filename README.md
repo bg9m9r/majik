@@ -19,7 +19,7 @@ Solution: `Majik.sln`.
 | `Majik.Core.SourceGen` | Roslyn source generator — emits the dispatch table that maps `[CardName]` attributes on factory classes to their card names. |
 | `Majik.Server` | ASP.NET Core host — REST (`/cards`, `/decks`, `/me`, `/matches`), SignalR `/hubs/match`, OpenAPI at `/openapi/v1.json`. |
 | `Majik.Bot` | Game-playing bot (EV search, decision policies). |
-| `Majik.Console` | Diagnostic CLI. Two commands: `play-triggers` (triggered-ability playground) and `export-modern-cards` (regenerates the embedded card seed). Not a gameplay UI. |
+| `Majik.Console` | Diagnostic CLI. Commands include `export-modern-cards` (regenerates the embedded card seed). Not a gameplay UI. |
 | `Majik.*.Tests` | xUnit + FluentAssertions + Moq. 20,000+ tests across `Majik.Core.Tests`, `Majik.Core.Api.Tests`, `Majik.Server.Tests`, `Majik.Bot.Tests`. (`Majik.Bot.Tests.Integration` exists but is mostly skipped — bot-vs-bot smoke.) |
 
 ## Common commands
@@ -31,9 +31,6 @@ dotnet test  --filter "FullyQualifiedName~StateBasedActionsTests.LegendRule"
 
 # Server (local dev — needs mongo, see "Local dev" below)
 dotnet run --project Majik.Server                   # http://localhost:5057
-
-# Triggered-ability playground
-dotnet run --project Majik.Console -- play-triggers [etb|apnap|intervening-if|delayed|all]
 
 # Regenerate the embedded Modern card pool (see "Updating card data")
 dotnet run --project Majik.Console -- export-modern-cards <scryfall-all-cards.json>

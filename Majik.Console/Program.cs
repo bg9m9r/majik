@@ -6,7 +6,6 @@ namespace Majik.Console;
 /// <summary>
 /// Diagnostic CLI shell. Hosts:
 /// <list type="bullet">
-/// <item><c>play-triggers</c> — engine triggered-ability playground.</item>
 /// <item><c>export-modern-cards</c> — regenerates the
 ///   <c>Majik.Core/CardData/Embedded/modern-cards.json.gz</c> seed from a
 ///   Scryfall bulk export. Replaces the one-shot SQLite dump from
@@ -37,14 +36,6 @@ class Program
         }
 
         if (args.Length > 0 &&
-            args[0].Equals("play-triggers", StringComparison.OrdinalIgnoreCase))
-        {
-            var scenario = args.Length > 1 ? args[1] : "all";
-            TriggerPlayground.Run(scenario);
-            return 0;
-        }
-
-        if (args.Length > 0 &&
             args[0].Equals("export-modern-cards", StringComparison.OrdinalIgnoreCase))
         {
             if (args.Length < 2)
@@ -69,7 +60,6 @@ class Program
         }
 
         System.Console.WriteLine("Usage:");
-        System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
         System.Console.WriteLine("  Majik.Console export-modern-cards <scryfall-all-cards.json> [output-path]");
         System.Console.WriteLine("  Majik.Console tune-bot-weights <archetype> [--games N] [--rounds R] [--strategy heuristic|mcts] [--step V] [--bad-start]");
         System.Console.WriteLine("  Majik.Console probe panel|<headName> [--n N] [--out DIR] [--concurrency C]");
@@ -79,8 +69,6 @@ class Program
         System.Console.WriteLine(Majik.Console.Commands.TuneBotWeightsCommand.HelpText);
         System.Console.WriteLine();
         System.Console.WriteLine(ProbeCommand.HelpText);
-        System.Console.WriteLine();
-        TriggerPlayground.PrintScenarios();
         return 0;
     }
 }
