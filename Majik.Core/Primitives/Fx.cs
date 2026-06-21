@@ -734,33 +734,6 @@ public static class Fx
         permanent.SetZone(ZoneType.Hand);
     }
 
-    /// <summary>
-    /// CR 701.20 — put <paramref name="permanent"/> on top of its
-    /// owner's library. Like <see cref="BounceToHand"/> this prefers
-    /// <see cref="ZoneService.MoveCard"/> when supplied.
-    /// </summary>
-    public static void BounceToTopOfLibrary(ICard permanent, ZoneService? zones = null)
-    {
-        if (permanent is null) throw new ArgumentNullException(nameof(permanent));
-        var owner = permanent.Owner;
-        if (owner is null) return;
-
-        if (zones is not null)
-        {
-            zones.MoveCard(permanent, permanent.Zone, ZoneType.Library, owner);
-            // ZoneService appends; for "on top" the caller must rotate.
-            // Default ZoneManager.AddCard already puts at the top of the
-            // library (Library.AddCard adds to position 0) — leave as-is.
-            return;
-        }
-
-        if (permanent.Zone == ZoneType.Battlefield) owner.Zones.Battlefield.RemoveCard(permanent);
-        else if (permanent.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(permanent);
-        else if (permanent.Zone == ZoneType.Hand) owner.Zones.Hand.RemoveCard(permanent);
-        else if (permanent.Zone == ZoneType.Exile) owner.Zones.Exile.RemoveCard(permanent);
-        owner.Zones.Library.AddCard(permanent);
-        permanent.SetZone(ZoneType.Library);
-    }
 
     /// <summary>
     /// CR 701.20 — move a card from a graveyard to its owner's
@@ -1006,21 +979,6 @@ public static class Fx
         if (creature is null) throw new ArgumentNullException(nameof(creature));
         if (amount <= 0) return;
         ConniveAction.ApplyN(creature, amount);
-    }
-
-    /// <summary>
-    /// CR 701.49 — Amass <paramref name="tribe"/> <paramref name="amount"/>
-    /// for <paramref name="controller"/>: ensure an Army of the tribe
-    /// exists, then put <paramref name="amount"/> +1/+1 counters on it.
-    /// No-op for <paramref name="amount"/> ≤ 0. Aliases
-    /// <see cref="AmassAction.Apply"/>; returns the affected Army (null on
-    /// no-op).
-    /// </summary>
-    public static Creature? Amass(Player controller, int amount, CardSubtype tribe, ZoneService? zones = null)
-    {
-        if (controller is null) throw new ArgumentNullException(nameof(controller));
-        if (amount <= 0) return null;
-        return AmassAction.Apply(controller, amount, tribe, zones);
     }
 
     // ------------------------------------------------------------------

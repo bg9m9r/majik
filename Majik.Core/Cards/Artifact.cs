@@ -10,16 +10,6 @@ namespace Majik.Core.Cards;
 /// </summary>
 public class Artifact : Permanent
 {
-    /// <summary>
-    /// Whether this is an Equipment artifact.
-    /// </summary>
-    public bool IsEquipment => HasSubtype(CardSubtype.Equipment);
-
-    /// <summary>
-    /// Whether this is a Vehicle artifact.
-    /// </summary>
-    public bool IsVehicle => HasSubtype(CardSubtype.Vehicle);
-
     public Artifact(string name, string manaCost, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
         : base(name, manaCost, new[] { CardType.Artifact }, supertypes, subtypes)
     {

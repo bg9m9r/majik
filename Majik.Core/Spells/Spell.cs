@@ -304,27 +304,10 @@ public class Spell : ISpell
     }
 
     /// <summary>
-    /// Check if the spell can be cast.
+    /// <see cref="IStackObject.Resolve"/> — synchronous resolution shim over
+    /// <see cref="ResolveAsync"/> for stack objects that have not migrated to
+    /// the async path (CR 608).
     /// </summary>
-    public bool CanBeCast(bool isMainPhase, bool isStackEmpty)
-    {
-        // Check card type restrictions
-        if (Card.HasType(CardType.Sorcery))
-        {
-            // Sorceries can only be cast during main phase with empty stack
-            return isMainPhase && isStackEmpty;
-        }
-
-        // Instants can be cast at instant speed (any time you have priority)
-        if (Card.HasType(CardType.Instant))
-        {
-            return true;
-        }
-
-        // Other spell types (future)
-        return true;
-    }
-
     public void Resolve() => ResolveAsync(null, null).GetAwaiter().GetResult();
 
     /// <summary>
@@ -334,7 +317,6 @@ public class Spell : ISpell
     /// single target group to fit the list-of-lists shape) and the
     /// resolver-supplied <paramref name="agent"/> / <paramref name="game"/> /
     /// <paramref name="ct"/>, then awaits each effect in declaration order.
-    /// The synchronous <see cref="Resolve"/> is a thin shim over this.
     /// </summary>
     public async ValueTask ResolveAsync(
         IPlayerAgent? agent,
@@ -370,29 +352,4 @@ public class Spell : ISpell
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
     }
 
-    /// <summary>
-    /// Get the zone the spell should move to after resolution.
-    /// Permanents go to battlefield, instants/sorceries go to graveyard (Rule 608.2).
-    /// </summary>
-    public ZoneType GetDestinationZone()
-    {
-        // Permanents go to battlefield
-        if (Card.HasType(CardType.Creature) ||
-            Card.HasType(CardType.Land) ||
-            Card.HasType(CardType.Enchantment) ||
-            Card.HasType(CardType.Artifact) ||
-            Card.HasType(CardType.Planeswalker))
-        {
-            return ZoneType.Battlefield;
-        }
-
-        // Instants and sorceries go to graveyard
-        if (Card.HasType(CardType.Instant) || Card.HasType(CardType.Sorcery))
-        {
-            return ZoneType.Graveyard;
-        }
-
-        // Default to graveyard
-        return ZoneType.Graveyard;
-    }
 }

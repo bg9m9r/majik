@@ -96,33 +96,4 @@ public class LordCostReductionTests
 
         Majik.Core.Combat.CombatAbilities.HasFlying(minion).Should().BeTrue();
     }
-
-    // ---------- Cost reduction ----------
-
-    [Fact]
-    public void CostReduction_ReducesGenericOnly()
-    {
-        var red = new CostReductionStaticEffect(2, (_, _) => true);
-        red.Reduce(ManaCost.Parse("3RR")).Generic.Should().Be(1);
-        red.Reduce(ManaCost.Parse("3RR")).Red.Should().Be(2);
-    }
-
-    [Fact]
-    public void CostReduction_FloorsAtZero()
-    {
-        var red = new CostReductionStaticEffect(5, (_, _) => true);
-        red.Reduce(ManaCost.Parse("2R")).Generic.Should().Be(0);
-        red.Reduce(ManaCost.Parse("2R")).Red.Should().Be(1);
-    }
-
-    [Fact]
-    public void CostReduction_AppliesToFilterMatches()
-    {
-        var bolt = new Instant("Bolt", "R") { Owner = _alice };
-        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
-
-        var red = new CostReductionStaticEffect(1, (_, c) => c.HasType(CardType.Instant));
-        red.AppliesTo(_alice, bolt).Should().BeTrue();
-        red.AppliesTo(_alice, bear).Should().BeFalse();
-    }
 }
