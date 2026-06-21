@@ -8009,4 +8009,129 @@ public class AgathasSoulCauldronTests
             "the gatherer must NOT read the exiled card owner's (Alice's) board "
             + "after re-home — that is the controller-scoped-gatherer-rebind bug");
     }
+
+    // -----------------------------------------------------------------------
+    // agatha-bespoke-creature-activated-ability-incremental-audit-tail —
+    // Fiery Hellhound + Wall of Fire are bespoke [CardName]-factory creatures
+    // whose sole non-mana activated ability is a firebreathing self-pump
+    // ("{R}: This creature gets +1/+0 until end of turn", CR 613.1f Layer 7c).
+    // The factory closure previously captured `card` and built the
+    // PumpUntilEndOfTurnEffect against it at AUTHOR time + was NOT RebindSafe,
+    // so Agatha's Soul Cauldron's group-grant emitted nothing for it (the
+    // OracleActivatedAbilityBinder oracle-rebuild fallback could reconstruct
+    // the shape, but the REAL factory ability stayed un-re-homeable). The
+    // migration retargets the pump to `(ctx.Source as Creature) ?? card` —
+    // built + registered at RESOLUTION time off the live ResolutionContext.Source
+    // (the new bearer after a RebindTo) — and marks the ability RebindSafe, so
+    // Agatha re-homes the REAL ability via ActivatedAbility.RebindTo (CR 707.2 /
+    // 613.1f): the BEARER gets pumped, never the exiled firebreather.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_FieryHellhound_SelfPumpToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        // A REAL bespoke [CardName]-factory creature in the graveyard. Its
+        // {R}: +1/+0 self-pump is now RebindSafe (reads ResolutionContext.Source).
+        var hellhound = FieryHellhoundFactory.Create(alice);
+        var realAbilities = hellhound.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Fiery Hellhound has exactly one non-mana activated ability — the firebreathing pump");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Fiery Hellhound pump reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(hellhound);
+        hellhound.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        // OracleStub deliberately returns NOTHING so the only way the pump is
+        // granted is via RebindTo of the REAL factory ability.
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), hellhound);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains Fiery Hellhound's REAL firebreathing via RebindTo");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer, "re-homed to the BEARER (CR 707.2)");
+        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        // Resolving the re-homed pump pumps the BEARER (+1/+0), never the exiled
+        // firebreather. Resolve through the ability path so
+        // ResolutionContext.Source = the rebound ability's source (the bearer).
+        var powerBefore = bearer.GetPower();
+        await pump.ResolveAsync(agent: null, game: null);
+        bearer.GetPower().Should().Be(powerBefore + 1,
+            "the re-homed pump boosts the BEARER (ResolutionContext.Source = bearer)");
+    }
+
+    [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_WallOfFire_SelfPumpToBearer()
+    {
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var wall = WallOfFireFactory.Create(alice);
+        var realAbilities = wall.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Wall of Fire has exactly one non-mana activated ability — the firebreathing pump");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Wall of Fire pump reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(wall);
+        wall.SetZone(ZoneType.Graveyard);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), wall);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle(
+            "the bearer gains Wall of Fire's REAL firebreathing via RebindTo");
+        var pump = granted[0];
+        pump.Source.Should().BeSameAs(bearer, "re-homed to the BEARER (CR 707.2)");
+        pump.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+
+        var powerBefore = bearer.GetPower();
+        await pump.ResolveAsync(agent: null, game: null);
+        bearer.GetPower().Should().Be(powerBefore + 1,
+            "the re-homed pump boosts the BEARER (ResolutionContext.Source = bearer)");
+    }
+
+    [Fact]
+    public async Task BespokeFirebreather_SelfPump_ResolvesOnOwnSourceWhenNotRebound()
+    {
+        // Sanity: the migrated effect still pumps its OWN source on the normal
+        // (un-rebound) ability resolution path — ResolutionContext.Source = the
+        // card itself.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+
+        var hellhound = FieryHellhoundFactory.Create(alice);
+        hellhound.ActiveEffects = effects;
+        var pump = hellhound.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        var powerBefore = hellhound.GetPower();
+        await pump.ResolveAsync(agent: null, game: null);
+        hellhound.GetPower().Should().Be(powerBefore + 1,
+            "resolving the un-rebound firebreathing pumps its own source");
+    }
 }
