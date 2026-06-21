@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Majik.Core.Abilities;
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
@@ -1123,12 +1122,6 @@ public sealed class GameFacade : IDisposable
     public ActionLog Log => _log;
 
     /// <summary>
-    /// Serializes the current state to JSON bytes — read-only spectator
-    /// snapshot. Pair with <see cref="SpectatorSnapshot.Load"/>.
-    /// </summary>
-    public byte[] Save() => JsonSerializer.SerializeToUtf8Bytes(GetState());
-
-    /// <summary>
     /// Full snapshot including action log + the deterministic-replay inputs
     /// (RNG seed, seat ids, instance-id → card-name map). Pair with
     /// <see cref="FromSnapshot"/> to fast-forward a fresh facade to this state.
@@ -1169,8 +1162,6 @@ public sealed class GameFacade : IDisposable
         }
         return map;
     }
-
-    public byte[] SaveSnapshotBytes() => JsonSerializer.SerializeToUtf8Bytes(SaveSnapshot());
 
     /// <summary>
     /// Replay-from-command-log (PLAN 08 / Phase 29.x). Rebuild a fresh facade
