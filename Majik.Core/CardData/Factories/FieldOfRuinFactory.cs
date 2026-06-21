@@ -48,6 +48,18 @@ namespace Majik.Core.CardData.Factories;
 ///   701.20a). All four ETB / shuffle events are independent — each
 ///   player's tutor is its own search.
 ///
+/// ## Prod each-player tutor — now reads the live roster
+/// Lands build through the binder chain in prod (NOT this [CardName] factory —
+/// see <c>named-factory-vs-binder-chain</c>). The production "Each player
+/// searches their library for a basic land card, puts it onto the battlefield,
+/// then shuffles" rider is bound in <see cref="LandActivatedAbilityBinder"/>,
+/// walking every player off the LIVE resolution roster
+/// (<see cref="Game.GameContext.AllPlayers"/>) in turn order — NO captured
+/// build-time <c>allPlayersResolver</c> (v1-deferrals
+/// resolver-null-continuous-effect-predicate-on-land-factories; #2710
+/// context-aware family). This factory's captured-resolver leg remains only for
+/// the test-only factory path.
+///
 /// ## Deferred (v1 gaps)
 /// - <b>"Each player" turn-order</b>: CR 603.3b APNAP isn't enforced at
 ///   the agent-prompt level here — the factory walks the supplied player
