@@ -3,6 +3,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -109,6 +110,84 @@ public class TriggeredAbilityTests
     }
 
     [Fact]
+    public async Task OptionalPrompt_Null_ByDefault_ResolvesMandatorily()
+    {
+        // A trigger with no OptionalPrompt is MANDATORY — its effects run
+        // unconditionally even when an agent is supplied (no yes/no is asked).
+        var calls = new List<string>();
+        var ability = NewAbility(
+            AlwaysFires(),
+            effects: new IEffect[] { new Effect("a", () => calls.Add("a")) });
+        var agent = new ScriptedAgent(); // no yes/no queued — must NOT be consulted
+
+        await ability.ResolveAsync(agent, game: null);
+
+        calls.Should().Equal("a");
+        ability.OptionalPrompt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OptionalPrompt_Decline_SkipsEffects()
+    {
+        // CR 603.5 — a "you may" trigger whose controller declines at
+        // resolution resolves as a no-op (no effects run).
+        var calls = new List<string>();
+        var ability = NewOptionalAbility(
+            new OptionalTriggerPrompt("do it?", BotIntent.Reanimate),
+            effects: new IEffect[] { new Effect("a", () => calls.Add("a")) });
+        var agent = new ScriptedAgent();
+        agent.QueueYesNo(false);
+
+        await ability.ResolveAsync(agent, game: null);
+
+        calls.Should().BeEmpty();
+        ability.IsResolving.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task OptionalPrompt_Accept_RunsEffects()
+    {
+        var calls = new List<string>();
+        var ability = NewOptionalAbility(
+            new OptionalTriggerPrompt("do it?", BotIntent.Reanimate),
+            effects: new IEffect[] { new Effect("a", () => calls.Add("a")) });
+        var agent = new ScriptedAgent();
+        agent.QueueYesNo(true);
+
+        await ability.ResolveAsync(agent, game: null);
+
+        calls.Should().Equal("a");
+    }
+
+    [Fact]
+    public async Task OptionalPrompt_NoAgent_AutoTakes_PreservingLegacyPosture()
+    {
+        // No agent registered for the controller ⇒ the "may" is auto-taken,
+        // preserving the legacy mandatory-resolution posture every pre-gate
+        // "you may" trigger relied on.
+        var calls = new List<string>();
+        var ability = NewOptionalAbility(
+            new OptionalTriggerPrompt("do it?", BotIntent.Reanimate),
+            effects: new IEffect[] { new Effect("a", () => calls.Add("a")) });
+
+        await ability.ResolveAsync(agent: null, game: null);
+
+        calls.Should().Equal("a");
+    }
+
+    [Fact]
+    public void RebindTo_PreservesOptionalPrompt()
+    {
+        var prompt = new OptionalTriggerPrompt("do it?", BotIntent.Reanimate);
+        var ability = NewOptionalAbility(prompt, effects: new IEffect[] { new Effect("a", () => { }) });
+        var newSource = new Creature("Copy", "1G", 2, 2) { Owner = _player, Zone = ZoneType.Battlefield };
+
+        var rebound = ability.RebindTo(newSource, _player);
+
+        rebound.OptionalPrompt.Should().Be(prompt);
+    }
+
+    [Fact]
     public void Constructor_NullCondition_Throws()
     {
         var source = new Creature("Bear", "1G", 2, 2) { Owner = _player, Zone = ZoneType.Battlefield };
@@ -127,6 +206,15 @@ public class TriggeredAbilityTests
         var source = new Creature("Bear", "1G", 2, 2) { Owner = _player, Zone = ZoneType.Battlefield };
         return new TriggeredAbility(source, _player, condition,
             effects: effects, interveningIf: interveningIf, activeZones: activeZones);
+    }
+
+    private TriggeredAbility NewOptionalAbility(
+        OptionalTriggerPrompt prompt,
+        IEnumerable<IEffect> effects)
+    {
+        var source = new Creature("Bear", "1G", 2, 2) { Owner = _player, Zone = ZoneType.Battlefield };
+        return new TriggeredAbility(source, _player, AlwaysFires(),
+            effects: effects, optionalPrompt: prompt);
     }
 
     private static ITriggerCondition AlwaysFires() =>

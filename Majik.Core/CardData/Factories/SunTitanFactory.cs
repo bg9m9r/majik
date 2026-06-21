@@ -24,8 +24,12 @@ namespace Majik.Core.CardData.Factories;
 ///   controller may return target <i>permanent</i> card (any permanent type
 ///   — creature, artifact, enchantment, land, or planeswalker) with mana
 ///   value 3 or less from their graveyard to the battlefield. v1 picks
-///   the first eligible permanent card deterministically; the "you may"
-///   defaults to taking the action when an eligible candidate exists.
+///   the first eligible permanent card deterministically; the "you may" is a
+///   first-class <see cref="OptionalTriggerPrompt"/> (CR 603.5) — the
+///   controller's agent is asked yes/no at resolution and the trigger resolves
+///   as a no-op on a decline. The default agent heuristic auto-accepts the
+///   <see cref="Cards.BotIntent.Reanimate"/>-tagged prompt, so the auto-take
+///   posture is preserved where no human/search agent answers.
 ///   Movement is funnelled through <see cref="ZoneService.MoveCard"/> when
 ///   a service is supplied so ETB triggers on the reanimated permanent fire
 ///   (CR 603.6a — PR #165). Falls back to raw zone manipulation suitable
@@ -36,10 +40,6 @@ namespace Majik.Core.CardData.Factories;
 ///   permanent card with mana value 3 or less.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"You may" prompt</b>: each trigger is faithfully optional in the
-///   oracle text. The v1 effect always reanimates the first eligible
-///   permanent card when one exists; a first-class yes/no agent prompt
-///   is deferred (mirrors Priest of Fell Rites / Primeval Titan).
 /// - <b>Target selection</b>: the v1 effect picks the first eligible
 ///   permanent card deterministically rather than prompting the agent to
 ///   choose among multiple eligible candidates. Same deferral pattern as
@@ -54,6 +54,17 @@ public static class SunTitanFactory
 {
     public const string CardName = "Sun Titan";
     public const string PrintedManaCost = "{4}{W}{W}";
+
+    /// <summary>
+    /// CR 603.5 — the "you may" gate shared by both reanimate triggers. The
+    /// <see cref="BotIntent.Reanimate"/> classifier auto-accepts under the
+    /// default agent heuristic (preserving the legacy auto-take posture); a
+    /// human / search agent may decline, in which case the trigger resolves as
+    /// a no-op.
+    /// </summary>
+    private static readonly OptionalTriggerPrompt ReanimatePrompt =
+        new("Return target permanent card with mana value 3 or less from your graveyard to the battlefield?",
+            BotIntent.Reanimate);
 
     /// <summary>
     /// Construct Sun Titan with no live ZoneService / TriggerManager wiring
@@ -117,7 +128,8 @@ public static class SunTitanFactory
             controller: owner,
             condition: Triggers.OnEnterBattlefieldSelf(card),
             effects: new[] { BuildReanimateEffect("Sun Titan: ETB reanimate target permanent card (mv ≤ 3)") },
-            activeZones: new[] { ZoneType.Battlefield });
+            activeZones: new[] { ZoneType.Battlefield },
+            optionalPrompt: ReanimatePrompt);
 
         card.AddAbility(etbTrigger);
         triggers?.RegisterTriggeredAbility(etbTrigger);
@@ -134,7 +146,8 @@ public static class SunTitanFactory
             controller: owner,
             condition: Triggers.OnAttackSelf(card),
             effects: new[] { BuildReanimateEffect("Sun Titan: attack reanimate target permanent card (mv ≤ 3)") },
-            activeZones: new[] { ZoneType.Battlefield });
+            activeZones: new[] { ZoneType.Battlefield },
+            optionalPrompt: ReanimatePrompt);
 
         card.AddAbility(attackTrigger);
         triggers?.RegisterTriggeredAbility(attackTrigger);
