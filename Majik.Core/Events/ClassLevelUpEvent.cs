@@ -27,7 +27,7 @@ public class ClassLevelUpEvent : GameEvent
     public int ToLevel { get; }
 
     public ClassLevelUpEvent(ICard source, Player controller, int fromLevel, int toLevel)
-        : base(EventType.ClassLeveledUp)
+        : base()
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));

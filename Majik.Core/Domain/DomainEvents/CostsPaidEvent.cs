@@ -20,7 +20,7 @@ public class CostsPaidEvent : GameEvent
     public IReadOnlyList<ICost> Costs { get; }
 
     public CostsPaidEvent(IStackObject stackObject, IEnumerable<ICost> costs) 
-        : base(EventType.Triggered)
+        : base()
     {
         StackObject = stackObject ?? throw new ArgumentNullException(nameof(stackObject));
         Costs = costs?.ToList().AsReadOnly() ?? throw new ArgumentNullException(nameof(costs));

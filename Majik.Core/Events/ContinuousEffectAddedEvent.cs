@@ -15,7 +15,7 @@ public class ContinuousEffectAddedEvent : GameEvent
     public ContinuousEffect Effect { get; }
 
     public ContinuousEffectAddedEvent(ContinuousEffect effect)
-        : base(EventType.ContinuousEffectAdded)
+        : base()
     {
         Effect = effect ?? throw new ArgumentNullException(nameof(effect));
     }

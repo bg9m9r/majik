@@ -18,7 +18,7 @@ public class CardDrawnEvent : GameEvent
     public Players.Player Player { get; }
 
     public CardDrawnEvent(ICard card, Players.Player player) 
-        : base(EventType.CardDrawn)
+        : base()
     {
         Card = card;
         Player = player;

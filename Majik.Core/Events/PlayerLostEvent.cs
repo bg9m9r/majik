@@ -13,7 +13,7 @@ public class PlayerLostEvent : GameEvent
     public Player Player { get; }
 
     public PlayerLostEvent(Player player) 
-        : base(EventType.GameEnded)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
     }

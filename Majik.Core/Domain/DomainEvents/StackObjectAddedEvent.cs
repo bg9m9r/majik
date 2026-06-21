@@ -14,7 +14,7 @@ public class StackObjectAddedEvent : GameEvent
     public IStackObject StackObject { get; }
 
     public StackObjectAddedEvent(IStackObject stackObject) 
-        : base(EventType.Triggered)
+        : base()
     {
         StackObject = stackObject ?? throw new ArgumentNullException(nameof(stackObject));
     }

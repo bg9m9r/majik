@@ -49,7 +49,7 @@ public sealed class OpeningHandCheckEvent : GameEvent
     public IReadOnlyList<ICard> OpeningHand { get; }
 
     public OpeningHandCheckEvent(Player player, IReadOnlyList<ICard> openingHand)
-        : base(EventType.OpeningHandCheck)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         OpeningHand = openingHand ?? throw new ArgumentNullException(nameof(openingHand));

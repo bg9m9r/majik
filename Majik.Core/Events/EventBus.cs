@@ -38,7 +38,6 @@ public class EventBus : IEventBus
     private Dictionary<Type, IReadOnlyList<Delegate>> _syncHandlers = new();
     private Dictionary<Type, IReadOnlyList<Delegate>> _asyncHandlers = new();
     private IReadOnlyList<Action<GameEvent>> _globalSyncHandlers = Array.Empty<Action<GameEvent>>();
-    private IReadOnlyList<Func<GameEvent, Task>> _globalAsyncHandlers = Array.Empty<Func<GameEvent, Task>>();
 
     /// <summary>
     /// Optional sink invoked when a handler throws. Receives the
@@ -106,13 +105,6 @@ public class EventBus : IEventBus
             var g = globalSync[i];
             SafeInvoke(() => g(@event), @event);
         }
-
-        var globalAsync = _globalAsyncHandlers;
-        for (var i = 0; i < globalAsync.Count; i++)
-        {
-            var g = globalAsync[i];
-            SafeFireAndForget(() => g(@event), @event);
-        }
     }
 
     public async Task PublishAsync<T>(T @event) where T : GameEvent
@@ -144,13 +136,6 @@ public class EventBus : IEventBus
             var g = globalSync[i];
             SafeInvoke(() => g(@event), @event);
         }
-
-        var globalAsync = _globalAsyncHandlers;
-        for (var i = 0; i < globalAsync.Count; i++)
-        {
-            var g = globalAsync[i];
-            await SafeAwait(() => g(@event), @event).ConfigureAwait(false);
-        }
     }
 
     public void SubscribeAll(Action<GameEvent> handler)
@@ -159,22 +144,10 @@ public class EventBus : IEventBus
         _globalSyncHandlers = Append(_globalSyncHandlers, handler);
     }
 
-    public void SubscribeAll(Func<GameEvent, Task> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-        _globalAsyncHandlers = Append(_globalAsyncHandlers, handler);
-    }
-
     public void UnsubscribeAll(Action<GameEvent> handler)
     {
         if (handler == null) return;
         _globalSyncHandlers = RemoveFrom(_globalSyncHandlers, handler);
-    }
-
-    public void UnsubscribeAll(Func<GameEvent, Task> handler)
-    {
-        if (handler == null) return;
-        _globalAsyncHandlers = RemoveFrom(_globalAsyncHandlers, handler);
     }
 
     // --- Copy-on-write store mutators ---------------------------------

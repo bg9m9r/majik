@@ -13,7 +13,7 @@ public class ExtraTurnAddedEvent : GameEvent
     public Player Player { get; }
 
     public ExtraTurnAddedEvent(Player player) 
-        : base(EventType.TurnStarted)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
     }

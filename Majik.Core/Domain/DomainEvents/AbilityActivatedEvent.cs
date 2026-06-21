@@ -14,7 +14,7 @@ public class AbilityActivatedEvent : GameEvent
     public IActivatedAbility Ability { get; }
 
     public AbilityActivatedEvent(IActivatedAbility ability) 
-        : base(EventType.Triggered)
+        : base()
     {
         Ability = ability ?? throw new ArgumentNullException(nameof(ability));
     }

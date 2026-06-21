@@ -14,7 +14,7 @@ public class GainedCitysBlessingEvent : GameEvent
     public Player Player { get; }
 
     public GainedCitysBlessingEvent(Player player)
-        : base(EventType.GainedCitysBlessing)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
     }

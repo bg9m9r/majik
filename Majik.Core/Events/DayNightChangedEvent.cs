@@ -17,7 +17,7 @@ public class DayNightChangedEvent : GameEvent
     public DayNightDesignation NewDesignation { get; }
 
     public DayNightChangedEvent(DayNightDesignation newDesignation)
-        : base(EventType.Triggered)
+        : base()
     {
         NewDesignation = newDesignation;
     }

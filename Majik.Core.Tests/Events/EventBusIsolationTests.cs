@@ -14,7 +14,7 @@ public class EventBusIsolationTests
     private sealed class TestEvent : GameEvent
     {
         public string Payload { get; }
-        public TestEvent(string payload) : base(EventType.GameStarted) { Payload = payload; }
+        public TestEvent(string payload) { Payload = payload; }
     }
 
     [Fact]

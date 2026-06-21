@@ -14,7 +14,7 @@ public class AllPlayersPassedEvent : GameEvent
     public bool StackIsEmpty { get; }
 
     public AllPlayersPassedEvent(bool stackIsEmpty) 
-        : base(EventType.PhaseEnded)
+        : base()
     {
         StackIsEmpty = stackIsEmpty;
     }

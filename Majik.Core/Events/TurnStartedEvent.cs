@@ -18,7 +18,7 @@ public class TurnStartedEvent : GameEvent
     public int TurnNumber { get; }
 
     public TurnStartedEvent(Player player, int turnNumber) 
-        : base(EventType.TurnStarted)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         TurnNumber = turnNumber;

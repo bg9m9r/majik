@@ -13,7 +13,7 @@ public class ExtraPhaseAddedEvent : GameEvent
     public StepStateType PhaseType { get; }
 
     public ExtraPhaseAddedEvent(StepStateType phaseType) 
-        : base(EventType.PhaseStarted)
+        : base()
     {
         PhaseType = phaseType;
     }

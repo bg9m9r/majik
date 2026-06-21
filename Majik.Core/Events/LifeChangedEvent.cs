@@ -23,7 +23,7 @@ public class LifeChangedEvent : GameEvent
     public int NewLife { get; }
 
     public LifeChangedEvent(Player player, int previousLife, int newLife) 
-        : base(EventType.LifeChanged)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         PreviousLife = previousLife;

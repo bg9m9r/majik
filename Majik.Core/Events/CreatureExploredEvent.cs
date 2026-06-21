@@ -56,7 +56,7 @@ public class CreatureExploredEvent : GameEvent
 
     public CreatureExploredEvent(
         ICard creature, Player controller, ICard? revealedCard, bool revealedLand)
-        : base(EventType.Explored)
+        : base()
     {
         Creature = creature ?? throw new ArgumentNullException(nameof(creature));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));

@@ -29,7 +29,7 @@ public class PlayerCounterAddedEvent : GameEvent
     public int Amount { get; }
 
     public PlayerCounterAddedEvent(Players.Player player, CounterType type, int amount)
-        : base(EventType.PlayerCounterAdded)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         CounterType = type ?? throw new ArgumentNullException(nameof(type));

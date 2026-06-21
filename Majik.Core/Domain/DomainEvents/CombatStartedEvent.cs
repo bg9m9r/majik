@@ -11,7 +11,7 @@ public class CombatStartedEvent : GameEvent
     public Player ActivePlayer { get; }
 
     public CombatStartedEvent(Player activePlayer)
-        : base(EventType.CombatStarted)
+        : base()
     {
         ActivePlayer = activePlayer ?? throw new ArgumentNullException(nameof(activePlayer));
     }

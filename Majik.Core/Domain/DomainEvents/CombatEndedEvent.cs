@@ -10,7 +10,7 @@ public class CombatEndedEvent : GameEvent
     public Majik.Core.Combat.Combat Combat { get; }
 
     public CombatEndedEvent(Majik.Core.Combat.Combat combat)
-        : base(EventType.CombatEnded)
+        : base()
     {
         Combat = combat ?? throw new ArgumentNullException(nameof(combat));
     }

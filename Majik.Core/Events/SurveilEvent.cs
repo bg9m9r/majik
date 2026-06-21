@@ -45,7 +45,7 @@ public class SurveilEvent : GameEvent
     public IReadOnlyList<ICard> Cards { get; }
 
     public SurveilEvent(Player player, int n, IReadOnlyList<ICard> cards)
-        : base(EventType.Surveil)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
         N = n;

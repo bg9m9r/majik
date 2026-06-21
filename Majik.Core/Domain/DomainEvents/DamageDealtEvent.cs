@@ -68,15 +68,13 @@ public class DamageDealtEvent : GameEvent
     /// <summary>True when the target is a player (life loss); false when a card.</summary>
     public bool TargetIsPlayer => TargetPlayer != null;
 
-    protected DamageDealtEvent(
-        EventType eventType,
+    public DamageDealtEvent(
         ICard? sourceCard,
         Player? sourcePlayer,
         ICard? targetCard,
         Player? targetPlayer,
         int amount,
         DamageType damageType)
-        : base(eventType)
     {
         if (sourceCard == null && sourcePlayer == null)
             throw new ArgumentException("Damage event requires a source card or source player.", nameof(sourceCard));
@@ -89,16 +87,5 @@ public class DamageDealtEvent : GameEvent
         TargetPlayer = targetPlayer;
         Amount = amount;
         DamageType = damageType;
-    }
-
-    public DamageDealtEvent(
-        ICard? sourceCard,
-        Player? sourcePlayer,
-        ICard? targetCard,
-        Player? targetPlayer,
-        int amount,
-        DamageType damageType)
-        : this(EventType.DamageDealt, sourceCard, sourcePlayer, targetCard, targetPlayer, amount, damageType)
-    {
     }
 }

@@ -37,7 +37,7 @@ public class CardRevealedEvent : GameEvent
     public string Reason { get; }
 
     public CardRevealedEvent(ICard card, Player player, ZoneType from, string reason)
-        : base(EventType.CardRevealed)
+        : base()
     {
         Card = card;
         Player = player;

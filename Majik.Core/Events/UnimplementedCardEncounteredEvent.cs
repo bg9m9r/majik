@@ -37,7 +37,7 @@ public sealed class UnimplementedCardEncounteredEvent : GameEvent
     public string Context { get; }
 
     public UnimplementedCardEncounteredEvent(ICard card, Player? player, string context)
-        : base(EventType.UnimplementedCardEncountered)
+        : base()
     {
         Card = card ?? throw new ArgumentNullException(nameof(card));
         CardName = card.Name;

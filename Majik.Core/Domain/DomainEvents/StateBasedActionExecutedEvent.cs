@@ -13,7 +13,7 @@ public class StateBasedActionExecutedEvent : GameEvent
     public string ActionDescription { get; }
 
     public StateBasedActionExecutedEvent(string actionDescription) 
-        : base(EventType.PhaseEnded)
+        : base()
     {
         ActionDescription = actionDescription ?? throw new ArgumentNullException(nameof(actionDescription));
     }

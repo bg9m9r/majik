@@ -23,7 +23,7 @@ public class CreatureBlocksEvent : GameEvent
     public Permanent BlockedAttacker { get; }
 
     public CreatureBlocksEvent(Permanent blocker, Permanent blockedAttacker)
-        : base(EventType.PhaseEnded)
+        : base()
     {
         Blocker = blocker ?? throw new ArgumentNullException(nameof(blocker));
         BlockedAttacker = blockedAttacker ?? throw new ArgumentNullException(nameof(blockedAttacker));

@@ -14,7 +14,7 @@ public class PriorityReceivedEvent : GameEvent
     public Player Player { get; }
 
     public PriorityReceivedEvent(Player player) 
-        : base(EventType.PhaseStarted)
+        : base()
     {
         Player = player ?? throw new ArgumentNullException(nameof(player));
     }

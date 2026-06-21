@@ -43,14 +43,7 @@ public interface IEventBus
     /// observer (audit log, transport bridge).</summary>
     void SubscribeAll(Action<GameEvent> handler);
 
-    /// <summary>Async variant of <see cref="SubscribeAll"/>.</summary>
-    void SubscribeAll(Func<GameEvent, Task> handler);
-
-    /// <summary>Remove a handler previously added via the sync
-    /// <see cref="SubscribeAll(Action{GameEvent})"/>.</summary>
+    /// <summary>Remove a handler previously added via
+    /// <see cref="SubscribeAll"/>.</summary>
     void UnsubscribeAll(Action<GameEvent> handler);
-
-    /// <summary>Remove a handler previously added via the async
-    /// <see cref="SubscribeAll(Func{GameEvent,Task})"/>.</summary>
-    void UnsubscribeAll(Func<GameEvent, Task> handler);
 }

@@ -53,7 +53,7 @@ public class CardMovedEvent : GameEvent
     }
 
     public CardMovedEvent(ICard card, ZoneType fromZone, ZoneType toZone, Player? lkiController)
-        : base(EventType.CardMoved)
+        : base()
     {
         Card = card;
         FromZone = fromZone;
