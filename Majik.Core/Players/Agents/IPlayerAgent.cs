@@ -1017,6 +1017,138 @@ public interface IPlayerAgent
     }
 
     /// <summary>
+    /// CR 700.6 / pile-split primitive — "separate [objects] into two piles"
+    /// (Liliana of the Veil's −6, the Fact-or-Fiction / Fade-Away pile-split
+    /// family). This agent is the PARTITIONER (player A). It returns the SUBSET
+    /// of <paramref name="objects"/> that forms the FIRST pile; the caller forms
+    /// the second pile from every object NOT returned. Either pile may be empty
+    /// (CR 700.6 — a pile can contain zero objects); the union of the two piles
+    /// is always exactly <paramref name="objects"/>.
+    /// <para>
+    /// The companion choice — the OTHER player (player B) deciding WHICH pile to
+    /// apply the per-pile effect to — flows through
+    /// <see cref="ChoosePileAsync"/>.
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.SplitIntoPiles"/>
+    /// (a Min 0 .. Max all sub-selection over the objects). The pre-agent posture
+    /// is an EVEN split (the first half forms pile one) — a deterministic,
+    /// CR-legal partition that doesn't trivially hand the chooser an empty pile.
+    /// The engine sanitises the returned subset (drops non-candidates +
+    /// duplicates) so a misbehaving agent can never produce an illegal pile. Smart
+    /// bots / remote agents override <see cref="ChooseAsync"/> (or this method) to
+    /// partition by value — e.g. Liliana's controller splitting the opponent's
+    /// board so BOTH piles hurt.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect closures
+    /// (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<(IReadOnlyList<ICard> PileOne, IReadOnlyList<ICard> PileTwo)> SplitIntoPilesAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> objects,
+        BotIntent intent = BotIntent.None,
+        CancellationToken ct = default)
+    {
+        var pool = objects ?? Array.Empty<ICard>();
+        if (pool.Count == 0)
+        {
+            return (Array.Empty<ICard>(), Array.Empty<ICard>());
+        }
+
+        var req = new ChoiceRequest(
+            ChoiceKind.SplitIntoPiles,
+            "Separate into two piles",
+            Min: 0, Max: pool.Count,
+            Candidates: pool.Cast<object>().ToList(),
+            Intent: intent,
+            Optional: false);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+
+        // Sanitise: pile one = distinct cards drawn from the candidate pool (by
+        // reference). Anything the agent returned that isn't a candidate is
+        // ignored.
+        var seen = new HashSet<ICard>();
+        var pileOne = new List<ICard>();
+        foreach (var o in chosen)
+        {
+            if (o is not ICard c) continue;
+            if (!pool.Contains(c)) continue;
+            if (!seen.Add(c)) continue;
+            pileOne.Add(c);
+        }
+
+        // The default ChooseAsync (and ScriptedAgent's) returns the first Min
+        // candidates — here Min is 0, so an absent / first-candidate agent hands
+        // back an EMPTY pile one. That is CR-legal but degenerate (it gives the
+        // chooser a free "sacrifice nothing"), so the deterministic pre-agent
+        // posture is an EVEN split instead: the first half forms pile one.
+        if (pileOne.Count == 0 && pool.Count > 0)
+        {
+            var half = pool.Count / 2;
+            for (var i = 0; i < half; i++)
+            {
+                if (seen.Add(pool[i])) pileOne.Add(pool[i]);
+            }
+        }
+
+        // Pile two = everything not in pile one, in candidate order.
+        var pileTwo = new List<ICard>();
+        foreach (var c in pool)
+        {
+            if (!seen.Contains(c)) pileTwo.Add(c);
+        }
+        return (pileOne, pileTwo);
+    }
+
+    /// <summary>
+    /// CR 700.6 / pile-split primitive — the companion to
+    /// <see cref="SplitIntoPilesAsync"/>. This agent is the CHOOSER (player B):
+    /// after player A has separated the objects into two piles, player B picks
+    /// WHICH pile the per-pile effect applies to (for Liliana's −6, which pile
+    /// the target player sacrifices). Returns <c>0</c> to choose
+    /// <paramref name="pileOne"/>, <c>1</c> to choose <paramref name="pileTwo"/>.
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.PickOne"/> over
+    /// two boxed pile-index sentinels (<c>0</c>, <c>1</c>). The pre-agent posture
+    /// (first candidate) picks pile one — deterministic. For a self-detrimental
+    /// "you sacrifice the chosen pile" application (Liliana's target player
+    /// choosing), a smart agent classified with <paramref name="intent"/> picks
+    /// the pile that hurts LESS; the default merely picks pile one. The engine
+    /// clamps the returned index to {0, 1}.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect closures
+    /// (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<int> ChoosePileAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> pileOne,
+        IReadOnlyList<ICard> pileTwo,
+        string label,
+        BotIntent intent = BotIntent.None,
+        CancellationToken ct = default)
+    {
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne,
+            label,
+            Min: 1, Max: 1,
+            Candidates: new object[] { 0, 1 },
+            Intent: intent,
+            Optional: false);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        if (chosen.Count > 0 && chosen[0] is int idx && (idx == 0 || idx == 1))
+        {
+            return idx;
+        }
+        return 0;
+    }
+
+    /// <summary>
     /// Pick exactly one card from a generic "pile" of candidates that does
     /// not live in one of the engine-tracked hand / battlefield / library
     /// zones — most notably the wishboard (sideboard treated as the
