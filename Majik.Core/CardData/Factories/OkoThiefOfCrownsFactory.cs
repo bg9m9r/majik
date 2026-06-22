@@ -12,13 +12,14 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Oko, Thief of Crowns (Throne of Eldraine, {1}{G}{U}).
 ///
 /// Legendary Planeswalker — Oko, starting loyalty 4.
-/// Oracle text:
+/// Oracle text (Scryfall, verified):
 ///   "+2: Create a Food token.
 ///    +1: Target artifact or creature loses all abilities and becomes a green
 ///         Elk creature with base power and toughness 3/3.
-///    -5: Exchange control of target artifact or creature you don't control
-///         and target creature you control. Then those creatures' controllers
-///         each remove all counters from the creature they control."
+///    -5: Exchange control of target artifact or creature you control and
+///         target creature an opponent controls with power 3 or less. Then
+///         those creatures' controllers each remove all counters from the
+///         creature they control."
 ///
 /// ## Implemented (v1)
 /// - Legendary Planeswalker with loyalty 4, Oko subtype, mana cost {1}{G}{U}.
@@ -49,13 +50,13 @@ namespace Majik.Core.CardData.Factories;
 ///   battlefield" (no duration printed). The effects' <c>IsActive()</c>
 ///   gating on the target's battlefield zone naturally lifts the rider when
 ///   the affected permanent leaves.
-/// - <b>-5</b>: exchange-control mechanic (CR 702.X / 611). The player set is
-///   read from the live resolution context (<c>rc.Game.AllPlayers</c>) at
+/// - <b>-5</b>: exchange-control mechanic (CR 611 / CR 110.2). The player set
+///   is read from the live resolution context (<c>rc.Game.AllPlayers</c>) at
 ///   resolution rather than a factory-captured resolver that is null on the
 ///   production routed build, so the exchange fires in real games.
-///   Deterministic auto-pick: first artifact/creature controlled by anyone
-///   other than Oko's controller, and first creature controlled by Oko's
-///   controller.
+///   Deterministic auto-pick per the current oracle: first artifact-or-creature
+///   Oko's controller controls (excluding Oko himself), and the first creature
+///   an opponent controls with power 3 or less.
 ///   Swaps <see cref="Permanent.Controller"/> on both and moves them between
 ///   the two players' battlefield zones so zone-snapshots see the new
 ///   controller. Counter-removal half is wired but no-ops because the v1
@@ -194,35 +195,39 @@ public static class OkoThiefOfCrownsFactory
                     var players = rc.Game?.AllPlayers;
                     if (players == null) return ValueTask.CompletedTask; // shape-only — no live game
 
-                    // First non-controller's artifact-or-creature, first
-                    // controller's creature.
-                    Permanent? theirs = null;
-                    Creature? mine = null;
+                    // Current Scryfall oracle: exchange control of target
+                    // artifact-or-creature YOU control and target creature an
+                    // OPPONENT controls with power 3 or less. ("you don't
+                    // control" / "creature you control" is the older Eldraine
+                    // wording; the card was erratated.)
+                    Creature? theirs = null;
+                    Permanent? mine = null;
 
                     var myController = oko.Controller ?? owner;
 
-                    // Mine: first creature on Oko's controller's battlefield.
+                    // Mine: first artifact-or-creature Oko's controller controls
+                    // (CR 109.1 — "artifact or creature"), excluding Oko himself.
                     foreach (var card in myController.Zones.Battlefield.GetCards())
                     {
-                        if (card is Creature c)
+                        if (card is Permanent perm && !ReferenceEquals(perm, oko)
+                            && (perm.HasType(CardType.Artifact) || perm.HasType(CardType.Creature)))
                         {
-                            mine = c;
+                            mine = perm;
                             break;
                         }
                     }
                     if (mine == null) return ValueTask.CompletedTask;
 
-                    // Theirs: first artifact-or-creature on any other player's
-                    // battlefield.
+                    // Theirs: first CREATURE with power 3 or less an opponent
+                    // controls (current oracle restriction).
                     foreach (var p in players)
                     {
                         if (ReferenceEquals(p, myController)) continue;
                         foreach (var card in p.Zones.Battlefield.GetCards())
                         {
-                            if (card is Permanent perm
-                                && (perm.HasType(CardType.Artifact) || perm.HasType(CardType.Creature)))
+                            if (card is Creature c && c.Power <= 3)
                             {
-                                theirs = perm;
+                                theirs = c;
                                 break;
                             }
                         }

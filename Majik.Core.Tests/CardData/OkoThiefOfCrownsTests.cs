@@ -26,9 +26,10 @@ namespace Majik.Core.Tests.CardData;
 ///   - Mechanic: +1 turns a target creature into a 3/3 Elk with no
 ///     abilities (Layer 4 type/subtype rewrite + Layer 6 ability strip +
 ///     Layer 7b BecomesPTEffect at 3/3).
-///   - Mechanic: -5 exchanges control of a target opponent's
-///     artifact-or-creature with one of Oko's controller's creatures —
-///     each card flips controller and moves between battlefield zones.
+///   - Mechanic: -5 exchanges control of an artifact-or-creature you control
+///     with a creature an opponent controls with power 3 or less (current
+///     oracle) — each card flips controller and moves between battlefield
+///     zones; an opponent creature with power > 3 is not a legal target.
 ///   - NamedCardFactory dispatch.
 /// </summary>
 public class OkoThiefOfCrownsTests
@@ -189,19 +190,22 @@ public class OkoThiefOfCrownsTests
     [Fact]
     public async Task Minus5_ExchangeControl_SwapsBattlefieldAndController()
     {
-        // Alice controls a 1/1 Goblin; Bob controls Sol Ring (artifact).
+        // Current oracle: exchange control of target artifact/creature YOU
+        // control and target creature an OPPONENT controls with power 3 or
+        // less. Alice controls Sol Ring (artifact she controls); Bob controls
+        // a 1/1 Goblin (power 1 ≤ 3).
+        var solRing = new Artifact("Sol Ring", "{1}");
+        solRing.SetOwner(_alice);
+        solRing.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(solRing);
+        solRing.SetZone(ZoneType.Battlefield);
+
         var goblin = new Creature("Goblin Recruit", "{R}", 1, 1,
             subtypes: new[] { CardSubtype.Goblin });
-        goblin.SetOwner(_alice);
-        goblin.SetController(_alice);
-        _alice.Zones.Battlefield.AddCard(goblin);
+        goblin.SetOwner(_bob);
+        goblin.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(goblin);
         goblin.SetZone(ZoneType.Battlefield);
-
-        var solRing = new Artifact("Sol Ring", "{1}");
-        solRing.SetOwner(_bob);
-        solRing.SetController(_bob);
-        _bob.Zones.Battlefield.AddCard(solRing);
-        solRing.SetZone(ZoneType.Battlefield);
 
         // PROD ROUTED PATH: single-arg factory, no captured resolver. The -5
         // reads the player list off the live resolution context.
@@ -218,29 +222,60 @@ public class OkoThiefOfCrownsTests
 
         oko.Loyalty.Should().Be(4, "9 - 5");
 
-        // Goblin now sits on Bob's battlefield + Sol Ring on Alice's.
-        _alice.Zones.Battlefield.GetCards().Should().NotContain(goblin);
-        _bob.Zones.Battlefield.GetCards().Should().Contain(goblin);
-        _bob.Zones.Battlefield.GetCards().Should().NotContain(solRing);
-        _alice.Zones.Battlefield.GetCards().Should().Contain(solRing);
+        // Sol Ring now sits on Bob's battlefield + Goblin on Alice's.
+        _alice.Zones.Battlefield.GetCards().Should().NotContain(solRing);
+        _bob.Zones.Battlefield.GetCards().Should().Contain(solRing);
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(goblin);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(goblin);
 
         // Controllers are flipped; ownership is unchanged (CR 110.2).
-        goblin.Controller.Should().BeSameAs(_bob);
-        solRing.Controller.Should().BeSameAs(_alice);
-        goblin.Owner.Should().BeSameAs(_alice);
-        solRing.Owner.Should().BeSameAs(_bob);
+        solRing.Controller.Should().BeSameAs(_bob);
+        goblin.Controller.Should().BeSameAs(_alice);
+        solRing.Owner.Should().BeSameAs(_alice);
+        goblin.Owner.Should().BeSameAs(_bob);
     }
 
     [Fact]
-    public async Task Minus5_NoOpponentPermanent_NoExchange_LoyaltyStillDecrements()
+    public async Task Minus5_OpponentCreaturePowerAbove3_NotAValidExchangeTarget()
     {
-        // Alice has a creature but Bob has nothing to exchange.
-        var goblin = new Creature("Goblin Recruit", "{R}", 1, 1,
-            subtypes: new[] { CardSubtype.Goblin });
-        goblin.SetOwner(_alice);
-        goblin.SetController(_alice);
-        _alice.Zones.Battlefield.AddCard(goblin);
-        goblin.SetZone(ZoneType.Battlefield);
+        // Current oracle restricts the opponent's creature to power 3 or less.
+        var myBeast = new Creature("My Beast", "{2}{G}", 4, 4);
+        myBeast.SetOwner(_alice);
+        myBeast.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(myBeast);
+        myBeast.SetZone(ZoneType.Battlefield);
+
+        var theirGiant = new Creature("Their Giant", "{4}{G}", 6, 6);
+        theirGiant.SetOwner(_bob);
+        theirGiant.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(theirGiant);
+        theirGiant.SetZone(ZoneType.Battlefield);
+
+        var oko = OkoThiefOfCrownsFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(oko);
+        oko.SetZone(ZoneType.Battlefield);
+        oko.AddLoyalty(5);
+
+        var minus5 = oko.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == -5);
+        await ResolveLoyaltyAsync(minus5, GameFor(_alice, _alice, _bob));
+
+        oko.Loyalty.Should().Be(4, "loyalty still paid (CR 606.3)");
+        _alice.Zones.Battlefield.GetCards().Should().Contain(myBeast,
+            "the only opponent creature has power 6 (> 3) → no legal exchange target");
+        myBeast.Controller.Should().BeSameAs(_alice);
+        theirGiant.Controller.Should().BeSameAs(_bob);
+    }
+
+    [Fact]
+    public async Task Minus5_NoOpponentCreature_NoExchange_LoyaltyStillDecrements()
+    {
+        // Alice has an artifact she controls but Bob has no creature to take.
+        var solRing = new Artifact("Sol Ring", "{1}");
+        solRing.SetOwner(_alice);
+        solRing.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(solRing);
+        solRing.SetZone(ZoneType.Battlefield);
 
         var oko = OkoThiefOfCrownsFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(oko);
@@ -253,8 +288,8 @@ public class OkoThiefOfCrownsTests
 
         // Loyalty change applies (CR 606.3) even when the body bails out.
         oko.Loyalty.Should().Be(4);
-        _alice.Zones.Battlefield.GetCards().Should().Contain(goblin,
-            "no exchange target → goblin stays put");
-        goblin.Controller.Should().BeSameAs(_alice);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(solRing,
+            "no opponent creature to take → Sol Ring stays put");
+        solRing.Controller.Should().BeSameAs(_alice);
     }
 }
