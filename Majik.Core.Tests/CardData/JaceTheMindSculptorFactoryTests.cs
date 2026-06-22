@@ -4,8 +4,10 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
@@ -332,6 +334,145 @@ public class JaceTheMindSculptorFactoryTests
         libCard.Zone.Should().Be(ZoneType.Exile, "the chosen player's library is exiled");
         handCard.Zone.Should().Be(ZoneType.Library, "their hand is shuffled into their library");
         _bob.Zones.Hand.GetCards().Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // CardMovedEvent provenance on bulk / library hops
+    // (loyalty-bulk-move-cardmovedevent-provenance)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Minus12_PublishesCardMovedEvent_PerHop_WhenZoneServiceRegistered()
+    {
+        // CR 701.20 — every individual library→exile and hand→library hop is a
+        // distinct zone change (CR 400.7), so each must publish a CardMovedEvent
+        // for LTB / "leaves the library" / "enters exile" subscribers when the
+        // target has a registered ZoneService. Previously the -12 used raw zone
+        // manipulation and fired nothing on the per-card hops.
+        ZoneServiceRegistry.Clear();
+        try
+        {
+            var bus = new EventBus();
+            var zones = new ZoneService(bus);
+            ZoneServiceRegistry.Set(_bob, zones);
+
+            var libCards = new[] { "L1", "L2", "L3" }
+                .Select(n => new Instant(n, "U") { Owner = _bob })
+                .ToArray();
+            foreach (var c in libCards)
+            {
+                _bob.Zones.Library.AddCard(c);
+                c.SetZone(ZoneType.Library);
+            }
+            var handCards = new[] { "H1", "H2" }
+                .Select(n => new Instant(n, "U") { Owner = _bob })
+                .ToArray();
+            foreach (var c in handCards)
+            {
+                _bob.Zones.Hand.AddCard(c);
+                c.SetZone(ZoneType.Hand);
+            }
+
+            var moves = new List<CardMovedEvent>();
+            bus.Subscribe<CardMovedEvent>(e => moves.Add(e));
+
+            var jace = JaceTheMindSculptorFactory.Create(
+                _alice,
+                targetPlayerResolver: () => new[] { _bob },
+                targetCreatureResolver: null);
+            jace.AddLoyalty(9); // 3 → 12
+
+            var minus12 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -12);
+            minus12.Activate();
+
+            // 3 library→exile hops + 2 hand→library hops = 5 CardMovedEvents.
+            moves.Where(m => m.FromZone == ZoneType.Library && m.ToZone == ZoneType.Exile)
+                .Should().HaveCount(3, "each exiled library card publishes a move event");
+            moves.Where(m => m.FromZone == ZoneType.Hand && m.ToZone == ZoneType.Library)
+                .Should().HaveCount(2, "each hand→library card publishes a move event");
+
+            // End state unchanged from the raw-path behaviour.
+            _bob.Zones.Exile.GetCards().Should().Contain(libCards);
+            _bob.Zones.Library.GetCards().Should().Contain(handCards);
+            _bob.Zones.Hand.GetCards().Should().BeEmpty();
+        }
+        finally
+        {
+            ZoneServiceRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Plus2_PublishesCardMovedEvent_ForBottomHop_WhenZoneServiceRegistered()
+    {
+        // The +2 "put that card on the bottom" hop is a Library→Library zone
+        // change; with a registered ZoneService it publishes a CardMovedEvent
+        // so library-watching subscribers observe the reorder.
+        ZoneServiceRegistry.Clear();
+        try
+        {
+            var bus = new EventBus();
+            var zones = new ZoneService(bus);
+            ZoneServiceRegistry.Set(_bob, zones);
+
+            var top = new Instant("Top", "U") { Owner = _bob };
+            var next = new Instant("Next", "U") { Owner = _bob };
+            _bob.Zones.Library.AddCard(top); top.SetZone(ZoneType.Library);
+            _bob.Zones.Library.AddCard(next); next.SetZone(ZoneType.Library);
+
+            var moves = new List<CardMovedEvent>();
+            bus.Subscribe<CardMovedEvent>(e => moves.Add(e));
+
+            var jace = JaceTheMindSculptorFactory.Create(
+                _alice,
+                targetPlayerResolver: () => new[] { _bob },
+                targetCreatureResolver: null);
+
+            var plus2 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +2);
+            plus2.Activate();
+
+            moves.Should().ContainSingle(m =>
+                m.FromZone == ZoneType.Library && m.ToZone == ZoneType.Library,
+                "the bottom hop publishes a Library→Library move event");
+            _bob.Zones.Library.GetCards().First().Should().BeSameAs(next);
+            _bob.Zones.Library.GetCards().Last().Should().BeSameAs(top);
+        }
+        finally
+        {
+            ZoneServiceRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Minus12_StillWorks_WhenNoZoneServiceRegistered_RawFallback()
+    {
+        // No registered ZoneService → raw-zone fallback keeps the exact prior
+        // end state (no events, but the moves still happen).
+        ZoneServiceRegistry.Clear();
+        try
+        {
+            var libCard = new Instant("L1", "U") { Owner = _bob };
+            _bob.Zones.Library.AddCard(libCard); libCard.SetZone(ZoneType.Library);
+            var handCard = new Instant("H1", "U") { Owner = _bob };
+            _bob.Zones.Hand.AddCard(handCard); handCard.SetZone(ZoneType.Hand);
+
+            var jace = JaceTheMindSculptorFactory.Create(
+                _alice,
+                targetPlayerResolver: () => new[] { _bob },
+                targetCreatureResolver: null);
+            jace.AddLoyalty(9);
+
+            var minus12 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -12);
+            minus12.Activate();
+
+            libCard.Zone.Should().Be(ZoneType.Exile);
+            handCard.Zone.Should().Be(ZoneType.Library);
+            _bob.Zones.Hand.GetCards().Should().BeEmpty();
+        }
+        finally
+        {
+            ZoneServiceRegistry.Clear();
+        }
     }
 
     [Fact]

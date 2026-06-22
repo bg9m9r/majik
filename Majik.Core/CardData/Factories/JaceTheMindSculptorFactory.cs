@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -65,15 +66,22 @@ namespace Majik.Core.CardData.Factories;
 ///   target a player (any player — "target player"); -1 targets any
 ///   battlefield creature.
 ///
+/// ## Implemented (v1) — movement provenance
+/// - <b>ZoneService routing on -12 bulk moves + +2 bottom hop</b>: the -12's
+///   per-card library→exile and hand→library hops and the +2's Library→Library
+///   bottom hop now route through the registered
+///   <see cref="Majik.Core.Services.ZoneService"/>
+///   (<see cref="Majik.Core.Services.ZoneServiceRegistry.Get(Player)"/>) so a
+///   <see cref="Majik.Core.Events.CardMovedEvent"/> publishes for each hop
+///   (CR 400.7 — each zone change is a distinct move). Raw-zone fallback when no
+///   service is registered (shape / dispatcher-test paths) preserves the exact
+///   prior end state without events.
+///
 /// ## Deferred (v1 gaps)
 /// - <b>0's "two cards from your hand"</b>: still uses first-in-hand. The 0
 ///   is a NON-targeted loyalty ability (it asks the controller to choose
 ///   cards in hand, not a target), so agent-driven hand-card choice is a
 ///   separate gap from the target-prompt wiring.
-/// - <b>ZoneService routing on -12 bulk moves</b>: -12 uses raw zone
-///   manipulation, so <see cref="Majik.Core.Events.CardMovedEvent"/>
-///   doesn't publish on the per-card hops. Same posture as Karn's -3 /
-///   Ugin's -X / -10.
 /// </summary>
 [CardName("Jace, the Mind Sculptor")]
 public static class JaceTheMindSculptorFactory
@@ -154,9 +162,11 @@ public static class JaceTheMindSculptorFactory
                     // "Look at" is internal — no visible state change for the
                     // peek step (the engine doesn't yet model hidden-info
                     // reveals). "May put on bottom" — auto-accept the move.
-                    target.Zones.Library.RemoveCard(top);
-                    target.Zones.Library.AddCard(top); // AddCard appends → bottom.
-                    top.SetZone(ZoneType.Library);
+                    // CR 400.7 — route the Library→Library bottom hop through the
+                    // registered ZoneService so a CardMovedEvent publishes (the
+                    // movement-provenance fix); raw-zone fallback when no service
+                    // is registered (shape / dispatcher-test paths).
+                    BottomHop(target, top);
                     return default;
                 }),
             },
@@ -269,22 +279,22 @@ public static class JaceTheMindSculptorFactory
 
                     // 1. Bulk move library → exile. Snapshot first (GetCards
                     //    returns a copy, but be explicit) to avoid mutating the
-                    //    iterated collection.
+                    //    iterated collection. CR 400.7 — each hop is its own zone
+                    //    change, so each is routed through the registered
+                    //    ZoneService and publishes a CardMovedEvent (the
+                    //    movement-provenance fix); raw fallback when unregistered.
+                    var zones = ZoneServiceRegistry.Get(target);
                     var libSnapshot = target.Zones.Library.GetCards().ToList();
                     foreach (var c in libSnapshot)
                     {
-                        target.Zones.Library.RemoveCard(c);
-                        target.Zones.Exile.AddCard(c);
-                        c.SetZone(ZoneType.Exile);
+                        Hop(zones, target, c, ZoneType.Library, ZoneType.Exile);
                     }
 
                     // 2. Bulk move hand → library.
                     var handSnapshot = target.Zones.Hand.GetCards().ToList();
                     foreach (var c in handSnapshot)
                     {
-                        target.Zones.Hand.RemoveCard(c);
-                        target.Zones.Library.AddCard(c);
-                        c.SetZone(ZoneType.Library);
+                        Hop(zones, target, c, ZoneType.Hand, ZoneType.Library);
                     }
 
                     // 3. Shuffle (CR 701.20a). Routes through GameRandomRegistry
@@ -298,5 +308,51 @@ public static class JaceTheMindSculptorFactory
             targetRequests: new[] { ultimatePlayerRequest }));
 
         return jace;
+    }
+
+    /// <summary>
+    /// CR 400.7 — move a single card between two of <paramref name="player"/>'s
+    /// zones. Routes through the registered <see cref="ZoneService"/> (when
+    /// <paramref name="zones"/> is non-null) so a
+    /// <see cref="Majik.Core.Events.CardMovedEvent"/> publishes for the hop —
+    /// the movement-provenance fix for -12's library→exile / hand→library bulk
+    /// legs. Falls back to raw zone manipulation (the prior behaviour) when no
+    /// service is registered (shape / dispatcher-test paths), preserving the
+    /// exact end state without events.
+    /// </summary>
+    private static void Hop(
+        ZoneService? zones, Player player, ICard card, ZoneType from, ZoneType to)
+    {
+        if (card.Zone != from) return; // defensive: snapshot drift
+        if (zones != null)
+        {
+            // Owner-routed (CR 400.3) — these cards never change owner.
+            zones.MoveCard(card, from, to, player);
+            return;
+        }
+        player.Zones.GetZone(from).RemoveCard(card);
+        player.Zones.GetZone(to).AddCard(card);
+        card.SetZone(to);
+    }
+
+    /// <summary>
+    /// +2's "put that card on the bottom of that player's library" — a
+    /// Library→Library reorder. Routed through the registered
+    /// <see cref="ZoneService"/> so a <see cref="Majik.Core.Events.CardMovedEvent"/>
+    /// fires (movement provenance); raw fallback re-appends to the bottom when no
+    /// service is registered. <see cref="Zones.IZone.AddCard"/> appends, so both
+    /// paths land the card on the bottom.
+    /// </summary>
+    private static void BottomHop(Player player, ICard top)
+    {
+        var zones = ZoneServiceRegistry.Get(player);
+        if (zones != null)
+        {
+            zones.MoveCard(top, ZoneType.Library, ZoneType.Library, player);
+            return;
+        }
+        player.Zones.Library.RemoveCard(top);
+        player.Zones.Library.AddCard(top); // AddCard appends → bottom.
+        top.SetZone(ZoneType.Library);
     }
 }
