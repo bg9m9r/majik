@@ -4,7 +4,10 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -59,36 +62,49 @@ public class KarnLiberatedTests
     }
 
     [Fact]
-    public void Karn_Plus4_TargetOpponentExilesACardFromHand()
+    public async Task Karn_Plus4_AgentChoosesTargetPlayer_WhoExilesACardFromHand()
     {
-        // Bob has a card in hand; Karn's +4 forces him to exile it.
+        // PROD-PATH verification: the activating player's agent CHOOSES the
+        // target player via ChoosePlayerAsync (read off the resolution
+        // context), rather than the old captured-resolver first-opponent
+        // shortcut. Three players so the choice is meaningful — the agent
+        // picks Carol (NOT Bob, the first opponent).
+        var carol = new Player("Carol", 20);
+
         var bobCard = new Card("Bob spell", "U") { Owner = _bob };
         _bob.Zones.Hand.AddCard(bobCard);
         bobCard.SetZone(ZoneType.Hand);
 
-        // Alice also has a card in hand — should not be touched (the
-        // auto-pick targets the first opponent, not the controller).
-        var aliceCard = new Card("Alice spell", "B") { Owner = _alice };
-        _alice.Zones.Hand.AddCard(aliceCard);
-        aliceCard.SetZone(ZoneType.Hand);
+        var carolCard = new Card("Carol spell", "G") { Owner = carol };
+        carol.Zones.Hand.AddCard(carolCard);
+        carolCard.SetZone(ZoneType.Hand);
 
-        var players = new[] { _alice, _bob };
-        var karn = KarnLiberatedFactory.Create(_alice, () => players, targetResolver: null);
+        var karn = KarnLiberatedFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(karn);
         karn.SetZone(ZoneType.Battlefield);
 
+        // The agent picks the SECOND opponent (Carol), proving the pick is
+        // agent-driven, not first-eligible.
+        var agent = new ScriptedAgent();
+        agent.QueueChoice(candidates =>
+        {
+            var pick = candidates.OfType<Player>().FirstOrDefault(p => ReferenceEquals(p, carol));
+            return pick is null ? System.Array.Empty<object>() : new object[] { pick };
+        });
+
         var plus4 = karn.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == +4);
-        plus4.Activate();
+        await ResolveLoyaltyAsync(plus4, agent, GameFor(_alice, _alice, _bob, carol));
 
         karn.Loyalty.Should().Be(10, "6 + 4 = 10");
 
-        _bob.Zones.Hand.GetCards().Should().NotContain(bobCard);
-        _bob.Zones.Exile.GetCards().Should().Contain(bobCard);
-        bobCard.Zone.Should().Be(ZoneType.Exile);
+        carol.Zones.Hand.GetCards().Should().NotContain(carolCard,
+            "the agent chose Carol as the target player");
+        carol.Zones.Exile.GetCards().Should().Contain(carolCard);
+        carolCard.Zone.Should().Be(ZoneType.Exile);
 
-        _alice.Zones.Hand.GetCards().Should().Contain(aliceCard,
-            "+4 targets one opponent, not the controller");
+        _bob.Zones.Hand.GetCards().Should().Contain(bobCard,
+            "Bob (the FIRST opponent) was not chosen — the old shortcut would have exiled his card");
     }
 
     [Fact]
@@ -103,7 +119,6 @@ public class KarnLiberatedTests
 
         var karn = KarnLiberatedFactory.Create(
             _alice,
-            allPlayersResolver: null,
             targetResolver: () => new[] { (Permanent)victim });
         _alice.Zones.Battlefield.AddCard(karn);
         karn.SetZone(ZoneType.Battlefield);
@@ -136,14 +151,14 @@ public class KarnLiberatedTests
     }
 
     [Fact]
-    public void Karn_Plus4_NoResolverWired_LoyaltyStillTicksUp()
+    public void Karn_Plus4_NoLiveGameContext_LoyaltyStillTicksUp()
     {
-        // Single-arg path passes no resolvers; the +4 effect no-ops but
-        // the loyalty change still applies (CR 606.3).
+        // Shape-only legacy sync path (ResolutionContext.Legacy — no live
+        // game). The +4 effect no-ops because it can't read a player pool off
+        // the context, but the loyalty change still applies (CR 606.3).
         var karn = KarnLiberatedFactory.Create(_alice);
 
-        // Give Bob a card in hand; the no-op resolver should leave it
-        // alone.
+        // Give Bob a card in hand; the context-less body should leave it alone.
         var bobCard = new Card("Bob spell", "U") { Owner = _bob };
         _bob.Zones.Hand.AddCard(bobCard);
         bobCard.SetZone(ZoneType.Hand);
@@ -154,7 +169,28 @@ public class KarnLiberatedTests
 
         karn.Loyalty.Should().Be(10);
         _bob.Zones.Hand.GetCards().Should().Contain(bobCard,
-            "no resolver wired → exile-from-hand effect is a silent no-op");
+            "no live game context → exile-from-hand effect is a silent no-op");
+    }
+
+    // -------------------------------------------------------------------
+    // Helpers — drive a loyalty ability through the PROD async resolution
+    // path (pay the loyalty cost, then run the effects against a live
+    // ResolutionContext carrying the activating player's agent + game).
+    // -------------------------------------------------------------------
+
+    private static GameContext GameFor(Player self, params Player[] all) =>
+        new(self, all, self, 1, StepStateType.PreCombatMain,
+            new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+    private static async Task ResolveLoyaltyAsync(
+        LoyaltyAbility ability, IPlayerAgent agent, GameContext game)
+    {
+        ability.PayLoyaltyCost();
+        var ctx = ResolutionContext.For(game.Self, agent, game, chosenTargets: null);
+        foreach (var e in ability.Effects)
+        {
+            await e.ExecuteAsync(ctx);
+        }
     }
 
     [Fact]

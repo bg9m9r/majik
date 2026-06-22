@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -10,20 +11,23 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Karn Liberated (New Phyrexia, {7}).
 ///
 /// Legendary Planeswalker — Karn, starting loyalty 6.
-/// Oracle text:
+/// Oracle text (verified against Scryfall):
 ///   "+4: Target player exiles a card from their hand.
-///    -3: Exile target permanent.
-///    -14: Restart the game, leaving in exile all non-Aura permanent cards
-///         exiled with Karn Liberated. Then put those cards onto the
-///         battlefield under your control."
+///    −3: Exile target permanent.
+///    −14: Restart the game, leaving in exile all non-Aura permanent cards
+///         exiled with Karn. Then put those cards onto the battlefield under
+///         your control."
 ///
 /// ## Implemented (v1)
 /// - Legendary Planeswalker with loyalty 6, Karn subtype, mana cost {7}.
-/// - <b>+4</b>: target-player-exiles-a-card-from-hand. v1 auto-pick: the
-///   first opponent in the supplied <paramref name="allPlayersResolver"/>
-///   exiles the first card in their hand (CR 701.21). With no resolver
-///   wired the effect no-ops while the loyalty change still applies
-///   (CR 606.3).
+/// - <b>+4</b>: target-player-exiles-a-card-from-hand. The activating player
+///   chooses the target player via
+///   <see cref="Players.Agents.IPlayerAgent.ChoosePlayerAsync"/> over the live
+///   game's players (CR 109.1 / 601.2c), read off the resolution context
+///   (<c>rc.Agent</c> + <c>rc.Game</c>) instead of a factory-captured resolver.
+///   The chosen player then exiles the first card in their hand (CR 701.21).
+///   On the shape-only path (no live game) the +4 no-ops while the loyalty
+///   change still applies (CR 606.3).
 /// - <b>-3</b>: exile-target-permanent. v1 auto-pick: the first matching
 ///   permanent in the supplied <paramref name="targetResolver"/> is moved
 ///   to its owner's exile zone (CR 701.21). With no resolver wired the
@@ -34,16 +38,17 @@ namespace Majik.Core.CardData.Factories;
 ///   Restart-the-game (CR 720) is an engine-foundational mechanic —
 ///   teardown + rebuild of the game-state aggregate, special "exiled with
 ///   Karn" tracking, ETB-under-Karn's-controller re-entry of the
-///   preserved non-Aura cards. Wiring it requires multiple sessions of
-///   coordinated work across <see cref="Majik.Core.Domain.Aggregates"/>,
-///   the state machines, and the zone service. The loyalty ability is
-///   present at -14 with an empty effect so the cost (loyalty change) is
-///   still paid (CR 606.3) and dispatcher-shape tests pass.
-/// - <b>Targeting prompts</b>: <see cref="LoyaltyAbility"/> doesn't yet
-///   declare <see cref="TargetRequest"/>s. +4 picks the first opponent
-///   and -3 picks the first matching permanent deterministically rather
-///   than via the agent. Hand-card choice for +4 is similarly
-///   deterministic (first card in the target player's hand).
+///   preserved non-Aura cards. The loyalty ability is present at -14 with an
+///   empty effect so the cost (loyalty change) is still paid (CR 606.3) and
+///   dispatcher-shape tests pass.
+/// - <b>-3 targeting prompt</b>: <see cref="LoyaltyAbility"/> doesn't yet
+///   declare a <see cref="TargetRequest"/> for the exile-target-permanent
+///   clause; it still picks the first matching permanent from the supplied
+///   <paramref name="targetResolver"/> rather than via an agent target prompt.
+/// - <b>+4 hand-card choice</b>: the chosen player exiles the FIRST card in
+///   their hand rather than choosing which card (the printed "exiles a card"
+///   gives the choice to that player). The PLAYER choice (which player) is now
+///   agent-driven; the WHICH-card sub-choice is still deterministic.
 /// </summary>
 [CardName("Karn Liberated")]
 public static class KarnLiberatedFactory
@@ -53,29 +58,23 @@ public static class KarnLiberatedFactory
     public const int StartingLoyalty = 6;
 
     /// <summary>
-    /// Construct Karn Liberated with no resolvers wired. Suitable for
-    /// shape / dispatcher tests — +4 and -3 will no-op; loyalty changes
-    /// still apply.
+    /// Construct Karn Liberated (production routed path). The +4 reads the
+    /// target player off the live resolution context; the -3 has no resolver
+    /// wired and no-ops; loyalty changes still apply.
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, allPlayersResolver: null, targetResolver: null);
+        Create(owner, targetResolver: null);
 
     /// <summary>
-    /// Construct Karn Liberated. When
-    /// <paramref name="allPlayersResolver"/> is non-null the +4 hand-exile
-    /// targets the first opponent. When <paramref name="targetResolver"/>
-    /// is non-null the -3 exiles the first permanent it returns.
+    /// Construct Karn Liberated. When <paramref name="targetResolver"/> is
+    /// non-null the -3 exiles the first permanent it returns.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Returns the full player list at
-    /// activation time. v1 picks the first non-owner as the +4 target.
-    /// May be null — +4 no-ops.</param>
     /// <param name="targetResolver">Returns candidate target permanents
     /// for -3 (any permanent, any controller). v1 picks the first
     /// permanent returned. May be null — -3 no-ops.</param>
     public static Planeswalker Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         Func<IReadOnlyList<Permanent>>? targetResolver)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -91,23 +90,26 @@ public static class KarnLiberatedFactory
         karn.SetController(owner);
 
         // -- +4: Target player exiles a card from their hand. -------------
-        // v1 auto-pick: first opponent in the player list exiles the first
-        // card in their hand. CR 701.21 (exile a card from a zone). With
-        // no resolver wired the effect is silent.
-        karn.AddAbility(new LoyaltyAbility(karn, +4, () =>
+        // CR 109.1 / 601.2c — the activating player CHOOSES the target player.
+        // The pick routes through the agent's ChoosePlayerAsync over the live
+        // game's players (read off the resolution context), then that player
+        // exiles the first card in their hand (CR 701.21). On the shape-only
+        // path (no live game) the body is a silent no-op.
+        karn.AddAbility(new LoyaltyAbility(karn, +4, new[]
         {
-            var players = allPlayersResolver?.Invoke();
-            if (players == null) return;
-            foreach (var p in players)
-            {
-                if (ReferenceEquals(p, owner)) continue;
-                var pick = p.Zones.Hand.GetCards().FirstOrDefault();
-                if (pick == null) continue;
-                p.Zones.Hand.RemoveCard(pick);
-                p.Zones.Exile.AddCard(pick);
-                pick.SetZone(ZoneType.Exile);
-                return; // CR 700.6 — "target player" is one player
-            }
+            new Effect(
+                $"{CardName}: +4 — target player exiles a card from their hand.",
+                async rc =>
+                {
+                    var target = await ChooseTargetPlayerAsync(owner, rc).ConfigureAwait(false);
+                    if (target is null) return;
+
+                    var pick = target.Zones.Hand.GetCards().FirstOrDefault();
+                    if (pick is null) return;
+                    target.Zones.Hand.RemoveCard(pick);
+                    target.Zones.Exile.AddCard(pick);
+                    pick.SetZone(ZoneType.Exile);
+                }),
         }));
 
         // -- -3: Exile target permanent. ----------------------------------
@@ -138,13 +140,48 @@ public static class KarnLiberatedFactory
         }));
 
         // -- -14 ultimate: Restart the game (CR 720), preserving non-Aura
-        //    permanent cards exiled with Karn Liberated, then put them onto
-        //    the battlefield under your control. v1 DEFERRED — shipped as
-        //    a no-op so the loyalty change (and "this card is a legal
-        //    -14 ability") still apply (CR 606.3). Restart-the-game is
+        //    permanent cards exiled with Karn, then put them onto the
+        //    battlefield under your control. v1 DEFERRED — shipped as a
+        //    no-op so the loyalty change (and "this card is a legal -14
+        //    ability") still apply (CR 606.3). Restart-the-game is
         //    engine-foundational and out of scope for the card-ship slice.
         karn.AddAbility(new LoyaltyAbility(karn, -14, () => { /* deferred — restart-the-game */ }));
 
         return karn;
+    }
+
+    /// <summary>
+    /// CR 109.1 / 601.2c — choose the "target player" for the +4. The
+    /// activating player's agent picks one player from the live game's player
+    /// list (every in-game player is a legal "target player"; Karn's +4 is the
+    /// rare loyalty ability that can name its OWN controller, CR 109.1).
+    /// Routed through <see cref="Players.Agents.IPlayerAgent.ChoosePlayerAsync"/>
+    /// over the live resolution context — forced in a one-legal-player game, a
+    /// real choice in a multiplayer match. Returns <see langword="null"/> only
+    /// when no live game context is available (shape-only path) — then the +4
+    /// no-ops while the loyalty change still applies (CR 606.3).
+    /// </summary>
+    private static async Task<Player?> ChooseTargetPlayerAsync(Player controller, ResolutionContext rc)
+    {
+        var game = rc.Game;
+        if (game?.AllPlayers is not { Count: > 0 } all) return null;
+
+        // CR 800.4a — a player who has left the game is no longer a legal
+        // target player. "Target player" may be ANY player, including the
+        // controller (CR 109.1) — do NOT filter the controller out.
+        var candidates = new List<Player>(all.Count);
+        foreach (var p in all)
+        {
+            if (p is null || p.HasLost) continue;
+            candidates.Add(p);
+        }
+        if (candidates.Count == 0) return null;
+
+        var agent = rc.Agent ?? AgentRegistry.Get(controller);
+        if (agent is null) return candidates[0];
+
+        return await agent.ChoosePlayerAsync(
+            game, candidates, $"{CardName}: +4 — choose target player to exile a card from hand",
+            Cards.BotIntent.None, rc.Ct).ConfigureAwait(false);
     }
 }
