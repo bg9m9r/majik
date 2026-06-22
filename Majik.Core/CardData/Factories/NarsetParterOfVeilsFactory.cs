@@ -4,6 +4,8 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Random;
 using Majik.Core.Zones;
 
@@ -34,16 +36,20 @@ namespace Majik.Core.CardData.Factories;
 ///   (CR 614 — replacement returns null). Reset is driven by
 ///   <see cref="TurnStartedEvent"/> on the supplied <see cref="IEventBus"/>.
 /// - <b>-2: top-four peek + grab noncreature/nonland</b>: looks at top 4
-///   of controller's library, picks the first noncreature/nonland (auto-
-///   pick deterministic — same v1 shape as Karn / Liliana), routes it to
-///   the controller's hand, and shuffles the remainder before placing on
-///   the bottom in shuffled order (CR 701.19 — "random order"). Uses
-///   <see cref="GameRandomRegistry"/> for the shuffle.
+///   of controller's library, prompts the resolving player's agent to
+///   choose WHICH eligible noncreature/nonland card to reveal and put into
+///   hand (CR 116.x — "you may reveal a [match]"; agent-driven via
+///   <see cref="IPlayerAgent.ChooseFromRevealedAsync"/>, the same
+///   reveal-and-choose surface Mishra's Research Desk / Impulse use). The
+///   agent receives the FULL peek so a remote UI can render every revealed
+///   card, plus the eligible subset (noncreature, nonland). Declining
+///   ("may") is honoured. The chosen card goes to hand; the remainder is
+///   shuffled (CR 701.19 — "random order", via
+///   <see cref="GameRandomRegistry"/>) before placing on the bottom in
+///   shuffled order. Falls back to the deterministic first-eligible pick
+///   when no agent is registered (shape / dispatcher-test posture).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Agent-driven reveal choice</b>: -2 picks the first eligible card
-///   rather than prompting; "may reveal" is auto-accepted whenever a
-///   candidate exists. Mirrors every other Phase-1 PW factory.
 /// - <b>Draw-watcher coverage</b>: the static gates on
 ///   <see cref="DrawCardIntent"/> — any draw path that bypasses
 ///   <see cref="ReplacementBus"/> also bypasses Narset (same gap as
@@ -112,50 +118,89 @@ public static class NarsetParterOfVeilsFactory
             lifecycle.Attach();
         }
 
-        // -- -2: peek top 4, grab a noncreature/nonland, rest to bottom
-        //        in random order. -----------------------------------------
-        narset.AddAbility(new LoyaltyAbility(narset, -2, () =>
+        // -- -2: peek top 4, agent picks WHICH noncreature/nonland to
+        //        reveal + put into hand, rest to bottom in random order. ---
+        narset.AddAbility(new LoyaltyAbility(narset, -2, new[]
         {
-            // Snapshot the top N (or fewer if the library is smaller).
-            var top = owner.Zones.Library.GetCards().Take(LookCount).ToList();
-            if (top.Count == 0) return;
-
-            // First noncreature/nonland — controller may reveal + put
-            // into hand (v1 auto-accept).
-            ICard? picked = null;
-            foreach (var c in top)
-            {
-                if (IsEligibleReveal(c))
-                {
-                    picked = c;
-                    break;
-                }
-            }
-
-            if (picked != null)
-            {
-                owner.Zones.Library.RemoveCard(picked);
-                owner.Zones.Hand.AddCard(picked);
-                picked.SetZone(ZoneType.Hand);
-                top.Remove(picked);
-            }
-
-            // Remainder — shuffle into a random order, then move each to
-            // the bottom of the library in that order.
-            if (top.Count > 0)
-            {
-                var rng = GameRandomRegistry.Get(owner);
-                rng.Shuffle(top);
-                foreach (var c in top)
-                {
-                    owner.Zones.Library.RemoveCard(c);
-                    owner.Zones.Library.AddCard(c); // AddCard appends to bottom
-                    c.SetZone(ZoneType.Library);
-                }
-            }
+            Fx.Inline("Narset, Parter of Veils -2", ctx => ResolveMinus2Async(owner, ctx)),
         }));
 
         return narset;
+    }
+
+    /// <summary>
+    /// CR 116.x / CR 701.19 — resolve the -2: look at the top four cards,
+    /// the agent MAY reveal a noncreature/nonland card from among them and
+    /// put it into hand, then put the rest on the bottom of the library in a
+    /// random order.
+    /// <para>
+    /// The pick is agent-driven via
+    /// <see cref="IPlayerAgent.ChooseFromRevealedAsync"/> (the shared
+    /// reveal-and-choose surface): the agent receives the FULL peek (so a
+    /// remote UI can render every revealed card — CR 701.15) plus the
+    /// eligible noncreature/nonland subset, and chooses WHICH card to reveal
+    /// (or declines — revealing is a "may"). Falls back to the deterministic
+    /// first-eligible pick when no agent is registered (shape / dispatcher-
+    /// test posture). The remainder is shuffled (CR 701.19 — "random order")
+    /// before being placed on the bottom of the library.
+    /// </para>
+    /// </summary>
+    private static async ValueTask ResolveMinus2Async(Player owner, ResolutionContext ctx)
+    {
+        // Snapshot the top N (or fewer if the library is smaller).
+        var top = owner.Zones.Library.GetCards().Take(LookCount).ToList();
+        if (top.Count == 0) return;
+
+        var eligible = top.Where(IsEligibleReveal).ToList();
+
+        // "You may reveal a noncreature, nonland card … and put it into your
+        // hand." CR 116.x — agent-driven WHICH-card pick over the eligible
+        // subset; optional (the "may"). Deterministic first-eligible fallback
+        // when no agent is registered.
+        ICard? picked = null;
+        var agent = ctx.Agent ?? AgentRegistry.Get(owner);
+        if (agent != null)
+        {
+            picked = await agent.ChooseFromRevealedAsync(
+                    ctx: ctx.Game,
+                    revealed: top,
+                    eligible: eligible,
+                    optional: true,
+                    label: "Narset, Parter of Veils: reveal a noncreature, nonland card to put into your hand",
+                    ct: ctx.Ct)
+                .ConfigureAwait(false);
+
+            // Defensive: a pick outside the eligible set is treated as a
+            // decline (mirrors RevealAndChoose's guard).
+            if (picked != null && !eligible.Contains(picked)) picked = null;
+        }
+        else
+        {
+            picked = eligible.Count > 0 ? eligible[0] : null;
+        }
+
+        if (picked != null)
+        {
+            owner.Zones.Library.RemoveCard(picked);
+            owner.Zones.Hand.AddCard(picked);
+            picked.SetZone(ZoneType.Hand);
+            top.Remove(picked);
+        }
+
+        // "Put the rest on the bottom of your library in a random order."
+        // CR 701.19 — shuffle the remainder, then move each to the bottom in
+        // that order.
+        if (top.Count > 0)
+        {
+            var rng = GameRandomRegistry.Get(owner);
+            rng.Shuffle(top);
+            foreach (var c in top)
+            {
+                owner.Zones.Library.RemoveCard(c);
+                owner.Zones.Library.AddCard(c); // AddCard appends to bottom
+                c.SetZone(ZoneType.Library);
+            }
+        }
     }
 
     private static bool IsEligibleReveal(ICard c)
