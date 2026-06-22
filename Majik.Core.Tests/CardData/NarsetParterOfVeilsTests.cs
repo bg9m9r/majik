@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Random;
 using Majik.Core.Services;
@@ -276,6 +277,93 @@ public class NarsetParterOfVeilsTests : IDisposable
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
         _alice.Zones.Library.GetCards().Should().HaveCount(4);
         _alice.Zones.Library.GetCards().Should().BeEquivalentTo(new ICard[] { top1, top2, top3, top4 });
+    }
+
+    [Fact]
+    public void NarsetMinus2_AgentChoosesWhichEligibleCard_NotJustFirst()
+    {
+        // Top 4: Counterspell, Lightning Bolt, Bear, Forest.
+        // Two eligible noncreature/nonland cards: Counterspell (first) and
+        // Lightning Bolt (second). A first-eligible auto-pick would grab
+        // Counterspell; the agent instead picks Lightning Bolt — proving the
+        // WHICH-card pick is agent-driven, not hard-coded first-eligible.
+        var counter = new Instant("Counterspell", "UU");
+        var bolt = new Instant("Lightning Bolt", "R");
+        var bear = new Creature("Bear", "1G", 2, 2);
+        var forest = new Land("Forest");
+
+        foreach (var c in new ICard[] { counter, bolt, bear, forest })
+        {
+            c.SetOwner(_alice);
+            _alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        GameRandomRegistry.Set(_alice, new GameRandom(seed: 99));
+
+        var agent = new ScriptedAgent();
+        // Pick the SECOND eligible card (Lightning Bolt).
+        agent.QueueFromRevealed((_, eligible) => eligible[1]);
+        AgentRegistry.Set(_alice, agent);
+
+        try
+        {
+            var narset = NarsetParterOfVeilsFactory.Create(_alice);
+            narset.Abilities.OfType<LoyaltyAbility>().Single(la => la.LoyaltyChange == -2).Activate();
+
+            // Lightning Bolt went to hand — NOT Counterspell.
+            _alice.Zones.Hand.GetCards().Should().Contain(bolt);
+            _alice.Zones.Hand.GetCards().Should().NotContain(counter);
+            bolt.Zone.Should().Be(ZoneType.Hand);
+
+            // The rest (Counterspell, Bear, Forest) are bottomed.
+            _alice.Zones.Library.GetCards().Should().HaveCount(3);
+            _alice.Zones.Library.GetCards().Should().Contain(new ICard[] { counter, bear, forest });
+            narset.Loyalty.Should().Be(3);
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void NarsetMinus2_AgentDeclinesReveal_BottomsAllFourRandomly()
+    {
+        // Top 4 contains an eligible card, but the agent declines the "may"
+        // — nothing goes to hand and all four are bottomed (CR 116.x).
+        var counter = new Instant("Counterspell", "UU");
+        var bear = new Creature("Bear", "1G", 2, 2);
+        var wolf = new Creature("Wolf", "G", 1, 1);
+        var forest = new Land("Forest");
+
+        foreach (var c in new ICard[] { counter, bear, wolf, forest })
+        {
+            c.SetOwner(_alice);
+            _alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        GameRandomRegistry.Set(_alice, new GameRandom(seed: 5));
+
+        var agent = new ScriptedAgent();
+        agent.QueueFromRevealed((ICard?)null); // decline
+        AgentRegistry.Set(_alice, agent);
+
+        try
+        {
+            var narset = NarsetParterOfVeilsFactory.Create(_alice);
+            narset.Abilities.OfType<LoyaltyAbility>().Single(la => la.LoyaltyChange == -2).Activate();
+
+            _alice.Zones.Hand.GetCards().Should().BeEmpty();
+            _alice.Zones.Library.GetCards().Should().HaveCount(4);
+            _alice.Zones.Library.GetCards().Should().BeEquivalentTo(new ICard[] { counter, bear, wolf, forest });
+            narset.Loyalty.Should().Be(3);
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
     }
 
     [Fact]
