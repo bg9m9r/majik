@@ -3,6 +3,7 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
@@ -83,14 +84,24 @@ namespace Majik.Core.CardData.Factories;
 ///   on the legacy direct-activation path (the captured resolver was null on
 ///   the routed prod build — the resolver-null bug class).
 ///
+/// ## Implemented (v1) — reveal visibility
+/// - <b>+1 reveal visibility (CR 701.16)</b>: when an artifact is found, the
+///   "you may reveal an artifact card …" step now publishes a
+///   <see cref="CardRevealedEvent"/> (tagged <see cref="ZoneType.Library"/>,
+///   reason <c>CardName</c>) via the shared
+///   <see cref="LibrarySearch.PublishRevealIfRequested"/> +
+///   <see cref="EventBusRegistry"/> seam — the same surface the tutor reveals
+///   use — so opponents/observers + the portal's reveal-flash see the revealed
+///   artifact. The reveal fires while the card is still in the library
+///   (mirroring the printed "reveal … and put it into your hand" order). No-op
+///   when no bus is registered, or when no artifact is found (nothing is made
+///   public).
+///
 /// ## Deferred (v1 gaps)
-/// - <b>+1 "you may reveal"</b>: the +1 auto-accepts the optional reveal and
-///   sends the first artifact to hand. The +1 is NON-targeted (it digs the
+/// - <b>+1 "you may reveal" choice</b>: the +1 auto-accepts the optional reveal
+///   and sends the first artifact to hand. The +1 is NON-targeted (it digs the
 ///   controller's own library), so agent-driven reveal choice is a separate
 ///   gap from the target-prompt wiring.
-/// - <b>+1 reveal visibility</b>: the "reveal an artifact" step has no visible
-///   reveal event (the engine doesn't yet model hidden-info reveals) — same
-///   posture as Jace's +2 peek.
 /// </summary>
 [CardName("Tezzeret, Agent of Bolas")]
 public static class TezzeretAgentOfBolasFactory
@@ -171,6 +182,15 @@ public static class TezzeretAgentOfBolasFactory
             var artifact = looked.FirstOrDefault(IsArtifactCard);
             if (artifact != null)
             {
+                // CR 701.16 — "you may reveal an artifact card …": the chosen
+                // artifact becomes public. Publish the reveal while the card is
+                // still in the library (mirroring the printed sequence
+                // "reveal … and put it into your hand") via the shared
+                // EventBusRegistry seam, so opponents/observers + the portal's
+                // reveal-flash see it. Best-effort: no-op when no bus is
+                // registered.
+                LibrarySearch.PublishRevealIfRequested(controller, artifact, CardName);
+
                 controller.Zones.Library.RemoveCard(artifact);
                 controller.Zones.Hand.AddCard(artifact);
                 artifact.SetZone(ZoneType.Hand);
