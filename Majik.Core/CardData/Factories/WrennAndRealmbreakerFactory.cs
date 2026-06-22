@@ -32,9 +32,11 @@ namespace Majik.Core.CardData.Factories;
 ///   when an eligible land card is present.
 /// - <b>-2</b>: scans a candidate-graveyards list for the first nonland
 ///   <see cref="Permanent"/> card and reanimates it under the activator's
-///   control. With <paramref name="allPlayersResolver"/> non-null the scan
-///   sweeps every player's graveyard; otherwise the scan is limited to
-///   the controller's graveyard. Routes through
+///   control. The graveyards scanned are read off the live resolution
+///   context (<c>rc.Game.AllPlayers</c>) at resolution rather than a
+///   factory-captured resolver null on the production routed build, so the
+///   -2 actually reanimates in real games; the scan falls back to the
+///   controller's graveyard on the shape-only path. Routes through
 ///   <see cref="ZoneService.MoveCard"/> when supplied so ETB triggers on
 ///   the reanimated permanent fire (CR 603.6a). v1 auto-pick.
 /// - <b>-7 ultimate</b>: mints an emblem in the controller's command
@@ -76,22 +78,21 @@ public static class WrennAndRealmbreakerFactory
     /// <see cref="ZoneService"/>.
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, zoneService: null, allPlayersResolver: null);
+        Create(owner, zoneService: null);
 
     /// <summary>
     /// Construct Wrenn and Realmbreaker with optional runtime services.
     /// When <paramref name="zoneService"/> is supplied, the -2's graveyard
     /// → battlefield move routes through <see cref="ZoneService.MoveCard"/>
     /// so ETB triggers / replacements on the reanimated permanent fire
-    /// (CR 603.6a). When <paramref name="allPlayersResolver"/> is supplied,
-    /// the -2 scans every player's graveyard for an eligible nonland
-    /// permanent card; otherwise the scan is limited to
-    /// <paramref name="owner"/>'s graveyard.
+    /// (CR 603.6a). The -2 scans every player's graveyard read off the live
+    /// resolution context (<c>rc.Game.AllPlayers</c>) for an eligible nonland
+    /// permanent card; on the shape-only path (no live game) the scan is
+    /// limited to <paramref name="owner"/>'s graveyard.
     /// </summary>
     public static Planeswalker Create(
         Player owner,
-        ZoneService? zoneService,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        ZoneService? zoneService)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -133,33 +134,46 @@ public static class WrennAndRealmbreakerFactory
         // movement goes through ZoneService. v1 auto-pick: first nonland
         // permanent card found scanning the configured graveyards.
         // -----------------------------------------------------------------
-        wrenn.AddAbility(new LoyaltyAbility(wrenn, -2, () =>
+        wrenn.AddAbility(new LoyaltyAbility(wrenn, -2, new[]
         {
-            var candidatePlayers = allPlayersResolver?.Invoke()
-                ?? (IReadOnlyList<Player>)new[] { owner };
-
-            foreach (var p in candidatePlayers)
-            {
-                if (p == null) continue;
-                var pick = p.Zones.Graveyard.GetCards()
-                    .OfType<Permanent>()
-                    .FirstOrDefault(c => !c.HasType(CardType.Land));
-                if (pick == null) continue;
-
-                if (zoneService != null)
+            new Effect(
+                "Wrenn and Realmbreaker: -2 — reanimate a nonland permanent card from a graveyard.",
+                rc =>
                 {
-                    zoneService.MoveCard(pick, ZoneType.Graveyard, ZoneType.Battlefield, owner);
-                }
-                else
-                {
-                    p.Zones.Graveyard.RemoveCard(pick);
-                    owner.Zones.Battlefield.AddCard(pick);
-                    pick.SetZone(ZoneType.Battlefield);
-                    pick.SetController(owner);
-                }
+                    // The graveyards to scan are read from the LIVE resolution
+                    // context (rc.Game.AllPlayers, CR 102.1 / 800.4a) at
+                    // resolution rather than a factory-captured resolver that is
+                    // null on the production routed build, so the -2 actually
+                    // reanimates in real games. Falls back to the controller's
+                    // own graveyard on the shape-only path (no live game).
+                    var candidatePlayers = rc.Game?.AllPlayers
+                        ?? (IReadOnlyList<Player>)new[] { owner };
 
-                return; // CR 700.6 — "target" is a single object
-            }
+                    foreach (var p in candidatePlayers)
+                    {
+                        if (p == null) continue;
+                        var pick = p.Zones.Graveyard.GetCards()
+                            .OfType<Permanent>()
+                            .FirstOrDefault(c => !c.HasType(CardType.Land));
+                        if (pick == null) continue;
+
+                        if (zoneService != null)
+                        {
+                            zoneService.MoveCard(pick, ZoneType.Graveyard, ZoneType.Battlefield, owner);
+                        }
+                        else
+                        {
+                            p.Zones.Graveyard.RemoveCard(pick);
+                            owner.Zones.Battlefield.AddCard(pick);
+                            pick.SetZone(ZoneType.Battlefield);
+                            pick.SetController(owner);
+                        }
+
+                        break; // CR 700.6 — "target" is a single object
+                    }
+
+                    return ValueTask.CompletedTask;
+                }),
         }));
 
         // -----------------------------------------------------------------

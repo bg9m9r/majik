@@ -5,7 +5,11 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -31,6 +35,20 @@ public class OkoThiefOfCrownsTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
+    private readonly Majik.Core.Stack.Stack _stack = new(new EventBus());
+
+    private GameContext GameFor(Player self, params Player[] all) =>
+        new(self, all, self, 1, StepStateType.PreCombatMain, _stack);
+
+    private async Task ResolveLoyaltyAsync(LoyaltyAbility ability, GameContext game)
+    {
+        ability.PayLoyaltyCost();
+        var ctx = ResolutionContext.For(game.Self, new ScriptedAgent(), game, chosenTargets: null);
+        foreach (var e in ability.Effects)
+        {
+            await e.ExecuteAsync(ctx);
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Identity + dispatch
@@ -128,8 +146,7 @@ public class OkoThiefOfCrownsTests
         var oko = OkoThiefOfCrownsFactory.Create(
             _alice,
             effects: effects,
-            battlefieldResolver: () => new Permanent[] { bear },
-            allPlayersResolver: null);
+            battlefieldResolver: () => new Permanent[] { bear });
         _alice.Zones.Battlefield.AddCard(oko);
         oko.SetZone(ZoneType.Battlefield);
 
@@ -170,7 +187,7 @@ public class OkoThiefOfCrownsTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Minus5_ExchangeControl_SwapsBattlefieldAndController()
+    public async Task Minus5_ExchangeControl_SwapsBattlefieldAndController()
     {
         // Alice controls a 1/1 Goblin; Bob controls Sol Ring (artifact).
         var goblin = new Creature("Goblin Recruit", "{R}", 1, 1,
@@ -186,18 +203,18 @@ public class OkoThiefOfCrownsTests
         _bob.Zones.Battlefield.AddCard(solRing);
         solRing.SetZone(ZoneType.Battlefield);
 
-        var oko = OkoThiefOfCrownsFactory.Create(
-            _alice,
-            effects: null,
-            battlefieldResolver: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        // PROD ROUTED PATH: single-arg factory, no captured resolver. The -5
+        // reads the player list off the live resolution context.
+        var oko = OkoThiefOfCrownsFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(oko);
+        oko.SetZone(ZoneType.Battlefield);
         // Bump loyalty so -5 is legal (4 + 5 → 9, well above 5).
         oko.AddLoyalty(5);
 
         var minus5 = oko.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == -5);
         minus5.CanActivate().Should().BeTrue();
-        minus5.Activate();
+        await ResolveLoyaltyAsync(minus5, GameFor(_alice, _alice, _bob));
 
         oko.Loyalty.Should().Be(4, "9 - 5");
 
@@ -215,7 +232,7 @@ public class OkoThiefOfCrownsTests
     }
 
     [Fact]
-    public void Minus5_NoOpponentPermanent_NoExchange_LoyaltyStillDecrements()
+    public async Task Minus5_NoOpponentPermanent_NoExchange_LoyaltyStillDecrements()
     {
         // Alice has a creature but Bob has nothing to exchange.
         var goblin = new Creature("Goblin Recruit", "{R}", 1, 1,
@@ -225,16 +242,14 @@ public class OkoThiefOfCrownsTests
         _alice.Zones.Battlefield.AddCard(goblin);
         goblin.SetZone(ZoneType.Battlefield);
 
-        var oko = OkoThiefOfCrownsFactory.Create(
-            _alice,
-            effects: null,
-            battlefieldResolver: null,
-            allPlayersResolver: () => new[] { _alice, _bob });
+        var oko = OkoThiefOfCrownsFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(oko);
+        oko.SetZone(ZoneType.Battlefield);
         oko.AddLoyalty(5);
 
         var minus5 = oko.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == -5);
-        minus5.Activate();
+        await ResolveLoyaltyAsync(minus5, GameFor(_alice, _alice, _bob));
 
         // Loyalty change applies (CR 606.3) even when the body bails out.
         oko.Loyalty.Should().Be(4);

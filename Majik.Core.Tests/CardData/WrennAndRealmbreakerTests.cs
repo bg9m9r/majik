@@ -5,8 +5,11 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -181,7 +184,7 @@ public class WrennAndRealmbreakerTests
         bear.SetZone(ZoneType.Graveyard);
 
         var wrenn = WrennAndRealmbreakerFactory.Create(
-            alice, zoneService: zones, allPlayersResolver: null);
+            alice, zoneService: zones);
         var minus2 = wrenn.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == -2);
         minus2.Activate();
@@ -210,6 +213,44 @@ public class WrennAndRealmbreakerTests
         _alice.Emblems.Should().HaveCount(1);
         _alice.Emblems[0].SourceName.Should().Contain("Wrenn and Realmbreaker");
         _alice.Emblems[0].Controller.Should().BeSameAs(_alice);
+    }
+
+    [Fact]
+    public async Task WrennAndRealmbreaker_Minus2_ProdPath_ReanimatesFromOpponentsGraveyard_ViaLiveContext()
+    {
+        // PROD ROUTED PATH: single-arg factory (no captured resolver). The -2
+        // reads every player's graveyard off the live resolution context, so a
+        // nonland permanent in an OPPONENT's graveyard is a valid pick. The old
+        // null resolver would have limited the scan and missed it.
+        var bob = new Player("Bob", 20);
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2);
+        bear.SetOwner(bob);
+        bob.Zones.Graveyard.AddCard(bear);
+        bear.SetZone(ZoneType.Graveyard);
+
+        var wrenn = WrennAndRealmbreakerFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(wrenn);
+        wrenn.SetZone(ZoneType.Battlefield);
+
+        var minus2 = wrenn.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == -2);
+
+        minus2.PayLoyaltyCost();
+        var stack = new Majik.Core.Stack.Stack(new EventBus());
+        var game = new GameContext(_alice, new[] { _alice, bob }, _alice, 1,
+            StepStateType.PreCombatMain, stack);
+        var ctx = ResolutionContext.For(_alice, new ScriptedAgent(), game, chosenTargets: null);
+        foreach (var e in minus2.Effects)
+        {
+            await e.ExecuteAsync(ctx);
+        }
+
+        wrenn.Loyalty.Should().Be(2, "4 - 2 = 2");
+        bear.Zone.Should().Be(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(bear);
+        bob.Zones.Graveyard.GetCards().Should().NotContain(bear);
+        bear.Controller.Should().BeSameAs(_alice,
+            "the reanimated permanent enters under the activator's control (CR 110.2)");
     }
 
     [Fact]

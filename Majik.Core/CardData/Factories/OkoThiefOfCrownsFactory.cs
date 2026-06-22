@@ -49,9 +49,13 @@ namespace Majik.Core.CardData.Factories;
 ///   battlefield" (no duration printed). The effects' <c>IsActive()</c>
 ///   gating on the target's battlefield zone naturally lifts the rider when
 ///   the affected permanent leaves.
-/// - <b>-5</b>: exchange-control mechanic (CR 702.X / 611). Deterministic
-///   auto-pick: first artifact/creature controlled by anyone other than
-///   Oko's controller, and first creature controlled by Oko's controller.
+/// - <b>-5</b>: exchange-control mechanic (CR 702.X / 611). The player set is
+///   read from the live resolution context (<c>rc.Game.AllPlayers</c>) at
+///   resolution rather than a factory-captured resolver that is null on the
+///   production routed build, so the exchange fires in real games.
+///   Deterministic auto-pick: first artifact/creature controlled by anyone
+///   other than Oko's controller, and first creature controlled by Oko's
+///   controller.
 ///   Swaps <see cref="Permanent.Controller"/> on both and moves them between
 ///   the two players' battlefield zones so zone-snapshots see the new
 ///   controller. Counter-removal half is wired but no-ops because the v1
@@ -90,7 +94,7 @@ public static class OkoThiefOfCrownsFactory
     /// services being non-null, so they no-op here.
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, effects: null, battlefieldResolver: null, allPlayersResolver: null);
+        Create(owner, effects: null, battlefieldResolver: null);
 
     /// <summary>
     /// Construct a fully-wired Oko.
@@ -104,15 +108,14 @@ public static class OkoThiefOfCrownsFactory
     /// snapshot at activation time. Used by the +1 (to find a valid target)
     /// and indirectly by the -5 via <paramref name="allPlayersResolver"/>.
     /// May be null — the +1 no-ops (legal — target picker).</param>
-    /// <param name="allPlayersResolver">Returns the player list. Used by
-    /// the -5 to find a non-controller's permanent + a controller's
-    /// creature for the exchange. May be null — the -5 no-ops while
-    /// loyalty still decrements per CR 606.3.</param>
+    /// <remarks>The -5 exchange reads the player list off the live resolution
+    /// context (<c>rc.Game.AllPlayers</c>) at resolution — no captured resolver
+    /// needed. On the shape-only path (no live game) the -5 no-ops while
+    /// loyalty still decrements per CR 606.3.</remarks>
     public static Planeswalker Create(
         Player owner,
         ContinuousEffectsService? effects,
-        Func<IReadOnlyList<Permanent>>? battlefieldResolver,
-        Func<IReadOnlyList<Player>>? allPlayersResolver)
+        Func<IReadOnlyList<Permanent>>? battlefieldResolver)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -175,66 +178,79 @@ public static class OkoThiefOfCrownsFactory
 
         // -- -5: Exchange control of target opponent-permanent and target
         //        creature you control. -----------------------------------
-        oko.AddAbility(new LoyaltyAbility(oko, -5, () =>
+        // The player set is read from the LIVE resolution context
+        // (rc.Game.AllPlayers, CR 102.1 / 800.4a) at resolution, not from a
+        // factory-captured resolver that is null on the production routed
+        // build — so the exchange actually fires in real games. v1 still
+        // auto-picks the exchanged permanents deterministically (the per-
+        // target choice stays on the loyalty TargetRequest queue, same posture
+        // as Karn's -3).
+        oko.AddAbility(new LoyaltyAbility(oko, -5, new[]
         {
-            if (allPlayersResolver == null) return;
-            var players = allPlayersResolver.Invoke();
-            if (players == null) return;
-
-            // First non-controller's artifact-or-creature, first
-            // controller's creature.
-            Permanent? theirs = null;
-            Creature? mine = null;
-
-            var myController = oko.Controller ?? owner;
-
-            // Mine: first creature on Oko's controller's battlefield.
-            foreach (var card in myController.Zones.Battlefield.GetCards())
-            {
-                if (card is Creature c)
+            new Effect(
+                $"{CardName}: -5 — exchange control of an opponent's artifact-or-creature and a creature you control.",
+                rc =>
                 {
-                    mine = c;
-                    break;
-                }
-            }
-            if (mine == null) return;
+                    var players = rc.Game?.AllPlayers;
+                    if (players == null) return ValueTask.CompletedTask; // shape-only — no live game
 
-            // Theirs: first artifact-or-creature on any other player's
-            // battlefield.
-            foreach (var p in players)
-            {
-                if (ReferenceEquals(p, myController)) continue;
-                foreach (var card in p.Zones.Battlefield.GetCards())
-                {
-                    if (card is Permanent perm
-                        && (perm.HasType(CardType.Artifact) || perm.HasType(CardType.Creature)))
+                    // First non-controller's artifact-or-creature, first
+                    // controller's creature.
+                    Permanent? theirs = null;
+                    Creature? mine = null;
+
+                    var myController = oko.Controller ?? owner;
+
+                    // Mine: first creature on Oko's controller's battlefield.
+                    foreach (var card in myController.Zones.Battlefield.GetCards())
                     {
-                        theirs = perm;
-                        break;
+                        if (card is Creature c)
+                        {
+                            mine = c;
+                            break;
+                        }
                     }
-                }
-                if (theirs != null) break;
-            }
-            if (theirs == null) return;
+                    if (mine == null) return ValueTask.CompletedTask;
 
-            // Exchange control — move each permanent between the two
-            // players' battlefield zones and swap their Controller refs.
-            var theirController = theirs.Controller ?? throw new InvalidOperationException(
-                "Exchange target is missing a controller — the resolver returned an off-battlefield permanent.");
+                    // Theirs: first artifact-or-creature on any other player's
+                    // battlefield.
+                    foreach (var p in players)
+                    {
+                        if (ReferenceEquals(p, myController)) continue;
+                        foreach (var card in p.Zones.Battlefield.GetCards())
+                        {
+                            if (card is Permanent perm
+                                && (perm.HasType(CardType.Artifact) || perm.HasType(CardType.Creature)))
+                            {
+                                theirs = perm;
+                                break;
+                            }
+                        }
+                        if (theirs != null) break;
+                    }
+                    if (theirs == null) return ValueTask.CompletedTask;
 
-            myController.Zones.Battlefield.RemoveCard(mine);
-            theirController.Zones.Battlefield.RemoveCard(theirs);
+                    // Exchange control — move each permanent between the two
+                    // players' battlefield zones and swap their Controller refs.
+                    var theirController = theirs.Controller ?? throw new InvalidOperationException(
+                        "Exchange target is missing a controller — the picked permanent is off-battlefield.");
 
-            theirController.Zones.Battlefield.AddCard(mine);
-            myController.Zones.Battlefield.AddCard(theirs);
+                    myController.Zones.Battlefield.RemoveCard(mine);
+                    theirController.Zones.Battlefield.RemoveCard(theirs);
 
-            mine.SetController(theirController);
-            theirs.SetController(myController);
+                    theirController.Zones.Battlefield.AddCard(mine);
+                    myController.Zones.Battlefield.AddCard(theirs);
 
-            // Counter removal half — documented intent. CR 611 counter-
-            // tracking isn't modelled on Permanent in v1, so this is a
-            // structural no-op. Once counters land, scan each swapped
-            // permanent's counter list and remove every counter.
+                    mine.SetController(theirController);
+                    theirs.SetController(myController);
+
+                    // Counter removal half — documented intent. CR 611 counter-
+                    // tracking isn't modelled on Permanent in v1, so this is a
+                    // structural no-op. Once counters land, scan each swapped
+                    // permanent's counter list and remove every counter.
+
+                    return ValueTask.CompletedTask;
+                }),
         }));
 
         return oko;

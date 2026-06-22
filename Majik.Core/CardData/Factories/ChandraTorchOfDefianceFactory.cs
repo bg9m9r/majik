@@ -40,12 +40,14 @@ namespace Majik.Core.CardData.Factories;
 ///   library. The "you may cast that card" choice is auto-resolved in v1 to
 ///   <em>decline</em> (the engine has no cast-from-exile-during-resolution
 ///   primitive — see "Deferred"), so the "if you don't" rider always fires:
-///   Chandra deals 2 damage to each opponent (every player in
-///   <paramref name="allPlayersResolver"/> other than the controller) via
+///   Chandra deals 2 damage to each opponent (the live
+///   <see cref="ContextOpponents"/> enumeration read off the resolution
+///   context — <c>rc.Game.AllPlayers</c>, CR 102.1 / 800.4a) via
 ///   <see cref="Fx.DealDamageAny"/>. With an empty library the clause no-ops
 ///   (CR 608.2c — no card to exile, so the optional cast and its rider don't
-///   resolve). Without a player resolver the exile still happens; the
-///   each-opponent damage no-ops.
+///   resolve). Reading the live game at resolution (instead of a factory-
+///   captured resolver null on the production routed build) is what makes the
+///   each-opponent damage actually fire in real games.
 /// - <b>+1 (ritual): Add {R}{R} (CR 606 + CR 106.4)</b>: adds two red mana to
 ///   the controller's mana pool via <see cref="Player.AddManaToPool"/>.
 /// - <b>−3: Chandra deals 4 damage to target creature (CR 606 + CR 119)</b>:
@@ -89,23 +91,20 @@ public static class ChandraTorchOfDefianceFactory
     private const string RitualMana = "{R}{R}";
 
     /// <summary>
-    /// Construct Chandra with no resolvers / triggers wired — the +1 impulse
-    /// exiles the top card but the each-opponent damage no-ops, the +1 ritual
-    /// adds {R}{R}, −3 no-ops, and −7 mints a structural-only emblem. Loyalty
-    /// changes still apply. Suitable for shape / dispatcher tests. This is the
-    /// overload <see cref="NamedCardFactory"/> dispatches to.
+    /// Construct Chandra (production routed path) — the +1 impulse exiles the
+    /// top card and deals 2 to each opponent read off the live resolution
+    /// context, the +1 ritual adds {R}{R}, −3 no-ops (no creature resolver),
+    /// and −7 mints a structural-only emblem. Loyalty changes still apply. This
+    /// is the overload <see cref="NamedCardFactory"/> dispatches to.
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, allPlayersResolver: null, targetCreatureResolver: null,
+        Create(owner, targetCreatureResolver: null,
             anyTargetResolver: null, triggers: null);
 
     /// <summary>
     /// Construct Chandra, Torch of Defiance.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Returns the full player list for the +1
-    /// impulse's "2 damage to each opponent" rider (every player other than the
-    /// controller). May be null — the rider no-ops.</param>
     /// <param name="targetCreatureResolver">Returns candidate creatures for the
     /// −3 "4 damage to target creature" clause. v1 picks the first. May be null
     /// — the clause no-ops.</param>
@@ -116,7 +115,6 @@ public static class ChandraTorchOfDefianceFactory
     /// spell-cast trigger. May be null — the emblem is structural-only.</param>
     public static Planeswalker Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         Func<IReadOnlyList<Creature>>? targetCreatureResolver,
         Func<object?>? anyTargetResolver,
         TriggerManager? triggers)
@@ -135,26 +133,36 @@ public static class ChandraTorchOfDefianceFactory
         // declines the optional cast (no cast-from-exile-during-resolution
         // primitive — see class xmldoc), so the "if you don't" rider always
         // resolves: 2 damage to each opponent.
-        chandra.AddAbility(new LoyaltyAbility(chandra, +1, () =>
+        //
+        // The each-opponent set is read from the LIVE resolution context
+        // (ContextOpponents.Of → GameContext.AllPlayers, CR 102.1 / 800.4a) at
+        // resolution, not from a factory-captured resolver that is null on the
+        // production routed build. Same fix as Ashiok / the each-opponent
+        // resolver-null class.
+        chandra.AddAbility(new LoyaltyAbility(chandra, +1, new[]
         {
-            var controller = chandra.Controller ?? owner;
+            new Effect(
+                $"{CardName}: +1 — exile top card; if you don't cast it, deal {Plus1OpponentDamage} to each opponent.",
+                rc =>
+                {
+                    var controller = chandra.Controller ?? owner;
 
-            var top = controller.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null) return; // empty library — nothing to exile (CR 608.2c)
+                    var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                    if (top == null) return ValueTask.CompletedTask; // empty library — nothing to exile (CR 608.2c)
 
-            // Exile the top card (CR 701.21).
-            controller.Zones.Library.RemoveCard(top);
-            controller.Zones.Exile.AddCard(top);
-            top.SetZone(ZoneType.Exile);
+                    // Exile the top card (CR 701.21).
+                    controller.Zones.Library.RemoveCard(top);
+                    controller.Zones.Exile.AddCard(top);
+                    top.SetZone(ZoneType.Exile);
 
-            // v1: decline the cast → "if you don't, deal 2 to each opponent".
-            var players = allPlayersResolver?.Invoke();
-            if (players == null) return;
-            foreach (var p in players)
-            {
-                if (ReferenceEquals(p, controller)) continue; // "each opponent"
-                Fx.DealDamageAny(p, Plus1OpponentDamage);
-            }
+                    // v1: decline the cast → "if you don't, deal 2 to each opponent".
+                    foreach (var opponent in ContextOpponents.Of(rc, controller))
+                    {
+                        Fx.DealDamageAny(opponent, Plus1OpponentDamage);
+                    }
+
+                    return ValueTask.CompletedTask;
+                }),
         }));
 
         // -- +1 (ritual): Add {R}{R}. -------------------------------------------
