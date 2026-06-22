@@ -399,7 +399,7 @@ public class AgentPromptYesNoFromHandTests
     // -- Liliana of the Veil ------------------------------------------------
 
     [Fact]
-    public void LilianaPlus1_AgentChoosesDiscardPick()
+    public async System.Threading.Tasks.Task LilianaPlus1_AgentChoosesDiscardPick()
     {
         var alice = new Player("A", 20);
         var bob = new Player("B", 20);
@@ -426,15 +426,27 @@ public class AgentPromptYesNoFromHandTests
             ReferenceEquals(p, alice) ? aliceAgent :
             ReferenceEquals(p, bob) ? bobAgent : null;
 
-        var liliana = LilianaOfTheVeilFactory.Create(
-            alice,
-            allPlayersResolver: () => new[] { alice, bob },
-            agentSelector: Selector);
+        var liliana = LilianaOfTheVeilFactory.Create(alice, agentSelector: Selector);
 
         var plus1 = liliana.Abilities
             .OfType<Majik.Core.Abilities.LoyaltyAbility>()
             .First(a => a.LoyaltyChange == +1);
-        plus1.Activate();
+
+        // The +1 reads the player list off the live ResolutionContext
+        // (rc.Game.AllPlayers) — the resolver-null loyalty fix. Resolve the
+        // effect with a live game context so the per-player agent discard runs.
+        plus1.PayLoyaltyCost();
+        var game = new Majik.Core.Game.GameContext(
+            self: alice,
+            allPlayers: new[] { alice, bob },
+            activePlayer: alice,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+        var rc = Majik.Core.Abilities.ResolutionContext.For(
+            alice, agent: null, game: game, chosenTargets: null);
+        foreach (var ef in plus1.Effects)
+            await ef.ExecuteAsync(rc);
 
         alicePitch.Zone.Should().Be(ZoneType.Graveyard);
         bobPitch.Zone.Should().Be(ZoneType.Graveyard);
