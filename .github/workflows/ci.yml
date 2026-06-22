@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
