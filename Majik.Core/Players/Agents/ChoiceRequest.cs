@@ -41,6 +41,18 @@ public enum ChoiceKind
 
     /// <summary>CR 701.42 — Surveil partition (top-order vs. graveyard).</summary>
     SurveilPartition,
+
+    /// <summary>
+    /// CR 800.4-style "separate [objects] into two piles" partition (Liliana
+    /// of the Veil's −6, Fact or Fiction, Fade Away — the pile-split family).
+    /// The partitioning player selects the SUBSET of candidates that forms the
+    /// FIRST pile; every remaining candidate forms the second pile. Modeled as
+    /// a sub-selection (Min 0 .. Max all) — the empty pick is legal (one pile
+    /// is empty, the other holds everything, CR 700.6 — a pile may be empty).
+    /// The companion pile choice (the OTHER player picking which pile) flows
+    /// through a separate <see cref="PickOne"/> over the two pile sentinels.
+    /// </summary>
+    SplitIntoPiles,
 }
 
 /// <summary>

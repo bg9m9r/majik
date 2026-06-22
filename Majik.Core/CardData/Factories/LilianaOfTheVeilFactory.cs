@@ -50,12 +50,21 @@ namespace Majik.Core.CardData.Factories;
 ///   target-player request but picks the creature deterministically rather
 ///   than via the sacrificing player's agent. Wiring full loyalty-target
 ///   plumbing is out of scope here.
-/// - <b>-6 ultimate</b>: pile-split is a multi-stage interactive effect
-///   (one player partitions, the other chooses which pile to sacrifice).
-///   No "split into piles" primitive exists in the engine yet. The
-///   loyalty ability is wired with a no-op body so the loyalty change
-///   still applies (CR 606.3 — the cost is paid even if the effect
-///   does nothing).
+///
+/// ## Implemented (pile-split pay-down)
+/// - <b>-6 ultimate</b>: "Separate all permanents target player controls into
+///   two piles. That player sacrifices all permanents in the pile of their
+///   choice." Two-stage interactive pile-split (CR 700.6 / CR 701.16) over the
+///   new <see cref="IPlayerAgent.SplitIntoPilesAsync"/> /
+///   <see cref="IPlayerAgent.ChoosePileAsync"/> primitive: Liliana's controller
+///   (player A) partitions the target player's permanents; the TARGET player
+///   (player B) picks which pile to sacrifice; the target player then
+///   sacrifices every permanent in the chosen pile (<see cref="Fx.Sacrifice"/>,
+///   CR 701.16 — bypasses indestructible / regeneration). Agents resolve in the
+///   same priority order as +1 (agentSelector → rc.Agent → AgentRegistry); a
+///   seat with no agent uses the CR-legal deterministic default (even split /
+///   pile one). With no live game context the body silently no-ops while the
+///   loyalty change still applies (CR 606.3).
 /// </summary>
 [CardName("Liliana of the Veil")]
 public static class LilianaOfTheVeilFactory
@@ -204,9 +213,115 @@ public static class LilianaOfTheVeilFactory
             },
             targetRequests: new[] { sacrificePlayerRequest }));
 
-        // -- -6 ultimate: pile split. v1 deferred — loyalty change applies
-        //    with an empty body so the cost is still paid.
-        liliana.AddAbility(new LoyaltyAbility(liliana, -6, () => { /* deferred */ }));
+        // -- -6 ultimate: Separate all permanents target player controls into
+        //    two piles. That player sacrifices all permanents in the pile of
+        //    their choice. -----------------------------------------------------
+        // CR 606 (loyalty) + CR 115 (target player) + CR 700.6 (piles) +
+        // CR 701.16 (sacrifice). Two-stage interactive pile-split:
+        //   1. Player A (Liliana's controller, rc.Controller) PARTITIONS the
+        //      target player's permanents into two piles via
+        //      IPlayerAgent.SplitIntoPilesAsync (ChoiceKind.SplitIntoPiles).
+        //   2. Player B (the TARGET player) chooses WHICH pile to sacrifice via
+        //      IPlayerAgent.ChoosePileAsync (PickOne over the two piles).
+        //   3. The target player sacrifices every permanent in the chosen pile
+        //      via Fx.Sacrifice (CR 701.16 — bypasses indestructible/regen).
+        // The target player is read off the ResolutionContext (slot 0), falling
+        // back to the first opponent read off ContextOpponents (live game
+        // context — no captured resolver) on the legacy direct-activation path.
+        // Each agent is resolved in the same priority order the +1 uses:
+        // explicit agentSelector, then rc.Agent for the activating controller,
+        // then the per-game AgentRegistry seam for the other seat(s). A seat
+        // with no agent uses the CR-legal deterministic default (even split /
+        // pile one). With no live game context the effect silently no-ops while
+        // the loyalty change still applies (CR 606.3 — the cost is paid even if
+        // the effect does nothing).
+        var pileSplitTargetRequest = new TargetRequest(
+            Description: "Separate all permanents target player controls into two piles",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Removal,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .Cast<object>()
+                .ToList());
+
+        liliana.AddAbility(new LoyaltyAbility(
+            liliana,
+            -6,
+            new[]
+            {
+                Fx.Inline(
+                    "Separate target player's permanents into two piles; that player sacrifices one pile",
+                    rc =>
+                    {
+                        if (rc.Game == null) return default;
+
+                        // CR 115 — the target player (slot 0), or the first
+                        // opponent with permanents on the legacy path.
+                        var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                            ? rc.ChosenTargets[0][0] as Player
+                            : null)
+                            ?? ContextOpponents.Of(rc, rc.Controller)
+                                .FirstOrDefault(p => p.Zones.Battlefield.GetCards().Any());
+                        if (target == null) return default;
+
+                        // CR 700.6 — "all permanents target player controls".
+                        var permanents = target.Zones.Battlefield.GetCards()
+                            .OfType<Permanent>()
+                            .Cast<ICard>()
+                            .ToList();
+                        if (permanents.Count == 0) return default;
+
+                        // Resolve the partitioner (player A = Liliana's
+                        // controller) and the chooser (player B = the target
+                        // player) agents, same priority order as +1.
+                        IPlayerAgent? AgentFor(Player p) =>
+                            agentSelector?.Invoke(p)
+                            ?? (ReferenceEquals(p, rc.Controller) ? rc.Agent : null)
+                            ?? AgentRegistry.Get(p);
+
+                        var partitioner = AgentFor(rc.Controller);
+                        var chooser = AgentFor(target);
+
+                        // Stage 1 — player A separates into two piles. With no
+                        // partitioner agent, even-split via the interface
+                        // default would still need an agent instance; fall back
+                        // to a deterministic even split inline.
+                        IReadOnlyList<ICard> pileOne, pileTwo;
+                        if (partitioner != null)
+                        {
+                            (pileOne, pileTwo) = partitioner
+                                .SplitIntoPilesAsync(rc.Game, permanents, BotIntent.Removal)
+                                .GetAwaiter().GetResult();
+                        }
+                        else
+                        {
+                            var half = permanents.Count / 2;
+                            pileOne = permanents.Take(half).ToList();
+                            pileTwo = permanents.Skip(half).ToList();
+                        }
+
+                        // Stage 2 — player B (the target player) chooses which
+                        // pile to sacrifice. No chooser agent → pile one (the
+                        // CR-legal deterministic default).
+                        var chosenIndex = chooser != null
+                            ? chooser.ChoosePileAsync(
+                                rc.Game, pileOne, pileTwo,
+                                "Choose a pile to sacrifice",
+                                BotIntent.Removal).GetAwaiter().GetResult()
+                            : 0;
+                        var doomed = chosenIndex == 1 ? pileTwo : pileOne;
+
+                        // Stage 3 — CR 701.16 — the target player sacrifices
+                        // every permanent in the chosen pile.
+                        foreach (var perm in doomed.ToList())
+                        {
+                            Fx.Sacrifice(perm);
+                        }
+                        return default;
+                    }),
+            },
+            targetRequests: new[] { pileSplitTargetRequest }));
 
         return liliana;
     }
