@@ -4,6 +4,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -32,6 +33,29 @@ public class UginTheSpiritDragonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
+
+    /// <summary>
+    /// Resolve a loyalty ability's effects against a LIVE resolution context —
+    /// the prod path now reads players / controller off rc.Game / rc.Controller
+    /// (the resolver-null loyalty fix), so the legacy resolver-free
+    /// <see cref="LoyaltyAbility.Activate"/> can't exercise the each-permanent /
+    /// each-player halves. This pays the (flat) loyalty cost, builds a
+    /// GameContext, then resolves each effect with rc.Controller = the activator.
+    /// </summary>
+    private static void ActivateWithContext(LoyaltyAbility ability, Player controller, params Player[] all)
+    {
+        ability.PayLoyaltyCost();
+        var game = new GameContext(
+            self: controller,
+            allPlayers: all,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+        var rc = ResolutionContext.For(controller, agent: null, game: game, chosenTargets: null);
+        foreach (var effect in ability.Effects)
+            effect.ExecuteAsync(rc).GetAwaiter().GetResult();
+    }
 
     [Fact]
     public void Ugin_IsLegendaryPlaneswalker_Ugin_7Loyalty_AtCost8()
@@ -66,10 +90,8 @@ public class UginTheSpiritDragonFactoryTests
     [Fact]
     public void Ugin_Plus2_DealsThreeDamageToPlayerTarget()
     {
-        var players = new[] { _alice, _bob };
         var ugin = UginTheSpiritDragonFactory.Create(
             _alice,
-            allPlayersResolver: () => players,
             anyTargetResolver: () => new object[] { _bob });
         _alice.Zones.Battlefield.AddCard(ugin);
         ugin.SetZone(ZoneType.Battlefield);
@@ -93,10 +115,8 @@ public class UginTheSpiritDragonFactoryTests
         _bob.Zones.Battlefield.AddCard(pw);
         pw.SetZone(ZoneType.Battlefield);
 
-        var players = new[] { _alice, _bob };
         var ugin = UginTheSpiritDragonFactory.Create(
             _alice,
-            allPlayersResolver: () => players,
             anyTargetResolver: () => new object[] { pw });
         _alice.Zones.Battlefield.AddCard(ugin);
         ugin.SetZone(ZoneType.Battlefield);
@@ -135,11 +155,7 @@ public class UginTheSpiritDragonFactoryTests
         _bob.Zones.Battlefield.AddCard(colourlessGolem);
         colourlessGolem.SetZone(ZoneType.Battlefield);
 
-        var players = new[] { _alice, _bob };
-        var ugin = UginTheSpiritDragonFactory.Create(
-            _alice,
-            allPlayersResolver: () => players,
-            anyTargetResolver: null);
+        var ugin = UginTheSpiritDragonFactory.Create(_alice);
         // Loyalty needs to cover X = 3.
         ugin.AddLoyalty(0); // no-op, just illustrative
         _alice.Zones.Battlefield.AddCard(ugin);
@@ -149,7 +165,8 @@ public class UginTheSpiritDragonFactoryTests
 
         var minusX = ugin.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == 0);
-        minusX.Activate();
+        // -X reads every battlefield off the live ResolutionContext.
+        ActivateWithContext(minusX, _alice, _alice, _bob);
 
         _bob.Zones.Exile.GetCards().Should().Contain(redGoblin);
         _bob.Zones.Exile.GetCards().Should().Contain(greenBeast);
@@ -180,11 +197,7 @@ public class UginTheSpiritDragonFactoryTests
         _bob.Zones.Battlefield.AddCard(redOne);
         redOne.SetZone(ZoneType.Battlefield);
 
-        var players = new[] { _alice, _bob };
-        var ugin = UginTheSpiritDragonFactory.Create(
-            _alice,
-            allPlayersResolver: () => players,
-            anyTargetResolver: null);
+        var ugin = UginTheSpiritDragonFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(ugin);
         ugin.SetZone(ZoneType.Battlefield);
 
@@ -192,7 +205,7 @@ public class UginTheSpiritDragonFactoryTests
 
         var minusX = ugin.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == 0);
-        minusX.Activate();
+        ActivateWithContext(minusX, _alice, _alice, _bob);
 
         _bob.Zones.Battlefield.GetCards().Should().Contain(redOne,
             "X = 0 < mv 1 — red one-drop is not exiled");
@@ -245,7 +258,8 @@ public class UginTheSpiritDragonFactoryTests
         var minus10 = ugin.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == -10);
         minus10.CanActivate().Should().BeTrue();
-        minus10.Activate();
+        // -10 reads the controller off the live ResolutionContext.
+        ActivateWithContext(minus10, _alice, _alice, _bob);
 
         ugin.Loyalty.Should().Be(0);
         _alice.LifeTotal.Should().Be(27, "20 + 7 = 27");
@@ -283,6 +297,33 @@ public class UginTheSpiritDragonFactoryTests
 
         ugin.Loyalty.Should().Be(9, "7 + 2 = 9 even with no any-target resolver wired");
         _bob.LifeTotal.Should().Be(20, "no resolver → +2 damage clause is a silent no-op");
+    }
+
+    [Fact]
+    public void Ugin_MinusX_BuiltViaProdRoutedSingleArg_StillExiles_NotInert()
+    {
+        // Regression for the resolver-null-loyalty-each-player-context-read
+        // deferral: the prod routed build dispatches the single-arg Create
+        // (NO captured player-list resolver). The -X each-permanent half must
+        // still run by reading rc.Game.AllPlayers at resolution — it used to
+        // be INERT on this path.
+        var redGoblin = new Creature("Goblin", "{1}{R}", 2, 1);
+        redGoblin.SetOwner(_bob); redGoblin.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(redGoblin);
+        redGoblin.SetZone(ZoneType.Battlefield);
+
+        var ugin = (Planeswalker)NamedCardFactory.Create("Ugin, the Spirit Dragon", _alice);
+        _alice.Zones.Battlefield.AddCard(ugin);
+        ugin.SetZone(ZoneType.Battlefield);
+        ugin.SetPendingCastX(2);
+
+        var minusX = ugin.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == 0);
+        ActivateWithContext(minusX, _alice, _alice, _bob);
+
+        _bob.Zones.Exile.GetCards().Should().Contain(redGoblin,
+            "the prod single-arg build's -X reads players off rc.Game — no longer inert");
+        ugin.Loyalty.Should().Be(5, "7 - 2 = 5");
     }
 
     [Fact]

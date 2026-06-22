@@ -29,20 +29,22 @@ namespace Majik.Core.CardData.Factories;
 ///   dispatch, CR 306.7). With no resolver wired the loyalty change
 ///   still applies (CR 606.3) and the damage clause silently no-ops.
 /// - <b>-X: exile each coloured permanent with mv ≤ X (CR 606 + CR
-///   701.21 + CR 105)</b>: scans every battlefield exposed by
-///   <paramref name="allPlayersResolver"/>; a permanent qualifies when
+///   701.21 + CR 105)</b>: <b>pure-enumeration each-permanent effect</b>.
+///   Reads every battlefield off the LIVE <see cref="ResolutionContext"/>
+///   (<c>rc.Game.AllPlayers</c>) at RESOLUTION — no captured player-list
+///   resolver, so it runs on the prod routed build (the
+///   <c>resolver-null-loyalty-each-player-context-read</c> deferral fix;
+///   same context-read pattern as <see cref="ContextOpponents"/> / #2549 /
+///   #2551, now applied on the loyalty path). A permanent qualifies when
 ///   <see cref="Card.ManaCostValue"/>.TotalValue ≤ X AND
-///   <see cref="CardColors.GetColors"/>.Count ≥ 1 (i.e. at least one
-///   coloured pip in the printed mana cost). Each qualifying card is
-///   moved to its owner's exile zone via raw zone manipulation — same
-///   posture as <see cref="KarnLiberatedFactory"/>'s -3. X is read off
-///   <see cref="Card.PendingCastX"/> at activation time (stamped by
-///   <see cref="Majik.Core.Game.SpellCastFlow"/> when the activator
-///   supplies a value; the printed loyalty cost surface is what the
-///   activator pays through). When no X is stamped the effect snapshots
-///   X = 0, which still legally exiles 0-cost coloured permanents
-///   (printed-cost mv 0 with a coloured indicator — rare but rules-correct
-///   under CR 202.3b + CR 105).
+///   <see cref="CardColors.GetColors"/>.Count ≥ 1 (at least one coloured
+///   pip in the printed mana cost). Each qualifying card is moved to its
+///   owner's exile zone via raw zone manipulation — same posture as
+///   <see cref="KarnLiberatedFactory"/>'s -3. X is read off the source's
+///   <see cref="Card.PendingCastX"/> at resolution (stamped by the
+///   activator; mirrors Chalice / Spell Queller's PendingCastX posture for
+///   X abilities). When no X is stamped the effect snapshots X = 0, which
+///   still legally exiles 0-cost coloured permanents (CR 202.3b + CR 105).
 /// - <b>-10: gain 7 life, return up to 7 permanent cards from
 ///   controller's graveyard, then draw 7 (CR 606 + CR 119.3 + CR 701.20
 ///   + CR 121)</b>: three-step ordered resolution — gain life first via
@@ -52,7 +54,8 @@ namespace Majik.Core.CardData.Factories;
 ///   HasType(Enchantment) || HasType(Planeswalker)</c>; deterministic
 ///   first-in-graveyard pick — same shape Priest of Fell Rites uses);
 ///   finally draw seven via <see cref="Fx.DrawCards"/>. The "up to" is
-///   auto-accepted at v1.
+///   auto-accepted at v1. The controller is read off the LIVE
+///   <see cref="ResolutionContext"/> (<c>rc.Controller</c>) at resolution.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>Loyalty target prompts</b>: <see cref="LoyaltyAbility"/> doesn't
@@ -77,31 +80,28 @@ public static class UginTheSpiritDragonFactory
     public const int UltimateDrawCount = 7;
 
     /// <summary>
-    /// Construct Ugin with no resolvers wired — +2 and -X effects no-op,
-    /// -10 still runs (graveyard / hand / life are owner-scoped). Suitable
-    /// for shape / dispatcher tests.
+    /// Construct Ugin with no any-target resolver wired — the +2 damage
+    /// clause no-ops while the loyalty change still applies. -X and -10 read
+    /// the live game / controller off the <see cref="ResolutionContext"/>, so
+    /// they run on this routed build too (they need no resolver). This is the
+    /// production routed overload (<c>NamedCardFactory.Create(name, owner)</c>).
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, allPlayersResolver: null, anyTargetResolver: null);
+        Create(owner, anyTargetResolver: null);
 
     /// <summary>
     /// Construct Ugin, the Spirit Dragon. When
     /// <paramref name="anyTargetResolver"/> is non-null, the +2 damage
-    /// effect picks the first returned target. When
-    /// <paramref name="allPlayersResolver"/> is non-null, the -X exile
-    /// scans every player's battlefield for coloured permanents with
-    /// mv ≤ X.
+    /// effect picks the first returned target. The -X exile + -10 ultimate
+    /// read the live battlefield / controller off the resolution context and
+    /// need no resolver.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Returns the full player list at
-    /// activation time. Used by -X to scan every battlefield. May be null
-    /// — -X no-ops while loyalty still applies.</param>
     /// <param name="anyTargetResolver">Returns any-target candidates
     /// (players / creatures / planeswalkers) for +2 at activation time.
     /// v1 picks the first. May be null — +2 damage clause no-ops.</param>
     public static Planeswalker Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         Func<IReadOnlyList<object>>? anyTargetResolver)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -135,56 +135,70 @@ public static class UginTheSpiritDragonFactory
         // -- -X: Exile each permanent with mana value X or less that's
         //    one or more colors. -------------------------------------------
         // CR 606 (loyalty cost) + CR 105 (colour from mana cost) +
-        // CR 701.21 (exile). v1 reads X off Card.PendingCastX (stamped by
-        // SpellCastFlow at activation time, mirroring Chalice / Spell
-        // Queller's PendingCastX-on-the-source posture for X loyalty
-        // abilities). Scans every battlefield exposed by allPlayersResolver
-        // and exiles each qualifying card (raw-zone, owner-scoped exile —
-        // same posture as Karn's -3).
-        ugin.AddAbility(new LoyaltyAbility(ugin, 0 /* -X registered at 0; effect pays "X" loyalty via RemoveLoyalty + reads PendingCastX for the exile mv cap */, () =>
-        {
-            // CR 606 — -X loyalty cost is dynamic; the engine currently
-            // models loyalty costs as flat ints, so we register the
-            // ability at LoyaltyChange = 0 (which CanActivate gates as
-            // "always legal" on a positive-loyalty walker) and apply the
-            // RemoveLoyalty for the chosen X here, reading
-            // <see cref="Card.PendingCastX"/> (stamped by the activator
-            // before triggering this ability; same posture Chalice /
-            // Spell Queller use for X on the stack). Future agent-loyalty
-            // plumbing will model "-X" natively.
-            var x = ugin.PendingCastX ?? 0;
-            if (x > 0) ugin.RemoveLoyalty(Math.Min(x, ugin.Loyalty));
-            var players = allPlayersResolver?.Invoke();
-            if (players == null) return;
-
-            // Snapshot first to avoid mutating the iterated collection.
-            var toExile = new List<Card>();
-            foreach (var p in players)
+        // CR 701.21 (exile). PURE-ENUMERATION each-permanent effect — reads
+        // every battlefield off the LIVE ResolutionContext (rc.Game.AllPlayers)
+        // at resolution, NOT from a build-time captured resolver (the prod
+        // routed single-arg Create leaves any captured resolver null → the
+        // clause used to be INERT in real games; the resolver-null loyalty
+        // deferral fix). X is read off the source's PendingCastX (stamped by
+        // the activator; same posture Chalice / Spell Queller use for X on the
+        // stack). Registered at LoyaltyChange = 0 because the engine models
+        // loyalty costs as flat ints; the effect pays the chosen X loyalty
+        // inline via RemoveLoyalty.
+        ugin.AddAbility(new LoyaltyAbility(ugin, 0 /* -X registered at 0; effect pays "X" loyalty via RemoveLoyalty + reads PendingCastX for the exile mv cap */,
+            new[]
             {
-                foreach (var c in p.Zones.Battlefield.GetCards())
+                Fx.Inline("Exile each coloured permanent with mv ≤ X", rc =>
                 {
-                    if (c is not Card permCard) continue;
-                    if (permCard.ManaCostValue.TotalValue > x) continue;
-                    if (CardColors.GetColors(permCard).Count == 0) continue;
-                    toExile.Add(permCard);
-                }
-            }
+                    // CR 606 — -X loyalty cost is dynamic; the engine models
+                    // loyalty costs as flat ints, so the ability is registered
+                    // at LoyaltyChange = 0 and the RemoveLoyalty for the chosen
+                    // X is applied here, reading PendingCastX off the source
+                    // (the captured planeswalker IS the loyalty ability's
+                    // Source on both the prod and legacy paths).
+                    var x = ugin.PendingCastX ?? 0;
+                    if (x > 0) ugin.RemoveLoyalty(Math.Min(x, ugin.Loyalty));
 
-            foreach (var c in toExile)
-            {
-                if (c.Zone != ZoneType.Battlefield) continue;
-                var holder = c.Controller ?? c.Owner;
-                holder?.Zones.Battlefield.RemoveCard(c);
-                var exileOwner = c.Owner ?? owner;
-                exileOwner.Zones.Exile.AddCard(c);
-                c.SetZone(ZoneType.Exile);
-            }
+                    // Read every battlefield off the live game context (CR 105 —
+                    // colour is determined from the printed mana cost). Snapshot
+                    // first to avoid mutating the iterated collection.
+                    var players = rc.Game?.AllPlayers;
+                    if (players == null)
+                    {
+                        ugin.ClearPendingCastX();
+                        return default;
+                    }
 
-            // Clear PendingCastX after the effect consumes it (parallels
-            // Chalice's clear-on-resolve so a later reactivation doesn't
-            // see stale state).
-            ugin.ClearPendingCastX();
-        }));
+                    var toExile = new List<Card>();
+                    foreach (var p in players)
+                    {
+                        if (p == null) continue;
+                        foreach (var c in p.Zones.Battlefield.GetCards())
+                        {
+                            if (c is not Card permCard) continue;
+                            if (permCard.ManaCostValue.TotalValue > x) continue;
+                            if (CardColors.GetColors(permCard).Count == 0) continue;
+                            toExile.Add(permCard);
+                        }
+                    }
+
+                    foreach (var c in toExile)
+                    {
+                        if (c.Zone != ZoneType.Battlefield) continue;
+                        var holder = c.Controller ?? c.Owner;
+                        holder?.Zones.Battlefield.RemoveCard(c);
+                        var exileOwner = c.Owner ?? owner;
+                        exileOwner.Zones.Exile.AddCard(c);
+                        c.SetZone(ZoneType.Exile);
+                    }
+
+                    // Clear PendingCastX after the effect consumes it (parallels
+                    // Chalice's clear-on-resolve so a later reactivation doesn't
+                    // see stale state).
+                    ugin.ClearPendingCastX();
+                    return default;
+                }),
+            }));
 
         // -- -10: You gain 7 life, return up to seven permanent cards
         //    from your graveyard to the battlefield, then draw seven
@@ -192,33 +206,41 @@ public static class UginTheSpiritDragonFactory
         // CR 606 (loyalty) + CR 119.3 (life) + CR 701.20 (graveyard →
         // battlefield) + CR 121 (draw). Three-step printed-order
         // resolution (CR 608.2c — events in printed order). "Up to seven"
-        // auto-accepted at v1; deterministic first-in-graveyard pick.
-        ugin.AddAbility(new LoyaltyAbility(ugin, -10, () =>
-        {
-            // 1. Life — CR 119.3. Snapshot the controller (planeswalker's
-            // controller at resolution time — the trigger's controller).
-            var controller = ugin.Controller ?? owner;
-            Fx.GainLife(controller, UltimateLifeGain);
-
-            // 2. Return up to 7 permanent cards from controller's
-            //    graveyard to the battlefield. "Permanent card" =
-            //    Creature / Artifact / Enchantment / Land / Planeswalker
-            //    (CR 110.4a).
-            var picks = controller.Zones.Graveyard.GetCards()
-                .Where(IsPermanentCard)
-                .Take(UltimateReturnLimit)
-                .ToList();
-            foreach (var p in picks)
+        // auto-accepted at v1; deterministic first-in-graveyard pick. The
+        // controller is read off the LIVE ResolutionContext (rc.Controller)
+        // at resolution, falling back to the captured owner on the legacy
+        // direct-activation path.
+        ugin.AddAbility(new LoyaltyAbility(ugin, -10,
+            new[]
             {
-                controller.Zones.Graveyard.RemoveCard(p);
-                controller.Zones.Battlefield.AddCard(p);
-                p.SetZone(ZoneType.Battlefield);
-                if (p is Permanent perm) perm.SetController(controller);
-            }
+                Fx.Inline("Gain 7, reanimate up to 7 permanents, draw 7", rc =>
+                {
+                    // 1. Life — CR 119.3. The controller is the planeswalker's
+                    // controller at resolution time.
+                    var controller = rc.Controller ?? ugin.Controller ?? owner;
+                    Fx.GainLife(controller, UltimateLifeGain);
 
-            // 3. Draw seven — CR 121.
-            Fx.DrawCards(controller, UltimateDrawCount);
-        }));
+                    // 2. Return up to 7 permanent cards from controller's
+                    //    graveyard to the battlefield. "Permanent card" =
+                    //    Creature / Artifact / Enchantment / Land / Planeswalker
+                    //    (CR 110.4a).
+                    var picks = controller.Zones.Graveyard.GetCards()
+                        .Where(IsPermanentCard)
+                        .Take(UltimateReturnLimit)
+                        .ToList();
+                    foreach (var p in picks)
+                    {
+                        controller.Zones.Graveyard.RemoveCard(p);
+                        controller.Zones.Battlefield.AddCard(p);
+                        p.SetZone(ZoneType.Battlefield);
+                        if (p is Permanent perm) perm.SetController(controller);
+                    }
+
+                    // 3. Draw seven — CR 121.
+                    Fx.DrawCards(controller, UltimateDrawCount);
+                    return default;
+                }),
+            }));
 
         return ugin;
     }

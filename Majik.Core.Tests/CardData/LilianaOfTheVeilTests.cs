@@ -4,6 +4,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -28,6 +29,29 @@ public class LilianaOfTheVeilTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
+
+    /// <summary>
+    /// Resolve a loyalty ability's effects against a LIVE resolution context.
+    /// The prod path now reads players / opponents off rc.Game (the
+    /// resolver-null loyalty fix), so the legacy resolver-free
+    /// <see cref="LoyaltyAbility.Activate"/> can't exercise the each-player /
+    /// target halves. Pays the loyalty cost, builds a GameContext, then resolves
+    /// each effect with rc.Controller = the activator.
+    /// </summary>
+    private static void ActivateWithContext(LoyaltyAbility ability, Player controller, params Player[] all)
+    {
+        ability.PayLoyaltyCost();
+        var game = new GameContext(
+            self: controller,
+            allPlayers: all,
+            activePlayer: controller,
+            turnNumber: 1,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+        var rc = ResolutionContext.For(controller, agent: null, game: game, chosenTargets: null);
+        foreach (var effect in ability.Effects)
+            effect.ExecuteAsync(rc).GetAwaiter().GetResult();
+    }
 
     [Fact]
     public void Liliana_IsLegendaryPlaneswalker_Liliana_3Loyalty_AtCost1BB()
@@ -68,14 +92,13 @@ public class LilianaOfTheVeilTests
         _bob.Zones.Hand.AddCard(bobCard);
         bobCard.SetZone(ZoneType.Hand);
 
-        var players = new[] { _alice, _bob };
-        var liliana = LilianaOfTheVeilFactory.Create(_alice, () => players);
+        var liliana = LilianaOfTheVeilFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(liliana);
         liliana.SetZone(ZoneType.Battlefield);
 
         var plus1 = liliana.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == +1);
-        plus1.Activate();
+        ActivateWithContext(plus1, _alice, _alice, _bob);
 
         // Loyalty went 3 → 4.
         liliana.Loyalty.Should().Be(4);
@@ -97,14 +120,15 @@ public class LilianaOfTheVeilTests
         _bob.Zones.Battlefield.AddCard(victim);
         victim.SetZone(ZoneType.Battlefield);
 
-        var players = new[] { _alice, _bob };
-        var liliana = LilianaOfTheVeilFactory.Create(_alice, () => players);
+        var liliana = LilianaOfTheVeilFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(liliana);
         liliana.SetZone(ZoneType.Battlefield);
 
         var minus2 = liliana.Abilities.OfType<LoyaltyAbility>()
             .Single(a => a.LoyaltyChange == -2);
-        minus2.Activate();
+        // -2 reads its opponent off the live ResolutionContext (no chosen
+        // target on this path → ContextOpponents fallback).
+        ActivateWithContext(minus2, _alice, _alice, _bob);
 
         liliana.Loyalty.Should().Be(1, "3 - 2 = 1");
 
@@ -129,14 +153,16 @@ public class LilianaOfTheVeilTests
     }
 
     [Fact]
-    public void Liliana_Plus1_NoResolverWired_LoyaltyStillTicksUp()
+    public void Liliana_Plus1_NoLiveGameContext_LoyaltyStillTicksUp()
     {
-        // The single-arg path passes no allPlayersResolver; the +1 effect
-        // no-ops but the loyalty change still applies (CR 606.3).
+        // The legacy direct Activate() path resolves with no live game context
+        // (ResolutionContext.Legacy → rc.Game == null), so the each-player
+        // discard is a silent no-op while the loyalty change still applies
+        // (CR 606.3). The prod routed build resolves with a live context and
+        // does run the discard (see Liliana_Plus1_EachPlayerDiscardsACard).
         var liliana = LilianaOfTheVeilFactory.Create(_alice);
 
-        // Give Alice a card in hand; the no-op resolver should leave it
-        // alone.
+        // Give Alice a card in hand; the no-context resolve leaves it alone.
         var card = new Card("c", "B") { Owner = _alice };
         _alice.Zones.Hand.AddCard(card);
         card.SetZone(ZoneType.Hand);
@@ -147,7 +173,33 @@ public class LilianaOfTheVeilTests
 
         liliana.Loyalty.Should().Be(4);
         _alice.Zones.Hand.GetCards().Should().Contain(card,
-            "no resolver wired → discard effect is a silent no-op");
+            "no live game context → discard effect is a silent no-op");
+    }
+
+    [Fact]
+    public void Liliana_Plus1_BuiltViaProdRoutedSingleArg_StillDiscards_NotInert()
+    {
+        // Regression for the resolver-null-loyalty-each-player-context-read
+        // deferral: the prod routed build dispatches the single-arg Create
+        // (NO captured player-list resolver). The +1 each-player discard must
+        // still run by reading rc.Game.AllPlayers — it used to be INERT here.
+        var aliceCard = new Card("Alice spell", "B") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(aliceCard);
+        aliceCard.SetZone(ZoneType.Hand);
+        var bobCard = new Card("Bob spell", "U") { Owner = _bob };
+        _bob.Zones.Hand.AddCard(bobCard);
+        bobCard.SetZone(ZoneType.Hand);
+
+        var liliana = (Planeswalker)NamedCardFactory.Create("Liliana of the Veil", _alice);
+        _alice.Zones.Battlefield.AddCard(liliana);
+        liliana.SetZone(ZoneType.Battlefield);
+
+        var plus1 = liliana.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == +1);
+        ActivateWithContext(plus1, _alice, _alice, _bob);
+
+        _alice.Zones.Graveyard.GetCards().Should().Contain(aliceCard);
+        _bob.Zones.Graveyard.GetCards().Should().Contain(bobCard);
     }
 
     [Fact]
