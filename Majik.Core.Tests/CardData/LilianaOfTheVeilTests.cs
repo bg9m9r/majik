@@ -4,8 +4,11 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -200,6 +203,111 @@ public class LilianaOfTheVeilTests
 
         _alice.Zones.Graveyard.GetCards().Should().Contain(aliceCard);
         _bob.Zones.Graveyard.GetCards().Should().Contain(bobCard);
+    }
+
+    [Fact]
+    public void Liliana_Plus1_EachPlayerChoosesOwnCard_ViaTheirOwnAgent()
+    {
+        // each-player-chooses-own-discard-agent-prompt deferral pay-down:
+        // CR 701.16a / CR 118.x — when "each player discards a card", EACH
+        // player chooses THEIR OWN card. The prod routed build (single-arg
+        // Create) must consult each affected player's OWN agent (looked up off
+        // the per-game AgentRegistry seam — #2543 / #2551b pattern), NOT pick
+        // the deterministic first-in-hand. Here each player's agent picks the
+        // SECOND card in hand, so first-in-hand would fail this test.
+        using var _ = AgentRegistry.PushScope();
+
+        var aliceKeep = new Card("Alice keep", "B") { Owner = _alice };
+        var alicePitch = new Card("Alice pitch", "B") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(aliceKeep); aliceKeep.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(alicePitch); alicePitch.SetZone(ZoneType.Hand);
+
+        var bobKeep = new Card("Bob keep", "U") { Owner = _bob };
+        var bobPitch = new Card("Bob pitch", "U") { Owner = _bob };
+        _bob.Zones.Hand.AddCard(bobKeep); bobKeep.SetZone(ZoneType.Hand);
+        _bob.Zones.Hand.AddCard(bobPitch); bobPitch.SetZone(ZoneType.Hand);
+
+        AgentRegistry.Set(_alice, new PickSpecificDiscardAgent(alicePitch));
+        AgentRegistry.Set(_bob, new PickSpecificDiscardAgent(bobPitch));
+
+        var liliana = (Planeswalker)NamedCardFactory.Create("Liliana of the Veil", _alice);
+        _alice.Zones.Battlefield.AddCard(liliana);
+        liliana.SetZone(ZoneType.Battlefield);
+
+        var plus1 = liliana.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == +1);
+        ActivateWithContext(plus1, _alice, _alice, _bob);
+
+        // Each player discarded the card THEIR OWN agent chose (the 2nd one),
+        // and kept the first — proving per-player agent consultation, not a
+        // global first-in-hand pick.
+        _alice.Zones.Graveyard.GetCards().Should().Contain(alicePitch);
+        _alice.Zones.Hand.GetCards().Should().Contain(aliceKeep);
+        _bob.Zones.Graveyard.GetCards().Should().Contain(bobPitch);
+        _bob.Zones.Hand.GetCards().Should().Contain(bobKeep);
+    }
+
+    [Fact]
+    public void Liliana_Plus1_RoutesThroughFxDiscardCard_PublishesDiscardedEvent()
+    {
+        // The discard must funnel through Fx.DiscardCard so DiscardedEvent fires
+        // (madness / "whenever you discard …" triggers observe it) — CR 701.8.
+        // The raw hand→graveyard move it replaced never published the event.
+        using var _ = EventBusRegistry.PushScope();
+        var aliceBus = new EventBus();
+        var bobBus = new EventBus();
+        var aliceDiscards = new List<DiscardedEvent>();
+        var bobDiscards = new List<DiscardedEvent>();
+        aliceBus.Subscribe<DiscardedEvent>(aliceDiscards.Add);
+        bobBus.Subscribe<DiscardedEvent>(bobDiscards.Add);
+        EventBusRegistry.Set(_alice, aliceBus);
+        EventBusRegistry.Set(_bob, bobBus);
+
+        var aliceCard = new Card("Alice spell", "B") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(aliceCard); aliceCard.SetZone(ZoneType.Hand);
+        var bobCard = new Card("Bob spell", "U") { Owner = _bob };
+        _bob.Zones.Hand.AddCard(bobCard); bobCard.SetZone(ZoneType.Hand);
+
+        var liliana = (Planeswalker)NamedCardFactory.Create("Liliana of the Veil", _alice);
+        _alice.Zones.Battlefield.AddCard(liliana);
+        liliana.SetZone(ZoneType.Battlefield);
+
+        var plus1 = liliana.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == +1);
+        ActivateWithContext(plus1, _alice, _alice, _bob);
+
+        aliceDiscards.Should().ContainSingle("Alice's discard must route through Fx.DiscardCard")
+            .Which.Card.Should().BeSameAs(aliceCard);
+        aliceDiscards[0].WasCost.Should().BeFalse();
+        bobDiscards.Should().ContainSingle("Bob's discard must route through Fx.DiscardCard")
+            .Which.Card.Should().BeSameAs(bobCard);
+    }
+
+    /// <summary>Test agent that, for a discard prompt, returns a pre-chosen
+    /// card from hand (used to prove each player picks their OWN card).</summary>
+    private sealed class PickSpecificDiscardAgent : IPlayerAgent
+    {
+        private readonly ICard _pick;
+        public PickSpecificDiscardAgent(ICard pick) => _pick = pick;
+
+        public Task<ICard?> ChooseFromHandAsync(
+            Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent,
+            CancellationToken ct = default)
+            => Task.FromResult<ICard?>(_pick);
+
+        // Unused surface.
+        public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<BotIntent>? modeIntents = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     [Fact]
