@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -47,10 +48,13 @@ namespace Majik.Core.CardData.Factories;
 ///   reminder text).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Target prompts</b>: -1 picks the first opponent in the supplied
-///   <paramref name="allPlayersResolver"/> rather than via the agent
-///   (same shape as Liliana/Karn). With no resolver wired the mill body
-///   no-ops and the EOT replacement is still registered.
+/// - <b>Mill-target choice</b>: -1's "target opponent" is now chosen by the
+///   activating player via
+///   <see cref="Players.Agents.IPlayerAgent.ChoosePlayerAsync"/> over the live
+///   <see cref="ContextOpponents"/> enumeration (CR 109.1 / 601.2c), read off
+///   the resolution context (<c>rc.Agent</c> + <c>rc.Game</c>). On the
+///   shape-only path (no live game) the mill body no-ops and the EOT
+///   replacement is still registered.
 /// - <b>"Anywhere → graveyard" coverage</b>: replacement gates on
 ///   destination = Graveyard only; source zone is unrestricted, matching
 ///   the printed text. Coverage is bounded by which call sites currently
@@ -69,22 +73,19 @@ public static class AshiokDreamRenderFactory
     public const int MillCount = 4;
 
     /// <summary>
-    /// Construct Ashiok, Dream Render with no resolvers / bus / continuous-
-    /// effects service. Suitable for shape / dispatcher tests — the -1's
-    /// mill + exile-rider body and the static search-restriction effect are
-    /// silently skipped; loyalty change still applies (CR 606.3).
+    /// Construct Ashiok, Dream Render with no bus / continuous-effects service
+    /// (production routed path). The -1 reads the mill target off the live
+    /// resolution context; the exile-rider half is skipped (no bus) and the
+    /// static search-restriction effect is not wired; loyalty change still
+    /// applies (CR 606.3).
     /// </summary>
     public static Planeswalker Create(Player owner) =>
-        Create(owner, allPlayersResolver: null, replacements: null, continuousEffects: null);
+        Create(owner, replacements: null, continuousEffects: null);
 
     /// <summary>
     /// Construct Ashiok, Dream Render.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="allPlayersResolver">Returns the full player list at
-    /// activation time. v1 picks the first non-owner as the -1 mill
-    /// target. May be null — the mill body no-ops while the loyalty
-    /// change still applies (CR 606.3).</param>
     /// <param name="replacements">Bus to register the EOT-expirable
     /// graveyard→exile replacement on at -1 resolution. May be null —
     /// the rider half is skipped.</param>
@@ -94,7 +95,6 @@ public static class AshiokDreamRenderFactory
     /// shape-only / dispatcher tests).</param>
     public static Planeswalker Create(
         Player owner,
-        Func<IReadOnlyList<Player>>? allPlayersResolver,
         ReplacementBus? replacements,
         ContinuousEffectsService? continuousEffects)
     {
@@ -112,35 +112,37 @@ public static class AshiokDreamRenderFactory
 
         // -- -1: Target opponent mills four cards. Exile each card put into
         //        a graveyard from anywhere this turn. -----------------------
-        // v1 auto-pick: the first opponent in the player list mills 4
-        // (CR 701.13b). The EOT exile-rider is registered on the supplied
-        // ReplacementBus regardless of whether a mill target was found
-        // (matches the printed "Exile each card put into a graveyard from
-        // anywhere this turn" — the rider is unconditional on the mill
-        // succeeding).
-        ashiok.AddAbility(new LoyaltyAbility(ashiok, -1, () =>
+        // CR 109.1 / 601.2c — the activating player CHOOSES the target
+        // opponent. The pick routes through the agent's ChoosePlayerAsync over
+        // the live ContextOpponents enumeration (read off the resolution
+        // context), then that opponent mills 4 (CR 701.13b). The EOT exile-
+        // rider is registered on the supplied ReplacementBus regardless of
+        // whether a mill target was found (matches the printed "Exile each card
+        // put into a graveyard from anywhere this turn" — the rider is
+        // unconditional on the mill succeeding).
+        ashiok.AddAbility(new LoyaltyAbility(ashiok, -1, new[]
         {
-            // ---------------- Mill half (CR 701.13b) ----------------------
-            var players = allPlayersResolver?.Invoke();
-            if (players != null)
-            {
-                foreach (var p in players)
+            new Effect(
+                $"{CardName}: -1 — target opponent mills four; exile graveyard-bound cards this turn.",
+                async rc =>
                 {
-                    if (ReferenceEquals(p, owner)) continue;
-                    MillAction.Apply(p, MillCount);
-                    break; // CR 700.6 — "target opponent" is one player
-                }
-            }
+                    // ------------- Mill half (CR 701.13b) ---------------------
+                    var target = await ChooseMillTargetAsync(owner, rc).ConfigureAwait(false);
+                    if (target is not null)
+                    {
+                        MillAction.Apply(target, MillCount);
+                    }
 
-            // ---------------- Exile rider (CR 614) ------------------------
-            // Unconditional graveyard-bound rewrite for the rest of the
-            // turn; EOT-expirable so ReplacementBus.ExpireEndOfTurn drops
-            // it during cleanup (CR 514.2).
-            if (replacements != null)
-            {
-                replacements.Register<ZoneMoveIntent>(
-                    new GraveyardToExileReplacement());
-            }
+                    // ------------- Exile rider (CR 614) -----------------------
+                    // Unconditional graveyard-bound rewrite for the rest of the
+                    // turn; EOT-expirable so ReplacementBus.ExpireEndOfTurn drops
+                    // it during cleanup (CR 514.2).
+                    if (replacements != null)
+                    {
+                        replacements.Register<ZoneMoveIntent>(
+                            new GraveyardToExileReplacement());
+                    }
+                }),
         }));
 
         // -- Static: "Players can't search libraries." --------------------
@@ -155,6 +157,32 @@ public static class AshiokDreamRenderFactory
         }
 
         return ashiok;
+    }
+
+    /// <summary>
+    /// CR 109.1 / 601.2c — choose the "target opponent" for the -1 mill. The
+    /// activating player's agent picks one opponent from the live
+    /// <see cref="ContextOpponents"/> enumeration (CR 102.1 / 800.4a — every
+    /// in-game opponent of <paramref name="controller"/>), read off the
+    /// resolution context. Routed through
+    /// <see cref="Players.Agents.IPlayerAgent.ChoosePlayerAsync"/> — forced in
+    /// the two-player engine target, a real choice in a 3+ player match.
+    /// Returns <see langword="null"/> when no opponent exists (no live game
+    /// context, or every opponent has left the game) — then the mill no-ops
+    /// while the loyalty change still applies (CR 606.3).
+    /// </summary>
+    private static async Task<Player?> ChooseMillTargetAsync(Player controller, ResolutionContext rc)
+    {
+        if (rc.Game is null) return null;
+        var opponents = ContextOpponents.Of(rc, controller).ToList();
+        if (opponents.Count == 0) return null;
+
+        var agent = rc.Agent ?? AgentRegistry.Get(controller);
+        if (agent is null) return opponents[0];
+
+        return await agent.ChoosePlayerAsync(
+            rc.Game, opponents, $"{CardName}: -1 — choose target opponent to mill",
+            Cards.BotIntent.None, rc.Ct).ConfigureAwait(false);
     }
 }
 

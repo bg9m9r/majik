@@ -5,7 +5,10 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -82,47 +85,67 @@ public class AshiokDreamRenderTests
     // -------------------------------------------------------------------
 
     [Fact]
-    public void Minus1_DecrementsLoyaltyByOne_AndOpponentMillsFour()
+    public async Task Minus1_DecrementsLoyaltyByOne_AndAgentChosenOpponentMillsFour()
     {
-        // Bob's library: 6 cards so we can verify exactly 4 are milled.
-        var bobLibraryCards = Enumerable.Range(0, 6)
+        // PROD-PATH verification: the activating player's agent CHOOSES the
+        // target opponent via ChoosePlayerAsync. Three players so the choice
+        // is meaningful — the agent picks Carol (NOT Bob, the first opponent).
+        var carol = new Player("Carol", 20);
+
+        // Carol's library: 6 cards so we can verify exactly 4 are milled.
+        var carolLibraryCards = Enumerable.Range(0, 6)
             .Select(i =>
             {
-                var c = new Card($"BobCard{i}", "U") { Owner = _bob };
-                _bob.Zones.Library.AddCard(c);
+                var c = new Card($"CarolCard{i}", "U") { Owner = carol };
+                carol.Zones.Library.AddCard(c);
                 c.SetZone(ZoneType.Library);
                 return c;
             }).ToList();
 
-        var players = new[] { _alice, _bob };
-        var ashiok = AshiokDreamRenderFactory.Create(
-            _alice, () => players, replacements: null, continuousEffects: null);
+        // Bob has a library too — he must be left untouched (not chosen).
+        var bobCard = new Card("BobCard", "U") { Owner = _bob };
+        _bob.Zones.Library.AddCard(bobCard);
+        bobCard.SetZone(ZoneType.Library);
+
+        var ashiok = AshiokDreamRenderFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(ashiok);
         ashiok.SetZone(ZoneType.Battlefield);
 
+        var agent = new ScriptedAgent();
+        agent.QueueChoice(candidates =>
+        {
+            var pick = candidates.OfType<Player>().FirstOrDefault(p => ReferenceEquals(p, carol));
+            return pick is null ? System.Array.Empty<object>() : new object[] { pick };
+        });
+
         var minus1 = ashiok.Abilities.OfType<LoyaltyAbility>().Single();
         minus1.LoyaltyChange.Should().Be(-1);
-        minus1.Activate();
+        await ResolveLoyaltyAsync(minus1, agent, GameFor(_alice, _alice, _bob, carol));
 
         ashiok.Loyalty.Should().Be(4, "5 - 1 = 4");
 
-        // The first 4 library cards moved to Bob's graveyard.
-        _bob.Zones.Graveyard.GetCards().Should().HaveCount(4);
-        _bob.Zones.Library.GetCards().Should().HaveCount(2);
+        // The first 4 of Carol's library cards moved to her graveyard.
+        carol.Zones.Graveyard.GetCards().Should().HaveCount(4);
+        carol.Zones.Library.GetCards().Should().HaveCount(2);
         for (int i = 0; i < 4; i++)
         {
-            _bob.Zones.Graveyard.GetCards().Should().Contain(bobLibraryCards[i]);
+            carol.Zones.Graveyard.GetCards().Should().Contain(carolLibraryCards[i]);
         }
+
+        // Bob (the FIRST opponent) was not chosen — his library is untouched.
+        _bob.Zones.Library.GetCards().Should().Contain(bobCard,
+            "Bob was not the chosen opponent — the old shortcut would have milled him");
 
         // Alice (controller) was not milled — "target opponent" semantics.
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
     }
 
     [Fact]
-    public void Minus1_NoResolverWired_LoyaltyStillTicksDown()
+    public void Minus1_NoLiveGameContext_LoyaltyStillTicksDown()
     {
-        // Single-arg dispatcher path: no allPlayersResolver — the mill body
-        // no-ops but the loyalty change still applies (CR 606.3).
+        // Shape-only legacy sync path (ResolutionContext.Legacy — no live
+        // game). The mill body no-ops but the loyalty change still applies
+        // (CR 606.3).
         var bobCard = new Card("BobCard", "U") { Owner = _bob };
         _bob.Zones.Library.AddCard(bobCard);
         bobCard.SetZone(ZoneType.Library);
@@ -134,7 +157,28 @@ public class AshiokDreamRenderTests
 
         ashiok.Loyalty.Should().Be(4);
         _bob.Zones.Library.GetCards().Should().Contain(bobCard,
-            "no resolver wired → mill is a silent no-op");
+            "no live game context → mill is a silent no-op");
+    }
+
+    // -------------------------------------------------------------------
+    // Helpers — drive the loyalty ability through the PROD async resolution
+    // path (pay the loyalty cost, then run the effects against a live
+    // ResolutionContext carrying the activating player's agent + game).
+    // -------------------------------------------------------------------
+
+    private static GameContext GameFor(Player self, params Player[] all) =>
+        new(self, all, self, 1, StepStateType.PreCombatMain,
+            new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+
+    private static async Task ResolveLoyaltyAsync(
+        LoyaltyAbility ability, IPlayerAgent agent, GameContext game)
+    {
+        ability.PayLoyaltyCost();
+        var ctx = ResolutionContext.For(game.Self, agent, game, chosenTargets: null);
+        foreach (var e in ability.Effects)
+        {
+            await e.ExecuteAsync(ctx);
+        }
     }
 
     // -------------------------------------------------------------------
@@ -145,15 +189,12 @@ public class AshiokDreamRenderTests
     public void Minus1_RegistersReplacement_RewritingAnyGraveyardMoveToExile()
     {
         var bus = new ReplacementBus();
-        var players = new[] { _alice, _bob };
 
-        // Bob has one library card so the mill body has something to do.
-        var bobLibCard = new Card("BobLibCard", "U") { Owner = _bob };
-        _bob.Zones.Library.AddCard(bobLibCard);
-        bobLibCard.SetZone(ZoneType.Library);
-
+        // The EOT exile-rider registers unconditionally at -1 resolution
+        // (independent of the mill target), so the legacy sync Activate() path
+        // is sufficient to exercise it.
         var ashiok = AshiokDreamRenderFactory.Create(
-            _alice, () => players, replacements: bus, continuousEffects: null);
+            _alice, replacements: bus, continuousEffects: null);
         _alice.Zones.Battlefield.AddCard(ashiok);
         ashiok.SetZone(ZoneType.Battlefield);
 
@@ -187,10 +228,9 @@ public class AshiokDreamRenderTests
     public void Replacement_DoesNotRewrite_NonGraveyardDestinations()
     {
         var bus = new ReplacementBus();
-        var players = new[] { _alice, _bob };
 
         var ashiok = AshiokDreamRenderFactory.Create(
-            _alice, () => players, replacements: bus, continuousEffects: null);
+            _alice, replacements: bus, continuousEffects: null);
         _alice.Zones.Battlefield.AddCard(ashiok);
         ashiok.SetZone(ZoneType.Battlefield);
 
@@ -213,21 +253,20 @@ public class AshiokDreamRenderTests
     }
 
     [Fact]
-    public void Minus1_WithoutBus_RiderIsSkipped_ButMillStillApplies()
+    public async Task Minus1_WithoutBus_RiderIsSkipped_ButMillStillApplies()
     {
-        var players = new[] { _alice, _bob };
-
         var bobLibCard = new Card("BobLibCard", "U") { Owner = _bob };
         _bob.Zones.Library.AddCard(bobLibCard);
         bobLibCard.SetZone(ZoneType.Library);
 
         var ashiok = AshiokDreamRenderFactory.Create(
-            _alice, () => players, replacements: null, continuousEffects: null);
+            _alice, replacements: null, continuousEffects: null);
         _alice.Zones.Battlefield.AddCard(ashiok);
         ashiok.SetZone(ZoneType.Battlefield);
 
-        var act = () => ashiok.Abilities.OfType<LoyaltyAbility>().Single().Activate();
-        act.Should().NotThrow();
+        // Two-player game: the single opponent (Bob) is the forced mill target.
+        var minus1 = ashiok.Abilities.OfType<LoyaltyAbility>().Single();
+        await ResolveLoyaltyAsync(minus1, new ScriptedAgent(), GameFor(_alice, _alice, _bob));
 
         _bob.Zones.Graveyard.GetCards().Should().Contain(bobLibCard,
             "mill body runs even without a ReplacementBus");
@@ -241,10 +280,9 @@ public class AshiokDreamRenderTests
     public void EndOfTurn_Cleanup_RemovesGraveyardToExileReplacement()
     {
         var bus = new ReplacementBus();
-        var players = new[] { _alice, _bob };
 
         var ashiok = AshiokDreamRenderFactory.Create(
-            _alice, () => players, replacements: bus, continuousEffects: null);
+            _alice, replacements: bus, continuousEffects: null);
         _alice.Zones.Battlefield.AddCard(ashiok);
         ashiok.SetZone(ZoneType.Battlefield);
 
@@ -282,8 +320,7 @@ public class AshiokDreamRenderTests
         // on Zone == Battlefield. The factory call by itself does not yet
         // mark the restriction active — Ashiok is unzoned.
         var ashiok = AshiokDreamRenderFactory.Create(
-            _alice, allPlayersResolver: null, replacements: null,
-            continuousEffects: effects);
+            _alice, replacements: null, continuousEffects: effects);
 
         // Sanity — re-attach a fresh effect (mirrors what would happen if
         // we built one and called Attach() with Ashiok off the battlefield).
