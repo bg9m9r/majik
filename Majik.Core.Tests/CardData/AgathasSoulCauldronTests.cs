@@ -7054,6 +7054,105 @@ public class AgathasSoulCauldronTests
     }
 
     [Fact]
+    public async Task Grant_RebindsBespokeFactoryCreature_SakuraTribeElder_SacrificesBearerTutorsForController()
+    {
+        // agatha-bespoke-source-migration-tail — Sakura-Tribe Elder's
+        // "Sacrifice this creature: Search your library for a basic land card,
+        // put that card onto the battlefield tapped, then shuffle." The "this
+        // creature" half now reads ResolutionContext.Source (the re-homed bearer
+        // under Agatha), and the AdditionalCost.Sacrifice cost re-homes via
+        // AdditionalCost.RebindSource. So Agatha's group-grant re-homes the REAL
+        // ability to the BEARER: the BEARER is sacrificed and ITS controller
+        // tutors the basic land, never the exiled Elder.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var effects = new Majik.Core.Effects.ContinuousEffectsService(bus);
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var elder = SakuraTribeElderFactory.Create(alice);
+        var realAbilities = elder.Abilities.OfType<ActivatedAbility>()
+            .Where(a => a is not IManaAbility)
+            .ToList();
+        realAbilities.Should().ContainSingle(
+            "Sakura-Tribe Elder has exactly one non-mana activated ability — the sac-then-tutor");
+        realAbilities.Should().OnlyContain(a => a.RebindSafe,
+            "the migrated Elder ability reads ResolutionContext.Source and is RebindSafe");
+        alice.Zones.Graveyard.AddCard(elder);
+        elder.SetZone(ZoneType.Graveyard);
+
+        // A basic land in Alice's library to be tutored to the battlefield.
+        var forest = new Land("Forest", supertypes: new[] { CardSupertype.Basic });
+        forest.SetOwner(alice);
+        forest.SetController(alice);
+        alice.Zones.Library.AddCard(forest);
+
+        var bearer = SeatedBearer(alice, effects, zones);
+
+        var cauldron = GrantingCauldron(alice, effects, bus, OracleStub());
+        alice.Zones.Library.AddCard(cauldron);
+        zones.MoveCard(cauldron, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        Resolve(TapAbility(cauldron), elder);
+
+        var granted = GrantedActivated(bearer);
+        granted.Should().ContainSingle("Elder's real sac-then-tutor is re-homed via RebindTo");
+        var sac = granted[0];
+        sac.Source.Should().BeSameAs(bearer,
+            "the re-homed ability is sourced on the BEARER (CR 707.2)");
+        sac.RebindSafe.Should().BeTrue("RebindTo preserves the re-source provenance");
+        sac.Costs.OfType<AdditionalCost>()
+            .Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice,
+                "the re-homed Sacrifice cost targets the BEARER (AdditionalCost.RebindSource)");
+
+        await sac.ResolveAsync(agent: null, game: null);
+
+        bearer.Zone.Should().Be(ZoneType.Graveyard,
+            "the re-homed sacrifice put the BEARER into its owner's graveyard, never the exiled Elder");
+        alice.Zones.Graveyard.GetCards().Should().Contain(bearer,
+            "the bearer is sacrificed to its OWNER's graveyard (CR 701.16)");
+        forest.Zone.Should().Be(ZoneType.Battlefield,
+            "the bearer's controller (Alice) tutored the basic land onto the battlefield (CR 701.19a)");
+        forest.IsTapped.Should().BeTrue("the tutored basic enters tapped (printed rider)");
+        elder.Zone.Should().Be(ZoneType.Exile,
+            "the exiled imprinted Elder is never touched by the granted ability");
+    }
+
+    [Fact]
+    public async Task BespokeSakuraTribeElder_SacrificesOwnSourceWhenNotRebound()
+    {
+        // Un-rebound posture: the legacy ResolutionContext (Source = the
+        // ability's own un-rebound source) sacrifices Sakura-Tribe Elder itself
+        // and tutors for its own controller — the resolve path is unchanged by
+        // the migration.
+        var alice = new Player("Alice", 20);
+        var bus = new Majik.Core.Events.EventBus();
+        var zones = new Majik.Core.Services.ZoneService(bus);
+
+        var elder = SakuraTribeElderFactory.Create(alice);
+        alice.Zones.Library.AddCard(elder);
+        zones.MoveCard(elder, ZoneType.Library, ZoneType.Battlefield, alice);
+
+        var forest = new Land("Forest", supertypes: new[] { CardSupertype.Basic });
+        forest.SetOwner(alice);
+        forest.SetController(alice);
+        alice.Zones.Library.AddCard(forest);
+
+        var sac = elder.Abilities.OfType<ActivatedAbility>()
+            .Single(a => a is not IManaAbility);
+
+        // ResolveAsync with game: null threads ResolutionContext.Source = the
+        // ability's own (un-rebound) source, so it sacrifices Sakura-Tribe Elder.
+        await sac.ResolveAsync(agent: null, game: null);
+
+        elder.Zone.Should().Be(ZoneType.Graveyard,
+            "the un-rebound ability sacrifices its own source");
+        alice.Zones.Graveyard.GetCards().Should().Contain(elder);
+        forest.Zone.Should().Be(ZoneType.Battlefield,
+            "the un-rebound ability still tutors the basic land for its own controller");
+        forest.IsTapped.Should().BeTrue("the tutored basic enters tapped");
+    }
+
+    [Fact]
     public async Task Grant_RebindsBespokeFactoryCreature_Tasigur_ReturnReadsBearerController()
     {
         var alice = new Player("Alice", 20);
