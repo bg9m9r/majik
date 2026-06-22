@@ -108,13 +108,34 @@ public static class SakuraTribeElderFactory
         // pool), so it uses the stack like a normal activated ability.
         // CR 701.19a — search consults the agent (null = decline; legal).
         // CR 701.20a — shuffle after the search via LibraryShuffle.
+        //
+        // RE-SOURCE-SAFE (agatha-bespoke-source-migration-tail): the
+        // "Sacrifice THIS CREATURE" half is the ability's own source, so the
+        // effect reads the live ResolutionContext.Source (the re-homed bearer
+        // under Agatha's Soul Cauldron) rather than capturing `card`, falling
+        // back to `card` only on the context-less legacy sync path
+        // (ResolutionContext.Legacy, Source = null). The "tutor a basic land"
+        // half reads the resolved CONTROLLER off that same self, so it tutors
+        // for the BEARER's controller, not the exiled Elder's. The sole cost is
+        // an AdditionalCost.Sacrifice that RebindTo Stage 1 re-homes onto the
+        // new source automatically (AdditionalCost.RebindSource). Marked
+        // RebindSafe below so Agatha's Soul Cauldron re-homes this REAL
+        // sac-then-tutor ability to a counter-bearing bearer via
+        // ActivatedAbility.RebindTo (CR 707.2 / 613.1f): the BEARER (not the
+        // exiled Elder) is sacrificed, and its controller tutors the basic
+        // land. "Sacrifice self + tutor basic land to battlefield tapped" is
+        // OUTSIDE the OracleActivatedAbilityBinder reconstructable set, so
+        // RebindTo of the real ability is the only sound re-home.
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: sac self + tutor basic land -> battlefield tapped",
             async ctx =>
             {
-                var controller = card.Controller ?? owner;
-                SacrificeSelf(card, owner, controller, eventBus);
+                // The re-homed bearer under Agatha (ctx.Source), else this card
+                // on the context-less legacy sync path.
+                var self = (ctx.Source as Creature) ?? card;
+                var controller = self.Controller ?? owner;
+                SacrificeSelf(self, owner, controller, eventBus);
                 await TutorBasicLandToBattlefieldTappedAsync(controller, ctx)
                     .ConfigureAwait(false);
             });
@@ -131,7 +152,8 @@ public static class SakuraTribeElderFactory
                 // dispatcher/test path where the cost was never pre-paid.
                 AdditionalCost.Sacrifice(card, eventBus),
             },
-            effects: new IEffect[] { tutorEffect });
+            effects: new IEffect[] { tutorEffect },
+            rebindSafe: true);
 
         card.AddAbility(tutorAbility);
 
@@ -163,9 +185,14 @@ public static class SakuraTribeElderFactory
             return;
         }
 
+        // CR 701.16 — a sacrificed permanent always goes to ITS owner's
+        // graveyard. When this ability is re-homed under Agatha's Soul Cauldron
+        // (RebindTo), `card` is the BEARER, so route to the bearer's own owner,
+        // falling back to the captured Elder owner on the legacy path.
         var holder = controller;
+        var graveyardOwner = card.Owner ?? owner;
         holder.Zones.Battlefield.RemoveCard(card);
-        owner.Zones.Graveyard.AddCard(card);
+        graveyardOwner.Zones.Graveyard.AddCard(card);
         card.SetZone(ZoneType.Graveyard);
     }
 
