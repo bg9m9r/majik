@@ -27,12 +27,16 @@ namespace Majik.Core.CardData.Factories;
 ///   resolution — no captured player-list resolver, so it runs on the prod
 ///   routed build (the <c>resolver-null-loyalty-each-player-context-read</c>
 ///   deferral fix; same context-read pattern as #2549 / #2551, on the loyalty
-///   path). For each player with at least one card in hand, the first card in
-///   hand is moved to graveyard (v1 deterministic pick, mirroring
-///   <see cref="YawgmothFactory"/>) unless a per-player
-///   <see cref="IPlayerAgent"/> is supplied (see the agentSelector overload).
-///   With no live game context (shape-only paths) the effect silently no-ops
-///   while the loyalty change still applies (CR 606.5 semantics).
+///   path). <b>Each player chooses THEIR OWN card</b> (CR 701.16a): the
+///   per-player agent is resolved in priority order — explicit agentSelector,
+///   then <c>rc.Agent</c> for the activating controller, then the per-game
+///   <see cref="AgentRegistry"/> seam for the other seat(s) (the #2543 /
+///   #2551b each-player-agent-choice pattern). The chosen card is discarded
+///   via <see cref="Fx.DiscardCard"/>, so <c>DiscardedEvent</c> / madness
+///   fire. A seat with no agent (headless / shape-only paths) falls back to
+///   first-card-in-hand (CR-legal deterministic pick). With no live game
+///   context the effect silently no-ops while the loyalty change still applies
+///   (CR 606.5 semantics).
 /// - <b>-2</b>: target-player-sacs-a-creature. Reads the chosen player off
 ///   the <see cref="ResolutionContext"/> (slot 0); on the legacy direct-
 ///   activation path it falls back to the first opponent with a creature read
@@ -46,10 +50,6 @@ namespace Majik.Core.CardData.Factories;
 ///   target-player request but picks the creature deterministically rather
 ///   than via the sacrificing player's agent. Wiring full loyalty-target
 ///   plumbing is out of scope here.
-/// - <b>Discard choice</b>: the printed card asks "each player discards a
-///   card" with each player choosing their own card. v1 picks the first
-///   card in hand unless a per-player agent is supplied (matches Yawgmoth's
-///   v1 simplification).
 /// - <b>-6 ultimate</b>: pile-split is a multi-stage interactive effect
 ///   (one player partitions, the other chooses which pile to sacrifice).
 ///   No "split into piles" primitive exists in the engine yet. The
@@ -64,17 +64,22 @@ public static class LilianaOfTheVeilFactory
     /// Construct Liliana of the Veil. The +1 / -2 effects read the live game
     /// off the <see cref="ResolutionContext"/> at resolution, so they run on
     /// the production routed build (<c>NamedCardFactory.Create(name, owner)</c>)
-    /// with no captured resolver. The discard picks the first card in hand.
+    /// with no captured resolver. Each player chooses their own discard via
+    /// their per-game <see cref="AgentRegistry"/> agent (first-in-hand only
+    /// when a seat has no agent).
     /// </summary>
     public static Planeswalker Create(Player owner)
         => Create(owner, agentSelector: null);
 
     /// <summary>
     /// Construct Liliana of the Veil with optional per-player
-    /// <see cref="IPlayerAgent"/> selector. When supplied, the +1 ability
-    /// consults <see cref="IPlayerAgent.ChooseFromHandAsync"/>
-    /// (<see cref="BotIntent.Discard"/>) per player for the discard pick.
-    /// Null preserves the legacy first-card-in-hand pick (CR 701.16a). The
+    /// <see cref="IPlayerAgent"/> selector. The +1 ability consults
+    /// <see cref="IPlayerAgent.ChooseFromHandAsync"/>
+    /// (<see cref="BotIntent.Discard"/>) per player for the discard pick: the
+    /// explicit <paramref name="agentSelector"/> wins, then <c>rc.Agent</c> for
+    /// the activating controller, then the per-game <see cref="AgentRegistry"/>
+    /// seam for the other seat(s) — so each player chooses their own card
+    /// (CR 701.16a). A seat with no agent falls back to first-card-in-hand. The
     /// player list is always read off the live resolution context.
     /// </summary>
     public static Planeswalker Create(
@@ -98,10 +103,11 @@ public static class LilianaOfTheVeilFactory
         // player list is read off the LIVE ResolutionContext (rc.Game.AllPlayers)
         // at resolution — NOT from a build-time captured resolver (the prod
         // routed single-arg Create left it null → the clause used to be INERT
-        // in real games; the resolver-null loyalty deferral fix). Agent path
-        // (per-player IPlayerAgent via selector): consult
-        // ChooseFromHandAsync(BotIntent.Discard); the heuristic bot's override
-        // pitches the highest-MV card. No-agent path: first card in hand.
+        // in real games; the resolver-null loyalty deferral fix). Each player's
+        // OWN agent is consulted via ChooseFromHandAsync(BotIntent.Discard) —
+        // resolved from agentSelector / rc.Agent (controller) / AgentRegistry
+        // (other seats); the discard routes through Fx.DiscardCard so
+        // DiscardedEvent / madness fire. No-agent seat: first card in hand.
         liliana.AddAbility(new LoyaltyAbility(liliana, +1,
             new[]
             {
@@ -114,22 +120,41 @@ public static class LilianaOfTheVeilFactory
                         if (p == null) continue;
                         var hand = p.Zones.Hand.GetCards().ToList();
                         if (hand.Count == 0) continue;
-                        var agent = agentSelector?.Invoke(p);
-                        ICard? pick;
+
+                        // CR 701.16a / CR 118.x — EACH player chooses THEIR OWN
+                        // card. Resolve the per-player agent in priority order:
+                        //   1. explicit agentSelector (test/back-compat seam),
+                        //   2. rc.Agent when p is the activating controller
+                        //      (the resolver-supplied agent already on context),
+                        //   3. the per-game AgentRegistry.Get(p) seam (the
+                        //      #2543 / #2551b each-player-agent-choice pattern —
+                        //      this is what the live routed build uses for the
+                        //      non-controller seat(s)).
+                        // No agent for a seat → first-card-in-hand (CR-legal
+                        // deterministic fallback for headless/shape-only paths).
+                        var agent = agentSelector?.Invoke(p)
+                            ?? (ReferenceEquals(p, rc.Controller) ? rc.Agent : null)
+                            ?? AgentRegistry.Get(p);
+                        ICard pick;
                         if (agent != null)
                         {
-                            pick = agent.ChooseFromHandAsync(p, hand, BotIntent.Discard)
+                            var chosen = agent
+                                .ChooseFromHandAsync(p, hand, BotIntent.Discard)
                                 .GetAwaiter().GetResult();
-                            if (pick == null || pick.Zone != ZoneType.Hand)
-                                pick = hand[0];
+                            pick = (chosen != null && chosen.Zone == ZoneType.Hand)
+                                ? chosen
+                                : hand[0];
                         }
                         else
                         {
                             pick = hand[0];
                         }
-                        p.Zones.Hand.RemoveCard(pick);
-                        p.Zones.Graveyard.AddCard(pick);
-                        pick.SetZone(ZoneType.Graveyard);
+
+                        // CR 701.8 — route through the central discard chokepoint
+                        // so DiscardedEvent fires (madness / "whenever you
+                        // discard …" triggers observe it). wasCost: false — this
+                        // is an effect discard, not a cost.
+                        Fx.DiscardCard(p, pick, wasCost: false);
                     }
                     return default;
                 }),
