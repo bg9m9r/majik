@@ -4,6 +4,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
@@ -70,12 +71,23 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Fx.GainLife"/> on the controller (CR 118.3 — two separate
 ///   life changes, not a transfer).
 ///
+/// ## Implemented (v1) — loyalty target prompts
+/// - <b>-1 / -4 declare real <see cref="TargetRequest"/>s</b> (CR 602.2b):
+///   the -1 (target artifact) and -4 (target player) declare a TargetRequest
+///   with a live <c>CandidateGatherer</c> so the loyalty dispatch path
+///   (<c>TurnDriver.DispatchLoyalty</c> → <c>CandidateGatherer</c> →
+///   <c>agent.ChooseTargetsAsync</c> → <c>SetChosenTargets</c>) prompts the
+///   activating player's agent. Each body reads the CHOSEN target off the
+///   <see cref="ResolutionContext"/> (<c>rc.ChosenTargets[0][0]</c>) with a
+///   CR 608.2b legality re-check, falling back to the captured resolver only
+///   on the legacy direct-activation path (the captured resolver was null on
+///   the routed prod build — the resolver-null bug class).
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Loyalty target prompts</b>: <see cref="LoyaltyAbility"/> doesn't
-///   declare <see cref="Majik.Core.Targeting.TargetRequest"/>s. -1 / -4 pick
-///   from the supplied resolvers deterministically; the +1 "you may reveal"
-///   auto-accepts. Agent-driven choice is the same gap Karn / Jace / Nahiri
-///   have.
+/// - <b>+1 "you may reveal"</b>: the +1 auto-accepts the optional reveal and
+///   sends the first artifact to hand. The +1 is NON-targeted (it digs the
+///   controller's own library), so agent-driven reveal choice is a separate
+///   gap from the target-prompt wiring.
 /// - <b>+1 reveal visibility</b>: the "reveal an artifact" step has no visible
 ///   reveal event (the engine doesn't yet model hidden-info reveals) — same
 ///   posture as Jace's +2 peek.
@@ -179,48 +191,100 @@ public static class TezzeretAgentOfBolasFactory
 
         // -- -1: Target artifact becomes an artifact creature with base power
         //    and toughness 5/5. ---------------------------------------------
-        // CR 606 (loyalty) + CR 613 (continuous). Layer 4 adds Creature
-        // (CR 613.1c — additive, the Artifact type is preserved); the Compute
-        // creature-row upgrade then provides a P/T row that the Layer-7b
-        // set-base lands on (CR 613.7b). v1 picks the first battlefield
-        // artifact from the resolver.
-        tezzeret.AddAbility(new LoyaltyAbility(tezzeret, Minus1Loyalty, () =>
-        {
-            if (effects == null) return;
-            var candidates = targetArtifactResolver?.Invoke();
-            if (candidates == null) return;
-            var target = candidates.FirstOrDefault(p =>
-                p != null
-                && p.Zone == ZoneType.Battlefield
-                && p.HasType(CardType.Artifact));
-            if (target == null) return;
+        // CR 606 (loyalty) + CR 115 (target artifact) + CR 613 (continuous).
+        // Layer 4 adds Creature (CR 613.1c — additive, the Artifact type is
+        // preserved); the Compute creature-row upgrade then provides a P/T row
+        // that the Layer-7b set-base lands on (CR 613.7b). The target artifact
+        // is chosen by the activating player's agent via a TargetRequest (any
+        // battlefield artifact — "target artifact"); the body reads the CHOSEN
+        // artifact off the ResolutionContext (slot 0) with a CR 608.2b legality
+        // re-check, falling back to the captured targetArtifactResolver only on
+        // the legacy direct-activation path.
+        var animateRequest = new TargetRequest(
+            Description: "Target artifact becomes a 5/5 artifact creature",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.None,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Permanent>()
+                .Where(c => c.HasType(CardType.Artifact))
+                .Cast<object>()
+                .ToList());
 
-            // Wire the target to consult the layer system so the Layer-4
-            // Creature grant + Layer-7b 5/5 surface at GetPower / GetToughness.
-            target.ActiveEffects = effects;
-            effects.Register(new TezzeretAnimateArtifactEffect(target));
-            effects.Register(new TezzeretSetBasePTEffect(
-                target, AnimateBasePower, AnimateBaseToughness));
-        }));
+        tezzeret.AddAbility(new LoyaltyAbility(
+            tezzeret,
+            Minus1Loyalty,
+            new[]
+            {
+                Fx.Inline("Target artifact becomes a 5/5 artifact creature", rc =>
+                {
+                    if (effects == null) return default;
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Permanent
+                        : null)
+                        ?? targetArtifactResolver?.Invoke()?.FirstOrDefault(p =>
+                            p != null
+                            && p.Zone == ZoneType.Battlefield
+                            && p.HasType(CardType.Artifact));
+                    // CR 608.2b — re-check the target's legality on resolution.
+                    if (target == null) return default;
+                    if (target.Zone != ZoneType.Battlefield) return default;
+                    if (!target.HasType(CardType.Artifact)) return default;
+
+                    // Wire the target to consult the layer system so the Layer-4
+                    // Creature grant + Layer-7b 5/5 surface at GetPower /
+                    // GetToughness.
+                    target.ActiveEffects = effects;
+                    effects.Register(new TezzeretAnimateArtifactEffect(target));
+                    effects.Register(new TezzeretSetBasePTEffect(
+                        target, AnimateBasePower, AnimateBaseToughness));
+                    return default;
+                }),
+            },
+            targetRequests: new[] { animateRequest }));
 
         // -- -4: Target player loses X life and you gain X life, where X is
         //    twice the number of artifacts you control. ---------------------
-        // CR 606 (loyalty) + CR 119.3 (life change). X computed at resolution
-        // (CR 608.2). Two separate life changes (CR 118.3 — not a transfer):
-        // the target loses, the controller gains.
-        tezzeret.AddAbility(new LoyaltyAbility(tezzeret, Minus4Loyalty, () =>
-        {
-            var controller = tezzeret.Controller ?? owner;
-            var targets = targetPlayerResolver?.Invoke();
-            if (targets == null) return;
-            var target = targets.FirstOrDefault();
-            if (target == null) return;
+        // CR 606 (loyalty) + CR 115 (target player) + CR 119.3 (life change).
+        // X computed at resolution (CR 608.2). Two separate life changes
+        // (CR 118.3 — not a transfer): the target loses, the controller gains.
+        // The target player is chosen by the activating player's agent via a
+        // TargetRequest (any player — "target player"); the body reads the
+        // CHOSEN player off the ResolutionContext (slot 0), falling back to the
+        // captured targetPlayerResolver only on the legacy direct-activation
+        // path.
+        var drainRequest = new TargetRequest(
+            Description: "Target player loses X life (X = twice your artifacts)",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Burn,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers.Cast<object>().ToList());
 
-            var x = Minus4ArtifactMultiplier * ArtifactCount(controller);
-            if (x <= 0) return;
-            Fx.LoseLife(target, x);
-            Fx.GainLife(controller, x);
-        }));
+        tezzeret.AddAbility(new LoyaltyAbility(
+            tezzeret,
+            Minus4Loyalty,
+            new[]
+            {
+                Fx.Inline("Target player loses X; you gain X (X = twice your artifacts)", rc =>
+                {
+                    var controller = rc.Controller ?? tezzeret.Controller ?? owner;
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Player
+                        : null)
+                        ?? targetPlayerResolver?.Invoke()?.FirstOrDefault();
+                    if (target == null) return default;
+
+                    var x = Minus4ArtifactMultiplier * ArtifactCount(controller);
+                    if (x <= 0) return default;
+                    Fx.LoseLife(target, x);
+                    Fx.GainLife(controller, x);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { drainRequest }));
 
         return tezzeret;
     }

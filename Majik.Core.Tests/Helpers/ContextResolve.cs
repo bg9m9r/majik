@@ -80,6 +80,28 @@ public static class ContextResolve
     }
 
     /// <summary>
+    /// jace-tezzeret-nahiri-loyalty-target-request-wire — run a loyalty
+    /// ability's effects through a live <see cref="ResolutionContext"/> with a
+    /// single chosen target threaded into <c>rc.ChosenTargets[0][0]</c>,
+    /// mirroring how <c>TurnDriver.DispatchLoyalty</c> collects the loyalty
+    /// ability's <see cref="Players.Agents.TargetRequest"/>, prompts the agent,
+    /// and calls <c>SetChosenTargets</c> before the stack object resolves. This
+    /// is the PROD path for a targeted loyalty ability (the captured resolver is
+    /// null on the routed build, so the chosen target is the only signal).
+    /// </summary>
+    public static void ResolveWithChosenTarget(
+        LoyaltyAbility ability, Player controller, object chosen, params Player[] players)
+    {
+        var chosenTargets = new IReadOnlyList<object>[] { new[] { chosen } };
+        var rc = ResolutionContext.For(
+            controller, agent: null, game: Game(controller, players), chosenTargets: chosenTargets);
+        foreach (var e in ability.Effects)
+        {
+            e.ExecuteAsync(rc).AsTask().GetAwaiter().GetResult();
+        }
+    }
+
+    /// <summary>
     /// Run a raw list of <see cref="IEffect"/> (e.g. a spell-definition's
     /// EffectFactory output, or a factory's BuildResolveEffect) through a live
     /// <see cref="ResolutionContext"/> built from <paramref name="players"/>

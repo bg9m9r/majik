@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
@@ -50,12 +51,25 @@ namespace Majik.Core.CardData.Factories;
 ///   deterministic replay and publishes a
 ///   <see cref="Majik.Core.Events.LibraryShuffledEvent"/>).
 ///
+/// ## Implemented (v1) — loyalty target prompts
+/// - <b>+2 / -1 / -12 declare real <see cref="TargetRequest"/>s</b>
+///   (CR 602.2b): each targeted loyalty ability declares a TargetRequest
+///   with a live <c>CandidateGatherer</c> so the loyalty dispatch path
+///   (<c>TurnDriver.DispatchLoyalty</c> → <c>CandidateGatherer</c> →
+///   <c>agent.ChooseTargetsAsync</c> → <c>SetChosenTargets</c>) prompts the
+///   activating player's agent. Each effect body reads the CHOSEN target off
+///   the <see cref="ResolutionContext"/> (<c>rc.ChosenTargets[0][0]</c>) with
+///   a CR 608.2b legality re-check, falling back to the captured resolver
+///   only on the legacy direct-activation path (the captured resolver was
+///   null on the routed prod build — the resolver-null bug class). +2 / -12
+///   target a player (any player — "target player"); -1 targets any
+///   battlefield creature.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Loyalty target prompts</b>: <see cref="LoyaltyAbility"/> doesn't
-///   declare <see cref="Majik.Core.Targeting.TargetRequest"/>s. +2 / -1
-///   / -12 pick from supplied resolvers deterministically; 0's "two
-///   cards from your hand" uses first-in-hand. Agent-driven choice is
-///   the same gap Karn / Wrenn / Ugin have.
+/// - <b>0's "two cards from your hand"</b>: still uses first-in-hand. The 0
+///   is a NON-targeted loyalty ability (it asks the controller to choose
+///   cards in hand, not a target), so agent-driven hand-card choice is a
+///   separate gap from the target-prompt wiring.
 /// - <b>ZoneService routing on -12 bulk moves</b>: -12 uses raw zone
 ///   manipulation, so <see cref="Majik.Core.Events.CardMovedEvent"/>
 ///   doesn't publish on the per-card hops. Same posture as Karn's -3 /
@@ -107,26 +121,46 @@ public static class JaceTheMindSculptorFactory
 
         // -- +2: Look at the top card of target player's library. You may
         //    put that card on the bottom of that player's library. --------
-        // CR 606 (loyalty) + CR 701.20 (zone move). v1 auto-accepts the
-        // optional "may bottom" — sending top → bottom is the heuristic
-        // default (matches the most common play pattern: filter the
-        // opponent's draw, or scry your own).
-        jace.AddAbility(new LoyaltyAbility(jace, +2, () =>
-        {
-            var targets = targetPlayerResolver?.Invoke();
-            if (targets == null) return;
-            var target = targets.FirstOrDefault();
-            if (target == null) return;
-            var top = target.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null) return;
-            // "Look at" is internal — no visible state change for the peek
-            // step (the engine doesn't yet model hidden-info reveals;
-            // future agent-driven choice will read the snapshot).
-            // "May put on bottom" — auto-accept the bottom move.
-            target.Zones.Library.RemoveCard(top);
-            target.Zones.Library.AddCard(top); // AddCard appends → bottom.
-            top.SetZone(ZoneType.Library);
-        }));
+        // CR 606 (loyalty) + CR 115 (target player) + CR 701.20 (zone move).
+        // The target player is chosen by the activating player's agent via a
+        // TargetRequest (any player — "target player", CR 115.4). The body
+        // reads the CHOSEN player off the ResolutionContext (slot 0) with a
+        // CR 608.2b legality re-check, falling back to the captured
+        // targetPlayerResolver only on the legacy direct-activation path. v1
+        // auto-accepts the optional "may bottom" — sending top → bottom is the
+        // heuristic default (filter the opponent's draw, or scry your own).
+        var peekPlayerRequest = new TargetRequest(
+            Description: "Target player (look at top card; may bottom it)",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.None,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers.Cast<object>().ToList());
+
+        jace.AddAbility(new LoyaltyAbility(
+            jace,
+            +2,
+            new[]
+            {
+                Fx.Inline("Look at top card of target player's library; may bottom it", rc =>
+                {
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Player
+                        : null)
+                        ?? targetPlayerResolver?.Invoke()?.FirstOrDefault();
+                    if (target == null) return default;
+                    var top = target.Zones.Library.GetCards().FirstOrDefault();
+                    if (top == null) return default;
+                    // "Look at" is internal — no visible state change for the
+                    // peek step (the engine doesn't yet model hidden-info
+                    // reveals). "May put on bottom" — auto-accept the move.
+                    target.Zones.Library.RemoveCard(top);
+                    target.Zones.Library.AddCard(top); // AddCard appends → bottom.
+                    top.SetZone(ZoneType.Library);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { peekPlayerRequest }));
 
         // -- 0: Draw three cards, then put two cards from your hand on top
         //    of your library in any order. ----------------------------------
@@ -160,58 +194,108 @@ public static class JaceTheMindSculptorFactory
         }));
 
         // -- -1: Return target creature to its owner's hand. ---------------
-        // CR 606 (loyalty) + CR 701.20 (bounce). v1 picks the first target
-        // candidate. Routes through Fx.BounceToHand so the move respects
-        // owner-resolution (CR 400.3 — cards return to their owner's
-        // zone, not the controller's).
-        jace.AddAbility(new LoyaltyAbility(jace, -1, () =>
-        {
-            var candidates = targetCreatureResolver?.Invoke();
-            if (candidates == null) return;
-            var target = candidates.FirstOrDefault();
-            if (target == null) return;
-            if (target.Zone != ZoneType.Battlefield) return;
-            Fx.BounceToHand(target);
-        }));
+        // CR 606 (loyalty) + CR 115 (target creature) + CR 701.20 (bounce).
+        // The target creature is chosen by the activating player's agent via a
+        // TargetRequest (any battlefield creature — "target creature" is
+        // unrestricted, CR 115.4). The body reads the CHOSEN creature off the
+        // ResolutionContext (slot 0) with a CR 608.2b legality re-check,
+        // falling back to the captured targetCreatureResolver only on the
+        // legacy direct-activation path. Routes through Fx.BounceToHand so the
+        // move respects owner-resolution (CR 400.3 — cards return to their
+        // owner's zone, not the controller's).
+        var bounceRequest = new TargetRequest(
+            Description: "Return target creature to its owner's hand",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Removal,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Creature>()
+                .Cast<object>()
+                .ToList());
+
+        jace.AddAbility(new LoyaltyAbility(
+            jace,
+            -1,
+            new[]
+            {
+                Fx.Inline("Return target creature to its owner's hand", rc =>
+                {
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Creature
+                        : null)
+                        ?? targetCreatureResolver?.Invoke()?.FirstOrDefault();
+                    if (target == null) return default;
+                    // CR 608.2b — a creature that has left the battlefield
+                    // before resolution is an illegal target; the ability does
+                    // nothing to it (the loyalty cost was already paid).
+                    if (target.Zone != ZoneType.Battlefield) return default;
+                    Fx.BounceToHand(target);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { bounceRequest }));
 
         // -- -12: Exile all cards from target player's library, then that
         //    player shuffles their hand into their library. ----------------
-        // CR 606 (loyalty) + CR 701.20 (library → exile bulk) + CR 701.20
-        // (hand → library bulk) + CR 701.20a (shuffle via
-        // LibraryShuffle). Three-step printed order (CR 608.2c).
-        jace.AddAbility(new LoyaltyAbility(jace, -12, () =>
-        {
-            var targets = targetPlayerResolver?.Invoke();
-            if (targets == null) return;
-            var target = targets.FirstOrDefault();
-            if (target == null) return;
+        // CR 606 (loyalty) + CR 115 (target player) + CR 701.20 (library →
+        // exile bulk) + CR 701.20 (hand → library bulk) + CR 701.20a (shuffle
+        // via LibraryShuffle). Three-step printed order (CR 608.2c). The
+        // target player is chosen by the activating player's agent via a
+        // TargetRequest; the body reads the CHOSEN player off the
+        // ResolutionContext (slot 0), falling back to the captured resolver
+        // only on the legacy direct-activation path.
+        var ultimatePlayerRequest = new TargetRequest(
+            Description: "Exile target player's library; they shuffle hand into library",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.None,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers.Cast<object>().ToList());
 
-            // 1. Bulk move library → exile. Snapshot first (GetCards
-            //    returns a copy, but be explicit) to avoid mutating the
-            //    iterated collection.
-            var libSnapshot = target.Zones.Library.GetCards().ToList();
-            foreach (var c in libSnapshot)
+        jace.AddAbility(new LoyaltyAbility(
+            jace,
+            -12,
+            new[]
             {
-                target.Zones.Library.RemoveCard(c);
-                target.Zones.Exile.AddCard(c);
-                c.SetZone(ZoneType.Exile);
-            }
+                Fx.Inline("Exile target player's library; they shuffle hand into library", rc =>
+                {
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Player
+                        : null)
+                        ?? targetPlayerResolver?.Invoke()?.FirstOrDefault();
+                    if (target == null) return default;
 
-            // 2. Bulk move hand → library.
-            var handSnapshot = target.Zones.Hand.GetCards().ToList();
-            foreach (var c in handSnapshot)
-            {
-                target.Zones.Hand.RemoveCard(c);
-                target.Zones.Library.AddCard(c);
-                c.SetZone(ZoneType.Library);
-            }
+                    // 1. Bulk move library → exile. Snapshot first (GetCards
+                    //    returns a copy, but be explicit) to avoid mutating the
+                    //    iterated collection.
+                    var libSnapshot = target.Zones.Library.GetCards().ToList();
+                    foreach (var c in libSnapshot)
+                    {
+                        target.Zones.Library.RemoveCard(c);
+                        target.Zones.Exile.AddCard(c);
+                        c.SetZone(ZoneType.Exile);
+                    }
 
-            // 3. Shuffle (CR 701.20a). Routes through GameRandomRegistry
-            //    + EventBusRegistry — LibraryShuffledEvent fires when a
-            //    bus is registered for the target.
-            LibraryShuffle.ShuffleLibrary(
-                target, reason: $"{CardName} -12 ultimate");
-        }));
+                    // 2. Bulk move hand → library.
+                    var handSnapshot = target.Zones.Hand.GetCards().ToList();
+                    foreach (var c in handSnapshot)
+                    {
+                        target.Zones.Hand.RemoveCard(c);
+                        target.Zones.Library.AddCard(c);
+                        c.SetZone(ZoneType.Library);
+                    }
+
+                    // 3. Shuffle (CR 701.20a). Routes through GameRandomRegistry
+                    //    + EventBusRegistry — LibraryShuffledEvent fires when a
+                    //    bus is registered for the target.
+                    LibraryShuffle.ShuffleLibrary(
+                        target, reason: $"{CardName} -12 ultimate");
+                    return default;
+                }),
+            },
+            targetRequests: new[] { ultimatePlayerRequest }));
 
         return jace;
     }

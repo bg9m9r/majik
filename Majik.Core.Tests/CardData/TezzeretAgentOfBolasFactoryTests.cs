@@ -6,6 +6,8 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -211,6 +213,90 @@ public class TezzeretAgentOfBolasFactoryTests
         minus4.Activate();
 
         tezz.Loyalty.Should().Be(0, "loyalty change still applies");
+    }
+
+    // -----------------------------------------------------------------------
+    // Loyalty target prompts (jace-tezzeret-nahiri-loyalty-target-request-wire)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Minus1_Minus4_DeclareTargetRequests()
+    {
+        // CR 602.2b — -1 (target artifact) and -4 (target player) are TARGETED;
+        // +1 (dig your own library) is not.
+        var tezz = TezzeretAgentOfBolasFactory.Create(_alice);
+        var byChange = tezz.Abilities.OfType<LoyaltyAbility>().ToDictionary(a => a.LoyaltyChange);
+
+        byChange[-1].TargetRequests.Should().ContainSingle();
+        byChange[-1].TargetRequests[0].MinTargets.Should().Be(1);
+        byChange[-4].TargetRequests.Should().ContainSingle();
+        byChange[-4].TargetRequests[0].MinTargets.Should().Be(1);
+        byChange[+1].TargetRequests.Should().BeEmpty("the +1 is non-targeted");
+    }
+
+    [Fact]
+    public void Minus1_GathererOffersBattlefieldArtifacts()
+    {
+        var rock = new Artifact("Mind Stone", "{2}");
+        rock.SetOwner(_alice); rock.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(rock); rock.SetZone(ZoneType.Battlefield);
+
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.SetOwner(_bob); bear.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(bear); bear.SetZone(ZoneType.Battlefield);
+
+        var tezz = TezzeretAgentOfBolasFactory.Create(_alice);
+        var minus1 = tezz.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -1);
+        var candidates = minus1.TargetRequests[0].CandidateGatherer!(ContextResolve.Game(_alice, _alice, _bob));
+
+        candidates.Should().Contain(rock, "any battlefield artifact is a legal target");
+        candidates.Should().NotContain(bear, "a non-artifact creature is not a legal target");
+    }
+
+    [Fact]
+    public void Minus1_AnimatesChosenArtifactTo5x5_OnProdBuild()
+    {
+        // PROD-PATH guard. The -1 wires the continuous effects onto the CHOSEN
+        // artifact (read off rc.ChosenTargets), not a null captured resolver.
+        var effects = new ContinuousEffectsService();
+        var rock = new Artifact("Mind Stone", "{2}");
+        rock.SetOwner(_alice); rock.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(rock); rock.SetZone(ZoneType.Battlefield);
+
+        var tezz = TezzeretAgentOfBolasFactory.Create(
+            _alice, targetArtifactResolver: null, targetPlayerResolver: null, effects: effects);
+        var minus1 = tezz.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -1);
+        minus1.PayLoyaltyCost();
+        ContextResolve.ResolveWithChosenTarget(minus1, _alice, rock, _alice, _bob);
+
+        var chars = effects.Compute(rock);
+        chars.Types.Should().Contain(CardType.Creature, "the chosen artifact becomes an artifact creature");
+        chars.Types.Should().Contain(CardType.Artifact);
+        var cc = (CreatureCharacteristics)chars;
+        cc.Power.Should().Be(5);
+        cc.Toughness.Should().Be(5);
+    }
+
+    [Fact]
+    public void Minus4_DrainsChosenPlayer_OnProdBuild()
+    {
+        // X = twice the artifacts Tezzeret's controller controls.
+        var rock1 = new Artifact("Mind Stone", "{2}");
+        rock1.SetOwner(_alice); rock1.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(rock1); rock1.SetZone(ZoneType.Battlefield);
+        var rock2 = new Artifact("Sol Ring", "{1}");
+        rock2.SetOwner(_alice); rock2.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(rock2); rock2.SetZone(ZoneType.Battlefield);
+
+        var tezz = (Planeswalker)NamedCardFactory.Create("Tezzeret, Agent of Bolas", _alice);
+        _alice.Zones.Battlefield.AddCard(tezz); tezz.SetZone(ZoneType.Battlefield);
+        tezz.AddLoyalty(1); // 3 → 4
+        var minus4 = tezz.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -4);
+        minus4.PayLoyaltyCost();
+        ContextResolve.ResolveWithChosenTarget(minus4, _alice, _bob, _alice, _bob);
+
+        _bob.LifeTotal.Should().Be(20 - 4, "X = 2 × 2 artifacts = 4; the chosen player loses 4");
+        _alice.LifeTotal.Should().Be(20 + 4, "the controller gains X");
     }
 
     [Fact]

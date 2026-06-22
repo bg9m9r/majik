@@ -5,6 +5,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Random;
 using Majik.Core.Services;
@@ -65,12 +66,25 @@ namespace Majik.Core.CardData.Factories;
 ///   owner's hand at the beginning of the next end step (CR 603.7, fenced on
 ///   <c>Timestamp &gt; resolvedAt</c> like Otherworldly Journey).
 ///
+/// ## Implemented (v1) — loyalty target prompt
+/// - <b>−2 declares a real <see cref="TargetRequest"/></b> (CR 602.2b): the
+///   −2 (exile target enchantment, tapped artifact, or tapped creature)
+///   declares a TargetRequest with a live <c>CandidateGatherer</c> that
+///   offers exactly the legal candidates (<see cref="IsExileTarget"/>) so the
+///   loyalty dispatch path (<c>TurnDriver.DispatchLoyalty</c> →
+///   <c>CandidateGatherer</c> → <c>agent.ChooseTargetsAsync</c> →
+///   <c>SetChosenTargets</c>) prompts the activating player's agent. The body
+///   reads the CHOSEN permanent off the <see cref="ResolutionContext"/>
+///   (<c>rc.ChosenTargets[0][0]</c>) with a CR 608.2b legality re-check,
+///   falling back to the captured targetResolver only on the legacy direct-
+///   activation path (the captured resolver was null on the routed prod build
+///   — the resolver-null bug class).
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Target prompts</b>: <see cref="LoyaltyAbility"/> doesn't declare
-///   <see cref="Majik.Core.Targeting.TargetRequest"/>s. −2 picks the first
-///   legal candidate from the supplied resolver deterministically; the −8
-///   library search auto-takes the first artifact/creature card. Same gap as
-///   Karn / Liliana / Ugin.
+/// - <b>−8 library search</b>: auto-takes the first artifact/creature card.
+///   The −8 is NON-targeted (it searches the controller's own library), so
+///   agent-driven search choice is a separate gap from the target-prompt
+///   wiring.
 /// - <b>"You may discard"</b>: +2 auto-discards the first hand card rather
 ///   than prompting which card (or whether) to discard — same deterministic
 ///   posture as Liliana of the Veil / Faithless Looting (<see cref="Fx.Discard"/>).
@@ -155,27 +169,57 @@ public static class NahiriTheHarbingerFactory
 
         // -- −2: Exile target enchantment, tapped artifact, or tapped
         //    creature. ------------------------------------------------------
-        // CR 606 (loyalty) + CR 701.21 (exile). v1 deterministic first-legal
-        // pick from the supplied resolver. "Target" — a single permanent.
-        nahiri.AddAbility(new LoyaltyAbility(nahiri, Minus2Loyalty, () =>
-        {
-            var candidates = targetResolver?.Invoke();
-            if (candidates == null) return;
-            foreach (var p in candidates)
-            {
-                if (p == null) continue;
-                if (p.Zone != ZoneType.Battlefield) continue;
-                if (!IsExileTarget(p)) continue;
+        // CR 606 (loyalty) + CR 115 (restricted target) + CR 701.21 (exile).
+        // "Target" — a single permanent matching the printed filter
+        // (IsExileTarget: any enchantment, tapped artifact, or tapped
+        // creature). The target is chosen by the activating player's agent via
+        // a TargetRequest whose CandidateGatherer offers exactly the legal
+        // permanents; the body reads the CHOSEN permanent off the
+        // ResolutionContext (slot 0) with a CR 608.2b legality re-check,
+        // falling back to the captured targetResolver only on the legacy
+        // direct-activation path.
+        var exileRequest = new TargetRequest(
+            Description: "Exile target enchantment, tapped artifact, or tapped creature",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: Array.Empty<object>(),
+            Intent: BotIntent.Removal,
+            CandidateGatherer: gameCtx => gameCtx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Permanent>()
+                .Where(IsExileTarget)
+                .Cast<object>()
+                .ToList());
 
-                // Raw-zone, owner-routed exile (same posture as Ugin / Karn).
-                var holder = p.Controller ?? p.Owner;
-                holder?.Zones.Battlefield.RemoveCard(p);
-                var exileOwner = p.Owner ?? owner;
-                exileOwner.Zones.Exile.AddCard(p);
-                p.SetZone(ZoneType.Exile);
-                return; // "target" — a single permanent.
-            }
-        }));
+        nahiri.AddAbility(new LoyaltyAbility(
+            nahiri,
+            Minus2Loyalty,
+            new[]
+            {
+                Fx.Inline("Exile target enchantment, tapped artifact, or tapped creature", rc =>
+                {
+                    var target = (rc.ChosenTargets.Count > 0 && rc.ChosenTargets[0].Count > 0
+                        ? rc.ChosenTargets[0][0] as Permanent
+                        : null)
+                        ?? targetResolver?.Invoke()?
+                            .FirstOrDefault(p => p != null
+                                && p.Zone == ZoneType.Battlefield
+                                && IsExileTarget(p));
+                    // CR 608.2b — re-check the target's legality on resolution.
+                    if (target == null) return default;
+                    if (target.Zone != ZoneType.Battlefield) return default;
+                    if (!IsExileTarget(target)) return default;
+
+                    // Raw-zone, owner-routed exile (same posture as Ugin / Karn).
+                    var holder = target.Controller ?? target.Owner;
+                    holder?.Zones.Battlefield.RemoveCard(target);
+                    var exileOwner = target.Owner ?? owner;
+                    exileOwner.Zones.Exile.AddCard(target);
+                    target.SetZone(ZoneType.Exile);
+                    return default;
+                }),
+            },
+            targetRequests: new[] { exileRequest }));
 
         // -- −8: Search your library for an artifact or creature card, put
         //    it onto the battlefield, then shuffle. It gains haste. Return

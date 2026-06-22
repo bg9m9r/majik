@@ -5,6 +5,8 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -222,6 +224,114 @@ public class JaceTheMindSculptorFactoryTests
         minus12.Activate();
 
         jace.Loyalty.Should().Be(0, "loyalty change still applies");
+    }
+
+    // -----------------------------------------------------------------------
+    // Loyalty target prompts (jace-tezzeret-nahiri-loyalty-target-request-wire)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Plus2_Minus1_Minus12_DeclareTargetRequests()
+    {
+        // CR 602.2b — the +2 (target player), -1 (target creature) and -12
+        // (target player) are TARGETED loyalty abilities. Each must declare a
+        // real single-target TargetRequest so the loyalty dispatch path prompts
+        // the activating player's agent (the resolver was null on the routed
+        // prod build). The 0 is non-targeted → no request.
+        var jace = JaceTheMindSculptorFactory.Create(_alice);
+        var byChange = jace.Abilities.OfType<LoyaltyAbility>().ToDictionary(a => a.LoyaltyChange);
+
+        byChange[+2].TargetRequests.Should().ContainSingle();
+        byChange[+2].TargetRequests[0].MinTargets.Should().Be(1);
+        byChange[+2].TargetRequests[0].MaxTargets.Should().Be(1);
+
+        byChange[-1].TargetRequests.Should().ContainSingle();
+        byChange[-1].TargetRequests[0].MinTargets.Should().Be(1);
+
+        byChange[-12].TargetRequests.Should().ContainSingle();
+        byChange[-12].TargetRequests[0].MinTargets.Should().Be(1);
+
+        byChange[0].TargetRequests.Should().BeEmpty("the 0 is non-targeted");
+    }
+
+    [Fact]
+    public void Minus1_GathererOffersBattlefieldCreatures()
+    {
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.SetOwner(_bob); bear.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(bear); bear.SetZone(ZoneType.Battlefield);
+
+        var rock = new Artifact("Mind Stone", "{2}");
+        rock.SetOwner(_alice); rock.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(rock); rock.SetZone(ZoneType.Battlefield);
+
+        var jace = JaceTheMindSculptorFactory.Create(_alice);
+        var minus1 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -1);
+        var candidates = minus1.TargetRequests[0].CandidateGatherer!(ContextResolve.Game(_alice, _alice, _bob));
+
+        candidates.Should().Contain(bear, "any battlefield creature is a legal target");
+        candidates.Should().NotContain(rock, "an artifact is not a creature");
+    }
+
+    [Fact]
+    public void Minus1_BouncesChosenCreature_OnProdBuild()
+    {
+        // PROD-PATH guard. The routed prod build (NamedCardFactory) has a null
+        // captured resolver — the chosen target threaded onto rc.ChosenTargets
+        // is the only signal. The -1 must bounce the CHOSEN creature.
+        var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        grizzly.SetOwner(_bob); grizzly.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(grizzly); grizzly.SetZone(ZoneType.Battlefield);
+
+        var jace = (Planeswalker)NamedCardFactory.Create("Jace, the Mind Sculptor", _alice);
+        var minus1 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -1);
+        minus1.PayLoyaltyCost();
+        ContextResolve.ResolveWithChosenTarget(minus1, _alice, grizzly, _alice, _bob);
+
+        jace.Loyalty.Should().Be(2, "3 - 1 = 2");
+        grizzly.Zone.Should().Be(ZoneType.Hand, "the chosen creature is bounced to its owner's hand");
+        _bob.Zones.Hand.GetCards().Should().Contain(grizzly, "CR 400.3 — owner-routed return");
+    }
+
+    [Fact]
+    public void Plus2_MovesChosenPlayersTopToBottom_OnProdBuild()
+    {
+        var topCard = new Creature("Top", "{1}", 1, 1);
+        var nextCard = new Creature("Next", "{1}", 1, 1);
+        topCard.SetOwner(_bob); nextCard.SetOwner(_bob);
+        _bob.Zones.Library.AddCard(topCard); topCard.SetZone(ZoneType.Library);
+        _bob.Zones.Library.AddCard(nextCard); nextCard.SetZone(ZoneType.Library);
+
+        var jace = (Planeswalker)NamedCardFactory.Create("Jace, the Mind Sculptor", _alice);
+        var plus2 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == +2);
+        plus2.PayLoyaltyCost();
+        ContextResolve.ResolveWithChosenTarget(plus2, _alice, _bob, _alice, _bob);
+
+        _bob.Zones.Library.GetCards().First().Should().BeSameAs(nextCard,
+            "the chosen player's old top card went to the bottom");
+        _bob.Zones.Library.GetCards().Last().Should().BeSameAs(topCard);
+    }
+
+    [Fact]
+    public void Minus12_ExilesChosenPlayersLibrary_OnProdBuild()
+    {
+        var libCard = new Creature("Lib", "{1}", 1, 1);
+        libCard.SetOwner(_bob);
+        _bob.Zones.Library.AddCard(libCard); libCard.SetZone(ZoneType.Library);
+
+        var handCard = new Creature("Hand", "{1}", 1, 1);
+        handCard.SetOwner(_bob);
+        _bob.Zones.Hand.AddCard(handCard); handCard.SetZone(ZoneType.Hand);
+
+        var jace = (Planeswalker)NamedCardFactory.Create("Jace, the Mind Sculptor", _alice);
+        jace.AddLoyalty(9); // 3 → 12
+        var minus12 = jace.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -12);
+        minus12.PayLoyaltyCost();
+        ContextResolve.ResolveWithChosenTarget(minus12, _alice, _bob, _alice, _bob);
+
+        libCard.Zone.Should().Be(ZoneType.Exile, "the chosen player's library is exiled");
+        handCard.Zone.Should().Be(ZoneType.Library, "their hand is shuffled into their library");
+        _bob.Zones.Hand.GetCards().Should().BeEmpty();
     }
 
     [Fact]

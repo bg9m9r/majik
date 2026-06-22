@@ -6,8 +6,10 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.StateMachine;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -32,6 +34,72 @@ public class NahiriTheHarbingerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
+
+    // -----------------------------------------------------------------------
+    // Loyalty target prompt (jace-tezzeret-nahiri-loyalty-target-request-wire)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Minus2_DeclaresTargetRequest()
+    {
+        // CR 602.2b — the −2 (exile target enchantment/tapped artifact/tapped
+        // creature) is TARGETED; the +2 / −8 (own hand/library) are not.
+        var nahiri = NahiriTheHarbingerFactory.Create(_alice);
+        var byChange = nahiri.Abilities.OfType<LoyaltyAbility>().ToDictionary(a => a.LoyaltyChange);
+
+        byChange[-2].TargetRequests.Should().ContainSingle();
+        byChange[-2].TargetRequests[0].MinTargets.Should().Be(1);
+        byChange[-2].TargetRequests[0].MaxTargets.Should().Be(1);
+        byChange[+2].TargetRequests.Should().BeEmpty("the +2 is non-targeted");
+        byChange[-8].TargetRequests.Should().BeEmpty("the −8 searches your own library");
+    }
+
+    [Fact]
+    public void Minus2_GathererOffersOnlyLegalExileTargets()
+    {
+        // Enchantment (any), tapped artifact, tapped creature are legal; an
+        // untapped artifact and an untapped creature are NOT.
+        var ench = new Enchantment("Oblivion Ring", "{2}{W}");
+        ench.SetOwner(_bob); ench.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(ench); ench.SetZone(ZoneType.Battlefield);
+
+        var tappedArt = new Artifact("Mind Stone", "{2}");
+        tappedArt.SetOwner(_bob); tappedArt.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(tappedArt); tappedArt.SetZone(ZoneType.Battlefield);
+        tappedArt.Tap();
+
+        var untappedCreature = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        untappedCreature.SetOwner(_bob); untappedCreature.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(untappedCreature); untappedCreature.SetZone(ZoneType.Battlefield);
+
+        var nahiri = NahiriTheHarbingerFactory.Create(_alice);
+        var minus2 = nahiri.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -2);
+        var candidates = minus2.TargetRequests[0].CandidateGatherer!(ContextResolve.Game(_alice, _alice, _bob));
+
+        candidates.Should().Contain(ench, "any enchantment is a legal target");
+        candidates.Should().Contain(tappedArt, "a tapped artifact is a legal target");
+        candidates.Should().NotContain(untappedCreature, "an untapped creature is not a legal target");
+    }
+
+    [Fact]
+    public void Minus2_ExilesChosenTarget_OnProdBuild()
+    {
+        // PROD-PATH guard. The routed build's captured resolver is null — the
+        // chosen target threaded onto rc.ChosenTargets is the only signal.
+        var ench = new Enchantment("Oblivion Ring", "{2}{W}");
+        ench.SetOwner(_bob); ench.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(ench); ench.SetZone(ZoneType.Battlefield);
+
+        var nahiri = (Planeswalker)NamedCardFactory.Create("Nahiri, the Harbinger", _alice);
+        var minus2 = nahiri.Abilities.OfType<LoyaltyAbility>().Single(a => a.LoyaltyChange == -2);
+        minus2.PayLoyaltyCost();
+        ContextResolve.ResolveWithChosenTarget(minus2, _alice, ench, _alice, _bob);
+
+        nahiri.Loyalty.Should().Be(2, "4 - 2 = 2");
+        ench.Zone.Should().Be(ZoneType.Exile, "the chosen permanent is exiled");
+        _bob.Zones.Exile.GetCards().Should().Contain(ench, "owner-routed exile");
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(ench);
+    }
 
     // -----------------------------------------------------------------------
     // Identity + dispatch
