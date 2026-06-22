@@ -5,7 +5,10 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 using MajikStack = Majik.Core.Stack.Stack;
@@ -41,6 +44,19 @@ public class ChandraTorchOfDefianceFactoryTests
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
 
+    private static async Task ResolveLoyaltyAsync(
+        LoyaltyAbility ability, params Player[] all)
+    {
+        ability.PayLoyaltyCost();
+        var stack = new MajikStack(new EventBus());
+        var game = new GameContext(all[0], all, all[0], 1, StepStateType.PreCombatMain, stack);
+        var ctx = ResolutionContext.For(all[0], new ScriptedAgent(), game, chosenTargets: null);
+        foreach (var e in ability.Effects)
+        {
+            await e.ExecuteAsync(ctx);
+        }
+    }
+
     [Fact]
     public void Chandra_IsLegendaryPlaneswalker_Chandra_4Loyalty_AtCost2RR()
     {
@@ -74,22 +90,19 @@ public class ChandraTorchOfDefianceFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Plus1Impulse_ExilesTopCard_AndDealsTwoToEachOpponent_WhenCastDeclined()
+    public async Task Plus1Impulse_ExilesTopCard_AndDealsTwoToEachOpponent_WhenCastDeclined()
     {
         var top = new Card("Top", "{1}") { Owner = _alice };
         _alice.Zones.Library.AddCard(top);
         top.SetZone(ZoneType.Library);
 
-        var chandra = ChandraTorchOfDefianceFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, _bob },
-            targetCreatureResolver: null,
-            anyTargetResolver: null,
-            triggers: null);
+        // PROD ROUTED PATH: single-arg factory, no captured resolver. The
+        // each-opponent damage reads the live game off the resolution context.
+        var chandra = ChandraTorchOfDefianceFactory.Create(_alice);
 
         var plus1Impulse = chandra.Abilities.OfType<LoyaltyAbility>()
             .First(a => a.LoyaltyChange == +1);
-        plus1Impulse.Activate();
+        await ResolveLoyaltyAsync(plus1Impulse, _alice, _bob);
 
         chandra.Loyalty.Should().Be(5); // 4 + 1
 
@@ -104,16 +117,12 @@ public class ChandraTorchOfDefianceFactoryTests
     }
 
     [Fact]
-    public void Plus1Impulse_EmptyLibrary_NoOpsButLoyaltyStillApplies()
+    public async Task Plus1Impulse_EmptyLibrary_NoOpsButLoyaltyStillApplies()
     {
-        var chandra = ChandraTorchOfDefianceFactory.Create(
-            _alice,
-            allPlayersResolver: () => new[] { _alice, _bob },
-            targetCreatureResolver: null,
-            anyTargetResolver: null,
-            triggers: null);
+        var chandra = ChandraTorchOfDefianceFactory.Create(_alice);
 
-        chandra.Abilities.OfType<LoyaltyAbility>().First(a => a.LoyaltyChange == +1).Activate();
+        var impulse = chandra.Abilities.OfType<LoyaltyAbility>().First(a => a.LoyaltyChange == +1);
+        await ResolveLoyaltyAsync(impulse, _alice, _bob);
 
         chandra.Loyalty.Should().Be(5);
         // No card to exile, no opponent damage (the impulse clause never resolves).
@@ -151,7 +160,6 @@ public class ChandraTorchOfDefianceFactoryTests
 
         var chandra = ChandraTorchOfDefianceFactory.Create(
             _alice,
-            allPlayersResolver: null,
             targetCreatureResolver: () => new[] { bear },
             anyTargetResolver: null,
             triggers: null);
@@ -175,7 +183,6 @@ public class ChandraTorchOfDefianceFactoryTests
 
         var chandra = ChandraTorchOfDefianceFactory.Create(
             _alice,
-            allPlayersResolver: null,
             targetCreatureResolver: null,
             anyTargetResolver: () => _bob, // "any target" — a player here
             triggers: triggers);
