@@ -1,0 +1,10 @@
+{
+  "name": "Niko, Light of Hope",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{2}{W}{U}",
+  "power": 3,
+  "toughness": 4,
+  "abilities": []
+}
