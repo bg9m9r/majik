@@ -1,0 +1,10 @@
+{
+  "name": "Tine Shrike",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Bird"],
+  "manaCost": "{3}{W}",
+  "power": 2,
+  "toughness": 1,
+  "keywords": ["Flying", "Infect"],
+  "abilities": []
+}
