@@ -34465,6 +34465,54 @@
     "Green"
   ]
 }
+==== quicksand ====
+{
+  "name": "Quicksand",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 1,
+      "list": [
+        "mana:C"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== quirion-ranger ====
 {
   "name": "Quirion Ranger",
