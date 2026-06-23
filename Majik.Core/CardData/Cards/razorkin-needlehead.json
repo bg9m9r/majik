@@ -1,0 +1,8 @@
+{
+  "name": "Razorkin Needlehead",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Assassin"],
+  "manaCost": "{R}{R}",
+  "power": 2,
+  "toughness": 2
+}
