@@ -21741,6 +21741,61 @@
   "mdfc": null,
   "colors": []
 }
+==== helga-skittish-seer ====
+{
+  "name": "Helga, Skittish Seer",
+  "manaCost": "{G}{W}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Druid",
+    "Frog"
+  ],
+  "power": 1,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green",
+    "White"
+  ]
+}
 ==== hell-mongrel ====
 {
   "name": "Hell Mongrel",
