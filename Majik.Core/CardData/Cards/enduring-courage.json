@@ -1,0 +1,9 @@
+{
+  "name": "Enduring Courage",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Dog", "Glimmer"],
+  "manaCost": "{2}{R}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
