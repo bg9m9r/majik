@@ -1,0 +1,9 @@
+{
+  "name": "Sky Terror",
+  "types": ["Creature"],
+  "subtypes": ["Dinosaur"],
+  "manaCost": "{R}{W}",
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["Flying", "Menace"]
+}
