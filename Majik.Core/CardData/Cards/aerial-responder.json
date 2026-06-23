@@ -1,0 +1,9 @@
+{
+  "name": "Aerial Responder",
+  "types": ["Creature"],
+  "subtypes": ["Dwarf", "Soldier"],
+  "manaCost": "{1}{W}{W}",
+  "power": 2,
+  "toughness": 3,
+  "keywords": ["Flying", "Vigilance", "Lifelink"]
+}
