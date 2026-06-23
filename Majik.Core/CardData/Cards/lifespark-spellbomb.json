@@ -1,0 +1,5 @@
+{
+  "name": "Lifespark Spellbomb",
+  "types": ["Artifact"],
+  "manaCost": "{1}"
+}
