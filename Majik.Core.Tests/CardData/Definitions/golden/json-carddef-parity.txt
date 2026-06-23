@@ -9772,6 +9772,59 @@
     "Blue"
   ]
 }
+==== cystbearer ====
+{
+  "name": "Cystbearer",
+  "manaCost": "{2}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Beast",
+    "Phyrexian"
+  ],
+  "power": 2,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Infect"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== dai-li-indoctrination ====
 {
   "name": "Dai Li Indoctrination",
