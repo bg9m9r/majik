@@ -1,0 +1,7 @@
+{
+  "name": "Cathedral of War",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
