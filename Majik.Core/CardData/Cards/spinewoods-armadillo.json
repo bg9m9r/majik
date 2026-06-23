@@ -1,0 +1,31 @@
+{
+  "name": "Spinewoods Armadillo",
+  "types": ["Creature"],
+  "subtypes": ["Armadillo"],
+  "manaCost": "{4}{G}{G}",
+  "power": 7,
+  "toughness": 7,
+  "keywords": ["Reach", "Ward"],
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "1G" },
+        { "type": "discard_self" }
+      ],
+      "effects": [
+        {
+          "type": "search_library",
+          "subtypes": ["Desert"],
+          "includeBasicLands": true,
+          "destination": "hand",
+          "shuffle": true
+        },
+        {
+          "type": "gain_life_self",
+          "amount": 3
+        }
+      ]
+    }
+  ]
+}

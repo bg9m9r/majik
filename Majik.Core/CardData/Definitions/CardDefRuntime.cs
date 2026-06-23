@@ -1661,12 +1661,13 @@ public static class CardDefRuntime
             .Select(ParseSubtype)
             .ToArray();
         var requireBasic = def.BasicLand;
+        var includeBasicLands = def.IncludeBasicLands;
         var cardType = ParseOptionalType(def.CardType);
         var destination = def.Destination;
         var shuffle = def.Shuffle;
 
         // Human-readable label for the agent prompt + a stable shuffle reason.
-        var label = BuildSearchLabel(subtypes, def.Subtypes, requireBasic, def.CardType);
+        var label = BuildSearchLabel(subtypes, def.Subtypes, requireBasic, def.CardType, includeBasicLands);
         var shuffleReason = $"search:{card.Name}";
 
         return new Effect(
@@ -1680,7 +1681,7 @@ public static class CardDefRuntime
                 var searcher = (card as Permanent)?.Controller ?? controller;
 
                 await RunLibrarySearchAsync(
-                        ctx, searcher, subtypes, requireBasic, cardType,
+                        ctx, searcher, subtypes, requireBasic, includeBasicLands, cardType,
                         destination, shuffle, label, shuffleReason)
                     .ConfigureAwait(false);
             });
@@ -1701,19 +1702,33 @@ public static class CardDefRuntime
         Player searcher,
         CardSubtype[] subtypes,
         bool requireBasic,
+        bool includeBasicLands,
         CardType? cardType,
         string destination,
         bool shuffle,
         string label,
         string shuffleReason)
     {
-        bool Matches(ICard c)
+        // CR 205.4a — a "basic land card" is a Land card with the Basic supertype.
+        static bool IsBasicLand(ICard c) =>
+            c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
+
+        bool MatchesPrimaryFilter(ICard c)
         {
             if (requireBasic && !c.HasSupertype(CardSupertype.Basic)) return false;
             if (cardType is { } ct && !c.HasType(ct)) return false;
             if (subtypes.Length > 0 && !subtypes.Any(c.HasSubtype)) return false;
             return true;
         }
+
+        // CR 205.3i — Spinewoods Armadillo's "basic land card OR a Desert card":
+        // the basic-land branch is a logical OR with the subtype/type filter, so
+        // either kind of card qualifies. Default (includeBasicLands = false)
+        // keeps the original AND-only predicate for every other tutor.
+        bool Matches(ICard c) =>
+            includeBasicLands
+                ? IsBasicLand(c) || MatchesPrimaryFilter(c)
+                : MatchesPrimaryFilter(c);
 
         var candidates = searcher.Zones.Library.GetCards()
             .Where(Matches)
@@ -1779,18 +1794,21 @@ public static class CardDefRuntime
     }
 
     private static string BuildSearchLabel(
-        CardSubtype[] subtypes, IReadOnlyList<string> subtypeNames, bool requireBasic, string? cardType)
+        CardSubtype[] subtypes, IReadOnlyList<string> subtypeNames, bool requireBasic,
+        string? cardType, bool includeBasicLands = false)
     {
         var basic = requireBasic ? "basic " : "";
+        // CR 205.3i — "basic land card or a <subtype> card" (Spinewoods Armadillo).
+        var orBasicLand = includeBasicLands ? "basic land card or a " : "";
         if (subtypes.Length > 0)
         {
-            return $"{basic}{string.Join("/", subtypeNames)} card";
+            return $"{orBasicLand}{basic}{string.Join("/", subtypeNames)} card";
         }
         if (!string.IsNullOrWhiteSpace(cardType))
         {
-            return $"{basic}{cardType.ToLowerInvariant()} card";
+            return $"{orBasicLand}{basic}{cardType.ToLowerInvariant()} card";
         }
-        return requireBasic ? "basic land card" : "card";
+        return requireBasic || includeBasicLands ? "basic land card" : "card";
     }
 
     /// <summary>Parse an optional card-type filter — <c>null</c>/empty means "no
@@ -2070,8 +2088,8 @@ public static class CardDefRuntime
 
                         await RunLibrarySearchAsync(
                                 searchCtx, affected, riderSubtypes, riderBasic,
-                                riderCardType, riderDestination, riderShuffle,
-                                riderLabel, riderShuffleReason)
+                                rider.IncludeBasicLands, riderCardType, riderDestination,
+                                riderShuffle, riderLabel, riderShuffleReason)
                             .ConfigureAwait(false);
                     }
                 }

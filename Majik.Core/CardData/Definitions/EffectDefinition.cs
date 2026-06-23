@@ -1706,6 +1706,24 @@ public sealed class SearchLibraryEffectDef : EffectDefinition
     /// Plains / Island" filter.</summary>
     public bool BasicLand { get; set; }
 
+    /// <summary>
+    /// "or a basic land card" — when <c>true</c>, a card ALSO matches if it is a
+    /// basic land (CR 205.4a — the Basic supertype on a Land card), in ADDITION
+    /// to the <see cref="Subtypes"/> / <see cref="CardType"/> filter (a logical
+    /// OR rather than the default AND). Default <c>false</c>.
+    ///
+    /// <para>
+    /// The canonical case is <b>Spinewoods Armadillo</b> — "Search your library
+    /// for a basic land card <i>or</i> a Desert card" (CR 205.3i — Desert is a
+    /// land type; a "Desert card" is any card with the Desert subtype). Modelled
+    /// as <c>Subtypes: ["Desert"]</c> + <c>IncludeBasicLands: true</c>, so the
+    /// found card may be EITHER a basic land OR a card with the Desert subtype.
+    /// Distinct from <see cref="BasicLand"/> (which AND-restricts the whole
+    /// search to basics — the panorama "basic Forest" filter).
+    /// </para>
+    /// </summary>
+    public bool IncludeBasicLands { get; set; }
+
     /// <summary>Optional <see cref="Majik.Core.Cards.Types.CardType"/> name
     /// (e.g. <c>"Creature"</c>, <c>"Land"</c>) the found card must have. Null =
     /// no card-type restriction.</summary>
