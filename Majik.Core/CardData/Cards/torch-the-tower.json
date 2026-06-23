@@ -1,0 +1,5 @@
+{
+  "name": "Torch the Tower",
+  "types": ["Instant"],
+  "manaCost": "{R}"
+}
