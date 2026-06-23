@@ -1,0 +1,9 @@
+{
+  "name": "Innocuous Rat",
+  "types": ["Creature"],
+  "subtypes": ["Rat"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
