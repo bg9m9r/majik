@@ -1,0 +1,6 @@
+{
+  "name": "O-Naginata",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
