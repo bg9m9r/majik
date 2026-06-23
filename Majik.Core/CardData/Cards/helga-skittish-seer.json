@@ -1,0 +1,10 @@
+{
+  "name": "Helga, Skittish Seer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Frog", "Druid"],
+  "manaCost": "{G}{W}{U}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}
