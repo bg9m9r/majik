@@ -635,4 +635,9 @@ public enum CardSubtype
     /// broader white/multicolour Kirin lineage (Kamigawa Spirit-dragons). CR
     /// 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
     Kirin,
+
+    /// <summary>Toy creature subtype — Twitching Doll (Duskmourn: "Spider Toy")
+    /// and the broader Duskmourn Toy lineage. CR 205.3m — flavour subtype with
+    /// no inherent rules meaning of its own.</summary>
+    Toy,
 }

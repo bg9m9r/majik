@@ -184,4 +184,17 @@ public sealed record CounterType(string Name)
     /// <see cref="Majik.Core.CardData.Factories.MazemindTomeFactory"/>.
     /// </summary>
     public static readonly CounterType Page = new("Page");
+
+    /// <summary>
+    /// CR 122 — Nest counters. Card-specific marker used by Twitching Doll
+    /// (Duskmourn). Its "{T}: Add one mana of any color. Put a nest counter on
+    /// this creature." accrues nest counters; the "{T}, Sacrifice this creature:
+    /// Create a 2/2 green Spider creature token with reach for each counter on
+    /// this creature." sac ability mints one Spider token per counter on it
+    /// (nest counters being the only counter type it ever bears). The counter
+    /// is an opaque marker — no built-in P/T or ability semantics; the payoff
+    /// is encoded by
+    /// <see cref="Majik.Core.CardData.Factories.TwitchingDollFactory"/>.
+    /// </summary>
+    public static readonly CounterType Nest = new("Nest");
 }

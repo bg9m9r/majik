@@ -1,0 +1,9 @@
+{
+  "name": "Twitching Doll",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Spider", "Toy"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
