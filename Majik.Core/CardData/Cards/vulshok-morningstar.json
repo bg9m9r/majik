@@ -1,0 +1,6 @@
+{
+  "name": "Vulshok Morningstar",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}"
+}
