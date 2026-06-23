@@ -1,0 +1,9 @@
+{
+  "name": "Iridescent Vinelasher",
+  "types": ["Creature"],
+  "subtypes": ["Lizard", "Assassin"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
