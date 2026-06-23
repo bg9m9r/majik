@@ -1,0 +1,7 @@
+{
+  "name": "Emeria, the Sky Ruin",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
