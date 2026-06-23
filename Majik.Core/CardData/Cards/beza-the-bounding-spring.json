@@ -1,0 +1,9 @@
+{
+  "name": "Beza, the Bounding Spring",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elemental", "Elk"],
+  "manaCost": "{2}{W}{W}",
+  "power": 4,
+  "toughness": 5
+}
