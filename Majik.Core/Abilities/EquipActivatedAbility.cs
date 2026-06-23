@@ -91,13 +91,18 @@ public sealed class EquipActivatedAbility : ActivatedAbility
     /// <paramref name="onAttached"/> fires after a successful attach
     /// (CR 701.3) and is used by cards like Sword of Feast and Famine to
     /// re-sync per-bearer lifecycles after a re-equip.
+    /// <paramref name="attachRestriction"/> (CR 702.6e) narrows the legal
+    /// attach targets — e.g. O-Naginata's "can be attached only to a creature
+    /// with power 3 or greater". Null = no restriction (the default for the
+    /// rest of the equipment cycle).
     /// </summary>
     public EquipActivatedAbility(
         Permanent source,
         ManaCost cost,
         Func<Permanent, ManaCost>? costProvider = null,
-        Action<Permanent, Creature>? onAttached = null)
-        : this(source, cost, costProvider, onAttached, BuildTargetRequest(source))
+        Action<Permanent, Creature>? onAttached = null,
+        Func<Creature, bool>? attachRestriction = null)
+        : this(source, cost, costProvider, onAttached, attachRestriction, BuildTargetRequest(source, attachRestriction))
     {
     }
 
@@ -107,8 +112,9 @@ public sealed class EquipActivatedAbility : ActivatedAbility
         Permanent source,
         string cost,
         Func<Permanent, ManaCost>? costProvider = null,
-        Action<Permanent, Creature>? onAttached = null)
-        : this(source, ManaCost.Parse(cost ?? string.Empty), costProvider, onAttached)
+        Action<Permanent, Creature>? onAttached = null,
+        Func<Creature, bool>? attachRestriction = null)
+        : this(source, ManaCost.Parse(cost ?? string.Empty), costProvider, onAttached, attachRestriction)
     {
     }
 
@@ -117,13 +123,14 @@ public sealed class EquipActivatedAbility : ActivatedAbility
         ManaCost cost,
         Func<Permanent, ManaCost>? costProvider,
         Action<Permanent, Creature>? onAttached,
+        Func<Creature, bool>? attachRestriction,
         TargetRequest targetRequest)
         : base(
             source: source ?? throw new ArgumentNullException(nameof(source)),
             controller: (source.Controller ?? source.Owner)
                 ?? throw new ArgumentException("Equipment source must have a controller or owner", nameof(source)),
             costs: new ICost[] { new EquipManaCostCost(source, cost, costProvider) },
-            effects: BuildEffects(source, onAttached),
+            effects: BuildEffects(source, onAttached, attachRestriction),
             targetRequests: new[] { targetRequest },
             sorcerySpeed: true)
     {
@@ -134,7 +141,9 @@ public sealed class EquipActivatedAbility : ActivatedAbility
         TargetCreature = targetRequest;
     }
 
-    private static TargetRequest BuildTargetRequest(Permanent source)
+    private static TargetRequest BuildTargetRequest(
+        Permanent source,
+        Func<Creature, bool>? attachRestriction)
     {
         var controller = source.Controller ?? source.Owner;
         return new TargetRequest(
@@ -153,6 +162,10 @@ public sealed class EquipActivatedAbility : ActivatedAbility
                 return ctrl.Zones.Battlefield.GetCards()
                     .OfType<Creature>()
                     .Where(c => ReferenceEquals(c.Controller, ctrl))
+                    // CR 702.6e — an equip restriction ("can be attached only
+                    // to a creature with power 3 or greater") narrows the
+                    // legal targets. Null = no restriction.
+                    .Where(c => attachRestriction == null || attachRestriction(c))
                     .Cast<object>()
                     .ToList();
             });
@@ -160,13 +173,14 @@ public sealed class EquipActivatedAbility : ActivatedAbility
 
     private static IEffect[] BuildEffects(
         Permanent source,
-        Action<Permanent, Creature>? onAttached)
+        Action<Permanent, Creature>? onAttached,
+        Func<Creature, bool>? attachRestriction)
     {
         return new IEffect[]
         {
             new Effect(
                 $"{source.Name}: equip — attach to target creature you control",
-                () => AttachOnResolve(source, onAttached))
+                () => AttachOnResolve(source, onAttached, attachRestriction))
         };
     }
 
@@ -180,7 +194,8 @@ public sealed class EquipActivatedAbility : ActivatedAbility
     /// </summary>
     private static void AttachOnResolve(
         Permanent source,
-        Action<Permanent, Creature>? onAttached)
+        Action<Permanent, Creature>? onAttached,
+        Func<Creature, bool>? attachRestriction)
     {
         var owner = source.Controller ?? source.Owner;
         if (owner == null) return;
@@ -198,7 +213,11 @@ public sealed class EquipActivatedAbility : ActivatedAbility
                 && eq.ChosenTargets.Count > 0
                 && eq.ChosenTargets[0].Count > 0
                 && eq.ChosenTargets[0][0] is Creature chosen
-                && ReferenceEquals(chosen.Controller, owner))
+                && ReferenceEquals(chosen.Controller, owner)
+                // CR 702.6e / 608.2b — a chosen target that no longer meets
+                // the equip restriction on resolution is illegal; reject it
+                // so the attach is a no-op rather than an illegal attach.
+                && (attachRestriction == null || attachRestriction(chosen)))
             {
                 bearer = chosen;
                 break;
@@ -207,7 +226,10 @@ public sealed class EquipActivatedAbility : ActivatedAbility
 
         bearer ??= owner.Zones.Battlefield.GetCards()
             .OfType<Creature>()
-            .FirstOrDefault(c => ReferenceEquals(c.Controller, owner));
+            .Where(c => ReferenceEquals(c.Controller, owner))
+            // CR 702.6e — the deterministic-fallback picker must also honour
+            // the equip restriction.
+            .FirstOrDefault(c => attachRestriction == null || attachRestriction(c));
 
         if (bearer == null) return; // No legal target → no-op (CR 608.2b).
         source.AttachTo(bearer);
