@@ -1,0 +1,8 @@
+{
+  "name": "Promising Vein",
+  "types": ["Land"],
+  "subtypes": ["Cave"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
