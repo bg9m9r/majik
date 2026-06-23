@@ -1,0 +1,5 @@
+{
+  "name": "Deduce",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
