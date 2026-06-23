@@ -1,0 +1,10 @@
+{
+  "name": "Stormfront Pegasus",
+  "types": ["Creature"],
+  "subtypes": ["Pegasus"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 1,
+  "keywords": ["Flying"],
+  "abilities": []
+}
