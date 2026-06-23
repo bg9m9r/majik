@@ -1,0 +1,9 @@
+{
+  "name": "Steamcore Scholar",
+  "types": ["Creature"],
+  "subtypes": ["Weird", "Detective"],
+  "manaCost": "{2}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
