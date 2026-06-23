@@ -1,0 +1,9 @@
+{
+  "name": "Silvercoat Lion",
+  "types": ["Creature"],
+  "subtypes": ["Cat"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
