@@ -1,0 +1,17 @@
+{
+  "name": "Crystal Ball",
+  "types": ["Artifact"],
+  "manaCost": "{3}",
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "scry_self", "amount": 2 }
+      ]
+    }
+  ]
+}
