@@ -1,0 +1,8 @@
+{
+  "name": "Mikokoro, Center of the Sea",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
