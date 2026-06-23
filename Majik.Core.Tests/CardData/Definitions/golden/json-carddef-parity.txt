@@ -12740,6 +12740,58 @@
   "mdfc": null,
   "colors": []
 }
+==== enduring-courage ====
+{
+  "name": "Enduring Courage",
+  "manaCost": "{2}{R}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature",
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Dog",
+    "Glimmer"
+  ],
+  "power": 3,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== enduring-curiosity ====
 {
   "name": "Enduring Curiosity",
