@@ -1,0 +1,5 @@
+{
+  "name": "Pest Control",
+  "types": ["Sorcery"],
+  "manaCost": "{W}{B}"
+}
