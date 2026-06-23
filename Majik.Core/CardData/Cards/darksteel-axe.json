@@ -1,0 +1,6 @@
+{
+  "name": "Darksteel Axe",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
