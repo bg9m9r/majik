@@ -1,0 +1,18 @@
+{
+  "name": "Seer's Lantern",
+  "types": ["Artifact"],
+  "manaCost": "{3}",
+  "abilities": [
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    }
+  ]
+}
