@@ -1,0 +1,6 @@
+{
+  "name": "Goblin Surprise",
+  "types": ["Instant"],
+  "manaCost": "{2}{R}",
+  "abilities": []
+}
