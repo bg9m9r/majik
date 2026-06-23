@@ -1,0 +1,9 @@
+{
+  "name": "Battlefield Raptor",
+  "types": ["Creature"],
+  "subtypes": ["Bird"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 2,
+  "keywords": ["Flying", "First strike"]
+}
