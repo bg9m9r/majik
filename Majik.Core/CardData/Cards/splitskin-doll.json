@@ -1,0 +1,9 @@
+{
+  "name": "Splitskin Doll",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Toy"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
