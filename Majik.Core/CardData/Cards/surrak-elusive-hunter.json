@@ -1,0 +1,10 @@
+{
+  "name": "Surrak, Elusive Hunter",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{2}{G}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
