@@ -1,0 +1,19 @@
+{
+  "name": "Lembas",
+  "types": ["Artifact"],
+  "subtypes": ["Food"],
+  "manaCost": "{2}",
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}" },
+        { "type": "tap_self" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        { "type": "gain_life_self", "amount": 3 }
+      ]
+    }
+  ]
+}
