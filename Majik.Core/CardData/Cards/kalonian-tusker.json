@@ -1,0 +1,9 @@
+{
+  "name": "Kalonian Tusker",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{G}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
