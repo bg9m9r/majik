@@ -1,0 +1,10 @@
+{
+  "name": "Mishra's Self-Replicator",
+  "types": ["Creature", "Artifact"],
+  "supertypes": [],
+  "subtypes": ["AssemblyWorker"],
+  "manaCost": "{5}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
