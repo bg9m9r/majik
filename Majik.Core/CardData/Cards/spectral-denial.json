@@ -1,0 +1,5 @@
+{
+  "name": "Spectral Denial",
+  "types": ["Instant"],
+  "manaCost": "{X}{U}"
+}
