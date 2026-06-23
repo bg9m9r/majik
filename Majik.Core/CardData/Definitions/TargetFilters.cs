@@ -63,7 +63,7 @@ public static class TargetFilters
             CandidateGatherer: ctx => Gather(ctx, o => predicate(o) && MatchesControl(controlScope, o, ctx)));
     }
 
-    private enum ControlScope { Any, YouControl, YouDontControl }
+    private enum ControlScope { Any, YouControl, YouDontControl, OpponentPlayer }
 
     private static ControlScope ControlScopeOf(string filter) => filter switch
     {
@@ -88,12 +88,22 @@ public static class TargetFilters
         // control to its owner's hand." The base predicate gates on the Wizard
         // subtype; the control rider is applied context-aware here.
         "wizard_you_control" => ControlScope.YouControl,
+        // CR 102.2 / 109.5 — "target opponent" is every player OTHER than the
+        // resolving controller. The player-scoped rider (vs the permanent-only
+        // YouDontControl) is applied to the Player candidate set context-aware
+        // in MatchesControl.
+        "opponent" or "target_opponent" => ControlScope.OpponentPlayer,
         _ => ControlScope.Any,
     };
 
     private static bool MatchesControl(ControlScope scope, object o, GameContext ctx)
     {
         if (scope == ControlScope.Any) return true;
+        // CR 102.2 — "target opponent": a Player other than the resolving
+        // controller (ctx.Self). Player-scoped, so it does NOT key off a
+        // permanent's Controller like the YouControl / YouDontControl riders.
+        if (scope == ControlScope.OpponentPlayer)
+            return o is Player player && !ReferenceEquals(player, ctx.Self);
         if (o is not Permanent p) return false;
         var youControl = ReferenceEquals(p.Controller, ctx.Self);
         return scope == ControlScope.YouControl ? youControl : !youControl;
@@ -132,6 +142,16 @@ public static class TargetFilters
                     o => IsAnyTarget(o) && WasDealtDamageThisTurn(o)),
             "player" =>
                 ($"target player to {verb}", o => o is Player),
+            // CR 109.5 / 115.1 — "target opponent". The base predicate gates on
+            // any Player; the "opponent" rider (every player OTHER than the
+            // resolving controller — CR 102.2) is applied context-aware in the
+            // candidate gatherer (ControlScopeOf → OpponentPlayer), since the
+            // context-free predicate cannot see ctx.Self. Canonical case:
+            // Vengeful Bloodwitch — "… target opponent loses 1 life …". Control
+            // is locked at announcement (CR 601.2c), so the resolution-time
+            // re-check treats this as a plain Player.
+            "opponent" or "target_opponent" =>
+                ($"target opponent to {verb}", o => o is Player),
             "creature" =>
                 ($"{verb} target creature", o => o is Creature c && OnBattlefield(c)),
             // CR 109.5 / 701.20 — "tapped creature an opponent controls"
