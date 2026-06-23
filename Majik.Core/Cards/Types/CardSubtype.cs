@@ -420,6 +420,9 @@ public enum CardSubtype
     // Planeswalker subtypes (examples)
     Ajani,
     Ashiok,
+    /// <summary>Saheeli planeswalker subtype — Saheeli, Sublime Artificer
+    /// (War of the Spark) and the rest of the Saheeli lineage. CR 205.3m.</summary>
+    Saheeli,
     Chandra,
     Grist,
     Jace,

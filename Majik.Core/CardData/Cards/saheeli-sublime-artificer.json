@@ -1,0 +1,9 @@
+{
+  "name": "Saheeli, Sublime Artificer",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Saheeli"],
+  "manaCost": "{1}{U/R}{U/R}",
+  "loyalty": 5,
+  "abilities": []
+}
