@@ -1,0 +1,9 @@
+{
+  "name": "Insomnia, Crown City",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
