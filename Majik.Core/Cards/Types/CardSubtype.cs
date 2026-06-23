@@ -30,6 +30,9 @@ public enum CardSubtype
     Zombie,
     Skeleton,
     Beast,
+    /// <summary>Armadillo creature subtype — Spinewoods Armadillo (Bloomburrow).
+    /// CR 205.3m.</summary>
+    Armadillo,
     /// <summary>Sloth creature subtype — Arboreal Grazer (Ravnica Allegiance).
     /// CR 205.3m.</summary>
     Sloth,
