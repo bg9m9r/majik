@@ -22,19 +22,28 @@ namespace Majik.Core.Effects;
 public sealed class AddCardTypeEffect : ContinuousEffect
 {
     private readonly Permanent _target;
+    private readonly bool _expiresAtEndOfTurn;
 
     /// <summary>The card type unioned onto the target's effective type set.</summary>
     public CardType CardType { get; }
 
-    public AddCardTypeEffect(Permanent target, CardType cardType)
+    /// <param name="expiresAtEndOfTurn">When true, the effect is dropped at the
+    /// cleanup step (CR 514.2). Defaults to false (lasts while the target is on
+    /// the battlefield — Phyrexian Metamorph's permanent "in addition" rider).
+    /// Set true for an until-end-of-turn "in addition" rider paired with an
+    /// until-EOT copy (Saheeli, Sublime Artificer's −2; CR 707.9b).</param>
+    public AddCardTypeEffect(Permanent target, CardType cardType, bool expiresAtEndOfTurn = false)
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
         CardType = cardType;
+        _expiresAtEndOfTurn = expiresAtEndOfTurn;
     }
 
     public override Layer Layer => Layer.Type;
 
     public override Permanent? Source => _target;
+
+    public override bool ExpiresAtEndOfTurn => _expiresAtEndOfTurn;
 
     public override bool IsActive() =>
         _target.Zone == Majik.Core.Zones.ZoneType.Battlefield;
