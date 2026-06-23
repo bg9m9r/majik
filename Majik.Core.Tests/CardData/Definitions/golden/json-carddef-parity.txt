@@ -42127,6 +42127,57 @@
   "mdfc": null,
   "colors": []
 }
+==== star-pupil ====
+{
+  "name": "Star Pupil",
+  "manaCost": "{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Human",
+    "Wizard"
+  ],
+  "power": 0,
+  "toughness": 0,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== steel-of-the-godhead ====
 {
   "name": "Steel of the Godhead",
