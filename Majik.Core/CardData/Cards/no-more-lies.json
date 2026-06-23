@@ -1,0 +1,6 @@
+{
+  "name": "No More Lies",
+  "types": ["Instant"],
+  "manaCost": "{W}{U}",
+  "colors": ["W", "U"]
+}
