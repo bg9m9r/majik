@@ -32009,6 +32009,60 @@
     "Black"
   ]
 }
+==== niko-light-of-hope ====
+{
+  "name": "Niko, Light of Hope",
+  "manaCost": "{2}{W}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Human",
+    "Wizard"
+  ],
+  "power": 3,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "White"
+  ]
+}
 ==== nishoba-brawler ====
 {
   "name": "Nishoba Brawler",
