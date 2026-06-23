@@ -1,0 +1,9 @@
+{
+  "name": "Sunspine Lynx",
+  "types": ["Creature"],
+  "subtypes": ["Elemental", "Cat"],
+  "manaCost": "{2}{R}{R}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
