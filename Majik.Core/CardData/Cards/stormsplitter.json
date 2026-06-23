@@ -1,0 +1,10 @@
+{
+  "name": "Stormsplitter",
+  "types": ["Creature"],
+  "subtypes": ["Otter", "Wizard"],
+  "manaCost": "{3}{R}",
+  "power": 1,
+  "toughness": 4,
+  "keywords": ["Haste"],
+  "abilities": []
+}
