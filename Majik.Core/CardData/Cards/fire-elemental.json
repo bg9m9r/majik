@@ -1,0 +1,9 @@
+{
+  "name": "Fire Elemental",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{3}{R}{R}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
