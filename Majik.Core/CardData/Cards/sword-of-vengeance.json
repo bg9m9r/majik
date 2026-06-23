@@ -1,0 +1,6 @@
+{
+  "name": "Sword of Vengeance",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{3}"
+}
