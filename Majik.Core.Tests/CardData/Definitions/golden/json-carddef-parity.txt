@@ -41638,6 +41638,60 @@
     "Red"
   ]
 }
+==== spinning-wheel ====
+{
+  "name": "Spinning Wheel",
+  "manaCost": "{3}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 5,
+      "list": [
+        "mana:B",
+        "mana:G",
+        "mana:R",
+        "mana:U",
+        "mana:W"
+      ]
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== spirebluff-canal ====
 {
   "name": "Spirebluff Canal",
