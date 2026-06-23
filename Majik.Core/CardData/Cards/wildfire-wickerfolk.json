@@ -1,0 +1,9 @@
+{
+  "name": "Wildfire Wickerfolk",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Scarecrow"],
+  "manaCost": "{R}{G}",
+  "power": 3,
+  "toughness": 2,
+  "keywords": ["Haste"]
+}

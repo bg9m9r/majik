@@ -53503,6 +53503,60 @@
     "Red"
   ]
 }
+==== wildfire-wickerfolk ====
+{
+  "name": "Wildfire Wickerfolk",
+  "manaCost": "{R}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Artifact",
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Scarecrow"
+  ],
+  "power": 3,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Haste"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green",
+    "Red"
+  ]
+}
 ==== willowrush-verge ====
 {
   "name": "Willowrush Verge",

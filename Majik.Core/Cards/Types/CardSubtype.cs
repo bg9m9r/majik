@@ -403,6 +403,10 @@ public enum CardSubtype
     /// <summary>Pest creature subtype — Mirrodin Besieged's Signal Pest,
     /// Strixhaven's Pest tokens. CR 205.3m.</summary>
     Pest,
+    /// <summary>Scarecrow creature/artifact subtype — Wildfire Wickerfolk,
+    /// Reaper King, the Shadowmoor Scarecrow cycle. Usually paired with the
+    /// Artifact type. CR 205.3g + CR 205.3m.</summary>
+    Scarecrow,
 
     // Eldrazi creature subtypes (CR 205.3m)
     Eldrazi,
