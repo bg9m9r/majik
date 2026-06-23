@@ -1,0 +1,6 @@
+{
+  "name": "Gateway Plaza",
+  "types": ["Land"],
+  "subtypes": ["Gate"],
+  "abilities": []
+}
