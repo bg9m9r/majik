@@ -1,0 +1,9 @@
+{
+  "name": "Juggernaut",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Juggernaut"],
+  "manaCost": "{4}",
+  "power": 5,
+  "toughness": 3,
+  "abilities": []
+}

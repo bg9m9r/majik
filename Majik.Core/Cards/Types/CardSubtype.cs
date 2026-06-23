@@ -385,6 +385,9 @@ public enum CardSubtype
     /// Engine, Triskelion. Almost always paired with the Artifact type.
     /// CR 205.3g + CR 205.3m.</summary>
     Golem,
+    /// <summary>Juggernaut creature/artifact subtype — Juggernaut (Antiquities
+    /// and reprints). Paired with the Artifact type. CR 205.3g + CR 205.3m.</summary>
+    Juggernaut,
     /// <summary>Gnome creature/artifact subtype — Bottle Gnomes, Clockwork
     /// Gnomes. Usually paired with the Artifact type. CR 205.3g + CR 205.3m.</summary>
     Gnome,
