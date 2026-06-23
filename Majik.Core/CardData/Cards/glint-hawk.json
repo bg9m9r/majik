@@ -1,0 +1,9 @@
+{
+  "name": "Glint Hawk",
+  "types": ["Creature"],
+  "subtypes": ["Bird"],
+  "manaCost": "{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
