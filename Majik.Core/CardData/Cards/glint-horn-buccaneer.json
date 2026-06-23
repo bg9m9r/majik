@@ -1,0 +1,9 @@
+{
+  "name": "Glint-Horn Buccaneer",
+  "types": ["Creature"],
+  "subtypes": ["Minotaur", "Pirate"],
+  "manaCost": "{1}{R}{R}",
+  "power": 2,
+  "toughness": 4,
+  "keywords": ["Haste"]
+}
