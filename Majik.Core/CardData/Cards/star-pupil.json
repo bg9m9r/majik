@@ -1,0 +1,9 @@
+{
+  "name": "Star Pupil",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{W}",
+  "power": 0,
+  "toughness": 0,
+  "colors": ["W"]
+}
