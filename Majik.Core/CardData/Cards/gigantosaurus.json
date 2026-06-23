@@ -1,0 +1,9 @@
+{
+  "name": "Gigantosaurus",
+  "types": ["Creature"],
+  "subtypes": ["Dinosaur"],
+  "manaCost": "{G}{G}{G}{G}{G}",
+  "power": 10,
+  "toughness": 10,
+  "abilities": []
+}
