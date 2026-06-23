@@ -1,0 +1,11 @@
+{
+  "name": "Tersa Lightshatter",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Orc", "Wizard"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 3,
+  "keywords": ["Haste"],
+  "abilities": []
+}
