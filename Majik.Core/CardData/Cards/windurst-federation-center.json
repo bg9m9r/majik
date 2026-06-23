@@ -1,0 +1,9 @@
+{
+  "name": "Windurst, Federation Center",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
