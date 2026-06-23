@@ -1,0 +1,9 @@
+{
+  "name": "Yoked Ox",
+  "types": ["Creature"],
+  "subtypes": ["Ox"],
+  "manaCost": "{W}",
+  "power": 0,
+  "toughness": 4,
+  "abilities": []
+}
