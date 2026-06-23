@@ -1,0 +1,21 @@
+{
+  "name": "Glarb, Calamity's Augur",
+  "supertypes": ["Legendary"],
+  "types": ["Creature"],
+  "subtypes": ["Frog", "Wizard", "Noble"],
+  "manaCost": "{B}{G}{U}",
+  "power": 2,
+  "toughness": 4,
+  "keywords": ["Deathtouch"],
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "surveil_self", "amount": 2 }
+      ]
+    }
+  ]
+}
