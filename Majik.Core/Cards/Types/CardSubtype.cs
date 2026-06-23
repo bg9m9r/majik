@@ -219,6 +219,12 @@ public enum CardSubtype
     /// <summary>Rabbit creature subtype — Pawpatch Recruit (Bloomburrow) and the
     /// rest of the Bloomburrow Rabbit lineage. CR 205.3m.</summary>
     Rabbit,
+    /// <summary>Raccoon creature subtype — Valley Mightcaller (Bloomburrow) and the
+    /// rest of the Bloomburrow Raccoon lineage. CR 205.3m.</summary>
+    Raccoon,
+    /// <summary>Squirrel creature subtype — Valley Mightcaller (Bloomburrow), the
+    /// Squirrel "go-wide" lineage, Earthcraft + Squirrel Nest. CR 205.3m.</summary>
+    Squirrel,
     /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
     /// Bitterblossom tokens. CR 205.3m.</summary>
     Faerie,
