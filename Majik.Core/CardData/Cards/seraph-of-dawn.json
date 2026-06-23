@@ -1,0 +1,8 @@
+{
+  "name": "Seraph of Dawn",
+  "types": ["Creature"],
+  "subtypes": ["Angel"],
+  "manaCost": "{2}{W}{W}",
+  "power": 2,
+  "toughness": 4
+}
