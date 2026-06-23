@@ -1,0 +1,6 @@
+{
+  "name": "No-Dachi",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}"
+}
