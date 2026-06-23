@@ -1102,6 +1102,61 @@
     "Red"
   ]
 }
+==== alloy-myr ====
+{
+  "name": "Alloy Myr",
+  "manaCost": "{3}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Artifact",
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Myr"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 5,
+      "list": [
+        "mana:B",
+        "mana:G",
+        "mana:R",
+        "mana:U",
+        "mana:W"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== alpha-myr ====
 {
   "name": "Alpha Myr",
