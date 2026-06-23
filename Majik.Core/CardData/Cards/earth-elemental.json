@@ -1,0 +1,9 @@
+{
+  "name": "Earth Elemental",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{3}{R}{R}",
+  "power": 4,
+  "toughness": 5,
+  "abilities": []
+}
