@@ -51772,6 +51772,58 @@
     "Green"
   ]
 }
+==== vaultborn-tyrant ====
+{
+  "name": "Vaultborn Tyrant",
+  "manaCost": "{5}{G}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Dinosaur"
+  ],
+  "power": 6,
+  "toughness": 6,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Trample"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== vector-imperial-capital ====
 {
   "name": "Vector, Imperial Capital",

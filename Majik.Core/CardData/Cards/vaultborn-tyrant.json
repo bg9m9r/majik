@@ -1,0 +1,9 @@
+{
+  "name": "Vaultborn Tyrant",
+  "types": ["Creature"],
+  "subtypes": ["Dinosaur"],
+  "manaCost": "{5}{G}{G}",
+  "power": 6,
+  "toughness": 6,
+  "keywords": ["Trample"]
+}
