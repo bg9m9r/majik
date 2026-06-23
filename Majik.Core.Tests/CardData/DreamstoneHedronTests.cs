@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData;
 /// - Empty-library: no draw, still sacrifices (CR 704.5b loss flag handled
 ///   by the draw path).
 /// </summary>
+[Trait("Color", "C")]
 public class DreamstoneHedronTests
 {
     private readonly Player _alice = new("Alice", 20);
