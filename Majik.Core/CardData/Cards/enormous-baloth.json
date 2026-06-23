@@ -1,0 +1,9 @@
+{
+  "name": "Enormous Baloth",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{6}{G}",
+  "power": 7,
+  "toughness": 7,
+  "abilities": []
+}
