@@ -1,0 +1,8 @@
+{
+  "name": "Flagstones of Trokair",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
