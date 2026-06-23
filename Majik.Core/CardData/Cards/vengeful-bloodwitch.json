@@ -1,0 +1,22 @@
+{
+  "name": "Vengeful Bloodwitch",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Warlock"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": {
+        "type": "whenever_another_creature_dies",
+        "youControlOnly": true,
+        "includeSelf": true
+      },
+      "effects": [
+        { "type": "lose_life_target", "amount": 1, "subject": "target", "targetFilter": "opponent" },
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
