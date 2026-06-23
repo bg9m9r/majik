@@ -1,0 +1,6 @@
+{
+  "name": "Whispersilk Cloak",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{3}"
+}
