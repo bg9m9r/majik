@@ -30661,6 +30661,56 @@
   "mdfc": null,
   "colors": []
 }
+==== obelisk-of-bant ====
+{
+  "name": "Obelisk of Bant",
+  "manaCost": "{3}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 3,
+      "list": [
+        "mana:G",
+        "mana:U",
+        "mana:W"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== obelisk-of-esper ====
 {
   "name": "Obelisk of Esper",
