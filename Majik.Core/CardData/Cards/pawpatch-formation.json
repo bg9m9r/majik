@@ -1,0 +1,5 @@
+{
+  "name": "Pawpatch Formation",
+  "types": ["Instant"],
+  "manaCost": "{1}{G}"
+}
