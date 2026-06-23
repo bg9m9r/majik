@@ -1,0 +1,10 @@
+{
+  "name": "Valley Mightcaller",
+  "types": ["Creature"],
+  "subtypes": ["Frog", "Warrior"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 1,
+  "keywords": ["Trample"],
+  "abilities": []
+}
