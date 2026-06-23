@@ -1,0 +1,6 @@
+{
+  "name": "Mask of Memory",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}"
+}
