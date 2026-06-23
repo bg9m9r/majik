@@ -1,0 +1,9 @@
+{
+  "name": "Woolly Thoctar",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{R}{G}{W}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
