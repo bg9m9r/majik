@@ -1,0 +1,9 @@
+{
+  "name": "Boros Swiftblade",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{R}{W}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
