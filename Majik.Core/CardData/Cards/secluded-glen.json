@@ -1,0 +1,8 @@
+{
+  "name": "Secluded Glen",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
