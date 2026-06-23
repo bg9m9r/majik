@@ -1,0 +1,9 @@
+{
+  "name": "Rabanastre, Royal City",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
