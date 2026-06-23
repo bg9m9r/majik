@@ -1,0 +1,9 @@
+{
+  "name": "Gongaga, Reactor Town",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
