@@ -1,0 +1,11 @@
+{
+  "name": "Krenko, Baron of Tin Street",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Goblin"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 3,
+  "keywords": ["Haste"],
+  "abilities": []
+}
