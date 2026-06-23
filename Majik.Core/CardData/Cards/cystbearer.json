@@ -1,0 +1,9 @@
+{
+  "name": "Cystbearer",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Beast"],
+  "manaCost": "{2}{G}",
+  "power": 2,
+  "toughness": 3,
+  "keywords": ["Infect"]
+}
