@@ -1,0 +1,9 @@
+{
+  "name": "Guadosalam, Farplane Gateway",
+  "types": ["Land"],
+  "subtypes": ["Town"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
