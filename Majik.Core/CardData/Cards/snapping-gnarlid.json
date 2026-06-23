@@ -1,0 +1,8 @@
+{
+  "name": "Snapping Gnarlid",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2
+}
