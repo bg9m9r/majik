@@ -626,4 +626,9 @@ public enum CardSubtype
     /// Junction). CR 205.3m — flavour subtype with no inherent rules meaning of
     /// its own.</summary>
     Starfish,
+
+    /// <summary>Kirin creature subtype — Sunpearl Kirin (Bloomburrow) and the
+    /// broader white/multicolour Kirin lineage (Kamigawa Spirit-dragons). CR
+    /// 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
+    Kirin,
 }

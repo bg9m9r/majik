@@ -1,0 +1,8 @@
+{
+  "name": "Sunpearl Kirin",
+  "manaCost": "{1}{W}",
+  "types": ["Creature"],
+  "subtypes": ["Kirin"],
+  "power": 2,
+  "toughness": 1
+}
