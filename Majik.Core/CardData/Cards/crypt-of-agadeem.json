@@ -1,0 +1,7 @@
+{
+  "name": "Crypt of Agadeem",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
