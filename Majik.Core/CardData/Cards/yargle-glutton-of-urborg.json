@@ -1,0 +1,10 @@
+{
+  "name": "Yargle, Glutton of Urborg",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Frog", "Spirit"],
+  "manaCost": "{4}{B}",
+  "power": 9,
+  "toughness": 3,
+  "abilities": []
+}
