@@ -1,0 +1,7 @@
+{
+  "name": "Tomb of the Spirit Dragon",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
