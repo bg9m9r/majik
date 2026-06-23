@@ -1,0 +1,9 @@
+{
+  "name": "Arboreal Grazer",
+  "types": ["Creature"],
+  "subtypes": ["Sloth", "Beast"],
+  "manaCost": "{G}",
+  "power": 0,
+  "toughness": 3,
+  "keywords": ["Reach"]
+}
