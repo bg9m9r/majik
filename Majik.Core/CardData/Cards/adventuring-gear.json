@@ -1,0 +1,6 @@
+{
+  "name": "Adventuring Gear",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
