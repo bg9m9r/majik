@@ -1,0 +1,8 @@
+{
+  "name": "Spineseeker Centipede",
+  "types": ["Creature"],
+  "subtypes": ["Insect"],
+  "manaCost": "{2}{G}",
+  "power": 2,
+  "toughness": 1
+}
