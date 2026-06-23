@@ -1,0 +1,9 @@
+{
+  "name": "Flensermite",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Gremlin"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "keywords": ["Infect", "Lifelink"]
+}

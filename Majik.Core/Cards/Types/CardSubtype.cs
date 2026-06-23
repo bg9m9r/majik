@@ -15,6 +15,10 @@ public enum CardSubtype
     /// <summary>Mite creature subtype — the Phyrexian Mite tokens minted by
     /// Mirrex / Tarsus Mite (Phyrexia: All Will Be One). CR 205.3m.</summary>
     Mite,
+    /// <summary>Gremlin creature subtype — Flensermite (New Phyrexia),
+    /// Mossfire Egg-adjacent / Kaladesh Gremlins (Aether Chaser, Ravenous
+    /// Intruder). CR 205.3m.</summary>
+    Gremlin,
     Germ,
     Elf,
     Goblin,
