@@ -1,0 +1,6 @@
+{
+  "name": "Loxodon Warhammer",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{3}"
+}
