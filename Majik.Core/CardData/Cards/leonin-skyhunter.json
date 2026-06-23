@@ -1,0 +1,8 @@
+{
+  "name": "Leonin Skyhunter",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Knight"],
+  "manaCost": "{W}{W}",
+  "power": 2,
+  "toughness": 2
+}
