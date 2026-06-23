@@ -1,0 +1,6 @@
+{
+  "name": "Lunar Convocation",
+  "types": ["Enchantment"],
+  "manaCost": "{W}{B}",
+  "abilities": []
+}
