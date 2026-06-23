@@ -1,0 +1,9 @@
+{
+  "name": "Horned Turtle",
+  "types": ["Creature"],
+  "subtypes": ["Turtle"],
+  "manaCost": "{2}{U}",
+  "power": 1,
+  "toughness": 4,
+  "abilities": []
+}
