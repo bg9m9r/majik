@@ -1,0 +1,10 @@
+{
+  "name": "Anim Pakal, Thousandth Moon",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{1}{R}{W}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
