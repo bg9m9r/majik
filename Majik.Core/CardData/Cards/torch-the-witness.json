@@ -1,0 +1,6 @@
+{
+  "name": "Torch the Witness",
+  "types": ["Sorcery"],
+  "manaCost": "{X}{R}",
+  "abilities": []
+}
