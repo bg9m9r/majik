@@ -1,0 +1,9 @@
+{
+  "name": "Twinflame Tyrant",
+  "types": ["Creature"],
+  "subtypes": ["Dragon"],
+  "manaCost": "{3}{R}{R}",
+  "power": 3,
+  "toughness": 5,
+  "abilities": []
+}
