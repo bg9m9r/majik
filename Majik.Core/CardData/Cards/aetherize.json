@@ -1,0 +1,5 @@
+{
+  "name": "Aetherize",
+  "types": ["Instant"],
+  "manaCost": "{3}{U}"
+}
