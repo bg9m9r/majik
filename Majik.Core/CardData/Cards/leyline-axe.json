@@ -1,0 +1,6 @@
+{
+  "name": "Leyline Axe",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{4}"
+}
