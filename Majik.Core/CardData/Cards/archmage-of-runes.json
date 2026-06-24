@@ -1,0 +1,9 @@
+{
+  "name": "Archmage of Runes",
+  "types": ["Creature"],
+  "subtypes": ["Giant", "Wizard"],
+  "manaCost": "{3}{U}{U}",
+  "power": 3,
+  "toughness": 6,
+  "colors": ["U"]
+}
