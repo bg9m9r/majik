@@ -1,0 +1,9 @@
+{
+  "name": "Bonehoard Dracosaur",
+  "types": ["Creature"],
+  "subtypes": ["Dinosaur", "Dragon"],
+  "manaCost": "{3}{R}{R}",
+  "power": 5,
+  "toughness": 5,
+  "keywords": ["Flying", "First strike"]
+}
