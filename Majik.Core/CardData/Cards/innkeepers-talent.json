@@ -1,0 +1,7 @@
+{
+  "name": "Innkeeper's Talent",
+  "types": ["Enchantment"],
+  "subtypes": ["Class"],
+  "manaCost": "{1}{G}",
+  "colors": ["G"]
+}
