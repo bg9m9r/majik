@@ -1,0 +1,8 @@
+{
+  "name": "Hardened Tactician",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{1}{W}{B}",
+  "power": 2,
+  "toughness": 4
+}
