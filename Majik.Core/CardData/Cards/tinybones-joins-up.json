@@ -1,0 +1,7 @@
+{
+  "name": "Tinybones Joins Up",
+  "types": ["Enchantment"],
+  "supertypes": ["Legendary"],
+  "manaCost": "{B}",
+  "abilities": []
+}
