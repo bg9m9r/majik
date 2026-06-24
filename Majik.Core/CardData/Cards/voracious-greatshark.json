@@ -1,0 +1,9 @@
+{
+  "name": "Voracious Greatshark",
+  "types": ["Creature"],
+  "subtypes": ["Shark"],
+  "manaCost": "{3}{U}{U}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
