@@ -1,0 +1,18 @@
+{
+  "name": "Spinewoods Paladin",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Knight"],
+  "manaCost": "{4}{G}",
+  "power": 5,
+  "toughness": 4,
+  "keywords": ["Trample"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "gain_life_self", "amount": 3 }
+      ]
+    }
+  ]
+}
