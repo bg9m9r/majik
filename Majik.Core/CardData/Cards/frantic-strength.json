@@ -1,0 +1,8 @@
+{
+  "name": "Frantic Strength",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{2}{G}",
+  "colors": ["G"],
+  "keywords": ["Flash"]
+}
