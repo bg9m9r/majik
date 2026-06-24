@@ -1,0 +1,8 @@
+{
+  "name": "Hauntwoods Shrieker",
+  "types": ["Creature"],
+  "subtypes": ["Beast", "Mutant"],
+  "manaCost": "{1}{G}{G}",
+  "power": 3,
+  "toughness": 3
+}
