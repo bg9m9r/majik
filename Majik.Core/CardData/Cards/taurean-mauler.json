@@ -1,0 +1,8 @@
+{
+  "name": "Taurean Mauler",
+  "types": ["Creature"],
+  "subtypes": ["Shapeshifter"],
+  "manaCost": "{2}{R}",
+  "power": 2,
+  "toughness": 2
+}
