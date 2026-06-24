@@ -1,0 +1,10 @@
+{
+  "name": "Felothar, Dawn of the Abzan",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{W}{B}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
