@@ -1,0 +1,18 @@
+{
+  "name": "Ominous Asylum",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{4}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}
