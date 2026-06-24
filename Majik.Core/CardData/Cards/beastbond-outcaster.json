@@ -1,0 +1,9 @@
+{
+  "name": "Beastbond Outcaster",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Druid"],
+  "manaCost": "{2}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
