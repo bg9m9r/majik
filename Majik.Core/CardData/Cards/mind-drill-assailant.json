@@ -1,0 +1,19 @@
+{
+  "name": "Mind Drill Assailant",
+  "types": ["Creature"],
+  "subtypes": ["Rat", "Warlock"],
+  "manaCost": "{2}{U/B}{U/B}",
+  "power": 2,
+  "toughness": 5,
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}{U/B}" }
+      ],
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}
