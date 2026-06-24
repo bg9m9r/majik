@@ -1,0 +1,10 @@
+{
+  "name": "Kutzil's Flanker",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Warrior"],
+  "manaCost": "{2}{W}",
+  "power": 3,
+  "toughness": 1,
+  "keywords": ["Flash"],
+  "abilities": []
+}
