@@ -1,0 +1,8 @@
+{
+  "name": "Aftermath Analyst",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Detective"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1
+}
