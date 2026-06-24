@@ -1,0 +1,19 @@
+{
+  "name": "Fear of Surveillance",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Nightmare"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 2,
+  "colors": ["W"],
+  "keywords": ["Vigilance"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "attacks_self" },
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}
