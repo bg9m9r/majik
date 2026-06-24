@@ -1,0 +1,5 @@
+{
+  "name": "Get a Leg Up",
+  "types": ["Instant"],
+  "manaCost": "{G}"
+}
