@@ -1,0 +1,9 @@
+{
+  "name": "Cogwork Wrestler",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Gnome"],
+  "manaCost": "{U}",
+  "power": 1,
+  "toughness": 2,
+  "keywords": ["Flash"]
+}
