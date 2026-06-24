@@ -1,0 +1,8 @@
+{
+  "name": "Wickerfolk Thresher",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Scarecrow"],
+  "manaCost": "{3}{G}",
+  "power": 5,
+  "toughness": 4
+}

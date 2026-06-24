@@ -57811,6 +57811,57 @@
     "Green"
   ]
 }
+==== wickerfolk-thresher ====
+{
+  "name": "Wickerfolk Thresher",
+  "manaCost": "{3}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Artifact",
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Scarecrow"
+  ],
+  "power": 5,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== wild-cantor ====
 {
   "name": "Wild Cantor",
