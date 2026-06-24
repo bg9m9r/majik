@@ -1,0 +1,6 @@
+{
+  "name": "Garruk's Uprising",
+  "types": ["Enchantment"],
+  "manaCost": "{2}{G}",
+  "colors": ["G"]
+}
