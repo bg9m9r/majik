@@ -39,6 +39,20 @@ public static class EntersWithCountersBinder
         @"\benters\s+(?:the\s+battlefield\s+)?with\s+X\s+\+1/\+1\s+counters?\s+on\s+it\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // CR 614.1d — conditional "enters with N -1/-1 counters on it if you cast
+    // it from your hand" form (Patched Plaything). Distinct from the fixed/+1
+    // patterns because (a) the counter type is -1/-1 (routes through the
+    // generic CountersOnEnter bag, not the +1/+1 channel) and (b) it is gated
+    // on the controller having cast the permanent from their hand — read off
+    // Card.WasCastFromHand at the moment the permanent would enter (the same
+    // cast-from-hand sentinel SpellCastFlow stamps and ZoneService preserves
+    // across the Stack -> Battlefield move). Non-cast entries (blink / copy /
+    // token) and library/graveyard casts leave WasCastFromHand == false, so the
+    // creature enters with no counters.
+    private static readonly Regex CastFromHandMinusPattern = new(
+        @"\benters\s+(?:the\s+battlefield\s+)?with\s+(?<n>a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+-1/-1\s+counters?\s+on\s+it\s+if\s+you\s+cast\s+it\s+from\s+your\s+hand\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public static bool Bind(ICard card, CardEntity entity, ReplacementBus replacements)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -55,6 +69,27 @@ public static class EntersWithCountersBinder
             if (n <= 0) return false;
 
             replacements.Register(new EntersWithCountersReplacement(card, n));
+            return true;
+        }
+
+        // CR 614.1d — "enters with N -1/-1 counters on it if you cast it from
+        // your hand" (Patched Plaything). The count is fixed (N), but the
+        // replacement only applies when the permanent was cast from its
+        // controller's hand. Register a dynamic -1/-1 replacement whose Func
+        // returns N iff Card.WasCastFromHand is set at entry, else 0 (CR 113.5
+        // — a non-hand cast / blink / copy leaves the sentinel clear, so the
+        // creature enters at full P/T).
+        var hand = CastFromHandMinusPattern.Match(text);
+        if (hand.Success)
+        {
+            var n = WordToInt(hand.Groups["n"].Value);
+            if (n <= 0) return false;
+
+            var self = card as Card;
+            replacements.Register(new EntersWithCountersReplacement(
+                card,
+                CounterType.MinusOneMinusOne,
+                () => self?.WasCastFromHand == true ? n : 0));
             return true;
         }
 

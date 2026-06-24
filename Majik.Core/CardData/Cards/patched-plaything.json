@@ -1,0 +1,10 @@
+{
+  "name": "Patched Plaything",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Toy"],
+  "manaCost": "{2}{W}",
+  "power": 4,
+  "toughness": 3,
+  "colors": ["W"],
+  "keywords": ["Double strike"]
+}
