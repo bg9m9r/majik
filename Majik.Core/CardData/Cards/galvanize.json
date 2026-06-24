@@ -1,0 +1,5 @@
+{
+  "name": "Galvanize",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}"
+}
