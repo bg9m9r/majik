@@ -1,0 +1,9 @@
+{
+  "name": "Bria, Riptide Rogue",
+  "supertypes": ["Legendary"],
+  "types": ["Creature"],
+  "subtypes": ["Otter", "Rogue"],
+  "manaCost": "{1}{U}{R}",
+  "power": 2,
+  "toughness": 2
+}
