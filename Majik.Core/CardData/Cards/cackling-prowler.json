@@ -1,0 +1,9 @@
+{
+  "name": "Cackling Prowler",
+  "types": ["Creature"],
+  "subtypes": ["Hyena", "Rogue"],
+  "manaCost": "{3}{G}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}

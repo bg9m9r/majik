@@ -69,6 +69,10 @@ public enum CardSubtype
     Moonfolk,
     Cleric,
     Rogue,
+    /// <summary>Hyena creature subtype — Cackling Prowler (Tarkir: Dragonstorm),
+    /// Pack of Wild Hyenas, Painted Bluffs-adjacent gnoll/hyena cards.
+    /// CR 205.3m.</summary>
+    Hyena,
     Knight,
     Soldier,
     Shaman,
