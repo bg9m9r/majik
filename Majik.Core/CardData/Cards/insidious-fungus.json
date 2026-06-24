@@ -1,0 +1,8 @@
+{
+  "name": "Insidious Fungus",
+  "types": ["Creature"],
+  "subtypes": ["Fungus"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 2
+}
