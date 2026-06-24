@@ -1,0 +1,8 @@
+{
+  "name": "Bloom Tender",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{1}{G}",
+  "power": 1,
+  "toughness": 1
+}
