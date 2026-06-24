@@ -2570,6 +2570,59 @@
   "mdfc": null,
   "colors": []
 }
+==== aurelia-the-warleader ====
+{
+  "name": "Aurelia, the Warleader",
+  "manaCost": "{2}{R}{R}{W}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Angel"
+  ],
+  "power": 3,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red",
+    "White"
+  ]
+}
 ==== auriok-champion ====
 {
   "name": "Auriok Champion",
