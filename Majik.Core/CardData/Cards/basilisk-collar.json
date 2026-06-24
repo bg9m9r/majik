@@ -1,0 +1,6 @@
+{
+  "name": "Basilisk Collar",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
