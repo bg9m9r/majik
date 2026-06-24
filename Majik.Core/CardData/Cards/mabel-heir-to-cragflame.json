@@ -1,0 +1,10 @@
+{
+  "name": "Mabel, Heir to Cragflame",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Mouse", "Soldier"],
+  "manaCost": "{1}{R}{W}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
