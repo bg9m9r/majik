@@ -1,0 +1,11 @@
+{
+  "name": "Zoraline, Cosmos Caller",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Bat", "Cleric"],
+  "manaCost": "{1}{W}{B}",
+  "power": 3,
+  "toughness": 3,
+  "keywords": ["Flying", "Vigilance"],
+  "abilities": []
+}
