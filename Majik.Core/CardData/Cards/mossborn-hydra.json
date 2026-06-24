@@ -1,0 +1,9 @@
+{
+  "name": "Mossborn Hydra",
+  "types": ["Creature"],
+  "subtypes": ["Elemental", "Hydra"],
+  "manaCost": "{2}{G}",
+  "power": 0,
+  "toughness": 0,
+  "colors": ["G"]
+}
