@@ -1,0 +1,9 @@
+{
+  "name": "Splash Lasher",
+  "types": ["Creature"],
+  "subtypes": ["Frog", "Wizard"],
+  "manaCost": "{3}{U}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
