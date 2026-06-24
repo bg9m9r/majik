@@ -1,0 +1,8 @@
+{
+  "name": "Crime Novelist",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Bard"],
+  "manaCost": "{2}{R}",
+  "power": 1,
+  "toughness": 3
+}
