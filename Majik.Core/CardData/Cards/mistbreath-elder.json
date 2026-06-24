@@ -1,0 +1,8 @@
+{
+  "name": "Mistbreath Elder",
+  "manaCost": "{G}",
+  "types": ["Creature"],
+  "subtypes": ["Frog", "Warrior"],
+  "power": 2,
+  "toughness": 2
+}
