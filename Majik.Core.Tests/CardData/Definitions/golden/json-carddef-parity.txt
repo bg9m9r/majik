@@ -33246,6 +33246,55 @@
   "mdfc": null,
   "colors": []
 }
+==== meteor-golem ====
+{
+  "name": "Meteor Golem",
+  "manaCost": "{7}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Artifact",
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Golem"
+  ],
+  "power": 3,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== midnight-reaper ====
 {
   "name": "Midnight Reaper",
