@@ -10244,6 +10244,58 @@
     "Blue"
   ]
 }
+==== curious-cadaver ====
+{
+  "name": "Curious Cadaver",
+  "manaCost": "{2}{U}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Detective",
+    "Zombie"
+  ],
+  "power": 3,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Blue"
+  ]
+}
 ==== cyclonic-rift ====
 {
   "name": "Cyclonic Rift",
