@@ -1,0 +1,6 @@
+{
+  "name": "Shore Up",
+  "types": ["Instant"],
+  "manaCost": "{U}",
+  "colors": ["U"]
+}
