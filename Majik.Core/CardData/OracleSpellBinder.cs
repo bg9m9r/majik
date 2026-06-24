@@ -63,6 +63,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Damage.SelfFightTemplate(),
             new SpellTemplates.Templates.Damage.AsymmetricFightTemplate(),
             new SpellTemplates.Templates.Damage.ChooseAndFightTemplate(),
+            new SpellTemplates.Templates.Damage.ExsanguinateDrainTemplate(),
             new SpellTemplates.Templates.Damage.EachOpponentLosesLifeTemplate(),
             new SpellTemplates.Templates.Damage.DealsNDamageEachOpponentTemplate(),
             new SpellTemplates.Templates.Damage.DamageEachPlayerTemplate(),
