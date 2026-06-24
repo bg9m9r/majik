@@ -1,0 +1,8 @@
+{
+  "name": "Outcaster Greenblade",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Mercenary"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 2
+}
