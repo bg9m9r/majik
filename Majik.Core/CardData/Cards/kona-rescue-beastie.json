@@ -1,0 +1,10 @@
+{
+  "name": "Kona, Rescue Beastie",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Beast", "Survivor"],
+  "manaCost": "{3}{G}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
