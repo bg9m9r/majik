@@ -35907,6 +35907,60 @@
   "mdfc": null,
   "colors": []
 }
+==== mind-drill-assailant ====
+{
+  "name": "Mind Drill Assailant",
+  "manaCost": "{2}{U/B}{U/B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Rat",
+    "Warlock"
+  ],
+  "power": 2,
+  "toughness": 5,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:ManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Blue"
+  ]
+}
 ==== mirran-crusader ====
 {
   "name": "Mirran Crusader",
