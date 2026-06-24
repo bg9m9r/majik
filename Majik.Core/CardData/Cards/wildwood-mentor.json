@@ -1,0 +1,9 @@
+{
+  "name": "Wildwood Mentor",
+  "types": ["Creature"],
+  "subtypes": ["Treefolk"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
