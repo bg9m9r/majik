@@ -1,0 +1,9 @@
+{
+  "name": "Brightblade Stoat",
+  "types": ["Creature"],
+  "subtypes": ["Weasel", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["First strike", "Lifelink"]
+}
