@@ -1,0 +1,9 @@
+{
+  "name": "Most Valuable Slayer",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{3}{R}",
+  "power": 2,
+  "toughness": 4,
+  "abilities": []
+}
