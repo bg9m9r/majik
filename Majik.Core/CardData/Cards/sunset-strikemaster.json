@@ -1,0 +1,25 @@
+{
+  "name": "Sunset Strikemaster",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Monk"],
+  "manaCost": "{1}{R}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "mana",
+      "produces": "R"
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}{R}" },
+        { "type": "tap_self" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        { "type": "deal_damage", "amount": 6, "target": "creature_with_flying" }
+      ]
+    }
+  ]
+}

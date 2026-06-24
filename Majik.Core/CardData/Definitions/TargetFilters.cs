@@ -282,6 +282,20 @@ public static class TargetFilters
             "creature_toughness_ge_4" =>
                 ("target creature with toughness 4 or greater",
                     o => o is Creature c && OnBattlefield(c) && c.Toughness >= 4),
+            // CR 109.5 / 702.9 — "creature with flying": a battlefield creature
+            // that has the Flying keyword (printed or granted). The check goes
+            // through CombatAbilities.HasFlying, the same canonical predicate
+            // combat uses, so a creature that gains flying via a continuous
+            // effect / aura counts and one that loses it does not. Both the
+            // candidate gatherer and the CR 608.2b resolution re-check (via
+            // Matches) apply the predicate, so a target that has lost flying
+            // since the ability went on the stack fizzles cleanly. Canonical
+            // case: Sunset Strikemaster — "It deals 6 damage to target creature
+            // with flying."
+            "creature_with_flying" =>
+                ($"target creature with flying to {verb}",
+                    o => o is Creature c && OnBattlefield(c)
+                         && Majik.Core.Combat.CombatAbilities.HasFlying(c)),
             // Graveyard-zone targets (CR 406 / 701.21 — "exile target card from
             // a graveyard"). The predicate gates on Graveyard zone, so the same
             // verb that exiles a battlefield permanent also exiles a graveyard
