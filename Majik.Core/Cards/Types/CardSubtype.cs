@@ -687,4 +687,9 @@ public enum CardSubtype
     /// and the broader Bloomburrow Wolverine lineage. CR 205.3m — flavour
     /// subtype with no inherent rules meaning of its own.</summary>
     Wolverine,
+
+    /// <summary>Horse creature subtype — Diamond Mare (Core Set 2019) and the
+    /// broader Horse lineage (Crimson Mare, Pegasus-adjacent Horses). CR 205.3m
+    /// — flavour subtype with no inherent rules meaning of its own.</summary>
+    Horse,
 }

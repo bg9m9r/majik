@@ -1,0 +1,8 @@
+{
+  "name": "Diamond Mare",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Horse"],
+  "manaCost": "{2}",
+  "power": 1,
+  "toughness": 3
+}
