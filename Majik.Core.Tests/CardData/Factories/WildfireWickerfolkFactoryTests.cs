@@ -9,23 +9,31 @@ using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
+using Creature = Majik.Core.Cards.Creature;
 
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// Tests for Wildfire Wickerfolk (Modern Horizons 3, {R}{G}, Artifact Creature
-/// — Scarecrow 3/2).
+/// Unit tests for <see cref="WildfireWickerfolkFactory"/> — Wildfire Wickerfolk
+/// ({R}{G}, Artifact Creature — Scarecrow 3/2).
 ///
-/// Covers the card's UNIQUE behaviour:
-///   - Identity (name / {R}{G} / 3/2 / Artifact + Creature / Scarecrow).
-///   - Haste — printed, always on.
-///   - Delirium inactive (3 types): printed 3/2, no trample.
-///   - Delirium active (4+ types): +1/+1 → 4/3 AND has trample.
-///   - Delirium dynamic: gaining a 4th distinct graveyard type lights up the
-///     +1/+1 and the trample grant.
+/// Oracle text (verified against Scryfall 2026-06-24):
+///   "Haste
+///    Delirium — This creature gets +1/+1 and has trample as long as there are
+///    four or more card types among cards in your graveyard."
 ///
-/// Dispatch + well-formedness are covered for every implemented card by
-/// CardFactoryContractTests — not re-asserted here.
+/// Covers:
+/// - Identity (name, types incl. Artifact, Scarecrow subtype, cost, P/T,
+///   owner/controller).
+/// - Intrinsic Haste (CR 702.10).
+/// - Delirium active (4+ types in graveyard): +1/+1 AND trample (CR 702.105 /
+///   702.19).
+/// - Delirium inactive (3 types): printed 3/2, no trample.
+/// - Delirium dynamic: gaining a 4th type while on the battlefield lights up
+///   the static.
+///
+/// NamedCardFactory dispatch + well-formedness are asserted globally by
+/// CardFactoryContractTests, so no dispatch test here.
 /// </summary>
 [Trait("Color", "M")]
 public class WildfireWickerfolkFactoryTests
@@ -45,53 +53,54 @@ public class WildfireWickerfolkFactoryTests
 
     private Creature CreateAndMoveToBattlefield(EventBus bus, ContinuousEffectsService effects)
     {
-        var ww = WildfireWickerfolkFactory.Create(_alice, bus, effects);
-        ww.SetZone(ZoneType.Battlefield);
-        bus.Publish(new CardMovedEvent(ww, ZoneType.Hand, ZoneType.Battlefield));
-        return ww;
+        var wf = WildfireWickerfolkFactory.Create(_alice, bus, effects);
+        wf.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(wf, ZoneType.Hand, ZoneType.Battlefield));
+        return wf;
     }
 
-    // -----------------------------------------------------------------------
-    // Identity
-    // -----------------------------------------------------------------------
+    // ── Identity ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void WildfireWickerfolk_Identity_ArtifactScarecrow_3_2_AtCostRG()
+    public void Identity_ArtifactCreatureScarecrow_3_2_AtCostRG()
     {
-        var ww = WildfireWickerfolkFactory.Create(_alice);
+        var wf = WildfireWickerfolkFactory.Create(_alice);
 
-        ww.Name.Should().Be("Wildfire Wickerfolk");
-        ww.ManaCost.Should().Be("{R}{G}");
-        ww.HasType(CardType.Creature).Should().BeTrue();
-        ww.HasType(CardType.Artifact).Should().BeTrue();
-        ww.HasSubtype(CardSubtype.Scarecrow).Should().BeTrue();
-        ww.BasePower.Should().Be(3);
-        ww.BaseToughness.Should().Be(2);
-        ww.Owner.Should().BeSameAs(_alice);
-        ww.Controller.Should().BeSameAs(_alice);
+        wf.Name.Should().Be("Wildfire Wickerfolk");
+        wf.ManaCost.Should().Be("{R}{G}");
+        wf.HasType(CardType.Creature).Should().BeTrue();
+        wf.HasType(CardType.Artifact).Should().BeTrue();
+        wf.HasSubtype(CardSubtype.Scarecrow).Should().BeTrue();
+        wf.BasePower.Should().Be(3);
+        wf.BaseToughness.Should().Be(2);
+        wf.Owner.Should().BeSameAs(_alice);
+        wf.Controller.Should().BeSameAs(_alice);
     }
-
-    // -----------------------------------------------------------------------
-    // Haste — printed, always on (CR 702.10)
-    // -----------------------------------------------------------------------
 
     [Fact]
-    public void WildfireWickerfolk_HasHaste()
+    public void HasHaste()
     {
-        var ww = WildfireWickerfolkFactory.Create(_alice);
-        CombatAbilities.HasHaste(ww).Should().BeTrue();
+        // CR 702.10 — Haste is intrinsic (printed keyword marker).
+        var wf = WildfireWickerfolkFactory.Create(_alice);
+        CombatAbilities.HasHaste(wf).Should().BeTrue();
     }
 
-    // -----------------------------------------------------------------------
-    // Delirium — conditional +1/+1 and trample (CR 702.105)
-    // -----------------------------------------------------------------------
+    [Fact]
+    public void WithoutDelirium_DoesNotHaveTrample()
+    {
+        // The base shape has no trample — it's only granted by delirium.
+        var wf = WildfireWickerfolkFactory.Create(_alice);
+        CombatAbilities.HasTrample(wf).Should().BeFalse();
+    }
+
+    // ── Delirium — +1/+1 and trample ─────────────────────────────────────
 
     [Fact]
     public void DeliriumInactive_ThreeTypes_Is_3_2_NoTrample()
     {
         var bus = new EventBus();
         var effects = new ContinuousEffectsService();
-        var ww = CreateAndMoveToBattlefield(bus, effects);
+        var wf = CreateAndMoveToBattlefield(bus, effects);
 
         SeedGraveyard(_alice,
             new[] { CardType.Creature },
@@ -100,17 +109,17 @@ public class WildfireWickerfolkFactoryTests
 
         WildfireWickerfolkFactory.IsDeliriumActive(_alice).Should().BeFalse();
 
-        ww.Power.Should().Be(3);
-        ww.Toughness.Should().Be(2);
-        CombatAbilities.HasTrample(ww).Should().BeFalse();
+        wf.Power.Should().Be(3);
+        wf.Toughness.Should().Be(2);
+        CombatAbilities.HasTrample(wf).Should().BeFalse();
     }
 
     [Fact]
-    public void DeliriumActive_FourTypes_Is_4_3_AndHasTrample()
+    public void DeliriumActive_FourTypes_Is_4_3_WithTrample()
     {
         var bus = new EventBus();
         var effects = new ContinuousEffectsService();
-        var ww = CreateAndMoveToBattlefield(bus, effects);
+        var wf = CreateAndMoveToBattlefield(bus, effects);
 
         SeedGraveyard(_alice,
             new[] { CardType.Creature },
@@ -120,38 +129,42 @@ public class WildfireWickerfolkFactoryTests
 
         WildfireWickerfolkFactory.IsDeliriumActive(_alice).Should().BeTrue();
 
-        ww.Power.Should().Be(4);
-        ww.Toughness.Should().Be(3);
-        CombatAbilities.HasTrample(ww).Should().BeTrue();
-        // Haste is unaffected by delirium.
-        CombatAbilities.HasHaste(ww).Should().BeTrue();
+        wf.Power.Should().Be(4);
+        wf.Toughness.Should().Be(3);
+        CombatAbilities.HasTrample(wf).Should().BeTrue(
+            "delirium grants trample (CR 702.105 / CR 702.19).");
+        CombatAbilities.HasHaste(wf).Should().BeTrue(
+            "Haste is intrinsic and unaffected by delirium.");
     }
 
     [Fact]
-    public void DeliriumDynamic_GainingFourthType_LightsUpPumpAndTrample()
+    public void DeliriumDynamic_GainingFourthType_LightsUpStatic()
     {
         var bus = new EventBus();
         var effects = new ContinuousEffectsService();
-        var ww = CreateAndMoveToBattlefield(bus, effects);
+
+        var wf = WildfireWickerfolkFactory.Create(_alice, bus, effects);
+        wf.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(wf, ZoneType.Hand, ZoneType.Battlefield));
 
         SeedGraveyard(_alice,
             new[] { CardType.Creature },
             new[] { CardType.Instant },
             new[] { CardType.Sorcery });
 
-        ww.Power.Should().Be(3, "3 types is below the delirium threshold");
-        CombatAbilities.HasTrample(ww).Should().BeFalse();
+        wf.Power.Should().Be(3, "3 types is below threshold");
+        CombatAbilities.HasTrample(wf).Should().BeFalse();
 
-        // Drop a fourth distinct type into the graveyard. The graveyard add
-        // bypasses the event bus, so invalidate the layer-system cache via
-        // Clear() (same pattern as GrimFlayerTests).
+        // Drop a fourth distinct type into the graveyard — delirium lights up
+        // on the next read. The graveyard add bypasses the event bus, so
+        // invalidate the layer-system cache explicitly via Clear().
         var enchant = new Card("Holy Aura", "1W", new[] { CardType.Enchantment });
         enchant.SetOwner(_alice);
         _alice.Zones.Graveyard.AddCard(enchant);
         effects.Clear();
 
-        ww.Power.Should().Be(4);
-        ww.Toughness.Should().Be(3);
-        CombatAbilities.HasTrample(ww).Should().BeTrue();
+        wf.Power.Should().Be(4);
+        wf.Toughness.Should().Be(3);
+        CombatAbilities.HasTrample(wf).Should().BeTrue();
     }
 }

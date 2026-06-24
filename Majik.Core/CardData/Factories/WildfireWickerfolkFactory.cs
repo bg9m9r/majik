@@ -10,56 +10,48 @@ using Majik.Core.Players;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Wildfire Wickerfolk (Modern Horizons 3, {R}{G}).
+/// Named-card factory for Wildfire Wickerfolk (Bloomburrow / Modern, {R}{G}).
 ///
 /// Artifact Creature — Scarecrow 3/2. Oracle text (verified against Scryfall
-/// 2026-06-23):
+/// 2026-06-24):
 ///   "Haste
 ///    Delirium — This creature gets +1/+1 and has trample as long as there
 ///    are four or more card types among cards in your graveyard."
 ///
 /// ## Shape source
 ///
-/// Card identity (name, {R}{G}, 3/2, Artifact Creature — Scarecrow, the printed
-/// Haste keyword) is loaded from
-/// <c>Majik.Core/CardData/Cards/wildfire-wickerfolk.json</c> via
-/// <see cref="CardDefinitionLoader.FromEmbeddedResource"/> and built through
-/// <see cref="CardDefinitionFactory"/>. The delirium-gated +1/+1-and-trample
-/// static is wired in code below.
+/// Card identity (name, {R}{G}, 3/2, Artifact Creature — Scarecrow, intrinsic
+/// Haste) is materialised from the embedded JSON definition
+/// (<c>wildfire-wickerfolk.json</c>) via
+/// <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
+/// <see cref="CardDefinitionFactory.Build"/>. Haste (CR 702.10) is carried as
+/// a <c>keywords</c> entry in the JSON — a printed <see cref="KeywordAbility"/>
+/// marker read by <see cref="Majik.Core.Combat.CombatAbilities.HasHaste"/>.
+/// The delirium grant is wired in code below.
 ///
 /// ## Implementation
 ///
-/// Wildfire Wickerfolk is the +1/+1-and-keyword analogue of
-/// <see cref="DragonsRageChannelerFactory"/> — it shares the same delirium
-/// (CR 702.105) two-layer conditional-static primitive (one Layer-7c P/T pump
-/// + one Layer-6 keyword grant), differing only in the pump magnitude (+1/+1
-/// vs. +2/+2), the granted keyword (Trample vs. Flying), and the absence of any
-/// triggered ability. Haste is printed (always on) rather than delirium-gated,
-/// so it carried in the JSON <c>keywords</c> array as a
-/// <see cref="KeywordAbility"/> marker read by
-/// <see cref="Majik.Core.Combat.CombatAbilities.HasHaste"/>.
-///
-/// - <b>Haste (CR 702.10)</b> — printed keyword marker from the JSON, read by
-///   <see cref="Majik.Core.Combat.CombatAbilities.HasHaste"/> so the creature
-///   ignores summoning sickness for attacking / tap abilities.
+/// Wildfire Wickerfolk is the +1/+1 / trample analogue of
+/// <see cref="DragonsRageChannelerFactory"/> (which grants +2/+2 / flying on
+/// delirium). It reuses the same delirium (CR 702.105) static-grant primitive:
 ///
 /// - <b>Delirium conditional static (CR 702.105 / CR 613.1f)</b>: two
-///   <see cref="DeliriumPumpEffect"/> instances registered with the
+///   <see cref="DeliriumGrantEffect"/> instances registered with the
 ///   <see cref="ContinuousEffectsService"/> when the runtime overload is used —
-///   one in Layer 7c (+1/+1) and one in Layer 6 (grants "Trample"). Both gate
-///   IsActive() on the Wickerfolk being on the battlefield AND the controller's
-///   graveyard holding 4+ distinct <see cref="CardType"/> values (sampled live
-///   via <see cref="TarmogoyfFactory.CountDistinctCardTypes"/> on every
-///   Compute, so graveyard changes reflect immediately — no event
-///   subscriptions). The granted Trample (CR 702.19) flows through the layer
-///   system because <see cref="Majik.Core.Combat.CombatAbilities.HasTrample"/>
-///   reads the computed keyword set when an effects service is wired.
+///   one Layer 7c (+1/+1) and one Layer 6 (Trample grant). Both gate
+///   <see cref="ContinuousEffect.IsActive"/> on Wildfire Wickerfolk being on
+///   the battlefield AND the controller's graveyard holding 4+ distinct
+///   <see cref="CardType"/> values (sampled live via
+///   <see cref="TarmogoyfFactory.CountDistinctCardTypes"/> on every Compute, so
+///   graveyard changes reflect immediately — no event subscriptions). The
+///   granted Trample is read by <see cref="Majik.Core.Combat.CombatAbilities.HasTrample"/>
+///   off the layer-computed keyword set (CR 702.19, excess-combat-damage rule).
 ///
 /// ## Wiring overloads
 ///
-/// - <see cref="Create(Player)"/> — card shape only (Haste marker present from
-///   the JSON; the delirium static is not registered with a continuous-effects
-///   service). Suitable for dispatcher / structural tests.
+/// - <see cref="Create(Player)"/> — card shape only (Haste marker present; the
+///   delirium static is not registered with a continuous-effects service).
+///   Suitable for dispatcher / structural tests.
 /// - <see cref="Create(Player, IEventBus?, ContinuousEffectsService?)"/> —
 ///   fully wired. The +1/+1 pump and Trample grant register / unregister via a
 ///   battlefield-zone lifecycle handler subscribed to the bus (mirrors
@@ -78,8 +70,8 @@ public static class WildfireWickerfolkFactory
         CardDefinitionLoader.FromEmbeddedResource(Slug);
 
     /// <summary>
-    /// Construct Wildfire Wickerfolk with no live wiring. The Haste marker is
-    /// present (from the JSON); the delirium static is not registered with a
+    /// Construct Wildfire Wickerfolk with no live wiring. Haste is present as a
+    /// printed marker; the delirium static is not registered with a
     /// continuous-effects service. Suitable for dispatcher / shape tests.
     /// </summary>
     public static Creature Create(Player owner) =>
@@ -88,6 +80,12 @@ public static class WildfireWickerfolkFactory
     /// <summary>
     /// Construct Wildfire Wickerfolk with optional runtime services.
     /// </summary>
+    /// <param name="owner">Card owner / initial controller.</param>
+    /// <param name="eventBus">Bus the delirium lifecycle subscribes to for
+    /// ETB/LTB. May be null.</param>
+    /// <param name="effects">Continuous-effects service the delirium +1/+1 and
+    /// Trample grants register against. May be null — the grants are then
+    /// skipped (shape only).</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
@@ -107,16 +105,16 @@ public static class WildfireWickerfolkFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Delirium static — "This creature gets +1/+1 and has trample as long
-        // as there are four or more card types among cards in your graveyard."
-        // (CR 702.105 / CR 613.1f). Two continuous effects register together —
-        // one Layer 7c (+1/+1) and one Layer 6 (Trample grant). Both gate
-        // IsActive() on the Wickerfolk being on the battlefield AND delirium
-        // being satisfied (sampled live from the controller's graveyard on
-        // every Compute).
+        // Delirium static — "This creature gets +1/+1 and has trample as
+        // long as there are four or more card types among cards in your
+        // graveyard." (CR 702.105 / CR 613.1f). Two continuous effects
+        // register together — one Layer 7c (+1/+1) and one Layer 6 (Trample
+        // grant). Both gate IsActive() on Wildfire Wickerfolk being on the
+        // battlefield AND delirium being satisfied (sampled live from the
+        // controller's graveyard on every Compute).
         //
         // When no ContinuousEffectsService is supplied (shape-only path) the
-        // effects aren't registered — the card still reflects the printed 3/2
+        // grants aren't registered — the card still reflects the printed 3/2
         // with Haste.
         // ----------------------------------------------------------------
         if (effects != null)
@@ -142,18 +140,18 @@ public static class WildfireWickerfolkFactory
     }
 
     /// <summary>
-    /// CR 613.1f — continuous effect that pumps the Wickerfolk's P/T by +1/+1
-    /// (Layer 7c) OR grants the Trample keyword (Layer 6), gated on delirium
-    /// (CR 702.105). One instance per layer is registered by
-    /// <see cref="DeliriumLifecycle"/>.
+    /// CR 613.1f — continuous effect that pumps Wildfire Wickerfolk's P/T by
+    /// +1/+1 (Layer 7c) OR grants the Trample keyword (Layer 6), gated on
+    /// delirium (CR 702.105) and on the creature being on the battlefield. One
+    /// instance per layer is registered by <see cref="DeliriumLifecycle"/>.
     /// </summary>
-    private sealed class DeliriumPumpEffect : ContinuousEffect
+    private sealed class DeliriumGrantEffect : ContinuousEffect
     {
         private readonly Creature _source;
         private readonly Player _controller;
         private readonly Layer _layer;
 
-        public DeliriumPumpEffect(Creature source, Player controller, Layer layer)
+        public DeliriumGrantEffect(Creature source, Player controller, Layer layer)
         {
             _source = source ?? throw new ArgumentNullException(nameof(source));
             _controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -184,13 +182,15 @@ public static class WildfireWickerfolkFactory
         }
 
         /// <summary>
-        /// Sim-only: reconstruct an identical <see cref="DeliriumPumpEffect"/> bound to
-        /// <paramref name="clonedSource"/> for the search-sandbox clone.
-        /// The controller is captured as a field; the cloned controller is obtained from
-        /// clonedSource.Controller (remapped by RelinkReferences). Both the PT_Modify and
-        /// Abilities layer instances are reconstructed independently by the cloner (one
-        /// CloneForSim call per registered effect instance).
-        /// preserves: _layer; source → clonedSource (as Creature); controller → clonedSource.Controller.
+        /// Sim-only: reconstruct an identical <see cref="DeliriumGrantEffect"/>
+        /// bound to <paramref name="clonedSource"/> for the search-sandbox
+        /// clone. The controller is captured as a field; the cloned controller
+        /// is obtained from clonedSource.Controller (remapped by
+        /// RelinkReferences). Both the PT_Modify and Abilities layer instances
+        /// are reconstructed independently by the cloner (one CloneForSim call
+        /// per registered effect instance).
+        /// preserves: _layer; source → clonedSource (as Creature); controller →
+        /// clonedSource.Controller.
         /// </summary>
         internal override ContinuousEffect? CloneForSim(
             Majik.Core.Cards.Permanent clonedSource,
@@ -199,14 +199,14 @@ public static class WildfireWickerfolkFactory
             if (clonedSource is not Majik.Core.Cards.Creature clonedCreature) return null;
             var clonedController = clonedCreature.Controller;
             if (clonedController == null) return null;
-            return new DeliriumPumpEffect(clonedCreature, clonedController, _layer);
+            return new DeliriumGrantEffect(clonedCreature, clonedController, _layer);
         }
     }
 
     /// <summary>
-    /// ETB/LTB lifecycle binder for the Wickerfolk's delirium static. Registers
-    /// the +1/+1 (Layer 7c) and Trample (Layer 6) effects when it enters the
-    /// battlefield; unregisters when it leaves. Mirrors
+    /// ETB/LTB lifecycle binder for Wildfire Wickerfolk's delirium static.
+    /// Registers the +1/+1 (Layer 7c) and Trample (Layer 6) effects when the
+    /// creature enters the battlefield; unregisters when it leaves. Mirrors
     /// <see cref="DragonsRageChannelerFactory"/>'s lifecycle shape.
     /// </summary>
     private sealed class DeliriumLifecycle
@@ -216,8 +216,8 @@ public static class WildfireWickerfolkFactory
         private readonly ContinuousEffectsService _effects;
         private readonly IEventBus? _eventBus;
         private readonly Action<CardMovedEvent> _handler;
-        private DeliriumPumpEffect? _pumpRegistered;
-        private DeliriumPumpEffect? _trampleRegistered;
+        private DeliriumGrantEffect? _pumpRegistered;
+        private DeliriumGrantEffect? _trampleRegistered;
         private bool _attached;
 
         public DeliriumLifecycle(
@@ -253,8 +253,8 @@ public static class WildfireWickerfolkFactory
             var shouldBeActive = _source.Zone == Majik.Core.Zones.ZoneType.Battlefield;
             if (shouldBeActive && _pumpRegistered == null)
             {
-                _pumpRegistered = new DeliriumPumpEffect(_source, _controller, Layer.PT_Modify);
-                _trampleRegistered = new DeliriumPumpEffect(_source, _controller, Layer.Abilities);
+                _pumpRegistered = new DeliriumGrantEffect(_source, _controller, Layer.PT_Modify);
+                _trampleRegistered = new DeliriumGrantEffect(_source, _controller, Layer.Abilities);
                 _effects.Register(_pumpRegistered);
                 _effects.Register(_trampleRegistered);
             }
