@@ -122,6 +122,7 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
     private readonly int _toughness;
     private readonly bool _includeSelf;
     private readonly Majik.Core.ValueObjects.ManaColor? _requiredColor;
+    private readonly System.Func<Majik.Core.ValueObjects.ManaColor?>? _colorProvider;
 
     /// <summary>
     /// Construct an anthem.
@@ -134,7 +135,7 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
     /// <param name="includeSelf">If the source IS a creature, whether to
     /// apply the bonus to itself. Defaults to false (Glorious Anthem
     /// shape — though it's an enchantment so the question is moot).</param>
-    /// <param name="requiredColor">Optional colour gate (CR 105 / CR 613.7c).
+    /// <param name="requiredColor">Optional FIXED colour gate (CR 105 / CR 613.7c).
     /// When non-null, only creatures whose printed colour set
     /// (<see cref="Majik.Core.Cards.CardColors.GetColors"/>) contains this
     /// colour are affected — the "White creatures you control get +1/+1"
@@ -142,18 +143,31 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
     /// than effective colour because GetEffectiveColors re-enters the layer
     /// service and would recurse during layer evaluation. Null keeps the
     /// all-creatures behaviour (Glorious Anthem / Heartless Summoning).</param>
+    /// <param name="colorProvider">Optional DYNAMIC colour gate (CR 614.12) —
+    /// the "creatures you control OF THE CHOSEN COLOR get +N/+M" shape
+    /// (Heraldic Banner). When supplied it is consulted at every layer
+    /// evaluation so the live chosen colour (stamped onto the source's
+    /// <see cref="Majik.Core.CardData.ColorChoice"/> holder as it entered)
+    /// drives membership; a null return from the provider means "no colour
+    /// chosen yet → restrict to nothing". When supplied it takes precedence
+    /// over <paramref name="requiredColor"/> (it reflects the resolved
+    /// decision). Like the fixed gate it reads PRINTED colour
+    /// (<see cref="Majik.Core.Cards.CardColors.GetColors"/>) to avoid
+    /// re-entering the layer service.</param>
     public ControllerCreatureAnthemEffect(
         Permanent source,
         int power,
         int toughness,
         bool includeSelf = false,
-        Majik.Core.ValueObjects.ManaColor? requiredColor = null)
+        Majik.Core.ValueObjects.ManaColor? requiredColor = null,
+        System.Func<Majik.Core.ValueObjects.ManaColor?>? colorProvider = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _power = power;
         _toughness = toughness;
         _includeSelf = includeSelf;
         _requiredColor = requiredColor;
+        _colorProvider = colorProvider;
     }
 
     public override Layer Layer => Layer.PT_Modify;
@@ -177,8 +191,18 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
         // are mid-evaluation. Reading printed colour avoids the cycle.
         // Deferred (v1 gap): a Layer-5 colour changer (e.g. a creature turned
         // white) is not reflected by this gate. Null means no restriction.
-        if (_requiredColor != null
-            && !Majik.Core.Cards.CardColors.GetColors(creature).Contains(_requiredColor.Value))
+        //
+        // CR 614.12 — the DYNAMIC colour gate (Heraldic Banner's "of the chosen
+        // color") wins when supplied: it reads the live chosen colour each
+        // evaluation. A null provider result means no colour has been chosen
+        // yet, so the anthem restricts to nothing (no creature qualifies).
+        var gateColor = _colorProvider != null ? _colorProvider() : _requiredColor;
+        if (_colorProvider != null && gateColor == null)
+        {
+            return false;
+        }
+        if (gateColor != null
+            && !Majik.Core.Cards.CardColors.GetColors(creature).Contains(gateColor.Value))
         {
             return false;
         }
@@ -195,7 +219,10 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
     /// Sim-only: reconstruct an identical <see cref="ControllerCreatureAnthemEffect"/>
     /// bound to <paramref name="clonedSource"/> for the search-sandbox clone.
     /// All filtering reads clonedSource.Controller live (correctly remapped).
-    /// preserves: _power, _toughness, _includeSelf, _requiredColor; source → clonedSource.
+    /// preserves: _power, _toughness, _includeSelf, _requiredColor, _colorProvider; source → clonedSource.
+    /// The dynamic _colorProvider closure is shared by reference — it reads the
+    /// per-card ColorChoice holder, which is stable across the sim clone (the
+    /// chosen colour is fixed once the permanent has entered, CR 614.12).
     /// </summary>
     internal override ContinuousEffect? CloneForSim(
         Permanent clonedSource,
@@ -205,5 +232,6 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
             power:         _power,
             toughness:     _toughness,
             includeSelf:   _includeSelf,
-            requiredColor: _requiredColor);
+            requiredColor: _requiredColor,
+            colorProvider: _colorProvider);
 }

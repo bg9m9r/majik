@@ -1,0 +1,5 @@
+{
+  "name": "Heraldic Banner",
+  "types": ["Artifact"],
+  "manaCost": "{3}"
+}
