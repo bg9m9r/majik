@@ -1,0 +1,9 @@
+{
+  "name": "Dragonback Lancer",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{3}{W}",
+  "power": 3,
+  "toughness": 3,
+  "keywords": ["Flying"]
+}
