@@ -1,0 +1,6 @@
+{
+  "name": "Fireshrieker",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{3}"
+}
