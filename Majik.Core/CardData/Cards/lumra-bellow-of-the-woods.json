@@ -1,0 +1,10 @@
+{
+  "name": "Lumra, Bellow of the Woods",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elemental", "Bear"],
+  "manaCost": "{4}{G}{G}",
+  "power": 0,
+  "toughness": 0,
+  "abilities": []
+}
