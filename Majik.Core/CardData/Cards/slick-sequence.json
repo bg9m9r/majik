@@ -1,0 +1,5 @@
+{
+  "name": "Slick Sequence",
+  "types": ["Instant"],
+  "manaCost": "{U}{R}"
+}
