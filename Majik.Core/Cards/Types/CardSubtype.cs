@@ -695,4 +695,9 @@ public enum CardSubtype
     /// broader Horse lineage (Crimson Mare, Pegasus-adjacent Horses). CR 205.3m
     /// — flavour subtype with no inherent rules meaning of its own.</summary>
     Horse,
+
+    /// <summary>Specter creature subtype — Hypnotic Specter, Hollow Marauder
+    /// (Edge of Eternities) and the broader evasive hand-attack Specter lineage.
+    /// CR 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
+    Specter,
 }
