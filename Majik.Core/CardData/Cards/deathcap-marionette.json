@@ -1,0 +1,9 @@
+{
+  "name": "Deathcap Marionette",
+  "types": ["Creature"],
+  "subtypes": ["Fungus"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "keywords": ["Deathtouch"]
+}
