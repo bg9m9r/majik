@@ -1,0 +1,9 @@
+{
+  "name": "Goldvein Hydra",
+  "types": ["Creature"],
+  "subtypes": ["Hydra"],
+  "manaCost": "{X}{G}",
+  "power": 0,
+  "toughness": 0,
+  "keywords": ["Vigilance", "Trample", "Haste"]
+}
