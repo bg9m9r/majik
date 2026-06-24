@@ -1,0 +1,10 @@
+{
+  "name": "Dragonlord's Servant",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Shaman"],
+  "manaCost": "{1}{R}",
+  "colors": ["R"],
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}
