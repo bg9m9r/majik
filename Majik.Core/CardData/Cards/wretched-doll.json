@@ -1,0 +1,20 @@
+{
+  "name": "Wretched Doll",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Toy"],
+  "manaCost": "{1}{B}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{B}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}
