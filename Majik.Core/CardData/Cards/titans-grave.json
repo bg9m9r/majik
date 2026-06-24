@@ -1,0 +1,18 @@
+{
+  "name": "Titan's Grave",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}{B}{G}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}
