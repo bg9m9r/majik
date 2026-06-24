@@ -1,0 +1,6 @@
+{
+  "name": "Dazzling Denial",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}",
+  "colors": ["U"]
+}
