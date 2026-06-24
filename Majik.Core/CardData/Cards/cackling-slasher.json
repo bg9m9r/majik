@@ -1,0 +1,9 @@
+{
+  "name": "Cackling Slasher",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Assassin"],
+  "manaCost": "{3}{B}",
+  "power": 3,
+  "toughness": 3,
+  "colors": ["B"]
+}
