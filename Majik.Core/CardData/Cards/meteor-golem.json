@@ -1,0 +1,8 @@
+{
+  "name": "Meteor Golem",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Golem"],
+  "manaCost": "{7}",
+  "power": 3,
+  "toughness": 3
+}
