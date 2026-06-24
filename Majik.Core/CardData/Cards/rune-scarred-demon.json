@@ -1,0 +1,9 @@
+{
+  "name": "Rune-Scarred Demon",
+  "types": ["Creature"],
+  "subtypes": ["Demon"],
+  "manaCost": "{5}{B}{B}",
+  "power": 6,
+  "toughness": 6,
+  "keywords": ["Flying"]
+}
