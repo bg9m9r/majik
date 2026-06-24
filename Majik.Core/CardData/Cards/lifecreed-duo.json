@@ -1,0 +1,21 @@
+{
+  "name": "Lifecreed Duo",
+  "types": ["Creature"],
+  "subtypes": ["Bat", "Bird"],
+  "manaCost": "{1}{W}",
+  "power": 1,
+  "toughness": 2,
+  "keywords": ["Flying"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": {
+        "type": "whenever_another_creature_enters",
+        "youControlOnly": true
+      },
+      "effects": [
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
