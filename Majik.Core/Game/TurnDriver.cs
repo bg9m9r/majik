@@ -1469,8 +1469,6 @@ public sealed class TurnDriver
             // params) — PriorityLoop's auto-pass gate is then disabled.
             autoPassPrefsProvider: _autoPassPrefsProvider,
             isPassOnlyDeadWindow: _isPassOnlyDeadWindow,
-            eventBus: _eventBus,
-            clock: _clock,
             // CR 603.3 — agent-aware trigger drain. The driver owns the
             // TriggerManager + the seat agents, so it supplies the async
             // drain the PriorityLoop calls each time a player is about to
@@ -1506,17 +1504,7 @@ public sealed class TurnDriver
                 _players,
                 _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
 
-        try
-        {
-            await loop.RunUntilRoundEndsAsync(activePlayer, ct);
-        }
-        finally
-        {
-            // Slice 5a — TurnDriver constructs a fresh PriorityLoop per
-            // priority round; without detach the bus would accumulate
-            // two handlers per round across the full game lifetime.
-            loop.DetachFromBus();
-        }
+        await loop.RunUntilRoundEndsAsync(activePlayer, ct);
     }
 
     private async Task RunCombat(Player attacker, Player defender, CancellationToken ct)
