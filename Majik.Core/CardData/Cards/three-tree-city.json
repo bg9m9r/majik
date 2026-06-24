@@ -1,0 +1,8 @@
+{
+  "name": "Three Tree City",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
