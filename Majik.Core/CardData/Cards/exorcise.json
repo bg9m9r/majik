@@ -1,0 +1,6 @@
+{
+  "name": "Exorcise",
+  "types": ["Sorcery"],
+  "manaCost": "{1}{W}",
+  "colors": ["W"]
+}
