@@ -678,4 +678,9 @@ public enum CardSubtype
     /// the broader Bloomburrow Weasel lineage. CR 205.3m — flavour subtype with
     /// no inherent rules meaning of its own.</summary>
     Weasel,
+
+    /// <summary>Wolverine creature subtype — Hivespine Wolverine (Bloomburrow)
+    /// and the broader Bloomburrow Wolverine lineage. CR 205.3m — flavour
+    /// subtype with no inherent rules meaning of its own.</summary>
+    Wolverine,
 }
