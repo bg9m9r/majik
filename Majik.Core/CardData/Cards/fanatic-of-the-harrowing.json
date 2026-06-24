@@ -1,0 +1,9 @@
+{
+  "name": "Fanatic of the Harrowing",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{3}{B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
