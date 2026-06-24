@@ -1,0 +1,9 @@
+{
+  "name": "Massacre Wurm",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Wurm"],
+  "manaCost": "{3}{B}{B}{B}",
+  "power": 6,
+  "toughness": 5,
+  "abilities": []
+}
