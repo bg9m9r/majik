@@ -1,0 +1,9 @@
+{
+  "name": "Marketwatch Phantom",
+  "types": ["Creature"],
+  "subtypes": ["Spirit", "Detective"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
