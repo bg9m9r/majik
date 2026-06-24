@@ -1,0 +1,5 @@
+{
+  "name": "Sure Strike",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}"
+}
