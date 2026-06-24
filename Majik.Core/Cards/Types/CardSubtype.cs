@@ -654,6 +654,13 @@ public enum CardSubtype
     /// its own.</summary>
     Starfish,
 
+    /// <summary>Survivor creature subtype — Aetherdrift's "Survival" cards
+    /// (Cynical Loner and the broader Survivor lineage). CR 205.3m — flavour
+    /// subtype with no inherent rules meaning of its own (the "Survival"
+    /// second-main-phase abilities key off the creature being tapped, not the
+    /// Survivor subtype).</summary>
+    Survivor,
+
     /// <summary>Kirin creature subtype — Sunpearl Kirin (Bloomburrow) and the
     /// broader white/multicolour Kirin lineage (Kamigawa Spirit-dragons). CR
     /// 205.3m — flavour subtype with no inherent rules meaning of its own.</summary>
