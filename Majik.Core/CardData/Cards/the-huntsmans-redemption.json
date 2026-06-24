@@ -1,0 +1,7 @@
+{
+  "name": "The Huntsman's Redemption",
+  "types": ["Enchantment"],
+  "subtypes": ["Saga"],
+  "manaCost": "{2}{G}",
+  "abilities": []
+}
