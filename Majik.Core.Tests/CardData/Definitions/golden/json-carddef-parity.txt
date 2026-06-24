@@ -20488,6 +20488,61 @@
     "Blue"
   ]
 }
+==== ghalta-primal-hunger ====
+{
+  "name": "Ghalta, Primal Hunger",
+  "manaCost": "{10}{G}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Dinosaur",
+    "Elder"
+  ],
+  "power": 12,
+  "toughness": 12,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Trample"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== ghirapur-aether-grid ====
 {
   "name": "Ghirapur Aether Grid",
