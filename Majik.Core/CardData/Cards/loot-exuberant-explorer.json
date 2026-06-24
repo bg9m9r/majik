@@ -1,0 +1,9 @@
+{
+  "name": "Loot, Exuberant Explorer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Beast", "Noble"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 4
+}
