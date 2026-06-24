@@ -1,0 +1,9 @@
+{
+  "name": "Dauntless Veteran",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{1}{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
