@@ -1,0 +1,9 @@
+{
+  "name": "Cynical Loner",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Survivor"],
+  "manaCost": "{1}{B}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
