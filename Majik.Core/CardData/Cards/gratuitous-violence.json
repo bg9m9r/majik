@@ -1,0 +1,6 @@
+{
+  "name": "Gratuitous Violence",
+  "types": ["Enchantment"],
+  "manaCost": "{2}{R}{R}{R}",
+  "colors": ["R"]
+}
