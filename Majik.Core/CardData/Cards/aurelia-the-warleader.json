@@ -1,0 +1,10 @@
+{
+  "name": "Aurelia, the Warleader",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Angel"],
+  "manaCost": "{2}{R}{R}{W}{W}",
+  "power": 3,
+  "toughness": 4,
+  "abilities": []
+}
