@@ -1,0 +1,6 @@
+{
+  "name": "Goldvein Pick",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
