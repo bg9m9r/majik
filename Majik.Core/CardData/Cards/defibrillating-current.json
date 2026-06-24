@@ -1,0 +1,5 @@
+{
+  "name": "Defibrillating Current",
+  "types": ["Sorcery"],
+  "manaCost": "{2/R}{2/W}{2/B}"
+}
