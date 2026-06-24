@@ -1,0 +1,10 @@
+{
+  "name": "Hollow Marauder",
+  "types": ["Creature"],
+  "subtypes": ["Specter", "Rogue"],
+  "manaCost": "{6}{B}",
+  "power": 4,
+  "toughness": 2,
+  "colors": ["B"],
+  "keywords": ["Flying"]
+}
