@@ -1,0 +1,6 @@
+{
+  "name": "Blasphemous Edict",
+  "types": ["Sorcery"],
+  "manaCost": "{3}{B}{B}",
+  "abilities": []
+}
