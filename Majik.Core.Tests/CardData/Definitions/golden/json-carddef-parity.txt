@@ -5154,6 +5154,60 @@
   "mdfc": null,
   "colors": []
 }
+==== bonny-pall-clearcutter ====
+{
+  "name": "Bonny Pall, Clearcutter",
+  "manaCost": "{3}{G}{U}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Giant",
+    "Scout"
+  ],
+  "power": 6,
+  "toughness": 5,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "Green"
+  ]
+}
 ==== bontus-last-reckoning ====
 {
   "name": "Bontu\u0027s Last Reckoning",
