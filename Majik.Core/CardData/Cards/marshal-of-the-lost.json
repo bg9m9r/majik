@@ -1,0 +1,10 @@
+{
+  "name": "Marshal of the Lost",
+  "types": ["Creature"],
+  "subtypes": ["Orc", "Warrior"],
+  "manaCost": "{2}{W}{B}",
+  "power": 3,
+  "toughness": 3,
+  "keywords": ["Deathtouch"],
+  "abilities": []
+}
