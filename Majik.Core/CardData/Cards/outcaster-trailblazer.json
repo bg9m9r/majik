@@ -1,0 +1,9 @@
+{
+  "name": "Outcaster Trailblazer",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Druid"],
+  "manaCost": "{2}{G}",
+  "power": 4,
+  "toughness": 2,
+  "abilities": []
+}
