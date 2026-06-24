@@ -1,0 +1,5 @@
+{
+  "name": "Stab",
+  "types": ["Instant"],
+  "manaCost": "{B}"
+}
