@@ -1,0 +1,8 @@
+{
+  "name": "Lumbering Worldwagon",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Vehicle"],
+  "manaCost": "{2}{G}",
+  "power": 0,
+  "toughness": 4
+}
