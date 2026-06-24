@@ -103,6 +103,8 @@ public static class SagaBinder
             "The Restoration of Eiganjo"
                 or "The Restoration of Eiganjo // Architect of Restoration"
                 => MakeEiganjoChapterHandler(perm, zones, triggers, eventBus),
+            "The Huntsman's Redemption"
+                => MakeHuntsmansRedemptionChapterHandler(perm, zones, effects),
             _ => _ => { /* generic saga — no-op effect, state still ticks */ },
         };
 
@@ -763,6 +765,168 @@ public static class SagaBinder
             controller.Zones.Library.RemoveCard(architect);
             architect.SetZone(ZoneType.Battlefield);
             controller.Zones.Battlefield.AddCard(architect);
+        }
+    }
+
+    /// <summary>
+    /// The Huntsman's Redemption (Tarkir: Dragonstorm, {2}{G}). A
+    /// non-transforming, self-sacrificing Enchantment — Saga.
+    /// I — Create a 3/3 green Beast creature token (CR 111 / 111.4).
+    /// II — You may sacrifice a creature. If you do, search your library for a
+    ///     creature or basic land card, reveal it, put it into your hand, then
+    ///     shuffle (CR 701.16 sacrifice + reflexive "if you do" + CR 701.19a /
+    ///     701.20a). The optional sacrifice is agent-driven; declining honours
+    ///     the "you may" and the reflexive tutor never fires.
+    /// III — Up to two target creatures each get +2/+2 and gain trample until
+    ///     end of turn (CR 613 layered until-EOT pump + keyword grant). The
+    ///     up-to-two creatures are picked deterministically (v1 — same posture
+    ///     as Eiganjo chapter II's reanimation target) and require a
+    ///     <paramref name="effects"/> service to register the until-EOT effects.
+    /// After chapter III resolves the Saga self-sacrifices via the generic
+    /// Saga-sacrifice SBA (CR 714.5 / 704.5r) — it does NOT transform, so
+    /// <see cref="SagaState"/> is left intact for the SBA to consume.
+    /// </summary>
+    private static Action<int> MakeHuntsmansRedemptionChapterHandler(
+        Permanent perm,
+        ZoneService? zones,
+        ContinuousEffectsService? effects) => chapter =>
+    {
+        var controller = perm.Controller ?? perm.Owner!;
+        switch (chapter)
+        {
+            case 1:
+                HuntsmanCreateBeastToken(controller, zones);
+                break;
+            case 2:
+                HuntsmanSacrificeThenTutor(controller, zones);
+                break;
+            case 3:
+                HuntsmanPumpUpToTwoCreatures(controller, effects);
+                break;
+        }
+    };
+
+    /// <summary>Huntsman chapter I — CR 111 / 111.4. Create a 3/3 green Beast
+    /// creature token. Routes through <see cref="ZoneService"/> when available
+    /// so ETB triggers fire (CR 603.6a).</summary>
+    private static void HuntsmanCreateBeastToken(Player controller, ZoneService? zones)
+    {
+        Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
+            new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                Name: "Beast",
+                Power: 3,
+                Toughness: 3,
+                Subtypes: new[] { CardSubtype.Beast },
+                Keywords: null,
+                Colors: new[] { ManaColor.Green }),
+            controller,
+            zones);
+    }
+
+    /// <summary>Huntsman chapter II — CR 701.16 sacrifice + reflexive "if you
+    /// do." "You may sacrifice a creature. If you do, search your library for a
+    /// creature or basic land card, reveal it, put it into your hand, then
+    /// shuffle." The optional sacrifice is resolved via the controller's agent
+    /// (declining — or no agent — honours the "you may" and the reflexive tutor
+    /// never fires). When a creature IS sacrificed, the deterministic v1 tutor
+    /// returns the first eligible card (a creature card OR a basic land card) by
+    /// library order; the search shuffles regardless (CR 701.20a) only when the
+    /// sacrifice happened (the "if you do" gates the whole reflexive
+    /// clause).</summary>
+    private static void HuntsmanSacrificeThenTutor(Player controller, ZoneService? zones)
+    {
+        var creatures = controller.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Cast<ICard>()
+            .ToList();
+
+        Card? sacrifice = null;
+        if (creatures.Count > 0)
+        {
+            var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+            // No agent → safe "may" opt-out (never auto-sacrifices). With an
+            // agent, declining (null) honours the "you may".
+            sacrifice = agent?
+                .ChooseFromBattlefieldAsync(controller, creatures, Majik.Core.Cards.BotIntent.None)
+                .GetAwaiter().GetResult() as Card;
+        }
+
+        if (sacrifice == null) return; // "you may" declined → "if you do" never fires.
+
+        // CR 701.16a — move the sacrificed creature to its owner's graveyard.
+        if (zones != null)
+        {
+            zones.MoveCardTo(sacrifice, ZoneType.Graveyard, sacrifice.Owner ?? controller);
+        }
+        else
+        {
+            controller.Zones.Battlefield.RemoveCard(sacrifice);
+            (sacrifice.Owner ?? controller).Zones.Graveyard.AddCard(sacrifice);
+            sacrifice.SetZone(ZoneType.Graveyard);
+        }
+
+        // Reflexive "if you do" — CR 701.19a / 701.20a. Search the controller's
+        // library for a creature OR basic land card, put it into hand, shuffle.
+        HuntsmanTutorCreatureOrBasicLand(controller, zones);
+    }
+
+    /// <summary>CR 701.19a / 701.20a — search <paramref name="controller"/>'s
+    /// library for a creature card OR a basic land card (CR 305.6 — Basic
+    /// supertype + Land card type), put it into hand, then shuffle. v1
+    /// deterministic picker — first matching card by library order (same posture
+    /// as <see cref="EiganjoTutorBasicPlains"/>). Routes the move through
+    /// <see cref="ZoneService.MoveCard"/> when available.</summary>
+    private static void HuntsmanTutorCreatureOrBasicLand(Player controller, ZoneService? zones)
+    {
+        var pick = controller.Zones.Library.GetCards()
+            .FirstOrDefault(c =>
+                c.HasType(CardType.Creature) ||
+                (c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic)));
+
+        if (pick != null)
+        {
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Hand, controller);
+            }
+            else
+            {
+                controller.Zones.Library.RemoveCard(pick);
+                controller.Zones.Hand.AddCard(pick);
+                pick.SetZone(ZoneType.Hand);
+            }
+        }
+        // CR 701.20a — shuffle regardless of whether anything was found.
+        LibraryShuffle.ShuffleLibrary(controller, "huntsmans-redemption");
+    }
+
+    /// <summary>Huntsman chapter III — CR 613. "Up to two target creatures each
+    /// get +2/+2 and gain trample until end of turn." Registers a
+    /// <see cref="PumpUntilEndOfTurnEffect"/> (Layer 7c, +2/+2) and a
+    /// <see cref="GrantKeywordUntilEndOfTurnEffect"/> (Layer 6, Trample) per
+    /// chosen creature on the supplied <paramref name="effects"/> service.
+    /// v1 deterministic target pick — up to two of the controller's own
+    /// creatures, highest power first (a buff is most useful on the
+    /// controller's board; same documented v1 Saga posture as Eiganjo chapter
+    /// II's deterministic reanimation target). No-op when no
+    /// <paramref name="effects"/> service is supplied (shape tests) or no
+    /// creatures are present.</summary>
+    private static void HuntsmanPumpUpToTwoCreatures(Player controller, ContinuousEffectsService? effects)
+    {
+        if (effects == null) return;
+
+        var targets = controller.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .OrderByDescending(c => c.Power)
+            .Take(2)
+            .ToList();
+
+        foreach (var creature in targets)
+        {
+            // CR 613.4c — Layer 7c +P/+T (PumpUntilEndOfTurnEffect, +2/+2).
+            effects.Register(new PumpUntilEndOfTurnEffect(creature, 2, 2));
+            // CR 613.1f — Layer 6 ability grant (Trample) until end of turn.
+            effects.Register(new GrantKeywordUntilEndOfTurnEffect(creature, "Trample"));
         }
     }
 
