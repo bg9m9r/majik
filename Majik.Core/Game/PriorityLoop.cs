@@ -1,7 +1,5 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
-using Majik.Core.Domain.DomainEvents;
-using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
@@ -73,20 +71,6 @@ public sealed class PriorityLoop
     // BEFORE the trigger drain (_asyncTriggerDrain) so SBAs fire, then any
     // pending triggers go on the stack, then the player gets priority.
     private readonly Action? _checkStateBasedActions;
-    private readonly Func<DateTime> _clock;
-    // Stack-mutation event subscriptions held so the loop can detach on
-    // its way out. TurnDriver constructs a fresh PriorityLoop per round
-    // and the bus outlives every one of them — without unsubscribe,
-    // every priority round would accumulate two handlers on the bus.
-    private readonly IEventBus? _eventBus;
-    private readonly Action<StackObjectAddedEvent>? _onStackAdded;
-    private readonly Action<StackObjectResolvedEvent>? _onStackResolved;
-    // Wall-clock timestamp of the most recent stack mutation seen by
-    // this loop (additions OR resolutions — anything that visibly
-    // mutates the stack from the player's POV). Initialised to
-    // DateTime.MinValue so the first dead window doesn't accidentally
-    // sit inside the display window at game start.
-    private DateTime _lastStackMutatedAt = DateTime.MinValue;
     private Player? _activePlayer;
 
     public PriorityLoop(
@@ -105,8 +89,6 @@ public sealed class PriorityLoop
         Action<Player, PriorityAction.ActivateManaAbility>? manaAbilityDispatcher = null,
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
-        IEventBus? eventBus = null,
-        Func<DateTime>? clock = null,
         Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
         Func<TurnState?>? turnStateAccessor = null,
         Action? checkStateBasedActions = null)
@@ -141,37 +123,6 @@ public sealed class PriorityLoop
         _landDropTracker = landDropTracker ?? throw new ArgumentNullException(nameof(landDropTracker));
         _autoPassPrefsProvider = autoPassPrefsProvider;
         _isPassOnlyDeadWindow = isPassOnlyDeadWindow;
-        _clock = clock ?? (() => DateTime.UtcNow);
-
-        // Slice 5a — subscribe to stack-mutation events so the auto-pass
-        // gate can suppress an immediate pass while the user is still
-        // watching the stack settle. Subscriptions are best-effort: when
-        // no bus is supplied (legacy ctor sites) the loop runs without a
-        // stack-display window — the FullControl + PhaseStop guards still
-        // protect the user, and auto-pass simply fires as fast as the
-        // engine can compute the kinds.
-        if (eventBus != null)
-        {
-            _eventBus = eventBus;
-            _onStackAdded = _ => _lastStackMutatedAt = _clock();
-            _onStackResolved = _ => _lastStackMutatedAt = _clock();
-            eventBus.Subscribe(_onStackAdded);
-            eventBus.Subscribe(_onStackResolved);
-        }
-    }
-
-    /// <summary>
-    /// Detach this loop's stack-mutation subscriptions from the engine
-    /// bus. Safe to call multiple times. Callers that construct a fresh
-    /// PriorityLoop per priority round (TurnDriver) MUST call this when
-    /// the round ends so handlers don't pile up on the bus across the
-    /// game's lifetime.
-    /// </summary>
-    public void DetachFromBus()
-    {
-        if (_eventBus == null) return;
-        if (_onStackAdded != null) _eventBus.Unsubscribe(_onStackAdded);
-        if (_onStackResolved != null) _eventBus.Unsubscribe(_onStackResolved);
     }
 
     /// <summary>
@@ -474,17 +425,21 @@ public sealed class PriorityLoop
     ///         current wire phase label. Semantics match the portal's
     ///         <c>shouldAutoPass</c>: <c>"mine"</c> means stop on the
     ///         viewer's own turn; <c>"theirs"</c> on the opponent's.</item>
-    ///   <item>We're past the stack-display window
-    ///         (<see cref="AutoPassConstants.StackMutationDisplayMs"/>)
-    ///         after the most recent stack mutation — EXCEPT on the own-top
-    ///         path, which is exempt (the player put the object there
-    ///         themselves; the opponent still gets their own display
-    ///         window). Gives the user a beat to register a freshly-landed
-    ///         trigger or spell they did not initiate before it resolves
-    ///         silently.</item>
     /// </list>
     /// A miss on any falls through to the normal
     /// <see cref="IPlayerAgent.ChoosePriorityActionAsync"/> path.
+    ///
+    /// <para>There is deliberately NO server-side "stack-display beat" gate
+    /// here: a genuinely-dead (pass-only) window must auto-pass IMMEDIATELY
+    /// so the engine never blocks awaiting a human whose only legal move is
+    /// pass. (A prior gate suppressed auto-pass for a brief window after any
+    /// stack mutation; because own-top is already exempt, that gate ONLY
+    /// ever fired on the dead, not-own-top case — exactly the priority
+    /// window where blocking on the human wedged the match permanently when
+    /// the client never surfaced an actionable pass-only prompt. The
+    /// minimum-display beat is still enforced client-side in the portal
+    /// (<c>STACK_MUTATION_DISPLAY_MS</c>), where it is purely cosmetic and
+    /// cannot deadlock the engine.)</para>
     ///
     /// <para>Concurrency: the prefs read is a snapshot. A user toggling
     /// FullControl while a window is being evaluated may see at most one
@@ -541,24 +496,13 @@ public sealed class PriorityLoop
             }
         }
 
-        // Gate 5 — stack-display window. AutoPassConstants.StackMutationDisplayMs
-        // after the last stack mutation, suppress to give the user a beat
-        // to register the change before it resolves silently. EXEMPT the
-        // own-top path: the player put that object on the stack themselves,
-        // so there is nothing new for them to register — and the opponent
-        // still gets their own full display window when priority reaches
-        // them. Without this exemption the freshly-cast object would always
-        // sit inside the window and re-prompt the caster (the very friction
-        // this path removes).
-        if (!ownsTopOfStack)
-        {
-            var elapsed = _clock() - _lastStackMutatedAt;
-            if (elapsed < TimeSpan.FromMilliseconds(AutoPassConstants.StackMutationDisplayMs))
-            {
-                return false;
-            }
-        }
-
+        // NOTE: there is intentionally no Gate 5 "stack-display beat" here.
+        // A dead (pass-only) window must auto-pass immediately rather than
+        // block awaiting a human whose only legal move is pass — suppressing
+        // the auto-pass for a post-stack-mutation beat wedged the match
+        // permanently when the client never surfaced an actionable pass-only
+        // prompt (the replay-confirmed dead-window wedge). The display beat
+        // remains a purely cosmetic, client-side concern in the portal.
         return true;
     }
 

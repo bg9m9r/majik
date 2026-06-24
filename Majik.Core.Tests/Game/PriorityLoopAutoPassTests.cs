@@ -95,8 +95,6 @@ public class PriorityLoopAutoPassTests
         CountingAgent aliceAgent, CountingAgent bobAgent,
         System.Func<Player, IAutoPassPrefsView?>? prefs = null,
         System.Func<GameContext, bool>? deadWindow = null,
-        IEventBus? eventBus = null,
-        System.Func<System.DateTime>? clock = null,
         StepStateType phase = StepStateType.PreCombatMain)
     {
         var agents = new System.Collections.Generic.Dictionary<Player, IPlayerAgent>
@@ -115,9 +113,7 @@ public class PriorityLoopAutoPassTests
             phaseAccessor: () => phase,
             landDropTracker: new LandDropTracker(),
             autoPassPrefsProvider: prefs,
-            isPassOnlyDeadWindow: deadWindow,
-            eventBus: eventBus,
-            clock: clock);
+            isPassOnlyDeadWindow: deadWindow);
     }
 
     // -------------------------------------------------------------------
@@ -131,12 +127,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
-            deadWindow: _ => true,
-            // Clock fixed at a time well past DateTime.MinValue so the
-            // stack-display window is satisfied. (No bus → mutations
-            // never advance _lastStackMutatedAt past MinValue anyway,
-            // but pin it explicitly.)
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: _ => true);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -168,8 +159,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
-            deadWindow: _ => false,
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: _ => false);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -189,8 +179,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: p => ReferenceEquals(p, _alice) ? null : new TestPrefs(),
-            deadWindow: _ => true,
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: _ => true);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -209,8 +198,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs { FullControl = true },
-            deadWindow: _ => true,
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: _ => true);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -236,7 +224,6 @@ public class PriorityLoopAutoPassTests
                 ? new TestPrefs { PhaseStops = new System.Collections.Generic.Dictionary<string, string> { ["PreCombatMain"] = "mine" } }
                 : new TestPrefs(),
             deadWindow: _ => true,
-            clock: () => new System.DateTime(2026, 1, 1),
             phase: StepStateType.PreCombatMain);
 
         await loop.RunUntilRoundEndsAsync(_alice);
@@ -260,7 +247,6 @@ public class PriorityLoopAutoPassTests
                 ? new TestPrefs { PhaseStops = new System.Collections.Generic.Dictionary<string, string> { ["PreCombatMain"] = "theirs" } }
                 : new TestPrefs(),
             deadWindow: _ => true,
-            clock: () => new System.DateTime(2026, 1, 1),
             phase: StepStateType.PreCombatMain);
 
         await loop.RunUntilRoundEndsAsync(_alice);
@@ -282,7 +268,6 @@ public class PriorityLoopAutoPassTests
                 PhaseStops = new System.Collections.Generic.Dictionary<string, string> { ["Upkeep"] = "mine" }
             },
             deadWindow: _ => true,
-            clock: () => new System.DateTime(2026, 1, 1),
             phase: StepStateType.PreCombatMain);
 
         await loop.RunUntilRoundEndsAsync(_alice);
@@ -291,27 +276,45 @@ public class PriorityLoopAutoPassTests
     }
 
     // -------------------------------------------------------------------
-    // Gate 5 — stack-mutation display window
+    // Dead-window auto-pass is IMMEDIATE — no server-side stack-display beat
+    //
+    // The engine must NEVER block awaiting a human on a pass-only window.
+    // A prior "Gate 5" suppressed auto-pass for a beat after any stack
+    // mutation; because own-top is already exempt, that gate fired ONLY on
+    // the dead, not-own-top case — exactly the window where blocking on the
+    // human wedged a live human-vs-bot match permanently (replay-confirmed:
+    // bot cast Boltwave → human got a dead window on an empty board → the
+    // loop awaited a pass the client never surfaced → frozen forever). The
+    // gate was removed; these tests prove a dead window auto-passes
+    // immediately regardless of how recently the stack mutated. The
+    // minimum-display beat remains purely client-side in the portal.
     // -------------------------------------------------------------------
 
+    // THE WEDGE-FIX TEST. Was `WithinStackDisplayWindow_PromptsAgent`, which
+    // asserted the OLD buggy behaviour: a dead window falling inside the
+    // post-stack-mutation display beat was SUPPRESSED from auto-pass and the
+    // agent was prompted. That encoded the wedge — on a human seat whose only
+    // legal move is pass, prompting blocks the loop forever when the client
+    // never surfaces an actionable pass-only prompt. Flipped to assert the
+    // correct behaviour: a dead, not-own-top window ALWAYS auto-passes,
+    // immediately, no matter how recently the stack mutated.
     [Fact]
-    public async Task WithinStackDisplayWindow_PromptsAgent()
+    public async Task DeadWindow_ImmediatelyAfterStackMutation_StillAutoPasses_NoPrompt()
     {
-        // Synthesise a stack mutation immediately before running the loop;
-        // clock barely advances → still inside the display window → prompt.
         var alice = new CountingAgent();
         var bob = new CountingAgent();
-        var now = new System.DateTime(2026, 1, 1);
 
-        // Construct the loop FIRST (subscribes to the bus), then publish.
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
             deadWindow: _ => true,
-            eventBus: _bus,
-            clock: () => now,
             phase: StepStateType.PreCombatMain);
 
-        // Stamp the stack as just-mutated.
+        // Publish a stack-mutation event in the same beat we run the loop —
+        // the very situation the removed Gate 5 suppressed auto-pass for.
+        // With the fix there is no stack-display beat server-side, so the
+        // dead window auto-passes regardless. (No bus is wired into the loop
+        // any more; this publish is a no-op for it and merely documents the
+        // "fresh mutation" intent.)
         var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1) { Owner = _alice, Zone = ZoneType.Battlefield };
         var trig = new Majik.Core.Abilities.TriggeredAbility(
             permanent, _alice,
@@ -319,59 +322,27 @@ public class PriorityLoopAutoPassTests
             effects: System.Array.Empty<Majik.Core.Abilities.IEffect>());
         _bus.Publish(new StackObjectAddedEvent(trig));
 
-        // Still at `now` — zero ms elapsed since the publish.
         await loop.RunUntilRoundEndsAsync(_alice);
 
-        alice.PromptCount.Should().BeGreaterThan(0, "we're still inside the stack-display window");
-    }
-
-    [Fact]
-    public async Task AfterStackDisplayWindowElapses_AutoPasses()
-    {
-        // Publish a stack mutation, then advance the clock past the
-        // display window → auto-pass.
-        var alice = new CountingAgent();
-        var bob = new CountingAgent();
-        var now = new System.DateTime(2026, 1, 1);
-
-        var loop = NewLoop(alice, bob,
-            prefs: _ => new TestPrefs(),
-            deadWindow: _ => true,
-            eventBus: _bus,
-            clock: () => now,
-            phase: StepStateType.PreCombatMain);
-
-        var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1) { Owner = _alice, Zone = ZoneType.Battlefield };
-        var trig = new Majik.Core.Abilities.TriggeredAbility(
-            permanent, _alice,
-            Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(permanent),
-            effects: System.Array.Empty<Majik.Core.Abilities.IEffect>());
-        _bus.Publish(new StackObjectAddedEvent(trig));
-
-        // Jump past the display window.
-        now = now.AddMilliseconds(AutoPassConstants.StackMutationDisplayMs + 50);
-
-        await loop.RunUntilRoundEndsAsync(_alice);
-
-        alice.PromptCount.Should().Be(0);
+        alice.PromptCount.Should().Be(0,
+            "a dead (pass-only) window must auto-pass immediately even right after " +
+            "a stack mutation — never block awaiting a human whose only move is pass");
         bob.PromptCount.Should().Be(0);
     }
 
+    // Was `StackObjectResolved_AlsoStampsMutation`, which asserted the OLD
+    // buggy behaviour for the resolution side of the beat (a freshly-resolved
+    // object suppressed auto-pass and prompted). Flipped: a dead window right
+    // after a resolution event still auto-passes.
     [Fact]
-    public async Task StackObjectResolved_AlsoStampsMutation()
+    public async Task DeadWindow_ImmediatelyAfterStackResolution_StillAutoPasses_NoPrompt()
     {
-        // Symmetric to StackObjectAdded — resolution counts as a visible
-        // stack mutation from the player's POV (the trigger LEAVES the
-        // stack), so the display window must apply afterwards too.
         var alice = new CountingAgent();
         var bob = new CountingAgent();
-        var now = new System.DateTime(2026, 1, 1);
 
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
             deadWindow: _ => true,
-            eventBus: _bus,
-            clock: () => now,
             phase: StepStateType.PreCombatMain);
 
         var permanent = new Majik.Core.Cards.Creature("Goblin", "R", 1, 1) { Owner = _alice, Zone = ZoneType.Battlefield };
@@ -383,7 +354,60 @@ public class PriorityLoopAutoPassTests
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
-        alice.PromptCount.Should().BeGreaterThan(0, "within display window after resolution");
+        alice.PromptCount.Should().Be(0,
+            "a dead window auto-passes immediately after a resolution too — " +
+            "no server-side display beat to block on");
+    }
+
+    // Integration-shape regression: the EXACT replay-confirmed wedge. An
+    // OPPONENT-controlled spell sits on top of the stack; the human (Alice)
+    // gets a DEAD priority window on it (her only legal move is pass), and a
+    // CountingAgent stands in for the RemoteAgent human that NEVER submits
+    // anything. Server-side auto-pass alone must carry the dead window: the
+    // loop synthesizes Alice's pass WITHOUT ever invoking her agent, the
+    // opponent's spell RESOLVES, the stack DRAINS, and the round ENDS — within
+    // a bounded timeout, never blocking forever. Before the fix the freshly
+    // PUSHED stack object sat inside the display beat → auto-pass suppressed →
+    // the loop awaited Alice's pass that never came → permanent wedge.
+    [Fact]
+    public async Task OpponentSpellOnStack_HumanNeverSubmits_DeadWindowAutoPasses_GameAdvances()
+    {
+        // Alice = the "human" seat. Her agent would BLOCK forever if prompted
+        // (a never-submitting RemoteAgent analogue): ChoosePriorityActionAsync
+        // here returns Pass, but the WEDGE shape is that it is reached at all —
+        // we assert PromptCount stays 0, i.e. the agent is never consulted.
+        var alice = new CountingAgent();
+        var bob = new CountingAgent();
+
+        // Every window in this scenario is pass-only from the holder's POV:
+        // Alice (human, only lands) can never respond to Bob's spell, and once
+        // it resolves the empty-stack windows are dead too. Bob's own window
+        // (his spell on top) auto-passes via the own-top reason regardless.
+        // prefs: non-null for Alice (the human seat → eligible for auto-pass),
+        // null for Bob (bot seat → drives himself; here he's a CountingAgent
+        // that just passes).
+        var loop = NewLoop(alice, bob,
+            prefs: p => ReferenceEquals(p, _alice) ? new TestPrefs() : null,
+            deadWindow: _ => true,
+            phase: StepStateType.PreCombatMain);
+
+        // BOB (the bot/opponent) controls the top of the stack — his spell.
+        PushOwnedStackObject(_bob);
+
+        // Bound the whole thing so a regression manifests as a FAILED test, not
+        // a hung suite. The fixed loop drains synchronously in microseconds.
+        var run = loop.RunUntilRoundEndsAsync(_alice);
+        var finished = await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(10)));
+
+        finished.Should().BeSameAs(run,
+            "the dead window must auto-pass server-side and let the opponent's " +
+            "spell resolve — never block awaiting the human forever (the wedge)");
+        await run; // surface any exception
+
+        alice.PromptCount.Should().Be(0,
+            "Alice's dead window was auto-passed server-side; her agent was never " +
+            "consulted, so a never-submitting human cannot wedge the clock");
+        _stack.IsEmpty.Should().BeTrue("the opponent's spell resolved and the stack drained");
     }
 
     // -------------------------------------------------------------------
@@ -425,8 +449,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
-            deadWindow: ctx => ctx.Stack.IsEmpty,
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: ctx => ctx.Stack.IsEmpty);
 
         PushOwnedStackObject(_alice);
 
@@ -448,8 +471,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs { FullControl = true },
-            deadWindow: ctx => ctx.Stack.IsEmpty,
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: ctx => ctx.Stack.IsEmpty);
 
         PushOwnedStackObject(_alice);
 
@@ -469,8 +491,7 @@ public class PriorityLoopAutoPassTests
         var bob = new CountingAgent();
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
-            deadWindow: ctx => ctx.Stack.IsEmpty,
-            clock: () => new System.DateTime(2026, 1, 1));
+            deadWindow: ctx => ctx.Stack.IsEmpty);
 
         PushOwnedStackObject(_bob);
 
@@ -483,57 +504,28 @@ public class PriorityLoopAutoPassTests
     }
 
     [Fact]
-    public async Task OwnTopOfStack_AutoPasses_EvenWithinStackDisplayWindow()
+    public async Task OwnTopOfStack_AutoPasses_NonDeadWindow_FreshMutation()
     {
-        // The display window (Gate 5) gives a player a beat to register a
-        // stack change they did NOT initiate. For your OWN top-of-stack
-        // object you just put it there — no beat needed; the opponent still
-        // gets their own display window when priority reaches them. So the
-        // own-top auto-pass is exempt from Gate 5.
+        // Own-top auto-pass fires even when the window is NOT dead (an untapped
+        // land keeps a mana ability legal) and even immediately after the
+        // mutation that put the object on the stack — there is no server-side
+        // display beat to suppress it. (Previously this asserted the own-top
+        // exemption from the now-removed Gate 5; the behaviour is unchanged.)
         var alice = new CountingAgent();
         var bob = new CountingAgent();
-        var now = new System.DateTime(2026, 1, 1);
 
         var loop = NewLoop(alice, bob,
             prefs: _ => new TestPrefs(),
             deadWindow: _ => false, // never a dead window → own-top is the only auto-pass reason
-            eventBus: _bus,         // subscribe so the push below stamps _lastStackMutatedAt
-            clock: () => now,
             phase: StepStateType.PreCombatMain);
 
-        PushOwnedStackObject(_alice); // stamps the display window at `now`
+        PushOwnedStackObject(_alice);
 
-        // Clock stays at `now` → round 1 is INSIDE the display window.
         await loop.RunUntilRoundEndsAsync(_alice);
 
-        // With the Gate-5 exemption Alice auto-passes her own object in
-        // round 1 and is prompted only in the trailing empty-stack round
-        // (count 1). Without the exemption she would be prompted in round 1
-        // too (count 2).
+        // Alice auto-passes her own object in round 1 and is prompted only in
+        // the trailing empty-stack round (count 1).
         alice.PromptCount.Should().Be(1,
-            "Alice's own-top auto-pass is exempt from the stack-display window");
-    }
-
-    // -------------------------------------------------------------------
-    // Bus subscription hygiene
-    // -------------------------------------------------------------------
-
-    [Fact]
-    public void DetachFromBus_RemovesHandlers()
-    {
-        var alice = new CountingAgent();
-        var bob = new CountingAgent();
-        var loop = NewLoop(alice, bob,
-            prefs: _ => new TestPrefs(),
-            deadWindow: _ => true,
-            eventBus: _bus,
-            clock: () => System.DateTime.UtcNow);
-
-        loop.DetachFromBus();
-        loop.DetachFromBus(); // idempotent — safe to call twice
-
-        // No assertion target on the bus surface; this test guards against
-        // future regressions in DetachFromBus throwing on a missing
-        // handler (Unsubscribe is tolerant of unknown handlers).
+            "Alice auto-passes her own top-of-stack object immediately, no display beat");
     }
 }
