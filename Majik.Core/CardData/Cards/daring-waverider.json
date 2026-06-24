@@ -1,0 +1,9 @@
+{
+  "name": "Daring Waverider",
+  "types": ["Creature"],
+  "subtypes": ["Otter", "Wizard"],
+  "manaCost": "{4}{U}{U}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
