@@ -1,0 +1,10 @@
+{
+  "name": "Ketramose, the New Dawn",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["God"],
+  "manaCost": "{1}{W}{B}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
