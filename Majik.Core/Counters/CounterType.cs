@@ -197,4 +197,17 @@ public sealed record CounterType(string Name)
     /// <see cref="Majik.Core.CardData.Factories.TwitchingDollFactory"/>.
     /// </summary>
     public static readonly CounterType Nest = new("Nest");
+
+    /// <summary>
+    /// CR 122 — Fellowship counters. Card-specific marker used by Banner of
+    /// Kinship (Modern Horizons 3). The Banner enters with a fellowship counter
+    /// for each creature its controller controls of the chosen creature type,
+    /// and creatures the controller controls of that type get +1/+1 for each
+    /// fellowship counter on the Banner. The counter is an opaque marker — no
+    /// built-in P/T or ability semantics; the chosen-type anthem that scales off
+    /// the count is wired by
+    /// <see cref="Majik.Core.CardData.Factories.BannerOfKinshipFactory"/> via a
+    /// dynamic-count <see cref="Majik.Core.Effects.LordStaticEffect"/>.
+    /// </summary>
+    public static readonly CounterType Fellowship = new("Fellowship");
 }

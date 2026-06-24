@@ -65,8 +65,14 @@ public sealed class LordStaticEffect : ContinuousEffect
     private readonly Permanent _source;
     private readonly CardSubtype? _subtype;
     private readonly string? _matchingKeyword;
-    private readonly int _power;
-    private readonly int _toughness;
+    // P/T boost is stored behind closures (same posture as
+    // AttachedBoostEffect) so the canonical constructors carry constant
+    // scalars while the dynamic-count constructor can vary the boost per
+    // layer pass (e.g. Banner of Kinship — "+1/+1 for each fellowship counter
+    // on this artifact", CR 613.7c). Sampled in Apply, so they observe the
+    // live counter / state at each Compute.
+    private readonly Func<int> _powerFn;
+    private readonly Func<int> _toughnessFn;
     private readonly IReadOnlyList<string> _grantedKeywords;
     private readonly bool _includeSelf;
     private readonly bool _opponentsOnly;
@@ -148,8 +154,47 @@ public sealed class LordStaticEffect : ContinuousEffect
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _subtype = matchingSubtype;
         _matchingKeyword = matchingKeyword;
-        _power = power;
-        _toughness = toughness;
+        _powerFn = () => power;
+        _toughnessFn = () => toughness;
+        _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
+        _includeSelf = includeSelf;
+        _opponentsOnly = opponentsOnly;
+        _allPlayers = allPlayers;
+        _tokensOnly = tokensOnly;
+        _tappedOnly = tappedOnly;
+    }
+
+    /// <summary>
+    /// Dynamic-boost constructor — the +P/+T applied to each matching creature
+    /// is sampled from <paramref name="powerFn"/> / <paramref name="toughnessFn"/>
+    /// at every layer pass (CR 613 — continuous effects are recomputed as the
+    /// game state changes). Models the chosen-type anthem whose magnitude scales
+    /// off live state: Banner of Kinship's "Creatures you control of the chosen
+    /// type get +1/+1 for each fellowship counter on this artifact" (CR 613.7c)
+    /// passes <c>() =&gt; source.Counters.Count(CounterType.Fellowship)</c> for
+    /// both. The membership filters (subtype / keyword / controller / token /
+    /// tapped) behave identically to the scalar constructors. Same
+    /// closure-behind-a-field posture as
+    /// <see cref="AttachedBoostEffect"/>'s dynamic-N constructor.
+    /// </summary>
+    public LordStaticEffect(
+        Permanent source,
+        CardSubtype? matchingSubtype,
+        Func<int> powerFn,
+        Func<int> toughnessFn,
+        string? matchingKeyword = null,
+        IReadOnlyList<string>? grantedKeywords = null,
+        bool includeSelf = false,
+        bool opponentsOnly = false,
+        bool allPlayers = false,
+        bool tokensOnly = false,
+        bool tappedOnly = false)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        _subtype = matchingSubtype;
+        _matchingKeyword = matchingKeyword;
+        _powerFn = powerFn ?? throw new ArgumentNullException(nameof(powerFn));
+        _toughnessFn = toughnessFn ?? throw new ArgumentNullException(nameof(toughnessFn));
         _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
         _includeSelf = includeSelf;
         _opponentsOnly = opponentsOnly;
@@ -220,21 +265,32 @@ public sealed class LordStaticEffect : ContinuousEffect
 
     public override void Apply(CreatureCharacteristics chars)
     {
-        chars.Power += _power;
-        chars.Toughness += _toughness;
+        // Sampled per layer pass so the dynamic-boost constructor observes
+        // live state (e.g. Banner of Kinship's fellowship-counter count).
+        // Constant for every scalar-constructor caller.
+        chars.Power += _powerFn();
+        chars.Toughness += _toughnessFn();
         foreach (var kw in _grantedKeywords) chars.Keywords.Add(kw);
     }
 
     /// <summary>
     /// Sim-only: reconstruct an identical <see cref="LordStaticEffect"/> bound to the
     /// <paramref name="clonedSource"/> permanent for the search-sandbox clone.  All
-    /// value-type configuration fields (_subtype, _matchingKeyword, _power, _toughness,
-    /// _grantedKeywords, _includeSelf, _opponentsOnly, _allPlayers, _tokensOnly) are
-    /// copied from <c>this</c> so the reconstructed effect is behaviourally identical to
+    /// value-type configuration fields (_subtype, _matchingKeyword, _powerFn, _toughnessFn,
+    /// _grantedKeywords, _includeSelf, _opponentsOnly, _allPlayers, _tokensOnly, _tappedOnly)
+    /// are copied from <c>this</c> so the reconstructed effect is behaviourally identical to
     /// the live one within the clone universe.  The <paramref name="clonedPlayers"/>
     /// resolver is accepted but unused — <see cref="LordStaticEffect"/> derives its player
     /// scope from <c>Source.Controller</c>, which is correctly wired on the cloned
     /// permanent, so no external resolver is required.
+    ///
+    /// <para>The P/T boost is carried via the dynamic-boost constructor so both the
+    /// scalar (constant-closure) and dynamic callers round-trip with identical magnitude.
+    /// For a dynamic-count anthem (Banner of Kinship) the closure reads the ORIGINAL
+    /// source's counter bag rather than <paramref name="clonedSource"/>'s — the same
+    /// closure-capture limitation <see cref="AttachedBoostEffect.CloneForSim"/> documents;
+    /// acceptable for sim v1 where the search clone reads base characteristics directly
+    /// (<see cref="Permanent.ActiveEffects"/> is left null in the cloned game).</para>
     /// </summary>
     internal override ContinuousEffect? CloneForSim(
         Permanent clonedSource,
@@ -242,9 +298,9 @@ public sealed class LordStaticEffect : ContinuousEffect
         => new LordStaticEffect(
             source:          clonedSource,
             matchingSubtype: _subtype,
+            powerFn:         _powerFn,
+            toughnessFn:     _toughnessFn,
             matchingKeyword: _matchingKeyword,
-            power:           _power,
-            toughness:       _toughness,
             grantedKeywords: _grantedKeywords,
             includeSelf:     _includeSelf,
             opponentsOnly:   _opponentsOnly,
