@@ -1,0 +1,9 @@
+{
+  "name": "Sandstorm Salvager",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Artificer"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
