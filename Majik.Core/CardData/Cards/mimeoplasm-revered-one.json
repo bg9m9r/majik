@@ -1,0 +1,10 @@
+{
+  "name": "Mimeoplasm, Revered One",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Ooze"],
+  "manaCost": "{X}{B}{G}{U}",
+  "power": 0,
+  "toughness": 0,
+  "abilities": []
+}

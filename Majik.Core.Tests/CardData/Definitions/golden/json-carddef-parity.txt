@@ -35959,6 +35959,60 @@
   "mdfc": null,
   "colors": []
 }
+==== mimeoplasm-revered-one ====
+{
+  "name": "Mimeoplasm, Revered One",
+  "manaCost": "{X}{B}{G}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Ooze"
+  ],
+  "power": 0,
+  "toughness": 0,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Blue",
+    "Green"
+  ]
+}
 ==== minamo-school-at-waters-edge ====
 {
   "name": "Minamo, School at Water\u0027s Edge",
