@@ -1,0 +1,7 @@
+{
+  "name": "Cori Mountain Monastery",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
