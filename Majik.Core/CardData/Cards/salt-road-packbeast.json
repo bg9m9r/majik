@@ -1,0 +1,17 @@
+{
+  "name": "Salt Road Packbeast",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{5}{W}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "draw_card", "amount": 1 }
+      ]
+    }
+  ]
+}
