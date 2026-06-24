@@ -1549,6 +1549,55 @@
   "mdfc": null,
   "colors": []
 }
+==== anthem-of-champions ====
+{
+  "name": "Anthem of Champions",
+  "manaCost": "{G}{W}",
+  "primaryType": "Enchantment",
+  "cardTypes": [
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green",
+    "White"
+  ]
+}
 ==== arboreal-grazer ====
 {
   "name": "Arboreal Grazer",
