@@ -1,0 +1,9 @@
+{
+  "name": "Skullcap Snail",
+  "types": ["Creature"],
+  "subtypes": ["Fungus", "Snail"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}

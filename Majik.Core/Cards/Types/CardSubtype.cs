@@ -443,6 +443,10 @@ public enum CardSubtype
     /// Tiller). CR 205.3m.</summary>
     Spike,
 
+    /// <summary>Snail creature subtype — Skullcap Snail (Modern Horizons 3),
+    /// Snail of Reasonable Value, Quagnoth-adjacent gastropods. CR 205.3m.</summary>
+    Snail,
+
     // Planeswalker subtypes (examples)
     Ajani,
     Ashiok,
