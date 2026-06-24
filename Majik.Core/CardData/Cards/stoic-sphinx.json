@@ -1,0 +1,9 @@
+{
+  "name": "Stoic Sphinx",
+  "types": ["Creature"],
+  "subtypes": ["Sphinx"],
+  "manaCost": "{2}{U}{U}",
+  "power": 5,
+  "toughness": 3,
+  "keywords": ["Flash", "Flying"]
+}
