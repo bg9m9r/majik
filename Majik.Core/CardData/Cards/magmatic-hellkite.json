@@ -1,0 +1,9 @@
+{
+  "name": "Magmatic Hellkite",
+  "types": ["Creature"],
+  "subtypes": ["Dragon"],
+  "manaCost": "{2}{R}{R}",
+  "power": 4,
+  "toughness": 5,
+  "abilities": []
+}
