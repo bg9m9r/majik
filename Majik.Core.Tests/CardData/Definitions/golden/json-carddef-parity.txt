@@ -41043,6 +41043,60 @@
     "Black"
   ]
 }
+==== roxanne-starfall-savant ====
+{
+  "name": "Roxanne, Starfall Savant",
+  "manaCost": "{3}{R}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Cat",
+    "Druid"
+  ],
+  "power": 4,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green",
+    "Red"
+  ]
+}
 ==== rugged-highlands ====
 {
   "name": "Rugged Highlands",

@@ -1,0 +1,10 @@
+{
+  "name": "Roxanne, Starfall Savant",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Cat", "Druid"],
+  "manaCost": "{3}{R}{G}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
