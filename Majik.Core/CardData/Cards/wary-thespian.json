@@ -1,0 +1,24 @@
+{
+  "name": "Wary Thespian",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Druid"],
+  "manaCost": "{1}{G}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "dies_self" },
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}
