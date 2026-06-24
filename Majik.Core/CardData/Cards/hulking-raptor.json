@@ -1,0 +1,9 @@
+{
+  "name": "Hulking Raptor",
+  "types": ["Creature"],
+  "subtypes": ["Dinosaur"],
+  "manaCost": "{2}{G}{G}",
+  "power": 5,
+  "toughness": 3,
+  "abilities": []
+}
