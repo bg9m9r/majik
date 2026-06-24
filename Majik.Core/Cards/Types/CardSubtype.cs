@@ -176,6 +176,9 @@ public enum CardSubtype
     /// <summary>Druid creature subtype — Noble Hierarch, Fyndhorn Elder,
     /// Devoted Druid. CR 205.3m.</summary>
     Druid,
+    /// <summary>Possum creature subtype — Tender Wildguide (Bloomburrow).
+    /// CR 205.3m.</summary>
+    Possum,
     /// <summary>Ally creature subtype — Sylvan Advocate, Kalastria Healer,
     /// the Battle for Zendikar Ally tribe. CR 205.3m — flavour subtype with
     /// no inherent rules meaning (Ally-matters cards reference it by name).</summary>
