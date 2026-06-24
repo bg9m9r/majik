@@ -278,7 +278,12 @@ public sealed class TurnDriver
         // of Summer) can read them at resolution.
         if (e.Spell?.Controller is { } caster && e.Spell.Card is { } card)
         {
-            TurnState.RecordSpellCast(caster, Majik.Core.Cards.CardColors.GetColors(card));
+            // CR 205.3 / 302.1 — a noncreature spell is any spell whose card is
+            // not a creature spell. Feeds the per-player noncreature tally read
+            // by Magebane Lizard.
+            var isNoncreature = !card.HasType(Majik.Core.Cards.Types.CardType.Creature);
+            TurnState.RecordSpellCast(
+                caster, Majik.Core.Cards.CardColors.GetColors(card), isNoncreature);
         }
     }
 

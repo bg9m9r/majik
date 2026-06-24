@@ -64,6 +64,15 @@ public sealed class TurnState
     // turn") reads this.
     private readonly Dictionary<Guid, int> _spellsCastByPlayer = new();
 
+    // Per-player count of NONCREATURE spells cast this turn (CR 205.3 /
+    // 302.1 — a noncreature spell is any spell whose card is not a creature
+    // spell). Read by Magebane Lizard ("Whenever a player casts a noncreature
+    // spell, this creature deals damage to that player equal to the number of
+    // noncreature spells they've cast this turn"). A strict subset of
+    // _spellsCastByPlayer — incremented only when the cast spell is NOT a
+    // creature spell.
+    private readonly Dictionary<Guid, int> _noncreatureSpellsCastByPlayer = new();
+
     // Per-player count of lands that have entered the battlefield under
     // their control this turn. Read by landfall-conditional spells
     // (Searing Blaze — CR 702.142 / "Whenever a land you control enters")
@@ -253,12 +262,25 @@ public sealed class TurnState
     /// Called when <paramref name="caster"/> casts a spell with the given
     /// <paramref name="colors"/> (CR 105). Read by "opponent cast a [colour]
     /// spell this turn" riders such as Veil of Summer.
+    ///
+    /// <para><paramref name="isNoncreatureSpell"/> additionally feeds the
+    /// per-player noncreature tally (CR 205.3 / 302.1) read by Magebane Lizard.
+    /// Defaults to <c>false</c> so existing colour-only call sites (and tests
+    /// that don't care about the noncreature count) are source-compatible.</para>
     /// </summary>
-    public void RecordSpellCast(Player caster, IReadOnlySet<ManaColor> colors)
+    public void RecordSpellCast(
+        Player caster,
+        IReadOnlySet<ManaColor> colors,
+        bool isNoncreatureSpell = false)
     {
         if (caster == null) return;
         _spellsCastByPlayer[caster.Id] =
             _spellsCastByPlayer.GetValueOrDefault(caster.Id) + 1;
+        if (isNoncreatureSpell)
+        {
+            _noncreatureSpellsCastByPlayer[caster.Id] =
+                _noncreatureSpellsCastByPlayer.GetValueOrDefault(caster.Id) + 1;
+        }
         if (colors == null || colors.Count == 0) return;
         if (!_spellColorsCastByPlayer.TryGetValue(caster.Id, out var set))
         {
@@ -388,6 +410,20 @@ public sealed class TurnState
             : _spellsCastByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
 
     /// <summary>
+    /// Number of NONCREATURE spells <paramref name="player"/> has cast this
+    /// turn (CR 205.3 / 302.1). Read by Magebane Lizard's trigger — "deals
+    /// damage to that player equal to the number of noncreature spells they've
+    /// cast this turn". Because the per-turn tally is incremented at cast time
+    /// (TurnDriver's SpellCastEvent subscriber) and the trigger resolves later
+    /// off the stack, the just-cast spell is already counted, so the value is
+    /// >= 1 at the trigger's resolution.
+    /// </summary>
+    public int NoncreatureSpellsCastByPlayer(Player player) =>
+        player == null
+            ? 0
+            : _noncreatureSpellsCastByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
+
+    /// <summary>
     /// True if any player other than <paramref name="viewer"/> has cast a
     /// spell of at least one of the given <paramref name="colors"/> this
     /// turn. Used by Veil of Summer's conditional draw clause.
@@ -440,6 +476,7 @@ public sealed class TurnState
         CopyRemapIntDict(src._permanentsLeftByController, _permanentsLeftByController, idRemap);
         CopyRemapIntDict(src._cardsDrawnByPlayer,         _cardsDrawnByPlayer,         idRemap);
         CopyRemapIntDict(src._spellsCastByPlayer,         _spellsCastByPlayer,         idRemap);
+        CopyRemapIntDict(src._noncreatureSpellsCastByPlayer, _noncreatureSpellsCastByPlayer, idRemap);
         CopyRemapIntDict(src._landsEnteredByController,   _landsEnteredByController,   idRemap);
         CopyRemapIntDict(src._cyclesByPlayer,             _cyclesByPlayer,             idRemap);
         CopyRemapIntDict(src._discardsByPlayer,           _discardsByPlayer,           idRemap);
@@ -505,6 +542,7 @@ public sealed class TurnState
         _cardsDrawnByPlayer.Clear();
         _spellColorsCastByPlayer.Clear();
         _spellsCastByPlayer.Clear();
+        _noncreatureSpellsCastByPlayer.Clear();
         _landsEnteredByController.Clear();
         _permanentsEnteredThisTurn.Clear();
         _cyclesByPlayer.Clear();
