@@ -6465,6 +6465,59 @@
     "Blue"
   ]
 }
+==== bristlebud-farmer ====
+{
+  "name": "Bristlebud Farmer",
+  "manaCost": "{2}{G}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Druid",
+    "Plant"
+  ],
+  "power": 5,
+  "toughness": 5,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Trample"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== bristly-bill-spine-sower ====
 {
   "name": "Bristly Bill, Spine Sower",
