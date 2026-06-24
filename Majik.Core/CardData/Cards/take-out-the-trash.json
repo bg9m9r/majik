@@ -1,0 +1,5 @@
+{
+  "name": "Take Out the Trash",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}"
+}
