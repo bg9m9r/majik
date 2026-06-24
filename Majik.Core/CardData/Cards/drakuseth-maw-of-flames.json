@@ -1,0 +1,10 @@
+{
+  "name": "Drakuseth, Maw of Flames",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Dragon"],
+  "manaCost": "{4}{R}{R}{R}",
+  "power": 7,
+  "toughness": 7,
+  "abilities": []
+}
