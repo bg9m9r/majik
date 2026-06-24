@@ -1,0 +1,7 @@
+{
+  "name": "Fumigate",
+  "types": ["Sorcery"],
+  "manaCost": "{3}{W}{W}",
+  "colors": ["W"],
+  "abilities": []
+}
