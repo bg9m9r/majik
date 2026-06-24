@@ -1,0 +1,10 @@
+{
+  "name": "Razorkin Hordecaller",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Clown", "Berserker"],
+  "manaCost": "{4}{R}",
+  "power": 4,
+  "toughness": 4,
+  "keywords": ["Haste"],
+  "abilities": []
+}
