@@ -1,0 +1,5 @@
+{
+  "name": "Fake Your Own Death",
+  "types": ["Instant"],
+  "manaCost": "{1}{B}"
+}
