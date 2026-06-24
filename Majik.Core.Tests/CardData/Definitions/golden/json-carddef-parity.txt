@@ -39130,6 +39130,60 @@
   "mdfc": null,
   "colors": []
 }
+==== plumecreed-escort ====
+{
+  "name": "Plumecreed Escort",
+  "manaCost": "{1}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Bird",
+    "Scout"
+  ],
+  "power": 2,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 2,
+      "list": [
+        "Flash",
+        "Flying"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== porcelain-legionnaire ====
 {
   "name": "Porcelain Legionnaire",

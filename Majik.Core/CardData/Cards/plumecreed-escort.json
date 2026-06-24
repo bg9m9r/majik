@@ -1,0 +1,10 @@
+{
+  "name": "Plumecreed Escort",
+  "types": ["Creature"],
+  "subtypes": ["Bird", "Scout"],
+  "manaCost": "{1}{U}",
+  "colors": ["U"],
+  "power": 2,
+  "toughness": 1,
+  "keywords": ["Flash", "Flying"]
+}
