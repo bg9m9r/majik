@@ -1,0 +1,6 @@
+{
+  "name": "Twist Reality",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}{U}",
+  "colors": ["U"]
+}
