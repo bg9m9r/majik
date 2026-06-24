@@ -1,0 +1,5 @@
+{
+  "name": "Tinker's Tote",
+  "types": ["Artifact"],
+  "manaCost": "{2}{W}"
+}
