@@ -500,6 +500,58 @@
     "White"
   ]
 }
+==== adventurers-inn ====
+{
+  "name": "Adventurer\u0027s Inn",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Town"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 1,
+      "list": [
+        "mana:C"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== adventuring-gear ====
 {
   "name": "Adventuring Gear",
