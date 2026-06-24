@@ -1,0 +1,10 @@
+{
+  "name": "Ghalta, Primal Hunger",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elder", "Dinosaur"],
+  "manaCost": "{10}{G}{G}",
+  "power": 12,
+  "toughness": 12,
+  "keywords": ["Trample"]
+}
