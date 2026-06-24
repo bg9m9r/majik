@@ -1,0 +1,8 @@
+{
+  "name": "Sanguine Syphoner",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Warlock"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 3
+}
