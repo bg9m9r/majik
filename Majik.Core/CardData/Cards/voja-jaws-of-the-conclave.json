@@ -1,0 +1,10 @@
+{
+  "name": "Voja, Jaws of the Conclave",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Wolf"],
+  "manaCost": "{2}{R}{G}{W}",
+  "power": 5,
+  "toughness": 5,
+  "abilities": []
+}
