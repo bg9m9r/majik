@@ -1,0 +1,6 @@
+{
+  "name": "Diamond Pick-Axe",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{R}"
+}
