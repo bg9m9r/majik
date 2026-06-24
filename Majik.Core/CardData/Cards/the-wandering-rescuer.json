@@ -1,0 +1,11 @@
+{
+  "name": "The Wandering Rescuer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Samurai", "Noble"],
+  "manaCost": "{3}{W}{W}",
+  "power": 3,
+  "toughness": 4,
+  "keywords": ["Flash", "Double strike"],
+  "abilities": []
+}
