@@ -1,0 +1,9 @@
+{
+  "name": "Warren Warleader",
+  "types": ["Creature"],
+  "subtypes": ["Rabbit", "Knight"],
+  "manaCost": "{2}{W}{W}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
