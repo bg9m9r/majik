@@ -1,0 +1,10 @@
+{
+  "name": "Fear of Isolation",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Nightmare"],
+  "manaCost": "{1}{U}",
+  "power": 2,
+  "toughness": 3,
+  "colors": ["U"],
+  "abilities": []
+}
