@@ -285,6 +285,9 @@ public enum CardSubtype
     /// <summary>Berserker creature subtype — Bloodbraid Elf (Alara Reborn /
     /// Modern Horizons 2), Goblin Berserker, Lovisa Coldeyes. CR 205.3m.</summary>
     Berserker,
+    /// <summary>Clown creature subtype — Razorkin Hordecaller (Duskmourn:
+    /// House of Horror) and the Razorkin / circus lineage. CR 205.3m.</summary>
+    Clown,
     /// <summary>Kithkin creature subtype — Burrenton Forge-Tender (Lorwyn),
     /// Goldmeadow Stalwart, Wizened Cenn. The Lorwyn / Shadowmoor halfling-
     /// adjacent white lineage. CR 205.3m.</summary>

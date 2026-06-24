@@ -42830,6 +42830,60 @@
   "mdfc": null,
   "colors": []
 }
+==== razorkin-hordecaller ====
+{
+  "name": "Razorkin Hordecaller",
+  "manaCost": "{4}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Berserker",
+    "Clown",
+    "Human"
+  ],
+  "power": 4,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Haste"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== razorkin-needlehead ====
 {
   "name": "Razorkin Needlehead",
