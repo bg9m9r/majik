@@ -1,0 +1,9 @@
+{
+  "name": "Hivespine Wolverine",
+  "types": ["Creature"],
+  "subtypes": ["Elemental", "Wolverine"],
+  "manaCost": "{3}{G}{G}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
