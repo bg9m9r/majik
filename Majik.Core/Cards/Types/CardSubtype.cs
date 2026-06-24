@@ -52,6 +52,9 @@ public enum CardSubtype
     Elemental,
     Bear,
     Insect,
+    /// <summary>Badger creature subtype — Hugs, Grisly Guardian
+    /// (Bloomburrow Commander). CR 205.3m.</summary>
+    Badger,
     /// <summary>Atog creature subtype — Atog (Antiquities), the artifact-eating
     /// "Atog" sacrifice-payoff family. CR 205.3m.</summary>
     Atog,
