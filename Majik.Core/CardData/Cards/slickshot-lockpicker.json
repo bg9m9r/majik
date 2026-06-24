@@ -1,0 +1,9 @@
+{
+  "name": "Slickshot Lockpicker",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rogue"],
+  "manaCost": "{2}{U}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
