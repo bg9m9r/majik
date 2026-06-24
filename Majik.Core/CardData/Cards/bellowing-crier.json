@@ -1,0 +1,9 @@
+{
+  "name": "Bellowing Crier",
+  "types": ["Creature"],
+  "subtypes": ["Frog", "Advisor"],
+  "manaCost": "{1}{U}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}

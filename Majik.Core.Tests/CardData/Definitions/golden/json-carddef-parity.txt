@@ -4201,6 +4201,57 @@
     "Blue"
   ]
 }
+==== bellowing-crier ====
+{
+  "name": "Bellowing Crier",
+  "manaCost": "{1}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Advisor",
+    "Frog"
+  ],
+  "power": 2,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== benders-waterskin ====
 {
   "name": "Bender\u0027s Waterskin",
