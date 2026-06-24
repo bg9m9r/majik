@@ -261,8 +261,12 @@ public static class EsikasChariotFactory
     /// V1 copies are lossy snapshots (CR 706.2 copiable values approximated
     /// to name + base P/T + subtypes + keyword names), mirroring
     /// <see cref="Majik.Core.Effects.CopyEffect"/>.
+    ///
+    /// <para><c>internal</c> so other "copy of target token you control"
+    /// factories reuse the identical mechanic verbatim — e.g.
+    /// <see cref="CaretakersTalentFactory"/>'s becomes-level-2 trigger.</para>
     /// </summary>
-    private static Creature? CreateCopyOfTargetToken(
+    internal static Creature? CreateCopyOfTargetToken(
         Player controller,
         TriggeredAbility? trigger,
         Func<Player, Creature?>? picker,
