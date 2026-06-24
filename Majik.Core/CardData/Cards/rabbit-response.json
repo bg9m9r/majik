@@ -1,0 +1,6 @@
+{
+  "name": "Rabbit Response",
+  "types": ["Instant"],
+  "manaCost": "{2}{W}{W}",
+  "abilities": []
+}
