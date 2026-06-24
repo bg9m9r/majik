@@ -1,0 +1,5 @@
+{
+  "name": "Take Up the Shield",
+  "types": ["Instant"],
+  "manaCost": "{1}{W}"
+}
