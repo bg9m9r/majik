@@ -1,0 +1,5 @@
+{
+  "name": "Stargaze",
+  "types": ["Sorcery"],
+  "manaCost": "{X}{B}{B}"
+}
