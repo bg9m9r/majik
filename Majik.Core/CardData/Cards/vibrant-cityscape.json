@@ -1,0 +1,20 @@
+{
+  "name": "Vibrant Cityscape",
+  "types": ["Land"],
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "tap_self" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        {
+          "type": "search_library",
+          "basicLand": true,
+          "destination": "battlefield_tapped"
+        }
+      ]
+    }
+  ]
+}
