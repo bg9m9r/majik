@@ -659,4 +659,9 @@ public enum CardSubtype
     /// and the broader Duskmourn Toy lineage. CR 205.3m — flavour subtype with
     /// no inherent rules meaning of its own.</summary>
     Toy,
+
+    /// <summary>Weasel creature subtype — Brightblade Stoat (Bloomburrow) and
+    /// the broader Bloomburrow Weasel lineage. CR 205.3m — flavour subtype with
+    /// no inherent rules meaning of its own.</summary>
+    Weasel,
 }
