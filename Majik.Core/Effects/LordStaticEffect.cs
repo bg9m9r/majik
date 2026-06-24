@@ -47,6 +47,18 @@ namespace Majik.Core.Effects;
 /// is the "Creature tokens you control get +1/+1 (and have KEYWORD)" shape
 /// used by Intangible Virtue. The token gate is ANDed with the subtype /
 /// controller filters; it is orthogonal to them.</para>
+///
+/// <para>Set <c>tappedOnly: true</c> to additionally gate on the creature
+/// being TAPPED (<see cref="Permanent.IsTapped"/>). Combined with
+/// <c>matchingSubtype: null</c> + <c>includeSelf: false</c> this is the
+/// "Other tapped creatures you control have KEYWORD" shape used by The
+/// Wandering Rescuer ("Other tapped creatures you control have hexproof").
+/// The tapped gate is ANDed with the subtype / token / controller filters;
+/// it is orthogonal to them. Because <see cref="AppliesTo"/> is re-evaluated
+/// on every <see cref="ContinuousEffectsService.Compute(Permanent)"/> pass,
+/// tapping / untapping a candidate flips its membership with no extra
+/// wiring (same posture as <see cref="HexproofWhileUntappedEffect"/>'s
+/// untapped check).</para>
 /// </summary>
 public sealed class LordStaticEffect : ContinuousEffect
 {
@@ -60,6 +72,7 @@ public sealed class LordStaticEffect : ContinuousEffect
     private readonly bool _opponentsOnly;
     private readonly bool _allPlayers;
     private readonly bool _tokensOnly;
+    private readonly bool _tappedOnly;
 
     /// <summary>
     /// Construct with a specific creature-type filter.
@@ -73,9 +86,10 @@ public sealed class LordStaticEffect : ContinuousEffect
         bool includeSelf = false,
         bool opponentsOnly = false,
         bool allPlayers = false,
-        bool tokensOnly = false)
+        bool tokensOnly = false,
+        bool tappedOnly = false)
         : this(source, (CardSubtype?)matchingSubtype, matchingKeyword: null, power, toughness,
-               grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly)
+               grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly, tappedOnly)
     {
     }
 
@@ -100,12 +114,13 @@ public sealed class LordStaticEffect : ContinuousEffect
         bool includeSelf = false,
         bool opponentsOnly = false,
         bool allPlayers = false,
-        bool tokensOnly = false)
+        bool tokensOnly = false,
+        bool tappedOnly = false)
         : this(source, matchingSubtype: null,
                matchingKeyword: string.IsNullOrWhiteSpace(matchingKeyword)
                    ? throw new ArgumentException("Keyword required", nameof(matchingKeyword))
                    : matchingKeyword,
-               power, toughness, grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly)
+               power, toughness, grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly, tappedOnly)
     {
     }
 
@@ -127,7 +142,8 @@ public sealed class LordStaticEffect : ContinuousEffect
         bool includeSelf = false,
         bool opponentsOnly = false,
         bool allPlayers = false,
-        bool tokensOnly = false)
+        bool tokensOnly = false,
+        bool tappedOnly = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _subtype = matchingSubtype;
@@ -139,6 +155,7 @@ public sealed class LordStaticEffect : ContinuousEffect
         _opponentsOnly = opponentsOnly;
         _allPlayers = allPlayers;
         _tokensOnly = tokensOnly;
+        _tappedOnly = tappedOnly;
     }
 
     public override Layer Layer => Layer.PT_Modify;
@@ -156,6 +173,10 @@ public sealed class LordStaticEffect : ContinuousEffect
         // ANDed with every controller / subtype branch below; orthogonal to
         // them. Default false preserves the all-creatures behaviour.
         if (_tokensOnly && !creature.IsToken) return false;
+        // Optional tapped-state gate ("Other tapped creatures you control ...").
+        // ANDed with every controller / subtype / token branch below; orthogonal
+        // to them. Re-evaluated each Compute, so tap/untap flips membership live.
+        if (_tappedOnly && !creature.IsTapped) return false;
         if (_allPlayers)
         {
             // No controller filter — effect applies to ALL creatures of the
@@ -228,5 +249,6 @@ public sealed class LordStaticEffect : ContinuousEffect
             includeSelf:     _includeSelf,
             opponentsOnly:   _opponentsOnly,
             allPlayers:      _allPlayers,
-            tokensOnly:      _tokensOnly);
+            tokensOnly:      _tokensOnly,
+            tappedOnly:      _tappedOnly);
 }
