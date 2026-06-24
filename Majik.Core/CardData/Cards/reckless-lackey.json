@@ -1,0 +1,10 @@
+{
+  "name": "Reckless Lackey",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Pirate"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 2,
+  "keywords": ["First strike", "Haste"],
+  "abilities": []
+}
