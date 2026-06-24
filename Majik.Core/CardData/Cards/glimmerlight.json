@@ -1,0 +1,7 @@
+{
+  "name": "Glimmerlight",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}",
+  "abilities": []
+}
