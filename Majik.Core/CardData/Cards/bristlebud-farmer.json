@@ -1,0 +1,10 @@
+{
+  "name": "Bristlebud Farmer",
+  "types": ["Creature"],
+  "subtypes": ["Plant", "Druid"],
+  "manaCost": "{2}{G}{G}",
+  "power": 5,
+  "toughness": 5,
+  "colors": ["G"],
+  "keywords": ["Trample"]
+}
