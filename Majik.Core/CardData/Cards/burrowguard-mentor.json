@@ -1,0 +1,10 @@
+{
+  "name": "Burrowguard Mentor",
+  "types": ["Creature"],
+  "subtypes": ["Rabbit", "Soldier"],
+  "manaCost": "{G}{W}",
+  "power": 0,
+  "toughness": 0,
+  "colors": ["G", "W"],
+  "keywords": ["Trample"]
+}
