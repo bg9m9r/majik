@@ -1,0 +1,10 @@
+{
+  "name": "Honest Rutstein",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Warlock"],
+  "manaCost": "{1}{B}{G}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
