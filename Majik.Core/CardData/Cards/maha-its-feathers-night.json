@@ -1,0 +1,10 @@
+{
+  "name": "Maha, Its Feathers Night",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elemental", "Bird"],
+  "manaCost": "{3}{B}{B}",
+  "power": 6,
+  "toughness": 5,
+  "abilities": []
+}
