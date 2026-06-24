@@ -1,0 +1,9 @@
+{
+  "name": "Patient Naturalist",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Scout"],
+  "manaCost": "{2}{G}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
