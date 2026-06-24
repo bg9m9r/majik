@@ -1,0 +1,10 @@
+{
+  "name": "Abuelo, Ancestral Echo",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Spirit"],
+  "manaCost": "{1}{W}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
