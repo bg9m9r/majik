@@ -33539,6 +33539,57 @@
   "mdfc": null,
   "colors": []
 }
+==== lumbering-worldwagon ====
+{
+  "name": "Lumbering Worldwagon",
+  "manaCost": "{2}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Artifact",
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Vehicle"
+  ],
+  "power": 0,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== lumra-bellow-of-the-woods ====
 {
   "name": "Lumra, Bellow of the Woods",
