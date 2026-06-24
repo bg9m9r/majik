@@ -1,0 +1,9 @@
+{
+  "name": "Reassembling Skeleton",
+  "types": ["Creature"],
+  "subtypes": ["Skeleton", "Warrior"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
