@@ -1,0 +1,9 @@
+{
+  "name": "Curious Cadaver",
+  "types": ["Creature"],
+  "subtypes": ["Zombie", "Detective"],
+  "manaCost": "{2}{U}{B}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
