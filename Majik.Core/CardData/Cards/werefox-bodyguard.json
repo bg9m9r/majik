@@ -1,0 +1,34 @@
+{
+  "name": "Werefox Bodyguard",
+  "manaCost": "{1}{W}{W}",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Fox", "Knight"],
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["Flash"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "exile_until_leaves",
+          "targetFilter": "non_fox_creature",
+          "opponentControlsOnly": false,
+          "excludeSelf": true,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}{W}" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        { "type": "gain_life_self", "amount": 2 }
+      ]
+    }
+  ]
+}

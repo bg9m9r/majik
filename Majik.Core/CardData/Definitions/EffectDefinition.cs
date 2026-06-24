@@ -535,7 +535,13 @@ public sealed class ExileUntilLeavesEffectDef : EffectDefinition
         // enforced by the runtime's resolution-time legality re-check (CR 608.2b).
         new Majik.Core.Players.Agents.TargetRequest(
             Description: BuildDescription(),
-            MinTargets: 1,
+            // CR 115.1b — "exile up to one … target" (Optional) declares the slot
+            // with MinTargets: 0 so the controller's agent may decline; the
+            // mandatory "exile target …" shape keeps MinTargets: 1. MaxTargets is
+            // 1 either way (the verb exiles a single permanent). Canonical
+            // optional case: Werefox Bodyguard — "exile up to one other target
+            // non-Fox creature until this creature leaves the battlefield."
+            MinTargets: Optional ? 0 : 1,
             MaxTargets: 1,
             LegalCandidates: System.Array.Empty<object>(),
             Intent: Majik.Core.Cards.BotIntent.Removal,

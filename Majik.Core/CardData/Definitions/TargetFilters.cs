@@ -154,6 +154,17 @@ public static class TargetFilters
                 ($"target opponent to {verb}", o => o is Player),
             "creature" =>
                 ($"{verb} target creature", o => o is Creature c && OnBattlefield(c)),
+            // CR 109.5 / 205.3m — "non-Fox creature": a battlefield creature that
+            // does NOT have the Fox subtype. Both the candidate gatherer and the
+            // CR 608.2b resolution re-check apply the !Fox gate, so a target that
+            // becomes a Fox (e.g. via a type-changing effect) after the trigger
+            // goes on the stack fizzles cleanly. Canonical case: Werefox
+            // Bodyguard — "exile up to one other target non-Fox creature until
+            // this creature leaves the battlefield."
+            "non_fox_creature" or "nonfox_creature" =>
+                ($"{verb} target non-Fox creature",
+                    o => o is Creature c && OnBattlefield(c)
+                         && !c.HasSubtype(CardSubtype.Fox)),
             // CR 109.5 / 701.20 — "tapped creature an opponent controls"
             // (Harbinger of the Tides ETB). Base predicate: a TAPPED
             // battlefield creature. The "an opponent controls" rider is layered
