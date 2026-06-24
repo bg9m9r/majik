@@ -1,0 +1,6 @@
+{
+  "name": "Doppelgang",
+  "types": ["Sorcery"],
+  "manaCost": "{X}{X}{X}{G}{U}",
+  "colors": ["G", "U"]
+}
