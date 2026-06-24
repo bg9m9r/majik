@@ -1,0 +1,6 @@
+{
+  "name": "Pearl of Wisdom",
+  "types": ["Sorcery"],
+  "manaCost": "{2}{U}",
+  "colors": ["U"]
+}
