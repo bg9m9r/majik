@@ -1,0 +1,9 @@
+{
+  "name": "Sazh's Chocobo",
+  "types": ["Creature"],
+  "subtypes": ["Bird"],
+  "manaCost": "{G}",
+  "power": 0,
+  "toughness": 1,
+  "abilities": []
+}
