@@ -1,0 +1,9 @@
+{
+  "name": "Festering Gulch",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
