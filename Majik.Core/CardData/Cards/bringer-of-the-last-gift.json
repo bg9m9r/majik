@@ -1,0 +1,9 @@
+{
+  "name": "Bringer of the Last Gift",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Demon"],
+  "manaCost": "{6}{B}{B}",
+  "power": 6,
+  "toughness": 6,
+  "keywords": ["Flying"]
+}
