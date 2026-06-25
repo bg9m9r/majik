@@ -110,6 +110,11 @@ public static class MatchRegistration
         // bound in Program.cs; IGitHubIssueClient is the typed HttpClient there.
         services.AddSingleton<MatchReportRepository>(sp =>
             new MatchReportRepository(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
+        // Slice 3 — GitHub webhook handler (pull_request closed+merged → mark
+        // report merged). Mongo-gated: it drives MatchReportRepository. The
+        // POST /webhooks/github endpoint resolves it via GetService and 503s
+        // when absent (no Mongo / no secret).
+        services.AddScoped<GitHubWebhookService>();
         services.AddScoped<IssueReportService>(sp => new IssueReportService(
             sp.GetRequiredService<MatchRepository>(),
             sp.GetRequiredService<MatchReportRepository>(),
@@ -120,6 +125,12 @@ public static class MatchRegistration
 
         services.AddHostedService<MatchIndexInitializer>();
         services.AddHostedService<MatchCleanupService>();
+
+        // Slice 3 — flips merged → delivered reports + notifies the reporter
+        // once the affected service redeploys. Mongo-gated (it sweeps
+        // MatchReportRepository). DeploymentOptions/IPortalVersionProbe/
+        // INotificationsPublisher are registered in Program.cs.
+        services.AddHostedService<DeploymentWatcher>();
         return services;
     }
 }

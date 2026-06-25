@@ -12,6 +12,11 @@ public sealed class GitHubOptions
     public string? RepositoryName { get; set; }
     public string IssueLabel { get; set; } = "app-report";
 
+    /// <summary>Shared secret for verifying inbound GitHub webhook deliveries
+    /// (X-Hub-Signature-256). Server-only (Render env: GitHub__WebhookSecret).
+    /// When unset, the webhook endpoint returns 503 — never crashes.</summary>
+    public string? WebhookSecret { get; set; }
+
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Token)
         && !string.IsNullOrWhiteSpace(RepositoryOwner)

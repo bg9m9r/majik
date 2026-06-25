@@ -53,6 +53,20 @@ builder.Services.AddSingleton(gitHubOptions);
 // singleton GitHubOptions registered above.
 builder.Services.AddHttpClient<IGitHubIssueClient, GitHubIssueClient>();
 
+// Slice 3 — user-keyed notifications. Singleton publisher resolves the hub
+// context to push "report-delivered" to a reporter's sub (routing via
+// SubUserIdProvider registered above).
+builder.Services.AddSingleton<INotificationsPublisher, NotificationsPublisher>();
+
+// Slice 3 — deployment-watcher config + portal version probe. The probe is a
+// typed HttpClient (polls the portal's version.json); options are bound like
+// ReportingOptions/GitHubOptions. The hosted DeploymentWatcher itself is
+// registered in AddMajikMatches (Mongo-gated — it needs MatchReportRepository).
+var deploymentOptions = builder.Configuration.GetSection(DeploymentOptions.SectionName)
+    .Get<DeploymentOptions>() ?? new DeploymentOptions();
+builder.Services.AddSingleton(deploymentOptions);
+builder.Services.AddHttpClient<IPortalVersionProbe, HttpPortalVersionProbe>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
@@ -185,11 +199,61 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
    .Produces(StatusCodes.Status200OK)
    .Produces(StatusCodes.Status401Unauthorized);
 
+// Slice 3 — GitHub webhook. Anonymous (GitHub can't carry our JWT); the raw
+// body is HMAC-verified against GitHub__WebhookSecret before any work runs.
+// 503 when no secret is configured (degrade gracefully, never crash).
+app.MapPost("/webhooks/github", async (HttpRequest req, GitHubOptions gh, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(gh.WebhookSecret))
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+    // GitHubWebhookService is Mongo-gated (it drives MatchReportRepository).
+    // Resolve lazily so the host still builds when Mongo is unconfigured.
+    var svc = req.HttpContext.RequestServices.GetService<GitHubWebhookService>();
+    if (svc is null)
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+    req.EnableBuffering();
+    using var reader = new StreamReader(req.Body, leaveOpen: true);
+    var body = await reader.ReadToEndAsync(ct);
+    req.Body.Position = 0;
+
+    var sig = req.Headers["X-Hub-Signature-256"].FirstOrDefault();
+    if (!GitHubWebhookVerifier.IsValid(body, sig, gh.WebhookSecret))
+        return Results.Unauthorized();
+
+    var eventType = req.Headers["X-GitHub-Event"].FirstOrDefault();
+    if (eventType == "pull_request")
+    {
+        var coreRepo = $"{gh.RepositoryOwner}/{gh.RepositoryName}";
+        await svc.HandlePullRequestAsync(body, coreRepo, ct);
+    }
+    return Results.Ok();
+})
+.AllowAnonymous()
+.WithName("GitHubWebhook")
+.WithTags("Meta");
+
+// Slice 3 — build identity. Reporters/portal compare commitSha + buildTime to
+// detect a redeploy carrying a fix. RENDER_GIT_COMMIT is injected by Render at
+// runtime; buildTime is this process's start time (captured once at boot).
+var bootTimeIso = DateTime.UtcNow.ToString("o");
+app.MapGet("/version", () => Results.Ok(new
+{
+    commitSha = Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT") ?? "dev",
+    buildTime = bootTimeIso,
+}))
+.AllowAnonymous()
+.WithName("GetVersion")
+.WithTags("Meta")
+.Produces(StatusCodes.Status200OK);
+
 app.MapProfileEndpoints();
 app.MapCardsEndpoints();
 app.MapMatchEndpoints();
 app.MapDeckEndpoints();
 app.MapHub<MatchHub>("/hubs/match");
+app.MapHub<NotificationsHub>("/hubs/notifications");
 
 app.Run();
 

@@ -37,6 +37,13 @@ public sealed class MatchReport
     [BsonElement("repo")]
     public string? Repo { get; set; }
 
+    /// <summary>When the fix PR merged (set by the GitHub webhook on the
+    /// Merged transition). Null until merged. The DeploymentWatcher compares
+    /// this against the affected service's live build time to decide when to
+    /// flip Merged → Delivered.</summary>
+    [BsonElement("fixMergedAt")]
+    public DateTime? FixMergedAt { get; set; }
+
     [BsonElement("title")]
     public required string Title { get; init; }
 
