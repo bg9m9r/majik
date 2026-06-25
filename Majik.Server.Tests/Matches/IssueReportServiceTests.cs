@@ -1,6 +1,9 @@
+using System.Text.Json;
 using FluentAssertions;
+using Majik.Core.Api.Dtos;
 using Majik.Server.Composition;
 using Majik.Server.Matches;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 using Match = Majik.Server.Matches.Match;
@@ -9,6 +12,11 @@ namespace Majik.Server.Tests.Matches;
 
 public class IssueReportServiceTests
 {
+    private sealed class FixedClock : IClock
+    {
+        public DateTime UtcNow { get; } = new(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    }
+
     private static ReportingOptions Allow(string sub) =>
         new() { Enabled = true, TrustedTesterSubs = { sub }, MaxReportsPerHour = 5, ReplayCap = 300 };
 
@@ -148,5 +156,44 @@ public class IssueReportServiceTests
         }
         IssueReportService.FitWithinLimit(Gen(), 50).Length.Should().Be(10);
         evaluated.Should().Be(1); // never composed the 2nd (expensive) candidate
+    }
+
+    [Fact]
+    public async Task Oversized_replay_is_trimmed_so_issue_body_fits_github_limit()
+    {
+        // The actual prod-failure path (#3490): a big board + 300 chunky replay
+        // events overflowed GitHub's 65536-char body limit → 422 → 502. Assert
+        // the body the client receives is within the cap AND carries a shrink note.
+        var matchId = Guid.NewGuid();
+        var match = PlayingMatch(matchId, "alice");
+
+        var replay = new MatchReplayBuffer(new FixedClock(), NullLogger<MatchReplayBuffer>.Instance);
+        var bigPayload = JsonDocument.Parse("{\"d\":\"" + new string('z', 500) + "\"}").RootElement.Clone();
+        for (var i = 0; i < 300; i++)
+            replay.RecordEvent(matchId, new EventDto(Guid.NewGuid(), "BigEvent", DateTime.UtcNow, bigPayload, i));
+
+        var matches = new Mock<MatchRepository>(MockBehavior.Loose, Mock.Of<MongoDB.Driver.IMongoDatabase>());
+        matches.Setup(m => m.GetByIdAsync(matchId, It.IsAny<CancellationToken>())).ReturnsAsync(match);
+        var reports = new Mock<MatchReportRepository>(MockBehavior.Loose, Mock.Of<MongoDB.Driver.IMongoDatabase>());
+        reports.Setup(r => r.CountBySubSinceAsync("alice", It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        string? capturedBody = null;
+        var gh = new Mock<IGitHubIssueClient>();
+        gh.Setup(x => x.CreateIssueAsync(It.IsAny<string>(), It.IsAny<string>(), "app-report", It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, CancellationToken>((_, body, _, _) => capturedBody = body)
+            .ReturnsAsync(new CreatedIssue(1, "https://github.com/o/r/issues/1"));
+
+        // gameFactory null → state omitted; the oversized REPLAY alone forces the shrink.
+        var svc = new IssueReportService(matches.Object, reports.Object, gh.Object,
+            gameFactory: null, replayBuffer: replay, Allow("alice"));
+
+        var r = await svc.CreateAsync("alice", matchId, new ReportIssueRequest("bug", null), default);
+
+        r.IsSuccess.Should().BeTrue("the oversized bundle must be capped, not rejected");
+        capturedBody.Should().NotBeNull();
+        capturedBody!.Length.Should().BeLessThanOrEqualTo(IssueReportService.MaxIssueBodyChars,
+            "the body sent to GitHub must stay under the 65536-char limit");
+        capturedBody.Should().Contain("to fit GitHub's 65536-char limit",
+            "a shrink note documents that the bundle was trimmed");
     }
 }
