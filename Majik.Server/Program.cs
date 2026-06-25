@@ -53,6 +53,11 @@ builder.Services.AddSingleton(gitHubOptions);
 // singleton GitHubOptions registered above.
 builder.Services.AddHttpClient<IGitHubIssueClient, GitHubIssueClient>();
 
+// Slice 3 — GitHub webhook handler (pull_request closed+merged → mark report
+// merged). Scoped because MatchReportRepository is only registered when Mongo
+// is configured (AddMajikMatches); the endpoint resolves it lazily.
+builder.Services.AddScoped<GitHubWebhookService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
@@ -184,6 +189,35 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
    .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
    .Produces(StatusCodes.Status200OK)
    .Produces(StatusCodes.Status401Unauthorized);
+
+// Slice 3 — GitHub webhook. Anonymous (GitHub can't carry our JWT); the raw
+// body is HMAC-verified against GitHub__WebhookSecret before any work runs.
+// 503 when no secret is configured (degrade gracefully, never crash).
+app.MapPost("/webhooks/github", async (HttpRequest req, GitHubOptions gh, GitHubWebhookService svc, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(gh.WebhookSecret))
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+    req.EnableBuffering();
+    using var reader = new StreamReader(req.Body, leaveOpen: true);
+    var body = await reader.ReadToEndAsync(ct);
+    req.Body.Position = 0;
+
+    var sig = req.Headers["X-Hub-Signature-256"].FirstOrDefault();
+    if (!GitHubWebhookVerifier.IsValid(body, sig, gh.WebhookSecret))
+        return Results.Unauthorized();
+
+    var eventType = req.Headers["X-GitHub-Event"].FirstOrDefault();
+    if (eventType == "pull_request")
+    {
+        var coreRepo = $"{gh.RepositoryOwner}/{gh.RepositoryName}";
+        await svc.HandlePullRequestAsync(body, coreRepo, ct);
+    }
+    return Results.Ok();
+})
+.AllowAnonymous()
+.WithName("GitHubWebhook")
+.WithTags("Meta");
 
 app.MapProfileEndpoints();
 app.MapCardsEndpoints();
