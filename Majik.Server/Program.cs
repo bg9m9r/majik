@@ -58,6 +58,11 @@ builder.Services.AddHttpClient<IGitHubIssueClient, GitHubIssueClient>();
 // is configured (AddMajikMatches); the endpoint resolves it lazily.
 builder.Services.AddScoped<GitHubWebhookService>();
 
+// Slice 3 — user-keyed notifications. Singleton publisher resolves the hub
+// context to push "report-delivered" to a reporter's sub (routing via
+// SubUserIdProvider registered above).
+builder.Services.AddSingleton<INotificationsPublisher, NotificationsPublisher>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
@@ -224,6 +229,7 @@ app.MapCardsEndpoints();
 app.MapMatchEndpoints();
 app.MapDeckEndpoints();
 app.MapHub<MatchHub>("/hubs/match");
+app.MapHub<NotificationsHub>("/hubs/notifications");
 
 app.Run();
 
