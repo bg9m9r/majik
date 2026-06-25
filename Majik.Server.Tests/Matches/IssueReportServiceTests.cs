@@ -119,4 +119,34 @@ public class IssueReportServiceTests
 
         r.Failure.Should().Be(ReportFailure.RateLimited);
     }
+
+    [Fact]
+    public void FitWithinLimit_picks_first_candidate_that_fits()
+    {
+        var candidates = new[] { new string('a', 100), new string('b', 40), new string('c', 10) };
+        // max 50 → the 100-char one is too big, the 40-char one fits first.
+        IssueReportService.FitWithinLimit(candidates, 50).Should().Be(new string('b', 40));
+    }
+
+    [Fact]
+    public void FitWithinLimit_hard_truncates_when_none_fit()
+    {
+        var candidates = new[] { new string('a', 100), new string('b', 80) };
+        var result = IssueReportService.FitWithinLimit(candidates, 50);
+        result.Length.Should().Be(50);
+        result.Should().Be(new string('b', 50)); // smallest, hard-truncated to the cap
+    }
+
+    [Fact]
+    public void FitWithinLimit_is_lazy_stops_at_first_fit()
+    {
+        var evaluated = 0;
+        IEnumerable<string> Gen()
+        {
+            evaluated++; yield return new string('x', 10);   // fits immediately
+            evaluated++; yield return new string('y', 9999);
+        }
+        IssueReportService.FitWithinLimit(Gen(), 50).Length.Should().Be(10);
+        evaluated.Should().Be(1); // never composed the 2nd (expensive) candidate
+    }
 }

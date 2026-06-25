@@ -87,19 +87,46 @@ public sealed class IssueReportService
         return $"[app-report] {firstLine} ({matchId.ToString()[..8]})";
     }
 
+    // GitHub rejects an issue body over 65536 chars (HTTP 422). Stay under it
+    // with a safety margin for the markdown scaffolding around the JSON.
+    internal const int MaxIssueBodyChars = 60000;
+
     private string BuildBody(string sub, Match match, ReportIssueRequest req)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"**Reporter:** `{sub}`  ");
-        sb.AppendLine($"**Match:** `{match.Id}`  GameId: `{match.GameId}`  ");
-        sb.AppendLine($"**Archetypes:** {match.Creator.Handle} vs {match.Opponent?.Handle}  ");
-        sb.AppendLine();
-        sb.AppendLine("### Description");
-        sb.AppendLine(req.Description ?? "(none)");
-        sb.AppendLine();
+        var prefix = new StringBuilder();
+        prefix.AppendLine($"**Reporter:** `{sub}`  ");
+        prefix.AppendLine($"**Match:** `{match.Id}`  GameId: `{match.GameId}`  ");
+        prefix.AppendLine($"**Archetypes:** {match.Creator.Handle} vs {match.Opponent?.Handle}  ");
+        prefix.AppendLine();
+        prefix.AppendLine("### Description");
+        prefix.AppendLine(req.Description ?? "(none)");
+        prefix.AppendLine();
+        var head = prefix.ToString();
 
-        var bundle = AssembleBundle(match, req.Telemetry);
+        // Fit the diagnostic bundle under GitHub's 65536-char body limit. Shrink
+        // in steps (lazily — stop at the first candidate that fits): full replay →
+        // fewer entries → none → drop the full-reveal state too. A big turn-7
+        // board + 300 replay events otherwise overflows and 422s the issue.
+        IEnumerable<string> Candidates()
+        {
+            foreach (var cap in new[] { _opts.ReplayCap, 100, 40, 10, 0 })
+                yield return Compose(head, match, req.Telemetry, replayCap: cap, includeState: true,
+                    note: cap < _opts.ReplayCap
+                        ? $"replay trimmed to the last {cap} events to fit GitHub's 65536-char limit"
+                        : null);
+            yield return Compose(head, match, req.Telemetry, replayCap: 0, includeState: false,
+                note: "replay + full state omitted to fit GitHub's 65536-char limit");
+        }
+        return FitWithinLimit(Candidates(), MaxIssueBodyChars);
+    }
+
+    private string Compose(string head, Match match, ClientTelemetryDto? telemetry,
+        int replayCap, bool includeState, string? note)
+    {
+        var bundle = AssembleBundle(match, telemetry, replayCap, includeState);
         var json = JsonSerializer.Serialize(bundle, new JsonSerializerOptions { WriteIndented = true });
+        var sb = new StringBuilder(head);
+        if (note != null) { sb.AppendLine($"> ⚠️ {note}"); sb.AppendLine(); }
         sb.AppendLine("<details><summary>Diagnostic bundle (replay + state + client telemetry)</summary>");
         sb.AppendLine();
         sb.AppendLine("```json");
@@ -109,23 +136,38 @@ public sealed class IssueReportService
         return sb.ToString();
     }
 
-    private object AssembleBundle(Match match, ClientTelemetryDto? telemetry)
+    /// <summary>Pure selector: return the first candidate (largest first) whose
+    /// length is within <paramref name="maxChars"/>; if none fit, hard-truncate
+    /// the smallest. Lazy over the source so callers can avoid composing
+    /// candidates they don't need.</summary>
+    internal static string FitWithinLimit(IEnumerable<string> candidatesLargestFirst, int maxChars)
+    {
+        var last = "";
+        foreach (var c in candidatesLargestFirst)
+        {
+            last = c;
+            if (c.Length <= maxChars) return c;
+        }
+        return last.Length > maxChars ? last[..maxChars] : last;
+    }
+
+    private object AssembleBundle(Match match, ClientTelemetryDto? telemetry, int replayCap, bool includeState)
     {
         object? state = null;
         object? replay = null;
 
-        if (match.GameId is Guid gid && _gameFactory?.Get(gid) is { } facade)
+        if (includeState && match.GameId is Guid gid && _gameFactory?.Get(gid) is { } facade)
         {
             try { state = facade.GetState(); } catch { /* facade torn down — omit */ }
         }
-        if (_replayBuffer != null)
+        if (replayCap > 0 && _replayBuffer != null)
         {
             var dto = _replayBuffer.GetReplay(match.Id);
             if (dto != null)
             {
                 IReadOnlyList<ReplayEntry> entries = dto.Entries;
-                if (entries.Count > _opts.ReplayCap)
-                    entries = entries.Skip(entries.Count - _opts.ReplayCap).ToList();
+                if (entries.Count > replayCap)
+                    entries = entries.Skip(entries.Count - replayCap).ToList();
                 replay = new { dto.MatchId, dto.SealedAt, dto.Truncated, dto.EntryCount, Entries = entries };
             }
         }
