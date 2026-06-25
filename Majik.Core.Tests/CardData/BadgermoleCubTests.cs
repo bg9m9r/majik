@@ -11,6 +11,7 @@ using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
+using Majik.Core.Keywords;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -241,6 +242,45 @@ public class BadgermoleCubTests
 
         triggers.PendingCount.Should().Be(0, "a land isn't a creature");
         _alice.ManaPool.Green.Should().Be(1, "only the Forest's own {G}");
+    }
+
+    /// <summary>
+    /// Regression: #3491. After earthbending a land it becomes a creature via a
+    /// Layer-4 continuous effect (CR 613.7b). Tapping that creature-land for mana
+    /// must trigger Badgermole Cub's "whenever you tap a creature for mana, add
+    /// an additional {G}" ability, even though the C# instance is a Land, not a
+    /// Creature.
+    /// </summary>
+    [Fact]
+    public void TappingEarthbentLandForMana_AddsAdditionalGreen()
+    {
+        var (bus, stack, triggers, activator) = BuildEngine();
+        var svc = new ContinuousEffectsService();
+
+        var cub = BadgermoleCubFactory.Create(_alice, triggers);
+        cub.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(cub);
+
+        var forest = (Land)NamedCardFactory.Create("Forest", _alice);
+        forest.SetController(_alice);
+        forest.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(forest);
+        forest.ActiveEffects = svc;
+        EarthbendAction.Apply(forest, _alice, 1, svc);
+
+        var manaAbility = forest.Abilities.OfType<IManaAbility>().First();
+
+        activator.ActivateManaAbility(manaAbility, _alice);
+
+        _alice.ManaPool.Green.Should().Be(1, "the forest's own {G}");
+        triggers.PendingCount.Should().Be(1,
+            "an earthbent land is a creature via Layer-4 grant, so the trigger fires");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.ManaPool.Green.Should().Be(2,
+            "Badgermole Cub adds an additional {G} when you tap an animated creature-land for mana");
     }
 
     private static (EventBus bus, Majik.Core.Stack.Stack stack, TriggerManager triggers, ManaAbilityActivator activator) BuildEngine()
