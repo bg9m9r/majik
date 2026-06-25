@@ -63,6 +63,15 @@ builder.Services.AddScoped<GitHubWebhookService>();
 // SubUserIdProvider registered above).
 builder.Services.AddSingleton<INotificationsPublisher, NotificationsPublisher>();
 
+// Slice 3 — deployment-watcher config + portal version probe. The probe is a
+// typed HttpClient (polls the portal's version.json); options are bound like
+// ReportingOptions/GitHubOptions. The hosted DeploymentWatcher itself is
+// registered in AddMajikMatches (Mongo-gated — it needs MatchReportRepository).
+var deploymentOptions = builder.Configuration.GetSection(DeploymentOptions.SectionName)
+    .Get<DeploymentOptions>() ?? new DeploymentOptions();
+builder.Services.AddSingleton(deploymentOptions);
+builder.Services.AddHttpClient<IPortalVersionProbe, HttpPortalVersionProbe>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 

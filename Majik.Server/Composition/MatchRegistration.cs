@@ -120,6 +120,12 @@ public static class MatchRegistration
 
         services.AddHostedService<MatchIndexInitializer>();
         services.AddHostedService<MatchCleanupService>();
+
+        // Slice 3 — flips merged → delivered reports + notifies the reporter
+        // once the affected service redeploys. Mongo-gated (it sweeps
+        // MatchReportRepository). DeploymentOptions/IPortalVersionProbe/
+        // INotificationsPublisher are registered in Program.cs.
+        services.AddHostedService<DeploymentWatcher>();
         return services;
     }
 }
