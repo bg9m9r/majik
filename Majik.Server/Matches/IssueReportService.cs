@@ -34,6 +34,17 @@ public sealed class IssueReportService
         _gameFactory = gameFactory; _replayBuffer = replayBuffer; _opts = opts;
     }
 
+    /// <summary>Whether <paramref name="callerSub"/> may file a report on this
+    /// match: an allowlisted trusted tester seated in the match. Drives the
+    /// portal Report-button visibility (no side effects).</summary>
+    public async Task<bool> CanReportAsync(string callerSub, Guid matchId, CancellationToken ct)
+    {
+        if (!_opts.IsTrusted(callerSub)) return false;
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return false;
+        return callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+    }
+
     public async Task<IssueReportResult> CreateAsync(
         string callerSub, Guid matchId, ReportIssueRequest req, CancellationToken ct)
     {

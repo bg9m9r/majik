@@ -94,6 +94,13 @@ public static class MatchEndpoints
             .WithName("ReportMatch")
             .Produces<ReportIssueResponse>(StatusCodes.Status201Created);
 
+        // Whether the caller may file a report on this match (allowlisted tester
+        // seated in the match). Drives the portal's Report-button visibility, so
+        // the button only renders for someone who is actually allowed to report.
+        group.MapGet("/{id:guid}/can-report", CanReport)
+            .WithName("CanReportMatch")
+            .Produces<CanReportResponse>(StatusCodes.Status200OK);
+
         // PLAN 07 — OpenAPI schema anchor. Carries the EventPayloadCatalog
         // (which references every currently-emitted *Payload record) into
         // /openapi/v1.json so ng-openapi-gen emits a typed interface per
@@ -170,6 +177,17 @@ public static class MatchEndpoints
         return r.IsSuccess
             ? Results.Created($"/matches/{r.Value!.Id}", r.Value)
             : ErrorToResult(r.Error!);
+    }
+
+    private static async Task<IResult> CanReport(
+        Guid id, ClaimsPrincipal user,
+        [FromServices] IssueReportService? svc, CancellationToken ct)
+    {
+        // Reporting unavailable (no Mongo / DI) → simply not allowed; the portal
+        // hides the button. Never an error — this only gates UI visibility.
+        if (svc == null) return Results.Ok(new CanReportResponse(false));
+        var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
+        return Results.Ok(new CanReportResponse(await svc.CanReportAsync(sub, id, ct)));
     }
 
     private static async Task<IResult> Report(

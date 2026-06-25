@@ -159,6 +159,17 @@
         ],
         "type": "object"
       },
+      "CanReportResponse": {
+        "properties": {
+          "canReport": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canReport"
+        ],
+        "type": "object"
+      },
       "CardDrawnPayload": {
         "properties": {
           "cardId": {
@@ -3230,6 +3241,37 @@
         ],
         "responses": {
           "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/can-report": {
+      "get": {
+        "operationId": "CanReportMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanReportResponse"
+                }
+              }
+            },
             "description": "OK"
           }
         },

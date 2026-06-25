@@ -13,5 +13,10 @@ public sealed record ReportIssueRequest(string Description, ClientTelemetryDto? 
 
 public sealed record ReportIssueResponse(Guid ReportId, int IssueNumber, string IssueUrl);
 
+/// <summary>Whether the caller may file a report on a given match (allowlisted
+/// trusted tester AND seated in the match). Drives the portal's Report-button
+/// visibility.</summary>
+public sealed record CanReportResponse(bool CanReport);
+
 /// <summary>Failure reasons (mapped to HTTP by the endpoint).</summary>
 public enum ReportFailure { NotAllowlisted, NotParticipant, RateLimited, MatchNotFound, GitHubFailed }

@@ -73,6 +73,37 @@ public class IssueReportServiceTests
     }
 
     [Fact]
+    public async Task CanReport_true_for_allowlisted_participant()
+    {
+        var matchId = Guid.NewGuid();
+        var matches = new Mock<MatchRepository>(MockBehavior.Loose, Mock.Of<MongoDB.Driver.IMongoDatabase>());
+        matches.Setup(m => m.GetByIdAsync(matchId, It.IsAny<CancellationToken>())).ReturnsAsync(PlayingMatch(matchId, "alice"));
+        var reports = new Mock<MatchReportRepository>(MockBehavior.Loose, Mock.Of<MongoDB.Driver.IMongoDatabase>());
+        var svc = new IssueReportService(matches.Object, reports.Object, new Mock<IGitHubIssueClient>().Object,
+            null, null, Allow("alice"));
+
+        (await svc.CanReportAsync("alice", matchId, default)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CanReport_false_when_not_allowlisted_or_not_participant()
+    {
+        var matchId = Guid.NewGuid();
+        var matches = new Mock<MatchRepository>(MockBehavior.Loose, Mock.Of<MongoDB.Driver.IMongoDatabase>());
+        matches.Setup(m => m.GetByIdAsync(matchId, It.IsAny<CancellationToken>())).ReturnsAsync(PlayingMatch(matchId, "alice"));
+        var reports = new Mock<MatchReportRepository>(MockBehavior.Loose, Mock.Of<MongoDB.Driver.IMongoDatabase>());
+        var svc = new IssueReportService(matches.Object, reports.Object, new Mock<IGitHubIssueClient>().Object,
+            null, null, Allow("alice"));
+
+        // not allowlisted (mallory not on the list)
+        (await svc.CanReportAsync("mallory", matchId, default)).Should().BeFalse();
+        // allowlisted but NOT seated in this match
+        var svc2 = new IssueReportService(matches.Object, reports.Object, new Mock<IGitHubIssueClient>().Object,
+            null, null, Allow("carol"));
+        (await svc2.CanReportAsync("carol", matchId, default)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Over_rate_limit_is_rejected()
     {
         var matchId = Guid.NewGuid();
