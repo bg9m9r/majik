@@ -86,6 +86,14 @@ public static class MatchEndpoints
             .Produces<MatchError>(StatusCodes.Status404NotFound)
             .Produces<MatchError>(StatusCodes.Status403Forbidden);
 
+        // In-app issue report (Slice 1). Allowlisted match participants snapshot
+        // replay + full-reveal state + client telemetry into a labelled GitHub
+        // issue. Returns 201 with the created issue ref. Annotate the response
+        // so ng-openapi-gen emits a typed ReportIssueResponse on the client.
+        group.MapPost("/{id:guid}/report", Report)
+            .WithName("ReportMatch")
+            .Produces<ReportIssueResponse>(StatusCodes.Status201Created);
+
         // PLAN 07 — OpenAPI schema anchor. Carries the EventPayloadCatalog
         // (which references every currently-emitted *Payload record) into
         // /openapi/v1.json so ng-openapi-gen emits a typed interface per
@@ -162,6 +170,28 @@ public static class MatchEndpoints
         return r.IsSuccess
             ? Results.Created($"/matches/{r.Value!.Id}", r.Value)
             : ErrorToResult(r.Error!);
+    }
+
+    private static async Task<IResult> Report(
+        Guid id, ReportIssueRequest body, ClaimsPrincipal user,
+        [FromServices] IssueReportService? svc, CancellationToken ct)
+    {
+        if (svc == null) return MongoUnavailable();
+        var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
+
+        var r = await svc.CreateAsync(sub, id, body, ct);
+        if (r.IsSuccess)
+            return Results.Created($"/matches/{id}/report/{r.Value!.ReportId}", r.Value);
+
+        return r.Failure switch
+        {
+            ReportFailure.NotAllowlisted => Results.Json(new { error = "not-allowlisted" }, statusCode: StatusCodes.Status403Forbidden),
+            ReportFailure.NotParticipant => Results.Json(new { error = "forbidden" }, statusCode: StatusCodes.Status403Forbidden),
+            ReportFailure.RateLimited    => Results.Json(new { error = "rate-limited" }, statusCode: StatusCodes.Status429TooManyRequests),
+            ReportFailure.MatchNotFound  => Results.Json(new { error = "match-not-found" }, statusCode: StatusCodes.Status404NotFound),
+            ReportFailure.GitHubFailed   => Results.Json(new { error = "issue-create-failed" }, statusCode: StatusCodes.Status502BadGateway),
+            _ => Results.Problem("unknown"),
+        };
     }
 
     private static async Task<IResult> List(
