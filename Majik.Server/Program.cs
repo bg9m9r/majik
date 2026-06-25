@@ -49,6 +49,10 @@ var gitHubOptions = builder.Configuration.GetSection(GitHubOptions.SectionName)
     .Get<GitHubOptions>() ?? new GitHubOptions();
 builder.Services.AddSingleton(gitHubOptions);
 
+// Typed HttpClient for opening report issues. Injects HttpClient + the
+// singleton GitHubOptions registered above.
+builder.Services.AddHttpClient<IGitHubIssueClient, GitHubIssueClient>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
