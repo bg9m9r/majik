@@ -35,6 +35,20 @@ builder.Services.AddMajikSignalR(builder.Configuration);
 // SubUserIdProvider for rationale; needed for the hub publisher's
 // per-recipient fan-out which carries CR 706 hidden info.
 builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, Majik.Server.Matches.SubUserIdProvider>();
+
+// In-app issue reporting (Slice 1). Bound + registered as singletons,
+// mirroring the ServerBotOptions GetSection().Get<>() pattern in
+// MajikEngineRegistration. Env binding: Reporting__TrustedTesterSubs__0,
+// Reporting__MaxReportsPerHour, GitHub__Token, GitHub__RepositoryOwner,
+// GitHub__RepositoryName, GitHub__IssueLabel.
+var reportingOptions = builder.Configuration.GetSection(ReportingOptions.SectionName)
+    .Get<ReportingOptions>() ?? new ReportingOptions();
+builder.Services.AddSingleton(reportingOptions);
+
+var gitHubOptions = builder.Configuration.GetSection(GitHubOptions.SectionName)
+    .Get<GitHubOptions>() ?? new GitHubOptions();
+builder.Services.AddSingleton(gitHubOptions);
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
