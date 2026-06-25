@@ -159,6 +159,17 @@
         ],
         "type": "object"
       },
+      "CanReportResponse": {
+        "properties": {
+          "canReport": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canReport"
+        ],
+        "type": "object"
+      },
       "CardDrawnPayload": {
         "properties": {
           "cardId": {
@@ -565,6 +576,49 @@
           "kind",
           "min",
           "max"
+        ],
+        "type": "object"
+      },
+      "ClientTelemetryDto": {
+        "properties": {
+          "buildSha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "consoleErrors": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "promptState": {},
+          "recentSignalR": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "route": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "route",
+          "buildSha",
+          "consoleErrors",
+          "recentSignalR",
+          "promptState"
         ],
         "type": "object"
       },
@@ -2343,6 +2397,53 @@
         ],
         "type": "object"
       },
+      "ReportIssueRequest": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "telemetry": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ClientTelemetryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "description",
+          "telemetry"
+        ],
+        "type": "object"
+      },
+      "ReportIssueResponse": {
+        "properties": {
+          "issueNumber": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "issueUrl": {
+            "type": "string"
+          },
+          "reportId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reportId",
+          "issueNumber",
+          "issueUrl"
+        ],
+        "type": "object"
+      },
       "RevealView": {
         "properties": {
           "eligibleInstanceIds": {
@@ -3148,6 +3249,37 @@
         ]
       }
     },
+    "/matches/{id}/can-report": {
+      "get": {
+        "operationId": "CanReportMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanReportResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
     "/matches/{id}/commands": {
       "post": {
         "operationId": "SubmitMatchCommand",
@@ -3352,6 +3484,47 @@
               }
             },
             "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/report": {
+      "post": {
+        "operationId": "ReportMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportIssueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportIssueResponse"
+                }
+              }
+            },
+            "description": "Created"
           }
         },
         "tags": [

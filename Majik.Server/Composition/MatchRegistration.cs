@@ -101,6 +101,23 @@ public static class MatchRegistration
             },
             sp.GetService<ILogger<MatchTimeoutScheduler>>()));
         services.AddScoped<MatchService>();
+
+        // In-app issue reporting (Slice 1). Mongo-gated like the rest of this
+        // file (only reached when MongoRegistration.IsConfigured). ReplayBuffer
+        // is a singleton above; ServerGameFactory comes from the engine reg —
+        // both resolved as optional (GetService) so a torn-down/absent facade
+        // just omits its slice of the bundle. ReportingOptions is a singleton
+        // bound in Program.cs; IGitHubIssueClient is the typed HttpClient there.
+        services.AddSingleton<MatchReportRepository>(sp =>
+            new MatchReportRepository(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
+        services.AddScoped<IssueReportService>(sp => new IssueReportService(
+            sp.GetRequiredService<MatchRepository>(),
+            sp.GetRequiredService<MatchReportRepository>(),
+            sp.GetRequiredService<IGitHubIssueClient>(),
+            sp.GetService<ServerGameFactory>(),
+            sp.GetService<MatchReplayBuffer>(),
+            sp.GetRequiredService<ReportingOptions>()));
+
         services.AddHostedService<MatchIndexInitializer>();
         services.AddHostedService<MatchCleanupService>();
         return services;
