@@ -3727,6 +3727,32 @@
         ]
       }
     },
+    "/version": {
+      "get": {
+        "operationId": "GetVersion",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Meta"
+        ]
+      }
+    },
+    "/webhooks/github": {
+      "post": {
+        "operationId": "GitHubWebhook",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Meta"
+        ]
+      }
+    },
     "/whoami": {
       "get": {
         "operationId": "WhoAmI",
