@@ -166,7 +166,10 @@ public static class BadgermoleCubFactory
             var you = card.Controller ?? owner;
             if (!ReferenceEquals(e.Player, you)) return false;
             // "a creature for mana" — the tapped source must be a creature.
-            if (e.Source is not Creature) return false;
+            // Use IsEffectivelyCreature() rather than `is Creature` so that
+            // a land animated by Earthbend (a Land C# instance with a Layer-4
+            // creature-type grant) also counts (CR 613.7b / 701.59).
+            if (e.Source is not Permanent p || !p.IsEffectivelyCreature()) return false;
             pendingController = e.Player;
             return true;
         });
