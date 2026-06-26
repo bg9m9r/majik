@@ -301,6 +301,11 @@ public class TurnDriverTriggerTargetDrainTests
     {
         public int ChooseTargetsCalls { get; private set; }
 
+        // Opt in to synthesized candidates (mirrors RemoteAgent): the guard in
+        // TargetCollection.CollectAsync skips the call only for agents with
+        // WantsSynthesizedTargetCandidates = true when live.Count == 0.
+        public bool WantsSynthesizedTargetCandidates => true;
+
         public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
         {
             ChooseTargetsCalls++;
