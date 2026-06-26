@@ -187,6 +187,19 @@ public sealed record ContinuousEffectRemovedPayload(
     string Description);
 
 /// <summary>
+/// CR 602 — an activated ability put on the stack. Carries the controller
+/// (who activated it) and the source permanent's identity so the portal can
+/// render "Alice activated Bloodstained Mire" in the game log without
+/// refetching /state. <see cref="SourceInstanceId"/> is
+/// <see cref="System.Guid.Empty"/> and <see cref="SourceName"/> is empty
+/// when the source is not an <c>ICard</c> (rare; non-permanent sources).
+/// </summary>
+public sealed record AbilityActivatedPayload(
+    Guid ControllerId,
+    Guid SourceInstanceId,
+    string SourceName);
+
+/// <summary>
 /// PLAN 07 — OpenAPI schema anchor. The SignalR <c>event</c> channel
 /// carries <see cref="EventDto.Payload"/> as a raw <c>JsonElement</c>, so
 /// the payload record shapes are otherwise invisible to OpenAPI (SignalR
@@ -219,4 +232,5 @@ public sealed record EventPayloadCatalog(
     DamageDealtPayload DamageDealt,
     CounterAddedPayload CounterAdded,
     ContinuousEffectAddedPayload ContinuousEffectAdded,
-    ContinuousEffectRemovedPayload ContinuousEffectRemoved);
+    ContinuousEffectRemovedPayload ContinuousEffectRemoved,
+    AbilityActivatedPayload AbilityActivated);

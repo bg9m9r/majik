@@ -679,6 +679,46 @@ public class EventPayloadTests
         payload.GetProperty("damageType").GetString().Should().Be("Spell");
     }
 
+    // ---- AbilityActivatedEvent payload ----
+
+    [Fact]
+    public void AbilityActivatedEvent_PayloadCarriesControllerAndSource()
+    {
+        // Regression guard for issue #3494: the game log couldn't show
+        // "Bot activated Bloodstained Mire" because AbilityActivatedEvent
+        // fell through to the empty-payload arm. ControllerId + SourceInstanceId
+        // + SourceName give the portal enough to render the log entry and stack
+        // annotation without refetching /state.
+        var alice = new Player("Alice");
+        var mire = new Land("Bloodstained Mire") { Owner = alice };
+        var ability = new Majik.Core.Abilities.ActivatedAbility(source: mire, controller: alice);
+        var e = new AbilityActivatedEvent(ability);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(mire.InstanceId);
+        payload.GetProperty("sourceName").GetString().Should().Be("Bloodstained Mire");
+    }
+
+    [Fact]
+    public void AbilityActivatedEvent_NonCardSource_EmitsEmptyGuidAndEmptyName()
+    {
+        // A small number of abilities have non-card sources (e.g. player
+        // abilities). The payload must still be well-formed with sentinel
+        // values rather than throwing.
+        var alice = new Player("Alice");
+        var nonCardSource = new object();
+        var ability = new Majik.Core.Abilities.ActivatedAbility(source: nonCardSource, controller: alice);
+        var e = new AbilityActivatedEvent(ability);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(Guid.Empty);
+        payload.GetProperty("sourceName").GetString().Should().Be("");
+    }
+
     [Fact]
     public void UnknownEvent_FallsBackToEmptyPayload()
     {

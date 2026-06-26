@@ -178,6 +178,13 @@ public static class EventPayloadBuilder
             SourceName: x.Effect.Source?.Name ?? "",
             Layer: x.Effect.Layer.ToString(),
             Description: x.Effect.Description)),
+        // CR 602 — activated ability put on the stack. Carries controller +
+        // source identity so the portal can render the game-log entry
+        // ("Alice activated Bloodstained Mire") without refetching /state.
+        AbilityActivatedEvent x => Serialize(new AbilityActivatedPayload(
+            ControllerId: x.Ability.Controller.Id,
+            SourceInstanceId: (x.Ability.Source as ICard)?.InstanceId ?? Guid.Empty,
+            SourceName: (x.Ability.Source as ICard)?.Name ?? "")),
         GameStartedEvent => Empty(),
         _ => Empty(),
     };
