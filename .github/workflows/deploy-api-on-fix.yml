@@ -1,0 +1,59 @@
+name: deploy-api-on-fix
+
+# Auto-deploy majik-api ONLY when a merged PR fixed an in-app report — i.e. the
+# PR closes an `app-report` issue. Card PRs / refactors / docs don't close an
+# app-report issue, so they never deploy (api auto-deploy stays off for those,
+# per the live-match-safety policy). Portal-repo fixes are a different repo and
+# auto-deploy themselves; this only covers the api.
+#
+# The Render credential is a per-service DEPLOY HOOK (RENDER_DEPLOY_HOOK_API),
+# NOT the account API key — it can only trigger a deploy of majik-api, nothing
+# else. It is referenced ONLY by this workflow, so the untrusted-input auto-fix
+# job never receives it.
+#
+# NOTE: deploying bounces the api's in-memory game state — any live match at
+# that instant is lost. Fixes are infrequent so this is accepted; a
+# "no live match in progress" guard can be added later if needed.
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  deploy:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Deploy api iff this merge closed an app-report issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PR body is untrusted — read it ONLY as an env var (never interpolated
+          # into the script), and only grep it for an issue number.
+          PR_BODY: ${{ github.event.pull_request.body }}
+          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+        run: |
+          set -euo pipefail
+          # First `Closes/Fixes/Resolves #N` (or `… bg9m9r/majik#N`) in the body.
+          num="$(printf '%s' "$PR_BODY" \
+            | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+(bg9m9r/majik)?#[0-9]+' \
+            | grep -oE '[0-9]+' | head -1 || true)"
+          if [ -z "${num}" ]; then
+            echo "PR closes no issue — not an app-report fix; skipping deploy."
+            exit 0
+          fi
+          labels="$(gh issue view "${num}" --repo bg9m9r/majik --json labels -q '.labels[].name' 2>/dev/null || true)"
+          echo "Closed issue #${num} labels: ${labels:-<none>}"
+          if ! printf '%s\n' "${labels}" | grep -qx 'app-report'; then
+            echo "Issue #${num} is not an app-report — skipping deploy."
+            exit 0
+          fi
+          if [ -z "${RENDER_DEPLOY_HOOK_API}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_API secret not set — cannot deploy."
+            exit 1
+          fi
+          echo "app-report fix merged (closed #${num}) → triggering majik-api deploy."
+          # Deploy hook = a per-service URL; POST triggers a deploy of majik-api only.
+          curl -fsS -X POST "${RENDER_DEPLOY_HOOK_API}" -o /dev/null -w 'render deploy hook HTTP %{http_code}\n'
