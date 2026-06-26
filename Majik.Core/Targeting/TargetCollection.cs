@@ -74,7 +74,14 @@ public static class TargetCollection
                 ? req
                 : req.WithCandidates(live);
 
-            var picked = agent != null
+            // Only skip the prompt for agents that rely on a synthesized pool
+            // (WantsSynthesizedTargetCandidates = true, i.e. RemoteAgent) when
+            // that pool came back empty — firing a SignalR prompt with 0
+            // candidates deadlocks the portal (issue #3495). Bots opt OUT of
+            // synthesis (WantsSynthesizedTargetCandidates = false) and handle
+            // empty pools via their own TargetPolicy heuristic; the guard must
+            // NOT skip them or targeted-spell tests break.
+            var picked = agent != null && (live.Count > 0 || !agent.WantsSynthesizedTargetCandidates)
                 ? await agent.ChooseTargetsAsync(ctx, promptReq, ct).ConfigureAwait(false)
                 : (IReadOnlyList<object>)Array.Empty<object>();
 
