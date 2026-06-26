@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "AbilityActivatedPayload": {
+        "properties": {
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "controllerId",
+          "sourceInstanceId",
+          "sourceName"
+        ],
+        "type": "object"
+      },
       "AbilityDto": {
         "properties": {
           "description": {
@@ -103,7 +124,7 @@
           },
           "chosenScore": {
             "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
               "string"
@@ -135,7 +156,7 @@
           },
           "score": {
             "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
             "type": [
               "number",
               "string"
@@ -990,6 +1011,9 @@
       },
       "EventPayloadCatalog": {
         "properties": {
+          "abilityActivated": {
+            "$ref": "#/components/schemas/AbilityActivatedPayload"
+          },
           "cardDrawn": {
             "$ref": "#/components/schemas/CardDrawnPayload"
           },
@@ -1055,7 +1079,8 @@
           "damageDealt",
           "counterAdded",
           "continuousEffectAdded",
-          "continuousEffectRemoved"
+          "continuousEffectRemoved",
+          "abilityActivated"
         ],
         "type": "object"
       },
