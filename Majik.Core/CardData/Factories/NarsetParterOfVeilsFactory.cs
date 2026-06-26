@@ -43,7 +43,14 @@ namespace Majik.Core.CardData.Factories;
 ///   reveal-and-choose surface Mishra's Research Desk / Impulse use). The
 ///   agent receives the FULL peek so a remote UI can render every revealed
 ///   card, plus the eligible subset (noncreature, nonland). Declining
-///   ("may") is honoured. The chosen card goes to hand; the remainder is
+///   ("may") is honoured. When the player elects to reveal, the chosen card
+///   is made public per CR 701.16: a <see cref="CardRevealedEvent"/> (tagged
+///   <see cref="ZoneType.Library"/>, reason <c>CardName</c>) is published via
+///   the shared <see cref="LibrarySearch.PublishRevealIfRequested"/> +
+///   <see cref="EventBusRegistry"/> seam, so opponents/observers + the
+///   portal's reveal-flash see the revealed card; declining publishes nothing
+///   (the look-at stays a private peek, CR 701.15). The chosen card goes to
+///   hand; the remainder is
 ///   shuffled (CR 701.19 — "random order", via
 ///   <see cref="GameRandomRegistry"/>) before placing on the bottom in
 ///   shuffled order. Falls back to the deterministic first-eligible pick
@@ -181,6 +188,15 @@ public static class NarsetParterOfVeilsFactory
 
         if (picked != null)
         {
+            // CR 701.16 — the elected "you may reveal a noncreature, nonland
+            // card …" becomes public. Publish the reveal while the card is
+            // still in the library (mirroring the printed "reveal … and put it
+            // into your hand" order) via the shared EventBusRegistry seam, so
+            // opponents/observers + the portal's reveal-flash see it.
+            // Best-effort: no-op when no bus is registered. Declining the "may"
+            // (picked == null) publishes nothing — a peek that ends private.
+            LibrarySearch.PublishRevealIfRequested(owner, picked, CardName);
+
             owner.Zones.Library.RemoveCard(picked);
             owner.Zones.Hand.AddCard(picked);
             picked.SetZone(ZoneType.Hand);

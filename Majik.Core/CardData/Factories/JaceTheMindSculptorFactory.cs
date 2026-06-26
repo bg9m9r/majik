@@ -31,6 +31,11 @@ namespace Majik.Core.CardData.Factories;
 ///   choice, sends it to the bottom (the "you may" is auto-accepted;
 ///   agent-driven choice is the same gap Wrenn / Karn have). No-resolver
 ///   path: legal no-op tail (loyalty change still applies).
+///   <b>No reveal event by design</b>: "Look at the top card" is a private
+///   peek (CR 701.15) — only the activating player sees it — so it
+///   deliberately does NOT publish a <see cref="Majik.Core.Events.CardRevealedEvent"/>.
+///   This is distinct from the "you may <i>reveal</i>" loyalty abilities
+///   (Tezzeret +1, Narset -2) which DO make the chosen card public (CR 701.16).
 /// - <b>0: draw 3, then bottom-up-top 2 from hand (CR 606 + CR 121 +
 ///   CR 701.20)</b>: draws via <see cref="Fx.DrawCards"/>; then takes
 ///   the first two cards in hand and re-inserts them at index 0 of
@@ -159,13 +164,14 @@ public static class JaceTheMindSculptorFactory
                     if (target == null) return default;
                     var top = target.Zones.Library.GetCards().FirstOrDefault();
                     if (top == null) return default;
-                    // "Look at" is internal — no visible state change for the
-                    // peek step (the engine doesn't yet model hidden-info
-                    // reveals). "May put on bottom" — auto-accept the move.
-                    // CR 400.7 — route the Library→Library bottom hop through the
-                    // registered ZoneService so a CardMovedEvent publishes (the
-                    // movement-provenance fix); raw-zone fallback when no service
-                    // is registered (shape / dispatcher-test paths).
+                    // "Look at the top card" is a PRIVATE peek (CR 701.15) —
+                    // only the activating player sees it — so no CardRevealedEvent
+                    // is published (that public-reveal surface is reserved for
+                    // "you may reveal" abilities, CR 701.16). "May put on bottom"
+                    // — auto-accept the move. CR 400.7 — route the Library→Library
+                    // bottom hop through the registered ZoneService so a
+                    // CardMovedEvent publishes (the movement-provenance fix);
+                    // raw-zone fallback when no service is registered.
                     BottomHop(target, top);
                     return default;
                 }),
