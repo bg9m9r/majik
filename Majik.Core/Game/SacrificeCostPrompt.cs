@@ -93,7 +93,7 @@ public static class SacrificeCostPrompt
             Optional: false);
 
         var chosen = await agent.ChooseAsync(ctx, req, ct).ConfigureAwait(false);
-        var pick = chosen.OfType<Creature>().FirstOrDefault() ?? eligible[0];
+        var pick = chosen.OfType<Permanent>().FirstOrDefault() ?? eligible[0];
         sacCost.ChooseSacrifice(pick);
     }
 

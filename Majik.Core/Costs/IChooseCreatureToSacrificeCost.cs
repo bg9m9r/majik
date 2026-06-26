@@ -16,14 +16,22 @@ namespace Majik.Core.Costs;
 ///
 /// <para>Without this hook the cost auto-picked the first eligible creature
 /// with no prompt — the live-play bug this interface fixes.</para>
+///
+/// <para>The return type is <see cref="Permanent"/> (not <see cref="Creature"/>)
+/// so that non-Creature permanents that are effectively creatures via a
+/// continuous Layer-4 type grant (e.g. lands animated by Badgermole Cub's
+/// earthbend ability) are also included. CR 613.1c / 701.16.</para>
 /// </summary>
 public interface IChooseCreatureToSacrificeCost : ICost
 {
-    /// <summary>The creatures the controller may choose to sacrifice for this
-    /// cost, enumerated against the player's current battlefield.</summary>
-    IReadOnlyList<Creature> EligibleSacrifices(Player player);
+    /// <summary>The permanents the controller may choose to sacrifice for this
+    /// cost, enumerated against the player's current battlefield. Includes any
+    /// permanent that is currently a creature via
+    /// <see cref="Permanent.IsEffectivelyCreature"/> (e.g. animated lands).</summary>
+    IReadOnlyList<Permanent> EligibleSacrifices(Player player);
 
-    /// <summary>Record the controller's chosen creature so <see cref="ICost.Pay"/>
-    /// sacrifices it. Null clears the choice (falls back to legacy auto-pick).</summary>
-    void ChooseSacrifice(Creature? creature);
+    /// <summary>Record the controller's chosen permanent so <see cref="ICost.Pay"/>
+    /// sacrifices it. Null clears the choice (falls back to legacy auto-pick).
+    /// Accepts any <see cref="Permanent"/> that is currently a creature.</summary>
+    void ChooseSacrifice(Permanent? permanent);
 }

@@ -43,37 +43,37 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
 
     /// <summary>
     /// Set by the activation dispatch (after prompting the controller via
-    /// <see cref="IChooseCreatureToSacrificeCost"/>) to indicate which creature
+    /// <see cref="IChooseCreatureToSacrificeCost"/>) to indicate which permanent
     /// to sacrifice. When null the cost falls back to the first eligible
-    /// creature on the controller's battlefield (deterministic legacy
+    /// permanent on the controller's battlefield (deterministic legacy
     /// behaviour — used only on paths that don't prompt, e.g. bot convenience
     /// wiring / factory-direct tests).
+    /// Accepts any <see cref="Permanent"/> that is currently a creature,
+    /// including lands animated by Badgermole Cub's earthbend (CR 613.1c).
     /// </summary>
-    public Creature? Target { get; set; }
+    public Permanent? Target { get; set; }
 
     /// <summary>
-    /// The creature that was actually sacrificed once <see cref="Pay"/>
+    /// The permanent that was actually sacrificed once <see cref="Pay"/>
     /// succeeded. Null before payment. Effect closures that reference "the
     /// sacrificed creature's mana value" (Prime Speaker Vannifar — CR 202.3)
     /// read this; it captures BOTH the prompted <see cref="Target"/> and the
-    /// deterministic first-eligible fallback, mirroring
-    /// <see cref="SacrificeCreatureCost.Sacrificed"/> /
-    /// <see cref="SacrificeACreatureAdditionalCost.Sacrificed"/>.
+    /// deterministic first-eligible fallback.
     /// </summary>
-    public Creature? Sacrificed { get; private set; }
+    public Permanent? Sacrificed { get; private set; }
 
     /// <inheritdoc/>
-    public IReadOnlyList<Creature> EligibleSacrifices(Player player)
+    public IReadOnlyList<Permanent> EligibleSacrifices(Player player)
     {
-        if (player == null) return Array.Empty<Creature>();
+        if (player == null) return Array.Empty<Permanent>();
         return player.Zones.Battlefield.GetCards()
-            .OfType<Creature>()
-            .Where(c => !ReferenceEquals(c, _self))
+            .OfType<Permanent>()
+            .Where(p => p.IsEffectivelyCreature() && !ReferenceEquals(p, _self))
             .ToList();
     }
 
     /// <inheritdoc/>
-    public void ChooseSacrifice(Creature? creature) => Target = creature;
+    public void ChooseSacrifice(Permanent? permanent) => Target = permanent;
 
     /// <inheritdoc/>
     public ICost RebindTo(object oldSource, object newSource)
@@ -108,8 +108,8 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
     {
         if (player == null) return false;
         return player.Zones.Battlefield.GetCards()
-            .OfType<Creature>()
-            .Any(c => !ReferenceEquals(c, _self));
+            .OfType<Permanent>()
+            .Any(p => p.IsEffectivelyCreature() && !ReferenceEquals(p, _self));
     }
 
     /// <inheritdoc/>
@@ -118,8 +118,8 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
         if (player == null) throw new ArgumentNullException(nameof(player));
 
         var pick = Target ?? player.Zones.Battlefield.GetCards()
-            .OfType<Creature>()
-            .FirstOrDefault(c => !ReferenceEquals(c, _self));
+            .OfType<Permanent>()
+            .FirstOrDefault(p => p.IsEffectivelyCreature() && !ReferenceEquals(p, _self));
 
         if (pick == null)
             throw new InvalidOperationException(
