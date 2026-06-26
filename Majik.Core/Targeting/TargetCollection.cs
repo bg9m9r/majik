@@ -74,7 +74,7 @@ public static class TargetCollection
                 ? req
                 : req.WithCandidates(live);
 
-            var picked = agent != null
+            var picked = agent != null && live.Count > 0
                 ? await agent.ChooseTargetsAsync(ctx, promptReq, ct).ConfigureAwait(false)
                 : (IReadOnlyList<object>)Array.Empty<object>();
 

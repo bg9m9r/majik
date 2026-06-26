@@ -202,6 +202,57 @@ public class TurnDriverTriggerTargetDrainTests
         }
     }
 
+    [Fact]
+    public async Task TriggerWithEmptyLegalTargets_SkipsAgentPrompt_Regression()
+    {
+        // A trigger whose LegalCandidates is empty fires via the async drain.
+        // CollectAsync must NOT call ChooseTargetsAsync when the resolved live
+        // pool is empty — doing so fires a dead-end SignalR prompt on
+        // RemoteAgent and hangs the TaskCompletionSource (issue #3495).
+        //
+        // HangingAgent.ChooseTargetsAsync never returns, simulating the portal
+        // not rendering a target UI with 0 candidates.
+        //
+        // Before fix: deadlocks → Task.WhenAny picks the 5-s delay → fails.
+        // After fix:  CollectAsync skips the agent → turn completes quickly.
+        var source = new Enchantment("Pinger", "R", supertypes: null, subtypes: null);
+        source.SetOwner(_alice);
+        source.SetController(_alice);
+        source.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(source);
+
+        var trigger = new TriggeredAbility(
+            source: source,
+            controller: _alice,
+            condition: new EventTriggerCondition<StepStartedEvent>((e, _) =>
+                e.StepType == StepStateType.Upkeep && ReferenceEquals(e.Player, _alice)),
+            effects: new IEffect[] { new Effect("no-op", () => { }) },
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>()),
+            });
+        _triggers.RegisterTriggeredAbility(trigger);
+
+        var hangingAgent = new HangingAgent();
+
+        SeedLibrary(_alice, 3);
+        SeedLibrary(_bob, 3);
+        var driver = NewDriver(hangingAgent, new DeterministicBotAgent());
+
+        var turnTask = driver.RunTurnAsync(_alice, turnNumber: 2);
+        var completedFirst = await Task.WhenAny(turnTask, Task.Delay(5000));
+
+        completedFirst.Should().BeSameAs(turnTask,
+            "the engine must not call ChooseTargetsAsync when the candidate pool is empty (deadlocks portal, issue #3495)");
+        hangingAgent.ChooseTargetsCalls.Should().Be(0,
+            "ChooseTargetsAsync must be skipped when the live candidate pool is empty");
+    }
+
     /// <summary>
     /// Passes every priority window but answers ChooseTargetsAsync via the
     /// supplied selector, recording how many times it was asked for targets.
@@ -227,6 +278,45 @@ public class TurnDriverTriggerTargetDrainTests
             => Task.FromResult<IReadOnlyList<ICard>>(Array.Empty<ICard>());
         public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default) => Task.FromResult(0);
         public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ITriggeredAbility>>(mine);
+        public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default)
+            => Task.FromResult(Majik.Core.Players.Agents.ManaPayment.Empty);
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
+            => Task.FromResult(CombatPlan.None);
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
+            => Task.FromResult(BlockPlan.None);
+        public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+            => Task.FromResult(new Majik.Core.Keywords.ScryAction.ScryDecision(ToBottom: peeked.ToList(), TopOrder: Array.Empty<ICard>()));
+        public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+            => Task.FromResult(new Majik.Core.Keywords.SurveilAction.SurveilDecision(ToGraveyard: peeked.ToList(), TopOrder: Array.Empty<ICard>()));
+    }
+
+    /// <summary>
+    /// Agent that hangs forever in ChooseTargetsAsync (simulates a RemoteAgent
+    /// whose TaskCompletionSource is never fulfilled — the portal didn't render
+    /// the target UI because the candidate pool was empty).
+    /// </summary>
+    private sealed class HangingAgent : IPlayerAgent
+    {
+        public int ChooseTargetsCalls { get; private set; }
+
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
+        {
+            ChooseTargetsCalls++;
+            return new TaskCompletionSource<IReadOnlyList<object>>().Task;
+        }
+
+        public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
+            => Task.FromResult(PriorityAction.Pass);
+        public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
+            => Task.FromResult(MulliganDecision.Keep);
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ICard>>(Array.Empty<ICard>());
+        public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
+            => Task.FromResult(0);
+        public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null, CancellationToken ct = default)
+            => Task.FromResult(0);
         public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ITriggeredAbility>>(mine);
         public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default)
