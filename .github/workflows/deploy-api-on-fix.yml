@@ -6,10 +6,10 @@ name: deploy-api-on-fix
 # per the live-match-safety policy). Portal-repo fixes are a different repo and
 # auto-deploy themselves; this only covers the api.
 #
-# The Render credential is a per-service DEPLOY HOOK (RENDER_DEPLOY_HOOK_API),
-# NOT the account API key — it can only trigger a deploy of majik-api, nothing
-# else. It is referenced ONLY by this workflow, so the untrusted-input auto-fix
-# job never receives it.
+# The Render credential is RENDER_API_KEY, referenced ONLY by this workflow —
+# the untrusted-input auto-fix job never declares it, so it never receives it.
+# (A per-service deploy hook would be tighter, but Render doesn't expose the hook
+# URL via API; the account key was the no-manual-step choice.)
 #
 # NOTE: deploying bounces the api's in-memory game state — any live match at
 # that instant is lost. Fixes are infrequent so this is accepted; a
@@ -33,7 +33,7 @@ jobs:
           # PR body is untrusted — read it ONLY as an env var (never interpolated
           # into the script), and only grep it for an issue number.
           PR_BODY: ${{ github.event.pull_request.body }}
-          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           set -euo pipefail
           # First `Closes/Fixes/Resolves #N` (or `… bg9m9r/majik#N`) in the body.
@@ -50,10 +50,11 @@ jobs:
             echo "Issue #${num} is not an app-report — skipping deploy."
             exit 0
           fi
-          if [ -z "${RENDER_DEPLOY_HOOK_API}" ]; then
-            echo "::error::RENDER_DEPLOY_HOOK_API secret not set — cannot deploy."
+          if [ -z "${RENDER_API_KEY}" ]; then
+            echo "::error::RENDER_API_KEY secret not set — cannot deploy."
             exit 1
           fi
           echo "app-report fix merged (closed #${num}) → triggering majik-api deploy."
-          # Deploy hook = a per-service URL; POST triggers a deploy of majik-api only.
-          curl -fsS -X POST "${RENDER_DEPLOY_HOOK_API}" -o /dev/null -w 'render deploy hook HTTP %{http_code}\n'
+          curl -fsS -X POST "https://api.render.com/v1/services/srv-d870ju6gvqtc739lt3r0/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" -H "Content-Type: application/json" -d '{}' \
+            | python3 -c "import sys,json;d=json.load(sys.stdin);print('render deploy',d.get('id'),d.get('status'))"
