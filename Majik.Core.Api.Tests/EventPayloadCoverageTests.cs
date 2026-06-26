@@ -1,5 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Xunit;
 
@@ -47,6 +48,7 @@ public class EventPayloadCoverageTests
         "CounterAddedEvent",
         nameof(ContinuousEffectAddedEvent),
         nameof(ContinuousEffectRemovedEvent),
+        nameof(AbilityActivatedEvent),
     };
 
     // The long-tail GameEvent subclasses that deliberately emit an empty
@@ -56,7 +58,6 @@ public class EventPayloadCoverageTests
     // MigratedEvents (with a record + arm) is the per-type migration step.
     private static readonly HashSet<string> KnownEmptyPayload = new()
     {
-        "AbilityActivatedEvent",
         "AllPlayersPassedEvent",
         "AttackersDeclaredEvent",
         "BlockersDeclaredEvent",
