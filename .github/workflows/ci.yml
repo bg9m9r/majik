@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         # On self-hosted runners setup-dotnet defaults to /usr/share/dotnet,
         # which the unprivileged runner user can't write. Install into the
         # runner tool cache (a shared Docker volume): writable, and persisted
