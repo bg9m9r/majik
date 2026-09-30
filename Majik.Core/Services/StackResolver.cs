@@ -100,6 +100,14 @@ public class StackResolver
                 }
             }
 
+            // Snapshot the spell card's zone BEFORE resolution so we can
+            // detect a self-move (GSZ, Eldritch Evolution) later. Only sniff
+            // when top is a spell; abilities don't trigger post-resolution zone
+            // moves in HandleSpellResolutionAsync.
+            var preResolutionSpellZone = (top is ISpell preSniff)
+                ? (ZoneType?)preSniff.Card.Zone
+                : null;
+
             // Resolve the object (Rule 608.1) on the async path. Mark this
             // object's controller as the "currently resolving" controller for
             // the duration so a counter effect run during resolution (a
@@ -129,7 +137,7 @@ public class StackResolver
                 var spellAgent = agentLookup?.Invoke(spell.Controller);
                 var spellCtx = ResolutionContext.For(
                     spell.Controller, spellAgent, game, chosenTargets: null, ct);
-                await HandleSpellResolutionAsync(spell, spellCtx).ConfigureAwait(false);
+                await HandleSpellResolutionAsync(spell, spellCtx, preResolutionSpellZone).ConfigureAwait(false);
             }
             // Handle ability resolution (Rule 608.2)
             else if (top is IActivatedAbility ability)
@@ -160,7 +168,8 @@ public class StackResolver
     /// controller's agent off <paramref name="ctx"/> instead of blocking a
     /// thread-pool thread.
     /// </summary>
-    private async ValueTask HandleSpellResolutionAsync(ISpell spell, ResolutionContext ctx)
+    private async ValueTask HandleSpellResolutionAsync(
+        ISpell spell, ResolutionContext ctx, ZoneType? preResolutionZone = null)
     {
         if (spell == null)
         {
@@ -180,6 +189,21 @@ public class StackResolver
         }
 
         var card = spell.Card;
+
+        // CR 608.2c / printed self-move override — some spells move themselves
+        // during resolution (GSZ "shuffle ~ into its owner's library"; Eldritch
+        // Evolution "exile ~"). The card starts in ZoneType.Stack and an effect
+        // moves it away during resolution; the post-resolution zone move must be
+        // skipped or we fire a spurious CardMovedEvent that accumulates an extra
+        // trigger and prompts OrderTriggersCommand (issue #3512).
+        // Guard: only applies when the card WAS in Stack before resolution and
+        // is now elsewhere — so unit tests that build spells without setting
+        // card.Zone to Stack (their default is Library) are unaffected.
+        if (preResolutionZone == ZoneType.Stack && card.Zone != ZoneType.Stack)
+        {
+            return;
+        }
+
         var destinationZone = GetSpellDestinationZone(spell);
 
         // Move card from stack to destination zone through ZoneService so

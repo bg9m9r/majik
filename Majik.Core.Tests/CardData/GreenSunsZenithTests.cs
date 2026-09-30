@@ -12,6 +12,7 @@ using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
+using MajikStack = Majik.Core.Stack.Stack;
 
 namespace Majik.Core.Tests.CardData;
 
@@ -371,5 +372,55 @@ public class GreenSunsZenithTests
         // GSZ itself still went into its owner's library (printed self-
         // shuffle override fires regardless of the tutor branch).
         gsz.Zone.Should().Be(ZoneType.Library);
+    }
+
+    // ── StackResolver integration: no spurious post-resolution zone move ──────
+
+    [Fact]
+    public async Task ResolveTopAsync_SelfShufflesDuringResolution_NoSpuriousLibraryToGraveyardMove()
+    {
+        // Regression for issue #3512: GSZ self-shuffles (Stack → Library) during
+        // resolution (Effect 2), but StackResolver.HandleSpellResolutionAsync
+        // then called MoveCardToAsync which saw card.Zone == Library and moved it
+        // Library → Graveyard, firing a spurious CardMovedEvent. Combined with
+        // the tutored creature's ETB event this accumulated two triggers and the
+        // engine prompted OrderTriggersCommand, freezing the game.
+        var bus = new EventBus();
+        var zones = new ZoneService(bus);
+        var stack = new MajikStack(bus);
+        var resolver = new StackResolver(bus, zones);
+        var alice = new Player("Alice", 20);
+
+        var elf = new Creature("Llanowar Elves", "G", 1, 1);
+        elf.SetOwner(alice);
+        elf.SetController(alice);
+        alice.Zones.Library.AddCard(elf);
+        elf.SetZone(ZoneType.Library);
+
+        var gsz = GreenSunsZenithFactory.Create(alice);
+        alice.Zones.Stack.AddCard(gsz);
+        gsz.SetZone(ZoneType.Stack);
+
+        var effects = GreenSunsZenithFactory
+            .BuildSpellDefinition(alice, gsz, zones)
+            .EffectFactory(new ChosenSpellParams(ModeIndex: null, X: 1,
+                Targets: Array.Empty<IReadOnlyList<object>>(), Mana: ManaPayment.Empty));
+        var spell = new Majik.Core.Spells.Spell(gsz, alice, effects: effects);
+        stack.Push(spell);
+
+        var moved = new List<CardMovedEvent>();
+        bus.Subscribe<CardMovedEvent>(moved.Add);
+
+        await resolver.ResolveTopAsync(stack, agentLookup: _ => new DeterministicBotAgent());
+
+        // GSZ must end up in the library (printed self-shuffle), not graveyard.
+        gsz.Zone.Should().Be(ZoneType.Library,
+            "GSZ's printed text says 'shuffle it into its owner's library'; " +
+            "StackResolver must not re-move it to the graveyard after the effect already moved it");
+
+        // No spurious Library → Graveyard move for GSZ.
+        moved.Should().NotContain(e =>
+            ReferenceEquals(e.Card, gsz) && e.ToZone == ZoneType.Graveyard,
+            "StackResolver must not move GSZ again after the self-shuffle effect moved it from Stack to Library");
     }
 }
