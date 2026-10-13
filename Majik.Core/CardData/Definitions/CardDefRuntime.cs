@@ -1962,8 +1962,13 @@ public static class CardDefRuntime
                 var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 if (agent != null)
                 {
-                    // Genuinely prompt — even with empty eligible so the player
-                    // sees the milled pile (mirrors RevealAndChoose's UX).
+                    // Guard: skip the prompt when eligible is empty. Sending
+                    // ChooseFromRevealedCommand with no eligible cards deadlocks
+                    // the portal's SignalR channel (same pattern as issue #3495
+                    // for ChooseTargetsAsync with 0 candidates). The pick is
+                    // optional, so an empty eligible set is an implicit decline.
+                    if (eligible.Count == 0) return;
+
                     pick = await agent.ChooseFromRevealedAsync(
                         ctx: ctx.Game,
                         revealed: milled,

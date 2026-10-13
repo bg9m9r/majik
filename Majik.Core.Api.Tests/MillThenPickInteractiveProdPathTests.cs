@@ -121,6 +121,53 @@ public class MillThenPickInteractiveProdPathTests
             "all four milled cards remain in the graveyard when the player declines");
     }
 
+    /// <summary>
+    /// Regression test for issue #3501.
+    ///
+    /// When all milled cards are non-matching types (e.g. all instants/sorceries),
+    /// <c>eligible.Count == 0</c> and the pick is optional — the engine must NOT
+    /// send <see cref="ChooseFromRevealedCommand"/> to the portal. Sending the
+    /// prompt with an empty eligible set deadlocks the SignalR channel (same
+    /// pattern as issue #3495 for <c>ChooseTargetsAsync</c> with 0 candidates).
+    /// </summary>
+    [Fact]
+    public async Task DredgersInsight_EtbResolve_NoEligibleCards_DoesNotPromptAgent()
+    {
+        AgentRegistry.Clear();
+        // All four milled cards are instants — none match Artifact/Creature/Land.
+        var bolt   = new Instant("Bolt",   "R") { Owner = _alice };
+        var shock  = new Instant("Shock",  "R") { Owner = _alice };
+        var lava   = new Instant("Lava Spike", "R") { Owner = _alice };
+        var ponder = new Instant("Ponder", "U") { Owner = _alice };
+        foreach (var c in new ICard[] { bolt, shock, lava, ponder })
+        {
+            _alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        var agent   = new RemoteAgent(_alice);
+        var enchant = BuildDredgersInsight(_alice);
+        var ctx     = ResolutionContext.For(
+            _alice, agent, game: null, chosenTargets: null);
+
+        // With the bug: task suspends awaiting ChooseFromRevealedAsync even
+        // though eligible is empty → portal deadlocks (issue #3501).
+        // After the fix: task completes immediately — no prompt is sent.
+        var task = ResolveEtbAsync(enchant, ctx);
+
+        agent.HasPending.Should().BeFalse(
+            "when no milled cards are eligible the engine must skip the prompt " +
+            "(sending ChooseFromRevealedCommand with empty eligible deadlocks the portal — #3501)");
+
+        await task;
+
+        _alice.Zones.Hand.GetCards().Should().BeEmpty(
+            "no eligible card to pick — nothing goes to hand");
+        _alice.Zones.Graveyard.GetCards().Should().BeEquivalentTo(
+            new ICard[] { bolt, shock, lava, ponder },
+            "all non-matching milled cards remain in the graveyard");
+    }
+
     private static async Task ResolveEtbAsync(Enchantment enchant, ResolutionContext ctx)
     {
         foreach (var effect in EtbTrigger(enchant).Effects)
