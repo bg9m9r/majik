@@ -47,17 +47,35 @@ public class CardMovedEvent : GameEvent
     /// </summary>
     public Player? LkiController { get; }
 
+    /// <summary>CR 406.3 — the card was in exile face down when it moved
+    /// (the flag is already cleared on the card: it is face up in its new
+    /// zone, CR 400.7). A move into a hidden zone (Bomat Courier returning its
+    /// cards to hand) must not reveal it to players who could not look.</summary>
+    public bool LeftFaceDownExile { get; }
+
+    /// <summary>CR 708.9 — set when a face-down permanent left the battlefield:
+    /// the card it represented, which is what is now in <see cref="ToZone"/>,
+    /// face up. <see cref="Card"/> stays the face-down creature that left (last
+    /// known information, CR 603.10: "a creature died").</summary>
+    public ICard? RevealedCard { get; init; }
+
     public CardMovedEvent(ICard card, ZoneType fromZone, ZoneType toZone)
         : this(card, fromZone, toZone, card.Controller)
     {
     }
 
     public CardMovedEvent(ICard card, ZoneType fromZone, ZoneType toZone, Player? lkiController)
+        : this(card, fromZone, toZone, lkiController, leftFaceDownExile: false)
+    {
+    }
+
+    public CardMovedEvent(ICard card, ZoneType fromZone, ZoneType toZone, Player? lkiController, bool leftFaceDownExile)
         : base()
     {
         Card = card;
         FromZone = fromZone;
         ToZone = toZone;
         LkiController = lkiController;
+        LeftFaceDownExile = leftFaceDownExile;
     }
 }

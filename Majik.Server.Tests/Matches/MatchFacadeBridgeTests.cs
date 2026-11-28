@@ -1592,4 +1592,44 @@ public class MatchFacadeBridgeTests
         return new PassPriorityCommand();
     }
 
+    [Fact]
+    public void ForwardEvent_PerPlayerEnvelope_UnmappedRecipient_GetsTheSpectatorVariant_NeverPublic()
+    {
+        // A recipient the routing cannot map to a seat must never get the
+        // full-information Public variant of a masked event (CR 706).
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+        var publicView = FakeEvent("CardDrawnEvent", """{"cardName":"Bolt"}""");
+        var spectatorView = FakeEvent("CardDrawnEvent", """{"hidden":true}""");
+        var envelope = new EventEnvelope(publicView,
+            new Dictionary<Guid, EventDto> { [aliceId] = FakeEvent(), [bobId] = FakeEvent() },
+            Spectator: spectatorView);
+
+        // Routing ids that match neither per-player key.
+        bridge.ForwardEvent(matchId, envelope, DefaultRouting(Guid.NewGuid(), Guid.NewGuid()));
+
+        hub.PerRecipient.Should().HaveCount(2);
+        hub.PerRecipient.Should().OnlyContain(c => ReferenceEquals(c.Payload, spectatorView));
+        hub.Group.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ForwardEvent_PerPlayerEnvelope_UnmappedRecipient_WithoutASpectatorVariant_IsDropped()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var aliceId = Guid.NewGuid();
+        var aliceView = FakeEvent("CardDrawnEvent", """{"cardName":"Bolt"}""");
+        var envelope = new EventEnvelope(FakeEvent("CardDrawnEvent", """{"cardName":"Bolt"}"""),
+            new Dictionary<Guid, EventDto> { [aliceId] = aliceView });
+
+        // creator-sub maps to Alice; opponent-sub maps to a seat with no variant.
+        bridge.ForwardEvent(Guid.NewGuid(), envelope, DefaultRouting(aliceId, Guid.NewGuid()));
+
+        hub.PerRecipient.Should().ContainSingle().Which.Payload.Should().BeSameAs(aliceView);
+        hub.Group.Should().BeEmpty();
+    }
 }

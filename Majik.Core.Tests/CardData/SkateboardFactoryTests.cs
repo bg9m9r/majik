@@ -109,6 +109,29 @@ public class SkateboardFactoryTests
     }
 
     [Fact]
+    public void Skateboard_EtbTrigger_OnAnAlreadyTappedPermanent_DoesNothing()
+    {
+        // CR 701.26a — tapping an already-tapped permanent does nothing; the
+        // trigger may legally target one (issue 3544 crash: Tap() threw).
+        var sb = SkateboardFactory.Create(_alice);
+        sb.Zone = ZoneType.Battlefield;
+        var target = new Artifact("Sol Ring", "{1}")
+        {
+            Owner = _alice,
+            Controller = _alice,
+            Zone = ZoneType.Battlefield,
+        };
+        target.Tap();
+
+        var trigger = sb.Abilities.OfType<TriggeredAbility>().Single();
+        trigger.SetChosenTargets(new[] { new object[] { target } });
+
+        var act = () => { foreach (var effect in trigger.Effects) effect.Execute(); };
+        act.Should().NotThrow();
+        target.IsTapped.Should().BeTrue();
+    }
+
+    [Fact]
     public void Skateboard_EtbTrigger_NoOp_WhenTargetHasLeftBattlefield()
     {
         // CR 608.2b — if the chosen permanent is no longer on the battlefield

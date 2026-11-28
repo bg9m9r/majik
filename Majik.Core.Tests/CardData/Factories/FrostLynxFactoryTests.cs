@@ -204,4 +204,26 @@ public class FrostLynxFactoryTests : IDisposable
         UntapStepRestrictions.ShouldSkipUntap(target, _bob).Should().BeFalse(
             "off-battlefield card is not marked for skip-untap");
     }
+
+    [Fact]
+    public void FrostLynx_Etb_TargetAlreadyTapped_StillLocksIt_WithoutThrowing()
+    {
+        // CR 701.26a — tapping an already-tapped permanent does nothing; the
+        // rest of the effect (the untap-step lock) still happens.
+        var lynx = FrostLynxFactory.Create(_alice);
+        var target = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        target.SetOwner(_bob);
+        target.SetController(_bob);
+        target.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(target);
+        target.Tap();
+
+        var etb = lynx.Abilities.OfType<TriggeredAbility>().Single();
+        etb.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+        var act = () => { foreach (var e in etb.Effects) e.Execute(); };
+
+        act.Should().NotThrow();
+        target.IsTapped.Should().BeTrue();
+        UntapStepRestrictions.ShouldSkipUntap(target, _bob).Should().BeTrue();
+    }
 }

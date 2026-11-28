@@ -13,7 +13,7 @@ namespace Majik.Core.Api.Tests;
 ///   * <b>migrated</b> — it has a typed <c>*Payload</c> record + a builder
 ///     arm constructing it (see <see cref="MigratedEvents"/>), OR
 ///   * <b>known-empty</b> — explicitly on <see cref="KnownEmptyPayload"/>,
-///     meaning the builder deliberately emits <c>{}</c> for it (the ~31
+///     meaning the builder deliberately emits <c>{}</c> for it (the remaining
 ///     long-tail types not yet migrated; the portal refetches /state on
 ///     them, which is non-breaking).
 ///
@@ -49,6 +49,29 @@ public class EventPayloadCoverageTests
         nameof(ContinuousEffectAddedEvent),
         nameof(ContinuousEffectRemovedEvent),
         nameof(AbilityActivatedEvent),
+        // Long-tail log / animation payloads.
+        "AttackersDeclaredEvent",
+        "BlockersDeclaredEvent",
+        "CardCycledEvent",
+        "CombatEndedEvent",
+        "CombatStartedEvent",
+        "CostsPaidEvent",
+        "CreatureAttacksEvent",
+        "CreatureBlocksEvent",
+        "DiscardedEvent",
+        "ExtraTurnAddedEvent",
+        "LibraryShuffledEvent",
+        "LifePaidEvent",
+        "ManaAbilityActivatedEvent",
+        "PermanentSacrificedEvent",
+        "PermanentTappedEvent",
+        "PriorityPassedEvent",
+        "PriorityReceivedEvent",
+        "SpellCounteredEvent",
+        "SurveilEvent",
+        "TargetsChosenEvent",
+        "TriggeredAbilityCounteredEvent",
+        "TriggeredAbilityTriggeredEvent",
     };
 
     // The long-tail GameEvent subclasses that deliberately emit an empty
@@ -59,38 +82,16 @@ public class EventPayloadCoverageTests
     private static readonly HashSet<string> KnownEmptyPayload = new()
     {
         "AllPlayersPassedEvent",
-        "AttackersDeclaredEvent",
-        "BlockersDeclaredEvent",
-        "CardCycledEvent",
         "ClassLevelUpEvent",
-        "CombatEndedEvent",
-        "CombatStartedEvent",
-        "CostsPaidEvent",
-        "CreatureAttacksEvent",
-        "CreatureBlocksEvent",
         "CreatureExploredEvent",
         "DayNightChangedEvent",
-        "DiscardedEvent",
-        "ExtraTurnAddedEvent",
         "GainedCitysBlessingEvent",
         "GameStartedEvent",
-        "LibraryShuffledEvent",
-        "LifePaidEvent",
-        "ManaAbilityActivatedEvent",
         "OpeningHandCheckEvent",
-        "PermanentSacrificedEvent",
-        "PermanentTappedEvent",
         "PlayerCounterAddedEvent",
-        "PriorityPassedEvent",
-        "PriorityReceivedEvent",
         "StackClearedEvent",
         "StateBasedActionExecutedEvent",
-        "SpellCounteredEvent",
-        "SurveilEvent",
         "SuspendCounterDrainedEvent",
-        "TargetsChosenEvent",
-        "TriggeredAbilityCounteredEvent",
-        "TriggeredAbilityTriggeredEvent",
         "UnimplementedCardEncounteredEvent",
     };
 

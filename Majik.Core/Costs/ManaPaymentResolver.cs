@@ -103,8 +103,15 @@ public sealed class ManaPaymentResolver
             Math.Min(pool.White, cost.White) + Math.Min(pool.Blue, cost.Blue) +
             Math.Min(pool.Black, cost.Black) + Math.Min(pool.Red, cost.Red) +
             Math.Min(pool.Green, cost.Green);
-        int poolLeftoverForGeneric = pool.Total - poolUsedForColored;
-        int needGeneric = Math.Max(0, cost.Generic - poolLeftoverForGeneric);
+        // CR 107.4c / 106.1b — a {C} pip (a tagged subset of Generic) is paid
+        // only with colorless mana: floating colorless first, then a source
+        // that makes it. Without this step the generic pick could take
+        // coloured sources for it, and the final check then failed for a
+        // payable cost (Kozilek's Command, Glaring Fleshraker).
+        int poolUsedForColorless = Math.Min(pool.Colorless, cost.Colorless);
+        int needC = cost.Colorless - poolUsedForColorless;
+        int poolLeftoverForGeneric = pool.Total - poolUsedForColored - poolUsedForColorless;
+        int needGeneric = Math.Max(0, cost.Generic - cost.Colorless - poolLeftoverForGeneric);
 
         // Candidate untapped mana sources the player controls.
         var candidates = new List<(ICard Card, IReadOnlyList<IManaAbility> Abilities)>();
@@ -171,6 +178,7 @@ public sealed class ManaPaymentResolver
         if (!TrySelectFor(m => m.Black, needB)) return false;
         if (!TrySelectFor(m => m.Red,   needR)) return false;
         if (!TrySelectFor(m => m.Green, needG)) return false;
+        if (!TrySelectFor(m => m.Colorless, needC)) return false;
 
         // 2) Cover the remaining generic with any unused untapped source.
         // CR 106.1c — generic can be paid with mana of ANY type, so a single
@@ -208,7 +216,7 @@ public sealed class ManaPaymentResolver
         var remaining = new Dictionary<char, int>
         {
             ['W'] = cost.White, ['U'] = cost.Blue, ['B'] = cost.Black,
-            ['R'] = cost.Red,   ['G'] = cost.Green,
+            ['R'] = cost.Red,   ['G'] = cost.Green, ['C'] = cost.Colorless,
         };
         var simulated = pool;
         foreach (var card in selected)
@@ -224,6 +232,7 @@ public sealed class ManaPaymentResolver
                 else if (remaining['B'] > 0 && mana.Black > 0) satisfies = 'B';
                 else if (remaining['R'] > 0 && mana.Red > 0) satisfies = 'R';
                 else if (remaining['G'] > 0 && mana.Green > 0) satisfies = 'G';
+                else if (remaining['C'] > 0 && mana.Colorless > 0) satisfies = 'C';
                 if (satisfies.HasValue)
                 {
                     ability = opt;
@@ -348,7 +357,7 @@ public sealed class ManaPaymentResolver
         var remaining = new Dictionary<char, int>
         {
             ['W'] = matchCost.White, ['U'] = matchCost.Blue, ['B'] = matchCost.Black,
-            ['R'] = matchCost.Red,   ['G'] = matchCost.Green,
+            ['R'] = matchCost.Red,   ['G'] = matchCost.Green, ['C'] = matchCost.Colorless,
         };
         var abilities = new List<IManaAbility>(payment.Sources.Count);
         foreach (var src in payment.Sources)
@@ -363,6 +372,12 @@ public sealed class ManaPaymentResolver
                 : src.Abilities.OfType<IManaAbility>().ToList();
             if (options.Count == 0)
                 throw new InvalidOperationException($"{src.Name} has no mana ability.");
+            // CR 605.3a — only an ability that can be activated now is a
+            // payment option (it threw "Cannot activate mana ability" when the
+            // pick landed on one that could not, which rewound the cast).
+            var activatable = options.Where(o => { try { return o.CanActivate(); } catch (InvalidOperationException) { return false; } }).ToList();
+            if (activatable.Count == 0) return false;
+            options = activatable;
 
             IManaAbility picked = options[0];
             foreach (var opt in options)
@@ -374,6 +389,7 @@ public sealed class ManaPaymentResolver
                 else if (remaining['B'] > 0 && mana.Black > 0) satisfies = 'B';
                 else if (remaining['R'] > 0 && mana.Red > 0) satisfies = 'R';
                 else if (remaining['G'] > 0 && mana.Green > 0) satisfies = 'G';
+                else if (remaining['C'] > 0 && mana.Colorless > 0) satisfies = 'C';
                 if (satisfies.HasValue)
                 {
                     picked = opt;

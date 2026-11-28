@@ -84,7 +84,9 @@ public static class MatchEndpoints
             .RequireRateLimiting(RateLimitPolicies.InMatch)
             .Produces<MatchReplayDto>(StatusCodes.Status200OK)
             .Produces<MatchError>(StatusCodes.Status404NotFound)
-            .Produces<MatchError>(StatusCodes.Status403Forbidden);
+            .Produces<MatchError>(StatusCodes.Status403Forbidden)
+            // match-in-progress: the full-information replay is for finished matches.
+            .Produces<MatchError>(StatusCodes.Status409Conflict);
 
         // In-app issue report (Slice 1). Allowlisted match participants snapshot
         // replay + full-reveal state + client telemetry into a labelled GitHub

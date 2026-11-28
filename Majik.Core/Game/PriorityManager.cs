@@ -56,6 +56,40 @@ public class PriorityManager
     /// </summary>
     public bool AllPlayersPassed => _state.AllPlayersPassed;
 
+    /// <summary>
+    /// CR 117.1 / 117.5 — the player the engine is waiting on for a priority
+    /// decision RIGHT NOW, or null while the engine is doing anything else
+    /// (checking SBAs and putting triggers on the stack before priority is
+    /// granted, applying the chosen action, resolving, between steps).
+    /// Narrower than <see cref="CurrentPlayer"/>, which names the next holder
+    /// as soon as priority moves (before CR 117.5's SBA / trigger work).
+    /// </summary>
+    public Player? DecidingPlayer { get; private set; }
+
+    /// <summary>Raised when <see cref="DecidingPlayer"/> changes. A plain
+    /// callback (not a bus event), raised on the engine flow.</summary>
+    public event Action<Player?>? DecidingPlayerChanged;
+
+    /// <summary>Mark the start / end of a priority decision (PriorityLoop).</summary>
+    internal void SetDecidingPlayer(Player? player)
+    {
+        if (ReferenceEquals(DecidingPlayer, player)) return;
+        DecidingPlayer = player;
+        var handlers = DecidingPlayerChanged;
+        if (handlers is null) return;
+        // An observer is not part of the rules: one that throws must neither
+        // escape into the priority loop (where, raised from its finally, it would
+        // also replace the agent's own exception) nor starve the others.
+        foreach (Action<Player?> handler in handlers.GetInvocationList())
+        {
+            try { handler(player); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Majik engine: DecidingPlayerChanged observer threw: {ex}");
+            }
+        }
+    }
+
     public PriorityManager(
         List<Player> players,
         Majik.Core.Stack.Stack stack,

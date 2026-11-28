@@ -976,6 +976,9 @@ public sealed class TurnDriver
             int? chosenX = null;
             if (def.HasVariableX)
             {
+                // CR 601.2 — a cancel at the X announcement (nothing moved or
+                // paid yet) propagates to PriorityLoop, which treats it as a
+                // no-op and asks the same player again.
                 chosenX = await _agents[actor].ChooseXAsync(ctx, castCard, ct);
             }
 
@@ -1024,7 +1027,12 @@ public sealed class TurnDriver
             }
             else
             {
-                payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
+                // CR 601.2g-h — name the spell, its stack entry and whether
+                // auto-pay works on the prompt (display only).
+                var subject = new Majik.Core.Players.Agents.ManaPaymentSubject(
+                    castCard, castFlow.PeekNextCastId(castCard),
+                    actor.ManaPool.CanPay(cost) || manaResolver.TryAutoSelectSources(actor, cost, out _));
+                payment = await _agents[actor].ChooseManaSourcesForAsync(ctx, cost, subject, ct);
                 // CR 601.2 / CR 727 — remote player aborted the cast at
                 // the cost-payment prompt. Nothing has been paid yet
                 // (the resolver hasn't run), so the spell simply stays
@@ -1033,11 +1041,9 @@ public sealed class TurnDriver
                 {
                     // CR 601.2 / CR 727 — player explicitly cancelled the cast at
                     // the cost-payment prompt. Nothing has been paid; spell stays
-                    // in hand. Return true so PriorityLoop keeps the current player
-                    // rather than force-passing (a deliberate cancel is not a
-                    // silent failure — the player chose this outcome and may choose
-                    // a different action next).
-                    return true;
+                    // in hand. PriorityLoop treats the cancel as a no-op and asks
+                    // the same player again.
+                    throw new Majik.Core.Players.Agents.CastCancelledException();
                 }
 
                 // Portal "Auto-pay": the mana-cost prompt's Auto-pay button
@@ -1151,9 +1157,18 @@ public sealed class TurnDriver
                     payManaCost: PayCastMana,
                     preChosenX: chosenX);
             }
+            catch (Majik.Core.Players.Agents.CastCancelledException)
+            {
+                // CR 732.1 — the player backed out at a casting prompt; the
+                // cast flow has rewound the card. PriorityLoop treats the
+                // cancel as a no-op and asks the same player again.
+                throw;
+            }
             catch (InvalidOperationException ex)
             {
                 RotateHand(castCard, $"CastAsync threw: {ex.Message}");
+                // CR 732.1 — the engine reversed the cast; tell the player why.
+                _agents[actor].NotifyActionReversed(ex.Message);
                 return false; // not committed: CastAsync threw
             }
             return true; // committed: spell put on the stack
@@ -1296,6 +1311,8 @@ public sealed class TurnDriver
                 && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
                 && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
             {
+                // A cancel propagates to PriorityLoop as a no-op: nothing is
+                // paid before ActivateAbility.
                 var x = await _agents[actor].ChooseXAsync(ctx, xSource, ct: default);
                 aaForX.SetChosenX(x);
                 costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
@@ -1502,9 +1519,27 @@ public sealed class TurnDriver
             // boundary instead of dying immediately.
             checkStateBasedActions: () => _sba.CheckStateBasedActions(
                 _players,
-                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
+                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()),
+            spellDefinitions: _spellDefResolver == null ? null : SpellDefinitionFor);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
+    }
+
+    // CR 601.2c — the definition the cast dispatcher would resolve for a card,
+    // memoized per card object and caster: a priority context reads it to see
+    // whether a spell's required targets exist, once per prompt per card, and
+    // the oracle binder is too slow to rerun that often. Only target requests
+    // are read from it; the cast itself resolves its own definition.
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ICard, Tuple<Player, Majik.Core.Game.SpellDefinition?>> _definitionMemo = new();
+
+    private Majik.Core.Game.SpellDefinition? SpellDefinitionFor(ICard card, Player caster)
+    {
+        if (_definitionMemo.TryGetValue(card, out var hit) && ReferenceEquals(hit.Item1, caster)) return hit.Item2;
+        Majik.Core.Game.SpellDefinition? def;
+        try { def = _spellDefResolver!(card, caster, _stack); }
+        catch (InvalidOperationException) { def = null; }
+        _definitionMemo.AddOrUpdate(card, Tuple.Create(caster, def));
+        return def;
     }
 
     private async Task RunCombat(Player attacker, Player defender, CancellationToken ct)

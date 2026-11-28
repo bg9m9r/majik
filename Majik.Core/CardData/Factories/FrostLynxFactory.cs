@@ -156,8 +156,8 @@ public static class FrostLynxFactory
         // CR 608.2b — illegal target at resolution = no effect.
         if (target.Zone != ZoneType.Battlefield) return;
 
-        // CR 701.20 — tap the target creature.
-        target.Tap();
+        // CR 701.20 / 701.26a — tap the target creature (no-op if already tapped).
+        Majik.Core.Primitives.Fx.Tap(target);
 
         // CR 502.1 — "doesn't untap during its controller's next untap step".
         var skipToken = new object();

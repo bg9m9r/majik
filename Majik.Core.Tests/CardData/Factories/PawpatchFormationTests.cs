@@ -77,11 +77,15 @@ public class PawpatchFormationTests : IDisposable
         OracleSpellBinder.Bind(Entity, _alice, x => x, null)
         ?? throw new InvalidOperationException("ModalChooseOne binder returned null for Pawpatch Formation");
 
+    // CR 700.2d / 601.2c — SpellCastFlow lays modal targets out per mode
+    // (Targets[ModeIndex]); the chosen mode's target sits in its own slot.
     private static ChosenSpellParams Mode(int index, params object[] target) =>
         new(
             ModeIndex: index,
             X: null,
-            Targets: new IReadOnlyList<object>[] { target },
+            Targets: Enumerable.Range(0, 3)
+                .Select(i => i == index ? (IReadOnlyList<object>)target : Array.Empty<object>())
+                .ToArray(),
             Mana: ManaPayment.Empty);
 
     // -----------------------------------------------------------------------

@@ -13,6 +13,30 @@ namespace Majik.Core.Stack;
 public class Stack
 {
     private readonly System.Collections.Generic.Stack<IStackObject> _objects = new();
+    // Parallel to _objects: the id of each stack entry. Equals the object's Id,
+    // except for a repeat push of an object already on the stack (one triggered
+    // ability that fired twice, CR 603.3), which gets a StackEntryIds.Repeat id.
+    private readonly System.Collections.Generic.Stack<Guid> _entryIds = new();
+    private readonly List<CastInProgress> _beingCast = new();
+
+    /// <summary>
+    /// CR 601.2a — spells being cast: moved to the stack, not yet pushed
+    /// (see <see cref="CastInProgress"/>), oldest first. Display data for
+    /// snapshots only; not part of <see cref="GetAll"/>.
+    /// </summary>
+    public IReadOnlyList<CastInProgress> BeingCast => _beingCast.ToArray();
+
+    internal CastInProgress BeginCast(ICard card, Player caster, Guid id)
+    {
+        var cast = new CastInProgress(card, caster, id);
+        _beingCast.Add(cast);
+        return cast;
+    }
+
+    internal CastInProgress? FindCast(ICard card) =>
+        _beingCast.LastOrDefault(c => ReferenceEquals(c.Card, card));
+
+    internal void EndCast(ICard card) => _beingCast.RemoveAll(c => ReferenceEquals(c.Card, card));
     private readonly IEventBus? _eventBus;
 
     /// <summary>
@@ -50,6 +74,17 @@ public class Stack
     public Player? CurrentResolutionController { get; set; }
 
     /// <summary>
+    /// The stack object StackResolver is resolving right now, and the stack
+    /// entry id it had. Null when nothing is mid-resolution through the
+    /// resolver. Read by <see cref="PublishSpellCountered"/> to name what
+    /// countered a spell (SpellCounteredEvent.CounteringObject).
+    /// </summary>
+    public IStackObject? CurrentlyResolving { get; internal set; }
+
+    /// <inheritdoc cref="CurrentlyResolving"/>
+    public Guid? CurrentlyResolvingEntryId { get; internal set; }
+
+    /// <summary>
     /// CR 701.5 — announce that <paramref name="spell"/> was countered. Fires
     /// <see cref="Majik.Core.Domain.DomainEvents.SpellCounteredEvent"/> on the
     /// stack's event bus, attributing the counter to
@@ -63,7 +98,11 @@ public class Stack
         if (spell is null) return;
         _eventBus?.Publish(
             new Majik.Core.Domain.DomainEvents.SpellCounteredEvent(
-                spell, CurrentResolutionController));
+                spell, CurrentResolutionController)
+            {
+                CounteringObject = CurrentlyResolving,
+                CounteringEntryId = CurrentlyResolving is null ? null : CurrentlyResolvingEntryId,
+            });
     }
 
     /// <summary>
@@ -76,8 +115,39 @@ public class Stack
             throw new ArgumentNullException(nameof(stackObject));
         }
 
+        var entryId = NextEntryId(stackObject);
         _objects.Push(stackObject);
-        _eventBus?.Publish(new StackObjectAddedEvent(stackObject));
+        _entryIds.Push(entryId);
+        _eventBus?.Publish(new StackObjectAddedEvent(stackObject) { EntryId = entryId });
+    }
+
+    /// <summary>
+    /// The entry id of the top of the stack (see <see cref="GetEntryIds"/>),
+    /// or null when the stack is empty.
+    /// </summary>
+    public Guid? TopEntryId => _entryIds.Count > 0 ? _entryIds.Peek() : null;
+
+    /// <summary>
+    /// The id of each stack entry, BOTTOM to TOP, parallel to
+    /// <see cref="GetAll"/>. CR 603.3 — each firing of a triggered ability is
+    /// its own stack object: the engine pushes the same ability object once per
+    /// firing, so a repeat copy gets a <see cref="StackEntryIds.Repeat"/> id
+    /// (the same scheme the order-triggers prompt uses) instead of sharing the
+    /// first copy's id. Every other entry's id is its object's
+    /// <see cref="IStackObject.Id"/>. Identity only: resolution still reads the
+    /// shared object.
+    /// </summary>
+    public IReadOnlyList<Guid> GetEntryIds() => _entryIds.ToArray().Reverse().ToList().AsReadOnly();
+
+    private Guid NextEntryId(IStackObject stackObject)
+    {
+        var copies = 0;
+        foreach (var o in _objects) if (ReferenceEquals(o, stackObject)) copies++;
+        if (copies == 0) return stackObject.Id;
+        var used = new HashSet<Guid>(_entryIds);
+        var id = stackObject.Id;
+        for (var salt = copies; used.Contains(id); salt++) id = StackEntryIds.Repeat(stackObject.Id, salt);
+        return id;
     }
 
     /// <summary>
@@ -90,16 +160,19 @@ public class Stack
             return null;
         }
 
+        _entryIds.Pop();
         return _objects.Pop();
     }
 
     /// <summary>
-    /// Get all objects on the stack (from top to bottom).
-    /// Returns a read-only list for encapsulation.
+    /// Get all objects on the stack from BOTTOM to TOP: index 0 is the first
+    /// object put on the stack, the last element is the top (the object that
+    /// resolves next, CR 608.1). Returns a read-only list for encapsulation.
     /// </summary>
     public IReadOnlyList<IStackObject> GetAll()
     {
-        return _objects.ToArray().Reverse().ToList().AsReadOnly(); // Return from top to bottom
+        // System.Collections.Generic.Stack.ToArray() is top-first; reversed = bottom-first.
+        return _objects.ToArray().Reverse().ToList().AsReadOnly();
     }
 
     /// <summary>
@@ -108,6 +181,7 @@ public class Stack
     public void Clear()
     {
         _objects.Clear();
+        _entryIds.Clear();
         _eventBus?.Publish(new StackClearedEvent());
     }
 
@@ -197,6 +271,7 @@ public class Stack
                 clonedSpell.ChosenTargets.Add(RemapRawTarget(raw, cardMap, playerMap));
 
             clone._objects.Push(clonedSpell);
+            clone._entryIds.Push(clonedSpell.Id);
         }
 
         // _objects was pushed bottom-to-top, giving us top-to-bottom internal

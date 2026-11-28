@@ -77,6 +77,8 @@ public sealed class RemoteAgent : IPlayerAgent
     // resolution; replaced on each new ChooseAsync prompt.
     private IReadOnlyList<object>? _pendingChoiceCandidates;
     private ChoiceKind? _pendingChoiceKind;
+    // ChoiceRequest bounds for the pending ChoiceCommand: (Optional ? 0 : Min, Max).
+    private (int Min, int Max)? _pendingChoiceBounds;
     // CR 115.4 / 608.2b — engine-resolved legal candidate pool for the most
     // recent ChooseTargetsAsync prompt. The TargetRequest handed to us by the
     // shared targeting pipeline (TargetCollection.CollectAsync) already has its
@@ -95,6 +97,12 @@ public sealed class RemoteAgent : IPlayerAgent
     // right slot by id and build the int[] split the engine expects. Cleared on
     // prompt resolution; replaced on each new divide-damage prompt.
     private IReadOnlyList<object>? _pendingDamageDivisionTargets;
+    // CR 700.2 — number of modes offered on the most recent choose-mode prompt,
+    // so Resolve can reject an out-of-range ChooseModeCommand.ModeIndex.
+    private int? _pendingModeCount;
+    // CR 700.2 — per mode, why it can't be chosen (null = choosable), for the
+    // pending mode prompt; enforced in Resolve. Null when nothing is enforced.
+    private IReadOnlyList<string?>? _pendingModeUnavailable;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -147,49 +155,58 @@ public sealed class RemoteAgent : IPlayerAgent
                 $"Command targets player {command.PlayerId} but this agent is for player {_player.Id}.");
         }
 
-        if (_pending == null || _pendingKinds == null)
+        lock (_closeLock)
         {
-            throw new InvalidOperationException(
-                "Agent has no pending prompt; nothing to resolve.");
-        }
+            // CR 104.3a — once a concession closed the seats, nothing is
+            // accepted from either player (checked under the same lock Close
+            // takes, so a Submit is either wholly before the concession or
+            // rejected).
+            if (_closed)
+            {
+                throw new InvalidOperationException(
+                    "The game is over (a player conceded); no further commands are accepted.");
+            }
 
-        if (!_pendingKinds.Contains(command.GetType()))
-        {
-            var expected = string.Join("/", _pendingKinds.Select(t => t.Name));
-            throw new InvalidOperationException(
-                $"Engine expected {expected}, got {command.GetType().Name}.");
-        }
+            if (_pending == null || _pendingKinds == null)
+            {
+                throw new InvalidOperationException(
+                    "Agent has no pending prompt; nothing to resolve.");
+            }
 
-        var pending = _pending;
-        var triggerOrder = _pendingTriggerOrder;
-        var libraryCandidates = _pendingLibraryCandidates;
-        var surveilPeeked = _pendingSurveilPeeked;
-        var scryPeeked = _pendingScryPeeked;
-        var revealedEligible = _pendingRevealedEligible;
-        var revealedOptional = _pendingRevealedOptional;
-        var bottomCount = _pendingBottomCount;
-        var choiceCandidates = _pendingChoiceCandidates;
-        var choiceKind = _pendingChoiceKind;
-        var targetCandidates = _pendingTargetCandidates;
-        var damageDivisionTargets = _pendingDamageDivisionTargets;
-        _pending = null;
-        _pendingKinds = null;
-        _pendingTriggerOrder = null;
-        _pendingLibraryCandidates = null;
-        _pendingSurveilPeeked = null;
-        _pendingScryPeeked = null;
-        _pendingRevealedEligible = null;
-        _pendingRevealedOptional = false;
-        _pendingBottomCount = null;
-        _pendingChoiceCandidates = null;
-        _pendingChoiceKind = null;
-        _pendingTargetCandidates = null;
-        _pendingDamageDivisionTargets = null;
-        _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, scryPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates, damageDivisionTargets);
+            if (!_pendingKinds.Contains(command.GetType()))
+            {
+                var expected = string.Join("/", _pendingKinds.Select(t => t.Name));
+                throw new InvalidOperationException(
+                    $"Engine expected {expected}, got {command.GetType().Name}.");
+            }
+
+            // Validate FIRST, against the still-pending prompt. An invalid
+            // answer throws here with the prompt, its stashes and its payload
+            // untouched, so the client can correct it and the engine keeps
+            // waiting on the same prompt (PromptRequested is not re-fired).
+            var complete = Resolve(_pending, command, _pendingTriggerOrder, _pendingLibraryCandidates,
+                _pendingSurveilPeeked, _pendingScryPeeked, _pendingRevealedEligible, _pendingRevealedOptional,
+                _pendingBottomCount, _pendingChoiceCandidates, _pendingChoiceKind, _pendingTargetCandidates,
+                _pendingDamageDivisionTargets, _pendingModeCount, _pendingModeUnavailable);
+
+            // Valid: retire the prompt, then hand the engine its answer — still
+            // under the lock, so a concurrent Close can't slip in between. The
+            // answer only completes a RunContinuationsAsynchronously TCS: no
+            // engine code runs here.
+            ClearPendingState();
+            complete();
+        }
     }
 
-    private void Resolve(
+    /// <summary>
+    /// Validate <paramref name="command"/> against the pending prompt and
+    /// translate it into the engine's answer WITHOUT touching the prompt or any
+    /// game state. Returns the completion that delivers the answer; the caller
+    /// clears the prompt and runs it only after validation succeeded. Throws
+    /// <see cref="InvalidOperationException"/> (with the rejection reason) on an
+    /// invalid answer, leaving the prompt pending for a corrected one.
+    /// </summary>
+    private Action Resolve(
         object tcs,
         GameCommand command,
         IReadOnlyList<ITriggeredAbility>? triggerOrder,
@@ -202,16 +219,19 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<object>? choiceCandidates,
         ChoiceKind? choiceKind,
         IReadOnlyList<object>? targetCandidates,
-        IReadOnlyList<object>? damageDivisionTargets)
+        IReadOnlyList<object>? damageDivisionTargets,
+        int? modeCount,
+        IReadOnlyList<string?>? modeUnavailable)
     {
+        Action complete;
         switch (command)
         {
             case PassPriorityCommand:
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(PriorityAction.Pass);
+                complete = Done<PriorityAction>(tcs, PriorityAction.Pass);
                 break;
             case PlayLandCommand pl:
                 var land = ResolveCard(pl.LandInstanceId);
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(new PriorityAction.PlayLand(land));
+                complete = Done<PriorityAction>(tcs, new PriorityAction.PlayLand(land));
                 break;
             case CastSpellCommand cs:
                 // Resolve the card from any zone (hand is the typical case;
@@ -228,23 +248,24 @@ public sealed class RemoteAgent : IPlayerAgent
                 var resolvedTargets = cs.TargetInstanceIds.Count == 0
                     ? (IReadOnlyList<object>)Array.Empty<object>()
                     : cs.TargetInstanceIds.Select(id => (object)ResolveCard(id)).ToList();
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.CastSpell(card, resolvedTargets));
                 break;
             case MulliganCommand m:
-                ((TaskCompletionSource<MulliganDecision>)tcs).SetResult(
+                complete = Done<MulliganDecision>(tcs, 
                     m.Keep ? MulliganDecision.Keep : MulliganDecision.Mulligan);
                 break;
             case ChooseTargetsCommand t:
             {
-                // CR 115.4 / 608.2b — validate every picked instance id against
-                // the engine-offered legal candidate pool (resolved upstream by
-                // TargetCollection from the TargetRequest's CandidateGatherer /
-                // "you control" / type restriction). A pick not in the offered
-                // set is ILLEGAL and is dropped (logged), rather than resolved
-                // blindly — this is the agent-boundary recheck that stops the
-                // portal from smuggling an opponent's land / any creature into a
-                // "target land you control" slot. When the engine attached no
+                // CR 115.4 / 601.2c / 608.2b — validate every picked instance id
+                // against the engine-offered legal candidate pool (resolved
+                // upstream by TargetCollection from the TargetRequest's
+                // CandidateGatherer / "you control" / type restriction). A pick
+                // not in the offered set, or the same object picked twice
+                // (CR 601.2c), is ILLEGAL: the answer is rejected with the prompt
+                // left pending so the client can answer again — the agent-boundary
+                // recheck that stops the portal from smuggling an opponent's land
+                // into a "target land you control" slot. When the engine attached no
                 // candidate pool (targetCandidates == null — e.g. a request with
                 // only a Description string and no machine-readable restriction),
                 // fall back to the prior behaviour and resolve the ids as-is so
@@ -264,27 +285,51 @@ public sealed class RemoteAgent : IPlayerAgent
                             .FirstOrDefault(c => CandidateMatchesId(c, id));
                         if (match == null)
                         {
-                            Console.Error.WriteLine(
-                                $"WARN: ChooseTargetsCommand selected instance {id} " +
-                                "is not in the offered legal-target set (CR 608.2b) — dropping.");
-                            continue;
+                            throw new InvalidOperationException(
+                                $"ChooseTargetsCommand selected instance {id}, which is not in the " +
+                                "offered legal-target set (CR 601.2c / 608.2b).");
+                        }
+                        if (picked.Any(p => ReferenceEquals(p, match)))
+                        {
+                            throw new InvalidOperationException(
+                                $"ChooseTargetsCommand selected instance {id} more than once (CR 601.2c).");
                         }
                         picked.Add(match);
                     }
                     resolved = picked;
                 }
-                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(resolved);
+                complete = Done<IReadOnlyList<object>>(tcs, resolved);
                 break;
             }
             case ChooseXCommand x:
-                ((TaskCompletionSource<int>)tcs).SetResult(x.X);
+                // CR 107.3 / 601.2b — X is announced as a number 0 or greater.
+                if (x.X < 0)
+                {
+                    throw new InvalidOperationException($"ChooseXCommand X can't be negative (got {x.X}).");
+                }
+                complete = Done<int>(tcs, x.X);
                 break;
             case ChooseModeCommand mc:
-                ((TaskCompletionSource<int>)tcs).SetResult(mc.ModeIndex);
+                // CR 700.2 — the chosen mode must be one of the offered modes.
+                if (modeCount is int modes && (mc.ModeIndex < 0 || mc.ModeIndex >= modes))
+                {
+                    throw new InvalidOperationException(
+                        $"ChooseModeCommand mode index {mc.ModeIndex} is out of range (0..{modes - 1}).");
+                }
+                RejectUnavailableMode(mc.ModeIndex, modeUnavailable);
+                complete = Done<int>(tcs, mc.ModeIndex);
                 break;
             case ChooseManaCommand mp:
-                ((TaskCompletionSource<ManaPayment>)tcs).SetResult(
+                complete = Done<ManaPayment>(tcs, 
                     new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
+                break;
+            case CancelCastCommand when tcs is not TaskCompletionSource<ManaPayment>:
+                // CR 601.2 / 732.1 — backing out at a mode, X or targets
+                // prompt of a cast: the agent throws CastCancelledException
+                // and the cast flow reverses the cast as it does an illegal
+                // one. Only cast prompts list CancelCastCommand (checked by
+                // _pendingKinds in Submit).
+                complete = FailWithCancel(tcs);
                 break;
             case CancelCastCommand:
                 // CR 601.2 / CR 727 — bailing out of a cast at the cost-
@@ -294,7 +339,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 // (must be a ChooseManaCommand awaiting) is enforced by
                 // _pendingKinds in Submit — a CancelCastCommand sent at
                 // any other prompt is rejected before reaching here.
-                ((TaskCompletionSource<ManaPayment>)tcs).SetResult(ManaPayment.Cancelled);
+                complete = Done<ManaPayment>(tcs, ManaPayment.Cancelled);
                 break;
             case ActivateManaAbilityCommand ama:
             {
@@ -323,7 +368,7 @@ public sealed class RemoteAgent : IPlayerAgent
                         $"Permanent {permanent.Name} has no mana abilities.");
                 }
                 var chosen = PickManaAbility(permanent, manaAbilities, ama.Color);
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.ActivateManaAbility(permanent, chosen));
                 break;
             }
@@ -361,7 +406,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 // re-prompts via ChooseTargetsAsync (mirrors the
                 // CastSpellCommand posture above; CR 602.1b chooses targets
                 // as part of activation, not the priority command).
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
                 break;
             }
@@ -395,7 +440,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 }
                 // Targets are not pre-resolved here — DispatchLoyalty re-prompts
                 // via ChooseTargetsAsync (CR 602.2b; mirrors ActivateAbilityCommand).
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.ActivateLoyaltyAbility(loyaltyAbility, Array.Empty<object>()));
                 break;
             }
@@ -412,14 +457,27 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         "OrderTriggersCommand resolved without a pending trigger order.");
                 }
-                var byId = triggerOrder.ToDictionary(t => t.Id);
+                // One id per trigger INSTANCE (TriggerEntryIds): the same ability
+                // that triggered twice appears twice under distinct ids.
+                var entryIds = TriggerEntryIds(triggerOrder);
+                var byId = new Dictionary<Guid, ITriggeredAbility>(entryIds.Count);
+                for (var i = 0; i < entryIds.Count; i++) byId[entryIds[i]] = triggerOrder[i];
                 var orderedTriggers = new List<ITriggeredAbility>(ot.StackObjectIdsInOrder.Count);
+                var listed = new HashSet<Guid>();
                 foreach (var id in ot.StackObjectIdsInOrder)
                 {
                     if (!byId.TryGetValue(id, out var ability))
                     {
                         throw new InvalidOperationException(
                             $"OrderTriggersCommand referenced unknown stack object {id}.");
+                    }
+                    // CR 603.3b — each trigger goes on the stack exactly once; a
+                    // duplicated id would otherwise pass the count check while
+                    // silently dropping another trigger.
+                    if (!listed.Add(id))
+                    {
+                        throw new InvalidOperationException(
+                            $"OrderTriggersCommand listed stack object {id} more than once.");
                     }
                     orderedTriggers.Add(ability);
                 }
@@ -429,13 +487,13 @@ public sealed class RemoteAgent : IPlayerAgent
                         $"OrderTriggersCommand listed {orderedTriggers.Count} triggers " +
                         $"but engine expected {triggerOrder.Count}.");
                 }
-                ((TaskCompletionSource<IReadOnlyList<ITriggeredAbility>>)tcs).SetResult(orderedTriggers);
+                complete = Done<IReadOnlyList<ITriggeredAbility>>(tcs, orderedTriggers);
                 break;
             case DeclareAttackersCommand atk:
-                ((TaskCompletionSource<CombatPlan>)tcs).SetResult(BuildCombatPlan(atk));
+                complete = Done<CombatPlan>(tcs, BuildCombatPlan(atk));
                 break;
             case DeclareBlockersCommand blk:
-                ((TaskCompletionSource<BlockPlan>)tcs).SetResult(BuildBlockPlan(blk));
+                complete = Done<BlockPlan>(tcs, BuildBlockPlan(blk));
                 break;
             case ChooseSurveilCommand sc:
             {
@@ -479,7 +537,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         $"ChooseSurveilCommand partitioned {seen.Count} cards but engine peeked {surveilPeeked.Count}.");
                 }
-                ((TaskCompletionSource<SurveilAction.SurveilDecision>)tcs).SetResult(
+                complete = Done<SurveilAction.SurveilDecision>(tcs, 
                     new SurveilAction.SurveilDecision(toGy, top));
                 break;
             }
@@ -525,7 +583,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         $"ChooseScryCommand partitioned {scrySeen.Count} cards but engine peeked {scryPeeked.Count}.");
                 }
-                ((TaskCompletionSource<ScryAction.ScryDecision>)tcs).SetResult(
+                complete = Done<ScryAction.ScryDecision>(tcs, 
                     new ScryAction.ScryDecision(toBottom, scryTop));
                 break;
             }
@@ -534,7 +592,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 // to the engine's TaskCompletionSource<bool>. Submit()
                 // already enforced _pendingKinds so we know the caller
                 // intended this prompt; nothing further to validate.
-                ((TaskCompletionSource<bool>)tcs).SetResult(yn.Answer);
+                complete = Done<bool>(tcs, yn.Answer);
                 break;
             case ChooseDamageDivisionCommand dd:
             {
@@ -568,7 +626,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     var id = DamageDivisionTargetId(damageDivisionTargets[i]);
                     split[i] = amountById.TryGetValue(id, out var amount) ? amount : 0;
                 }
-                ((TaskCompletionSource<IReadOnlyList<int>>)tcs).SetResult(split);
+                complete = Done<IReadOnlyList<int>>(tcs, split);
                 break;
             }
             case ChooseFromRevealedCommand cr:
@@ -580,11 +638,12 @@ public sealed class RemoteAgent : IPlayerAgent
                 // engine-offered eligible subset so the client can't smuggle
                 // an arbitrary revealed-but-ineligible card past the filter.
                 //
-                // Server-side validation posture (per spec): if the wire
-                // submits an InstanceId not in the eligible set, return
-                // null + log to console rather than throwing. The brief
-                // explicitly calls this out so a malicious / buggy client
-                // can't crash a live match — better to no-op the pick.
+                // An InstanceId not in the eligible set, or no pick on a
+                // mandatory prompt with eligible cards, is rejected with the
+                // prompt left pending (the client answers again; a rejected
+                // answer no longer wedges the game). No pick is legal when the
+                // prompt is optional or nothing is eligible — a mandatory clause
+                // can't force a pick from nothing.
                 if (revealedEligible == null)
                 {
                     throw new InvalidOperationException(
@@ -596,30 +655,16 @@ public sealed class RemoteAgent : IPlayerAgent
                     picked = revealedEligible.FirstOrDefault(c => c.InstanceId == pickedId);
                     if (picked == null)
                     {
-                        // Out-of-set pick — coerce to decline + warn. The
-                        // engine sees the same null payload it would on a
-                        // legitimate decline, but the log surfaces the
-                        // client misbehaviour for diagnostics.
-                        Console.Error.WriteLine(
-                            $"WARN: ChooseFromRevealedCommand selected instance {pickedId} " +
-                            $"is not in the offered eligible list — treating as decline.");
+                        throw new InvalidOperationException(
+                            $"ChooseFromRevealedCommand selected instance {pickedId}, which is not in the offered eligible list.");
                     }
                 }
-                // When the prompt was MANDATORY (Optional=false) AND the
-                // eligible set is non-empty, a null pick is an agent
-                // misbehaviour, not a legal decline. Fall back to the first
-                // eligible card so the engine doesn't see a no-op on a
-                // "put one of them" clause. When eligible is empty, null
-                // is always legal — mandatory clauses can't force a pick
-                // from nothing.
-                if (picked == null && !revealedOptional && revealedEligible.Count > 0)
+                else if (!revealedOptional && revealedEligible.Count > 0)
                 {
-                    Console.Error.WriteLine(
-                        "WARN: ChooseFromRevealedCommand declined on a mandatory prompt " +
-                        "with non-empty eligible set — falling back to first eligible.");
-                    picked = revealedEligible[0];
+                    throw new InvalidOperationException(
+                        "ChooseFromRevealedCommand must pick a card: the prompt is mandatory and eligible cards exist.");
                 }
-                ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
+                complete = Done<ICard?>(tcs, picked);
                 break;
             }
             case ChooseLibraryPickCommand lp:
@@ -648,7 +693,7 @@ public sealed class RemoteAgent : IPlayerAgent
                             $"ChooseLibraryPickCommand selected instance {id} is not in the offered candidate list.");
                     }
                 }
-                ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
+                complete = Done<ICard?>(tcs, picked);
                 break;
             }
             case ChooseCardsToBottomCommand cb:
@@ -690,7 +735,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     }
                     chosen.Add(resolved);
                 }
-                ((TaskCompletionSource<IReadOnlyList<ICard>>)tcs).SetResult(chosen);
+                complete = Done<IReadOnlyList<ICard>>(tcs, chosen);
                 break;
             }
             case ChoiceCommand choice:
@@ -698,9 +743,9 @@ public sealed class RemoteAgent : IPlayerAgent
                 // PLAN 01 (Slice C) — unified declarative choice. Validate the
                 // submitted Kind matches the outstanding prompt, then map each
                 // SelectedInstanceId back to its offered candidate object
-                // (ICard by InstanceId, Player by Id). Out-of-set ids are
-                // dropped (logged) rather than thrown — same don't-crash-a-
-                // live-match posture as ChooseFromRevealedCommand.
+                // (ICard by InstanceId, Player by Id). An id not offered, an id
+                // named twice, or a pick count outside the request's bounds is
+                // rejected with the prompt left pending.
                 if (choiceCandidates == null || choiceKind == null)
                 {
                     throw new InvalidOperationException(
@@ -728,24 +773,111 @@ public sealed class RemoteAgent : IPlayerAgent
                     var picked = new List<object>(choice.SelectedInstanceIds.Count);
                     foreach (var id in choice.SelectedInstanceIds)
                     {
-                        var match = choiceCandidates.FirstOrDefault(c => CandidateMatchesId(c, id));
+                        // Match on the same ids shipped on PromptDto.ChoiceOptions
+                        // (value sentinels carry a positional synthetic id).
+                        object? match = null;
+                        for (var i = 0; i < choiceCandidates.Count && match == null; i++)
+                        {
+                            if (ChoiceOptionId(choiceCandidates[i], i) == id) match = choiceCandidates[i];
+                        }
                         if (match == null)
                         {
-                            Console.Error.WriteLine(
-                                $"WARN: ChoiceCommand selected instance {id} is not in the offered " +
-                                "candidate set — dropping.");
-                            continue;
+                            throw new InvalidOperationException(
+                                $"ChoiceCommand selected {id}, which is not in the offered candidate set.");
+                        }
+                        if (picked.Any(p => ReferenceEquals(p, match)))
+                        {
+                            throw new InvalidOperationException(
+                                $"ChoiceCommand selected {id} more than once.");
                         }
                         picked.Add(match);
                     }
+                    // ChoiceRequest.Min / Max. An optional choice may pick none;
+                    // a minimum larger than the pool needs only the whole pool
+                    // (choose as many as possible).
+                    if (_pendingChoiceBounds is var (min, max))
+                    {
+                        var required = Math.Min(min, choiceCandidates.Count);
+                        if (picked.Count < required || picked.Count > max)
+                        {
+                            throw new InvalidOperationException(
+                                $"ChoiceCommand picked {picked.Count}; it must pick between {required} and {max}.");
+                        }
+                    }
+                    foreach (var p in picked)
+                    {
+                        if (p is int modeIdx) RejectUnavailableMode(modeIdx, modeUnavailable);
+                    }
                     result = picked;
                 }
-                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(result);
+                complete = Done<IReadOnlyList<object>>(tcs, result);
                 break;
             }
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
+        return complete;
+    }
+
+    // Bind the validated answer to the prompt's TaskCompletionSource now (the
+    // value is already computed) and deliver it later, after Submit has cleared
+    // the prompt — so nothing is mutated unless validation passed.
+    private static Action FailWithCancel(object tcs) => tcs switch
+    {
+        TaskCompletionSource<int> t => () => t.SetException(new CastCancelledException()),
+        TaskCompletionSource<IReadOnlyList<object>> t => () => t.SetException(new CastCancelledException()),
+        TaskCompletionSource<IReadOnlyList<int>> t => () => t.SetException(new CastCancelledException()),
+        _ => throw new InvalidOperationException("CancelCastCommand is not accepted at this prompt."),
+    };
+
+    /// <summary>CR 601.2 — this player is casting a spell right now (it is on
+    /// the stack as being cast), so a casting prompt may be cancelled.</summary>
+    private bool CastInProgress(GameContext? ctx) =>
+        ctx?.Stack.BeingCast.Any(c => ReferenceEquals(c.Caster, _player)) == true;
+
+    private static Type[] WithCancel(bool cancellable, Type kind) =>
+        cancellable ? new[] { kind, typeof(CancelCastCommand) } : new[] { kind };
+
+    /// <summary>CR 732.1 — shown once, on this player's next prompt.</summary>
+    public void NotifyActionReversed(string reason)
+    {
+        lock (_closeLock) _notice = reason;
+    }
+
+    private string? _notice;
+
+    private static Action Done<T>(object tcs, T value)
+    {
+        var typed = (TaskCompletionSource<T>)tcs;
+        return () => typed.SetResult(value);
+    }
+
+    // Synthetic ids for value options ("MAJIKOPT" + index): stable per prompt,
+    // derived from the option's position, and never drawn from the game's id
+    // source (so they don't perturb deterministic replay ids).
+    private static readonly byte[] SyntheticOptionTail = "MAJIKOPT"u8.ToArray();
+
+    /// <summary>The id a <see cref="ChoiceCommand"/> sends for the option at
+    /// <paramref name="index"/>: the card's instance id, the player's id, the
+    /// stack spell's id, or a synthetic positional id for a value sentinel.</summary>
+    private static Guid ChoiceOptionId(object candidate, int index) => candidate switch
+    {
+        ICard card => card.InstanceId,
+        Player player => player.Id,
+        Majik.Core.Spells.ISpell spell => spell.Id,
+        _ => new Guid(index + 1, 0, 0, SyntheticOptionTail),
+    };
+
+    private static ChoiceOptionDto DescribeChoiceOption(object candidate, int index, Func<object, string?>? label, Player viewer)
+    {
+        var custom = label?.Invoke(candidate);
+        return candidate switch
+        {
+            ICard card => new ChoiceOptionDto(card.InstanceId, "Card", custom ?? StateSnapshotter.DisplayName(card, viewer)),
+            Player player => new ChoiceOptionDto(player.Id, "Player", custom ?? player.Name),
+            Majik.Core.Spells.ISpell spell => new ChoiceOptionDto(spell.Id, "Spell", custom ?? spell.Card.Name),
+            _ => new ChoiceOptionDto(ChoiceOptionId(candidate, index), "Value", custom ?? candidate.ToString() ?? ""),
+        };
     }
 
     // PLAN 01 (Slice C) — match a ChoiceCommand instance id to a candidate
@@ -768,9 +900,9 @@ public sealed class RemoteAgent : IPlayerAgent
     };
 
     // CR 601.2d — human-readable label for a divide-damage target row.
-    private static string DamageDivisionTargetName(object target) => target switch
+    private static string DamageDivisionTargetName(object target, Player viewer) => target switch
     {
-        ICard card => card.Name,
+        ICard card => StateSnapshotter.DisplayName(card, viewer),
         Player player => player.Name,
         _ => "(unknown)",
     };
@@ -838,8 +970,54 @@ public sealed class RemoteAgent : IPlayerAgent
             ?? throw new InvalidOperationException($"No card found for instance {id}.");
     }
 
+    /// <summary>
+    /// Layer service used by <see cref="PriorityLegalActions"/> to discover
+    /// layer-granted / retyped mana abilities (CR 305.6). Set by
+    /// <see cref="GameFacade"/>; null leaves printed abilities only.
+    /// </summary>
+    internal Majik.Core.Effects.ContinuousEffectsService? Layers { get; set; }
+
+    /// <summary>
+    /// Priority prompt. <see cref="PromptDto.ExpectedKinds"/> stays the coarse
+    /// <see cref="PriorityKinds"/> list; the payload additionally carries the
+    /// specific legal lands / casts / abilities
+    /// (<see cref="PromptDto.LegalActions"/>, CR 117 / 305 / 601 / 602 / 605 / 606).
+    /// </summary>
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
-        => Prompt<PriorityAction>(ct, PriorityKinds.Build(ctx));
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(LegalActions: BuildLegalActionsHint(ctx));
+        try
+        {
+            return Prompt<PriorityAction>(ct, PriorityKinds.Build(ctx));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
+    /// <summary>The legal actions are a hint: a fault building them (beyond the
+    /// per-card containment inside <see cref="PriorityLegalActions.Build"/>)
+    /// ships the prompt without the list instead of faulting the game.</summary>
+    private LegalActionsDto? BuildLegalActionsHint(GameContext ctx)
+    {
+        try
+        {
+            return PriorityLegalActions.Build(ctx, Layers);
+        }
+        catch (Exception ex)
+        {
+            GameFacade.ReportContainedFaultOnce(this, "PriorityLegalActions.Build", ex,
+                $"PriorityLegalActions.Build for {_player.Name} threw; priority prompt sent without LegalActions");
+            return null;
+        }
+    }
 
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Prompt<MulliganDecision>(ct, typeof(MulliganCommand));
@@ -908,6 +1086,10 @@ public sealed class RemoteAgent : IPlayerAgent
     /// </summary>
     public bool WantsSynthesizedTargetCandidates => true;
 
+    /// <inheritdoc />
+    /// <remarks>A person reads the reversal notice and chooses again.</remarks>
+    public bool RepromptsAfterReversal => true;
+
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -931,7 +1113,8 @@ public sealed class RemoteAgent : IPlayerAgent
         {
             var cardSnapshots = candidates
                 .OfType<ICard>()
-                .Select(StateSnapshotter.SnapshotCard)
+                // CR 708.2 — an opponent's face-down permanent stays masked.
+                .Select(c => StateSnapshotter.SnapshotCard(c, _player))
                 .ToList();
             // CR 115 — ship players in the pool too (previously dropped by the
             // card-only snapshot), so the portal can render a player HUD as a
@@ -962,7 +1145,7 @@ public sealed class RemoteAgent : IPlayerAgent
 
         try
         {
-            return Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
+            return Prompt<IReadOnlyList<object>>(ct, WithCancel(CastInProgress(ctx), typeof(ChooseTargetsCommand)));
         }
         catch
         {
@@ -982,6 +1165,43 @@ public sealed class RemoteAgent : IPlayerAgent
     /// </summary>
     public Task<IReadOnlyList<object>> ChooseAsync(
         GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+        => ChooseCoreAsync(ctx, req, ct, label: null, decorate: null);
+
+    // The interface's "pick zero or one card" shims (ChooseFromHand /
+    // ChooseFromBattlefield / ChooseFromPile) document null as a decline the
+    // calling effect handles, but declare Min 1. Now that ChoiceCommand counts
+    // are enforced, the human seat states that contract explicitly (Optional)
+    // so an empty selection stays a legal decline. Same prompt and payload as
+    // the interface defaults; bots keep their own implementations.
+    public Task<ICard?> ChooseFromHandAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct = default)
+        => PickOneOrNoneAsync("choose from hand", candidates, intent, ct);
+
+    public Task<ICard?> ChooseFromBattlefieldAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct = default)
+        => PickOneOrNoneAsync("choose from battlefield", candidates, intent, ct);
+
+    public Task<ICard?> ChooseFromPileAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, string pileLabel, BotIntent intent, CancellationToken ct = default)
+        => PickOneOrNoneAsync(pileLabel, candidates, intent, ct);
+
+    private async Task<ICard?> PickOneOrNoneAsync(
+        string description, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct)
+    {
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, description, Min: 1, Max: 1,
+            Candidates: candidates, Intent: intent, Optional: true);
+        var chosen = await ChooseAsync(null!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
+
+    private Task<IReadOnlyList<object>> ChooseCoreAsync(
+        GameContext ctx,
+        ChoiceRequest req,
+        CancellationToken ct,
+        Func<object, string?>? label,
+        Func<PromptPayload, PromptPayload>? decorate,
+        bool cancellable = false)
     {
         ArgumentNullException.ThrowIfNull(req);
         if (_pending != null)
@@ -991,6 +1211,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var live = req.ResolveCandidates(ctx);
         _pendingChoiceCandidates = live;
         _pendingChoiceKind = req.Kind;
+        _pendingChoiceBounds = (req.Optional ? 0 : req.Min, req.Max);
 
         // Ship the candidate cards + the choice descriptor onto the wire
         // payload (mirrors ChooseTargetsAsync). Without these the portal had
@@ -1004,52 +1225,337 @@ public sealed class RemoteAgent : IPlayerAgent
         // bespoke views (gift, etc.) cover those.
         var cardSnapshots = live
             .OfType<ICard>()
-            .Select(StateSnapshotter.SnapshotCard)
+            // CR 708.2 — an opponent's face-down permanent stays masked.
+            .Select(c => StateSnapshotter.SnapshotCard(c, _player))
             .ToList();
-        _pendingPayload = new PromptPayload(
+        // Every option — cards, players, stack spells and value sentinels (a
+        // colour, a card name, a mode index) — gets an answerable id on
+        // ChoiceOptions; players also ship as PlayerCandidates (the shape the
+        // targets prompt already uses). Before this, a choice over players or
+        // sentinels shipped nothing the client could send back.
+        var playerSnapshots = live
+            .OfType<Player>()
+            .Select(p => new Majik.Core.Api.Dtos.PlayerCandidateDto(p.Id, p.Name, p.LifeTotal))
+            .ToList();
+        var options = live.Select((c, i) => DescribeChoiceOption(c, i, label, _player)).ToList();
+        var payload = new PromptPayload(
             Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
             Label: req.Description,
-            ChoiceView: new ChoiceViewDto(req.Kind.ToString(), req.Min, req.Max));
+            ChoiceView: new ChoiceViewDto(req.Kind.ToString(), req.Min, req.Max),
+            PlayerCandidates: playerSnapshots.Count > 0 ? playerSnapshots : null,
+            ChoiceOptions: options);
+        _pendingPayload = decorate?.Invoke(payload) ?? payload;
         try
         {
-            return Prompt<IReadOnlyList<object>>(ct, typeof(ChoiceCommand));
+            return Prompt<IReadOnlyList<object>>(ct, WithCancel(cancellable, typeof(ChoiceCommand)));
         }
         catch
         {
             _pendingChoiceCandidates = null;
             _pendingChoiceKind = null;
+            _pendingChoiceBounds = null;
             _pendingPayload = null;
             throw;
         }
     }
 
+    /// <summary>
+    /// CR 601.2b / 107.3 — choose X. Ships <see cref="PromptDto.MinX"/> = 0 (X
+    /// can't be negative; a negative answer is rejected) and, when the engine
+    /// can tell, the mana-affordable <see cref="PromptDto.MaxX"/> hint (see
+    /// <see cref="AffordableMaxX"/>).
+    /// </summary>
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
-        => Prompt<int>(ct, typeof(ChooseXCommand));
+    {
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(MinX: 0, MaxX: AffordableMaxX(ctx, source));
+        try
+        {
+            // Cancellable only while casting: the dispatcher announces a cast's
+            // X with the card still in the zone it is cast from (hand,
+            // graveyard, exile), or the card is already on the stack being
+            // cast. A source on the battlefield (an activation, an upkeep
+            // payment) or on the stack resolving (Harnessed Lightning) is not.
+            var casting = CastInProgress(ctx)
+                || source.Zone is not (Majik.Core.Zones.ZoneType.Battlefield or Majik.Core.Zones.ZoneType.Stack);
+            return Prompt<int>(ct, WithCancel(casting, typeof(ChooseXCommand)));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
+    /// <summary>
+    /// Upper bound on X for a spell being cast with {X} in its mana cost
+    /// (CR 601.2b / 601.2f): (floating mana + one activation of every untapped
+    /// mana source − the rest of the effective cost with X = 0) ÷ number of {X}
+    /// symbols. Null when the source has no {X} mana cost or is already on the
+    /// battlefield (X chosen during resolution or for an activated ability —
+    /// the engine knows no bound there). A hint only: it can under-count
+    /// variable-output mana abilities, so it is never enforced.
+    /// </summary>
+    private int? AffordableMaxX(GameContext? ctx, ICard? source)
+    {
+        if (source is not Card card || !card.ManaCostValue.HasX || card.Zone == Majik.Core.Zones.ZoneType.Battlefield)
+        {
+            return null;
+        }
+        try
+        {
+            var xSymbols = Math.Max(1, card.ManaCost.Count(ch => ch == 'X' || ch == 'x'));
+            var rest = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, _player, ctx?.AllPlayers).TotalValue;
+            var available = PriorityLegalActions.PotentialMana(_player, Layers);
+            return Math.Max(0, (available - rest) / xSymbols);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// CR 700.2 — "choose one" modal prompt. Ships every mode
+    /// (<see cref="PromptDto.ModeOptions"/>, index = the value
+    /// <see cref="ChooseModeCommand.ModeIndex"/> accepts) with
+    /// MinModes = MaxModes = 1; an out-of-range index is rejected.
+    /// </summary>
     public Task<int> ChooseModeAsync(
         GameContext ctx,
         IReadOnlyList<string> modes,
         IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
         CancellationToken ct = default)
-        => Prompt<int>(ct, typeof(ChooseModeCommand));
+        => ChooseModeAmongAsync(ctx, modes, Array.Empty<string?>(), modeIntents, ct);
+
+    /// <summary>
+    /// CR 700.2 — "choose one" with each mode's availability: a mode the
+    /// engine says can't be chosen ships <c>IsChoosable = false</c> with the
+    /// reason, and an answer naming it is rejected with that reason (prompt left
+    /// pending).
+    /// </summary>
+    public Task<int> ChooseModeAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(modes);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingModeCount = modes.Count;
+        _pendingModeUnavailable = Enforced(unavailableReasons, modes.Count, min: 1);
+        _pendingPayload = new PromptPayload(
+            ModeOptions: ModeRows(modes, unavailableReasons), MinModes: 1, MaxModes: 1);
+        try
+        {
+            return Prompt<int>(ct, WithCancel(CastInProgress(ctx), typeof(ChooseModeCommand)));
+        }
+        catch
+        {
+            _pendingModeCount = null;
+            _pendingModeUnavailable = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
+    private static IReadOnlyList<ModeOptionDto> ModeRows(
+        IReadOnlyList<string> modes, IReadOnlyList<string?>? unavailable) =>
+        modes.Select((text, i) =>
+        {
+            var why = unavailable != null && i < unavailable.Count ? unavailable[i] : null;
+            return new ModeOptionDto(i, text ?? "", why == null, why);
+        }).ToList();
+
+    // The reasons are enforced only while enough modes remain choosable to
+    // answer at all. When too few do, the cast is illegal whatever is picked
+    // and is rewound at target collection (CR 601.2c), as before.
+    private static IReadOnlyList<string?>? Enforced(
+        IReadOnlyList<string?>? unavailable, int modeCount, int min)
+    {
+        if (unavailable == null || unavailable.All(r => r == null)) return null;
+        var choosable = Enumerable.Range(0, modeCount).Count(i => i >= unavailable.Count || unavailable[i] == null);
+        return choosable >= Math.Max(1, min) ? unavailable : null;
+    }
+
+    private static void RejectUnavailableMode(int index, IReadOnlyList<string?>? unavailable)
+    {
+        if (unavailable != null && index >= 0 && index < unavailable.Count && unavailable[index] is { } why)
+        {
+            throw new InvalidOperationException($"Mode {index} can't be chosen (CR 700.2): {why}");
+        }
+    }
+
+    /// <summary>
+    /// CR 700.2d / 700.2e — "choose one or more" (or "choose two") modal prompt.
+    /// Answered with a <see cref="ChoiceCommand"/> (kind PickN) whose ids come
+    /// from <see cref="PromptDto.ChoiceOptions"/> (one per mode, labelled with
+    /// the mode text); <see cref="PromptDto.ModeOptions"/> / MinModes / MaxModes
+    /// describe the choice. The answer is never repaired: a ChoiceCommand that
+    /// repeats a mode (CR 700.2d), picks fewer than the minimum or more than the
+    /// maximum, or names an id not offered is rejected with a reason and the
+    /// prompt stays pending, the same policy as every prompt (validated in
+    /// <see cref="Resolve"/>'s ChoiceCommand arm).
+    /// </summary>
+    public Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => ChooseModesAmongAsync(ctx, modes, minModes, maxModes, Array.Empty<string?>(), modeIntents, ct);
+
+    /// <summary>The multi-mode twin of <see cref="ChooseModeAmongAsync"/>: a
+    /// mode that can't be chosen ships <c>IsChoosable = false</c> with its
+    /// reason, and a ChoiceCommand picking it is rejected (prompt left pending).</summary>
+    public async Task<IReadOnlyList<int>> ChooseModesAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(modes);
+        var min = Math.Max(1, minModes);
+        var max = Math.Min(maxModes, modes.Count);
+        var req = new ChoiceRequest(
+            ChoiceKind.PickN,
+            "Choose modes",
+            Min: min,
+            Max: max,
+            Candidates: Enumerable.Range(0, modes.Count).Cast<object>().ToList(),
+            Intent: Majik.Core.Cards.BotIntent.None,
+            Optional: false);
+        // Set inside decorate: it runs only once ChooseCoreAsync has checked no
+        // other prompt is pending, so a refused call never touches that prompt.
+        var stashed = false;
+        Task<IReadOnlyList<object>> prompt;
+        try
+        {
+            prompt = ChooseCoreAsync(ctx, req, ct, cancellable: CastInProgress(ctx),
+                label: o => o is int i && i >= 0 && i < modes.Count ? modes[i] : null,
+                decorate: p =>
+                {
+                    _pendingModeUnavailable = Enforced(unavailableReasons, modes.Count, min);
+                    stashed = true;
+                    return p with { ModeOptions = ModeRows(modes, unavailableReasons), MinModes = min, MaxModes = max };
+                });
+        }
+        catch
+        {
+            if (stashed) _pendingModeUnavailable = null;
+            throw;
+        }
+        var chosen = await prompt.ConfigureAwait(false);
+
+        // Every accepted answer was validated (distinct offered ids, count in
+        // [min, max]). The one unvalidated result is the empty decline handed
+        // to the engine after the game closed (a concession while the prompt
+        // was open): give it the first modes so the cast can unwind.
+        if (chosen.Count == 0 && IsClosed)
+            return Enumerable.Range(0, Math.Min(min, modes.Count)).ToList();
+        return chosen.Cast<int>().ToList();
+    }
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
     {
-        // Stash the engine-provided list so the eventual
-        // OrderTriggersCommand can translate its StackObjectIds back into
-        // the matching ability instances. Replaced on each prompt; cleared
-        // in Submit when the prompt resolves. Only commit the field if
-        // Prompt actually accepts the registration (it throws if another
-        // prompt is already outstanding).
+        // CR 603.3b — stash the engine-provided list so the eventual
+        // OrderTriggersCommand can translate its ids back into the matching
+        // ability instances, and ship every trigger id + description on the
+        // payload so the client can render and answer the prompt. Stashed
+        // BEFORE Prompt fires PromptRequested (observers build the PromptDto
+        // synchronously from the payload), never on top of a pending prompt.
+        ArgumentNullException.ThrowIfNull(mine);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingTriggerOrder = mine;
+        var entryIds = TriggerEntryIds(mine);
+        _pendingPayload = new PromptPayload(TriggerOptions: mine.Select((t, i) => DescribeTrigger(t, entryIds[i])).ToList());
         try
         {
-            var task = Prompt<IReadOnlyList<ITriggeredAbility>>(ct, typeof(OrderTriggersCommand));
-            _pendingTriggerOrder = mine;
-            return task;
+            return Prompt<IReadOnlyList<ITriggeredAbility>>(ct, typeof(OrderTriggersCommand));
         }
         catch
         {
             _pendingTriggerOrder = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
+    // CR 603.3b — wire row for one trigger. Text = the trigger's effect text
+    // (joined) when the ability carries any, else "<source> trigger" (the same
+    // fallback StateSnapshotter uses for a trigger on the stack).
+    private static TriggerOptionDto DescribeTrigger(ITriggeredAbility trigger, Guid entryId)
+    {
+        var sourceCard = trigger.Source as ICard;
+        var sourceName = sourceCard?.Name ?? "";
+        var text = EventPayloadBuilder.TriggerText(trigger);
+        return new TriggerOptionDto(entryId, sourceCard?.InstanceId, sourceName, text);
+    }
+
+    /// <summary>
+    /// CR 603.2 / 603.3b — one wire id per trigger INSTANCE in
+    /// <paramref name="triggers"/>. The trigger manager queues the registered
+    /// ability object on every firing, so an ability that triggered twice in
+    /// one batch (Blade of the Bloodchief when two creatures die together)
+    /// appears twice with the same <see cref="ITriggeredAbility.Id"/>. The first
+    /// occurrence keeps the ability's id; the n-th repeat gets an id derived
+    /// deterministically from it, so the prompt and the answering
+    /// <see cref="OrderTriggersCommand"/> agree without extra state.
+    /// </summary>
+    private static IReadOnlyList<Guid> TriggerEntryIds(IReadOnlyList<ITriggeredAbility> triggers)
+    {
+        var seen = new Dictionary<ITriggeredAbility, int>(ReferenceEqualityComparer.Instance);
+        var used = new HashSet<Guid>();
+        var ids = new List<Guid>(triggers.Count);
+        foreach (var trigger in triggers)
+        {
+            seen.TryGetValue(trigger, out var occurrence);
+            seen[trigger] = occurrence + 1;
+            var id = trigger.Id;
+            // Same derivation the stack uses for a repeat push (Stack.GetEntryIds),
+            // so the prompt's ids are the stack objects' ids.
+            for (var salt = occurrence; !used.Add(id); salt++)
+            {
+                id = Majik.Core.Stack.StackEntryIds.Repeat(trigger.Id, salt);
+            }
+            ids.Add(id);
+        }
+        return ids;
+    }
+
+    /// <summary>CR 601.2g-h — the mana prompt, naming what it pays for on
+    /// <see cref="PromptDto.ManaPayment"/>.</summary>
+    public Task<ManaPayment> ChooseManaSourcesForAsync(
+        GameContext ctx, ManaCost cost, ManaPaymentSubject subject, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(cost);
+        ArgumentNullException.ThrowIfNull(subject);
+        if (_pending != null) throw new InvalidOperationException("A prompt is already pending.");
+        _pendingPayload = new PromptPayload(ManaPayment: new ManaPaymentViewDto(
+            subject.StackEntryId, subject.Source.InstanceId,
+            StateSnapshotter.DisplayName(subject.Source, _player),
+            cost.ToBraceString(), cost.RemainingAfter(_player.ManaPool), subject.AutoPayAvailable));
+        try
+        {
+            return ChooseManaSourcesAsync(ctx, cost, ct);
+        }
+        catch
+        {
+            _pendingPayload = null;
             throw;
         }
     }
@@ -1061,11 +1567,61 @@ public sealed class RemoteAgent : IPlayerAgent
         // resolver translates Cancelled → no-op cast at the dispatch site.
         => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand), typeof(CancelCastCommand));
 
+    /// <summary>
+    /// CR 508.1a — declare-attackers prompt. Ships the engine-computed
+    /// <paramref name="eligibleAttackers"/> on the payload
+    /// (<see cref="PromptDto.EligibleAttackerIds"/>) so the client can offer
+    /// exactly the creatures that may attack.
+    /// </summary>
     public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
-        => Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));
+    {
+        ArgumentNullException.ThrowIfNull(eligibleAttackers);
+        // Mirror the other payload-bearing prompts: stash before Prompt fires
+        // PromptRequested observers, never on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(
+            EligibleAttackerIds: eligibleAttackers.Select(p => p.InstanceId).ToList());
+        try
+        {
+            return Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
+    /// <summary>
+    /// CR 509.1a — declare-blockers prompt. Ships the engine-supplied
+    /// <paramref name="attackers"/> and <paramref name="eligibleBlockers"/> on the
+    /// payload (<see cref="PromptDto.AttackerIds"/> /
+    /// <see cref="PromptDto.EligibleBlockerIds"/>).
+    /// </summary>
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
-        => Prompt<BlockPlan>(ct, typeof(DeclareBlockersCommand));
+    {
+        ArgumentNullException.ThrowIfNull(attackers);
+        ArgumentNullException.ThrowIfNull(eligibleBlockers);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(
+            AttackerIds: attackers.Select(p => p.InstanceId).ToList(),
+            EligibleBlockerIds: eligibleBlockers.Select(p => p.InstanceId).ToList());
+        try
+        {
+            return Prompt<BlockPlan>(ct, typeof(DeclareBlockersCommand));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     // CR 508.1 — translate the wire DeclareAttackersCommand into the
     // engine-shaped CombatPlan. Each declaration carries an attacker (must
@@ -1082,21 +1638,29 @@ public sealed class RemoteAgent : IPlayerAgent
             return CombatPlan.None;
         }
 
+        // CR 508.1a — validate against what the engine offered (TurnDriver's
+        // layer-aware eligibility, CR 613.1c), not the C# class: an animated
+        // land or a creature-typed Land instance is an eligible attacker
+        // without being a Creature object. Without an offered list, fall back
+        // to "effectively a creature".
+        var eligible = _pendingPayload?.EligibleAttackerIds;
         var decls = new List<AttackerDeclaration>(cmd.Attackers.Count);
         foreach (var dto in cmd.Attackers)
         {
             var card = ResolveCard(dto.AttackerInstanceId);
-            if (card is not Creature creature)
+            if (eligible != null ? !eligible.Contains(dto.AttackerInstanceId) : !IsEffectivelyCreature(card))
             {
                 throw new InvalidOperationException(
-                    $"Attacker {dto.AttackerInstanceId} is not a Creature ({card.GetType().Name}).");
+                    $"Attacker {dto.AttackerInstanceId} is not an eligible attacker (CR 508.1a).");
             }
 
             var defender = ResolveDefender(dto.DefenderId);
-            decls.Add(new AttackerDeclaration(creature, defender));
+            decls.Add(new AttackerDeclaration((Permanent)card, defender));
         }
         return new CombatPlan(decls);
     }
+
+    private static bool IsEffectivelyCreature(ICard card) => card is Permanent p && p.IsEffectivelyCreature();
 
     // CR 509.1 — translate the wire DeclareBlockersCommand. Each blocker
     // must be a Creature this agent controls; each attacker (referenced
@@ -1111,24 +1675,30 @@ public sealed class RemoteAgent : IPlayerAgent
             return BlockPlan.None;
         }
 
+        // CR 509.1a — same agreement as attackers: a blocker must be one the
+        // engine offered, and the creature it blocks one of the attackers the
+        // engine listed (both layer-aware, CR 613.1c); without offered lists,
+        // fall back to "effectively a creature".
+        var eligibleBlockers = _pendingPayload?.EligibleBlockerIds;
+        var attackers = _pendingPayload?.AttackerIds;
         var decls = new List<BlockerDeclaration>(cmd.Blockers.Count);
         foreach (var dto in cmd.Blockers)
         {
             var blockerCard = ResolveCard(dto.BlockerInstanceId);
-            if (blockerCard is not Creature blocker)
+            if (eligibleBlockers != null ? !eligibleBlockers.Contains(dto.BlockerInstanceId) : !IsEffectivelyCreature(blockerCard))
             {
                 throw new InvalidOperationException(
-                    $"Blocker {dto.BlockerInstanceId} is not a Creature ({blockerCard.GetType().Name}).");
+                    $"Blocker {dto.BlockerInstanceId} is not an eligible blocker (CR 509.1a).");
             }
 
             var attackerCard = ResolveCard(dto.AttackerInstanceId);
-            if (attackerCard is not Creature attacker)
+            if (attackers != null ? !attackers.Contains(dto.AttackerInstanceId) : !IsEffectivelyCreature(attackerCard))
             {
                 throw new InvalidOperationException(
-                    $"Attacker {dto.AttackerInstanceId} is not a Creature ({attackerCard.GetType().Name}).");
+                    $"Attacker {dto.AttackerInstanceId} is not an attacking creature (CR 509.1a).");
             }
 
-            decls.Add(new BlockerDeclaration(blocker, attacker));
+            decls.Add(new BlockerDeclaration((Permanent)blockerCard, (Permanent)attackerCard));
         }
         return new BlockPlan(decls);
     }
@@ -1452,7 +2022,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var targetRows = targets
             .Select(t => new DamageDivisionTargetDto(
                 DamageDivisionTargetId(t),
-                DamageDivisionTargetName(t)))
+                DamageDivisionTargetName(t, _player)))
             .ToList();
         _pendingDamageDivisionTargets = targets;
         _pendingPayload = new PromptPayload(
@@ -1476,20 +2046,214 @@ public sealed class RemoteAgent : IPlayerAgent
 
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {
-        if (_pending != null)
+        TaskCompletionSource<T> tcs;
+        PromptPayload? payload;
+        lock (_closeLock)
         {
-            throw new InvalidOperationException("A prompt is already pending.");
+            if (_pending != null)
+            {
+                throw new InvalidOperationException("A prompt is already pending.");
+            }
+
+            tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (_closed)
+            {
+                // CR 104.3a — the game is over (a player conceded): nobody is
+                // asked anything any more. Answer with the decline value so the
+                // engine runs straight to its game-over gate.
+                ClearPendingState();
+                Decline(tcs);
+                return tcs.Task;
+            }
+
+            ct.Register(() => tcs.TrySetCanceled(ct));
+            _pending = tcs;
+            _pendingKinds = acceptedKinds;
+            _pendingAbort = () => Decline(tcs);
+            // Captured with the prompt: an answer clears _pendingPayload, and
+            // one can arrive as soon as the first observer has seen the prompt.
+            payload = _pendingPayload;
+            if (_notice != null)
+            {
+                payload = (payload ?? new PromptPayload()) with { Notice = _notice };
+                _notice = null;
+            }
         }
 
-        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        ct.Register(() => tcs.TrySetCanceled(ct));
-        _pending = tcs;
-        _pendingKinds = acceptedKinds;
+        // The facade publishes its state snapshot, builds the one PromptDto
+        // from the captured payload, fans it out, and only then releases
+        // waiting submitters.
+        try { PromptRaised?.Invoke(acceptedKinds, payload); }
+        catch { /* a facade fault must not abort the engine */ }
 
-        try { PromptRequested?.Invoke(acceptedKinds); }
+        // Observers are external code: run them off the engine flow so work
+        // they start never counts as the engine (GameFacade reads).
+        try { GameFacade.RunOffEngineFlow(() => PromptRequested?.Invoke(acceptedKinds)); }
         catch { /* observer fault must not abort the engine */ }
 
-        return tcs.Task;
+        return DeliverUnlessClosed(tcs.Task);
+    }
+
+    /// <summary>Runs on the engine flow right before <see cref="PromptRequested"/>
+    /// fires, with the payload captured when the prompt was raised (set by
+    /// <see cref="GameFacade"/>: publish the snapshot, build and fan out the
+    /// prompt, release submitters).</summary>
+    internal Action<IReadOnlyList<Type>, PromptPayload?>? PromptRaised { get; set; }
+
+    private readonly object _closeLock = new();
+    private bool _closed;
+    private Action? _pendingAbort;
+
+    /// <summary>True once <see cref="Close"/> ran: every prompt is answered
+    /// with its decline value and no <see cref="PromptRequested"/> fires.</summary>
+    public bool IsClosed
+    {
+        get { lock (_closeLock) return _closed; }
+    }
+
+    /// <summary>
+    /// CR 104.3a — the game ended by concession. Completes the outstanding
+    /// prompt (if any) with its decline value — pass priority, keep, no
+    /// attackers / blockers, cancelled mana payment, no optional targets, X = 0,
+    /// mode 0, "no" — or cancels it when no safe decline exists, and makes every
+    /// later prompt resolve the same way immediately, so the engine never waits
+    /// on this seat again. Idempotent.
+    /// </summary>
+    /// <summary>
+    /// CR 104.3a — an answer given before a concession but picked up by the
+    /// engine after it must not be acted on: the conceder has left the game.
+    /// The engine awaits this instead of the answer itself: if the seat has
+    /// been closed by the time the answer is handed over, it gets the decline
+    /// value (or a cancellation) instead.
+    /// </summary>
+    private Task<T> DeliverUnlessClosed<T>(Task<T> answer)
+    {
+        var delivered = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        answer.ContinueWith(t =>
+        {
+            // Test seam: hold the engine between the answer's acceptance and
+            // its pickup, then deliver exactly as below.
+            if (BeforeAnswerPickupForTest is { } hold)
+            {
+                hold().ContinueWith(_ => Hand(t), CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                return;
+            }
+            Hand(t);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return delivered.Task;
+
+        void Hand(Task<T> t)
+        {
+            if (IsClosed && t.IsCompletedSuccessfully)
+            {
+                Decline(delivered);
+                return;
+            }
+            if (t.IsCanceled) delivered.TrySetCanceled();
+            else if (t.IsFaulted) delivered.TrySetException(t.Exception!.InnerExceptions);
+            else delivered.TrySetResult(t.Result);
+        }
+    }
+
+    /// <summary>Test seam: awaited after an answer is accepted and before the
+    /// engine picks it up (<see cref="DeliverUnlessClosed"/>).</summary>
+    internal Func<Task>? BeforeAnswerPickupForTest { get; set; }
+
+    /// <summary>
+    /// CR 104.3a — close every seat AND run <paramref name="whileClosing"/>
+    /// (marking the conceder lost) while holding every seat's lock, so no
+    /// <see cref="Submit"/> on any seat can be accepted after it, nor
+    /// interleave with it. Outstanding prompts are declined after the locks
+    /// are released (their continuations run asynchronously).
+    /// </summary>
+    internal static void CloseAll(IReadOnlyList<RemoteAgent> agents, Action whileClosing)
+    {
+        var aborts = new List<Action>();
+        CloseLocked(agents, 0, whileClosing, aborts);
+        foreach (var abort in aborts) abort();
+
+        static void CloseLocked(IReadOnlyList<RemoteAgent> agents, int index, Action whileClosing, List<Action> aborts)
+        {
+            if (index == agents.Count)
+            {
+                whileClosing();
+                foreach (var agent in agents)
+                {
+                    if (agent._closed) continue;
+                    agent._closed = true;
+                    if (agent._pendingAbort is { } abort) aborts.Add(abort);
+                    agent.ClearPendingState();
+                }
+                return;
+            }
+            lock (agents[index]._closeLock)
+            {
+                CloseLocked(agents, index + 1, whileClosing, aborts);
+            }
+        }
+    }
+
+    public void Close()
+    {
+        Action? abort;
+        lock (_closeLock)
+        {
+            if (_closed) return;
+            _closed = true;
+            abort = _pendingAbort;
+            ClearPendingState();
+        }
+        abort?.Invoke();
+    }
+
+    private void ClearPendingState()
+    {
+        _pending = null;
+        _pendingKinds = null;
+        _pendingAbort = null;
+        _pendingTriggerOrder = null;
+        _pendingLibraryCandidates = null;
+        _pendingSurveilPeeked = null;
+        _pendingScryPeeked = null;
+        _pendingRevealedEligible = null;
+        _pendingRevealedOptional = false;
+        _pendingBottomCount = null;
+        _pendingChoiceCandidates = null;
+        _pendingChoiceKind = null;
+        _pendingChoiceBounds = null;
+        _pendingTargetCandidates = null;
+        _pendingDamageDivisionTargets = null;
+        _pendingModeCount = null;
+        _pendingModeUnavailable = null;
+        _pendingPayload = null;
+    }
+
+    private static void Decline<T>(TaskCompletionSource<T> tcs)
+    {
+        object? decline = typeof(T) switch
+        {
+            var t when t == typeof(PriorityAction) => PriorityAction.Pass,
+            var t when t == typeof(MulliganDecision) => MulliganDecision.Keep,
+            var t when t == typeof(CombatPlan) => CombatPlan.None,
+            var t when t == typeof(BlockPlan) => BlockPlan.None,
+            var t when t == typeof(ManaPayment) => ManaPayment.Cancelled,
+            var t when t == typeof(IReadOnlyList<object>) => Array.Empty<object>(),
+            var t when t == typeof(bool) => false,
+            var t when t == typeof(int) => 0,
+            _ => null,
+        };
+        if (decline is T value)
+        {
+            tcs.TrySetResult(value);
+        }
+        else
+        {
+            // No answer is safe to fabricate (trigger order, scry split, bottom
+            // cards, …): cancel. The engine observes an OperationCanceledException,
+            // which the facade's concede path absorbs.
+            tcs.TrySetCanceled();
+        }
     }
 }
 
@@ -1596,4 +2360,46 @@ public sealed record PromptPayload(
     /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
     /// <see cref="PromptDto.ScryView"/>.
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? ScryView = null);
+    IReadOnlyList<CardSnapshotDto>? ScryView = null,
+    /// <summary>
+    /// Specific legal actions at a priority window (lands / casts / abilities).
+    /// Non-null only on priority prompts. <see cref="GameFacade.BuildPrompt"/>
+    /// forwards this onto <see cref="PromptDto.LegalActions"/>.
+    /// </summary>
+    LegalActionsDto? LegalActions = null,
+    /// <summary>
+    /// CR 508.1a — engine-supplied eligible attackers. Non-null only on
+    /// declare-attackers prompts; forwarded onto <see cref="PromptDto.EligibleAttackerIds"/>.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleAttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — engine-supplied attacking creatures. Non-null only on
+    /// declare-blockers prompts; forwarded onto <see cref="PromptDto.AttackerIds"/>.
+    /// </summary>
+    IReadOnlyList<Guid>? AttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — engine-supplied eligible blockers. Non-null only on
+    /// declare-blockers prompts; forwarded onto <see cref="PromptDto.EligibleBlockerIds"/>.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleBlockerIds = null,
+    /// <summary>
+    /// CR 603.3b — triggers to order. Non-null only on order-triggers prompts;
+    /// forwarded onto <see cref="PromptDto.TriggerOptions"/>.
+    /// </summary>
+    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null,
+    /// <summary>CR 107.3 — forwarded onto <see cref="PromptDto.MinX"/>.</summary>
+    int? MinX = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.MaxX"/>.</summary>
+    int? MaxX = null,
+    /// <summary>CR 700.2 — forwarded onto <see cref="PromptDto.ModeOptions"/>.</summary>
+    IReadOnlyList<ModeOptionDto>? ModeOptions = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.MinModes"/>.</summary>
+    int? MinModes = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.MaxModes"/>.</summary>
+    int? MaxModes = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.ChoiceOptions"/>.</summary>
+    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null,
+    ManaPaymentViewDto? ManaPayment = null,
+    /// <summary>CR 732.1 — the engine's reason for reversing this player's
+    /// last cast, forwarded onto <see cref="PromptDto.Notice"/>.</summary>
+    string? Notice = null);

@@ -217,15 +217,17 @@ public static class BomatCourierFactory
         var top = controller.Zones.Library.GetCards().FirstOrDefault();
         if (top == null) return;
 
+        // CR 406.3 — face down, and "(You can't look at it.)": no lookers.
         if (zones != null)
         {
-            zones.MoveCard(top, ZoneType.Library, ZoneType.Exile, controller);
+            zones.ExileFaceDown(top, ZoneType.Library, System.Array.Empty<Player>(), controller);
         }
         else
         {
             controller.Zones.Library.RemoveCard(top);
             controller.Zones.Exile.AddCard(top);
             top.SetZone(ZoneType.Exile);
+            (top as Card)?.MarkExiledFaceDown(System.Array.Empty<Player>());
         }
 
         // Per-Courier "exiled with this creature" ledger (CR 400.7).

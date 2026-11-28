@@ -18,7 +18,19 @@ public sealed record GameStateDto(
     // to detect dropped events. Defaults to 0 so any construction that
     // predates the seq plumbing (and any pre-deploy client) degrades to the
     // prior always-accept behaviour.
-    long Seq = 0);
+    long Seq = 0,
+    // CR 117.1 / 117.3 — the player the engine is waiting on for a priority
+    // decision. Null whenever the engine is doing anything else: checking
+    // state-based actions and putting triggered abilities on the stack before
+    // priority is granted (CR 117.5 — including while a trigger's controller
+    // is prompted to order triggers or choose targets), applying the chosen
+    // action, resolving (CR 117.4), during steps in which no player receives
+    // priority (untap; usually cleanup, CR 514.3), before the game starts and
+    // after it ends. Same value in every viewer's snapshot.
+    // A prompt addressed to a seat is authoritative regardless of this field:
+    // a client must answer a pending prompt for its seat even when this names
+    // the other player or is null.
+    Guid? PriorityPlayerId = null);
 
 public sealed record PlayerDto(
     Guid Id,
@@ -85,15 +97,76 @@ public sealed record CardSnapshotDto(
     // that currently imprint cards; defaults to an empty list everywhere else
     // (and for non-permanents). NOT recursive — an imprinted card's own
     // ImprintedCards is left empty.
-    IReadOnlyList<CardSnapshotDto>? ImprintedCards = null);
+    IReadOnlyList<CardSnapshotDto>? ImprintedCards = null,
+    // CR 708.2 — true for a face-down permanent (manifest, manifest dread,
+    // cloak). To a player who may not look at it the DTO is only what the rules
+    // allow: Name "Face-down permanent" (the same string the event payloads
+    // use), no mana cost, Types ["Creature"], its P/T (normally 2/2, plus
+    // whatever modifies it), no mana colours and only the abilities its
+    // face-down state grants; tapped, counters and attachments stay visible.
+    bool IsFaceDown = false,
+    // CR 708.6 — for the face-down permanent's controller (and the all-revealed
+    // spectator view) only: the card it represents, so the controller can look
+    // at it. Null for everyone else, and for face-up cards.
+    CardSnapshotDto? FaceDownCard = null);
 
 public sealed record AbilityDto(string Kind, string Description, Guid? Id = null);
 
+/// <summary>One object on the stack. <see cref="GameStateDto.Stack"/> lists
+/// them BOTTOM to TOP: the last element is the top of the stack, the object
+/// that resolves next (CR 608.1).</summary>
 public sealed record StackObjectDto(
     Guid Id,
     string Kind,
     Guid? ControllerId,
-    string Description);
+    string Description,
+    // CR 601.2c / 603.3d / 115.1 — the object's chosen targets, in the order
+    // they were announced (target slots in order, then each slot's picks).
+    // Empty when it has no targets; null only from constructions predating
+    // this field. CR 706 — a target card in a zone hidden from the viewer
+    // (an opponent's hand, any library) is listed with Id = Guid.Empty, the
+    // same placeholder hidden zones use; its Kind is still "Card".
+    IReadOnlyList<TargetRefDto>? Targets = null,
+    // CR 601.2a — true while this spell is still being cast: it moved to the
+    // stack as the first step of casting and its caster is choosing modes,
+    // X, targets or paying costs (CR 601.2b–h). Always the top entry. Its Id
+    // is the id it keeps once the cast completes; Targets lists those chosen
+    // so far. If the cast is cancelled or rewound (CR 732), it disappears
+    // from the stack and the card is back in its owner's hand in the next
+    // snapshot.
+    bool IsBeingCast = false,
+    // The InstanceId of the card this object comes from: for a spell, the card
+    // being cast (CR 601.2a); for an activated or triggered ability, its source
+    // (CR 113.7), a permanent or a card in another zone. Card ids are kept
+    // across zone moves, so it is the id the client saw in the hand or on the
+    // battlefield. Null when there is no source card, or when that card is in a
+    // zone hidden from the viewer (CR 706: a library, another player's hand).
+    Guid? SourceCardId = null,
+    // CR 113.2 / 602.1 — an ability's own text: for an activated ability
+    // "cost: effect" (costs in brace form), for a triggered ability its effect
+    // text (the same Text TriggeredAbilityTriggeredPayload carries). The engine
+    // keeps no printed trigger sentence, so this is the generated effect text.
+    // Null for a spell (its card carries the oracle text), and when the source
+    // is in a zone hidden from the viewer or is a face-down permanent the
+    // viewer may not look at (CR 706, CR 708.2).
+    string? RulesText = null,
+    // The id of the ability this entry comes from. Triggered: the ability's
+    // id, which TriggeredAbilityTriggeredPayload.AbilityId names (that event is
+    // published when the ability triggers, before it is put on the stack,
+    // CR 603.3, so it cannot carry the entry id; this field is the link).
+    // Activated: the activated ability's id as listed on its card
+    // (AbilityDto.Id), not the stack copy's. Null for a spell.
+    Guid? AbilityId = null);
+
+/// <summary>A reference to a chosen target. <see cref="Kind"/> is "Card"
+/// (<see cref="Id"/> = the card's InstanceId), "Player" (the player id) or
+/// "Spell" (the targeted stack object's <see cref="StackObjectDto.Id"/>): a
+/// spell, or an activated or triggered ability on the stack (CR 115.1d, e.g.
+/// Stifle's target). A target that is on the stack more than once (an ability
+/// that triggered twice, CR 603.3) is listed once per entry, by each entry's
+/// id: the engine targets the ability itself, and countering it removes every
+/// entry.</summary>
+public sealed record TargetRefDto(Guid Id, string Kind);
 
 public sealed record ManaPoolDto(int Generic, int White, int Blue, int Black, int Red, int Green, int Colorless)
 {
@@ -125,10 +198,17 @@ public sealed record EventDto(Guid EventId, string Type, DateTime At, JsonElemen
 /// legacy subscription hands subscribers <see cref="Public"/>; bridge
 /// code uses <see cref="GameFacade.SubscribeEnvelopes"/> to access the
 /// per-player dictionary.
+///
+/// <para><see cref="Spectator"/> (set whenever <see cref="PerPlayer"/> is) is
+/// the variant for a recipient that is not a seated player: masked as for
+/// someone who may look at no hidden card (CR 706: hand and library contents
+/// hidden, CR 708.2 face-down names withheld). A non-player must never get
+/// <see cref="Public"/> for a masked event.</para>
 /// </summary>
 public sealed record EventEnvelope(
     EventDto Public,
-    IReadOnlyDictionary<Guid, EventDto>? PerPlayer);
+    IReadOnlyDictionary<Guid, EventDto>? PerPlayer,
+    EventDto? Spectator = null);
 
 /// <summary>
 /// Server → client envelope signalling that the engine is awaiting a
@@ -274,7 +354,171 @@ public sealed record PromptDto(
     /// <see cref="SurveilView"/> exactly (scry's "bottom" replaces surveil's
     /// "graveyard").
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? ScryView = null);
+    IReadOnlyList<CardSnapshotDto>? ScryView = null,
+    /// <summary>
+    /// CR 117 / 305 / 601 / 602 / 605 / 606 — the specific legal actions the
+    /// prompted player can take at this priority window: lands they may play,
+    /// cards they may cast, and abilities they may activate right now (see
+    /// <see cref="LegalActionsDto"/>). Non-null only on priority prompts
+    /// (<c>ExpectedKinds</c> contains <c>PassPriorityCommand</c>); null on every
+    /// other prompt kind. Finer-grained than <see cref="ExpectedKinds"/>, which
+    /// stays the coarse, permissive command-type list.
+    /// </summary>
+    LegalActionsDto? LegalActions = null,
+    /// <summary>
+    /// CR 508.1a — instance ids of the creatures the engine determined can be
+    /// declared as attackers. Non-null only on declare-attackers prompts
+    /// (empty when none can attack); null on every other prompt kind.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleAttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — instance ids of the attacking creatures the defending player
+    /// may block. Non-null only on declare-blockers prompts; null otherwise.
+    /// </summary>
+    IReadOnlyList<Guid>? AttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — instance ids of the defending player's creatures the engine
+    /// determined can be declared as blockers. Non-null only on
+    /// declare-blockers prompts (empty when none can block); null otherwise.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleBlockerIds = null,
+    /// <summary>
+    /// CR 603.3b — the triggered abilities the player must order, in the
+    /// engine's default order. <c>OrderTriggersCommand.StackObjectIdsInOrder</c>
+    /// must list every <see cref="TriggerOptionDto.TriggerId"/> exactly once.
+    /// Non-null only on order-triggers prompts; null on every other prompt kind.
+    /// </summary>
+    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null,
+    /// <summary>
+    /// CR 107.3 / 601.2b — smallest legal value for <c>ChooseXCommand.X</c>
+    /// (always 0: X can't be negative). Non-null only on choose-X prompts.
+    /// </summary>
+    int? MinX = null,
+    /// <summary>
+    /// Largest X the player could currently pay for, when the engine can tell:
+    /// only for a spell being cast with {X} in its mana cost, computed as
+    /// (floating mana + one activation of every untapped mana source − the rest
+    /// of the effective cost) ÷ the number of {X} symbols. A hint for the UI,
+    /// not enforced. Null when the engine knows no upper bound (X chosen during
+    /// resolution, activated-ability X, …) and on every other prompt kind.
+    /// </summary>
+    int? MaxX = null,
+    /// <summary>
+    /// CR 700.2 — the modes of a modal spell or ability, in printed order.
+    /// <see cref="ModeOptionDto.Index"/> is the value <c>ChooseModeCommand.ModeIndex</c>
+    /// accepts on a choose-mode prompt. On a "choose one or more" prompt
+    /// (answered with <c>ChoiceCommand</c>) each mode also appears on
+    /// <see cref="ChoiceOptions"/> in the same order. Null on every other prompt kind.
+    /// </summary>
+    IReadOnlyList<ModeOptionDto>? ModeOptions = null,
+    /// <summary>CR 700.2d / 700.2e — fewest modes to choose. Set whenever
+    /// <see cref="ModeOptions"/> is.</summary>
+    int? MinModes = null,
+    /// <summary>CR 700.2d / 700.2e — most modes to choose. Set whenever
+    /// <see cref="ModeOptions"/> is.</summary>
+    int? MaxModes = null,
+    /// <summary>
+    /// Every option of a declarative choice prompt (<c>ExpectedKinds</c> contains
+    /// <c>ChoiceCommand</c>), in the engine's order: cards, players, stack spells
+    /// and value options (a colour, a card name, a mode) alike. Each
+    /// <see cref="ChoiceOptionDto.Id"/> is what <c>ChoiceCommand.SelectedInstanceIds</c>
+    /// accepts. Non-null on every choice prompt (empty for a plain yes/no); null
+    /// on every other prompt kind. <see cref="Candidates"/> /
+    /// <see cref="PlayerCandidates"/> keep carrying the card / player snapshots.
+    /// </summary>
+    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null,
+    /// <summary>
+    /// CR 601.2g-h — what a mana payment prompt (<c>ChooseManaCommand</c>) pays
+    /// for. Non-null on a spell's mana prompt; null on every other prompt kind.
+    /// </summary>
+    ManaPaymentViewDto? ManaPayment = null,
+    /// <summary>
+    /// CR 732.1 / 601.2 — why the engine reversed this player's last cast
+    /// (an illegal cast it rewound itself, e.g. no mode of a modal spell had a
+    /// legal target), shown once on the next prompt to that player. Null
+    /// otherwise. A cast the player cancelled carries no notice.
+    /// </summary>
+    string? Notice = null);
+
+/// <summary>Body of <see cref="PromptDto.ManaPayment"/>. Display only.</summary>
+/// <param name="StackEntryId">The id the spell has on the stack once cast. The
+/// mana prompt comes before the spell moves to the stack, so the entry is not in
+/// a snapshot taken while the prompt is open; it appears under this id.</param>
+/// <param name="SourceCardId">The spell's card (still in its origin zone).</param>
+/// <param name="SourceName">The spell's name.</param>
+/// <param name="TotalCost">The full cost being paid, brace form (<c>{1}{R}</c>).</param>
+/// <param name="RemainingCost">What the floating mana pool does not cover, brace
+/// form; <c>{0}</c> when it covers everything.</param>
+/// <param name="AutoPayAvailable">Whether a <c>ChooseManaCommand</c> with no
+/// sources (auto-pay) pays the cost.</param>
+public sealed record ManaPaymentViewDto(
+    Guid? StackEntryId,
+    Guid SourceCardId,
+    string SourceName,
+    string TotalCost,
+    string RemainingCost,
+    bool AutoPayAvailable);
+
+/// <summary>One mode on <see cref="PromptDto.ModeOptions"/>.</summary>
+/// <param name="Index">Zero-based printed index; the value <c>ChooseModeCommand.ModeIndex</c> accepts.</param>
+/// <param name="Text">The mode's text.</param>
+/// <param name="IsChoosable">CR 700.2 — false when the mode can't be chosen
+/// (a targeted mode with too few legal targets, CR 601.2c). An answer naming it
+/// is rejected with <paramref name="UnavailableReason"/>.</param>
+/// <param name="UnavailableReason">Why the mode can't be chosen; null when it can.</param>
+public sealed record ModeOptionDto(int Index, string Text, bool IsChoosable = true, string? UnavailableReason = null);
+
+/// <summary>One option on <see cref="PromptDto.ChoiceOptions"/>.</summary>
+/// <param name="Id">Id to send in <c>ChoiceCommand.SelectedInstanceIds</c>: the card's
+/// instance id, the player's id, the stack spell's id, or — for a value option, which
+/// has no engine id — a synthetic id that is stable for this prompt.</param>
+/// <param name="Kind"><c>"Card"</c>, <c>"Player"</c>, <c>"Spell"</c> or <c>"Value"</c>.</param>
+/// <param name="Label">Human-readable label (card / player name, colour, mode text, …).</param>
+public sealed record ChoiceOptionDto(Guid Id, string Kind, string Label);
+
+/// <summary>
+/// One triggered ability on <see cref="PromptDto.TriggerOptions"/>.
+/// </summary>
+/// <param name="TriggerId">The id <c>OrderTriggersCommand.StackObjectIdsInOrder</c>
+/// accepts for this trigger (the ability's stack-object id).</param>
+/// <param name="SourceInstanceId">Instance id of the card / permanent the trigger
+/// comes from; null when the source is not a card (e.g. an emblem).</param>
+/// <param name="SourceName">Name of the source, or "" when unknown.</param>
+/// <param name="Text">Best human-readable description the engine has: the
+/// trigger's effect text when present, otherwise "&lt;source name&gt; trigger".</param>
+public sealed record TriggerOptionDto(Guid TriggerId, Guid? SourceInstanceId, string SourceName, string Text);
+
+/// <summary>
+/// The specific legal actions at a priority window, shipped on
+/// <see cref="PromptDto.LegalActions"/>. Computed by
+/// <see cref="Majik.Core.Api.PriorityLegalActions"/> from the engine's own
+/// timing, cost and activation gates; a client may make exactly these clickable.
+/// </summary>
+/// <param name="PlayableLandIds">CR 305.1 / 305.2 — instance ids of the lands
+/// the player may play now (own main phase, empty stack, land drop available).</param>
+/// <param name="CastableCardIds">CR 307.1 / 601.2 — instance ids of the cards in
+/// hand the player may cast now: timing permits (sorcery speed, or instant /
+/// Flash) and the mana cost is payable from the pool plus untapped sources.</param>
+/// <param name="ActivatableAbilities">CR 602 / 605 / 606 — abilities of permanents
+/// the player controls whose activation is legal and payable now.</param>
+public sealed record LegalActionsDto(
+    IReadOnlyList<Guid> PlayableLandIds,
+    IReadOnlyList<Guid> CastableCardIds,
+    IReadOnlyList<AbilityRefDto> ActivatableAbilities);
+
+/// <summary>
+/// One activatable ability on <see cref="LegalActionsDto.ActivatableAbilities"/>.
+/// </summary>
+/// <param name="PermanentInstanceId">Instance id of the permanent carrying the ability.</param>
+/// <param name="AbilityId">Ability id to echo back: <c>ActivateAbilityCommand.AbilityId</c>
+/// for <c>"Activated"</c>, <c>ActivateLoyaltyAbilityCommand.LoyaltyAbilityId</c> for
+/// <c>"Loyalty"</c>. Mana abilities are addressed on the wire by permanent + colour
+/// (<c>ActivateManaAbilityCommand</c>) and have no engine id, so for <c>"Mana"</c>
+/// this is <see cref="Guid.Empty"/> and there is one entry per permanent with at
+/// least one activatable mana ability.</param>
+/// <param name="Kind"><c>"Mana"</c> (CR 605), <c>"Activated"</c> (CR 602) or
+/// <c>"Loyalty"</c> (CR 606).</param>
+public sealed record AbilityRefDto(Guid PermanentInstanceId, Guid AbilityId, string Kind);
 
 /// <summary>
 /// CR 601.2d / CR 119.4 — per-prompt body for a divided-damage allocation

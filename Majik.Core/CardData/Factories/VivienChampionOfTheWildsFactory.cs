@@ -181,7 +181,10 @@ public static class VivienChampionOfTheWildsFactory
                 label: "Card to exile face down",
                 pickedDestination: ZoneType.Exile,
                 restDestination: ZoneType.Library,
-                sourceTag: Slug);
+                sourceTag: Slug,
+                // CR 406.3 — exiled face down; its controller may look at it
+                // (they may cast it if it's a creature spell).
+                pickedFaceDownLookers: new[] { controller });
 
             // CR 601.3e — "you may cast it if it's a creature spell." Stamp a
             // runtime exile-cast grant for the printed cost on a creature pick;

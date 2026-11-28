@@ -147,6 +147,8 @@ public class AbilityActivator
             activatedAbility.SetChosenDamageDivision(chosenDivision);
         }
 
+        activatedAbility.SetActivatedFrom(ability.Id);
+
         // Add ability to stack
         _stack.Push(activatedAbility);
 

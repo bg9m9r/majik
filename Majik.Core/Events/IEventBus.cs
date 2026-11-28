@@ -46,4 +46,18 @@ public interface IEventBus
     /// <summary>Remove a handler previously added via
     /// <see cref="SubscribeAll"/>.</summary>
     void UnsubscribeAll(Action<GameEvent> handler);
+
+    /// <summary>
+    /// Subscribe an observer that must see events in the order they were
+    /// published (a transport bridge to clients). An event published by a
+    /// handler while another event is being delivered (a trigger triggering
+    /// on a move, CR 603.2) is published after it, so the observer receives
+    /// the outer event first. The default treats it as
+    /// <see cref="SubscribeAll"/>; <see cref="EventBus"/> delivers observers
+    /// before any other handler of the event.
+    /// </summary>
+    void SubscribeObserver(Action<GameEvent> handler) => SubscribeAll(handler);
+
+    /// <summary>Remove a handler added via <see cref="SubscribeObserver"/>.</summary>
+    void UnsubscribeObserver(Action<GameEvent> handler) => UnsubscribeAll(handler);
 }

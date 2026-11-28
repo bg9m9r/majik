@@ -168,8 +168,8 @@ public static class TidebinderMageFactory
         if (!target.HasType(CardType.Creature)) return;
         if (!IsRedOrGreen(target)) return;
 
-        // CR 701.20 — tap the target creature.
-        target.Tap();
+        // CR 701.20 / 701.26a — tap the target creature (no-op if already tapped).
+        Majik.Core.Primitives.Fx.Tap(target);
 
         // CR 502.1 — "doesn't untap during its controller's untap step".
         // CR 611.2b — duration is "for as long as you control this creature",

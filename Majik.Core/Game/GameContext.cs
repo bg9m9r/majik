@@ -43,6 +43,16 @@ public sealed class GameContext
     /// </summary>
     public TurnState? TurnState { get; }
 
+    /// <summary>
+    /// CR 601.2c — the cast-time spell-definition lookup the live engine uses
+    /// (the same resolver <see cref="TurnDriver"/> dispatches casts with),
+    /// memoized per card name and caster. Priority contexts carry it so a
+    /// legal-action list can check that a spell's required targets exist
+    /// (<see cref="Majik.Core.Targeting.TargetFeasibility"/>). Null outside the
+    /// priority loop; consumers then skip the target check.
+    /// </summary>
+    public Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? SpellDefinitions { get; init; }
+
     // Memoized opponent set. The accessor sits on the MCTS legality hot path
     // (LegalActionEnumerator enumerates it per candidate action), so the prior
     // .Where(...).ToList() allocated a fresh list on every call. AllPlayers is

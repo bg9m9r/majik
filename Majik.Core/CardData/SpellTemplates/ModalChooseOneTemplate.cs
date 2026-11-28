@@ -145,11 +145,39 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         var pick = @params.TryGetValue("pick", out var pk) ? pk : "one";
         var pickCount = PickCount(pick);
 
+        // CR 700.2d / 601.2c — each mode's body must read ITS OWN target
+        // slots, and only the chosen modes' targets are chosen. Stamp every
+        // request with its mode index: SpellCastFlow then prompts only the
+        // chosen modes and fills the ModalTargetLayout (mode by mode, one slot
+        // per request), and mode m's body gets its slice of that layout. Before
+        // this, a mode body read the first slots of the whole list (Drown in the
+        // Loch's destroy mode threw), and a mode with two requests (Bushwhack's
+        // fight) fell onto the index-aligned path and read the wrong slots.
+        var requests = new List<TargetRequest>();
+        for (var m = 0; m < modeDefs.Count; m++)
+        {
+            if (modeDefs[m] is not { } md) continue;
+            requests.AddRange(md.TargetRequests.Select(r => r with { ModeIndex = m }));
+        }
+        var offsets = Majik.Core.Game.ModalTargetLayout.Offsets(modeDefs.Count, requests, out _);
+
+        IReadOnlyList<IReadOnlyList<object>> SlotsFor(int mode, ChosenSpellParams p)
+        {
+            var count = modeDefs[mode]!.TargetRequests.Count;
+            if (count == 0) return Array.Empty<IReadOnlyList<object>>();
+            var start = offsets[mode];
+            var slice = new IReadOnlyList<object>[count];
+            for (var k = 0; k < count; k++)
+            {
+                slice[k] = start + k < p.Targets.Count ? p.Targets[start + k] : Array.Empty<object>();
+            }
+            return slice;
+        }
+
         return new SpellDefinition(
             Modes: clauses,
             HasVariableX: modeDefs.Any(d => d?.HasVariableX == true),
-            TargetRequests: modeDefs.Where(d => d != null)
-                .SelectMany(d => d!.TargetRequests).ToList(),
+            TargetRequests: requests,
             ModeIntents: modeIntents,
             EffectFactory: p =>
             {
@@ -169,7 +197,7 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
                     if (!seen.Add(idx)) continue; // CR 700.2d — each mode at most once
                     if (seen.Count > pickCount) break; // honor printed pick count
                     var picked = modeDefs[idx];
-                    if (picked != null) effects.AddRange(picked.EffectFactory(p));
+                    if (picked != null) effects.AddRange(picked.EffectFactory(p with { Targets = SlotsFor(idx, p) }));
                 }
                 return effects;
             });

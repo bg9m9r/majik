@@ -50,6 +50,7 @@ public class ZoneService
     /// </summary>
     public void MoveCard(ICard card, ZoneType fromZone, ZoneType toZone, Player? controller = null)
     {
+        card = Revealed(card);
         var intent = BuildIntent(card, fromZone, toZone, controller);
         if (_replacements != null)
         {
@@ -59,6 +60,28 @@ public class ZoneService
         }
 
         CommitMove(card, fromZone, intent);
+    }
+
+    /// <summary>
+    /// CR 406.3 — exile <paramref name="card"/> face down: only
+    /// <paramref name="mayLook"/> may look at it (empty for "you can't look at
+    /// it"). Same replacement / event path as <see cref="MoveCard"/>; the flag
+    /// is on the card by the time <see cref="CardMovedEvent"/> is published.
+    /// A replacement that sends the card elsewhere leaves it face up there.
+    /// </summary>
+    public void ExileFaceDown(ICard card, ZoneType fromZone, IReadOnlyCollection<Player> mayLook, Player? controller = null)
+    {
+        ArgumentNullException.ThrowIfNull(mayLook);
+        card = Revealed(card);
+        var intent = BuildIntent(card, fromZone, ZoneType.Exile, controller);
+        if (_replacements != null)
+        {
+            var replaced = _replacements.Apply(intent);
+            if (replaced == null) return; // cancelled
+            intent = replaced;
+        }
+
+        CommitMove(card, fromZone, intent, faceDownLookers: mayLook);
     }
 
     /// <summary>
@@ -74,6 +97,7 @@ public class ZoneService
         Player? controller = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
+        card = Revealed(card);
         var intent = BuildIntent(card, fromZone, toZone, controller);
         if (_replacements != null)
         {
@@ -127,8 +151,56 @@ public class ZoneService
     /// <see cref="MoveCardAsync"/>; identical behaviour regardless of which
     /// bus path produced the intent.
     /// </summary>
-    private void CommitMove(ICard card, ZoneType fromZone, ZoneMoveIntent intent)
+    /// <summary>CR 708.9 — a face-down permanent that already left the
+    /// battlefield is the card it represented: a later move of that object
+    /// (an effect acting on the leaves/dies event's card) moves that card.</summary>
+    private static ICard Revealed(ICard card) =>
+        card is ManifestedCreature { Zone: not ZoneType.Battlefield } gone
+            && gone.UnderlyingCard.Zone == gone.Zone
+            ? gone.UnderlyingCard
+            : card;
+
+    /// <summary>
+    /// CR 708.9 / 400.7 — a face-down permanent leaving the battlefield is
+    /// revealed, and in its new zone it is the card it represented, face up:
+    /// the face-down wrapper is removed (it exists nowhere afterwards) and the
+    /// represented card is put into the destination. The move event names the
+    /// face-down creature that left (LKI for leaves/dies triggers, CR 603.10)
+    /// with <see cref="CardMovedEvent.RevealedCard"/> = the card.
+    /// </summary>
+    private void CommitFaceDownLeave(ManifestedCreature faceDown, ZoneMoveIntent intent)
     {
+        var to = intent.ToZone;
+        var lkiController = faceDown.Controller;
+        var card = faceDown.UnderlyingCard;
+        var owner = card.Owner ?? faceDown.Owner;
+
+        faceDown.TurnFaceUp();              // revealed
+        faceDown.SetZone(to);               // leave-battlefield reset; in no zone list
+        faceDown.Owner?.Zones.Battlefield.RemoveCard(faceDown);
+        if (!ReferenceEquals(faceDown.Controller, faceDown.Owner))
+            faceDown.Controller?.Zones.Battlefield.RemoveCard(faceDown);
+
+        card.SetController(owner);
+        card.SetZone(to);
+        owner?.Zones.GetZone(to).AddCard(card);
+
+        _eventBus?.Publish(new CardMovedEvent(faceDown, ZoneType.Battlefield, to, lkiController)
+        {
+            RevealedCard = card,
+        });
+    }
+
+    private void CommitMove(ICard card, ZoneType fromZone, ZoneMoveIntent intent,
+        IReadOnlyCollection<Player>? faceDownLookers = null)
+    {
+        if (card is ManifestedCreature { IsFaceDown: true } faceDown
+            && fromZone == ZoneType.Battlefield && intent.ToZone != ZoneType.Battlefield)
+        {
+            CommitFaceDownLeave(faceDown, intent);
+            return;
+        }
+
         var finalToZone = intent.ToZone;
         var finalController = intent.Controller;
 
@@ -142,8 +214,14 @@ public class ZoneService
         // value. Snapshotting here threads the correct LKI controller into the
         // CardMovedEvent published below.
         var lkiController = card.Controller;
+        // CR 406.3 — read before the zone change clears it.
+        var leftFaceDownExile = card is Card { IsExiledFaceDown: true };
 
         card.SetZone(finalToZone);
+        if (faceDownLookers != null && finalToZone == ZoneType.Exile && card is Card exiledFaceDown)
+        {
+            exiledFaceDown.MarkExiledFaceDown(faceDownLookers);
+        }
 
         if (finalController != null && finalToZone == ZoneType.Battlefield)
         {
@@ -153,9 +231,10 @@ public class ZoneService
         if (finalToZone == ZoneType.Battlefield && card is Permanent permanent)
         {
             permanent.MarkEnteredBattlefield();
+            // CR 614.1c — enters with the tapped status; not a tap (no event).
             if (intent.EntersTapped && !permanent.IsTapped)
             {
-                permanent.Tap();
+                permanent.EnterTapped();
             }
             // CR 400.7 / CR 603.6a — stamp "entered directly from library"
             // sentinel so ETB abilities (Fblthp, the Lost's draw-2 clause)
@@ -228,7 +307,7 @@ public class ZoneService
         // still read the in-flight stamp earlier in this method. We
         // publish CardMovedEvent FIRST so any LTB subscriber that wants
         // to consult Card.WasCast can do so before the clear runs.
-        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone, lkiController));
+        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone, lkiController, leftFaceDownExile));
 
         if (fromZone == ZoneType.Battlefield && finalToZone != ZoneType.Battlefield
             && card is Card concreteForCastClear)

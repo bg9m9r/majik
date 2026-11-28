@@ -182,6 +182,9 @@ public static class HivespineWolverineFactory
                 new TargetRequest(
                     Description: "target creature you control",
                     MinTargets: 0,
+                    // CR 700.2 / 603.3c — this request belongs to mode 0; choosing that mode needs a target.
+                    PrintedMinTargets: 1,
+                    ModeIndex: 0,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Buff,
@@ -194,6 +197,9 @@ public static class HivespineWolverineFactory
                 new TargetRequest(
                     Description: "target creature token",
                     MinTargets: 0,
+                    // CR 700.2 / 603.3c — this request belongs to mode 1; choosing that mode needs a target.
+                    PrintedMinTargets: 1,
+                    ModeIndex: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal,
@@ -207,6 +213,9 @@ public static class HivespineWolverineFactory
                 new TargetRequest(
                     Description: "target artifact or enchantment",
                     MinTargets: 0,
+                    // CR 700.2 / 603.3c — this request belongs to mode 2; choosing that mode needs a target.
+                    PrintedMinTargets: 1,
+                    ModeIndex: 2,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal,

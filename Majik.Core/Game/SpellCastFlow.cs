@@ -192,7 +192,11 @@ public sealed class SpellCastFlow
         // proposal atomic anyway, the early hand move is behaviourally safe.
         if (sourceZoneAtCast == ZoneType.Hand)
         {
-            _zoneService.MoveCard(card, ZoneType.Hand, ZoneType.Stack, controller: caster);
+            // CR 601.2a — the spell is on the stack from here; let snapshots
+            // show it while its caster makes the remaining choices. Registered
+            // BEFORE the move so the move's CardMovedEvent can name the stack
+            // entry the card becomes (CardMovedPayload.StackEntryId).
+            MoveToStackAsCast(card, ZoneType.Hand, caster);
         }
 
         try
@@ -212,9 +216,55 @@ public sealed class SpellCastFlow
             // exception propagates. (Non-hand origins never entered the early
             // move, so they have nothing to rewind.) The card has not been
             // Pushed onto the stack object yet, so this is a pure zone rewind.
+            _stack.EndCast(card);
             _zoneService.MoveCard(card, ZoneType.Stack, ZoneType.Hand, controller: caster);
             throw;
         }
+        finally
+        {
+            // Pushed (the Spell is in GetAll now; EndCast ran just before the
+            // push) or abandoned: either way the in-progress entry is gone.
+            _stack.EndCast(card);
+        }
+    }
+
+    // CR 601.2a — the id a spell being cast is shown under, and keeps once
+    // pushed. Derived from the card and a per-flow cast counter rather than
+    // drawn from DeterministicIdScope, so it consumes no id from the
+    // deterministic sequence (every other id in a seeded game is unchanged).
+    private int _castSeq;
+
+    /// <summary>CR 601.2a — move the card being cast to the stack. The cast is
+    /// registered first (with the id the spell keeps once pushed) so that the
+    /// move's CardMovedEvent can name the stack entry the card becomes.</summary>
+    private void MoveToStackAsCast(ICard card, ZoneType from, Player caster)
+    {
+        _stack.BeginCast(card, caster, NextCastId(card));
+        try
+        {
+            _zoneService.MoveCard(card, from, ZoneType.Stack, controller: caster);
+        }
+        catch
+        {
+            _stack.EndCast(card);
+            throw;
+        }
+    }
+
+    /// <summary>The id the next cast of <paramref name="card"/> through this
+    /// flow is shown under and keeps once pushed (CR 601.2a). Lets a dispatcher
+    /// that asks for mana before calling <see cref="CastAsync"/> name the stack
+    /// entry the payment is for. Consumes nothing.</summary>
+    public Guid PeekNextCastId(ICard card) => CastId(card, _castSeq + 1);
+
+    private Guid NextCastId(ICard card) => CastId(card, ++_castSeq);
+
+    private static Guid CastId(ICard card, int seq)
+    {
+        var bytes = card.InstanceId.ToByteArray();
+        var mix = BitConverter.GetBytes(seq * 0x2545F491 ^ 0x5CA57ED);
+        for (var b = 0; b < 4; b++) bytes[4 + b] ^= mix[b];
+        return new Guid(bytes);
     }
 
     /// <summary>
@@ -268,7 +318,7 @@ public sealed class SpellCastFlow
         // two") spells return the chosen set (CR 700.2d). The scalar is kept
         // in sync with the first chosen mode so legacy single-mode
         // EffectFactory closures still read ChosenSpellParams.ModeIndex.
-        var modeChoice = await PromptForModesAsync(definition, ctx, agent, ct);
+        var modeChoice = await PromptForModesAsync(definition, card, ctx, agent, ct);
         int? mode = modeChoice.Count > 0 ? modeChoice[0] : (int?)null;
         IReadOnlyList<int>? modeIndexes =
             definition.IsMultiMode && modeChoice.Count > 0 ? modeChoice : null;
@@ -307,8 +357,12 @@ public sealed class SpellCastFlow
         // CR 601.2c only chooses targets for modes that were chosen. Unchosen
         // modes keep an empty slot so EffectFactory's per-mode index lookups
         // stay aligned.
+        var inProgressCast = _stack.FindCast(card);
+        Action<IReadOnlyList<IReadOnlyList<object>>>? targetProgress =
+            inProgressCast is null ? null : slots => inProgressCast.Targets = slots;
         var collectedTargets = await CollectTargetsAsync(
-            definition, card, ctx, agent, modeChoice, ct);
+            definition, card, ctx, agent, modeChoice, ct, targetProgress);
+        if (inProgressCast is not null) inProgressCast.Targets = collectedTargets.ToArray();
 
         // CR 601.2d — divide-damage announcement. A spell that deals a fixed
         // total of damage "divided as you choose among" its chosen targets
@@ -408,7 +462,7 @@ public sealed class SpellCastFlow
         // below still see the true origin.
         if (sourceZoneAtCast != ZoneType.Hand)
         {
-            _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
+            MoveToStackAsCast(card, card.Zone, caster);
         }
 
         // CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature cleanup
@@ -424,6 +478,8 @@ public sealed class SpellCastFlow
             mergedAdditional);
 
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
+        // CR 601.2a — the spell keeps the id it was shown under while being cast.
+        if (_stack.FindCast(card) is { } inProgress) spell.Id = inProgress.Id;
 
         // CR 707.10a — retain the per-slot target requests on the stack object so
         // a "copy this spell" effect (Twincast / Reverberate) can re-prompt the
@@ -472,6 +528,13 @@ public sealed class SpellCastFlow
         // "the first spell cast after the exert" as the old player-scoped
         // counter did. No cast-time provenance step is needed here.
 
+        // CR 601.2c — keep the announced targets on the stack object so a
+        // state snapshot can show what the spell targets.
+        spell.AnnouncedTargets = collectedTargets;
+
+        // Hand over from the in-progress entry to the stack object (same id)
+        // with nothing published in between.
+        _stack.EndCast(card);
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 
@@ -910,20 +973,81 @@ public sealed class SpellCastFlow
     /// scripts keep their behaviour; multi-mode spells route through
     /// <see cref="IPlayerAgent.ChooseModesAsync"/>.</summary>
     private static async Task<IReadOnlyList<int>> PromptForModesAsync(
-        SpellDefinition definition, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+        SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
     {
         if (definition.Modes.Count == 0) return Array.Empty<int>();
 
+        var unavailable = ModeUnavailableReasons(
+            definition, ctx, agent.WantsSynthesizedTargetCandidates);
+
+        // CR 601.2c / 700.2 — too few choosable modes makes the cast illegal
+        // whatever is picked. An agent that can only pick from the offered
+        // pools would face a prompt with no legal answer, so the cast is
+        // reversed here instead (the caller rewinds it, CR 732.1). Bots keep
+        // their own target heuristics and are prompted as before.
+        var choosable = unavailable.Count(r => r == null);
+        if (agent.WantsSynthesizedTargetCandidates && choosable < Math.Max(1, definition.MinModes))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: no mode can be chosen (CR 601.2c / 700.2) — " +
+                string.Join(" ", unavailable.Where(r => r != null)));
+        }
         if (!definition.IsMultiMode)
         {
-            var single = await agent.ChooseModeAsync(
-                ctx, definition.Modes, definition.ModeIntents, ct);
+            var single = await agent.ChooseModeAmongAsync(
+                ctx, definition.Modes, unavailable, definition.ModeIntents, ct);
             return new[] { single };
         }
 
-        return await agent.ChooseModesAsync(
+        return await agent.ChooseModesAmongAsync(
             ctx, definition.Modes, definition.MinModes, definition.MaxModes,
-            definition.ModeIntents, ct);
+            unavailable, definition.ModeIntents, ct);
+    }
+
+    /// <summary>
+    /// CR 700.2 / 601.2c — per printed mode, why it can't be chosen (null when
+    /// it can): a chosen targeted mode needs its printed minimum of legal
+    /// targets, so a mode whose live pool is smaller makes the cast illegal.
+    /// Uses exactly the pool and minimum <see cref="CollectTargetsAsync"/>
+    /// prompts with (the same mode-to-request mapping, <c>AsChosenMode()</c>,
+    /// <see cref="Targeting.TargetCollection.ResolveLivePool"/> with the agent's
+    /// synthesis flag), so an agent that can only pick from the pool (the
+    /// remote agent) is rejected by that collection for exactly these modes.
+    /// </summary>
+    internal static IReadOnlyList<string?> ModeUnavailableReasons(
+        SpellDefinition definition, GameContext ctx, bool synthesize)
+        => ModeUnavailableReasons(definition.Modes.Count, definition.TargetRequests, ctx, synthesize);
+
+    /// <summary>The same per-mode reasons for any modal object (a modal
+    /// triggered ability too, CR 603.3c): requests map to modes by
+    /// <see cref="TargetRequest.ModeIndex"/> when all carry one, else by
+    /// position when there is one request per mode; otherwise no mode is
+    /// marked.</summary>
+    internal static IReadOnlyList<string?> ModeUnavailableReasons(
+        int modeCount, IReadOnlyList<TargetRequest> requests, GameContext ctx, bool synthesize)
+    {
+        var reasons = new string?[modeCount];
+        if (modeCount == 0 || requests.Count == 0 || ctx is null) return reasons;
+
+        IEnumerable<(int Mode, TargetRequest Request)> pairs =
+            requests.All(r => r.ModeIndex.HasValue)
+                ? requests.Select(r => (r.ModeIndex!.Value, r))
+                : requests.Count == modeCount
+                    ? requests.Select((r, i) => (i, r))
+                    : Enumerable.Empty<(int, TargetRequest)>();
+        foreach (var (mode, request) in pairs)
+        {
+            if (mode < 0 || mode >= modeCount || reasons[mode] != null) continue;
+            var chosen = request.AsChosenMode();
+            var pool = Targeting.TargetCollection.ResolveLivePool(chosen, ctx, synthesize);
+            if (pool.Count < chosen.MinTargets)
+            {
+                reasons[mode] = chosen.MinTargets == 1
+                    ? $"No legal target: {request.Description}."
+                    : $"Needs {chosen.MinTargets} legal targets ({request.Description}); there are {pool.Count}.";
+            }
+        }
+        return reasons;
     }
 
     /// <summary>CR 702.121 / CR 601.2f / CR 601.2g — build the escalate
@@ -1045,7 +1169,8 @@ public sealed class SpellCastFlow
 
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
         SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent,
-        IReadOnlyList<int> chosenModes, CancellationToken ct)
+        IReadOnlyList<int> chosenModes, CancellationToken ct,
+        Action<IReadOnlyList<IReadOnlyList<object>>>? progress = null)
     {
         // CR 700.2d / CR 601.2c — mode-aware target collection for SPARSE
         // modal spells: the targeted modes are a SUBSET of the printed modes
@@ -1054,18 +1179,21 @@ public sealed class SpellCastFlow
         // 1 are targeted). Collect a target ONLY for a chosen targeted mode,
         // raising its minimum to the printed minimum so a chosen targeted mode
         // with no legal target makes the whole cast illegal and rewinds, rather
-        // than silently no-opping on resolution. The returned slots are keyed by
-        // ModeIndex (sized to cover the highest mode index) so the EffectFactory's
-        // per-mode Targets[ModeIndex] lookups stay aligned. This generalizes the
-        // escalate/Charm rewind (CR 601.2c) to the index-misaligned Cryptic /
-        // Command family.
+        // than silently no-opping on resolution. The returned slots follow
+        // ModalTargetLayout: mode by mode, one slot per request (at least one per
+        // mode), so a mode with one request sits at Targets[ModeIndex] and a mode
+        // with several (a fight mode) gets each of its requests, in order. This
+        // generalizes the escalate/Charm rewind (CR 601.2c) to the
+        // index-misaligned Cryptic / Command family.
         if (definition.Modes.Count > 0
             && definition.TargetRequests.Count > 0
             && definition.TargetRequests.All(r => r.ModeIndex.HasValue)
             && chosenModes.Count > 0)
         {
             var chosenModeSet = new HashSet<int>(chosenModes);
-            var slotCount = definition.Modes.Count;
+            var modeCount = definition.Modes.Count;
+            var offsets = ModalTargetLayout.Offsets(modeCount, definition.TargetRequests, out var slotCount);
+            var nextInMode = new int[modeCount];
             var perModeSparse = new IReadOnlyList<object>[slotCount];
             for (var s = 0; s < slotCount; s++)
             {
@@ -1075,7 +1203,8 @@ public sealed class SpellCastFlow
             foreach (var request in definition.TargetRequests)
             {
                 var modeIdx = request.ModeIndex!.Value;
-                if (modeIdx < 0 || modeIdx >= slotCount) continue;
+                if (modeIdx < 0 || modeIdx >= modeCount) continue;
+                var slotIdx = offsets[modeIdx] + nextInMode[modeIdx]++;
                 if (!chosenModeSet.Contains(modeIdx)) continue;
 
                 // CR 601.2c — a CHOSEN targeted mode demands its printed
@@ -1084,7 +1213,8 @@ public sealed class SpellCastFlow
                 var oneSlot = await Targeting.TargetCollection.CollectAsync(
                     new[] { request.AsChosenMode() },
                     card, ctx, agent, throwOnInsufficient: true, ct);
-                perModeSparse[modeIdx] = oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>();
+                perModeSparse[slotIdx] = oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>();
+                progress?.Invoke(perModeSparse.ToArray());
             }
 
             var sparseList = new List<IReadOnlyList<object>>(perModeSparse);
@@ -1119,6 +1249,7 @@ public sealed class SpellCastFlow
                     new[] { definition.TargetRequests[i].AsChosenMode() },
                     card, ctx, agent, throwOnInsufficient: true, ct);
                 perMode.Add(oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>());
+                progress?.Invoke(perMode.ToArray());
             }
 
             if (card is Card concreteMulti && perMode.Count > 0)
@@ -1137,7 +1268,8 @@ public sealed class SpellCastFlow
             ctx,
             agent,
             throwOnInsufficient: true,
-            ct);
+            ct,
+            progress);
 
         // CR 601.2f — stamp the freshly-picked targets onto the card so any
         // cost-reduction ability on the card itself can read them during cost

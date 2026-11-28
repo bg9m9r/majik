@@ -166,7 +166,10 @@ public static class SkateboardFactory
                 // resolution; if it has left, the effect is a no-op.
                 if (target.Zone != ZoneType.Battlefield) return;
 
-                target.Tap();
+                // CR 701.26a — tapping an already-tapped permanent does nothing
+                // (it may legally be the target): the tolerant effect funnel, not
+                // Permanent.Tap(), which throws for the cost path's benefit.
+                Majik.Core.Primitives.Fx.Tap(target);
             });
 
         etbTrigger = new TriggeredAbility(

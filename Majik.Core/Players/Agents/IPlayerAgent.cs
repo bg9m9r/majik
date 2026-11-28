@@ -47,6 +47,23 @@ public interface IPlayerAgent
     bool WantsSynthesizedTargetCandidates => false;
 
     /// <summary>
+    /// CR 732.1 — the engine reversed this agent's cast itself (it turned out
+    /// illegal after the card moved to the stack: no choosable mode, too few
+    /// legal targets, an unpayable cost). <paramref name="reason"/> says why.
+    /// An agent with a human behind it shows it; others ignore it.
+    /// </summary>
+    void NotifyActionReversed(string reason) { }
+
+    /// <summary>
+    /// CR 732.1 — when the engine reverses this agent's cast, ask the same
+    /// player again (priority unchanged) instead of forcing a pass. True for a
+    /// seat with a person behind it, who reads the reason and chooses again;
+    /// false (the default) for bots, so one that re-proposes the same illegal
+    /// cast cannot spin the priority round.
+    /// </summary>
+    bool RepromptsAfterReversal => false;
+
+    /// <summary>
     /// Pick targets satisfying the request (cardinality + legality).
     /// </summary>
     Task<IReadOnlyList<object>> ChooseTargetsAsync(
@@ -418,6 +435,32 @@ public interface IPlayerAgent
         CancellationToken ct = default);
 
     /// <summary>
+    /// CR 700.2 — the same prompt, with why each mode can't be chosen
+    /// (<paramref name="unavailableReasons"/>, parallel to
+    /// <paramref name="modes"/>; null entry = choosable). Agents that render the
+    /// prompt (RemoteAgent) show and enforce it; every other agent answers it as
+    /// <see cref="ChooseModeAsync"/>.
+    /// </summary>
+    Task<int> ChooseModeAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => ChooseModeAsync(ctx, modes, modeIntents, ct);
+
+    /// <summary>The multi-mode twin of <see cref="ChooseModeAmongAsync"/>.</summary>
+    Task<IReadOnlyList<int>> ChooseModesAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => ChooseModesAsync(ctx, modes, minModes, maxModes, modeIntents, ct);
+
+    /// <summary>
     /// CR 700.2d / CR 702.121 — pick the set of modes for a "choose one or
     /// more" (or "choose two", "choose two or three") modal spell. Returns
     /// the chosen mode indices, in the order the caster wants them announced
@@ -499,6 +542,16 @@ public interface IPlayerAgent
     /// </summary>
     Task<ManaPayment> ChooseManaSourcesAsync(
         GameContext ctx, ManaCost cost, CancellationToken ct = default);
+
+    /// <summary>
+    /// CR 601.2g-h — the same prompt, naming what the mana pays for (display
+    /// only: the answer and its handling are unchanged). Agents that render
+    /// the prompt (RemoteAgent) override it; every other agent answers it as
+    /// <see cref="ChooseManaSourcesAsync(GameContext, ManaCost, CancellationToken)"/>.
+    /// </summary>
+    Task<ManaPayment> ChooseManaSourcesForAsync(
+        GameContext ctx, ManaCost cost, ManaPaymentSubject subject, CancellationToken ct = default)
+        => ChooseManaSourcesAsync(ctx, cost, ct);
 
     /// <summary>
     /// Declare attackers (Rule 508). Empty plan = attack with nothing. The

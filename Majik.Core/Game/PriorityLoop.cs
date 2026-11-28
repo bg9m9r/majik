@@ -71,6 +71,7 @@ public sealed class PriorityLoop
     // BEFORE the trigger drain (_asyncTriggerDrain) so SBAs fire, then any
     // pending triggers go on the stack, then the player gets priority.
     private readonly Action? _checkStateBasedActions;
+    private readonly Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? _spellDefinitions;
     private Player? _activePlayer;
 
     public PriorityLoop(
@@ -91,11 +92,13 @@ public sealed class PriorityLoop
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
         Func<TurnState?>? turnStateAccessor = null,
-        Action? checkStateBasedActions = null)
+        Action? checkStateBasedActions = null,
+        Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? spellDefinitions = null)
     {
         _castDispatcher = castDispatcher;
         _asyncTriggerDrain = asyncTriggerDrain;
         _checkStateBasedActions = checkStateBasedActions;
+        _spellDefinitions = spellDefinitions;
         // CR 603.3 — when an agent-aware async drain is supplied, this loop
         // owns the drain; suppress PriorityManager's built-in sync drain so
         // pending targeted triggers are NOT auto-picked first-eligible before
@@ -154,6 +157,11 @@ public sealed class PriorityLoop
             // silently fails). 500 is well above any realistic round.
             const int kActionLimit = 500;
             var actionCount = 0;
+            // Withdrawn casts (a cancel, or an engine-reversed cast at a seat
+            // that is asked again) are not actions and leave priority where it
+            // was; this separate, generous cap only stops a runaway client.
+            const int kWithdrawnLimit = 5000;
+            var withdrawnCount = 0;
             while (!_priority.AllPlayersPassed && !ct.IsCancellationRequested)
             {
                 var current = _priority.CurrentPlayer
@@ -232,7 +240,19 @@ public sealed class PriorityLoop
                     continue;
                 }
 
-                var action = await agent.ChoosePriorityActionAsync(ctx, ct).ConfigureAwait(false);
+                // CR 117.1 — the holder now actually has priority: SBAs ran and
+                // pending triggers are on the stack (CR 117.5). Mark the decision
+                // window for observers; it closes once the choice is made.
+                PriorityAction action;
+                _priority.SetDecidingPlayer(current);
+                try
+                {
+                    action = await agent.ChoosePriorityActionAsync(ctx, ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _priority.SetDecidingPlayer(null);
+                }
 
                 if (action is PriorityAction.PassAction)
                 {
@@ -240,7 +260,7 @@ public sealed class PriorityLoop
                     continue;
                 }
 
-                if (++actionCount > kActionLimit)
+                if (actionCount + 1 > kActionLimit)
                 {
                     System.Console.Error.WriteLine(
                         $"PRIORITY LOOP SAFETY: {kActionLimit} non-pass actions in one round, " +
@@ -248,8 +268,33 @@ public sealed class PriorityLoop
                     return;
                 }
 
-                var applied = await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
+                bool applied;
+                try
+                {
+                    applied = await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
+                }
+                catch (Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    // CR 732.1 — the player backed out of a cast or activation
+                    // at one of its prompts; it has been rewound and nothing
+                    // was paid. Not an action: the same player is asked again
+                    // with the same priority state (pass count untouched).
+                    if (++withdrawnCount > kWithdrawnLimit) { WithdrawnLimitHit(current); return; }
+                    continue;
+                }
 
+                if (!applied && action is PriorityAction.CastSpell && agent.RepromptsAfterReversal)
+                {
+                    // CR 732.1 — the engine reversed this player's cast (it
+                    // turned out illegal, e.g. the chosen mana could not pay
+                    // it) and has told them why. A seat with a person behind it
+                    // is asked again, as after a cancel, instead of losing
+                    // priority to a forced pass.
+                    if (++withdrawnCount > kWithdrawnLimit) { WithdrawnLimitHit(current); return; }
+                    continue;
+                }
+
+                actionCount++;
                 if (!applied)
                 {
                     // The proposal was rejected / no-op'd (e.g. an illegal
@@ -518,7 +563,10 @@ public sealed class PriorityLoop
             && _landDropTracker.CanPlayLand(self, activePlayer, ph, _stack.IsEmpty, out _);
         return new(
             self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable,
-            turnState: _turnStateAccessor?.Invoke());
+            turnState: _turnStateAccessor?.Invoke())
+        {
+            SpellDefinitions = _spellDefinitions,
+        };
     }
 
     // PLAN 01 — resolve the agent for a stack object's controller when
@@ -532,6 +580,10 @@ public sealed class PriorityLoop
         if (_agents.TryGetValue(controller, out var seatAgent)) return seatAgent;
         return AgentRegistry.Get(controller);
     }
+
+    private static void WithdrawnLimitHit(Player actor) =>
+        System.Console.Error.WriteLine(
+            $"PRIORITY LOOP SAFETY: too many withdrawn casts in one round, actor={actor.Name}. Forcing round end.");
 
     private static bool HoldsPriority(PriorityAction action) => action switch
     {

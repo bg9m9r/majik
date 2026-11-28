@@ -30,7 +30,7 @@ public class EventPayloadTests
         payload.GetProperty("to").GetString().Should().Be("Stack");
         // Enriched fields the portal patch path needs to render the
         // destination zone without refetching /state:
-        payload.GetProperty("manaCost").GetString().Should().Be("R");
+        payload.GetProperty("manaCost").GetString().Should().Be("{R}", "C17: brace form on the wire (CR 107.4)");
         payload.TryGetProperty("hidden", out _).Should().BeFalse();
     }
 
@@ -233,6 +233,20 @@ public class EventPayloadTests
         counters.GetProperty("+1/+1").GetInt32().Should().Be(3);
     }
 
+    [Fact]
+    public void CardMovedEvent_OffTheBattlefield_CarriesNoCounters()
+    {
+        // CR 122.2 / 400.7 — a creature that dies with counters arrives in the
+        // graveyard as a new object with none.
+        var alice = new Player("Alice");
+        var hydra = new Creature("Counter Hydra", "2GG", 0, 0) { Owner = alice };
+        hydra.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 3);
+        var e = new CardMovedEvent(hydra, ZoneType.Battlefield, ZoneType.Graveyard);
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null);
+
+        payload.GetProperty("counters").EnumerateObject().Should().BeEmpty();
+    }
     [Fact]
     public void CardMovedEvent_EnrichedFieldsMatchFreshSnapshot()
     {
@@ -811,5 +825,37 @@ public class EventPayloadTests
 
         payload.GetProperty("from").GetString().Should().Be("TurnBeginning");
         payload.GetProperty("to").GetString().Should().Be("PreCombatMain");
+    }
+
+    [Fact]
+    public void GameFacade_MaskedEvent_CarriesASpectatorVariant_MaskedForANonPlayer()
+    {
+        // CR 706 — a draw is hidden from everyone but the drawer. A recipient
+        // that is not a seated player gets the Spectator variant: masked.
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var envelopes = new List<Majik.Core.Api.Dtos.EventEnvelope>();
+        using var _ = facade.SubscribeEnvelopes(envelopes.Add);
+        var bolt = new Instant("Lightning Bolt", "{R}") { Owner = facade.Alice, Zone = ZoneType.Hand };
+
+        facade.EventBus.Publish(new CardDrawnEvent(bolt, facade.Alice));
+
+        var env = envelopes.Single(e => e.Public.Type == nameof(CardDrawnEvent));
+        env.Public.Payload.GetProperty("cardName").GetString().Should().Be("Lightning Bolt");
+        env.Spectator.Should().NotBeNull();
+        env.Spectator!.Payload.GetProperty("hidden").GetBoolean().Should().BeTrue();
+        env.Spectator.Payload.TryGetProperty("cardName", out var _n).Should().BeFalse();
+        (env.Spectator.EventId, env.Spectator.Seq).Should().Be((env.Public.EventId, env.Public.Seq));
+    }
+
+    [Fact]
+    public void GameFacade_PublicEvent_HasNoSpectatorVariant()
+    {
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var envelopes = new List<Majik.Core.Api.Dtos.EventEnvelope>();
+        using var _ = facade.SubscribeEnvelopes(envelopes.Add);
+
+        facade.EventBus.Publish(new LifeChangedEvent(facade.Alice, 20, 17));
+
+        envelopes.Single().Spectator.Should().BeNull("a public event goes to everyone as Public");
     }
 }

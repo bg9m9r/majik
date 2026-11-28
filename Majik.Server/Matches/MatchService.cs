@@ -1577,6 +1577,14 @@ public sealed class MatchService
         if (dto == null)
             return Result.Fail<MatchReplayDto>(new MatchError("match-not-found"));
 
+        // The buffer is the full-information stream (every hidden zone, the
+        // public variant of each event). During a live match that would show
+        // a seated player the opponent's hand, so it is served only once the
+        // match ended and the buffer was sealed (MatchFacadeBridge detach).
+        // A live player's own view stays on the per-viewer hub stream.
+        if (dto.SealedAt == null)
+            return Result.Fail<MatchReplayDto>(new MatchError("match-in-progress"));
+
         return Result.Ok(dto);
     }
 

@@ -14,7 +14,9 @@ public class Player
     private LifeTotal _lifeTotal;
     private ValueObjects.ManaPool _manaPool;
     private readonly List<Mana.ManaProvenanceSlot> _manaProvenance = new();
-    private bool _hasLost;
+    // volatile: a concession (CR 104.3a) marks the player lost from a
+    // non-engine thread; the engine reads it at its game-over gates.
+    private volatile bool _hasLost;
 
     /// <summary>
     /// Stable per-instance identifier. Used by DTO/web layer to reference

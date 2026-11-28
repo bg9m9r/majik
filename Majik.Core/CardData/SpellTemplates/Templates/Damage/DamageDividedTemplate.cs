@@ -62,7 +62,7 @@ public sealed class DamageDividedTemplate : ISpellTemplate
 
         var max = CapToMax(fm.Groups["cap"].Value, n);
         return DamageSpellFactory.DamageDividedAmongAnyTargetsSpell(
-            n, max, ctx.Resolver, ctx.Replacements, ctx.Caster, ctx.EventBus);
+            n, max, ctx.Resolver, ctx.Replacements, ctx.Caster, ctx.EventBus, ctx.Stack);
     }
 
     private static int CapToMax(string capWord, int n)

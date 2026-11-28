@@ -1853,14 +1853,11 @@ public class RemoteAgentTests
     }
 
     [Fact]
-    public async Task ChooseFromRevealed_InvalidInstanceId_CoercedToDecline()
+    public async Task ChooseFromRevealed_InvalidInstanceId_Rejected_PromptStaysPending()
     {
-        // Defence: out-of-set InstanceId is logged + coerced to null
-        // rather than throwing — a buggy or malicious client must never
-        // crash a live match. Distinct from ChooseLibraryPickCommand which
-        // throws on invalid IDs (that prompt is per-search, mid-resolve,
-        // and a malformed pick there indicates a wire bug worth surfacing
-        // immediately).
+        // An out-of-set InstanceId is rejected (like ChooseLibraryPickCommand)
+        // with the prompt left pending, so the client can answer again — a
+        // rejected answer no longer wedges the game.
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
         var agent = new RemoteAgent(_alice);
 
@@ -1870,18 +1867,20 @@ public class RemoteAgentTests
             eligible: new ICard[] { bear },
             optional: true,
             label: "Permanent to put into hand");
-        agent.Submit(new ChooseFromRevealedCommand(Guid.NewGuid()) { PlayerId = _alice.Id });
+        FluentActions.Invoking(() => agent.Submit(new ChooseFromRevealedCommand(Guid.NewGuid()) { PlayerId = _alice.Id }))
+            .Should().Throw<InvalidOperationException>().WithMessage("*not in the offered eligible list*");
+        agent.HasPending.Should().BeTrue();
 
-        (await task).Should().BeNull();
+        agent.Submit(new ChooseFromRevealedCommand(bear.InstanceId) { PlayerId = _alice.Id });
+        (await task).Should().BeSameAs(bear);
     }
 
     [Fact]
-    public async Task ChooseFromRevealed_MandatoryPromptNullSubmit_FallsBackToFirstEligible()
+    public async Task ChooseFromRevealed_MandatoryPromptNullSubmit_Rejected_PromptStaysPending()
     {
         // Mandatory prompt ("put one of them into your hand") with non-
-        // empty eligible. A null pick is treated as agent misbehaviour,
-        // not a legal decline — fall back to the first eligible so the
-        // engine doesn't see a no-op on a "put one" clause.
+        // empty eligible. A null pick is not a legal decline: it is rejected
+        // and the prompt stays pending for a real pick.
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
         var elf = new Creature("Elf", "G", 1, 1) { Owner = _alice };
         var agent = new RemoteAgent(_alice);
@@ -1892,10 +1891,12 @@ public class RemoteAgentTests
             eligible: new ICard[] { bear, elf },
             optional: false,
             label: "Card to put into hand");
-        agent.Submit(new ChooseFromRevealedCommand(InstanceId: null) { PlayerId = _alice.Id });
+        FluentActions.Invoking(() => agent.Submit(new ChooseFromRevealedCommand(InstanceId: null) { PlayerId = _alice.Id }))
+            .Should().Throw<InvalidOperationException>().WithMessage("*mandatory*");
+        agent.HasPending.Should().BeTrue();
 
-        (await task).Should().BeSameAs(bear,
-            "mandatory prompt + null pick coerces to first eligible");
+        agent.Submit(new ChooseFromRevealedCommand(elf.InstanceId) { PlayerId = _alice.Id });
+        (await task).Should().BeSameAs(elf);
     }
 
     [Fact]

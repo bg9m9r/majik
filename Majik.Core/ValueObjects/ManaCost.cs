@@ -397,6 +397,57 @@ public class ManaCost : IEquatable<ManaCost>
         return string.Join("", parts);
     }
 
+    /// <summary>
+    /// CR 107.4 — the cost in mana-symbol (brace) form, the one shape mana costs
+    /// take on the wire: <c>{X}{2}{C}{W/U}{2/W}{G/P}{W}{U}{B}{R}{G}</c>. A zero
+    /// cost with no X prints <c>{0}</c>. <see cref="ToString"/> keeps its legacy
+    /// brace-less shape for logs and existing callers.
+    /// </summary>
+    public string ToBraceString() =>
+        Brace(HasX, Generic - Colorless, Colorless, HybridPips, PhyrexianPips, White, Blue, Black, Red, Green);
+
+    /// <summary>
+    /// CR 601.2g-h — what is still unpaid once <paramref name="pool"/>'s floating
+    /// mana is spent on this cost, in brace form (<c>{0}</c> when the pool covers
+    /// it). Coloured pips take their own colour, {C} pips take colorless mana, and
+    /// whatever is left pays generic (CR 106.1c). Hybrid and Phyrexian pips are
+    /// shown unpaid: how they are paid is the player's choice.
+    /// </summary>
+    public string RemainingAfter(ManaPool pool)
+    {
+        ArgumentNullException.ThrowIfNull(pool);
+        int w = Math.Max(0, White - pool.White), u = Math.Max(0, Blue - pool.Blue),
+            b = Math.Max(0, Black - pool.Black), r = Math.Max(0, Red - pool.Red),
+            g = Math.Max(0, Green - pool.Green), c = Math.Max(0, Colorless - pool.Colorless);
+        var spent = (White - w) + (Blue - u) + (Black - b) + (Red - r) + (Green - g) + (Colorless - c);
+        var generic = Math.Max(0, (Generic - Colorless) - (pool.Total - spent));
+        return Brace(false, generic, c, HybridPips, PhyrexianPips, w, u, b, r, g);
+    }
+
+    private static string Brace(bool x, int generic, int colorless, IReadOnlyList<HybridPip> hybrid,
+        IReadOnlyList<ManaColor> phyrexian, int w, int u, int b, int r, int g)
+    {
+        var s = new System.Text.StringBuilder();
+        if (x) s.Append("{X}");
+        if (generic > 0) s.Append('{').Append(generic).Append('}');
+        Repeat("C", colorless);
+        foreach (var h in hybrid)
+            s.Append('{').Append(h.GenericAlternative > 0 ? h.GenericAlternative.ToString() : Letter(h.Color1))
+             .Append('/').Append(Letter(h.Color2)).Append('}');
+        foreach (var p in phyrexian) s.Append('{').Append(Letter(p)).Append("/P}");
+        Repeat("W", w); Repeat("U", u); Repeat("B", b); Repeat("R", r); Repeat("G", g);
+        return s.Length == 0 ? "{0}" : s.ToString();
+
+        void Repeat(string pip, int n) { for (var i = 0; i < n; i++) s.Append('{').Append(pip).Append('}'); }
+    }
+
+    private static string Letter(ManaColor c) => c switch
+    {
+        ManaColor.White => "W", ManaColor.Blue => "U", ManaColor.Black => "B",
+        ManaColor.Red => "R", ManaColor.Green => "G", ManaColor.Colorless => "C",
+        _ => "",
+    };
+
     public bool Equals(ManaCost? other)
     {
         if (other is null) return false;

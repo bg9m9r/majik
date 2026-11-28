@@ -51,6 +51,56 @@ public sealed class GameFacade : IDisposable
     public static Action<Exception, GameEvent>? OnEventHandlerError { get; set; }
 
     /// <summary>
+    /// Process-wide sink for engine faults that are CONTAINED rather than
+    /// fatal (the second argument says where: e.g. which card's gate threw
+    /// while building a prompt's legal-action hint, or what was unwinding
+    /// after a concession). Same seam as <see cref="OnEventHandlerError"/>
+    /// (the server bridges both to its logger) but never fails fast: when
+    /// left null the fault goes to <see cref="System.Diagnostics.Trace"/>.
+    /// </summary>
+    public static Action<Exception, string>? OnEngineDiagnostic { get; set; }
+
+    /// <summary>
+    /// Raised for every contained fault, in addition to
+    /// <see cref="OnEngineDiagnostic"/> (which a host replaces). Lets test
+    /// harnesses observe contained faults regardless of the host's sink;
+    /// production code should use <see cref="OnEngineDiagnostic"/>.
+    /// </summary>
+    public static event Action<Exception, string>? ContainedFaultReported;
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, HashSet<string>> ReportedFaults = new();
+
+    /// <summary>
+    /// Report a contained fault at most once per <paramref name="scope"/> object
+    /// (a card or ability instance, an agent — all per game) and
+    /// <paramref name="key"/>, so a faulting card does not report at every
+    /// priority window.
+    /// </summary>
+    internal static void ReportContainedFaultOnce(object scope, string key, Exception ex, string context)
+    {
+        var seen = ReportedFaults.GetValue(scope, _ => new HashSet<string>(StringComparer.Ordinal));
+        lock (seen)
+        {
+            if (!seen.Add(key + "|" + ex.GetType().FullName)) return;
+        }
+        ReportContainedFault(ex, context);
+    }
+
+    internal static void ReportContainedFault(Exception ex, string context)
+    {
+        try { ContainedFaultReported?.Invoke(ex, context); }
+        catch { /* an observer fault must not take the engine down */ }
+        var sink = OnEngineDiagnostic;
+        if (sink is null)
+        {
+            System.Diagnostics.Trace.TraceWarning($"Majik engine: contained fault ({context}): {ex}");
+            return;
+        }
+        try { RunOffEngineFlow(() => sink(ex, context)); }
+        catch { /* a faulty sink must not take the engine down */ }
+    }
+
+    /// <summary>
     /// Feature flag (DEFAULT TRUE): when on, factory-backed NON-LAND deck
     /// cards are built through their <c>[CardName]</c> <c>*Factory</c> during
     /// <see cref="Create"/> rather than arriving as ability-less binder-chain
@@ -102,6 +152,11 @@ public sealed class GameFacade : IDisposable
     private readonly StateBasedActions _sba;
     private readonly CombatFlow _combatFlow;
     private readonly Player _alice;
+
+    /// <summary>The viewer of the envelope's Spectator variant: a player of no
+    /// seat, so every masking rule treats it as someone who may look at no
+    /// hidden card (CR 706, 708.2). Never in the game.</summary>
+    private readonly Player _spectatorViewer = new("spectator", 0);
     private readonly Player _bob;
     private ICardRepository? _cardRepo;
     private readonly RemoteAgent _aliceAgent;
@@ -287,7 +342,16 @@ public sealed class GameFacade : IDisposable
     /// <summary>Read-only access to the trigger manager (used by fuzz/diagnostic observers).</summary>
     public TriggerManager Triggers => _triggers;
 
-    /// <summary>Read-only access to the event bus (used by fuzz/diagnostic observers).</summary>
+    /// <summary>Read-only access to the event bus (used by fuzz/diagnostic observers).
+    /// <para>This is the engine's own bus: its handlers run synchronously ON
+    /// THE ENGINE FLOW, as engine callees (unlike <see cref="Subscribe"/> /
+    /// <see cref="SubscribeEnvelopes"/> / <see cref="SubscribePrompts"/>, which
+    /// run off it). A handler here may read live state on its own thread but
+    /// must not hand state reads to another thread (Task.Run, timers, an await
+    /// that resumes elsewhere): such work would inherit the engine-flow mark
+    /// and read live objects without a lock while the engine runs. Wrap any
+    /// such hand-off in <see cref="Majik.Core.Game.EngineFlow.RunExternal"/>,
+    /// or use the public subscription methods instead.</para></summary>
     public EventBus EventBus => _bus;
 
     private GameFacade(Player alice, Player bob)
@@ -325,10 +389,10 @@ public sealed class GameFacade : IDisposable
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
         _combatFlow = new CombatFlow(_bus, _sba, Replacements);
 
-        _aliceAgent = new RemoteAgent(alice, LookupCard, LookupPlayer);
-        _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer);
-        _aliceAgent.PromptRequested += _ => PulsePromptSignal();
-        _bobAgent.PromptRequested += _ => PulsePromptSignal();
+        _aliceAgent = new RemoteAgent(alice, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
+        _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
+        _aliceAgent.PromptRaised = (kinds, payload) => OnPromptRaised(_alice, kinds, payload);
+        _bobAgent.PromptRaised = (kinds, payload) => OnPromptRaised(_bob, kinds, payload);
 
         _aliceAgentEffective = _aliceAgent;
         _bobAgentEffective = _bobAgent;
@@ -345,10 +409,66 @@ public sealed class GameFacade : IDisposable
 
         _loop = BuildPriorityLoop();
 
-        _bus.SubscribeAll(BridgeEvent);
+        // Publication order for clients (C21): the bridge sees an event before
+        // any handler can publish a follow-up (a trigger on a move).
+        _bus.SubscribeObserver(BridgeEvent);
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
         _bus.Subscribe<PhaseStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
+        _bus.Subscribe<PlayerLostEvent>(e => { lock (_concedeLock) _lossPublished.Add(e.Player.Id); });
+        // Quiescent points between prompts (bot seats raise none): a player
+        // receiving priority (CR 117.3, after SBAs and triggers, CR 117.5) and
+        // a step starting. Refresh only the views an off-engine reader asked for.
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.PriorityReceivedEvent>(_ => PublishOnEngineFlow(allViews: false));
+        _bus.Subscribe<StepStartedEvent>(_ => PublishOnEngineFlow(allViews: false));
+        // CR 117.1 / 117.5 — the snapshot's priority holder is the player the
+        // engine is actually waiting on for a priority decision (PriorityLoop
+        // opens the window after SBAs and the trigger drain, and closes it once
+        // the choice is made), null otherwise — so it never names a seat while
+        // the engine is prompting another seat for a trigger's targets. Every
+        // prompt republishes all views, so a prompt never ships next to a
+        // stale holder.
+        _priority.DecidingPlayerChanged += player =>
+        {
+            try
+            {
+                _priorityHolder = player;
+                if (player != null) PublishOnEngineFlow(allViews: false);
+                else ClearPublishedPriorityHolder();
+            }
+            catch (Exception ex)
+            {
+                ReportContainedFault(ex, "publishing the priority holder");
+            }
+        };
+    }
+
+    /// <summary>
+    /// CR 117.3c — the decision just closed, so nobody holds priority. Nothing
+    /// changed game state since the decision opened and published (the agent
+    /// only chose; the loop applies the choice after this), so the published
+    /// views are patched in place instead of rebuilt: three record copies, no
+    /// snapshot walk, a few hundred nanoseconds per priority pass.
+    /// </summary>
+    private void ClearPublishedPriorityHolder()
+    {
+        if (!_engineRunning || !ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this)) return;
+        var previous = Volatile.Read(ref _published);
+        if (previous is null) return;
+        Volatile.Write(ref _published, new PublishedStates(
+            previous.Spectator is { PriorityPlayerId: not null } s ? s with { PriorityPlayerId = null } : previous.Spectator,
+            previous.Alice is { PriorityPlayerId: not null } a ? a with { PriorityPlayerId = null } : previous.Alice,
+            previous.Bob is { PriorityPlayerId: not null } b ? b with { PriorityPlayerId = null } : previous.Bob));
+    }
+
+    private void PublishOnEngineFlow(bool allViews)
+    {
+        // Not running: foreign reads build live, nothing to publish. Off the
+        // engine flow: must not touch live objects.
+        if (_engineRunning && ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this))
+        {
+            PublishSnapshot(allViews);
+        }
     }
 
     private PriorityLoop BuildPriorityLoop()
@@ -408,6 +528,8 @@ public sealed class GameFacade : IDisposable
             int? chosenX = null;
             if (cast.AlternativeCost == null && cost.HasX)
             {
+                // A CastCancelledException here propagates to PriorityLoop,
+                // which treats the cancel as a no-op (nothing moved or paid).
                 chosenX = await agent.ChooseXAsync(ctx, cast.Card, CancellationToken.None);
                 if (chosenX is { } xv && xv > 0)
                 {
@@ -431,17 +553,18 @@ public sealed class GameFacade : IDisposable
             }
             else
             {
-                payment = await agent.ChooseManaSourcesAsync(ctx, cost, CancellationToken.None);
+                var subject = new ManaPaymentSubject(
+                    cast.Card, castFlow.PeekNextCastId(cast.Card),
+                    actor.ManaPool.CanPay(cost) || manaResolver.TryAutoSelectSources(actor, cost, out _));
+                payment = await agent.ChooseManaSourcesForAsync(ctx, cost, subject, CancellationToken.None);
                 // CR 601.2 / CR 727 — CancelCastCommand surfaces as the
                 // Cancelled sentinel. Spell stays in hand, nothing fires.
                 if (payment.IsCancelled)
                 {
-                    // CR 601.2 / CR 727 — player explicitly cancelled. The cast
-                    // is abandoned but priority is NOT forced-passed (the human
-                    // made a deliberate choice; they remain the priority holder so
-                    // they can choose again). Return true so PriorityLoop keeps
-                    // the current player rather than calling PassPriority().
-                    return true;
+                    // CR 601.2 / CR 727 — player explicitly cancelled. Nothing
+                    // has been paid; PriorityLoop treats the cancel as a no-op
+                    // and asks the same player again.
+                    throw new Majik.Core.Players.Agents.CastCancelledException();
                 }
 
                 // Portal "Auto-pay" — empty (non-cancelled) source list means
@@ -470,6 +593,10 @@ public sealed class GameFacade : IDisposable
                     preChosenMana: payment,
                     payManaCost: _ => manaResolver.Pay(actor, cost, payment),
                     preChosenX: chosenX);
+            }
+            catch (Majik.Core.Players.Agents.CastCancelledException)
+            {
+                throw; // CR 732.1 — the player backed out: a no-op for PriorityLoop
             }
             catch (InvalidOperationException)
             {
@@ -572,6 +699,8 @@ public sealed class GameFacade : IDisposable
                 && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
                 && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
             {
+                // A cancel propagates to PriorityLoop as a no-op: nothing is
+                // paid before the activation itself.
                 var x = await agents[actor].ChooseXAsync(ctx, xSource, ct: default);
                 aaForX.SetChosenX(x);
                 costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
@@ -757,10 +886,17 @@ public sealed class GameFacade : IDisposable
     /// <see cref="Majik.Bot.BotPlayerAgent"/>). Must be called before
     /// <see cref="StartAsync"/> / <see cref="StartFullGameAsync"/>; throws
     /// once the game is running. After swap, <see cref="SubmitAsync"/> for
-    /// that seat will throw — the bot drives itself.</summary>
+    /// that seat will throw — the bot drives itself.
+    /// <para>The agent runs ON THE ENGINE FLOW (it is an engine callee and
+    /// may read live state on its own thread). It must not hand state reads
+    /// to other threads; callbacks it invokes for its consumer (a "thinking"
+    /// notification, a decision sink, a logger) must go through
+    /// <see cref="Majik.Core.Game.EngineFlow.RunExternal"/> —
+    /// <c>BotPlayerAgent</c> and <c>VanillaShellTracker</c> already do.</para></summary>
     public void ReplaceAliceAgent(IPlayerAgent agent) => SwapAgent(_alice, agent);
 
-    /// <summary>Replaces the Bob-seat agent. See <see cref="ReplaceAliceAgent"/>.</summary>
+    /// <summary>Replaces the Bob-seat agent. See <see cref="ReplaceAliceAgent"/>
+    /// (including the engine-flow contract for agents).</summary>
     public void ReplaceBobAgent(IPlayerAgent agent) => SwapAgent(_bob, agent);
 
     private void SwapAgent(Player seat, IPlayerAgent agent)
@@ -920,7 +1056,7 @@ public sealed class GameFacade : IDisposable
         // synchronous StartAsync call, so it stays active across every later
         // SubmitAsync continuation that resumes the loop). Concurrent
         // single-round facades therefore get isolated registry stores.
-        _loopTask = RunSingleRoundWithScopeAsync(ct);
+        _loopTask = StartOnEngineFlow(() => RunSingleRoundWithScopeAsync(ct));
         await WaitForPromptOrLoopAsync(settled, _loopTask, ct).ConfigureAwait(false);
     }
 
@@ -939,7 +1075,14 @@ public sealed class GameFacade : IDisposable
         // riders (Grove of the Burnwillows) resolve the opponent set at
         // activation on the single-round path too (mirrors GameDriver).
         Majik.Core.Game.GamePlayersRegistry.Set(new[] { _alice, _bob });
-        await _loop.RunUntilRoundEndsAsync(_alice, ct).ConfigureAwait(false);
+        try
+        {
+            await _loop.RunUntilRoundEndsAsync(_alice, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            ExitEngineRunning();
+        }
     }
 
     /// <summary>
@@ -1053,13 +1196,191 @@ public sealed class GameFacade : IDisposable
         // (index 0) instead of re-rolling at random; the random flip is only
         // a fallback for callers (bot-vs-bot sims) that don't specify a
         // starting player.
-        _fullGameTask = driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct);
+        _fullGameTask = StartOnEngineFlow(() =>
+            RunDriverAsync(driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct), orderedPlayers[0]));
         return WaitForPromptOrLoopAsync(settled, _fullGameTask, ct);
+    }
+
+    /// <summary>
+    /// Await the driver run. On a concession (CR 104.3a) the run ends through
+    /// the engine's own game-over gate; if a declined prompt surfaced as a
+    /// cancellation instead, absorb it so <see cref="FullGameTask"/> completes
+    /// rather than faulting. Publishes the conceder's
+    /// <see cref="PlayerLostEvent"/> once the engine is quiescent and before
+    /// the task completes.
+    /// </summary>
+    private async Task<GameDriver.GameResult> RunDriverAsync(Task<GameDriver.GameResult> run, Player startingPlayer)
+    {
+        try
+        {
+            GameDriver.GameResult result;
+            try
+            {
+                result = await run.ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ConcedingPlayer is not null)
+            {
+                // CR 104.3a — the game ended by concession. Declined prompts
+                // can surface as a cancellation, or as a fault in engine/card
+                // code that consumed a decline it didn't expect (e.g. indexed
+                // [0] of an empty choice). Either way the concession decides the
+                // game: contain it (a fault is reported, not rethrown) and end
+                // with the concession result, settled by FixGameResult below.
+                if (ex is not OperationCanceledException)
+                {
+                    ReportContainedFault(ex, "engine fault while unwinding after a concession; game ended by the concession");
+                }
+                result = new GameDriver.GameResult(_currentTurn, null, startingPlayer);
+            }
+            BeforeGameResultForTest?.Invoke();
+            result = FixGameResult(result);
+            AfterGameResultForTest?.Invoke();
+            PublishConcessionLoss();
+            return result;
+        }
+        finally
+        {
+            // Game over (won, conceded, or faulted): final snapshot, CR 104.
+            ExitEngineRunning();
+        }
+    }
+
+    /// <summary>
+    /// The driver has stopped: fix the result, under the concede lock, so a
+    /// concession either happened before this point (and decides the result)
+    /// or arrives after it (and is a no-op, see <see cref="ConcedeAsync"/>).
+    /// CR 104.3a — after a concession the conceder has lost; the opponent wins
+    /// only if they have not lost too — CR 104.4a, otherwise it is a draw.
+    /// </summary>
+    private GameDriver.GameResult FixGameResult(GameDriver.GameResult driverResult)
+    {
+        lock (_concedeLock)
+        {
+            _gameResultFixed = true;
+            if (_concedingPlayer is null) return driverResult;
+            var opponent = Opponent(_concedingPlayer);
+            return driverResult with { Winner = opponent.HasLost ? null : opponent };
+        }
     }
 
     /// <summary>Task representing the in-flight full-game run, or null
     /// when only <see cref="StartAsync"/> was called.</summary>
     public Task<GameDriver.GameResult>? FullGameTask => _fullGameTask;
+
+    private readonly object _concedeLock = new();
+    private Player? _concedingPlayer;
+    private bool _concessionPublished;
+    private bool _gameResultFixed;
+
+    // Players whose PlayerLostEvent has gone out (SBA or concession), so a
+    // loss is published at most once per player.
+    private readonly HashSet<Guid> _lossPublished = new();
+
+    /// <summary>Test hook: runs on the engine flow right after the game
+    /// result is fixed, before <see cref="FullGameTask"/> completes.</summary>
+    internal Action? AfterGameResultForTest { get; set; }
+
+    /// <summary>Test hook: runs on the engine flow after the driver stopped,
+    /// right before the game result is fixed.</summary>
+    internal Action? BeforeGameResultForTest { get; set; }
+
+    private Player? ConcedingPlayer
+    {
+        get { lock (_concedeLock) return _concedingPlayer; }
+    }
+
+    private Player Opponent(Player player) => ReferenceEquals(player, _alice) ? _bob : _alice;
+
+    /// <summary>
+    /// CR 104.3a — <paramref name="playerId"/> concedes: they leave the game
+    /// immediately and lose it; the remaining player wins (CR 104.2a). The
+    /// loser is marked lost at once (so every engine game-over gate sees it),
+    /// both seats' pending prompts are completed with their decline value (or
+    /// cancelled) and later prompts are answered the same way, the engine runs
+    /// to its game-over gate, the normal <see cref="PlayerLostEvent"/> is
+    /// published, and <see cref="FullGameTask"/> completes without faulting.
+    /// The returned task completes once the game has ended (for a full game:
+    /// once <see cref="FullGameTask"/> has completed — after a bot seat that is
+    /// mid-decision returns). Conceding twice, or once the game is already
+    /// over, is a no-op.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="playerId"/> is not a seat of this game.</exception>
+    public async Task ConcedeAsync(Guid playerId)
+    {
+        var player = LookupPlayer(playerId)
+            ?? throw new ArgumentException($"Unknown player {playerId}.", nameof(playerId));
+
+        // Ordering (all under _concedeLock, then every seat's agent lock):
+        //   1. decide: a concession already recorded, a fixed game result
+        //      (FixGameResult), a finished run, or a player already lost ⇒
+        //      no-op;
+        //   2. record the conceder;
+        //   3. with BOTH seats' agent locks held: mark the conceder lost
+        //      (CR 104.3a: immediately) and close both seats — so no Submit on
+        //      either seat is accepted after this point or interleaves with it;
+        //   4. release the agent locks, decline the outstanding prompts.
+        // The lost flag is a volatile write (Player._hasLost): a single
+        // monotonic false→true flag the engine reads at its game-over gates,
+        // so it needs visibility, not a lock. An answer accepted before the
+        // close but not yet picked up by the engine is replaced with the
+        // decline value (RemoteAgent.DeliverUnlessClosed); one the engine was
+        // already applying when the concession landed finishes — it was
+        // made before the concession.
+        lock (_concedeLock)
+        {
+            var gameOver = _concedingPlayer != null
+                || _gameResultFixed
+                || (_fullGameTask?.IsCompleted ?? false)
+                || _alice.HasLost
+                || _bob.HasLost;
+            if (gameOver)
+            {
+                player = null;
+            }
+            else
+            {
+                _concedingPlayer = player;
+                var conceder = player;
+                RemoteAgent.CloseAll(new[] { _aliceAgent, _bobAgent }, () => conceder.MarkLost());
+            }
+        }
+
+        var run = (Task?)_fullGameTask ?? _loopTask;
+        if (run != null)
+        {
+            try
+            {
+                await run.ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ConcedingPlayer is not null)
+            {
+                // Single-round loop: a cancelled decline is the expected exit;
+                // any other fault while unwinding is contained (see RunDriverAsync).
+                if (ex is not OperationCanceledException)
+                {
+                    ReportContainedFault(ex, "engine fault while unwinding after a concession; game ended by the concession");
+                }
+            }
+        }
+        if (player != null && _fullGameTask == null)
+        {
+            // No driver to publish from (not started / single-round loop).
+            PublishConcessionLoss();
+        }
+    }
+
+    private void PublishConcessionLoss()
+    {
+        Player? loser;
+        lock (_concedeLock)
+        {
+            if (_concedingPlayer == null || _concessionPublished) return;
+            _concessionPublished = true;
+            loser = _concedingPlayer;
+            if (!_lossPublished.Add(loser.Id)) return;
+        }
+        _bus.Publish(new PlayerLostEvent(loser));
+    }
 
     /// <summary>
     /// Submit a player command. Returns when the engine has processed it
@@ -1488,33 +1809,158 @@ public sealed class GameFacade : IDisposable
 
     /// <summary>Full-information snapshot (spectator view). Use
     /// <see cref="GetStateFor"/> for a per-player view that masks
-    /// opponent hidden zones.</summary>
-    public GameStateDto GetState() => StateSnapshotter.Snapshot(
-        GameId, turnNumber: _currentTurn, phase: _currentPhase,
-        activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
-        players: new[] { _alice, _bob },
-        stack: _stack,
-        turnState: _currentTurnState,
-        // PLAN 04 — report the last event's seq; reading does NOT advance it.
-        seq: Interlocked.Read(ref _lastEventSeq));
+    /// opponent hidden zones.
+    /// <para>Thread-safe. On the engine's own flow (engine code, event and
+    /// prompt handlers, a bot deciding) and whenever no game is running, the
+    /// snapshot is built from live state. From any other thread while a game
+    /// runs, the immutable snapshot the engine last published is returned
+    /// (refreshed before every prompt, at each priority grant / step start
+    /// for views being read, and at game end) — live objects are never
+    /// touched off the engine flow.</para></summary>
+    public GameStateDto GetState()
+    {
+        if (TryReadLive(viewer: null) is { } live) return live;
+        Interlocked.Or(ref _requestedViews, SpectatorView);
+        return Volatile.Read(ref _published)!.Spectator!;
+    }
 
     /// <summary>Per-player snapshot. CR 706 hidden information (opponent
     /// hand) is masked. Pass the requesting player's id; returns null
-    /// when the id matches no slot in this game.</summary>
+    /// when the id matches no slot in this game. Thread-safe on the same
+    /// terms as <see cref="GetState"/>.</summary>
     public GameStateDto? GetStateFor(Guid viewerPlayerId)
     {
         var viewer = ResolveSlot(viewerPlayerId);
         if (viewer == null) return null;
+        if (TryReadLive(viewer) is { } live) return live;
 
-        return StateSnapshotter.Snapshot(
-            GameId, turnNumber: _currentTurn, phase: _currentPhase,
-            activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
-            players: new[] { _alice, _bob },
-            stack: _stack,
-            viewer: viewer,
-            turnState: _currentTurnState,
-            // PLAN 04 — report the last event's seq; reading does NOT advance it.
-            seq: Interlocked.Read(ref _lastEventSeq));
+        var isAlice = ReferenceEquals(viewer, _alice);
+        Interlocked.Or(ref _requestedViews, isAlice ? AliceView : BobView);
+        var published = Volatile.Read(ref _published)!;
+        return (isAlice ? published.Alice : published.Bob)!;
+    }
+
+    private GameStateDto BuildState(Player? viewer) => StateSnapshotter.Snapshot(
+        GameId, turnNumber: _currentTurn, phase: _currentPhase,
+        activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
+        players: new[] { _alice, _bob },
+        stack: _stack,
+        viewer: viewer,
+        turnState: _currentTurnState,
+        // PLAN 04 — report the last event's seq; reading does NOT advance it.
+        seq: Interlocked.Read(ref _lastEventSeq),
+        priorityPlayer: _priorityHolder);
+
+    /// <summary>CR 117.1 — the player holding priority, or null. Written only
+    /// on the engine flow; read by snapshot builds (engine flow, or not running).</summary>
+    private volatile Player? _priorityHolder;
+
+    // ── Published snapshot (thread-safe state reads) ──────────────────────
+    // The engine flow is the only flow that walks live game objects (layer
+    // Compute writes ContinuousEffectsService caches, so even a "read" from a
+    // foreign thread races the engine and can corrupt it). The engine flow is
+    // identified by an AsyncLocal set where the driver / single-round loop is
+    // started: it flows into every engine continuation (and into handlers the
+    // engine invokes synchronously), but not into a foreign caller's thread.
+
+    private const int SpectatorView = 1, AliceView = 2, BobView = 4, AllViews = 7;
+
+    private sealed record PublishedStates(GameStateDto? Spectator, GameStateDto? Alice, GameStateDto? Bob);
+
+    private PublishedStates? _published;
+    private int _requestedViews;
+    private volatile bool _engineRunning;
+
+    private readonly object _liveReadLock = new();
+
+    /// <summary>
+    /// Invoke an EXTERNAL callback (a public subscriber) with the engine-flow
+    /// tag cleared, restoring it afterwards. Anything the callback does
+    /// synchronously, and anything it schedules (Task.Run, timers, await
+    /// continuations capture the ExecutionContext at that moment), is then a
+    /// foreign caller: GetState returns the published snapshot. Internal
+    /// engine callees (bus handlers, bots, card closures) are not routed
+    /// through here and keep live reads.
+    /// </summary>
+    internal static void RunOffEngineFlow(Action callback) => Majik.Core.Game.EngineFlow.RunExternal(callback);
+
+
+    /// <summary>Test hook: does the calling flow count as this facade's
+    /// engine flow (live reads, no lock)?</summary>
+    internal bool IsOnEngineFlow => ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this);
+
+    /// <summary>Test hook: the priority manager (decision window, CR 117).</summary>
+    internal Majik.Core.Game.PriorityManager Priority => _priority;
+
+    /// <summary>Live build when allowed: on the engine flow (single-threaded
+    /// by construction, no lock), or while no engine is running (serialised,
+    /// since two foreign readers would race each other on the layer caches).
+    /// Null = a foreign thread while the engine runs → use the published
+    /// snapshot.</summary>
+    private GameStateDto? TryReadLive(Player? viewer)
+    {
+        if (_engineRunning && ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this)) return BuildState(viewer);
+        if (_engineRunning) return null;
+        lock (_liveReadLock)
+        {
+            // Re-check: the engine may have started while we waited.
+            return _engineRunning ? null : BuildState(viewer);
+        }
+    }
+
+    /// <summary>Start an engine task on the engine flow: publish the opening
+    /// snapshot, switch foreign reads to it, and tag the task's async flow
+    /// (every continuation, and every handler the engine calls synchronously,
+    /// inherits the tag; the caller's flow is restored before returning).</summary>
+    private TTask StartOnEngineFlow<TTask>(Func<TTask> start) where TTask : Task
+    {
+        lock (_liveReadLock)
+        {
+            PublishSnapshot(allViews: true);
+            _engineRunning = true;
+        }
+        var previous = Majik.Core.Game.EngineFlow.Current;
+        Majik.Core.Game.EngineFlow.Current = this;
+        try { return start(); }
+        finally { Majik.Core.Game.EngineFlow.Current = previous; }
+    }
+
+    /// <summary>
+    /// Rebuild and publish the snapshot. Engine flow (or engine not running)
+    /// only. <paramref name="allViews"/> = rebuild every view (before a prompt,
+    /// at start and end); otherwise only the views an off-engine reader has
+    /// asked for (zero cost when nobody reads off-engine, e.g. bot sims).
+    /// </summary>
+    private void PublishSnapshot(bool allViews)
+    {
+        var mask = allViews ? AllViews : Volatile.Read(ref _requestedViews);
+        if (mask == 0) return;
+        try
+        {
+            var previous = Volatile.Read(ref _published);
+            var next = new PublishedStates(
+                (mask & SpectatorView) != 0 ? BuildState(null) : previous?.Spectator,
+                (mask & AliceView) != 0 ? BuildState(_alice) : previous?.Alice,
+                (mask & BobView) != 0 ? BuildState(_bob) : previous?.Bob);
+            Volatile.Write(ref _published, next);
+        }
+        catch (Exception) when (!allViews)
+        {
+            // Event-driven refresh: keep the previous snapshot rather than
+            // throwing out of an engine event handler (DEBUG fail-fast).
+        }
+    }
+
+    /// <summary>Engine finished (normally, by concession, or faulted): publish
+    /// the final snapshot, then let reads go live (nothing else mutates).</summary>
+    private void ExitEngineRunning()
+    {
+        // Nobody holds priority once the engine stopped (game over, or the
+        // single round ended).
+        _priorityHolder = null;
+        try { PublishSnapshot(allViews: true); }
+        catch (Exception) { /* a faulted game may not snapshot; reads go live below */ }
+        lock (_liveReadLock) _engineRunning = false;
     }
 
     private Player? ResolveSlot(Guid id)
@@ -1526,9 +1972,21 @@ public sealed class GameFacade : IDisposable
 
     /// <summary>
     /// Stream events. Returned <see cref="IDisposable"/> unsubscribes.
-    /// Receives the public / full-reveal <see cref="EventDto"/>; use
-    /// <see cref="SubscribeEnvelopes"/> when you need access to the
-    /// per-player masked variants for CR 706 hidden-information events.
+    /// <para>
+    /// <b>Full information — never send these to a player.</b> Each
+    /// <see cref="EventDto"/> is <see cref="EventEnvelope.Public"/>, built with
+    /// no viewer (<c>EventPayloadBuilder.Build(e, viewer: null)</c>): it names
+    /// cards moving between hidden zones (CR 706), the card a player drew, the
+    /// cards surveilled to the top of a library, and the card underneath a
+    /// face-down permanent (CR 708.2). It is for spectator/replay, logs, tests
+    /// and in-process tools. To deliver events to a seat, use
+    /// <see cref="SubscribeEnvelopes"/> and send that seat
+    /// <see cref="EventEnvelope.PerPlayer"/>[playerId] whenever
+    /// <see cref="EventEnvelope.PerPlayer"/> is non-null (it is non-null
+    /// exactly when <c>EventPayloadBuilder.RequiresPerViewerMasking</c> says the
+    /// payload differs per viewer); <see cref="EventEnvelope.Public"/> is safe
+    /// to broadcast only when it is null.
+    /// </para>
     /// </summary>
     public IDisposable Subscribe(Action<EventDto> handler)
     {
@@ -1558,29 +2016,60 @@ public sealed class GameFacade : IDisposable
     public IDisposable SubscribePrompts(Action<PromptDto> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        Action<IReadOnlyList<Type>> aliceHandler = kinds => handler(BuildPrompt(_alice, _aliceAgent, kinds));
-        Action<IReadOnlyList<Type>> bobHandler = kinds => handler(BuildPrompt(_bob, _bobAgent, kinds));
-        _aliceAgent.PromptRequested += aliceHandler;
-        _bobAgent.PromptRequested += bobHandler;
+        lock (_promptSubscribers) _promptSubscribers.Add(handler);
         return new Subscription(() =>
         {
-            _aliceAgent.PromptRequested -= aliceHandler;
-            _bobAgent.PromptRequested -= bobHandler;
+            lock (_promptSubscribers) _promptSubscribers.Remove(handler);
         });
+    }
+
+    private readonly List<Action<PromptDto>> _promptSubscribers = new();
+
+    /// <summary>
+    /// A seat's agent is about to wait (engine flow). In order:
+    /// <list type="number">
+    ///   <item>publish every state view (quiescent point; a client reading
+    ///     state on receipt of the prompt sees this prompt's state);</item>
+    ///   <item>build the <see cref="PromptDto"/> ONCE, from the payload the
+    ///     agent captured when it raised the prompt;</item>
+    ///   <item>hand that same instance to every observer, off the engine flow;</item>
+    ///   <item>only then release <see cref="SubmitAsync"/> / <see cref="StartAsync"/>
+    ///     waiters — so no submitter they release can answer the prompt before
+    ///     every observer has it (and even an observer that answers at once
+    ///     can't strip the payload: it was captured up front).</item>
+    /// </list>
+    /// </summary>
+    private void OnPromptRaised(Player player, IReadOnlyList<Type> kinds, PromptPayload? payload)
+    {
+        PublishOnEngineFlow(allViews: true);
+        var prompt = BuildPrompt(player, kinds, payload);
+        // Swap the signal BEFORE the fan-out: a SubmitAsync an observer starts
+        // during the fan-out captures the NEW signal and is released by the
+        // engine's next prompt (or the end of the run), not by this one's
+        // pulse — so it returns only once the engine processed its command.
+        // Waiters that captured the old signal are released after the fan-out.
+        var previousSignal = Interlocked.Exchange(ref _nextPromptSignal, NewSignal());
+        Action<PromptDto>[] observers;
+        lock (_promptSubscribers) observers = _promptSubscribers.ToArray();
+        foreach (var observer in observers)
+        {
+            try { RunOffEngineFlow(() => observer(prompt)); }
+            catch { /* one observer's fault must not starve the others or the engine */ }
+        }
+        previousSignal.TrySetResult(true);
     }
 
     // Forward the agent's per-prompt payload (currently: library-search
     // candidate list + label + full library view,
     // see RemoteAgent.ChooseLibraryPickAsync) onto the wire PromptDto.
-    // Read synchronously inside PromptRequested — RemoteAgent stashes
-    // PendingPayload before invoking the observer, so the field is populated
-    // for the kinds that need it (null otherwise).
+    // The payload is the one RemoteAgent captured under its lock when it
+    // raised the prompt (see OnPromptRaised), so it is populated for the
+    // kinds that need it (null otherwise) even if an answer already arrived.
     // Privacy: the PromptDto is published only to the seat whose agent fired
     // PromptRequested (per-recipient SignalR routing in MatchFacadeBridge).
     // LibraryView is therefore never visible to the opponent.
-    private PromptDto BuildPrompt(Player player, RemoteAgent agent, IReadOnlyList<Type> kinds)
+    private PromptDto BuildPrompt(Player player, IReadOnlyList<Type> kinds, PromptPayload? payload)
     {
-        var payload = agent.PendingPayload;
         return new PromptDto(
             GameId: GameId,
             PlayerId: player.Id,
@@ -1596,7 +2085,20 @@ public sealed class GameFacade : IDisposable
             DamageDivisionView: payload?.DamageDivisionView,
             PlayerCandidates: payload?.PlayerCandidates,
             StackCandidates: payload?.StackCandidates,
-            ScryView: payload?.ScryView);
+            ScryView: payload?.ScryView,
+            LegalActions: payload?.LegalActions,
+            EligibleAttackerIds: payload?.EligibleAttackerIds,
+            AttackerIds: payload?.AttackerIds,
+            EligibleBlockerIds: payload?.EligibleBlockerIds,
+            TriggerOptions: payload?.TriggerOptions,
+            MinX: payload?.MinX,
+            MaxX: payload?.MaxX,
+            ModeOptions: payload?.ModeOptions,
+            MinModes: payload?.MinModes,
+            MaxModes: payload?.MaxModes,
+            ChoiceOptions: payload?.ChoiceOptions,
+            ManaPayment: payload?.ManaPayment,
+            Notice: payload?.Notice);
     }
 
     private void BridgeEvent(GameEvent e)
@@ -1630,7 +2132,7 @@ public sealed class GameFacade : IDisposable
             EventId: e.EventId,
             Type: type,
             At: wireAt,
-            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState),
+            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState, stack: _stack),
             Seq: seq);
 
         IReadOnlyDictionary<Guid, EventDto>? perPlayer = null;
@@ -1648,18 +2150,25 @@ public sealed class GameFacade : IDisposable
                     EventId: e.EventId,
                     Type: type,
                     At: wireAt,
-                    Payload: EventPayloadBuilder.Build(e, _alice, turnState),
+                    Payload: EventPayloadBuilder.Build(e, _alice, turnState, _stack),
                     Seq: seq),
                 [_bob.Id] = new EventDto(
                     EventId: e.EventId,
                     Type: type,
                     At: wireAt,
-                    Payload: EventPayloadBuilder.Build(e, _bob, turnState),
+                    Payload: EventPayloadBuilder.Build(e, _bob, turnState, _stack),
                     Seq: seq),
             };
         }
 
-        var envelope = new EventEnvelope(publicDto, perPlayer);
+        // CR 706 — what a recipient that is not a seated player may see.
+        var spectator = perPlayer is null ? null : new EventDto(
+            EventId: e.EventId,
+            Type: type,
+            At: wireAt,
+            Payload: EventPayloadBuilder.Build(e, _spectatorViewer, turnState, _stack),
+            Seq: seq);
+        var envelope = new EventEnvelope(publicDto, perPlayer, spectator);
 
         // Replay suppression (PLAN 08 / Phase 29.x): the state fold + seq stamp
         // above ALWAYS run (so the rebuilt facade's GetState catches up to the
@@ -1673,11 +2182,11 @@ public sealed class GameFacade : IDisposable
 
         foreach (var sub in _subscribers.ToList())
         {
-            sub(publicDto);
+            RunOffEngineFlow(() => sub(publicDto));
         }
         foreach (var sub in _envelopeSubscribers.ToList())
         {
-            sub(envelope);
+            RunOffEngineFlow(() => sub(envelope));
         }
     }
 
@@ -1715,7 +2224,9 @@ public sealed class GameFacade : IDisposable
         var sink = OnEventHandlerError;
         if (sink != null)
         {
-            sink(ex, @event);
+            // External callback: never let it (or work it schedules) count
+            // as the engine flow.
+            RunOffEngineFlow(() => sink(ex, @event));
             return;
         }
 

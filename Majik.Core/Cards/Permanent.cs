@@ -587,6 +587,20 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// CR 614.1c / 110.5 — the permanent enters the battlefield tapped: it
+    /// has that status as it arrives, and it did not become tapped (no tap
+    /// happened). So no <see cref="Majik.Core.Domain.DomainEvents.PermanentTappedEvent"/>
+    /// is published and "whenever ~ becomes tapped" does not trigger. Called by
+    /// the zone-move pipeline only.
+    /// </summary>
+    internal void EnterTapped()
+    {
+        if (_isTapped) return;
+        _isTapped = true;
+        ActiveEffects?.BumpGeneration();
+    }
+
+    /// <summary>
     /// CR 400.7 / 613.7 / 614 — a permanent that changes zones becomes a NEW
     /// object and loses all status it had on the battlefield, including its
     /// tapped/untapped state. Called by the zone-move pipeline when a

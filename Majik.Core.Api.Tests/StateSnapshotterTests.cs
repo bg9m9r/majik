@@ -151,7 +151,8 @@ public class StateSnapshotterTests
             Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, stack);
 
-        dto.Stack.Should().ContainSingle().Which.Description.Should().Be("Windswept Heath");
+        // C20 — "{source} ability", the shape triggers use ("{source} trigger").
+        dto.Stack.Should().ContainSingle().Which.Description.Should().Be("Windswept Heath ability");
     }
 
     [Fact]
@@ -235,6 +236,30 @@ public class StateSnapshotterTests
         cardDto.Counters!["Charge"].Should().Be(1);
     }
 
+    [Fact]
+    public void Snapshot_ACardThatLeftTheBattlefield_ShowsNoCounters()
+    {
+        // CR 122.2 / 400.7 — counters exist on permanents; a card that dies
+        // with counters is a new object in the graveyard with none. The engine
+        // keeps the old values on the object for last-known information, so
+        // the snapshot must not read them off a card outside the battlefield.
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+        bear.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 2);
+        zones.MoveCard(bear, ZoneType.Battlefield, ZoneType.Graveyard, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cardDto = dto.Players.Single(p => p.Id == alice.Id)
+                         .Graveyard.Cards
+                         .Single(c => c.InstanceId == bear.InstanceId);
+        cardDto.Counters.Should().NotBeNull().And.BeEmpty();
+    }
     [Fact]
     public void Snapshot_NoCounters_YieldsEmptyCounterMap()
     {

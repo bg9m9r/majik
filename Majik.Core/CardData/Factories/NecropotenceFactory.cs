@@ -174,7 +174,6 @@ public static class NecropotenceFactory
         // step (CR 603.7d — delayed triggers each fire once and
         // auto-unregister).
         //
-        // Face-down exile is deferred — engine has no face-down flag.
         // -----------------------------------------------------------------
         var activated = new ActivatedAbility(
             source: card,
@@ -208,6 +207,9 @@ public static class NecropotenceFactory
                         owner.Zones.Library.RemoveCard(top);
                         owner.Zones.Exile.AddCard(top);
                         top.SetZone(ZoneType.Exile);
+                        // CR 406.3 — "Exile the top card of your library face
+                        // down": no effect lets anyone look at it.
+                        (top as Card)?.MarkExiledFaceDown(System.Array.Empty<Player>());
 
                         if (triggerManager == null)
                         {

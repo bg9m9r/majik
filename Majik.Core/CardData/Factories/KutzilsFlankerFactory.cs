@@ -184,6 +184,9 @@ public static class KutzilsFlankerFactory
                 new TargetRequest(
                     Description: "target player",
                     MinTargets: 0,
+                    // CR 700.2 / 603.3c — this request belongs to mode 2; choosing that mode needs a target.
+                    PrintedMinTargets: 1,
+                    ModeIndex: 2,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal,

@@ -277,4 +277,22 @@ public class TidebinderMageFactoryTests : IDisposable
         UntapStepRestrictions.ShouldSkipUntap(target, _bob).Should().BeFalse(
             "off-battlefield card is not marked for skip-untap");
     }
+
+    [Fact]
+    public void TidebinderMage_Etb_TargetAlreadyTapped_StillLocksIt_WithoutThrowing()
+    {
+        // CR 701.26a — tapping an already-tapped permanent does nothing; the
+        // untap-step lock still applies.
+        var tide = TidebinderMageFactory.Create(_alice);
+        var target = NewOpponentCreature("Llanowar Elves", "{G}");
+        target.Tap();
+
+        var etb = tide.Abilities.OfType<TriggeredAbility>().Single();
+        etb.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+        var act = () => { foreach (var e in etb.Effects) e.Execute(); };
+
+        act.Should().NotThrow();
+        target.IsTapped.Should().BeTrue();
+        UntapStepRestrictions.ShouldSkipUntap(target, _bob).Should().BeTrue();
+    }
 }
