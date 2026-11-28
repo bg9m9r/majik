@@ -1815,11 +1815,21 @@ public sealed class RemoteAgent : IPlayerAgent
             _pendingAbort = () => Decline(tcs);
         }
 
+        // Quiescent point: the engine is about to wait on this seat. Let the
+        // facade publish its state snapshot BEFORE observers learn about the
+        // prompt, so a client reading state on receipt sees this prompt's state.
+        try { BeforePromptRequested?.Invoke(); }
+        catch { /* a snapshot fault must not abort the engine */ }
+
         try { PromptRequested?.Invoke(acceptedKinds); }
         catch { /* observer fault must not abort the engine */ }
 
         return tcs.Task;
     }
+
+    /// <summary>Runs on the engine flow right before <see cref="PromptRequested"/>
+    /// fires (set by <see cref="GameFacade"/> to publish its state snapshot).</summary>
+    internal Action? BeforePromptRequested { get; set; }
 
     private readonly object _closeLock = new();
     private bool _closed;

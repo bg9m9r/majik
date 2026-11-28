@@ -329,6 +329,10 @@ public sealed class GameFacade : IDisposable
         _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
         _aliceAgent.PromptRequested += _ => PulsePromptSignal();
         _bobAgent.PromptRequested += _ => PulsePromptSignal();
+        // Quiescent point: publish every view BEFORE the prompt reaches any
+        // observer (RemoteAgent fires this ahead of PromptRequested).
+        _aliceAgent.BeforePromptRequested = () => PublishOnEngineFlow(allViews: true);
+        _bobAgent.BeforePromptRequested = () => PublishOnEngineFlow(allViews: true);
 
         _aliceAgentEffective = _aliceAgent;
         _bobAgentEffective = _bobAgent;
@@ -349,6 +353,21 @@ public sealed class GameFacade : IDisposable
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
         _bus.Subscribe<PhaseStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
+        // Quiescent points between prompts (bot seats raise none): a player
+        // receiving priority (CR 117.3, after SBAs and triggers, CR 117.5) and
+        // a step starting. Refresh only the views an off-engine reader asked for.
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.PriorityReceivedEvent>(_ => PublishOnEngineFlow(allViews: false));
+        _bus.Subscribe<StepStartedEvent>(_ => PublishOnEngineFlow(allViews: false));
+    }
+
+    private void PublishOnEngineFlow(bool allViews)
+    {
+        // Not running: foreign reads build live, nothing to publish. Off the
+        // engine flow: must not touch live objects.
+        if (_engineRunning && ReferenceEquals(EngineFlow.Value, this))
+        {
+            PublishSnapshot(allViews);
+        }
     }
 
     private PriorityLoop BuildPriorityLoop()
@@ -920,7 +939,7 @@ public sealed class GameFacade : IDisposable
         // synchronous StartAsync call, so it stays active across every later
         // SubmitAsync continuation that resumes the loop). Concurrent
         // single-round facades therefore get isolated registry stores.
-        _loopTask = RunSingleRoundWithScopeAsync(ct);
+        _loopTask = StartOnEngineFlow(() => RunSingleRoundWithScopeAsync(ct));
         await WaitForPromptOrLoopAsync(settled, _loopTask, ct).ConfigureAwait(false);
     }
 
@@ -939,7 +958,14 @@ public sealed class GameFacade : IDisposable
         // riders (Grove of the Burnwillows) resolve the opponent set at
         // activation on the single-round path too (mirrors GameDriver).
         Majik.Core.Game.GamePlayersRegistry.Set(new[] { _alice, _bob });
-        await _loop.RunUntilRoundEndsAsync(_alice, ct).ConfigureAwait(false);
+        try
+        {
+            await _loop.RunUntilRoundEndsAsync(_alice, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            ExitEngineRunning();
+        }
     }
 
     /// <summary>
@@ -1053,7 +1079,8 @@ public sealed class GameFacade : IDisposable
         // (index 0) instead of re-rolling at random; the random flip is only
         // a fallback for callers (bot-vs-bot sims) that don't specify a
         // starting player.
-        _fullGameTask = RunDriverAsync(driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct), orderedPlayers[0]);
+        _fullGameTask = StartOnEngineFlow(() =>
+            RunDriverAsync(driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct), orderedPlayers[0]));
         return WaitForPromptOrLoopAsync(settled, _fullGameTask, ct);
     }
 
@@ -1067,17 +1094,25 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     private async Task<GameDriver.GameResult> RunDriverAsync(Task<GameDriver.GameResult> run, Player startingPlayer)
     {
-        GameDriver.GameResult result;
         try
         {
-            result = await run.ConfigureAwait(false);
+            GameDriver.GameResult result;
+            try
+            {
+                result = await run.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ConcedingPlayer is not null)
+            {
+                result = new GameDriver.GameResult(_currentTurn, Opponent(ConcedingPlayer), startingPlayer);
+            }
+            PublishConcessionLoss();
+            return result;
         }
-        catch (OperationCanceledException) when (ConcedingPlayer is not null)
+        finally
         {
-            result = new GameDriver.GameResult(_currentTurn, Opponent(ConcedingPlayer), startingPlayer);
+            // Game over (won, conceded, or faulted): final snapshot, CR 104.
+            ExitEngineRunning();
         }
-        PublishConcessionLoss();
-        return result;
     }
 
     /// <summary>Task representing the in-flight full-game run, or null
@@ -1596,33 +1631,132 @@ public sealed class GameFacade : IDisposable
 
     /// <summary>Full-information snapshot (spectator view). Use
     /// <see cref="GetStateFor"/> for a per-player view that masks
-    /// opponent hidden zones.</summary>
-    public GameStateDto GetState() => StateSnapshotter.Snapshot(
-        GameId, turnNumber: _currentTurn, phase: _currentPhase,
-        activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
-        players: new[] { _alice, _bob },
-        stack: _stack,
-        turnState: _currentTurnState,
-        // PLAN 04 — report the last event's seq; reading does NOT advance it.
-        seq: Interlocked.Read(ref _lastEventSeq));
+    /// opponent hidden zones.
+    /// <para>Thread-safe. On the engine's own flow (engine code, event and
+    /// prompt handlers, a bot deciding) and whenever no game is running, the
+    /// snapshot is built from live state. From any other thread while a game
+    /// runs, the immutable snapshot the engine last published is returned
+    /// (refreshed before every prompt, at each priority grant / step start
+    /// for views being read, and at game end) — live objects are never
+    /// touched off the engine flow.</para></summary>
+    public GameStateDto GetState()
+    {
+        if (TryReadLive(viewer: null) is { } live) return live;
+        Interlocked.Or(ref _requestedViews, SpectatorView);
+        return Volatile.Read(ref _published)!.Spectator!;
+    }
 
     /// <summary>Per-player snapshot. CR 706 hidden information (opponent
     /// hand) is masked. Pass the requesting player's id; returns null
-    /// when the id matches no slot in this game.</summary>
+    /// when the id matches no slot in this game. Thread-safe on the same
+    /// terms as <see cref="GetState"/>.</summary>
     public GameStateDto? GetStateFor(Guid viewerPlayerId)
     {
         var viewer = ResolveSlot(viewerPlayerId);
         if (viewer == null) return null;
+        if (TryReadLive(viewer) is { } live) return live;
 
-        return StateSnapshotter.Snapshot(
-            GameId, turnNumber: _currentTurn, phase: _currentPhase,
-            activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
-            players: new[] { _alice, _bob },
-            stack: _stack,
-            viewer: viewer,
-            turnState: _currentTurnState,
-            // PLAN 04 — report the last event's seq; reading does NOT advance it.
-            seq: Interlocked.Read(ref _lastEventSeq));
+        var isAlice = ReferenceEquals(viewer, _alice);
+        Interlocked.Or(ref _requestedViews, isAlice ? AliceView : BobView);
+        var published = Volatile.Read(ref _published)!;
+        return (isAlice ? published.Alice : published.Bob)!;
+    }
+
+    private GameStateDto BuildState(Player? viewer) => StateSnapshotter.Snapshot(
+        GameId, turnNumber: _currentTurn, phase: _currentPhase,
+        activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
+        players: new[] { _alice, _bob },
+        stack: _stack,
+        viewer: viewer,
+        turnState: _currentTurnState,
+        // PLAN 04 — report the last event's seq; reading does NOT advance it.
+        seq: Interlocked.Read(ref _lastEventSeq));
+
+    // ── Published snapshot (thread-safe state reads) ──────────────────────
+    // The engine flow is the only flow that walks live game objects (layer
+    // Compute writes ContinuousEffectsService caches, so even a "read" from a
+    // foreign thread races the engine and can corrupt it). The engine flow is
+    // identified by an AsyncLocal set where the driver / single-round loop is
+    // started: it flows into every engine continuation (and into handlers the
+    // engine invokes synchronously), but not into a foreign caller's thread.
+
+    private const int SpectatorView = 1, AliceView = 2, BobView = 4, AllViews = 7;
+
+    private sealed record PublishedStates(GameStateDto? Spectator, GameStateDto? Alice, GameStateDto? Bob);
+
+    private static readonly AsyncLocal<GameFacade?> EngineFlow = new();
+    private PublishedStates? _published;
+    private int _requestedViews;
+    private volatile bool _engineRunning;
+
+    private readonly object _liveReadLock = new();
+
+    /// <summary>Live build when allowed: on the engine flow (single-threaded
+    /// by construction, no lock), or while no engine is running (serialised,
+    /// since two foreign readers would race each other on the layer caches).
+    /// Null = a foreign thread while the engine runs → use the published
+    /// snapshot.</summary>
+    private GameStateDto? TryReadLive(Player? viewer)
+    {
+        if (ReferenceEquals(EngineFlow.Value, this)) return BuildState(viewer);
+        if (_engineRunning) return null;
+        lock (_liveReadLock)
+        {
+            // Re-check: the engine may have started while we waited.
+            return _engineRunning ? null : BuildState(viewer);
+        }
+    }
+
+    /// <summary>Start an engine task on the engine flow: publish the opening
+    /// snapshot, switch foreign reads to it, and tag the task's async flow
+    /// (every continuation, and every handler the engine calls synchronously,
+    /// inherits the tag; the caller's flow is restored before returning).</summary>
+    private TTask StartOnEngineFlow<TTask>(Func<TTask> start) where TTask : Task
+    {
+        lock (_liveReadLock)
+        {
+            PublishSnapshot(allViews: true);
+            _engineRunning = true;
+        }
+        var previous = EngineFlow.Value;
+        EngineFlow.Value = this;
+        try { return start(); }
+        finally { EngineFlow.Value = previous; }
+    }
+
+    /// <summary>
+    /// Rebuild and publish the snapshot. Engine flow (or engine not running)
+    /// only. <paramref name="allViews"/> = rebuild every view (before a prompt,
+    /// at start and end); otherwise only the views an off-engine reader has
+    /// asked for (zero cost when nobody reads off-engine, e.g. bot sims).
+    /// </summary>
+    private void PublishSnapshot(bool allViews)
+    {
+        var mask = allViews ? AllViews : Volatile.Read(ref _requestedViews);
+        if (mask == 0) return;
+        try
+        {
+            var previous = Volatile.Read(ref _published);
+            var next = new PublishedStates(
+                (mask & SpectatorView) != 0 ? BuildState(null) : previous?.Spectator,
+                (mask & AliceView) != 0 ? BuildState(_alice) : previous?.Alice,
+                (mask & BobView) != 0 ? BuildState(_bob) : previous?.Bob);
+            Volatile.Write(ref _published, next);
+        }
+        catch (Exception) when (!allViews)
+        {
+            // Event-driven refresh: keep the previous snapshot rather than
+            // throwing out of an engine event handler (DEBUG fail-fast).
+        }
+    }
+
+    /// <summary>Engine finished (normally, by concession, or faulted): publish
+    /// the final snapshot, then let reads go live (nothing else mutates).</summary>
+    private void ExitEngineRunning()
+    {
+        try { PublishSnapshot(allViews: true); }
+        catch (Exception) { /* a faulted game may not snapshot; reads go live below */ }
+        lock (_liveReadLock) _engineRunning = false;
     }
 
     private Player? ResolveSlot(Guid id)
