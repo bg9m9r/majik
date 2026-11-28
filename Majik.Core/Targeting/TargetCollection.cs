@@ -52,7 +52,8 @@ public static class TargetCollection
         GameContext ctx,
         IPlayerAgent? agent,
         bool throwOnInsufficient = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Action<IReadOnlyList<IReadOnlyList<object>>>? onSlotChosen = null)
     {
         var collected = new List<IReadOnlyList<object>>(requests?.Count ?? 0);
         if (requests == null || requests.Count == 0)
@@ -94,6 +95,9 @@ public static class TargetCollection
             }
 
             collected.Add(picked);
+            // Progress for display (the spell-being-cast snapshot): the slots
+            // chosen so far. Not read by rules code.
+            onSlotChosen?.Invoke(collected.ToArray());
         }
 
         return collected;

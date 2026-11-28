@@ -193,6 +193,9 @@ public sealed class SpellCastFlow
         if (sourceZoneAtCast == ZoneType.Hand)
         {
             _zoneService.MoveCard(card, ZoneType.Hand, ZoneType.Stack, controller: caster);
+            // CR 601.2a — the spell is on the stack from here; let snapshots
+            // show it while its caster makes the remaining choices.
+            _stack.BeginCast(card, caster, NextCastId(card));
         }
 
         try
@@ -212,9 +215,30 @@ public sealed class SpellCastFlow
             // exception propagates. (Non-hand origins never entered the early
             // move, so they have nothing to rewind.) The card has not been
             // Pushed onto the stack object yet, so this is a pure zone rewind.
+            _stack.EndCast(card);
             _zoneService.MoveCard(card, ZoneType.Stack, ZoneType.Hand, controller: caster);
             throw;
         }
+        finally
+        {
+            // Pushed (the Spell is in GetAll now; EndCast ran just before the
+            // push) or abandoned: either way the in-progress entry is gone.
+            _stack.EndCast(card);
+        }
+    }
+
+    // CR 601.2a — the id a spell being cast is shown under, and keeps once
+    // pushed. Derived from the card and a per-flow cast counter rather than
+    // drawn from DeterministicIdScope, so it consumes no id from the
+    // deterministic sequence (every other id in a seeded game is unchanged).
+    private int _castSeq;
+
+    private Guid NextCastId(ICard card)
+    {
+        var bytes = card.InstanceId.ToByteArray();
+        var mix = BitConverter.GetBytes(++_castSeq * 0x2545F491 ^ 0x5CA57ED);
+        for (var b = 0; b < 4; b++) bytes[4 + b] ^= mix[b];
+        return new Guid(bytes);
     }
 
     /// <summary>
@@ -307,8 +331,12 @@ public sealed class SpellCastFlow
         // CR 601.2c only chooses targets for modes that were chosen. Unchosen
         // modes keep an empty slot so EffectFactory's per-mode index lookups
         // stay aligned.
+        var inProgressCast = _stack.FindCast(card);
+        Action<IReadOnlyList<IReadOnlyList<object>>>? targetProgress =
+            inProgressCast is null ? null : slots => inProgressCast.Targets = slots;
         var collectedTargets = await CollectTargetsAsync(
-            definition, card, ctx, agent, modeChoice, ct);
+            definition, card, ctx, agent, modeChoice, ct, targetProgress);
+        if (inProgressCast is not null) inProgressCast.Targets = collectedTargets.ToArray();
 
         // CR 601.2d — divide-damage announcement. A spell that deals a fixed
         // total of damage "divided as you choose among" its chosen targets
@@ -409,6 +437,7 @@ public sealed class SpellCastFlow
         if (sourceZoneAtCast != ZoneType.Hand)
         {
             _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
+            _stack.BeginCast(card, caster, NextCastId(card));
         }
 
         // CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature cleanup
@@ -424,6 +453,8 @@ public sealed class SpellCastFlow
             mergedAdditional);
 
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
+        // CR 601.2a — the spell keeps the id it was shown under while being cast.
+        if (_stack.FindCast(card) is { } inProgress) spell.Id = inProgress.Id;
 
         // CR 707.10a — retain the per-slot target requests on the stack object so
         // a "copy this spell" effect (Twincast / Reverberate) can re-prompt the
@@ -476,6 +507,9 @@ public sealed class SpellCastFlow
         // state snapshot can show what the spell targets.
         spell.AnnouncedTargets = collectedTargets;
 
+        // Hand over from the in-progress entry to the stack object (same id)
+        // with nothing published in between.
+        _stack.EndCast(card);
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 
@@ -1049,7 +1083,8 @@ public sealed class SpellCastFlow
 
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
         SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent,
-        IReadOnlyList<int> chosenModes, CancellationToken ct)
+        IReadOnlyList<int> chosenModes, CancellationToken ct,
+        Action<IReadOnlyList<IReadOnlyList<object>>>? progress = null)
     {
         // CR 700.2d / CR 601.2c — mode-aware target collection for SPARSE
         // modal spells: the targeted modes are a SUBSET of the printed modes
@@ -1093,6 +1128,7 @@ public sealed class SpellCastFlow
                     new[] { request.AsChosenMode() },
                     card, ctx, agent, throwOnInsufficient: true, ct);
                 perModeSparse[slotIdx] = oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>();
+                progress?.Invoke(perModeSparse.ToArray());
             }
 
             var sparseList = new List<IReadOnlyList<object>>(perModeSparse);
@@ -1127,6 +1163,7 @@ public sealed class SpellCastFlow
                     new[] { definition.TargetRequests[i].AsChosenMode() },
                     card, ctx, agent, throwOnInsufficient: true, ct);
                 perMode.Add(oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>());
+                progress?.Invoke(perMode.ToArray());
             }
 
             if (card is Card concreteMulti && perMode.Count > 0)
@@ -1145,7 +1182,8 @@ public sealed class SpellCastFlow
             ctx,
             agent,
             throwOnInsufficient: true,
-            ct);
+            ct,
+            progress);
 
         // CR 601.2f — stamp the freshly-picked targets onto the card so any
         // cost-reduction ability on the card itself can read them during cost

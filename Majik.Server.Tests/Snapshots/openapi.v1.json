@@ -2737,6 +2737,10 @@
             "format": "uuid",
             "type": "string"
           },
+          "isBeingCast": {
+            "default": false,
+            "type": "boolean"
+          },
           "kind": {
             "type": "string"
           },

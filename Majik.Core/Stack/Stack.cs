@@ -17,6 +17,26 @@ public class Stack
     // except for a repeat push of an object already on the stack (one triggered
     // ability that fired twice, CR 603.3), which gets a StackEntryIds.Repeat id.
     private readonly System.Collections.Generic.Stack<Guid> _entryIds = new();
+    private readonly List<CastInProgress> _beingCast = new();
+
+    /// <summary>
+    /// CR 601.2a — spells being cast: moved to the stack, not yet pushed
+    /// (see <see cref="CastInProgress"/>), oldest first. Display data for
+    /// snapshots only; not part of <see cref="GetAll"/>.
+    /// </summary>
+    public IReadOnlyList<CastInProgress> BeingCast => _beingCast.ToArray();
+
+    internal CastInProgress BeginCast(ICard card, Player caster, Guid id)
+    {
+        var cast = new CastInProgress(card, caster, id);
+        _beingCast.Add(cast);
+        return cast;
+    }
+
+    internal CastInProgress? FindCast(ICard card) =>
+        _beingCast.LastOrDefault(c => ReferenceEquals(c.Card, card));
+
+    internal void EndCast(ICard card) => _beingCast.RemoveAll(c => ReferenceEquals(c.Card, card));
     private readonly IEventBus? _eventBus;
 
     /// <summary>

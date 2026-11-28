@@ -115,7 +115,15 @@ public sealed record StackObjectDto(
     // this field. CR 706 — a target card in a zone hidden from the viewer
     // (an opponent's hand, any library) is listed with Id = Guid.Empty, the
     // same placeholder hidden zones use; its Kind is still "Card".
-    IReadOnlyList<TargetRefDto>? Targets = null);
+    IReadOnlyList<TargetRefDto>? Targets = null,
+    // CR 601.2a — true while this spell is still being cast: it moved to the
+    // stack as the first step of casting and its caster is choosing modes,
+    // X, targets or paying costs (CR 601.2b–h). Always the top entry. Its Id
+    // is the id it keeps once the cast completes; Targets lists those chosen
+    // so far. If the cast is cancelled or rewound (CR 732), it disappears
+    // from the stack and the card is back in its owner's hand in the next
+    // snapshot.
+    bool IsBeingCast = false);
 
 /// <summary>A reference to a chosen target. <see cref="Kind"/> is "Card"
 /// (<see cref="Id"/> = the card's InstanceId), "Player" (the player id) or

@@ -47,7 +47,12 @@ public static class StateSnapshotter
             // CR 603.3 — one entry per stack object, keyed by its entry id (a
             // repeat firing of one triggered ability gets its own id).
             Stack: stack.GetAll().Zip(stack.GetEntryIds(),
-                (o, id) => SnapshotStackObject(o, viewer) with { Id = id }).ToList(),
+                (o, id) => SnapshotStackObject(o, viewer) with { Id = id })
+                // CR 601.2a — a spell being cast is on the stack (top) while
+                // its caster chooses targets / modes / X / costs, before the
+                // engine pushes the Spell object.
+                .Concat(stack.BeingCast.Select(c => SnapshotBeingCast(c, viewer)))
+                .ToList(),
             YouPlayerId: viewer?.Id,
             Seq: seq,
             PriorityPlayerId: priorityPlayer?.Id);
@@ -323,6 +328,15 @@ public static class StateSnapshotter
     private static StackObjectDto SnapshotStackObject(IStackObject obj, Player? viewer) =>
         SnapshotStackObjectCore(obj) with { Targets = SnapshotTargets(obj, viewer) };
 
+    // Same shape as a pushed spell (SnapshotStackObjectCore), flagged.
+    private static StackObjectDto SnapshotBeingCast(Majik.Core.Stack.CastInProgress cast, Player? viewer) =>
+        new(Id: cast.Id,
+            Kind: "Spell",
+            ControllerId: cast.Caster.Id,
+            Description: cast.Card.Name,
+            Targets: TargetRefs(cast.Targets.SelectMany(s => s), viewer),
+            IsBeingCast: true);
+
     // CR 601.2c / 603.3d — the object's chosen targets in announcement order.
     private static IReadOnlyList<TargetRefDto> SnapshotTargets(IStackObject obj, Player? viewer)
     {
@@ -334,6 +348,11 @@ public static class StateSnapshotter
             ActivatedAbility a => a.ChosenTargets.SelectMany(s => s),
             _ => Array.Empty<object>(),
         };
+        return TargetRefs(raw, viewer);
+    }
+
+    private static IReadOnlyList<TargetRefDto> TargetRefs(IEnumerable<object> raw, Player? viewer)
+    {
         var refs = new List<TargetRefDto>();
         foreach (var target in raw)
         {
