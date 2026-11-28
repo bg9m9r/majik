@@ -89,15 +89,13 @@ public class StackResolver
             // CR 608.2b — spell with at least one chosen target: if every
             // target is now illegal, the spell is countered on resolution.
             // SYNCHRONOUS — runs before the resolution await.
-            if (top is Majik.Core.Spells.Spell spellRecheck
-                && spellRecheck.ChosenTargets.Count > 0
-                && spellRecheck.TargetLegalityPredicate != null)
+            if (top is Majik.Core.Spells.Spell spellRecheck && spellRecheck.HasTargetLegalityRules)
             {
-                var anyLegal = spellRecheck.ChosenTargets
-                    .Any(t => spellRecheck.TargetLegalityPredicate(t));
+                var anyLegal = Enumerable.Range(0, spellRecheck.ChosenTargets.Count)
+                    .Any(spellRecheck.IsTargetLegal);
                 if (!anyLegal)
                 {
-                    spellRecheck.Card.SetZone(Zones.ZoneType.Graveyard);
+                    PutCounteredSpellInGraveyard(spellRecheck);
                     _eventBus?.Publish(new StateBasedActionExecutedEvent(
                         $"{spellRecheck.Card.Name} countered: all targets illegal"));
                     // CR 608.2b — countered by the rules, not by a spell or
@@ -166,6 +164,21 @@ public class StackResolver
         }
 
         return top;
+    }
+
+    /// <summary>
+    /// CR 608.2b / 701.6a — a countered spell goes to its owner's graveyard; a
+    /// copy just ceases to exist (CR 707.10c). Through ZoneService when there
+    /// is one, so the card leaves the stack zone's list and CardMovedEvent fires.
+    /// </summary>
+    private void PutCounteredSpellInGraveyard(Majik.Core.Spells.Spell spell)
+    {
+        if (spell.IsCopy) return;
+        var card = spell.Card;
+        if (_zoneService != null && card.Owner != null && card.Zone == ZoneType.Stack)
+            _zoneService.MoveCard(card, ZoneType.Stack, ZoneType.Graveyard, card.Owner);
+        else
+            card.SetZone(ZoneType.Graveyard);
     }
 
     /// <summary>

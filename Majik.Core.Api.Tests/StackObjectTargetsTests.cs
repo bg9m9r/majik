@@ -79,12 +79,10 @@ public class StackObjectTargetsTests
     [Fact]
     public void AfterARedirect_TheSnapshotShowsWhatTheSpellWillActuallyAffect()
     {
-        // CR 115.7 — the redirect primitives rewrite Spell.ChosenTargets[0].
-        // A live-cast spell keeps its targets in AnnouncedTargets (its effects
-        // captured them at cast) and has no ChosenTargets, so a redirect is a
-        // no-op for it and the snapshot correctly still shows the original
-        // target. A copy carries its targets in ChosenTargets: the redirect
-        // applies and the snapshot shows the new target.
+        // CR 115.7 — the redirect primitives rewrite Spell.ChosenTargets[0],
+        // the one list of a spell's current targets: a live-cast spell
+        // (announced targets) and a copy (ChosenTargets set directly) are
+        // both redirected, and the snapshot shows the new target.
         var stack = new Majik.Core.Stack.Stack();
         var bear = Put(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _bob, ZoneType.Battlefield);
         var skite = Put(new Creature("Spellskite", "{2}", 0, 4), _bob, ZoneType.Battlefield);
@@ -92,8 +90,9 @@ public class StackObjectTargetsTests
         var live = new Spell(Put(new Instant("Lightning Bolt", "{R}"), _alice, ZoneType.Stack), _alice);
         live.AnnouncedTargets = new IReadOnlyList<object>[] { new object[] { bear } };
         stack.Push(live);
-        Majik.Core.Services.SpellRedirector.RedirectTopSpellSingleTarget(stack, skite).Should().BeFalse();
-        Snap(stack, _alice).Stack[0].Targets.Should().Equal(new TargetRefDto(bear.InstanceId, "Card"));
+        Majik.Core.Services.SpellRedirector.RedirectTopSpellSingleTarget(stack, skite).Should().BeTrue();
+        Snap(stack, _alice).Stack[0].Targets.Should().Equal(new TargetRefDto(skite.InstanceId, "Card"));
+        live.AnnouncedTargets.Should().ContainSingle().Which.Should().Equal(skite);
 
         var copy = new Spell(Put(new Instant("Lightning Bolt", "{R}"), _alice, ZoneType.Stack), _alice);
         copy.ChosenTargets.Add(bear);

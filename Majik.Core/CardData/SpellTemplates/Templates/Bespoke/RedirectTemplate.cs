@@ -33,11 +33,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Bespoke;
 ///   spell's mana value"): dropped at v1 — the redirector doesn't surface
 ///   the spell that was redirected, and the rider doesn't matter for the
 ///   stub-level effect (which doesn't actually change resolution).
-/// - <b>Effect-closure retargeting</b>: see <see cref="SpellRedirector"/>
-///   class-level remarks — the v1 redirector mutates
-///   <c>ChosenTargets</c> only; the pre-built effect closures still
-///   resolve against the original target. Lossy semantic, documented.
-///
+
 /// CR 114.6 (changing the target of a spell or ability).
 /// </summary>
 public sealed class RedirectTemplate : ISpellTemplate

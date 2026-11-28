@@ -528,9 +528,18 @@ public sealed class SpellCastFlow
         // "the first spell cast after the exert" as the old player-scoped
         // counter did. No cast-time provenance step is needed here.
 
-        // CR 601.2c — keep the announced targets on the stack object so a
-        // state snapshot can show what the spell targets.
-        spell.AnnouncedTargets = collectedTargets;
+        // CR 601.2c / 115.7 / 608.2b — the announced targets become the spell's
+        // current targets (Spell.ChosenTargets, the one list redirects rewrite
+        // and the resolution recheck reads). The spell can rebuild its effects
+        // through this same pipeline when those targets change before it
+        // resolves: effects hold the targets they were built with.
+        spell.SetCastTargets(collectedTargets, slots =>
+        {
+            var rebuilt = ApplySpliceRiders(
+                definition.EffectFactory(chosen with { Targets = slots }), mergedAdditional, caster);
+            return AppendCleanupEffects(
+                rebuilt, card, caster, alternativeCost, hasKickerPayment, giftRecipient, mergedAdditional);
+        });
 
         // Hand over from the in-progress entry to the stack object (same id)
         // with nothing published in between.

@@ -32,20 +32,134 @@ public class Spell : ISpell
     public bool IsResolving => _resolutionState.IsResolving;
 
     /// <summary>
-    /// Raw targets selected at cast time (CR 601.2c). Independent of the
-    /// engine's <see cref="ITarget"/> abstraction — used by resolution
-    /// recheck (CR 608.2b) to validate against current game state.
+    /// The spell's CURRENT targets (CR 601.2c, 115.7), flattened in
+    /// announcement order: target slots in order, then each slot's picks. This
+    /// is the one representation every reader and writer uses: the cast flow
+    /// fills it (<see cref="SetCastTargets"/>), redirect effects rewrite it
+    /// (Spellskite, Misdirection, Deflecting Swat … CR 115.7), the CR 608.2b
+    /// recheck reads it, and resolution builds the effects from it
+    /// (<see cref="ResolveAsync"/>). Copies fill it directly.
     /// </summary>
     public IList<object> ChosenTargets { get; } = new List<object>();
 
+    // Slot sizes of a cast spell's targets (one per target request), so the
+    // flat ChosenTargets can be cut back into the slots its EffectFactory reads.
+    private int[]? _slotSizes;
+    // Rebuilds the effects for a given set of slots (SpellCastFlow's effect
+    // pipeline), and the targets the current effects were built for.
+    private Func<IReadOnlyList<IReadOnlyList<object>>, IReadOnlyList<IEffect>>? _rebuildEffects;
+    private object[]? _effectsBuiltFor;
+    // CR 608.2b / 400.7 — each announced target and the zone a card target was
+    // in when it was announced. A card that has since left that zone is a new
+    // object: no longer the spell's target.
+    private object[]? _announced;
+    private ZoneType?[]? _announcedZones;
+
     /// <summary>
-    /// CR 601.2c — the targets announced when this spell was cast, one slot
-    /// per target request, in announcement order. Read-only metadata for state
-    /// snapshots (the effects captured their targets at cast time); not read
-    /// by resolution. Null for spells not cast through SpellCastFlow (copies,
-    /// test spells) — readers fall back to <see cref="ChosenTargets"/>.
+    /// CR 601.2c — <see cref="ChosenTargets"/> cut into one slot per target
+    /// request, in announcement order (a view: it always reflects redirects).
+    /// Null for spells not cast through SpellCastFlow (copies, test spells).
+    /// Setting it (tests) replaces <see cref="ChosenTargets"/>.
     /// </summary>
-    public IReadOnlyList<IReadOnlyList<object>>? AnnouncedTargets { get; internal set; }
+    public IReadOnlyList<IReadOnlyList<object>>? AnnouncedTargets
+    {
+        get
+        {
+            if (_slotSizes is null) return null;
+            var slots = new List<IReadOnlyList<object>>(_slotSizes.Length);
+            var i = 0;
+            foreach (var size in _slotSizes)
+            {
+                slots.Add(ChosenTargets.Skip(i).Take(size).ToArray());
+                i += size;
+            }
+            return slots;
+        }
+        internal set => SetCastTargets(value ?? Array.Empty<IReadOnlyList<object>>(), null);
+    }
+
+    /// <summary>
+    /// CR 601.2c — record the targets announced for this spell: fills
+    /// <see cref="ChosenTargets"/> and remembers the slot shape.
+    /// <paramref name="rebuildEffects"/> rebuilds the spell's effects for given
+    /// slots. The current effects are taken to be built for these targets.
+    /// </summary>
+    internal void SetCastTargets(
+        IReadOnlyList<IReadOnlyList<object>> slots,
+        Func<IReadOnlyList<IReadOnlyList<object>>, IReadOnlyList<IEffect>>? rebuildEffects)
+    {
+        ChosenTargets.Clear();
+        foreach (var slot in slots) foreach (var t in slot) ChosenTargets.Add(t);
+        _slotSizes = slots.Select(s => s.Count).ToArray();
+        _rebuildEffects = rebuildEffects;
+        _effectsBuiltFor = ChosenTargets.ToArray();
+        _announced = ChosenTargets.ToArray();
+        _announcedZones = _announced.Select(t => t is ICard c ? c.Zone : (ZoneType?)null).ToArray();
+    }
+
+    /// <summary>
+    /// CR 608.2b — whether the target at <paramref name="index"/> of
+    /// <see cref="ChosenTargets"/> is still legal.
+    /// <para>For a spell cast through SpellCastFlow the rule is CR 400.7: an
+    /// announced card target that has left the zone it was in is a new object
+    /// and no longer this spell's target. A target put there by a redirect is
+    /// legal (the redirecting effect checked it, CR 115.7). Nothing else is
+    /// judged here: the free-text target categories are too coarse to decide
+    /// legality (Exorcise's "artifact, enchantment, or creature" classifies
+    /// as Creature), so a target that is still in its zone counts as legal.</para>
+    /// <para>For other spells (copies, test spells) the rule is
+    /// <see cref="TargetLegalityPredicate"/>, else legal.</para>
+    /// </summary>
+    public bool IsTargetLegal(int index)
+    {
+        var target = ChosenTargets[index];
+        if (_announced is not null && _announcedZones is not null)
+        {
+            if (index >= _announced.Length || !ReferenceEquals(_announced[index], target)) return true;
+            return !(target is ICard card && _announcedZones[index] is { } zone && card.Zone != zone);
+        }
+        return TargetLegalityPredicate?.Invoke(target) ?? true;
+    }
+
+    /// <summary>
+    /// CR 115.7 / 608.2b — make the effects act on the spell's current, legal
+    /// targets. Effects are built at cast time and hold their targets, so when
+    /// a redirect changed <see cref="ChosenTargets"/>, or a target has become
+    /// illegal, the effects are rebuilt through the cast's effect pipeline:
+    /// from the current targets, with each illegal one replaced by
+    /// <see cref="IllegalTarget.Instance"/> (an object no effect acts on: "the
+    /// spell doesn't perform any actions on it", CR 608.2b). A spell whose
+    /// every target is illegal never gets here (StackResolver counters it).
+    /// No-op for spells without a rebuild (copies, test spells).
+    /// </summary>
+    private void SyncEffectsWithTargets()
+    {
+        if (_rebuildEffects is null || _slotSizes is null) return;
+        var current = new object[ChosenTargets.Count];
+        for (var i = 0; i < current.Length; i++)
+            current[i] = IsTargetLegal(i) ? ChosenTargets[i] : IllegalTarget.Instance;
+        if (_effectsBuiltFor is not null && current.Length == _effectsBuiltFor.Length
+            && current.Zip(_effectsBuiltFor).All(p => ReferenceEquals(p.First, p.Second)))
+            return;
+
+        var slots = new List<IReadOnlyList<object>>(_slotSizes.Length);
+        var at = 0;
+        foreach (var size in _slotSizes)
+        {
+            slots.Add(current.Skip(at).Take(size).ToArray());
+            at += size;
+        }
+        var rebuilt = _rebuildEffects(slots);
+        _effects.Clear();
+        _effects.AddRange(rebuilt);
+        _effectsBuiltFor = current;
+    }
+
+    /// <summary>CR 608.2b — true when this spell has targets and at least one
+    /// legality rule applies to them (so the resolution recheck can judge).</summary>
+    public bool HasTargetLegalityRules =>
+        ChosenTargets.Count > 0
+        && (TargetLegalityPredicate != null || _announced != null);
 
     /// <summary>
     /// Predicate the resolver uses to check whether at least one chosen
@@ -339,6 +453,8 @@ public class Spell : ISpell
 
         _resolutionState = ResolutionState.Resolving();
 
+        SyncEffectsWithTargets();
+
         // Spell.ChosenTargets is a flat list (CR 601.2c); present it to the
         // resolution context as a single target group so async effects can
         // read ChosenTargets[0] uniformly with the ability paths.
@@ -361,4 +477,16 @@ public class Spell : ISpell
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
     }
 
+}
+
+/// <summary>
+/// CR 608.2b — stands in for a target that became illegal when a spell's
+/// effects are rebuilt at resolution: it is no card, player or spell, so no
+/// effect acts on it ("the spell or ability doesn't perform any actions on it").
+/// </summary>
+public sealed class IllegalTarget
+{
+    public static readonly IllegalTarget Instance = new();
+    private IllegalTarget() { }
+    public override string ToString() => "(illegal target)";
 }
