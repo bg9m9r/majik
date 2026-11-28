@@ -131,12 +131,12 @@ public static class EventPayloadBuilder
             CardId: (x.Spell as ISpell)?.Card?.InstanceId,
             CardName: (x.Spell as ISpell)?.Card?.Name)),
         StackObjectAddedEvent x => SerializeStack(new StackObjectPayload(
-            StackId: x.StackObject.Id,
+            StackId: x.EntryId ?? x.StackObject.Id,
             ControllerId: x.StackObject.Controller.Id,
             Kind: StackKind(x.StackObject),
             Description: StackDescription(x.StackObject))),
         StackObjectResolvedEvent x => SerializeStack(new StackObjectPayload(
-            StackId: x.StackObject.Id,
+            StackId: x.EntryId ?? x.StackObject.Id,
             ControllerId: x.StackObject.Controller.Id,
             Kind: StackKind(x.StackObject),
             Description: StackDescription(x.StackObject))),

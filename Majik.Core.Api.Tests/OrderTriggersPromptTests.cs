@@ -101,4 +101,36 @@ public class OrderTriggersPromptTests
             { PlayerId = facade.Alice.Id });
         (await task).Should().Equal(dies, other, dies);
     }
+
+    [Fact]
+    public async Task TheSameAbilityTriggeringTwice_IsTwoStackObjects_WhoseIdsAreThePromptIds()
+    {
+        // CR 603.3 — each firing is put on the stack as its own object. The
+        // snapshot gives each its own id, the same ids the order-triggers
+        // prompt used, so a client keying by id sees one object per firing.
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var blade = new Creature("Blade of the Bloodchief", "{1}", 0, 0);
+        blade.SetOwner(facade.Alice);
+        blade.SetController(facade.Alice);
+        facade.Alice.Zones.Battlefield.AddCard(blade);
+        blade.SetZone(ZoneType.Battlefield);
+        var dies = new TriggeredAbility(blade, facade.Alice, Triggers.OnEnterBattlefieldSelf(blade));
+        facade.Triggers.EnqueuePending(dies);
+        facade.Triggers.EnqueuePending(dies);
+        var prompts = new List<PromptDto>();
+        using var sub = facade.SubscribePrompts(prompts.Add);
+        var agent = AliceAgent(facade);
+        var ctx = new Majik.Core.Game.GameContext(facade.Alice, new[] { facade.Alice, facade.Bob }, facade.Alice, 1,
+            Majik.Core.StateMachine.StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+
+        var drain = facade.Triggers.PutPendingTriggersOnStackAsync(facade.Alice,
+            new Dictionary<Majik.Core.Players.Player, Majik.Core.Players.Agents.IPlayerAgent> { [facade.Alice] = agent }, ctx);
+        var options = prompts.Should().ContainSingle().Subject.TriggerOptions!;
+        agent.Submit(new OrderTriggersCommand(options.Select(o => o.TriggerId).ToList()) { PlayerId = facade.Alice.Id });
+        await drain;
+
+        var stackIds = facade.GetState().Stack.Select(s => s.Id).ToList();
+        stackIds.Should().HaveCount(2).And.OnlyHaveUniqueItems("each firing is its own stack object");
+        stackIds.Should().BeEquivalentTo(options.Select(o => o.TriggerId));
+    }
 }

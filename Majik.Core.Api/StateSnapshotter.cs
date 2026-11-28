@@ -44,7 +44,10 @@ public static class StateSnapshotter
             Phase: PhaseLabelResolver.Resolve(phase, turnState),
             ActivePlayerId: activePlayer.Id,
             Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
-            Stack: stack.GetAll().Select(o => SnapshotStackObject(o, viewer)).ToList(),
+            // CR 603.3 — one entry per stack object, keyed by its entry id (a
+            // repeat firing of one triggered ability gets its own id).
+            Stack: stack.GetAll().Zip(stack.GetEntryIds(),
+                (o, id) => SnapshotStackObject(o, viewer) with { Id = id }).ToList(),
             YouPlayerId: viewer?.Id,
             Seq: seq,
             PriorityPlayerId: priorityPlayer?.Id);

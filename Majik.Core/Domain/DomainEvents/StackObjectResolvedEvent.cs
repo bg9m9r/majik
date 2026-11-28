@@ -13,6 +13,13 @@ public class StackObjectResolvedEvent : GameEvent
     /// </summary>
     public IStackObject StackObject { get; }
 
+    /// <summary>
+    /// The stack entry's id (see <see cref="Majik.Core.Stack.Stack.GetEntryIds"/>):
+    /// differs from <see cref="IStackObject.Id"/> only for a repeat firing of a
+    /// triggered ability (CR 603.3). Null when the publisher didn't supply it.
+    /// </summary>
+    public Guid? EntryId { get; init; }
+
     public StackObjectResolvedEvent(IStackObject stackObject) 
         : base()
     {

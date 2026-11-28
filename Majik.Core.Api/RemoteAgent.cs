@@ -1411,12 +1411,11 @@ public sealed class RemoteAgent : IPlayerAgent
             seen.TryGetValue(trigger, out var occurrence);
             seen[trigger] = occurrence + 1;
             var id = trigger.Id;
+            // Same derivation the stack uses for a repeat push (Stack.GetEntryIds),
+            // so the prompt's ids are the stack objects' ids.
             for (var salt = occurrence; !used.Add(id); salt++)
             {
-                var bytes = trigger.Id.ToByteArray();
-                var mix = BitConverter.GetBytes(salt * -1640531535); // golden-ratio mix of the repeat index
-                for (var b = 0; b < 4; b++) bytes[12 + b] ^= mix[b];
-                id = new Guid(bytes);
+                id = Majik.Core.Stack.StackEntryIds.Repeat(trigger.Id, salt);
             }
             ids.Add(id);
         }

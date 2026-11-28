@@ -69,6 +69,7 @@ public class StackResolver
         }
 
         // Pop the object from stack and resolve it
+        var topEntryId = stack.TopEntryId;
         var top = stack.Pop();
         if (top != null)
         {
@@ -142,7 +143,7 @@ public class StackResolver
             }
 
             // Fire resolution event
-            _eventBus?.Publish(new StackObjectResolvedEvent(top));
+            _eventBus?.Publish(new StackObjectResolvedEvent(top) { EntryId = topEntryId });
 
             // Check state-based actions after resolution (Rule 704.1)
             // Note: In a full implementation, we'd need access to all players and cards
