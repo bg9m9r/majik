@@ -145,11 +145,44 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         var pick = @params.TryGetValue("pick", out var pk) ? pk : "one";
         var pickCount = PickCount(pick);
 
+        // CR 700.2d / 601.2c — each mode's body must read ITS OWN target
+        // slots. SpellCastFlow lays modal targets out per mode: when every
+        // request carries a ModeIndex, slot = Targets[ModeIndex] and only the
+        // chosen modes are prompted. So when every mode takes at most one
+        // request, stamp each with its mode index and hand mode i the slot
+        // Targets[i]. A mode with several requests can't use that layout: keep
+        // the flat concatenation (one slot per request) and slice by offset.
+        // Before this, every mode body got the whole list and read slot 0 —
+        // the FIRST mode's slot (Drown in the Loch's destroy mode threw).
+        var perModeKeyed = modeDefs.All(d => d == null || d.TargetRequests.Count <= 1);
+        var requests = new List<TargetRequest>();
+        var offsets = new int[modeDefs.Count];
+        for (var m = 0; m < modeDefs.Count; m++)
+        {
+            offsets[m] = requests.Count;
+            if (modeDefs[m] is not { } md) continue;
+            requests.AddRange(perModeKeyed
+                ? md.TargetRequests.Select(r => r with { ModeIndex = m })
+                : md.TargetRequests);
+        }
+
+        IReadOnlyList<IReadOnlyList<object>> SlotsFor(int mode, ChosenSpellParams p)
+        {
+            var count = modeDefs[mode]!.TargetRequests.Count;
+            if (count == 0) return Array.Empty<IReadOnlyList<object>>();
+            var start = perModeKeyed ? mode : offsets[mode];
+            var slice = new IReadOnlyList<object>[count];
+            for (var k = 0; k < count; k++)
+            {
+                slice[k] = start + k < p.Targets.Count ? p.Targets[start + k] : Array.Empty<object>();
+            }
+            return slice;
+        }
+
         return new SpellDefinition(
             Modes: clauses,
             HasVariableX: modeDefs.Any(d => d?.HasVariableX == true),
-            TargetRequests: modeDefs.Where(d => d != null)
-                .SelectMany(d => d!.TargetRequests).ToList(),
+            TargetRequests: requests,
             ModeIntents: modeIntents,
             EffectFactory: p =>
             {
@@ -169,7 +202,7 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
                     if (!seen.Add(idx)) continue; // CR 700.2d — each mode at most once
                     if (seen.Count > pickCount) break; // honor printed pick count
                     var picked = modeDefs[idx];
-                    if (picked != null) effects.AddRange(picked.EffectFactory(p));
+                    if (picked != null) effects.AddRange(picked.EffectFactory(p with { Targets = SlotsFor(idx, p) }));
                 }
                 return effects;
             });
