@@ -117,4 +117,28 @@ public class StackObjectTargetsTests
 
         Snap(stack, _alice).Stack[1].Targets.Should().Equal(new TargetRefDto(trigger.Id, "Spell"));
     }
+
+    [Fact]
+    public void ATargetedTriggerThatFiredTwice_IsReferencedByTheStackEntryIdsOfItsFirings()
+    {
+        // CR 603.3 — the same ability triggered twice is two stack objects, each
+        // with its own entry id (StackObjectDto.Id). A target ref must use those
+        // ids, never the bare ability id. The engine's target is the shared
+        // ability object and a counter removes every firing of it
+        // (OracleSpellBinder.RemoveFromStack), so the ref lists each firing.
+        var stack = new Majik.Core.Stack.Stack();
+        var source = Put(new Creature("Pinger", "{R}", 1, 1), _bob, ZoneType.Battlefield);
+        var trigger = new TriggeredAbility(source, _bob, Triggers.OnEnterBattlefieldSelf(source));
+        stack.Push(trigger);
+        stack.Push(trigger);
+        var stifle = new Spell(Put(new Instant("Stifle", "{U}"), _alice, ZoneType.Stack), _alice);
+        stifle.AnnouncedTargets = new IReadOnlyList<object>[] { new object[] { trigger } };
+        stack.Push(stifle);
+
+        var snap = Snap(stack, _alice);
+        var firingIds = snap.Stack.Take(2).Select(s => s.Id).ToList();
+        firingIds.Should().OnlyHaveUniqueItems();
+        snap.Stack[2].Targets!.Select(t => t.Id).Should().Equal(firingIds);
+        snap.Stack[2].Targets.Should().OnlyContain(t => t.Kind == "Spell");
+    }
 }

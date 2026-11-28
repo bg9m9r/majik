@@ -129,8 +129,10 @@ public sealed record StackObjectDto(
 /// (<see cref="Id"/> = the card's InstanceId), "Player" (the player id) or
 /// "Spell" (the targeted stack object's <see cref="StackObjectDto.Id"/>): a
 /// spell, or an activated or triggered ability on the stack (CR 115.1d, e.g.
-/// Stifle's target). For a triggered ability that fired more than once, the
-/// ref names its first copy's id.</summary>
+/// Stifle's target). A target that is on the stack more than once (an ability
+/// that triggered twice, CR 603.3) is listed once per entry, by each entry's
+/// id: the engine targets the ability itself, and countering it removes every
+/// entry.</summary>
 public sealed record TargetRefDto(Guid Id, string Kind);
 
 public sealed record ManaPoolDto(int Generic, int White, int Blue, int Black, int Red, int Green, int Colorless)

@@ -38,6 +38,8 @@ public static class StateSnapshotter
         ArgumentNullException.ThrowIfNull(activePlayer);
         ArgumentNullException.ThrowIfNull(stack);
 
+        var entryIds = EntryIdsByObject(stack);
+
         return new GameStateDto(
             GameId: gameId,
             TurnNumber: turnNumber,
@@ -47,11 +49,11 @@ public static class StateSnapshotter
             // CR 603.3 — one entry per stack object, keyed by its entry id (a
             // repeat firing of one triggered ability gets its own id).
             Stack: stack.GetAll().Zip(stack.GetEntryIds(),
-                (o, id) => SnapshotStackObject(o, viewer) with { Id = id })
+                (o, id) => SnapshotStackObject(o, viewer, entryIds) with { Id = id })
                 // CR 601.2a — a spell being cast is on the stack (top) while
                 // its caster chooses targets / modes / X / costs, before the
                 // engine pushes the Spell object.
-                .Concat(stack.BeingCast.Select(c => SnapshotBeingCast(c, viewer)))
+                .Concat(stack.BeingCast.Select(c => SnapshotBeingCast(c, viewer, entryIds)))
                 .ToList(),
             YouPlayerId: viewer?.Id,
             Seq: seq,
@@ -325,20 +327,36 @@ public static class StateSnapshotter
         _ => new AbilityDto(ability.GetType().Name, ability.ToString() ?? ""),
     };
 
-    private static StackObjectDto SnapshotStackObject(IStackObject obj, Player? viewer) =>
-        SnapshotStackObjectCore(obj) with { Targets = SnapshotTargets(obj, viewer) };
+    /// <summary>CR 603.3 — every stack entry id of each object on the stack,
+    /// bottom to top (an ability that triggered twice has two).</summary>
+    private static IReadOnlyDictionary<IStackObject, List<Guid>> EntryIdsByObject(Majik.Core.Stack.Stack stack)
+    {
+        var map = new Dictionary<IStackObject, List<Guid>>(ReferenceEqualityComparer.Instance);
+        foreach (var (obj, id) in stack.GetAll().Zip(stack.GetEntryIds()))
+        {
+            if (!map.TryGetValue(obj, out var ids)) map[obj] = ids = new List<Guid>(1);
+            ids.Add(id);
+        }
+        return map;
+    }
+
+    private static StackObjectDto SnapshotStackObject(IStackObject obj, Player? viewer,
+        IReadOnlyDictionary<IStackObject, List<Guid>>? entryIds) =>
+        SnapshotStackObjectCore(obj) with { Targets = SnapshotTargets(obj, viewer, entryIds) };
 
     // Same shape as a pushed spell (SnapshotStackObjectCore), flagged.
-    private static StackObjectDto SnapshotBeingCast(Majik.Core.Stack.CastInProgress cast, Player? viewer) =>
+    private static StackObjectDto SnapshotBeingCast(Majik.Core.Stack.CastInProgress cast, Player? viewer,
+        IReadOnlyDictionary<IStackObject, List<Guid>>? entryIds) =>
         new(Id: cast.Id,
             Kind: "Spell",
             ControllerId: cast.Caster.Id,
             Description: cast.Card.Name,
-            Targets: TargetRefs(cast.Targets.SelectMany(s => s), viewer),
+            Targets: TargetRefs(cast.Targets.SelectMany(s => s), viewer, entryIds),
             IsBeingCast: true);
 
     // CR 601.2c / 603.3d — the object's chosen targets in announcement order.
-    private static IReadOnlyList<TargetRefDto> SnapshotTargets(IStackObject obj, Player? viewer)
+    private static IReadOnlyList<TargetRefDto> SnapshotTargets(IStackObject obj, Player? viewer,
+        IReadOnlyDictionary<IStackObject, List<Guid>>? entryIds)
     {
         IEnumerable<object> raw = obj switch
         {
@@ -348,10 +366,17 @@ public static class StateSnapshotter
             ActivatedAbility a => a.ChosenTargets.SelectMany(s => s),
             _ => Array.Empty<object>(),
         };
-        return TargetRefs(raw, viewer);
+        return TargetRefs(raw, viewer, entryIds);
     }
 
-    internal static IReadOnlyList<TargetRefDto> TargetRefs(IEnumerable<object> raw, Player? viewer)
+    /// <param name="entryIds">The stack's entry ids per object. A stack-object
+    /// target is referenced by its entry id(s) (StackObjectDto.Id), one ref per
+    /// firing when it is on the stack more than once: the engine's target is the
+    /// shared object, and a counter removes every firing of it
+    /// (OracleSpellBinder.RemoveFromStack). Null, or an object not on the stack:
+    /// its own id (the entry id of a first push).</param>
+    internal static IReadOnlyList<TargetRefDto> TargetRefs(IEnumerable<object> raw, Player? viewer,
+        IReadOnlyDictionary<IStackObject, List<Guid>>? entryIds = null)
     {
         var refs = new List<TargetRefDto>();
         foreach (var target in raw)
@@ -361,13 +386,13 @@ public static class StateSnapshotter
                 case Player p:
                     refs.Add(new TargetRefDto(p.Id, "Player"));
                     break;
-                case ISpell s:
-                    refs.Add(new TargetRefDto(s.Id, "Spell"));
-                    break;
-                // CR 115.1d — an activated or triggered ability on the stack
-                // (Stifle's target). Same "Spell" kind: a stack-object ref.
+                // CR 115.1d — a spell, or an activated or triggered ability on
+                // the stack (Stifle's target). Same "Spell" kind: a stack-object ref.
                 case IStackObject so:
-                    refs.Add(new TargetRefDto(so.Id, "Spell"));
+                    if (entryIds != null && entryIds.TryGetValue(so, out var ids))
+                        foreach (var id in ids) refs.Add(new TargetRefDto(id, "Spell"));
+                    else
+                        refs.Add(new TargetRefDto(so.Id, "Spell"));
                     break;
                 case ICard c:
                     refs.Add(new TargetRefDto(IsHiddenFrom(c, viewer) ? Guid.Empty : c.InstanceId, "Card"));
