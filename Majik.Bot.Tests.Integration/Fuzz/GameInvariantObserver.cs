@@ -171,26 +171,12 @@ public sealed class GameInvariantObserver : IDisposable
 
     private void CheckZoneIntegrity(int turn, string phase)
     {
-        var seen = new Dictionary<Guid, string>();
-        foreach (var p in _players)
+        foreach (var d in Majik.Bot.Tests.FullGameGate.ZoneIntegrity.FindDuplicates(_players))
         {
-            foreach (var zt in AllZones)
-            {
-                foreach (var card in EnumerateZone(p, zt))
-                {
-                    if (seen.TryGetValue(card.InstanceId, out var firstZone))
-                    {
-                        _violations.Add(new InvariantViolation(
-                            "ZoneIntegrity",
-                            $"Card '{card.Name}' ({card.InstanceId}) present in both {firstZone} and {zt}.",
-                            turn, phase));
-                    }
-                    else
-                    {
-                        seen[card.InstanceId] = zt.ToString();
-                    }
-                }
-            }
+            _violations.Add(new InvariantViolation(
+                "ZoneIntegrity",
+                $"Card '{d.Card.Name}' ({d.Card.InstanceId}) present in both {d.FirstZone} and {d.SecondZone}.",
+                turn, phase));
         }
     }
 
