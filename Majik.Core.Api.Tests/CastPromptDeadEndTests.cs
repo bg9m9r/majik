@@ -67,6 +67,9 @@ public class CastPromptDeadEndTests
     /// cast attempt (before cleanup can discard it).</summary>
     private ZoneType? _zoneAfterCast;
 
+    /// <summary>Every prompt in order: (Alice?, kinds).</summary>
+    private readonly List<(bool Alice, IReadOnlyList<string> Kinds)> _order = new();
+
     private async Task<List<PromptDto>> Drive(GameFacade facade, Card card, Func<PromptDto, GameCommand?> onCastPrompt)
     {
         var seen = new List<PromptDto>();
@@ -74,6 +77,7 @@ public class CastPromptDeadEndTests
         using var sub = facade.SubscribePrompts(p =>
         {
             GameCommand? answer = null;
+            lock (_order) _order.Add((p.PlayerId == facade.Alice.Id, p.ExpectedKinds));
             if (p.ExpectedKinds.Contains(nameof(MulliganCommand))) answer = new MulliganCommand(Keep: true);
             else if (p.PlayerId != facade.Alice.Id)
             {
@@ -137,6 +141,11 @@ public class CastPromptDeadEndTests
         targets.Should().NotBeNull();
         targets!.ExpectedKinds.Should().Contain(nameof(CancelCastCommand));
         _zoneAfterCast.Should().Be(ZoneType.Hand);
+        // CR 732.1 — the game is back where it was: Alice, who cast the
+        // spell, has priority again (as after a cancel at the payment prompt).
+        var after = _order.SkipWhile(o => !o.Kinds.Contains(nameof(ChooseTargetsCommand))).Skip(1).First();
+        after.Alice.Should().BeTrue("a cancelled cast does not pass priority");
+        after.Kinds.Should().Contain(nameof(CastSpellCommand));
     }
 
     [Fact]

@@ -983,8 +983,9 @@ public sealed class TurnDriver
                 catch (Majik.Core.Players.Agents.CastCancelledException)
                 {
                     // CR 601.2 — backed out at the X announcement; nothing
-                    // has moved or been paid yet.
-                    return false;
+                    // has moved or been paid yet. Like a cancel at the
+                    // payment prompt, the player keeps priority (true).
+                    return true;
                 }
             }
 
@@ -1165,15 +1166,19 @@ public sealed class TurnDriver
                     payManaCost: PayCastMana,
                     preChosenX: chosenX);
             }
+            catch (Majik.Core.Players.Agents.CastCancelledException)
+            {
+                // CR 732.1 — the player backed out at a casting prompt; the
+                // cast flow has rewound the card. The player keeps priority,
+                // as after a cancel at the payment prompt (true = no forced
+                // pass in PriorityLoop).
+                return true;
+            }
             catch (InvalidOperationException ex)
             {
                 RotateHand(castCard, $"CastAsync threw: {ex.Message}");
-                // CR 732.1 — the engine reversed the cast; tell the player why
-                // (a cast the player cancelled needs no explanation).
-                if (ex is not Majik.Core.Players.Agents.CastCancelledException)
-                {
-                    _agents[actor].NotifyActionReversed(ex.Message);
-                }
+                // CR 732.1 — the engine reversed the cast; tell the player why.
+                _agents[actor].NotifyActionReversed(ex.Message);
                 return false; // not committed: CastAsync threw
             }
             return true; // committed: spell put on the stack

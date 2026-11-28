@@ -534,7 +534,9 @@ public sealed class GameFacade : IDisposable
                 }
                 catch (Majik.Core.Players.Agents.CastCancelledException)
                 {
-                    return false; // CR 601.2 — backed out before anything moved or was paid
+                    // CR 601.2 — backed out before anything moved or was paid;
+                    // the player keeps priority, as after a payment cancel.
+                    return true;
                 }
                 if (chosenX is { } xv && xv > 0)
                 {
@@ -600,6 +602,10 @@ public sealed class GameFacade : IDisposable
                     preChosenMana: payment,
                     payManaCost: _ => manaResolver.Pay(actor, cost, payment),
                     preChosenX: chosenX);
+            }
+            catch (Majik.Core.Players.Agents.CastCancelledException)
+            {
+                return true; // CR 732.1 — the player backed out; they keep priority
             }
             catch (InvalidOperationException)
             {
