@@ -977,16 +977,56 @@ public sealed class SpellCastFlow
     {
         if (definition.Modes.Count == 0) return Array.Empty<int>();
 
+        var unavailable = ModeUnavailableReasons(
+            definition, ctx, agent.WantsSynthesizedTargetCandidates);
         if (!definition.IsMultiMode)
         {
-            var single = await agent.ChooseModeAsync(
-                ctx, definition.Modes, definition.ModeIntents, ct);
+            var single = await agent.ChooseModeAmongAsync(
+                ctx, definition.Modes, unavailable, definition.ModeIntents, ct);
             return new[] { single };
         }
 
-        return await agent.ChooseModesAsync(
+        return await agent.ChooseModesAmongAsync(
             ctx, definition.Modes, definition.MinModes, definition.MaxModes,
-            definition.ModeIntents, ct);
+            unavailable, definition.ModeIntents, ct);
+    }
+
+    /// <summary>
+    /// CR 700.2 / 601.2c — per printed mode, why it can't be chosen (null when
+    /// it can): a chosen targeted mode needs its printed minimum of legal
+    /// targets, so a mode whose live pool is smaller makes the cast illegal.
+    /// Uses exactly the pool and minimum <see cref="CollectTargetsAsync"/>
+    /// prompts with (the same mode-to-request mapping, <c>AsChosenMode()</c>,
+    /// <see cref="Targeting.TargetCollection.ResolveLivePool"/> with the agent's
+    /// synthesis flag), so an agent that can only pick from the pool (the
+    /// remote agent) is rejected by that collection for exactly these modes.
+    /// </summary>
+    internal static IReadOnlyList<string?> ModeUnavailableReasons(
+        SpellDefinition definition, GameContext ctx, bool synthesize)
+    {
+        var modeCount = definition.Modes.Count;
+        var reasons = new string?[modeCount];
+        if (modeCount == 0 || definition.TargetRequests.Count == 0 || ctx is null) return reasons;
+
+        IEnumerable<(int Mode, TargetRequest Request)> pairs =
+            definition.TargetRequests.All(r => r.ModeIndex.HasValue)
+                ? definition.TargetRequests.Select(r => (r.ModeIndex!.Value, r))
+                : definition.TargetRequests.Count == modeCount
+                    ? definition.TargetRequests.Select((r, i) => (i, r))
+                    : Enumerable.Empty<(int, TargetRequest)>();
+        foreach (var (mode, request) in pairs)
+        {
+            if (mode < 0 || mode >= modeCount || reasons[mode] != null) continue;
+            var chosen = request.AsChosenMode();
+            var pool = Targeting.TargetCollection.ResolveLivePool(chosen, ctx, synthesize);
+            if (pool.Count < chosen.MinTargets)
+            {
+                reasons[mode] = chosen.MinTargets == 1
+                    ? $"No legal target: {request.Description}."
+                    : $"Needs {chosen.MinTargets} legal targets ({request.Description}); there are {pool.Count}.";
+            }
+        }
+        return reasons;
     }
 
     /// <summary>CR 702.121 / CR 601.2f / CR 601.2g — build the escalate

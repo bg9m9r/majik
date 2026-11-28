@@ -418,6 +418,32 @@ public interface IPlayerAgent
         CancellationToken ct = default);
 
     /// <summary>
+    /// CR 700.2 — the same prompt, with why each mode can't be chosen
+    /// (<paramref name="unavailableReasons"/>, parallel to
+    /// <paramref name="modes"/>; null entry = choosable). Agents that render the
+    /// prompt (RemoteAgent) show and enforce it; every other agent answers it as
+    /// <see cref="ChooseModeAsync"/>.
+    /// </summary>
+    Task<int> ChooseModeAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => ChooseModeAsync(ctx, modes, modeIntents, ct);
+
+    /// <summary>The multi-mode twin of <see cref="ChooseModeAmongAsync"/>.</summary>
+    Task<IReadOnlyList<int>> ChooseModesAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => ChooseModesAsync(ctx, modes, minModes, maxModes, modeIntents, ct);
+
+    /// <summary>
     /// CR 700.2d / CR 702.121 — pick the set of modes for a "choose one or
     /// more" (or "choose two", "choose two or three") modal spell. Returns
     /// the chosen mode indices, in the order the caster wants them announced

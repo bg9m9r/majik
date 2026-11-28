@@ -440,7 +440,11 @@ public sealed record ManaPaymentViewDto(
 /// <summary>One mode on <see cref="PromptDto.ModeOptions"/>.</summary>
 /// <param name="Index">Zero-based printed index; the value <c>ChooseModeCommand.ModeIndex</c> accepts.</param>
 /// <param name="Text">The mode's text.</param>
-public sealed record ModeOptionDto(int Index, string Text);
+/// <param name="IsChoosable">CR 700.2 — false when the mode can't be chosen
+/// (a targeted mode with too few legal targets, CR 601.2c). An answer naming it
+/// is rejected with <paramref name="UnavailableReason"/>.</param>
+/// <param name="UnavailableReason">Why the mode can't be chosen; null when it can.</param>
+public sealed record ModeOptionDto(int Index, string Text, bool IsChoosable = true, string? UnavailableReason = null);
 
 /// <summary>One option on <see cref="PromptDto.ChoiceOptions"/>.</summary>
 /// <param name="Id">Id to send in <c>ChoiceCommand.SelectedInstanceIds</c>: the card's

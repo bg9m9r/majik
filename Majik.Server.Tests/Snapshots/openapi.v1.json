@@ -2617,8 +2617,18 @@
               "string"
             ]
           },
+          "isChoosable": {
+            "default": true,
+            "type": "boolean"
+          },
           "text": {
             "type": "string"
+          },
+          "unavailableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "required": [

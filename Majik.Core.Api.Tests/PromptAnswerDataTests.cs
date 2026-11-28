@@ -278,4 +278,54 @@ public class PromptAnswerDataTests
         _ = agent.ChooseManaSourcesAsync(null!, Majik.Core.ValueObjects.ManaCost.Parse("{R}"));
         _prompts.Should().ContainSingle().Which.ManaPayment.Should().BeNull();
     }
+
+    [Fact]
+    public async Task ChooseMode_AnUnavailableMode_ShipsNotChoosable_AndIsRejectedWithItsReason()
+    {
+        // CR 700.2 — a mode that can't be chosen is shown so, and refused.
+        IPlayerAgent agent = _agent;
+        var task = agent.ChooseModeAmongAsync(null!, new[] { "Destroy target artifact", "Draw" },
+            new[] { "No legal target: target artifact.", null });
+
+        var prompt = _prompts.Should().ContainSingle().Subject;
+        prompt.ModeOptions.Should().Equal(
+            new ModeOptionDto(0, "Destroy target artifact", IsChoosable: false, "No legal target: target artifact."),
+            new ModeOptionDto(1, "Draw"));
+
+        var act = () => _agent.Submit(Cmd(new ChooseModeCommand(0)));
+        act.Should().Throw<InvalidOperationException>().WithMessage("*No legal target: target artifact.*");
+        task.IsCompleted.Should().BeFalse("the prompt stays pending");
+        _agent.Submit(Cmd(new ChooseModeCommand(1)));
+        (await task).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ChooseModes_PickingAnUnavailableMode_IsRejected()
+    {
+        IPlayerAgent agent = _agent;
+        var task = agent.ChooseModesAmongAsync(null!, new[] { "Counter", "Bounce", "Draw" }, 1, 2,
+            new[] { null, "No legal target: target creature.", null });
+        var prompt = _prompts.Should().ContainSingle().Subject;
+        prompt.ModeOptions![1].IsChoosable.Should().BeFalse();
+
+        var act = () => _agent.Submit(Cmd(new ChoiceCommand(prompt.ChoiceView!.Kind,
+            new[] { prompt.ChoiceOptions![0].Id, prompt.ChoiceOptions![1].Id })));
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Mode 1 can't be chosen*");
+        task.IsCompleted.Should().BeFalse();
+        _agent.Submit(Cmd(new ChoiceCommand(prompt.ChoiceView!.Kind,
+            new[] { prompt.ChoiceOptions![0].Id, prompt.ChoiceOptions![2].Id })));
+        (await task).Should().Equal(0, 2);
+    }
+
+    [Fact]
+    public async Task ChooseMode_WhenNoModeIsChoosable_NothingIsEnforced()
+    {
+        // The cast is illegal whatever is picked and rewinds at target
+        // collection (CR 601.2c), so the prompt must stay answerable.
+        IPlayerAgent agent = _agent;
+        var task = agent.ChooseModeAmongAsync(null!, new[] { "A", "B" }, new[] { "no", "no" });
+        _prompts.Should().ContainSingle().Which.ModeOptions!.Should().OnlyContain(m => !m.IsChoosable);
+        _agent.Submit(Cmd(new ChooseModeCommand(0)));
+        (await task).Should().Be(0);
+    }
 }

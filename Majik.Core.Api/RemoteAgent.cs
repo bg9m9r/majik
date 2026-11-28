@@ -100,6 +100,9 @@ public sealed class RemoteAgent : IPlayerAgent
     // CR 700.2 — number of modes offered on the most recent choose-mode prompt,
     // so Resolve can reject an out-of-range ChooseModeCommand.ModeIndex.
     private int? _pendingModeCount;
+    // CR 700.2 — per mode, why it can't be chosen (null = choosable), for the
+    // pending mode prompt; enforced in Resolve. Null when nothing is enforced.
+    private IReadOnlyList<string?>? _pendingModeUnavailable;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -184,7 +187,7 @@ public sealed class RemoteAgent : IPlayerAgent
             var complete = Resolve(_pending, command, _pendingTriggerOrder, _pendingLibraryCandidates,
                 _pendingSurveilPeeked, _pendingScryPeeked, _pendingRevealedEligible, _pendingRevealedOptional,
                 _pendingBottomCount, _pendingChoiceCandidates, _pendingChoiceKind, _pendingTargetCandidates,
-                _pendingDamageDivisionTargets, _pendingModeCount);
+                _pendingDamageDivisionTargets, _pendingModeCount, _pendingModeUnavailable);
 
             // Valid: retire the prompt, then hand the engine its answer — still
             // under the lock, so a concurrent Close can't slip in between. The
@@ -217,7 +220,8 @@ public sealed class RemoteAgent : IPlayerAgent
         ChoiceKind? choiceKind,
         IReadOnlyList<object>? targetCandidates,
         IReadOnlyList<object>? damageDivisionTargets,
-        int? modeCount)
+        int? modeCount,
+        IReadOnlyList<string?>? modeUnavailable)
     {
         Action complete;
         switch (command)
@@ -312,6 +316,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         $"ChooseModeCommand mode index {mc.ModeIndex} is out of range (0..{modes - 1}).");
                 }
+                RejectUnavailableMode(mc.ModeIndex, modeUnavailable);
                 complete = Done<int>(tcs, mc.ModeIndex);
                 break;
             case ChooseManaCommand mp:
@@ -790,6 +795,10 @@ public sealed class RemoteAgent : IPlayerAgent
                             throw new InvalidOperationException(
                                 $"ChoiceCommand picked {picked.Count}; it must pick between {required} and {max}.");
                         }
+                    }
+                    foreach (var p in picked)
+                    {
+                        if (p is int modeIdx) RejectUnavailableMode(modeIdx, modeUnavailable);
                     }
                     result = picked;
                 }
@@ -1276,6 +1285,20 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<string> modes,
         IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
         CancellationToken ct = default)
+        => ChooseModeAmongAsync(ctx, modes, Array.Empty<string?>(), modeIntents, ct);
+
+    /// <summary>
+    /// CR 700.2 — "choose one" with each mode's availability: a mode the
+    /// engine says can't be chosen ships <c>IsChoosable = false</c> with the
+    /// reason, and an answer naming it is rejected with that reason (prompt left
+    /// pending).
+    /// </summary>
+    public Task<int> ChooseModeAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<string?> unavailableReasons,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(modes);
         if (_pending != null)
@@ -1283,8 +1306,9 @@ public sealed class RemoteAgent : IPlayerAgent
             throw new InvalidOperationException("A prompt is already pending.");
         }
         _pendingModeCount = modes.Count;
+        _pendingModeUnavailable = Enforced(unavailableReasons, modes.Count, min: 1);
         _pendingPayload = new PromptPayload(
-            ModeOptions: ModeRows(modes), MinModes: 1, MaxModes: 1);
+            ModeOptions: ModeRows(modes, unavailableReasons), MinModes: 1, MaxModes: 1);
         try
         {
             return Prompt<int>(ct, typeof(ChooseModeCommand));
@@ -1292,13 +1316,38 @@ public sealed class RemoteAgent : IPlayerAgent
         catch
         {
             _pendingModeCount = null;
+            _pendingModeUnavailable = null;
             _pendingPayload = null;
             throw;
         }
     }
 
-    private static IReadOnlyList<ModeOptionDto> ModeRows(IReadOnlyList<string> modes) =>
-        modes.Select((text, i) => new ModeOptionDto(i, text ?? "")).ToList();
+    private static IReadOnlyList<ModeOptionDto> ModeRows(
+        IReadOnlyList<string> modes, IReadOnlyList<string?>? unavailable) =>
+        modes.Select((text, i) =>
+        {
+            var why = unavailable != null && i < unavailable.Count ? unavailable[i] : null;
+            return new ModeOptionDto(i, text ?? "", why == null, why);
+        }).ToList();
+
+    // The reasons are enforced only while enough modes remain choosable to
+    // answer at all. When too few do, the cast is illegal whatever is picked
+    // and is rewound at target collection (CR 601.2c), as before.
+    private static IReadOnlyList<string?>? Enforced(
+        IReadOnlyList<string?>? unavailable, int modeCount, int min)
+    {
+        if (unavailable == null || unavailable.All(r => r == null)) return null;
+        var choosable = Enumerable.Range(0, modeCount).Count(i => i >= unavailable.Count || unavailable[i] == null);
+        return choosable >= Math.Max(1, min) ? unavailable : null;
+    }
+
+    private static void RejectUnavailableMode(int index, IReadOnlyList<string?>? unavailable)
+    {
+        if (unavailable != null && index >= 0 && index < unavailable.Count && unavailable[index] is { } why)
+        {
+            throw new InvalidOperationException($"Mode {index} can't be chosen (CR 700.2): {why}");
+        }
+    }
 
     /// <summary>
     /// CR 700.2d / 700.2e — "choose one or more" (or "choose two") modal prompt.
@@ -1311,11 +1360,24 @@ public sealed class RemoteAgent : IPlayerAgent
     /// prompt stays pending, the same policy as every prompt (validated in
     /// <see cref="Resolve"/>'s ChoiceCommand arm).
     /// </summary>
-    public async Task<IReadOnlyList<int>> ChooseModesAsync(
+    public Task<IReadOnlyList<int>> ChooseModesAsync(
         GameContext ctx,
         IReadOnlyList<string> modes,
         int minModes,
         int maxModes,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => ChooseModesAmongAsync(ctx, modes, minModes, maxModes, Array.Empty<string?>(), modeIntents, ct);
+
+    /// <summary>The multi-mode twin of <see cref="ChooseModeAmongAsync"/>: a
+    /// mode that can't be chosen ships <c>IsChoosable = false</c> with its
+    /// reason, and a ChoiceCommand picking it is rejected (prompt left pending).</summary>
+    public async Task<IReadOnlyList<int>> ChooseModesAmongAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<string?> unavailableReasons,
         IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
         CancellationToken ct = default)
     {
@@ -1330,10 +1392,27 @@ public sealed class RemoteAgent : IPlayerAgent
             Candidates: Enumerable.Range(0, modes.Count).Cast<object>().ToList(),
             Intent: Majik.Core.Cards.BotIntent.None,
             Optional: false);
-        var chosen = await ChooseCoreAsync(ctx, req, ct,
-            label: o => o is int i && i >= 0 && i < modes.Count ? modes[i] : null,
-            decorate: p => p with { ModeOptions = ModeRows(modes), MinModes = min, MaxModes = max })
-            .ConfigureAwait(false);
+        // Set inside decorate: it runs only once ChooseCoreAsync has checked no
+        // other prompt is pending, so a refused call never touches that prompt.
+        var stashed = false;
+        Task<IReadOnlyList<object>> prompt;
+        try
+        {
+            prompt = ChooseCoreAsync(ctx, req, ct,
+                label: o => o is int i && i >= 0 && i < modes.Count ? modes[i] : null,
+                decorate: p =>
+                {
+                    _pendingModeUnavailable = Enforced(unavailableReasons, modes.Count, min);
+                    stashed = true;
+                    return p with { ModeOptions = ModeRows(modes, unavailableReasons), MinModes = min, MaxModes = max };
+                });
+        }
+        catch
+        {
+            if (stashed) _pendingModeUnavailable = null;
+            throw;
+        }
+        var chosen = await prompt.ConfigureAwait(false);
 
         // Every accepted answer was validated (distinct offered ids, count in
         // [min, max]). The one unvalidated result is the empty decline handed
@@ -2097,6 +2176,7 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingTargetCandidates = null;
         _pendingDamageDivisionTargets = null;
         _pendingModeCount = null;
+        _pendingModeUnavailable = null;
         _pendingPayload = null;
     }
 
