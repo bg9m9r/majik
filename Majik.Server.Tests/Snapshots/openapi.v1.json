@@ -471,6 +471,13 @@
               "string"
             ]
           },
+          "stackEntryId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "summoningSickness": {
             "type": [
               "null",

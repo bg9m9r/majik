@@ -192,10 +192,11 @@ public sealed class SpellCastFlow
         // proposal atomic anyway, the early hand move is behaviourally safe.
         if (sourceZoneAtCast == ZoneType.Hand)
         {
-            _zoneService.MoveCard(card, ZoneType.Hand, ZoneType.Stack, controller: caster);
             // CR 601.2a — the spell is on the stack from here; let snapshots
-            // show it while its caster makes the remaining choices.
-            _stack.BeginCast(card, caster, NextCastId(card));
+            // show it while its caster makes the remaining choices. Registered
+            // BEFORE the move so the move's CardMovedEvent can name the stack
+            // entry the card becomes (CardMovedPayload.StackEntryId).
+            MoveToStackAsCast(card, ZoneType.Hand, caster);
         }
 
         try
@@ -232,6 +233,23 @@ public sealed class SpellCastFlow
     // drawn from DeterministicIdScope, so it consumes no id from the
     // deterministic sequence (every other id in a seeded game is unchanged).
     private int _castSeq;
+
+    /// <summary>CR 601.2a — move the card being cast to the stack. The cast is
+    /// registered first (with the id the spell keeps once pushed) so that the
+    /// move's CardMovedEvent can name the stack entry the card becomes.</summary>
+    private void MoveToStackAsCast(ICard card, ZoneType from, Player caster)
+    {
+        _stack.BeginCast(card, caster, NextCastId(card));
+        try
+        {
+            _zoneService.MoveCard(card, from, ZoneType.Stack, controller: caster);
+        }
+        catch
+        {
+            _stack.EndCast(card);
+            throw;
+        }
+    }
 
     private Guid NextCastId(ICard card)
     {
@@ -436,8 +454,7 @@ public sealed class SpellCastFlow
         // below still see the true origin.
         if (sourceZoneAtCast != ZoneType.Hand)
         {
-            _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
-            _stack.BeginCast(card, caster, NextCastId(card));
+            MoveToStackAsCast(card, card.Zone, caster);
         }
 
         // CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature cleanup

@@ -58,7 +58,11 @@ public sealed record CardMovedPayload(
     // (manifest, cloak). The card fields are then what the viewer may see:
     // to anyone but its controller, "Face-down permanent", a 2/2 creature
     // with no mana cost and no abilities. Omitted otherwise.
-    bool? IsFaceDown = null);
+    bool? IsFaceDown = null,
+    // CR 601.2a — on a move to the stack (a spell being cast): the id of the
+    // stack entry the card becomes, i.e. its StackObjectDto.Id, both while it
+    // is being cast and once it is on the stack. Omitted for other moves.
+    Guid? StackEntryId = null);
 
 /// <summary>
 /// CR 120 — a player drawing a card (Library → Hand). Dual-shape: the

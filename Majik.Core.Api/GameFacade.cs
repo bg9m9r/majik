@@ -2114,7 +2114,7 @@ public sealed class GameFacade : IDisposable
             EventId: e.EventId,
             Type: type,
             At: wireAt,
-            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState),
+            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState, stack: _stack),
             Seq: seq);
 
         IReadOnlyDictionary<Guid, EventDto>? perPlayer = null;
@@ -2132,13 +2132,13 @@ public sealed class GameFacade : IDisposable
                     EventId: e.EventId,
                     Type: type,
                     At: wireAt,
-                    Payload: EventPayloadBuilder.Build(e, _alice, turnState),
+                    Payload: EventPayloadBuilder.Build(e, _alice, turnState, _stack),
                     Seq: seq),
                 [_bob.Id] = new EventDto(
                     EventId: e.EventId,
                     Type: type,
                     At: wireAt,
-                    Payload: EventPayloadBuilder.Build(e, _bob, turnState),
+                    Payload: EventPayloadBuilder.Build(e, _bob, turnState, _stack),
                     Seq: seq),
             };
         }

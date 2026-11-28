@@ -77,9 +77,15 @@ public static class EventPayloadBuilder
     /// first-class phase values, so phase / step labels are already
     /// disambiguated and the <paramref name="turnState"/> argument is retained
     /// only for call-site compatibility (it no longer affects the labels).</summary>
-    public static JsonElement Build(GameEvent e, Player? viewer, PhaseStateType? turnState) => e switch
+    public static JsonElement Build(GameEvent e, Player? viewer, PhaseStateType? turnState) =>
+        Build(e, viewer, turnState, stack: null);
+
+    /// <param name="stack">The live stack, when known: lets a move to the stack
+    /// name the stack entry the card becomes (CR 601.2a).</param>
+    internal static JsonElement Build(GameEvent e, Player? viewer, PhaseStateType? turnState,
+        Majik.Core.Stack.Stack? stack) => e switch
     {
-        CardMovedEvent x => BuildCardMoved(x, viewer),
+        CardMovedEvent x => BuildCardMoved(x, viewer, stack),
         CardDrawnEvent x => BuildCardDrawn(x, viewer),
         // CardRevealedEvent: hand-reveal effects (CR 701.16) are public
         // by definition — the controller chose to show the card to all
@@ -387,7 +393,7 @@ public static class EventPayloadBuilder
             ToTop: seesTop ? toTop.Select(c => new CardRefPayload(c.InstanceId, c.Name)).ToList() : null));
     }
 
-    private static JsonElement BuildCardMoved(CardMovedEvent x, Player? viewer)
+    private static JsonElement BuildCardMoved(CardMovedEvent x, Player? viewer, Majik.Core.Stack.Stack? stack)
     {
         var ownerId = x.Card.Owner?.Id;
         bool mask = ShouldMaskCardForViewer(viewer, ownerId, x.FromZone, x.ToZone);
@@ -451,7 +457,19 @@ public static class EventPayloadBuilder
             SummoningSickness: f.SummoningSickness,
             Abilities: f.Abilities,
             ProducedManaColors: f.ProducedManaColors,
-            Counters: f.Counters));
+            Counters: f.Counters,
+            StackEntryId: x.ToZone == ZoneType.Stack ? StackEntryOf(x.Card, stack) : null));
+    }
+
+    /// <summary>CR 601.2a — the stack entry a card moved to the stack became: the
+    /// cast in progress (whose id the spell keeps), else the pushed spell.</summary>
+    private static Guid? StackEntryOf(ICard card, Majik.Core.Stack.Stack? stack)
+    {
+        if (stack is null) return null;
+        if (stack.BeingCast.LastOrDefault(c => ReferenceEquals(c.Card, card)) is { } cast) return cast.Id;
+        foreach (var (obj, id) in stack.GetAll().Zip(stack.GetEntryIds()))
+            if (obj is ISpell s && ReferenceEquals(s.Card, card)) return id;
+        return null;
     }
 
     private static JsonElement BuildCardDrawn(CardDrawnEvent x, Player? viewer)
