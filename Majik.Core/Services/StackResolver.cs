@@ -93,7 +93,7 @@ public class StackResolver
             if (top is Majik.Core.Spells.Spell spellRecheck && spellRecheck.HasTargetLegalityRules)
             {
                 var anyLegal = Enumerable.Range(0, spellRecheck.ChosenTargets.Count)
-                    .Any(spellRecheck.IsTargetLegal);
+                    .Any(i => spellRecheck.IsTargetLegal(i, game));
                 if (!anyLegal)
                 {
                     PutCounteredSpellInGraveyard(spellRecheck, stack);

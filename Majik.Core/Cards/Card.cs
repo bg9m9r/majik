@@ -184,6 +184,15 @@ public class Card : ICard
         _faceDownLookers = mayLook.Distinct().ToArray();
     }
 
+    /// <summary>
+    /// CR 400.7 — how many times this card has changed zones. An object that
+    /// moves from one zone to another becomes a new object with no memory of
+    /// its previous existence, so a spell or ability that captured the count
+    /// when it targeted the card can tell that a card back in the same zone
+    /// (flickered) is no longer its target. Only compared, never shown.
+    /// </summary>
+    public int ZoneChangeCount { get; private set; }
+
     public ZoneType Zone
     {
         get => _zone;
@@ -191,6 +200,7 @@ public class Card : ICard
         {
             var previousZone = _zone;
             _zone = value;
+            if (previousZone != value) ZoneChangeCount++;
             // CR 400.7 / 613.7 / 614 — a permanent that leaves the battlefield
             // becomes a NEW object in its destination zone and loses all status
             // it had on the battlefield, including its tapped/untapped state.
@@ -1860,6 +1870,7 @@ public class Card : ICard
 
         // -- scalar runtime state --
         _zone = src._zone;
+        ZoneChangeCount = src.ZoneChangeCount;
         // CR 406.3 — face-down exile state; lookers re-linked in RelinkReferences.
         _exiledFaceDown = src._exiledFaceDown;
         _faceDownLookers = src._faceDownLookers;

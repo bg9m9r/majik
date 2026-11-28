@@ -49,11 +49,14 @@ public class Spell : ISpell
     // pipeline), and the targets the current effects were built for.
     private Func<IReadOnlyList<IReadOnlyList<object>>, IReadOnlyList<IEffect>>? _rebuildEffects;
     private object[]? _effectsBuiltFor;
-    // CR 608.2b / 400.7 — each announced target and the zone a card target was
-    // in when it was announced. A card that has since left that zone is a new
-    // object: no longer the spell's target.
+    // CR 608.2b / 400.7 — each current target as the spell took it (announced,
+    // or put there by a redirect) and a card target's zone-change count at that
+    // moment. A card that has changed zones since, even back to the same zone,
+    // is a new object: no longer the spell's target.
     private object[]? _announced;
-    private ZoneType?[]? _announcedZones;
+    private int?[]? _announcedZoneChanges;
+    // The live game the spell is resolving in, for the per-request recheck.
+    private GameContext? _resolvingIn;
 
     /// <summary>
     /// CR 601.2c — <see cref="ChosenTargets"/> cut into one slot per target
@@ -94,31 +97,92 @@ public class Spell : ISpell
         _rebuildEffects = rebuildEffects;
         _effectsBuiltFor = ChosenTargets.ToArray();
         _announced = ChosenTargets.ToArray();
-        _announcedZones = _announced.Select(t => t is ICard c ? c.Zone : (ZoneType?)null).ToArray();
+        _announcedZoneChanges = _announced.Select(ZoneChangesOf).ToArray();
+    }
+
+    private static int? ZoneChangesOf(object target) => target is Card c ? c.ZoneChangeCount : null;
+
+    /// <summary>
+    /// CR 115.7 — a redirect changes the target at <paramref name="index"/> to
+    /// <paramref name="newTarget"/>. The new target is held to the same rules
+    /// as an announced one from here on (CR 608.2b): the same object, still
+    /// targetable, still meeting the target request of its slot.
+    /// </summary>
+    public void RedirectTarget(int index, object newTarget)
+    {
+        ArgumentNullException.ThrowIfNull(newTarget);
+        ChosenTargets[index] = newTarget;
+        if (_announced is not null && _announcedZoneChanges is not null && index < _announced.Length)
+        {
+            _announced[index] = newTarget;
+            _announcedZoneChanges[index] = ZoneChangesOf(newTarget);
+        }
+    }
+
+    /// <summary>The target request that governs <see cref="ChosenTargets"/>[<paramref name="index"/>]
+    /// (CR 601.2c), when the cast recorded one per slot.</summary>
+    public TargetRequest? RequestForTarget(int index)
+    {
+        if (_slotSizes is null || RetargetRequests is not { } reqs || reqs.Count != _slotSizes.Length) return null;
+        var at = 0;
+        for (var slot = 0; slot < _slotSizes.Length; slot++)
+        {
+            at += _slotSizes[slot];
+            if (index < at) return reqs[slot];
+        }
+        return null;
     }
 
     /// <summary>
     /// CR 608.2b — whether the target at <paramref name="index"/> of
     /// <see cref="ChosenTargets"/> is still legal.
-    /// <para>For a spell cast through SpellCastFlow the rule is CR 400.7: an
-    /// announced card target that has left the zone it was in is a new object
-    /// and no longer this spell's target. A target put there by a redirect is
-    /// legal (the redirecting effect checked it, CR 115.7). Nothing else is
-    /// judged here: the free-text target categories are too coarse to decide
-    /// legality (Exorcise's "artifact, enchantment, or creature" classifies
-    /// as Creature), so a target that is still in its zone counts as legal.</para>
+    /// <para>For a spell cast through SpellCastFlow, a target is legal when
+    /// all of these hold:</para>
+    /// <list type="bullet">
+    ///   <item>CR 400.7 — it is the same object: a card target has not
+    ///   changed zones since the spell took it (announced, or redirected via
+    ///   <see cref="RedirectTarget"/>);</item>
+    ///   <item>CR 115.5 / 702.11 / 702.16 / 702.18 — the spell can still
+    ///   target it (hexproof, shroud, protection from one of its colours);</item>
+    ///   <item>CR 608.2b — with the live game (<paramref name="game"/>, or the
+    ///   one it is resolving in), it still meets its slot's target request: a
+    ///   request with a candidate gatherer must still offer it, evaluated for
+    ///   the spell's controller ("creature you don't control" after a control
+    ///   change). A request with only a static pool is not re-judged.</item>
+    /// </list>
+    /// The free-text categories are not used: too coarse to decide legality
+    /// (Exorcise's "artifact, enchantment, or creature" classifies as Creature).
     /// <para>For other spells (copies, test spells) the rule is
     /// <see cref="TargetLegalityPredicate"/>, else legal.</para>
     /// </summary>
-    public bool IsTargetLegal(int index)
+    public bool IsTargetLegal(int index) => IsTargetLegal(index, null);
+
+    /// <inheritdoc cref="IsTargetLegal(int)"/>
+    public bool IsTargetLegal(int index, GameContext? game)
     {
         var target = ChosenTargets[index];
-        if (_announced is not null && _announcedZones is not null)
+        if (_announced is null || _announcedZoneChanges is null)
+            return TargetLegalityPredicate?.Invoke(target) ?? true;
+
+        if (index < _announced.Length && ReferenceEquals(_announced[index], target)
+            && target is Card card && _announcedZoneChanges[index] is { } changes
+            && card.ZoneChangeCount != changes)
+            return false;
+
+        if (!Majik.Core.Targeting.TargetCandidateService.IsTargetableBy(target, Controller, Card))
+            return false;
+
+        game ??= _resolvingIn;
+        if (game is not null && RequestForTarget(index) is { CandidateGatherer: not null } request)
         {
-            if (index >= _announced.Length || !ReferenceEquals(_announced[index], target)) return true;
-            return !(target is ICard card && _announcedZones[index] is { } zone && card.Zone != zone);
+            var asController = ReferenceEquals(game.Self, Controller)
+                ? game
+                : new GameContext(Controller, game.AllPlayers, game.ActivePlayer, game.TurnNumber,
+                    game.CurrentPhase, game.Stack, game.LandPlayAvailable, game.TurnState);
+            if (!request.ResolveCandidates(asController).Any(c => ReferenceEquals(c, target)))
+                return false;
         }
-        return TargetLegalityPredicate?.Invoke(target) ?? true;
+        return true;
     }
 
     /// <summary>
@@ -468,6 +532,7 @@ public class Spell : ISpell
 
         _resolutionState = ResolutionState.Resolving();
 
+        _resolvingIn = game;
         SyncEffectsWithTargets();
 
         // Spell.ChosenTargets is a flat list (CR 601.2c); present it to the

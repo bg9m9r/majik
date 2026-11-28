@@ -96,6 +96,28 @@ public static partial class TargetCandidateService
             .Enchantments()
             .Lands();
 
+    /// <summary>
+    /// CR 115.5 / 702.11 / 702.16 / 702.18 — can a spell or ability
+    /// controlled by <paramref name="controller"/>, from
+    /// <paramref name="source"/>, target <paramref name="o"/> right now?
+    /// Applies only untargetability (hexproof, hexproof from a colour,
+    /// shroud, protection from a colour of the source) to permanents on the
+    /// battlefield and players. Anything else (a card in a graveyard, a spell)
+    /// is always targetable here; whether it is still where its target
+    /// request needs it is the request's and CR 400.7's business.
+    /// </summary>
+    public static bool IsTargetableBy(object o, Player controller, ICard? source)
+    {
+        if (o is not (Permanent { Zone: Majik.Core.Zones.ZoneType.Battlefield } or Player)) return true;
+        if (!TargetLegality.IsLegal(PermissiveSpec, o, controller)) return false;
+        if (source is null) return true;
+        foreach (var color in Majik.Core.Cards.CardColors.GetColors(source))
+        {
+            if (!TargetLegality.IsLegal(PermissiveSpec, o, controller, color.ToString())) return false;
+        }
+        return true;
+    }
+
     private static bool IsTargetableNow(object o, Player caster)
     {
         if (o is Permanent || o is Player)

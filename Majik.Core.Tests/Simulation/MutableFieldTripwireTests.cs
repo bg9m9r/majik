@@ -50,6 +50,7 @@ public sealed class MutableFieldTripwireTests
             "_subtypes",                            // COPIED (AddRange — definition)
             "_supertypes",                          // COPIED (AddRange — definition)
             "_zone",                                // COPIED (_zone = src._zone)
+            "ZoneChangeCount",                      // COPIED (ZoneChangeCount = src.ZoneChangeCount)
 
             // ── auto-property backing fields (normalized to PropName) ────────
             "AdventureSpec",                        // COPIED (definition ref — AdventureSpec = src.AdventureSpec)
