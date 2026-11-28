@@ -234,6 +234,20 @@ public class EventPayloadTests
     }
 
     [Fact]
+    public void CardMovedEvent_OffTheBattlefield_CarriesNoCounters()
+    {
+        // CR 122.2 / 400.7 — a creature that dies with counters arrives in the
+        // graveyard as a new object with none.
+        var alice = new Player("Alice");
+        var hydra = new Creature("Counter Hydra", "2GG", 0, 0) { Owner = alice };
+        hydra.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 3);
+        var e = new CardMovedEvent(hydra, ZoneType.Battlefield, ZoneType.Graveyard);
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null);
+
+        payload.GetProperty("counters").EnumerateObject().Should().BeEmpty();
+    }
+    [Fact]
     public void CardMovedEvent_EnrichedFieldsMatchFreshSnapshot()
     {
         // The enriched event MUST agree with a fresh /state snapshot for the

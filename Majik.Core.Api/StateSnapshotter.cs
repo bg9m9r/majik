@@ -297,7 +297,10 @@ public static class StateSnapshotter
     /// non-permanents; <see cref="PermanentFields.Counters"/> is an empty map
     /// when the card carries no counters.
     /// </summary>
-    internal static PermanentFields BuildPermanentFields(ICard card)
+    /// <param name="zone">The zone the card is shown in (a move event passes
+    /// its destination); defaults to the card's current zone. Counters are
+    /// emitted only for the battlefield.</param>
+    internal static PermanentFields BuildPermanentFields(ICard card, ZoneType? zone = null)
     {
         int? power = null;
         int? toughness = null;
@@ -330,7 +333,12 @@ public static class StateSnapshotter
         {
             tapped = perm.IsTapped;
             summoningSickness = perm.HasSummoningSickness;
-            counters = SnapshotCounters(perm);
+            // CR 122.2 / 400.7 — counters are on permanents. A card that left
+            // the battlefield is a new object with none; the engine keeps the
+            // old values on it only for last-known information. No other zone
+            // carries engine-placed counters in a live game (suspend's time
+            // counters live in SuspendedCardRegistry, which no live game wires).
+            if ((zone ?? perm.Zone) == ZoneType.Battlefield) counters = SnapshotCounters(perm);
         }
 
         return new PermanentFields(

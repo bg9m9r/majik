@@ -455,7 +455,7 @@ public static class EventPayloadBuilder
             // CR 708.9 — a face-down permanent left the battlefield and was
             // revealed to everyone: the payload names the card it was. CardId
             // stays the permanent clients know; RevealedCardId is the card.
-            var rf = StateSnapshotter.BuildPermanentFields(revealed);
+            var rf = StateSnapshotter.BuildPermanentFields(revealed, x.ToZone);
             return SerializeCard(new CardMovedPayload(
                 From: x.FromZone.ToString(),
                 To: x.ToZone.ToString(),
@@ -523,7 +523,7 @@ public static class EventPayloadBuilder
                 IsFaceDown: true));
         }
 
-        var f = StateSnapshotter.BuildPermanentFields(x.Card);
+        var f = StateSnapshotter.BuildPermanentFields(x.Card, x.ToZone);
         return SerializeCard(new CardMovedPayload(
             From: x.FromZone.ToString(),
             To: x.ToZone.ToString(),
