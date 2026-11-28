@@ -135,4 +135,34 @@ public class SpellRedirectTests
             .Should().NotContain(_elk).And.NotContain(_bear).And.NotContain(bolt);
         bolt.ChosenTargets.Should().ContainSingle().Which.Should().Be(_bear, "an illegal new target leaves the target unchanged (CR 115.7)");
     }
+
+    [Fact]
+    public async Task Spellskite_CannotBecomeTheTargetOfASpellThatCantTargetACreature()
+    {
+        // CR 115.7 — Lava Axe targets a player or planeswalker; Spellskite
+        // (a creature) is not a legal new target, so the target stays.
+        var axe = await Cast(_alice, "Lava Axe", new object[] { _bob });
+        var skite = OnBattlefield(SpellskiteFactory.Create(_bob), _bob);
+        var ability = skite.Abilities.OfType<ActivatedAbility>().First();
+        ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { axe } });
+
+        foreach (var effect in ability.Effects)
+            await effect.ExecuteAsync(new ResolutionContext(_bob, null, Ctx(_bob), ability.ChosenTargets));
+
+        axe.ChosenTargets.Should().ContainSingle().Which.Should().Be(_bob);
+    }
+
+    [Fact]
+    public async Task HydroelectricSpecimen_CannotBecomeTheTargetOfASpellThatCantTargetACreature()
+    {
+        var axe = await Cast(_alice, "Lava Axe", new object[] { _bob });
+        var specimen = OnBattlefield(HydroelectricSpecimenFactory.Create(_bob, _stack), _bob);
+        var etb = specimen.Abilities.OfType<TriggeredAbility>().Single();
+        etb.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { axe } });
+
+        foreach (var effect in etb.Effects)
+            await effect.ExecuteAsync(new ResolutionContext(_bob, null, Ctx(_bob), etb.ChosenTargets));
+
+        axe.ChosenTargets.Should().ContainSingle().Which.Should().Be(_bob);
+    }
 }

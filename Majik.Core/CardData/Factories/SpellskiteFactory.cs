@@ -129,21 +129,23 @@ public static class SpellskiteFactory
 
         var effect = new Effect(
             $"{CardName}: redirect target single-target spell to {CardName}",
-            () =>
+            rc =>
             {
-                if (ability == null) return;
+                if (ability == null) return ValueTask.CompletedTask;
                 if (ability.ChosenTargets.Count == 0
-                    || ability.ChosenTargets[0].Count == 0) return;
+                    || ability.ChosenTargets[0].Count == 0) return ValueTask.CompletedTask;
 
                 var picked = ability.ChosenTargets[0][0];
-                if (picked is not Spell spell) return;
+                if (picked is not Spell spell) return ValueTask.CompletedTask;
                 // CR 114.6 / Spellskite-specific clause — only redirect a
                 // spell with a SINGLE target. Multi-target picks are
                 // ineligible → no-op (CR 608.2b).
-                if (spell.ChosenTargets.Count != 1) return;
+                if (spell.ChosenTargets.Count != 1) return ValueTask.CompletedTask;
 
-                // CR 115.7 — only if Spellskite is a legal target for it.
-                spell.TryRedirectTarget(0, spellskite);
+                // CR 115.7 — only if Spellskite is a legal target for it: with
+                // the live game, one the spell's target request offers.
+                spell.TryRedirectTarget(0, spellskite, rc.Game);
+                return ValueTask.CompletedTask;
             });
 
         ability = new ActivatedAbility(
