@@ -3254,6 +3254,23 @@
               "string"
             ]
           },
+          "counteringName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "counteringStackId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "default": "CounteredByEffect",
+            "type": "string"
+          },
           "stackId": {
             "format": "uuid",
             "type": "string"

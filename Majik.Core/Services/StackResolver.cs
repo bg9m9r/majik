@@ -79,7 +79,10 @@ public class StackResolver
             if (top is ITriggeredAbility triggered && !triggered.CanBePutOnStack())
             {
                 _eventBus?.Publish(new TriggeredAbilityCounteredEvent(
-                    triggered, "intervening-if failed at resolution"));
+                    triggered, TriggeredAbilityCounteredEvent.InterveningIfFailed)
+                {
+                    EntryId = topEntryId,
+                });
                 return top;
             }
 
@@ -97,6 +100,12 @@ public class StackResolver
                     spellRecheck.Card.SetZone(Zones.ZoneType.Graveyard);
                     _eventBus?.Publish(new StateBasedActionExecutedEvent(
                         $"{spellRecheck.Card.Name} countered: all targets illegal"));
+                    // CR 608.2b — countered by the rules, not by a spell or
+                    // ability: no countering controller or object.
+                    _eventBus?.Publish(new SpellCounteredEvent(spellRecheck, counteringController: null)
+                    {
+                        Reason = SpellCounterReason.AllTargetsIllegal,
+                    });
                     return top;
                 }
             }
@@ -110,7 +119,11 @@ public class StackResolver
             // sequential resolutions don't leak the attribution.
             var agent = agentLookup?.Invoke(top.Controller);
             var previousResolutionController = stack.CurrentResolutionController;
+            var previousResolving = stack.CurrentlyResolving;
+            var previousResolvingEntryId = stack.CurrentlyResolvingEntryId;
             stack.CurrentResolutionController = top.Controller;
+            stack.CurrentlyResolving = top;
+            stack.CurrentlyResolvingEntryId = topEntryId;
             try
             {
                 await top.ResolveAsync(agent, game, ct).ConfigureAwait(false);
@@ -118,6 +131,8 @@ public class StackResolver
             finally
             {
                 stack.CurrentResolutionController = previousResolutionController;
+                stack.CurrentlyResolving = previousResolving;
+                stack.CurrentlyResolvingEntryId = previousResolvingEntryId;
             }
 
             // Handle spell resolution (Rule 608.2)

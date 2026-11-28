@@ -242,9 +242,12 @@ public static class EventPayloadBuilder
             CardId: x.CounteredSpell.Card?.InstanceId,
             CardName: x.CounteredSpell.Card?.Name ?? "",
             ControllerId: x.CounteredSpell.Controller.Id,
-            CounteringControllerId: x.CounteringController?.Id)),
+            CounteringControllerId: x.CounteringController?.Id,
+            CounteringStackId: x.CounteringObject is null ? null : x.CounteringEntryId ?? x.CounteringObject.Id,
+            CounteringName: CounteringName(x.CounteringObject, viewer),
+            Reason: x.Reason.ToString())),
         TriggeredAbilityCounteredEvent x => Serialize(new TriggeredAbilityCounteredPayload(
-            StackId: x.Ability.Id,
+            StackId: x.EntryId ?? x.Ability.Id,
             SourceId: (x.Ability.Source as ICard)?.InstanceId,
             SourceName: DisplayName(x.Ability.Source as ICard, viewer),
             ControllerId: x.Ability.Controller.Id,
@@ -306,6 +309,7 @@ public static class EventPayloadBuilder
         AttackersDeclaredEvent x => x.Combat.Attackers.Any(a => IsFaceDown(a.Creature)),
         BlockersDeclaredEvent x => x.Combat.GetAllBlockers().Any(b => IsFaceDown(b.Creature)),
         TriggeredAbilityCounteredEvent x => IsFaceDown(x.Ability.Source as ICard),
+        SpellCounteredEvent x => x.CounteringObject is { } by && IsFaceDown(AbilitySource(by)),
         ManaAbilityActivatedEvent x => IsFaceDown(x.Source as ICard),
         AbilityActivatedEvent x => IsFaceDown(x.Ability.Source as ICard),
         ContinuousEffectAddedEvent x => IsFaceDown(x.Effect.Source),
@@ -319,6 +323,15 @@ public static class EventPayloadBuilder
     internal const string FaceDownName = StateSnapshotter.FaceDownName;
 
     private static bool IsFaceDown(ICard? card) => StateSnapshotter.IsFaceDown(card);
+
+    /// <summary>The display name of what countered a spell: a spell's card name,
+    /// an ability's source name (masked for a face-down source, CR 708.2).</summary>
+    private static string? CounteringName(IStackObject? by, Player? viewer) => by switch
+    {
+        null => null,
+        ISpell s => s.Card?.Name ?? "",
+        _ => DisplayName(AbilitySource(by), viewer),
+    };
 
     private static ICard? AbilitySource(IStackObject obj) => obj switch
     {

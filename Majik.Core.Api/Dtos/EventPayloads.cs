@@ -290,16 +290,31 @@ public sealed record PermanentSacrificedPayload(
     bool WasToken);
 
 /// <summary>CR 701.6 — a spell was countered. <see cref="StackId"/> is the
-/// spell's stack id.</summary>
+/// spell's stack id.
+/// <para><see cref="CounteringStackId"/> / <see cref="CounteringName"/> name the
+/// spell or ability whose effect countered it: its StackObjectDto.Id and its
+/// display name (a spell's card name; an ability's source name, "Face-down
+/// permanent" to a player who may not look at that source, CR 708.2). Both
+/// null when the rules countered it (CR 608.2b) or the source is unknown.</para>
+/// <para><see cref="Reason"/> is one of a closed set: "CounteredByEffect" (CR
+/// 701.6a, a counter effect) or "AllTargetsIllegal" (CR 608.2b, every target
+/// was illegal on resolution).</para></summary>
 public sealed record SpellCounteredPayload(
     Guid StackId,
     Guid? CardId,
     string CardName,
     Guid ControllerId,
-    Guid? CounteringControllerId);
+    Guid? CounteringControllerId,
+    Guid? CounteringStackId = null,
+    string? CounteringName = null,
+    string Reason = "CounteredByEffect");
 
 /// <summary>CR 603.4 / CR 701.6 — a triggered ability was countered or removed
-/// (e.g. its intervening-if condition was false on resolution).</summary>
+/// (e.g. its intervening-if condition was false on resolution).
+/// <see cref="StackId"/> is the removed entry's StackObjectDto.Id (for an
+/// ability that triggered twice, the firing that was removed).
+/// <see cref="Reason"/> is a display string from a closed set; today its only
+/// value is "intervening-if failed at resolution" (CR 603.4).</summary>
 public sealed record TriggeredAbilityCounteredPayload(
     Guid StackId,
     Guid? SourceId,

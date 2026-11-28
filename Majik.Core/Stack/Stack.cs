@@ -74,6 +74,17 @@ public class Stack
     public Player? CurrentResolutionController { get; set; }
 
     /// <summary>
+    /// The stack object StackResolver is resolving right now, and the stack
+    /// entry id it had. Null when nothing is mid-resolution through the
+    /// resolver. Read by <see cref="PublishSpellCountered"/> to name what
+    /// countered a spell (SpellCounteredEvent.CounteringObject).
+    /// </summary>
+    public IStackObject? CurrentlyResolving { get; internal set; }
+
+    /// <inheritdoc cref="CurrentlyResolving"/>
+    public Guid? CurrentlyResolvingEntryId { get; internal set; }
+
+    /// <summary>
     /// CR 701.5 — announce that <paramref name="spell"/> was countered. Fires
     /// <see cref="Majik.Core.Domain.DomainEvents.SpellCounteredEvent"/> on the
     /// stack's event bus, attributing the counter to
@@ -87,7 +98,11 @@ public class Stack
         if (spell is null) return;
         _eventBus?.Publish(
             new Majik.Core.Domain.DomainEvents.SpellCounteredEvent(
-                spell, CurrentResolutionController));
+                spell, CurrentResolutionController)
+            {
+                CounteringObject = CurrentlyResolving,
+                CounteringEntryId = CurrentlyResolving is null ? null : CurrentlyResolvingEntryId,
+            });
     }
 
     /// <summary>
