@@ -214,6 +214,19 @@ public class Card : ICard
                 _exiledFaceDown = false;
                 _faceDownLookers = System.Array.Empty<Player>();
             }
+            // CR 400.7 / 120.3 — a permanent that enters the battlefield is a
+            // new object with no damage marked on it. Damage stays on the card
+            // it left behind (so a dead creature still reads as dead), but a
+            // creature returned by undying / persist / reanimation must not
+            // bring it back: Young Wolf + Agatha's Soul Cauldron looped forever
+            // because each counter removal left a 1/1 with the 1 damage it had
+            // died with still marked (CR 704.5g).
+            if (this is Permanent entering
+                && previousZone != ZoneType.Battlefield
+                && value == ZoneType.Battlefield)
+            {
+                entering.ClearMarkedDamage();
+            }
             // CR 613 — a permanent's battlefield presence is an input to the
             // layer system: lords/anthems/CDAs scoped to "permanents you
             // control" change as ANY permanent enters/leaves play, and an
