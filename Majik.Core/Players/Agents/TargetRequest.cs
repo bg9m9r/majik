@@ -47,6 +47,14 @@ namespace Majik.Core.Players.Agents;
 /// (one request per mode, e.g. the Charm family) leave this null and rely on
 /// positional alignment.
 /// </para>
+///
+/// <para>
+/// <see cref="DistinctFromRequest"/> (default = null) is the index of an
+/// earlier request whose targets this one may not repeat: "any OTHER target"
+/// (Arc Trail). <c>TargetCollection.CollectAsync</c> removes that request's
+/// picks from this one's pool, and a repeated pick makes the cast illegal
+/// (CR 601.2c).
+/// </para>
 /// </summary>
 public sealed record TargetRequest(
     string Description,
@@ -57,7 +65,8 @@ public sealed record TargetRequest(
     Func<GameContext, IReadOnlyList<object>>? CandidateGatherer = null,
     int? PrintedMinTargets = null,
     int? ModeIndex = null,
-    IRebindableGatherer? RebindableGatherer = null)
+    IRebindableGatherer? RebindableGatherer = null,
+    int? DistinctFromRequest = null)
 {
     /// <summary>
     /// agatha-mother-of-runes-style-candidate-gatherer-controller-rebind —

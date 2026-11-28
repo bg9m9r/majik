@@ -71,6 +71,20 @@ public static class TargetCollection
             // portal can render legal targets — see ResolveLivePool.
             var live = ResolveLivePool(
                 req, ctx, agent?.WantsSynthesizedTargetCandidates ?? false);
+
+            // CR 601.2c — "any other target": the earlier request's picks are
+            // not candidates. With no pool of its own, the pool is the earlier
+            // request's ("any other target" is any target), synthesized even
+            // for a bot (which otherwise picks from an empty pool) so there is
+            // a pool to filter.
+            IReadOnlyList<object> earlier = Array.Empty<object>();
+            if (req.DistinctFromRequest is { } other && other >= 0 && other < collected.Count)
+            {
+                earlier = collected[other];
+                if (live.Count == 0) live = ResolveLivePool(requests[other], ctx, synthesizeWhenEmpty: true);
+                live = live.Where(c => !earlier.Contains(c)).ToList();
+            }
+
             // CR 601.2c — an agent that can only pick from the offered pool
             // can't answer a required request whose pool is too small: the
             // cast is illegal, so reverse it now rather than raise a prompt
@@ -97,6 +111,17 @@ public static class TargetCollection
             var picked = agent != null && (live.Count > 0 || !agent.WantsSynthesizedTargetCandidates)
                 ? await agent.ChooseTargetsAsync(ctx, promptReq, ct).ConfigureAwait(false)
                 : (IReadOnlyList<object>)Array.Empty<object>();
+
+            if (earlier.Count > 0 && picked.Any(earlier.Contains))
+            {
+                if (throwOnInsufficient)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot resolve {card?.Name ?? "ability"}: target request " +
+                        $"'{req.Description}' must be a different target (CR 601.2c).");
+                }
+                picked = picked.Where(p => !earlier.Contains(p)).ToList();
+            }
 
             if (throwOnInsufficient && picked.Count < req.MinTargets)
             {

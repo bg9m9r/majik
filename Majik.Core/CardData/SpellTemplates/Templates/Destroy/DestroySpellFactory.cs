@@ -84,17 +84,36 @@ internal static class DestroySpellFactory
             }) };
         });
 
-    internal static SpellDefinition DestroyArtifactOrEnchantmentSpell(Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target artifact or enchantment", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
+    internal static SpellDefinition DestroyArtifactOrEnchantmentSpell(Func<object, object> resolver) =>
+        DestroyArtifactOrEnchantmentSpell(resolver, artifact: true, enchantment: true);
+
+    /// <summary>"Destroy target artifact" / "... enchantment" / "... artifact
+    /// or enchantment" (CR 115.1): the request and the resolution check use
+    /// exactly the printed types.</summary>
+    internal static SpellDefinition DestroyArtifactOrEnchantmentSpell(
+        Func<object, object> resolver, bool artifact, bool enchantment)
+    {
+        var label = (artifact, enchantment) switch
         {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("destroy artifact/enchantment", () =>
+            (true, false) => "target artifact",
+            (false, true) => "target enchantment",
+            _ => "target artifact or enchantment",
+        };
+        bool Fits(ICard c) =>
+            (artifact && c.HasType(CardType.Artifact)) || (enchantment && c.HasType(CardType.Enchantment));
+        return new(
+            Modes: Array.Empty<string>(), HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
             {
-                if (target is ICard card) OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
-            }) };
-        });
+                var target = resolver(p.Targets[0][0]);
+                return new IEffect[] { new Effect($"destroy {label[7..]}", () =>
+                {
+                    if (target is ICard card && Fits(card))
+                        OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
+                }) };
+            });
+    }
 
     /// <summary>
     /// "Destroy up to N target artifacts and/or enchantments." (Force of Vigor
