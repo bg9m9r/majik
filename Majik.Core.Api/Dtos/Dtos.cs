@@ -431,7 +431,14 @@ public sealed record PromptDto(
     /// CR 601.2g-h — what a mana payment prompt (<c>ChooseManaCommand</c>) pays
     /// for. Non-null on a spell's mana prompt; null on every other prompt kind.
     /// </summary>
-    ManaPaymentViewDto? ManaPayment = null);
+    ManaPaymentViewDto? ManaPayment = null,
+    /// <summary>
+    /// CR 732.1 / 601.2 — why the engine reversed this player's last cast
+    /// (an illegal cast it rewound itself, e.g. no mode of a modal spell had a
+    /// legal target), shown once on the next prompt to that player. Null
+    /// otherwise. A cast the player cancelled carries no notice.
+    /// </summary>
+    string? Notice = null);
 
 /// <summary>Body of <see cref="PromptDto.ManaPayment"/>. Display only.</summary>
 /// <param name="StackEntryId">The id the spell has on the stack once cast. The

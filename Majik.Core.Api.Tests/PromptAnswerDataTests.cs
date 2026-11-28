@@ -69,7 +69,8 @@ public class PromptAnswerDataTests
         var task = _agent.ChooseXAsync(null!, hydra);
 
         var prompt = _prompts.Should().ContainSingle().Subject;
-        prompt.ExpectedKinds.Should().Equal(nameof(ChooseXCommand));
+        // CR 601.2 — a cast's X prompt may also be answered by backing out.
+        prompt.ExpectedKinds.Should().Equal(nameof(ChooseXCommand), nameof(CancelCastCommand));
         prompt.MinX.Should().Be(0);
         prompt.MaxX.Should().Be(2);
         _agent.Submit(Cmd(new ChooseXCommand(2)));
@@ -327,5 +328,19 @@ public class PromptAnswerDataTests
         _prompts.Should().ContainSingle().Which.ModeOptions!.Should().OnlyContain(m => !m.IsChoosable);
         _agent.Submit(Cmd(new ChooseModeCommand(0)));
         (await task).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(ZoneType.Battlefield)]
+    [InlineData(ZoneType.Stack)]
+    public void ChooseX_ForASourceThatIsNotBeingCast_OffersNoCancel(ZoneType zone)
+    {
+        // An activation's or a resolving spell's X (Harnessed Lightning on the
+        // stack) is not a casting prompt: there is no cast to back out of.
+        var source = Put(new Instant("Harnessed Lightning", "{1}{R}"), zone);
+
+        _ = _agent.ChooseXAsync(null!, source);
+
+        _prompts.Should().ContainSingle().Which.ExpectedKinds.Should().Equal(nameof(ChooseXCommand));
     }
 }

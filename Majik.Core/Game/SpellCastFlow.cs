@@ -318,7 +318,7 @@ public sealed class SpellCastFlow
         // two") spells return the chosen set (CR 700.2d). The scalar is kept
         // in sync with the first chosen mode so legacy single-mode
         // EffectFactory closures still read ChosenSpellParams.ModeIndex.
-        var modeChoice = await PromptForModesAsync(definition, ctx, agent, ct);
+        var modeChoice = await PromptForModesAsync(definition, card, ctx, agent, ct);
         int? mode = modeChoice.Count > 0 ? modeChoice[0] : (int?)null;
         IReadOnlyList<int>? modeIndexes =
             definition.IsMultiMode && modeChoice.Count > 0 ? modeChoice : null;
@@ -973,12 +973,25 @@ public sealed class SpellCastFlow
     /// scripts keep their behaviour; multi-mode spells route through
     /// <see cref="IPlayerAgent.ChooseModesAsync"/>.</summary>
     private static async Task<IReadOnlyList<int>> PromptForModesAsync(
-        SpellDefinition definition, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+        SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
     {
         if (definition.Modes.Count == 0) return Array.Empty<int>();
 
         var unavailable = ModeUnavailableReasons(
             definition, ctx, agent.WantsSynthesizedTargetCandidates);
+
+        // CR 601.2c / 700.2 — too few choosable modes makes the cast illegal
+        // whatever is picked. An agent that can only pick from the offered
+        // pools would face a prompt with no legal answer, so the cast is
+        // reversed here instead (the caller rewinds it, CR 732.1). Bots keep
+        // their own target heuristics and are prompted as before.
+        var choosable = unavailable.Count(r => r == null);
+        if (agent.WantsSynthesizedTargetCandidates && choosable < Math.Max(1, definition.MinModes))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name}: no mode can be chosen (CR 601.2c / 700.2) — " +
+                string.Join(" ", unavailable.Where(r => r != null)));
+        }
         if (!definition.IsMultiMode)
         {
             var single = await agent.ChooseModeAmongAsync(

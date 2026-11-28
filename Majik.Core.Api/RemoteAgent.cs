@@ -323,6 +323,14 @@ public sealed class RemoteAgent : IPlayerAgent
                 complete = Done<ManaPayment>(tcs, 
                     new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
                 break;
+            case CancelCastCommand when tcs is not TaskCompletionSource<ManaPayment>:
+                // CR 601.2 / 732.1 — backing out at a mode, X or targets
+                // prompt of a cast: the agent throws CastCancelledException
+                // and the cast flow reverses the cast as it does an illegal
+                // one. Only cast prompts list CancelCastCommand (checked by
+                // _pendingKinds in Submit).
+                complete = FailWithCancel(tcs);
+                break;
             case CancelCastCommand:
                 // CR 601.2 / CR 727 — bailing out of a cast at the cost-
                 // payment step. Surface the Cancelled sentinel so the
@@ -814,6 +822,30 @@ public sealed class RemoteAgent : IPlayerAgent
     // Bind the validated answer to the prompt's TaskCompletionSource now (the
     // value is already computed) and deliver it later, after Submit has cleared
     // the prompt — so nothing is mutated unless validation passed.
+    private static Action FailWithCancel(object tcs) => tcs switch
+    {
+        TaskCompletionSource<int> t => () => t.SetException(new CastCancelledException()),
+        TaskCompletionSource<IReadOnlyList<object>> t => () => t.SetException(new CastCancelledException()),
+        TaskCompletionSource<IReadOnlyList<int>> t => () => t.SetException(new CastCancelledException()),
+        _ => throw new InvalidOperationException("CancelCastCommand is not accepted at this prompt."),
+    };
+
+    /// <summary>CR 601.2 — this player is casting a spell right now (it is on
+    /// the stack as being cast), so a casting prompt may be cancelled.</summary>
+    private bool CastInProgress(GameContext? ctx) =>
+        ctx?.Stack.BeingCast.Any(c => ReferenceEquals(c.Caster, _player)) == true;
+
+    private static Type[] WithCancel(bool cancellable, Type kind) =>
+        cancellable ? new[] { kind, typeof(CancelCastCommand) } : new[] { kind };
+
+    /// <summary>CR 732.1 — shown once, on this player's next prompt.</summary>
+    public void NotifyActionReversed(string reason)
+    {
+        lock (_closeLock) _notice = reason;
+    }
+
+    private string? _notice;
+
     private static Action Done<T>(object tcs, T value)
     {
         var typed = (TaskCompletionSource<T>)tcs;
@@ -1109,7 +1141,7 @@ public sealed class RemoteAgent : IPlayerAgent
 
         try
         {
-            return Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
+            return Prompt<IReadOnlyList<object>>(ct, WithCancel(CastInProgress(ctx), typeof(ChooseTargetsCommand)));
         }
         catch
         {
@@ -1164,7 +1196,8 @@ public sealed class RemoteAgent : IPlayerAgent
         ChoiceRequest req,
         CancellationToken ct,
         Func<object, string?>? label,
-        Func<PromptPayload, PromptPayload>? decorate)
+        Func<PromptPayload, PromptPayload>? decorate,
+        bool cancellable = false)
     {
         ArgumentNullException.ThrowIfNull(req);
         if (_pending != null)
@@ -1210,7 +1243,7 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingPayload = decorate?.Invoke(payload) ?? payload;
         try
         {
-            return Prompt<IReadOnlyList<object>>(ct, typeof(ChoiceCommand));
+            return Prompt<IReadOnlyList<object>>(ct, WithCancel(cancellable, typeof(ChoiceCommand)));
         }
         catch
         {
@@ -1237,7 +1270,14 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingPayload = new PromptPayload(MinX: 0, MaxX: AffordableMaxX(ctx, source));
         try
         {
-            return Prompt<int>(ct, typeof(ChooseXCommand));
+            // Cancellable only while casting: the dispatcher announces a cast's
+            // X with the card still in the zone it is cast from (hand,
+            // graveyard, exile), or the card is already on the stack being
+            // cast. A source on the battlefield (an activation, an upkeep
+            // payment) or on the stack resolving (Harnessed Lightning) is not.
+            var casting = CastInProgress(ctx)
+                || source.Zone is not (Majik.Core.Zones.ZoneType.Battlefield or Majik.Core.Zones.ZoneType.Stack);
+            return Prompt<int>(ct, WithCancel(casting, typeof(ChooseXCommand)));
         }
         catch
         {
@@ -1311,7 +1351,7 @@ public sealed class RemoteAgent : IPlayerAgent
             ModeOptions: ModeRows(modes, unavailableReasons), MinModes: 1, MaxModes: 1);
         try
         {
-            return Prompt<int>(ct, typeof(ChooseModeCommand));
+            return Prompt<int>(ct, WithCancel(CastInProgress(ctx), typeof(ChooseModeCommand)));
         }
         catch
         {
@@ -1398,7 +1438,7 @@ public sealed class RemoteAgent : IPlayerAgent
         Task<IReadOnlyList<object>> prompt;
         try
         {
-            prompt = ChooseCoreAsync(ctx, req, ct,
+            prompt = ChooseCoreAsync(ctx, req, ct, cancellable: CastInProgress(ctx),
                 label: o => o is int i && i >= 0 && i < modes.Count ? modes[i] : null,
                 decorate: p =>
                 {
@@ -2029,6 +2069,11 @@ public sealed class RemoteAgent : IPlayerAgent
             // Captured with the prompt: an answer clears _pendingPayload, and
             // one can arrive as soon as the first observer has seen the prompt.
             payload = _pendingPayload;
+            if (_notice != null)
+            {
+                payload = (payload ?? new PromptPayload()) with { Notice = _notice };
+                _notice = null;
+            }
         }
 
         // The facade publishes its state snapshot, builds the one PromptDto
@@ -2350,4 +2395,7 @@ public sealed record PromptPayload(
     int? MaxModes = null,
     /// <summary>Forwarded onto <see cref="PromptDto.ChoiceOptions"/>.</summary>
     IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null,
-    ManaPaymentViewDto? ManaPayment = null);
+    ManaPaymentViewDto? ManaPayment = null,
+    /// <summary>CR 732.1 — the engine's reason for reversing this player's
+    /// last cast, forwarded onto <see cref="PromptDto.Notice"/>.</summary>
+    string? Notice = null);

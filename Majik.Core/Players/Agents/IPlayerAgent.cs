@@ -47,6 +47,14 @@ public interface IPlayerAgent
     bool WantsSynthesizedTargetCandidates => false;
 
     /// <summary>
+    /// CR 732.1 — the engine reversed this agent's cast itself (it turned out
+    /// illegal after the card moved to the stack: no choosable mode, too few
+    /// legal targets, an unpayable cost). <paramref name="reason"/> says why.
+    /// An agent with a human behind it shows it; others ignore it.
+    /// </summary>
+    void NotifyActionReversed(string reason) { }
+
+    /// <summary>
     /// Pick targets satisfying the request (cardinality + legality).
     /// </summary>
     Task<IReadOnlyList<object>> ChooseTargetsAsync(

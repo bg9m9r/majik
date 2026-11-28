@@ -976,7 +976,16 @@ public sealed class TurnDriver
             int? chosenX = null;
             if (def.HasVariableX)
             {
-                chosenX = await _agents[actor].ChooseXAsync(ctx, castCard, ct);
+                try
+                {
+                    chosenX = await _agents[actor].ChooseXAsync(ctx, castCard, ct);
+                }
+                catch (Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    // CR 601.2 — backed out at the X announcement; nothing
+                    // has moved or been paid yet.
+                    return false;
+                }
             }
 
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
@@ -1159,6 +1168,12 @@ public sealed class TurnDriver
             catch (InvalidOperationException ex)
             {
                 RotateHand(castCard, $"CastAsync threw: {ex.Message}");
+                // CR 732.1 — the engine reversed the cast; tell the player why
+                // (a cast the player cancelled needs no explanation).
+                if (ex is not Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    _agents[actor].NotifyActionReversed(ex.Message);
+                }
                 return false; // not committed: CastAsync threw
             }
             return true; // committed: spell put on the stack
@@ -1301,7 +1316,16 @@ public sealed class TurnDriver
                 && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
                 && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
             {
-                var x = await _agents[actor].ChooseXAsync(ctx, xSource, ct: default);
+                int x;
+                try
+                {
+                    x = await _agents[actor].ChooseXAsync(ctx, xSource, ct: default);
+                }
+                catch (Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    // Nothing is paid before ActivateAbility; abandon it.
+                    return;
+                }
                 aaForX.SetChosenX(x);
                 costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
                     activate.Ability.Costs, x);

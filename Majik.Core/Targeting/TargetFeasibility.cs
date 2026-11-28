@@ -28,22 +28,13 @@ public static class TargetFeasibility
         if (requests.Count == 0) return true;
         var modeCount = definition.Modes.Count;
 
-        if (modeCount > 0 && requests.All(r => r.ModeIndex.HasValue))
+        // The mode prompt's own per-mode reasons (SpellCastFlow.ModeUnavailableReasons),
+        // so "castable" here and "choosable" on the mode prompt never disagree.
+        if (modeCount > 0 && (requests.All(r => r.ModeIndex.HasValue) || requests.Count == modeCount))
         {
-            var feasible = 0;
-            for (var m = 0; m < modeCount; m++)
-            {
-                var mode = m;
-                if (requests.Where(r => r.ModeIndex == mode).All(r => Satisfiable(r.AsChosenMode(), ctx)))
-                    feasible++;
-            }
-            return feasible >= Math.Max(1, definition.MinModes);
-        }
-
-        if (modeCount > 0 && requests.Count == modeCount)
-        {
-            var feasible = requests.Count(r => Satisfiable(r.AsChosenMode(), ctx));
-            return feasible >= Math.Max(1, definition.MinModes);
+            var choosable = SpellCastFlow.ModeUnavailableReasons(definition, ctx, synthesize: true)
+                .Count(reason => reason == null);
+            return choosable >= Math.Max(1, definition.MinModes);
         }
 
         return HasLegalTargets(requests, ctx);

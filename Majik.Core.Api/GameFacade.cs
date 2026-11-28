@@ -528,7 +528,14 @@ public sealed class GameFacade : IDisposable
             int? chosenX = null;
             if (cast.AlternativeCost == null && cost.HasX)
             {
-                chosenX = await agent.ChooseXAsync(ctx, cast.Card, CancellationToken.None);
+                try
+                {
+                    chosenX = await agent.ChooseXAsync(ctx, cast.Card, CancellationToken.None);
+                }
+                catch (Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    return false; // CR 601.2 — backed out before anything moved or was paid
+                }
                 if (chosenX is { } xv && xv > 0)
                 {
                     cost = cost.AddGenericCost(xv);
@@ -695,7 +702,15 @@ public sealed class GameFacade : IDisposable
                 && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
                 && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
             {
-                var x = await agents[actor].ChooseXAsync(ctx, xSource, ct: default);
+                int x;
+                try
+                {
+                    x = await agents[actor].ChooseXAsync(ctx, xSource, ct: default);
+                }
+                catch (Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    return; // nothing is paid before the activation itself
+                }
                 aaForX.SetChosenX(x);
                 costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
                     activate.Ability.Costs, x);
@@ -2091,7 +2106,8 @@ public sealed class GameFacade : IDisposable
             MinModes: payload?.MinModes,
             MaxModes: payload?.MaxModes,
             ChoiceOptions: payload?.ChoiceOptions,
-            ManaPayment: payload?.ManaPayment);
+            ManaPayment: payload?.ManaPayment,
+            Notice: payload?.Notice);
     }
 
     private void BridgeEvent(GameEvent e)

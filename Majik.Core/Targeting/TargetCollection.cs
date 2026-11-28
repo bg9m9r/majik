@@ -71,6 +71,18 @@ public static class TargetCollection
             // portal can render legal targets — see ResolveLivePool.
             var live = ResolveLivePool(
                 req, ctx, agent?.WantsSynthesizedTargetCandidates ?? false);
+            // CR 601.2c — an agent that can only pick from the offered pool
+            // can't answer a required request whose pool is too small: the
+            // cast is illegal, so reverse it now rather than raise a prompt
+            // with no legal answer.
+            if (throwOnInsufficient && agent is { WantsSynthesizedTargetCandidates: true }
+                && live.Count < req.MinTargets)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot cast {card?.Name ?? "ability"}: target request '{req.Description}' " +
+                    $"needs {req.MinTargets} legal target(s); there are {live.Count} (CR 601.2c).");
+            }
+
             var promptReq = ReferenceEquals(live, req.LegalCandidates)
                 ? req
                 : req.WithCandidates(live);

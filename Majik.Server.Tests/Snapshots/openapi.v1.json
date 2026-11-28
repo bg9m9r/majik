@@ -3088,6 +3088,12 @@
               "array"
             ]
           },
+          "notice": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "playerCandidates": {
             "items": {
               "$ref": "#/components/schemas/PlayerCandidateDto"
