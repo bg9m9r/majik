@@ -37,9 +37,16 @@ public sealed class GameStateSnapshotThreadSafetyTests
 
     private sealed record Outcome(string? Winner, int Turns, string? Fault);
 
-    private static async Task<(Outcome Outcome, int Reads, List<Exception> ReaderErrors)> PlayAsync(
+    public enum Reader { None, ForeignThreads, HandlerTaskRun, HandlerAwaitYield }
+
+    private static Task<(Outcome Outcome, int Reads, List<Exception> ReaderErrors)> PlayAsync(
         string aliceDeck, string bobDeck, int seed, bool withReader)
+        => PlayAsync(aliceDeck, bobDeck, seed, withReader ? Reader.ForeignThreads : Reader.None);
+
+    private static async Task<(Outcome Outcome, int Reads, List<Exception> ReaderErrors)> PlayAsync(
+        string aliceDeck, string bobDeck, int seed, Reader mode)
     {
+        var withReader = mode == Reader.ForeignThreads;
         using var ids = DeterministicIdScope.Push(new DeterministicIdSource(seed));
         var facade = GameFacade.Create("Alice", "Bob", RealDeck(aliceDeck), RealDeck(bobDeck), cardRepo: Repo);
         facade.ReplaceAliceAgent(new HeuristicBotAgent(cardRepository: Repo));
@@ -75,6 +82,48 @@ public sealed class GameStateSnapshotThreadSafetyTests
             })));
         }
 
+        // Work started BY an event handler (a Task.Run, or an await
+        // continuation) must not inherit the engine-flow tag: it reads the
+        // published snapshot like any other foreign caller.
+        var outstanding = 0;
+        IDisposable? handlerSub = null;
+        void HandlerRead()
+        {
+            try
+            {
+                if (facade.IsOnEngineFlow)
+                    throw new InvalidOperationException("handler-started work was treated as engine flow");
+                facade.GetState().Should().NotBeNull();
+                facade.GetStateFor(facade.Alice.Id).Should().NotBeNull();
+                facade.GetStateFor(facade.Bob.Id).Should().NotBeNull();
+            }
+            catch (Exception ex)
+            {
+                lock (errors) errors.Add(ex);
+            }
+            Interlocked.Increment(ref reads);
+        }
+        if (mode == Reader.HandlerTaskRun)
+        {
+            handlerSub = facade.Subscribe(ev =>
+            {
+                if (facade.IsOnEngineFlow)
+                    lock (errors) errors.Add(new InvalidOperationException("synchronous handler ran on the engine flow"));
+                Interlocked.Increment(ref outstanding);
+                _ = Task.Run(() => { HandlerRead(); Interlocked.Decrement(ref outstanding); });
+            });
+        }
+        else if (mode == Reader.HandlerAwaitYield)
+        {
+            handlerSub = facade.SubscribeEnvelopes(async _ =>
+            {
+                Interlocked.Increment(ref outstanding);
+                await Task.Yield();
+                HandlerRead();
+                Interlocked.Decrement(ref outstanding);
+            });
+        }
+
         string? fault = null;
         GameDriver.GameResult? result = null;
         try
@@ -91,6 +140,10 @@ public sealed class GameStateSnapshotThreadSafetyTests
         {
             stop.Cancel();
             await reader;
+            handlerSub?.Dispose();
+            var drain = System.Diagnostics.Stopwatch.StartNew();
+            while (Volatile.Read(ref outstanding) > 0 && drain.Elapsed < TimeSpan.FromSeconds(30))
+                await Task.Delay(5);
         }
         return (new Outcome(result?.Winner?.Name, result?.TurnsPlayed ?? -1, fault), reads, errors);
     }
@@ -123,6 +176,53 @@ public sealed class GameStateSnapshotThreadSafetyTests
             + readerErrors.FirstOrDefault());
     }
 
+    [Theory]
+    [InlineData(Reader.HandlerTaskRun)]
+    [InlineData(Reader.HandlerAwaitYield)]
+    public async Task WorkStartedByAnEventHandler_IsNotEngineFlow_AndNeverChangesTheGame(Reader mode)
+    {
+        var readerErrors = new List<Exception>();
+        var reads = 0;
+        foreach (var (aliceDeck, bobDeck) in new[] { ("Burn", "BorosEnergy"), ("Prowess", "Burn"), ("BorosEnergy", "Prowess") })
+        foreach (var seed in Enumerable.Range(100, 5))
+        {
+            var baseline = await PlayAsync(aliceDeck, bobDeck, seed, Reader.None);
+            var stressed = await PlayAsync(aliceDeck, bobDeck, seed, mode);
+            _out.WriteLine($"{mode} {aliceDeck} v {bobDeck} seed {seed}: baseline {baseline.Outcome}, " +
+                           $"with handler reads {stressed.Outcome}, {stressed.Reads} reads, {stressed.ReaderErrors.Count} errors");
+            readerErrors.AddRange(stressed.ReaderErrors);
+            reads += stressed.Reads;
+            stressed.Outcome.Should().Be(baseline.Outcome, $"handler-started reads must not change the game (seed {seed})");
+        }
+        reads.Should().BeGreaterThan(0);
+        readerErrors.Should().BeEmpty("first: " + readerErrors.FirstOrDefault());
+    }
+
+    [Fact]
+    public async Task EngineCallees_StillReadOnTheEngineFlow()
+    {
+        // Internal engine callees — here a handler on the engine's own bus,
+        // the surface triggers / SBAs / bots are driven through — keep live
+        // reads; only the facade's public subscriber fan-out is untagged.
+        var deck = Enumerable.Range(0, 20).Select(_ => (ICard)new Land("Forest")).ToList();
+        var facade = GameFacade.Create("Alice", "Bob", deck, deck.Select(_ => (ICard)new Land("Mountain")).ToList());
+        facade.ReplaceAliceAgent(new HeuristicBotAgent());
+        facade.ReplaceBobAgent(new HeuristicBotAgent());
+        int engineCalls = 0, offFlow = 0, publicCalls = 0, publicOnFlow = 0;
+        facade.EventBus.Subscribe<Majik.Core.Events.StepStartedEvent>(_ =>
+        {
+            engineCalls++;
+            if (!facade.IsOnEngineFlow) offFlow++;
+            else facade.GetState().Should().NotBeNull();
+        });
+        using var sub = facade.Subscribe(_ => { publicCalls++; if (facade.IsOnEngineFlow) publicOnFlow++; });
+        await facade.StartFullGameAsync(firstPlayerSlot: 0, maxTurns: 2, rng: new GameRandom(3));
+        await facade.FullGameTask!.WaitAsync(TimeSpan.FromSeconds(30));
+        engineCalls.Should().BeGreaterThan(0);
+        offFlow.Should().Be(0);
+        publicCalls.Should().BeGreaterThan(0);
+        publicOnFlow.Should().Be(0);
+    }
     private static RemoteAgent Seat(GameFacade facade, string field) =>
         (RemoteAgent)typeof(GameFacade)
             .GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!

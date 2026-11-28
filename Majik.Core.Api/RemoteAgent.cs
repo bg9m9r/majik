@@ -1821,7 +1821,9 @@ public sealed class RemoteAgent : IPlayerAgent
         try { BeforePromptRequested?.Invoke(); }
         catch { /* a snapshot fault must not abort the engine */ }
 
-        try { PromptRequested?.Invoke(acceptedKinds); }
+        // Observers are external code: run them off the engine flow so work
+        // they start never counts as the engine (GameFacade reads).
+        try { GameFacade.RunOffEngineFlow(() => PromptRequested?.Invoke(acceptedKinds)); }
         catch { /* observer fault must not abort the engine */ }
 
         return tcs.Task;

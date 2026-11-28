@@ -1691,6 +1691,32 @@ public sealed class GameFacade : IDisposable
 
     private readonly object _liveReadLock = new();
 
+    /// <summary>
+    /// Invoke an EXTERNAL callback (a public subscriber) with the engine-flow
+    /// tag cleared, restoring it afterwards. Anything the callback does
+    /// synchronously, and anything it schedules (Task.Run, timers, await
+    /// continuations capture the ExecutionContext at that moment), is then a
+    /// foreign caller: GetState returns the published snapshot. Internal
+    /// engine callees (bus handlers, bots, card closures) are not routed
+    /// through here and keep live reads.
+    /// </summary>
+    internal static void RunOffEngineFlow(Action callback)
+    {
+        var previous = EngineFlow.Value;
+        if (previous is null)
+        {
+            callback();
+            return;
+        }
+        EngineFlow.Value = null;
+        try { callback(); }
+        finally { EngineFlow.Value = previous; }
+    }
+
+    /// <summary>Test hook: does the calling flow count as this facade's
+    /// engine flow (live reads, no lock)?</summary>
+    internal bool IsOnEngineFlow => ReferenceEquals(EngineFlow.Value, this);
+
     /// <summary>Live build when allowed: on the engine flow (single-threaded
     /// by construction, no lock), or while no engine is running (serialised,
     /// since two foreign readers would race each other on the layer caches).
@@ -1698,7 +1724,7 @@ public sealed class GameFacade : IDisposable
     /// snapshot.</summary>
     private GameStateDto? TryReadLive(Player? viewer)
     {
-        if (ReferenceEquals(EngineFlow.Value, this)) return BuildState(viewer);
+        if (_engineRunning && ReferenceEquals(EngineFlow.Value, this)) return BuildState(viewer);
         if (_engineRunning) return null;
         lock (_liveReadLock)
         {
@@ -1800,8 +1826,16 @@ public sealed class GameFacade : IDisposable
     public IDisposable SubscribePrompts(Action<PromptDto> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        Action<IReadOnlyList<Type>> aliceHandler = kinds => handler(BuildPrompt(_alice, _aliceAgent, kinds));
-        Action<IReadOnlyList<Type>> bobHandler = kinds => handler(BuildPrompt(_bob, _bobAgent, kinds));
+        Action<IReadOnlyList<Type>> aliceHandler = kinds =>
+        {
+            var prompt = BuildPrompt(_alice, _aliceAgent, kinds);
+            RunOffEngineFlow(() => handler(prompt));
+        };
+        Action<IReadOnlyList<Type>> bobHandler = kinds =>
+        {
+            var prompt = BuildPrompt(_bob, _bobAgent, kinds);
+            RunOffEngineFlow(() => handler(prompt));
+        };
         _aliceAgent.PromptRequested += aliceHandler;
         _bobAgent.PromptRequested += bobHandler;
         return new Subscription(() =>
@@ -1926,11 +1960,11 @@ public sealed class GameFacade : IDisposable
 
         foreach (var sub in _subscribers.ToList())
         {
-            sub(publicDto);
+            RunOffEngineFlow(() => sub(publicDto));
         }
         foreach (var sub in _envelopeSubscribers.ToList())
         {
-            sub(envelope);
+            RunOffEngineFlow(() => sub(envelope));
         }
     }
 
