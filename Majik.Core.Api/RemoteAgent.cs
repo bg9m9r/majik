@@ -1305,8 +1305,11 @@ public sealed class RemoteAgent : IPlayerAgent
     /// Answered with a <see cref="ChoiceCommand"/> (kind PickN) whose ids come
     /// from <see cref="PromptDto.ChoiceOptions"/> (one per mode, labelled with
     /// the mode text); <see cref="PromptDto.ModeOptions"/> / MinModes / MaxModes
-    /// describe the choice. The answer is sanitised exactly like the
-    /// <see cref="IPlayerAgent"/> default (dedupe, range, min backfill).
+    /// describe the choice. The answer is never repaired: a ChoiceCommand that
+    /// repeats a mode (CR 700.2d), picks fewer than the minimum or more than the
+    /// maximum, or names an id not offered is rejected with a reason and the
+    /// prompt stays pending, the same policy as every prompt (validated in
+    /// <see cref="Resolve"/>'s ChoiceCommand arm).
     /// </summary>
     public async Task<IReadOnlyList<int>> ChooseModesAsync(
         GameContext ctx,
@@ -1332,20 +1335,13 @@ public sealed class RemoteAgent : IPlayerAgent
             decorate: p => p with { ModeOptions = ModeRows(modes), MinModes = min, MaxModes = max })
             .ConfigureAwait(false);
 
-        var seen = new HashSet<int>();
-        var clean = new List<int>();
-        foreach (var o in chosen)
-        {
-            if (o is not int idx || idx < 0 || idx >= modes.Count || !seen.Add(idx)) continue;
-            clean.Add(idx);
-            if (clean.Count >= maxModes) break;
-        }
-        // CR 700.2e — enforce the minimum (backfill from the first unused modes).
-        for (var i = 0; i < modes.Count && clean.Count < minModes; i++)
-        {
-            if (seen.Add(i)) clean.Add(i);
-        }
-        return clean;
+        // Every accepted answer was validated (distinct offered ids, count in
+        // [min, max]). The one unvalidated result is the empty decline handed
+        // to the engine after the game closed (a concession while the prompt
+        // was open): give it the first modes so the cast can unwind.
+        if (chosen.Count == 0 && IsClosed)
+            return Enumerable.Range(0, Math.Min(min, modes.Count)).ToList();
+        return chosen.Cast<int>().ToList();
     }
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)

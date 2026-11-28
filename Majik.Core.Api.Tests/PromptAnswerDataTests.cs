@@ -214,4 +214,39 @@ public class PromptAnswerDataTests
         prompt.MaxModes.Should().BeNull();
         prompt.ChoiceOptions.Should().BeNull();
     }
+
+    [Theory]
+    [InlineData(new[] { 0, 0 }, "more than once")]
+    [InlineData(new[] { 0, 1, 2 }, "between 1 and 2")]
+    [InlineData(new int[0], "between 1 and 2")]
+    public async Task ChooseModes_ADuplicateOrOutOfRangeAnswer_IsRejectedWithAReason_AndThePromptStaysPending(
+        int[] picks, string reason)
+    {
+        // CR 700.2d — no mode twice; CR 700.2 — the pick word's count. Same
+        // policy as every prompt: reject with a reason, keep the prompt open.
+        IPlayerAgent agent = _agent;
+        var task = agent.ChooseModesAsync(null!, new[] { "Counter", "Bounce", "Draw" }, minModes: 1, maxModes: 2);
+        var prompt = _prompts.Should().ContainSingle().Subject;
+        var ids = picks.Select(i => prompt.ChoiceOptions![i].Id).ToArray();
+
+        var act = () => _agent.Submit(Cmd(new ChoiceCommand(prompt.ChoiceView!.Kind, ids)));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage($"*{reason}*");
+        task.IsCompleted.Should().BeFalse("the prompt stays pending");
+        _agent.Submit(Cmd(new ChoiceCommand(prompt.ChoiceView!.Kind, new[] { prompt.ChoiceOptions![1].Id })));
+        (await task).Should().Equal(1);
+    }
+
+    [Fact]
+    public async Task ChooseModes_AnId_NotOffered_IsRejected()
+    {
+        IPlayerAgent agent = _agent;
+        var task = agent.ChooseModesAsync(null!, new[] { "Counter", "Bounce" }, minModes: 1, maxModes: 2);
+        var prompt = _prompts.Should().ContainSingle().Subject;
+
+        var act = () => _agent.Submit(Cmd(new ChoiceCommand(prompt.ChoiceView!.Kind, new[] { Guid.NewGuid() })));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*not in the offered*");
+        task.IsCompleted.Should().BeFalse();
+    }
 }
