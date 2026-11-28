@@ -656,6 +656,8 @@ public class Permanent : Card
         // attached to its target as it resolves (CR 303.4a), before it lands.
         if (from != ZoneType.Stack) Unattach();
         foreach (var attached in _attachments.ToList()) attached.Unattach();
+        // CR 716.2a — a Class enters as a level-1 Class.
+        ClassState?.ResetToLevelOne();
     }
 
     internal void ResetOnLeaveBattlefield()

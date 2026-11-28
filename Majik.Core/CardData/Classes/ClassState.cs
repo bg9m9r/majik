@@ -122,6 +122,11 @@ public sealed class ClassState
         return true;
     }
 
+    /// <summary>CR 716.2a / 400.7 — a Class that enters the battlefield from
+    /// another zone is a new object and a level-1 Class. No level-up event:
+    /// nothing levelled.</summary>
+    internal void ResetToLevelOne() => CurrentLevel = 1;
+
     /// <summary>CR 716.4 — advance to <paramref name="targetLevel"/>.
     /// Returns false if the sequential gate fails (e.g. attempt to skip
     /// from 1 to 3) without mutating state.</summary>

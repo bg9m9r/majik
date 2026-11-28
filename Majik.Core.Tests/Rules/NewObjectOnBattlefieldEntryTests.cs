@@ -183,4 +183,22 @@ public class NewObjectOnBattlefieldEntryTests
         jace.Loyalty.Should().Be(3);
         jace.LoyaltyAbilityActivatedThisTurn.Should().BeFalse();
     }
+
+    [Fact]
+    public void AReturningClass_IsLevelOne()
+    {
+        // CR 716.2a / 400.7 — a Class enters as a level-1 Class; the level the
+        // old object reached does not come back with it.
+        var talent = new Enchantment("Bandit's Talent", "{1}{B}");
+        talent.AttachClassState(new Majik.Core.CardData.Classes.ClassState(4));
+        Put(talent);
+        talent.ClassState!.LevelUp().Should().BeTrue();
+        talent.ClassState!.LevelUp().Should().BeTrue();
+
+        _zones.MoveCard(talent, ZoneType.Battlefield, ZoneType.Hand);
+        talent.ClassState!.CurrentLevel.Should().Be(3, "last known information");
+        _zones.MoveCard(talent, ZoneType.Hand, ZoneType.Battlefield, _alice);
+
+        talent.ClassState!.CurrentLevel.Should().Be(1);
+    }
 }
