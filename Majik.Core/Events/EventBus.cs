@@ -38,6 +38,33 @@ public class EventBus : IEventBus
     private Dictionary<Type, IReadOnlyList<Delegate>> _syncHandlers = new();
     private Dictionary<Type, IReadOnlyList<Delegate>> _asyncHandlers = new();
     private IReadOnlyList<Action<GameEvent>> _globalSyncHandlers = Array.Empty<Action<GameEvent>>();
+    // Observers (the client bridge) run FIRST, before every other handler of
+    // the event, so an event a handler publishes while this one is delivered
+    // (a trigger triggering on a move) reaches them after this one: they see
+    // events in publication order. See IEventBus.SubscribeObserver.
+    private IReadOnlyList<Action<GameEvent>> _observers = Array.Empty<Action<GameEvent>>();
+
+    public void SubscribeObserver(Action<GameEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _observers = Append(_observers, handler);
+    }
+
+    public void UnsubscribeObserver(Action<GameEvent> handler)
+    {
+        if (handler == null) return;
+        _observers = RemoveFrom(_observers, handler);
+    }
+
+    private void NotifyObservers(GameEvent @event)
+    {
+        var observers = _observers;
+        for (var i = 0; i < observers.Count; i++)
+        {
+            var o = observers[i];
+            SafeInvoke(() => o(@event), @event);
+        }
+    }
 
     /// <summary>
     /// Optional sink invoked when a handler throws. Receives the
@@ -75,6 +102,7 @@ public class EventBus : IEventBus
     public void Publish<T>(T @event) where T : GameEvent
     {
         ArgumentNullException.ThrowIfNull(@event);
+        NotifyObservers(@event);
 
         var type = typeof(T);
         // Capture each channel's live reference once. COW guarantees the
@@ -110,6 +138,7 @@ public class EventBus : IEventBus
     public async Task PublishAsync<T>(T @event) where T : GameEvent
     {
         ArgumentNullException.ThrowIfNull(@event);
+        NotifyObservers(@event);
 
         var type = typeof(T);
         if (_syncHandlers.TryGetValue(type, out var sync))

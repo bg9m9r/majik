@@ -409,7 +409,9 @@ public sealed class GameFacade : IDisposable
 
         _loop = BuildPriorityLoop();
 
-        _bus.SubscribeAll(BridgeEvent);
+        // Publication order for clients (C21): the bridge sees an event before
+        // any handler can publish a follow-up (a trigger on a move).
+        _bus.SubscribeObserver(BridgeEvent);
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
         _bus.Subscribe<PhaseStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
