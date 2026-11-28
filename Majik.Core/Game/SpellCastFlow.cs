@@ -1016,16 +1016,24 @@ public sealed class SpellCastFlow
     /// </summary>
     internal static IReadOnlyList<string?> ModeUnavailableReasons(
         SpellDefinition definition, GameContext ctx, bool synthesize)
+        => ModeUnavailableReasons(definition.Modes.Count, definition.TargetRequests, ctx, synthesize);
+
+    /// <summary>The same per-mode reasons for any modal object (a modal
+    /// triggered ability too, CR 603.3c): requests map to modes by
+    /// <see cref="TargetRequest.ModeIndex"/> when all carry one, else by
+    /// position when there is one request per mode; otherwise no mode is
+    /// marked.</summary>
+    internal static IReadOnlyList<string?> ModeUnavailableReasons(
+        int modeCount, IReadOnlyList<TargetRequest> requests, GameContext ctx, bool synthesize)
     {
-        var modeCount = definition.Modes.Count;
         var reasons = new string?[modeCount];
-        if (modeCount == 0 || definition.TargetRequests.Count == 0 || ctx is null) return reasons;
+        if (modeCount == 0 || requests.Count == 0 || ctx is null) return reasons;
 
         IEnumerable<(int Mode, TargetRequest Request)> pairs =
-            definition.TargetRequests.All(r => r.ModeIndex.HasValue)
-                ? definition.TargetRequests.Select(r => (r.ModeIndex!.Value, r))
-                : definition.TargetRequests.Count == modeCount
-                    ? definition.TargetRequests.Select((r, i) => (i, r))
+            requests.All(r => r.ModeIndex.HasValue)
+                ? requests.Select(r => (r.ModeIndex!.Value, r))
+                : requests.Count == modeCount
+                    ? requests.Select((r, i) => (i, r))
                     : Enumerable.Empty<(int, TargetRequest)>();
         foreach (var (mode, request) in pairs)
         {

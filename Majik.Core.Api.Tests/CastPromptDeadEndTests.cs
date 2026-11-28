@@ -22,8 +22,15 @@ public class CastPromptDeadEndTests
     private static readonly EmbeddedCardRepository Repo = new();
 
     private static (GameFacade Facade, Dictionary<string, Land> Lands) Game(params (string Name, CardSubtype Sub)[] lands)
+        => Game(Array.Empty<string>(), lands);
+
+    /// <summary><paramref name="realCards"/> are built the production way
+    /// (shells in Alice's deck, bound by the facade) and moved to her hand.</summary>
+    private static (GameFacade Facade, Dictionary<string, Land> Lands) Game(string[] realCards, params (string Name, CardSubtype Sub)[] lands)
     {
-        var deck = Enumerable.Range(0, 20).Select(_ => (ICard)new Land("Wastes")).ToList();
+        var deck = Enumerable.Range(0, 20).Select(_ => (ICard)new Land("Wastes"))
+            .Concat(realCards.Select(n => DeckCardShellBuilder.Build(Repo.GetByName(n)!)))
+            .ToList();
         var facade = GameFacade.Create("Alice", "Bob", deck, deck.Select(_ => (ICard)new Land("Wastes")).ToList(), cardRepo: Repo);
         var map = new Dictionary<string, Land>();
         var n = 0;
@@ -35,6 +42,13 @@ public class CastPromptDeadEndTests
             OracleManaBinder.BindBasicLandMana(land, facade.Alice);
             facade.Alice.Zones.Battlefield.AddCard(land);
             map[$"{name}{n++}"] = land;
+        }
+        foreach (var name in realCards)
+        {
+            var built = facade.Alice.Zones.Library.GetCards().First(c => c.Name == name);
+            facade.Alice.Zones.Library.RemoveCard(built);
+            facade.Alice.Zones.Hand.AddCard(built);
+            built.SetZone(ZoneType.Hand);
         }
         return (facade, map);
     }
@@ -183,5 +197,28 @@ public class CastPromptDeadEndTests
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         raised.Should().Be(0, "a prompt that can't be answered legally is never raised");
+    }
+
+    [Fact]
+    public async Task AModalTrigger_ShipsEachModesAvailability_LikeAModalSpell()
+    {
+        // CR 700.2 / 603.3c — Knight of Autumn's ETB: "destroy target artifact
+        // or enchantment" can't be chosen with none on the battlefield; the
+        // other two modes can.
+        var (facade, _) = Game(new[] { "Knight of Autumn" },
+            ("Forest", CardSubtype.Forest), ("Plains", CardSubtype.Plains), ("Forest", CardSubtype.Forest));
+        var knight = (Card)facade.Alice.Zones.Hand.GetCards().First(c => c.Name == "Knight of Autumn");
+        PromptDto? modes = null;
+
+        await Drive(facade, knight, p =>
+        {
+            if (p.ModeOptions == null) return null;
+            modes ??= p;
+            return new ChooseModeCommand(2);
+        });
+
+        modes.Should().NotBeNull("the ETB trigger asks for its mode");
+        modes!.ModeOptions!.Select(m => m.IsChoosable).Should().Equal(true, false, true);
+        modes.ModeOptions![1].UnavailableReason.Should().Contain("artifact or enchantment");
     }
 }

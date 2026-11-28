@@ -389,13 +389,29 @@ public class TriggerManager
                 // (none registered for this controller) records nothing, so the
                 // effect body falls back to its factory default — behaviour-
                 // preserving for the no-agent dispatcher path.
+                HashSet<int>? chosenModeSet = null;
                 if (ability is TriggeredAbility modal
                     && modal.ModeRequest is { } modeReq
                     && agent != null)
                 {
+                    // CR 700.2 / 603.3c — a mode whose targets can't be chosen
+                    // can't be chosen. Requests tied to a mode by ModeIndex
+                    // give the same per-mode reasons a modal spell ships.
+                    var modeTagged = ModeTagged(modal);
+                    var reasons = modeTagged
+                        ? Game.SpellCastFlow.ModeUnavailableReasons(
+                            modeReq.Modes.Count, modal.TargetRequests, ctx, agent.WantsSynthesizedTargetCandidates)
+                        : new string?[modeReq.Modes.Count];
+                    if (reasons.Count(r => r == null) < Math.Max(1, modeReq.MinModes))
+                    {
+                        // CR 603.3c — no legal choice of modes: the ability is
+                        // removed from the stack.
+                        continue;
+                    }
                     var chosenModes = await ChooseModesForTriggerAsync(
-                        agent, modeReq, ctx, ct);
+                        agent, modeReq, reasons, ctx, ct);
                     modal.SetChosenModes(chosenModes);
+                    if (modeTagged) chosenModeSet = new HashSet<int>(chosenModes);
                 }
 
                 // Prompt for targets if the concrete ability has declared any
@@ -409,13 +425,36 @@ public class TriggerManager
                     // every fire via each request's CandidateGatherer. A null
                     // agent (no agent registered for this controller) resolves
                     // every request to an empty pick — behaviour-preserving.
-                    var collected = await Targeting.TargetCollection.CollectAsync(
-                        ta.TargetRequests,
-                        card: ta.Source as Cards.ICard,
-                        ctx,
-                        agent,
-                        throwOnInsufficient: false,
-                        ct);
+                    List<IReadOnlyList<object>> collected;
+                    if (chosenModeSet != null)
+                    {
+                        // CR 700.2 — only a chosen mode's targets are chosen;
+                        // the slots keep their request positions (factories
+                        // read ChosenTargets[requestIndex]).
+                        collected = new List<IReadOnlyList<object>>(ta.TargetRequests.Count);
+                        foreach (var req in ta.TargetRequests)
+                        {
+                            if (!chosenModeSet.Contains(req.ModeIndex!.Value))
+                            {
+                                collected.Add(Array.Empty<object>());
+                                continue;
+                            }
+                            var one = await Targeting.TargetCollection.CollectAsync(
+                                new[] { req.AsChosenMode() }, card: ta.Source as Cards.ICard,
+                                ctx, agent, throwOnInsufficient: false, ct);
+                            collected.Add(one.Count > 0 ? one[0] : Array.Empty<object>());
+                        }
+                    }
+                    else
+                    {
+                        collected = await Targeting.TargetCollection.CollectAsync(
+                            ta.TargetRequests,
+                            card: ta.Source as Cards.ICard,
+                            ctx,
+                            agent,
+                            throwOnInsufficient: false,
+                            ct);
+                    }
                     ta.SetChosenTargets(collected);
 
                     // CR 601.2d / CR 119.4 — for a "deals N damage divided as
@@ -463,15 +502,19 @@ public class TriggerManager
     /// hard-requires a non-null context (and throws) falls back to the first
     /// <see cref="ModeRequest.MinModes"/> modes so the trigger still resolves.
     /// </summary>
+    private static bool ModeTagged(TriggeredAbility modal) =>
+        modal.TargetRequests.Count > 0 && modal.TargetRequests.All(r => r.ModeIndex.HasValue);
+
     private static async Task<IReadOnlyList<int>> ChooseModesForTriggerAsync(
-        IPlayerAgent agent, ModeRequest req, GameContext ctx, CancellationToken ct)
+        IPlayerAgent agent, ModeRequest req, IReadOnlyList<string?> unavailable,
+        GameContext ctx, CancellationToken ct)
     {
         try
         {
             if (req.IsSingleMode)
             {
-                var single = await agent.ChooseModeAsync(
-                    ctx, req.Modes, req.ModeIntents, ct).ConfigureAwait(false);
+                var single = await agent.ChooseModeAmongAsync(
+                    ctx, req.Modes, unavailable, req.ModeIntents, ct).ConfigureAwait(false);
                 if (single >= 0 && single < req.Modes.Count)
                 {
                     return new[] { single };
@@ -479,8 +522,8 @@ public class TriggerManager
             }
             else
             {
-                var multi = await agent.ChooseModesAsync(
-                    ctx, req.Modes, req.MinModes, req.MaxModes, req.ModeIntents, ct)
+                var multi = await agent.ChooseModesAmongAsync(
+                    ctx, req.Modes, req.MinModes, req.MaxModes, unavailable, req.ModeIntents, ct)
                     .ConfigureAwait(false);
                 if (multi.Count > 0) return multi;
             }
@@ -492,9 +535,12 @@ public class TriggerManager
             // as the factory-time PickModeAsync fallback).
         }
 
-        // CR 700.2e — deterministic fallback: the first MinModes modes.
+        // CR 700.2e — deterministic fallback: the first MinModes modes that
+        // can be chosen (the caller has checked enough of them can).
         var n = Math.Clamp(req.MinModes, 1, Math.Max(1, req.Modes.Count));
-        return Enumerable.Range(0, n).ToList();
+        var choosable = Enumerable.Range(0, req.Modes.Count)
+            .Where(i => i >= unavailable.Count || unavailable[i] == null).ToList();
+        return (choosable.Count >= n ? choosable : Enumerable.Range(0, req.Modes.Count).ToList()).Take(n).ToList();
     }
 
     public void Clear()
