@@ -38,7 +38,7 @@ namespace Majik.Core.Costs;
 ///   family — Goblin Bombardment / Skirk Prospector / Walking Ballista's
 ///   ping targeting).
 /// </summary>
-public sealed class SacrificeAnotherCreatureOrBloodTokenCost : ICost
+public sealed class SacrificeAnotherCreatureOrBloodTokenCost : ICost, IChoosePermanentToSacrificeCost
 {
     private readonly Permanent _self;
     private readonly IEventBus? _eventBus;
@@ -64,6 +64,14 @@ public sealed class SacrificeAnotherCreatureOrBloodTokenCost : ICost
     public string Description =>
         $"sacrifice a creature other than {_self.Name} or a Blood token";
 
+    /// <inheritdoc/>
+    /// <remarks>CR 117.1 — the player paying the cost chooses; the activation
+    /// asks through <see cref="Majik.Core.Game.SacrificeCostPrompt"/>.</remarks>
+    public IReadOnlyList<Permanent> EligiblePermanents(Player player) =>
+        player.Zones.Battlefield.GetCards().OfType<Permanent>().Where(IsEligible).ToList();
+
+    /// <inheritdoc/>
+    public void ChoosePermanent(Permanent? permanent) => Target = permanent;
     /// <inheritdoc/>
     public bool CanPay(Player player)
     {

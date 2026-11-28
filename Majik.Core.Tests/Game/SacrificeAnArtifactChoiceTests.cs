@@ -93,6 +93,27 @@ public class SacrificeAnArtifactChoiceTests
     }
 
     [Fact]
+    public async Task ACreatureOrBloodTokenCost_AsksWhichToSacrifice()
+    {
+        // Falkenrath Pit Fighter: "Sacrifice another creature or a Blood
+        // token" — the controller chooses between them (CR 117.1).
+        var fighter = OnBattlefield(new Creature("Falkenrath Pit Fighter", "{R}", 2, 1));
+        var bear = OnBattlefield(new Creature("Bear", "{1}{G}", 2, 2));
+        var blood = OnBattlefield(new Artifact("Blood", "", subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Blood }));
+        var cost = new SacrificeAnotherCreatureOrBloodTokenCost(fighter);
+        var ability = new ActivatedAbility(source: fighter, controller: _alice, costs: new ICost[] { cost },
+            effects: new IEffect[] { new Effect("noop", () => { }) });
+        var agent = new PickingAgent(c => c.Single(o => ReferenceEquals(o, bear)));
+
+        await SacrificeCostPrompt.ChooseSacrificesAsync(_alice, ability, agent, Ctx(_alice));
+        cost.Pay(_alice);
+
+        agent.Offered.Should().BeEquivalentTo(new object[] { bear, blood });
+        bear.Zone.Should().Be(ZoneType.Graveyard);
+        blood.Zone.Should().Be(ZoneType.Battlefield);
+    }
+
+    [Fact]
     public async Task TheSource_IsSacrificed_WhenItIsTheOnlyArtifact()
     {
         var ravager = OnBattlefield(new Artifact("Arcbound Ravager", "{2}"));
