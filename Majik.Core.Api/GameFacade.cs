@@ -1120,9 +1120,18 @@ public sealed class GameFacade : IDisposable
             {
                 result = await run.ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (ConcedingPlayer is not null)
+            catch (Exception ex) when (ConcedingPlayer is not null)
             {
-                // Winner settled by FixGameResult below.
+                // CR 104.3a — the game ended by concession. Declined prompts
+                // can surface as a cancellation, or as a fault in engine/card
+                // code that consumed a decline it didn't expect (e.g. indexed
+                // [0] of an empty choice). Either way the concession decides the
+                // game: contain it (a fault is reported, not rethrown) and end
+                // with the concession result, settled by FixGameResult below.
+                if (ex is not OperationCanceledException)
+                {
+                    ReportContainedFault(ex, "engine fault while unwinding after a concession; game ended by the concession");
+                }
                 result = new GameDriver.GameResult(_currentTurn, null, startingPlayer);
             }
             BeforeGameResultForTest?.Invoke();
@@ -1245,9 +1254,14 @@ public sealed class GameFacade : IDisposable
             {
                 await run.ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (ConcedingPlayer is not null)
+            catch (Exception ex) when (ConcedingPlayer is not null)
             {
-                // Single-round loop: a cancelled decline is the expected exit.
+                // Single-round loop: a cancelled decline is the expected exit;
+                // any other fault while unwinding is contained (see RunDriverAsync).
+                if (ex is not OperationCanceledException)
+                {
+                    ReportContainedFault(ex, "engine fault while unwinding after a concession; game ended by the concession");
+                }
             }
         }
         if (player != null && _fullGameTask == null)

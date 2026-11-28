@@ -156,6 +156,37 @@ public sealed class GameFacadeConcedeTests
     }
 
     [Fact]
+    public async Task Concede_WhileAClosureThatIndexesTheAnswerIsWaiting_EndsCleanly()
+    {
+        // Engine-flow code (here: Bob's seat, standing in for a card closure
+        // that asks the opponent to choose) awaits Alice's choice and indexes
+        // [0]. The concession declines it with an empty list, so that code
+        // throws while the game unwinds: the game must still end as a clean
+        // concession, not a faulted FullGameTask.
+        GameFacade? facade = null;
+        var bot = new GatedBotAgent(async ctx =>
+        {
+            var alice = Agent(facade!, "_aliceAgent");
+            var picks = await alice.ChooseAsync(ctx, new ChoiceRequest(
+                ChoiceKind.PickOne, "Choose a player", 1, 1, new object[] { facade!.Alice, facade.Bob }));
+            _ = picks[0];
+        });
+        var h = NewHarness(bot);
+        var f = facade = h.Facade;
+        await f.StartFullGameAsync(firstPlayerSlot: 1, maxTurns: 10, rng: new GameRandom(3));
+        var mulligan = await h.NextAsync(p => p.PlayerId == f.Alice.Id && p.ExpectedKinds.Contains(nameof(MulliganCommand)));
+        await f.SubmitAsync(new MulliganCommand(Keep: true) { PlayerId = mulligan.PlayerId });
+        await h.NextAsync(p => p.PlayerId == f.Alice.Id && p.ExpectedKinds.Contains(nameof(ChoiceCommand)));
+
+        await f.ConcedeAsync(f.Alice.Id).WaitAsync(Timeout);
+
+        var result = await AwaitGameAsync(f);
+        result.Winner.Should().BeSameAs(f.Bob);
+        f.Alice.HasLost.Should().BeTrue();
+        h.PlayerLostEvents.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Concede_Twice_IsANoOp()
     {
         var h = NewHarness();
@@ -216,7 +247,7 @@ public sealed class GameFacadeConcedeTests
     /// test releases it — models "the opponent bot is acting" deterministically.
     /// Every other decision is the minimal legal answer.
     /// </summary>
-    private sealed class GatedBotAgent : IPlayerAgent
+    private sealed class GatedBotAgent(Func<GameContext, Task>? decide = null) : IPlayerAgent
     {
         private readonly TaskCompletionSource _deciding = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -228,8 +259,13 @@ public sealed class GameFacadeConcedeTests
 
         public async Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
         {
-            Interlocked.Increment(ref _decisions);
+            var first = Interlocked.Increment(ref _decisions) == 1;
             _deciding.TrySetResult();
+            if (decide != null)
+            {
+                if (first) await decide(ctx).ConfigureAwait(false);
+                return PriorityAction.Pass;
+            }
             await _release.Task.ConfigureAwait(false);
             return PriorityAction.Pass;
         }
