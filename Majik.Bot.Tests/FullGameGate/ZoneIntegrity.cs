@@ -17,7 +17,22 @@ public static class ZoneIntegrity
     };
 
     /// <summary>A card found in more than one zone (across every player's zones).</summary>
-    public sealed record Duplicate(ICard Card, ZoneType FirstZone, ZoneType SecondZone);
+    public sealed record Duplicate(ICard Card, ZoneType FirstZone, ZoneType SecondZone)
+    {
+        /// <summary>"ZoneIntegrity|card|ZoneA+ZoneB", the two zones ordered by
+        /// name. The pair separates different desyncs of one card (left on the
+        /// Stack after resolving to the Battlefield vs to the Graveyard), and
+        /// ordering it keeps the signature independent of the scan order.</summary>
+        public string Signature
+        {
+            get
+            {
+                var zones = new[] { FirstZone.ToString(), SecondZone.ToString() };
+                Array.Sort(zones, StringComparer.Ordinal);
+                return $"ZoneIntegrity|{Card.Name}|{zones[0]}+{zones[1]}";
+            }
+        }
+    }
 
     public static IReadOnlyList<Duplicate> FindDuplicates(IEnumerable<Player> players)
     {

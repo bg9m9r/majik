@@ -30,21 +30,37 @@ public class FullGameGateTests
     /// (a NEW signature still fails). Use only for a proven-intermittent bug.</param>
     private sealed record Known(string Reason, int Issue, bool Intermittent = false);
 
+    private const string StaysOnStack = "the card stays in the Stack zone after it moves on (CR 400.1)";
+
     // signature → why it is tolerated + the tracking issue.
     // 3544 = engine crashes / contained faults; 3545 = zone desync; 3543 = this gate.
     private static readonly IReadOnlyDictionary<string, Known> AllowList = new Dictionary<string, Known>
     {
-        ["ZoneIntegrity|Aether Vial"] = new("in both the Stack and the Battlefield after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Chalice of the Void"] = new("in both the Stack and the Battlefield after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Claws of Gix"] = new("in both the Stack and the Battlefield after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Mox Opal"] = new("in both the Stack and the Battlefield after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Mishra's Bauble"] = new("in both the Stack and the Graveyard after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Tormod's Crypt"] = new("in both the Stack and the Graveyard after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Walking Ballista"] = new("in both the Stack and the Graveyard after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        ["ZoneIntegrity|Welding Jar"] = new("in both the Stack and the Graveyard after being cast: the card stays in the Stack zone after it moves on (CR 400.1)", 3545),
-        // Seen once in ~25 full passes (SultaiMidrange vs EsperBlink seed 1), on a
-        // nondeterministically reached game path.
-        ["ZoneIntegrity|Shardless Agent"] = new("intermittent: the card is found in two zones at once (CR 400.1)", 3545, Intermittent: true),
+        // Derived from ten Release runs at the Part 2 tip; every entry below
+        // was observed, and each not marked Intermittent was seen in every run.
+        // The card stays in the Stack zone after it moves on
+        // (CR 400.1): to the Battlefield when it resolves; to the Graveyard,
+        // then Exile, as it is sacrificed and its card exiled (Ballista,
+        // Bauble, Jar, all in EldraziTron games).
+        ["ZoneIntegrity|Chalice of the Void|Battlefield+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Claws of Gix|Battlefield+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Mox Opal|Battlefield+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Mox Opal|Graveyard+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Mishra's Bauble|Exile+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Mishra's Bauble|Graveyard+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Tormod's Crypt|Graveyard+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Walking Ballista|Exile+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Walking Ballista|Graveyard+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Welding Jar|Exile+Stack"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Welding Jar|Graveyard+Stack"] = new(StaysOnStack, 3545),
+        // The same leftover, on a path where the card is then shuffled into its
+        // library: 1 of 10 runs (EldraziTron vs SultaiMidrange seed 1).
+        ["ZoneIntegrity|Walking Ballista|Library+Stack"] = new("intermittent: " + StaysOnStack, 3545, Intermittent: true),
+        // Not a Stack leftover: a second desync the name-only signature hid
+        // (10/10 runs, SultaiMidrange vs Affinity seed 0).
+        ["ZoneIntegrity|Mox Opal|Graveyard+Library"] = new("in both the Graveyard and the Library (CR 400.1)", 3545),
+        // 3 of 9 runs (Yawg vs Affinity seed 1).
+        ["ZoneIntegrity|Engineered Explosives|Exile+Graveyard"] = new("intermittent: in both the Graveyard and Exile (CR 400.1)", 3545, Intermittent: true),
         // A live loop: state-based actions keep executing (millions of
         // StateBasedActionExecutedEvent in 60s, CR 704.3 never converges) until
         // the timeout cancels the game. Seen only in Yawg games (GoryoVengeance vs

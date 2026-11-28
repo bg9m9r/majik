@@ -1,5 +1,8 @@
 using FluentAssertions;
 using Majik.Core.Api;
+using Majik.Core.Cards;
+using Majik.Core.Players;
+using Majik.Core.Zones;
 using Majik.Core.Events;
 using Xunit;
 
@@ -59,5 +62,23 @@ public class FullGameGateRunnerTests
         {
             GameFacade.OnEventHandlerError = previous;
         }
+    }
+
+    [Fact]
+    public void AZoneDesync_SignatureNamesTheCardAndBothZones_InAFixedOrder()
+    {
+        // CR 400.1: a card in two zones at once. The pair is part of the
+        // signature (Stack+Battlefield and Stack+Graveyard are different bugs)
+        // and is ordered by name so the scan order of the zones cannot change it.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var opal = new Artifact("Mox Opal", "{0}");
+        alice.Zones.Battlefield.AddCard(opal);
+        bob.Zones.Stack.AddCard(opal);
+
+        var dup = ZoneIntegrity.FindDuplicates(new[] { alice, bob }).Should().ContainSingle().Subject;
+        dup.Signature.Should().Be("ZoneIntegrity|Mox Opal|Battlefield+Stack");
+        new ZoneIntegrity.Duplicate(opal, ZoneType.Stack, ZoneType.Battlefield).Signature
+            .Should().Be(dup.Signature);
     }
 }

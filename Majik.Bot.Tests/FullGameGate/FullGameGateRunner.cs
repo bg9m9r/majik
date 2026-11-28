@@ -26,7 +26,7 @@ public sealed record GateGameResult(GateGame Game, IReadOnlyDictionary<string, s
 /// engine fault was reported on its flow, and (d) no event handler threw (only
 /// while <see cref="CaptureHandlerFaults"/> is open). A failure becomes a stable
 /// signature: exception type + top engine frame for faults, invariant name +
-/// card name for zone integrity, and the last event type for a hang (a hang has
+/// card name + zone pair for zone integrity, and the last event type for a hang (a hang has
 /// no frame to key on: the stuck flow's stack is not observable from here).
 /// </summary>
 public static class FullGameGateRunner
@@ -157,7 +157,7 @@ public static class FullGameGateRunner
                 if (e is TurnStartedEvent ts) lastTurn = ts.TurnNumber;
                 if (e is not StepStartedEvent) return;
                 foreach (var d in ZoneIntegrity.FindDuplicates(players))
-                    sigs.TryAdd($"ZoneIntegrity|{d.Card.Name}", $"{d.FirstZone} and {d.SecondZone}");
+                    sigs.TryAdd(d.Signature, $"{d.FirstZone} and {d.SecondZone}");
             });
 
             using var cts = new CancellationTokenSource(timeout);
@@ -181,7 +181,7 @@ public static class FullGameGateRunner
                 sigs.TryAdd(Signature("GameFault", ex), ex.Message);
             }
             foreach (var d in ZoneIntegrity.FindDuplicates(players))
-                sigs.TryAdd($"ZoneIntegrity|{d.Card.Name}", $"{d.FirstZone} and {d.SecondZone}");
+                sigs.TryAdd(d.Signature, $"{d.FirstZone} and {d.SecondZone}");
         }
         catch (Exception ex)
         {
