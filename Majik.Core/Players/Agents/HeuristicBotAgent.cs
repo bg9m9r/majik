@@ -821,6 +821,17 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     ///   + gain life / prevent        — value when our life is low
     ///   + create / put — board-build, valuable when our board is light
     /// Highest-scored index wins. Tie-break: first.</summary>
+    /// <summary>CR 700.2 — multi-mode pick: see <see cref="BotModeChoice"/>.</summary>
+    public async Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => BotModeChoice.FromBestMode(
+            await ChooseModeAsync(ctx, modes, modeIntents, ct).ConfigureAwait(false), modes.Count, minModes);
+
     public Task<int> ChooseModeAsync(
         GameContext ctx,
         IReadOnlyList<string> modes,

@@ -183,6 +183,16 @@ public sealed class BotPlayerAgent : IPlayerAgent
         CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickMode(ctx, _self, modes), ct);
 
+    /// <summary>CR 700.2 — multi-mode pick: see <see cref="BotModeChoice"/>.</summary>
+    public Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => WrapAsync(() => BotModeChoice.FromBestMode(_strategy.PickMode(ctx, _self, modes), modes.Count, minModes), ct);
+
     /// <summary>
     /// CR 614.12 / CR 201.4 — "choose a card name" heuristic. The engine
     /// surveys the chooser's known information and hands us a

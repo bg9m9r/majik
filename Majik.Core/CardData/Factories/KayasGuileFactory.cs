@@ -157,6 +157,9 @@ public static class KayasGuileFactory
             Modes: Modes,
             HasVariableX: false,
             TargetRequests: Array.Empty<TargetRequest>(),
+            // CR 700.2 / 702.41 — "Choose two", or all four when entwined.
+            MinModes: entwined ? TotalModes : PickCount,
+            MaxModes: entwined ? TotalModes : PickCount,
             ModeIntents: new[]
             {
                 BotIntent.Removal, // each opponent sacrifices a creature
@@ -178,7 +181,8 @@ public static class KayasGuileFactory
 
                 var effects = new List<IEffect>();
                 var seen = new HashSet<int>();
-                foreach (var raw in indices)
+                // CR 608.2c — chosen modes resolve in printed order.
+                foreach (var raw in ChosenModes.InPrintedOrder(indices, TotalModes, cap))
                 {
                     if (raw < 0 || raw >= TotalModes) continue;
                     if (!seen.Add(raw)) continue;  // CR 700.2e — each mode at most once

@@ -159,9 +159,12 @@ public class AtarkasCommandFactoryTests
             AtarkasCommandFactory.ModeDamageEach);
 
         var effects = def.EffectFactory(chosen);
-        // Mode 2 is the first chosen mode.
-        effects[0].Execute();
+        // CR 608.2c — the chosen modes resolve in printed order: mode 1 (3
+        // damage to each opponent), then mode 2 (the land).
+        effects.Should().HaveCount(2);
+        foreach (var effect in effects) effect.Execute();
 
+        _bob.LifeTotal.Should().Be(17, "mode 1 resolved too");
         forest.Zone.Should().Be(ZoneType.Battlefield,
             because: "mode 2 puts a land from hand onto the battlefield (CR 113.6c)");
         _alice.Zones.Battlefield.GetCards().Should().Contain(forest);
