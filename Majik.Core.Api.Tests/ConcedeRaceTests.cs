@@ -24,9 +24,9 @@ public class ConcedeRaceTests
             .GetValue(facade)!;
 
     [Fact]
-    public async Task SubmitRacingConcede_NothingAppliedAfterConcedeReturns_RejectedSubmitsNeverApply_NoFault()
+    public async Task SubmitRacingConcede_RejectedSubmitsNeverApply_NoFault()
     {
-        int appliedAfterConcedeReturned = 0, appliedWithoutAcceptance = 0, accepted = 0, rejectedAsOver = 0;
+        int appliedWithoutAcceptance = 0, accepted = 0, rejectedAsOver = 0;
         for (var i = 0; i < 200; i++)
         {
             var deck = Enumerable.Range(0, 10).Select(_ => (ICard)new Land("Forest")).ToList();
@@ -34,13 +34,10 @@ public class ConcedeRaceTests
             var land = new Land("Forest");
             land.SetOwner(facade.Alice); land.SetController(facade.Alice);
             facade.Alice.Zones.Hand.AddCard(land); land.SetZone(Majik.Core.Zones.ZoneType.Hand);
-            var concedeReturned = false;
             var landEntered = false;
             facade.EventBus.Subscribe<CardMovedEvent>(e =>
             {
-                if (!ReferenceEquals(e.Card, land) || e.ToZone != Majik.Core.Zones.ZoneType.Battlefield) return;
-                landEntered = true;
-                if (Volatile.Read(ref concedeReturned)) Interlocked.Increment(ref appliedAfterConcedeReturned);
+                if (ReferenceEquals(e.Card, land) && e.ToZone == Majik.Core.Zones.ZoneType.Battlefield) landEntered = true;
             });
             await facade.StartAsync();
 
@@ -63,7 +60,6 @@ public class ConcedeRaceTests
             {
                 go.Wait();
                 await facade.ConcedeAsync(facade.Alice.Id);
-                Volatile.Write(ref concedeReturned, true);
             });
             go.Set();
             await Task.WhenAll(submit, concede).WaitAsync(TimeSpan.FromSeconds(10));
@@ -79,9 +75,48 @@ public class ConcedeRaceTests
                     .Should().Throw<InvalidOperationException>().WithMessage("*game is over*");
             }
         }
-        appliedAfterConcedeReturned.Should().Be(0, "no command is applied after ConcedeAsync returns");
         appliedWithoutAcceptance.Should().Be(0, "a rejected Submit is never applied");
         (accepted + rejectedAsOver).Should().Be(200, "every racing Submit is either accepted before the concession or rejected as game over");
+    }
+
+    [Fact]
+    public async Task AnAnswerAcceptedBeforeTheConcession_ButPickedUpAfterIt_IsDeclinedAndNeverApplied()
+    {
+        // CR 104.3a — the conceder leaves the game at once. An answer the seat
+        // accepted before the close, but which the engine only picks up after
+        // it, is replaced by the decline value (pass priority) — the land is
+        // never played.
+        var deck = Enumerable.Range(0, 10).Select(_ => (ICard)new Land("Forest")).ToList();
+        var facade = GameFacade.Create("Alice", "Bob", deck, deck.ToList());
+        var land = new Land("Forest");
+        land.SetOwner(facade.Alice); land.SetController(facade.Alice);
+        facade.Alice.Zones.Hand.AddCard(land); land.SetZone(Majik.Core.Zones.ZoneType.Hand);
+        var landEntered = false;
+        facade.EventBus.Subscribe<CardMovedEvent>(e =>
+        {
+            if (ReferenceEquals(e.Card, land) && e.ToZone == Majik.Core.Zones.ZoneType.Battlefield) landEntered = true;
+        });
+        await facade.StartAsync();
+
+        var alice = Seat(facade, "_aliceAgent");
+        var held = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        alice.BeforeAnswerPickupForTest = () => { held.TrySetResult(); return release.Task; };
+        alice.HasPending.Should().BeTrue("Alice holds priority with a land in hand");
+
+        alice.Submit(new PlayLandCommand(land.InstanceId) { PlayerId = facade.Alice.Id }); // accepted
+        await held.Task.WaitAsync(TimeSpan.FromSeconds(10));                                 // engine held before pickup
+
+        var concede = facade.ConcedeAsync(facade.Alice.Id);
+        facade.Alice.HasLost.Should().BeTrue("the concession closed the seats while the answer was held");
+        release.TrySetResult();
+        await concede.WaitAsync(TimeSpan.FromSeconds(10));
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!facade.IsRoundComplete && DateTime.UtcNow < deadline) await Task.Delay(5);
+        facade.IsRoundComplete.Should().BeTrue("the engine runs to its game-over gate");
+
+        landEntered.Should().BeFalse("an answer picked up after the concession is replaced by the decline");
+        land.Zone.Should().Be(Majik.Core.Zones.ZoneType.Hand);
     }
     [Fact]
     public async Task Concede_WhenTheOpponentHasAlsoLost_IsADraw_AndEachLossIsPublishedOnce()

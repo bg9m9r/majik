@@ -1899,6 +1899,20 @@ public sealed class RemoteAgent : IPlayerAgent
         var delivered = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         answer.ContinueWith(t =>
         {
+            // Test seam: hold the engine between the answer's acceptance and
+            // its pickup, then deliver exactly as below.
+            if (BeforeAnswerPickupForTest is { } hold)
+            {
+                hold().ContinueWith(_ => Hand(t), CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                return;
+            }
+            Hand(t);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return delivered.Task;
+
+        void Hand(Task<T> t)
+        {
             if (IsClosed && t.IsCompletedSuccessfully)
             {
                 Decline(delivered);
@@ -1907,9 +1921,12 @@ public sealed class RemoteAgent : IPlayerAgent
             if (t.IsCanceled) delivered.TrySetCanceled();
             else if (t.IsFaulted) delivered.TrySetException(t.Exception!.InnerExceptions);
             else delivered.TrySetResult(t.Result);
-        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-        return delivered.Task;
+        }
     }
+
+    /// <summary>Test seam: awaited after an answer is accepted and before the
+    /// engine picks it up (<see cref="DeliverUnlessClosed"/>).</summary>
+    internal Func<Task>? BeforeAnswerPickupForTest { get; set; }
 
     /// <summary>
     /// CR 104.3a — close every seat AND run <paramref name="whileClosing"/>
