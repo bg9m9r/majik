@@ -54,16 +54,18 @@ internal static class DamageSpellFactory
     /// the intent was cancelled or zeroed and the caller should skip the
     /// state mutation entirely.
     ///
-    /// Source for the intent is the casting <see cref="Player"/> — direct
-    /// damage spells don't carry an ICard reference into the effect closure
-    /// today. The PreventAllCombatDamageShield filters on Creature source so
-    /// Fog stays combat-only; redirection / mass prevention effects can hook
-    /// here once they exist. Fully card-aware source threading is a
-    /// follow-up.
+    /// CR 120.1 / 609.7 — the source of the damage is the spell: the card of
+    /// the spell resolving on <paramref name="stack"/>, so a replacement keyed
+    /// on the source's colour, type or controller (protection, "prevent all
+    /// damage from red sources", Soul-Scar Mage) reads the spell.
+    /// <paramref name="fallbackSource"/> (the caster) is used only when no
+    /// spell is resolving (a direct effect call with no stack).
     /// </summary>
-    private static int Filter(ReplacementBus? bus, object source, object target, int n)
+    private static int Filter(
+        ReplacementBus? bus, Majik.Core.Stack.Stack? stack, object fallbackSource, object target, int n)
     {
         if (bus == null) return n;
+        var source = (object?)(stack?.CurrentlyResolving as Majik.Core.Spells.ISpell)?.Card ?? fallbackSource;
         var intent = target switch
         {
             Creature c => new DamageIntent(source, n, TargetCreature: c),
@@ -95,7 +97,7 @@ internal static class DamageSpellFactory
             var target = resolver(p.Targets[0][0]);
             return new IEffect[] { new Effect($"deal {n}", () =>
             {
-                var amount = Filter(replacements, (object?)caster ?? target, target, n);
+                var amount = Filter(replacements, stack, (object?)caster ?? target, target, n);
                 if (amount <= 0) return;
                 OracleSpellBinder.DealDamage(target, amount);
                 EmitDamageDealt(bus, caster, stack, target, amount);
@@ -125,7 +127,7 @@ internal static class DamageSpellFactory
                 // CR 800.4a / 104.3a — a player who has already left the game
                 // can't be dealt damage; LoseLife would throw on a lost player.
                 if (player.HasLost) return;
-                var amount = Filter(replacements, (object?)caster ?? target, player, n);
+                var amount = Filter(replacements, stack, (object?)caster ?? target, player, n);
                 if (amount <= 0) return;
                 player.LoseLife(amount);
                 EmitDamageDealt(bus, caster, stack, player, amount);
@@ -212,7 +214,7 @@ internal static class DamageSpellFactory
             return new IEffect[] { new Effect($"deal {n} to creature", () =>
             {
                 if (target is not Creature creature) return;
-                var amount = Filter(replacements, (object?)caster ?? creature, creature, n);
+                var amount = Filter(replacements, stack, (object?)caster ?? creature, creature, n);
                 if (amount <= 0) return;
                 creature.TakeDamage(amount);
                 EmitDamageDealt(bus, caster, stack, creature, amount);
@@ -239,7 +241,7 @@ internal static class DamageSpellFactory
             var x = p.X ?? 0;
             return new IEffect[] { new Effect($"deal X={x}", () =>
             {
-                var amount = Filter(replacements, (object?)caster ?? target, target, x);
+                var amount = Filter(replacements, stack, (object?)caster ?? target, target, x);
                 if (amount <= 0) return;
                 OracleSpellBinder.DealDamage(target, amount);
                 EmitDamageDealt(bus, caster, stack, target, amount);
@@ -267,7 +269,7 @@ internal static class DamageSpellFactory
             return new IEffect[] { new Effect($"deal X={x} to creature", () =>
             {
                 if (target is not Creature creature) return;
-                var amount = Filter(replacements, (object?)caster ?? creature, creature, x);
+                var amount = Filter(replacements, stack, (object?)caster ?? creature, creature, x);
                 if (amount <= 0) return;
                 creature.TakeDamage(amount);
                 EmitDamageDealt(bus, caster, stack, creature, amount);
@@ -340,7 +342,7 @@ internal static class DamageSpellFactory
                     if (share <= 0) continue;
                     var target = resolver(slots[i]);
                     if (target is null) continue; // illegal at resolution (CR 608.2b)
-                    var amount = Filter(replacements, (object?)caster ?? target, target, share);
+                    var amount = Filter(replacements, stack, (object?)caster ?? target, target, share);
                     if (amount <= 0) continue;
                     OracleSpellBinder.DealDamage(target, amount);
                     EmitDamageDealt(bus, caster, stack, target, amount);
