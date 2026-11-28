@@ -264,7 +264,11 @@ public class TemplateTargetFilterScannerTests
         }
         return (mismatches.Distinct().ToList(), compared, unaligned);
     }
+
+    // Its own CI step (ci.yml "Target-filter scanner") so the mismatch table
+    // is readable in the log; the Core test step excludes this category.
     [Fact]
+    [Trait("Category", "Scanner")]
     public void BoundTargetFilters_MatchTheOraclePhrase_ExceptTheAllowListedOnes()
     {
         var (found, compared, unaligned) = Scan();
