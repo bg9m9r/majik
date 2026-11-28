@@ -1414,6 +1414,29 @@ public sealed class RemoteAgent : IPlayerAgent
         return ids;
     }
 
+    /// <summary>CR 601.2g-h — the mana prompt, naming what it pays for on
+    /// <see cref="PromptDto.ManaPayment"/>.</summary>
+    public Task<ManaPayment> ChooseManaSourcesForAsync(
+        GameContext ctx, ManaCost cost, ManaPaymentSubject subject, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(cost);
+        ArgumentNullException.ThrowIfNull(subject);
+        if (_pending != null) throw new InvalidOperationException("A prompt is already pending.");
+        _pendingPayload = new PromptPayload(ManaPayment: new ManaPaymentViewDto(
+            subject.StackEntryId, subject.Source.InstanceId,
+            StateSnapshotter.DisplayName(subject.Source, _player),
+            cost.ToBraceString(), cost.RemainingAfter(_player.ManaPool), subject.AutoPayAvailable));
+        try
+        {
+            return ChooseManaSourcesAsync(ctx, cost, ct);
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
     public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
         // CR 601.2 / CR 727 — CancelCastCommand is offered alongside
         // ChooseManaCommand at the cost-payment prompt so the remote
@@ -2246,4 +2269,5 @@ public sealed record PromptPayload(
     /// <summary>Forwarded onto <see cref="PromptDto.MaxModes"/>.</summary>
     int? MaxModes = null,
     /// <summary>Forwarded onto <see cref="PromptDto.ChoiceOptions"/>.</summary>
-    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null);
+    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null,
+    ManaPaymentViewDto? ManaPayment = null);

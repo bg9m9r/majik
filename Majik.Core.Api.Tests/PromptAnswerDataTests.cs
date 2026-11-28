@@ -249,4 +249,33 @@ public class PromptAnswerDataTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*not in the offered*");
         task.IsCompleted.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task ManaPrompt_NamesWhatItPaysFor_TheTotalAndRemainingCost_AndAutoPay()
+    {
+        // CR 601.2g-h — the payment prompt says which spell, which stack entry,
+        // the full cost, what the floating pool leaves unpaid, and whether auto-pay works.
+        var bear = Put(new Creature("Goblin Bear", "{2}{R}", 2, 2), ZoneType.Hand);
+        Alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("{R}"));
+        var entry = Guid.NewGuid();
+        IPlayerAgent agent = _agent;
+
+        var task = agent.ChooseManaSourcesForAsync(null!, Majik.Core.ValueObjects.ManaCost.Parse("{2}{R}"),
+            new ManaPaymentSubject(bear, entry, AutoPayAvailable: true));
+
+        var prompt = _prompts.Should().ContainSingle().Subject;
+        prompt.ExpectedKinds.Should().Contain(nameof(ChooseManaCommand));
+        prompt.ManaPayment.Should().Be(new ManaPaymentViewDto(
+            entry, bear.InstanceId, "Goblin Bear", "{2}{R}", "{2}", AutoPayAvailable: true));
+        _agent.Submit(Cmd(new ChooseManaCommand(Array.Empty<Guid>())));
+        (await task).IsCancelled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ThePlainManaPrompt_CarriesNoPaymentView()
+    {
+        IPlayerAgent agent = _agent;
+        _ = agent.ChooseManaSourcesAsync(null!, Majik.Core.ValueObjects.ManaCost.Parse("{R}"));
+        _prompts.Should().ContainSingle().Which.ManaPayment.Should().BeNull();
+    }
 }

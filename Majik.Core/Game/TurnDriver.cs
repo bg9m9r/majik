@@ -1024,7 +1024,12 @@ public sealed class TurnDriver
             }
             else
             {
-                payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
+                // CR 601.2g-h — name the spell, its stack entry and whether
+                // auto-pay works on the prompt (display only).
+                var subject = new Majik.Core.Players.Agents.ManaPaymentSubject(
+                    castCard, castFlow.PeekNextCastId(castCard),
+                    actor.ManaPool.CanPay(cost) || manaResolver.TryAutoSelectSources(actor, cost, out _));
+                payment = await _agents[actor].ChooseManaSourcesForAsync(ctx, cost, subject, ct);
                 // CR 601.2 / CR 727 — remote player aborted the cast at
                 // the cost-payment prompt. Nothing has been paid yet
                 // (the resolver hasn't run), so the spell simply stays

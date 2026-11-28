@@ -411,7 +411,31 @@ public sealed record PromptDto(
     /// on every other prompt kind. <see cref="Candidates"/> /
     /// <see cref="PlayerCandidates"/> keep carrying the card / player snapshots.
     /// </summary>
-    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null);
+    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null,
+    /// <summary>
+    /// CR 601.2g-h — what a mana payment prompt (<c>ChooseManaCommand</c>) pays
+    /// for. Non-null on a spell's mana prompt; null on every other prompt kind.
+    /// </summary>
+    ManaPaymentViewDto? ManaPayment = null);
+
+/// <summary>Body of <see cref="PromptDto.ManaPayment"/>. Display only.</summary>
+/// <param name="StackEntryId">The id the spell has on the stack once cast. The
+/// mana prompt comes before the spell moves to the stack, so the entry is not in
+/// a snapshot taken while the prompt is open; it appears under this id.</param>
+/// <param name="SourceCardId">The spell's card (still in its origin zone).</param>
+/// <param name="SourceName">The spell's name.</param>
+/// <param name="TotalCost">The full cost being paid, brace form (<c>{1}{R}</c>).</param>
+/// <param name="RemainingCost">What the floating mana pool does not cover, brace
+/// form; <c>{0}</c> when it covers everything.</param>
+/// <param name="AutoPayAvailable">Whether a <c>ChooseManaCommand</c> with no
+/// sources (auto-pay) pays the cost.</param>
+public sealed record ManaPaymentViewDto(
+    Guid? StackEntryId,
+    Guid SourceCardId,
+    string SourceName,
+    string TotalCost,
+    string RemainingCost,
+    bool AutoPayAvailable);
 
 /// <summary>One mode on <see cref="PromptDto.ModeOptions"/>.</summary>
 /// <param name="Index">Zero-based printed index; the value <c>ChooseModeCommand.ModeIndex</c> accepts.</param>

@@ -251,10 +251,18 @@ public sealed class SpellCastFlow
         }
     }
 
-    private Guid NextCastId(ICard card)
+    /// <summary>The id the next cast of <paramref name="card"/> through this
+    /// flow is shown under and keeps once pushed (CR 601.2a). Lets a dispatcher
+    /// that asks for mana before calling <see cref="CastAsync"/> name the stack
+    /// entry the payment is for. Consumes nothing.</summary>
+    public Guid PeekNextCastId(ICard card) => CastId(card, _castSeq + 1);
+
+    private Guid NextCastId(ICard card) => CastId(card, ++_castSeq);
+
+    private static Guid CastId(ICard card, int seq)
     {
         var bytes = card.InstanceId.ToByteArray();
-        var mix = BitConverter.GetBytes(++_castSeq * 0x2545F491 ^ 0x5CA57ED);
+        var mix = BitConverter.GetBytes(seq * 0x2545F491 ^ 0x5CA57ED);
         for (var b = 0; b < 4; b++) bytes[4 + b] ^= mix[b];
         return new Guid(bytes);
     }

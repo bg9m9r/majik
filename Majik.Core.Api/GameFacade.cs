@@ -549,7 +549,10 @@ public sealed class GameFacade : IDisposable
             }
             else
             {
-                payment = await agent.ChooseManaSourcesAsync(ctx, cost, CancellationToken.None);
+                var subject = new ManaPaymentSubject(
+                    cast.Card, castFlow.PeekNextCastId(cast.Card),
+                    actor.ManaPool.CanPay(cost) || manaResolver.TryAutoSelectSources(actor, cost, out _));
+                payment = await agent.ChooseManaSourcesForAsync(ctx, cost, subject, CancellationToken.None);
                 // CR 601.2 / CR 727 — CancelCastCommand surfaces as the
                 // Cancelled sentinel. Spell stays in hand, nothing fires.
                 if (payment.IsCancelled)
@@ -2085,7 +2088,8 @@ public sealed class GameFacade : IDisposable
             ModeOptions: payload?.ModeOptions,
             MinModes: payload?.MinModes,
             MaxModes: payload?.MaxModes,
-            ChoiceOptions: payload?.ChoiceOptions);
+            ChoiceOptions: payload?.ChoiceOptions,
+            ManaPayment: payload?.ManaPayment);
     }
 
     private void BridgeEvent(GameEvent e)

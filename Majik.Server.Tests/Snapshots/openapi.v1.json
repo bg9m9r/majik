@@ -2444,6 +2444,42 @@
         ],
         "type": "object"
       },
+      "ManaPaymentViewDto": {
+        "properties": {
+          "autoPayAvailable": {
+            "type": "boolean"
+          },
+          "remainingCost": {
+            "type": "string"
+          },
+          "sourceCardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "stackEntryId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "totalCost": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "stackEntryId",
+          "sourceCardId",
+          "sourceName",
+          "totalCost",
+          "remainingCost",
+          "autoPayAvailable"
+        ],
+        "type": "object"
+      },
       "ManaPoolDto": {
         "properties": {
           "black": {
@@ -2979,6 +3015,16 @@
             "type": [
               "null",
               "array"
+            ]
+          },
+          "manaPayment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManaPaymentViewDto"
+              }
             ]
           },
           "maxModes": {

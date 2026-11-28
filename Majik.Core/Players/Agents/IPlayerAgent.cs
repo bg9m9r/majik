@@ -501,6 +501,16 @@ public interface IPlayerAgent
         GameContext ctx, ManaCost cost, CancellationToken ct = default);
 
     /// <summary>
+    /// CR 601.2g-h — the same prompt, naming what the mana pays for (display
+    /// only: the answer and its handling are unchanged). Agents that render
+    /// the prompt (RemoteAgent) override it; every other agent answers it as
+    /// <see cref="ChooseManaSourcesAsync(GameContext, ManaCost, CancellationToken)"/>.
+    /// </summary>
+    Task<ManaPayment> ChooseManaSourcesForAsync(
+        GameContext ctx, ManaCost cost, ManaPaymentSubject subject, CancellationToken ct = default)
+        => ChooseManaSourcesAsync(ctx, cost, ct);
+
+    /// <summary>
     /// Declare attackers (Rule 508). Empty plan = attack with nothing. The
     /// eligible list is typed <see cref="Permanent"/> so an animated NON-creature
     /// combatant (a manland — deferral

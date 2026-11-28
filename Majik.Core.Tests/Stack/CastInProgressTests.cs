@@ -74,6 +74,20 @@ public class CastInProgressTests
         card.Zone.Should().Be(ZoneType.Hand);
     }
 
+    [Fact]
+    public async Task PeekNextCastId_IsTheIdThePushedSpellGets_AndConsumesNothing()
+    {
+        // A dispatcher asks for mana before CastAsync (CR 601.2g-h display):
+        // the id it names on the prompt must be the spell's stack id.
+        var (card, def) = Bolt();
+        var peeked = _flow.PeekNextCastId(card);
+        _flow.PeekNextCastId(card).Should().Be(peeked);
+
+        var spell = await _flow.CastAsync(_alice, card, def, new ProbingAgent(_bob, () => { }), Ctx);
+
+        spell.Id.Should().Be(peeked);
+    }
+
     /// <summary>Picks <paramref name="target"/>, running <paramref name="probe"/> when targets are requested.</summary>
     private sealed class ProbingAgent(object target, Action probe) : DelegatingAgent
     {
