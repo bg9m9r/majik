@@ -1033,7 +1033,7 @@ public sealed class TurnDriver
                 // auto-pay works on the prompt (display only).
                 var subject = new Majik.Core.Players.Agents.ManaPaymentSubject(
                     castCard, castFlow.PeekNextCastId(castCard),
-                    actor.ManaPool.CanPay(cost) || manaResolver.TryAutoSelectSources(actor, cost, out _));
+                    manaResolver.CanAfford(actor, cost));
                 payment = await _agents[actor].ChooseManaSourcesForAsync(ctx, cost, subject, ct);
                 // CR 601.2 / CR 727 — remote player aborted the cast at
                 // the cost-payment prompt. Nothing has been paid yet

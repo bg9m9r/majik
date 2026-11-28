@@ -33,8 +33,9 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Escalate {1}</b> (CR 702.121) — a per-extra-mode MANA additional cost
 ///   (CR 601.2f), wired via <see cref="SpellDefinition.Escalate"/> with a fresh
 ///   <see cref="EscalateManaAdditionalCost"/> per extra mode. The cast flow pays
-///   (modesChosen − 1) of them and rejects the cast atomically (CR 601.2g) when
-///   the caster's mana pool can't cover the extra escalate mana.
+///   (modesChosen − 1) of them, after the base cost, and rejects the cast
+///   atomically (CR 601.2g) when the base cost plus the escalate mana is not
+///   affordable from the pool and untapped sources.
 ///
 /// ## Per-mode effects (mapped to existing primitives)
 ///   Mode 0 — target player wheels their hand. CR 701.16 (discard) + CR 121
@@ -136,12 +137,11 @@ public static class CollectiveDefianceFactory
             // bill exceeds the caster's available mana (CR 601.2g).
             Escalate: new EscalateSpec(
                 Description: "{1}",
-                BuildPerModeCost: _ => new EscalateManaAdditionalCost(ManaCost.Parse("{1}")),
-                // CR 601.2g — the escalate mana is paid from the caster's pool
-                // at cost time (before the main mana payment). Confirm the pool
-                // can cover {1} × extraModes up front.
-                CanPayExtra: (player, extra) =>
-                    player.ManaPool.CanPay(ManaCost.Zero.AddGenericCost(extra))),
+                // CR 601.2f-g — no probe: SpellCastFlow checks the base cost
+                // plus the escalate mana with the cast path's affordability
+                // check (floating pool, else untapped sources), and pays the
+                // escalate mana after the base cost (CR 601.2h).
+                BuildPerModeCost: _ => new EscalateManaAdditionalCost(ManaCost.Parse("{1}"))),
             EffectFactory: p =>
             {
                 // CR 700.2d — resolve the chosen modes in PRINTED order

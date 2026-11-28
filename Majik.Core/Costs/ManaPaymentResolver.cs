@@ -78,6 +78,14 @@ public sealed class ManaPaymentResolver
     /// honoured. Lands aren't summoning-sick, so their abilities activate
     /// freely.</para>
     /// </summary>
+    /// <summary>
+    /// CR 601.2g — the cast path's affordability check: the floating pool
+    /// covers <paramref name="cost"/>, or it can be covered with auto-selected
+    /// untapped sources (<see cref="TryAutoSelectSources"/>). Probes only.
+    /// </summary>
+    public bool CanAfford(Player payer, ManaCost cost) =>
+        payer.ManaPool.CanPay(cost) || TryAutoSelectSources(payer, cost, out _);
+
     public bool TryAutoSelectSources(Player payer, ManaCost cost, out ManaPayment payment)
     {
         if (payer == null) throw new ArgumentNullException(nameof(payer));

@@ -333,7 +333,18 @@ public sealed class SpellCastFlow
         // the cast before any escalate discard / pay-life is committed.
         if (definition.Escalate is { } escalate && modeChoice.Count > 1)
         {
-            BuildAndPrecheckEscalateCosts(escalate, card, caster, modeChoice.Count - 1, mergedAdditional);
+            // CR 601.2f — escalate mana is part of the total cost. When the
+            // caller pays the base cost (payManaCost), the check covers the
+            // base plus the escalate mana, with the same affordability check
+            // the dispatcher uses for the base cost.
+            var baseManaCost = ManaCost.Zero;
+            if (payManaCost != null)
+            {
+                baseManaCost = alternativeCost?.AlternativeManaCost
+                    ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(card, caster, ctx.AllPlayers);
+                if (preChosenX is { } px && px > 0) baseManaCost = baseManaCost.AddGenericCost(px);
+            }
+            BuildAndPrecheckEscalateCosts(escalate, card, caster, modeChoice.Count - 1, mergedAdditional, baseManaCost);
         }
 
         // CR 601.2e + CR 202.3b — choose X and stamp the value on the card so
@@ -441,6 +452,10 @@ public sealed class SpellCastFlow
             throw new InvalidOperationException(
                 $"Cannot cast {card.Name}: mana payment failed (CR 601.2h).");
         }
+
+        // CR 601.2h / CR 702.121a — the escalate mana, paid after the base
+        // cost so it never takes a source chosen for the base cost.
+        PayEscalateMana(mergedAdditional, card, caster);
 
         // CR 601.2a — for a hand-sourced cast the card is ALREADY on the stack
         // (moved at the top of this method, honouring the strict CR 601.2a "move
@@ -923,8 +938,10 @@ public sealed class SpellCastFlow
     private static void PayAdditionalCosts(
         IReadOnlyList<IAdditionalCost> mergedAdditional, Player caster)
     {
+        // Escalate mana is paid with the mana cost (PayEscalateMana).
         foreach (var addCost in mergedAdditional)
         {
+            if (addCost is EscalateManaAdditionalCost) continue;
             if (!addCost.CanPay(caster))
             {
                 throw new InvalidOperationException(
@@ -934,6 +951,7 @@ public sealed class SpellCastFlow
 
         foreach (var addCost in mergedAdditional)
         {
+            if (addCost is EscalateManaAdditionalCost) continue;
             if (!addCost.Pay(caster))
             {
                 throw new InvalidOperationException(
@@ -1079,7 +1097,8 @@ public sealed class SpellCastFlow
         ICard card,
         Player caster,
         int extraModes,
-        List<IAdditionalCost> mergedAdditional)
+        List<IAdditionalCost> mergedAdditional,
+        ManaCost baseManaCost)
     {
         if (extraModes <= 0) return;
 
@@ -1096,16 +1115,62 @@ public sealed class SpellCastFlow
                 $"insufficient resources for {extraModes} extra-mode payment(s).");
         }
 
+        var escalateMana = ManaCost.Zero;
+        var built = new List<IAdditionalCost>(extraModes);
         for (var i = 0; i < extraModes; i++)
         {
             var cost = escalate.BuildPerModeCost(card);
+            built.Add(cost);
+            if (cost is EscalateManaAdditionalCost manaCost)
+            {
+                escalateMana = escalateMana.Combine(manaCost.EscalateCost);
+                continue;
+            }
             if (!cost.CanPay(caster))
             {
                 throw new InvalidOperationException(
                     $"Cannot pay Escalate cost ({escalate.Description}) for {card.Name}: " +
                     $"insufficient resources for {extraModes} extra-mode payment(s).");
             }
-            mergedAdditional.Add(cost);
+        }
+
+        // CR 601.2f-g — mana escalate: the base cost plus every extra mode's
+        // escalate mana must be affordable, by the cast path's check (floating
+        // pool, else untapped sources), not by the floating pool alone.
+        if (!escalateMana.IsZero
+            && !ManaResolverFor(caster, null).CanAfford(caster, baseManaCost.Combine(escalateMana)))
+        {
+            throw new InvalidOperationException(
+                $"Cannot pay Escalate cost ({escalate.Description}) for {card.Name}: " +
+                $"insufficient resources for {extraModes} extra-mode payment(s).");
+        }
+        mergedAdditional.AddRange(built);
+    }
+
+    private static Majik.Core.Costs.ManaPaymentResolver ManaResolverFor(Player caster, IEventBus? bus) =>
+        new(caster.Zones.Battlefield.GetCards().OfType<Permanent>()
+                .Select(p => p.ActiveEffects).FirstOrDefault(e => e != null),
+            bus);
+
+    /// <summary>CR 601.2h / CR 702.121a — pay the escalate mana for the
+    /// extra modes: from the floating pool when it covers it, else from
+    /// auto-selected untapped sources. Throws (an illegal cast) when it
+    /// cannot be paid.</summary>
+    private void PayEscalateMana(IReadOnlyList<IAdditionalCost> mergedAdditional, ICard card, Player caster)
+    {
+        var total = ManaCost.Zero;
+        foreach (var c in mergedAdditional.OfType<EscalateManaAdditionalCost>())
+            total = total.Combine(c.EscalateCost);
+        if (total.IsZero) return;
+
+        var resolver = ManaResolverFor(caster, _eventBus);
+        var payment = Majik.Core.Players.Agents.ManaPayment.Empty;
+        var paid = caster.ManaPool.CanPay(total)
+            || resolver.TryAutoSelectSources(caster, total, out payment);
+        if (!paid || !resolver.Pay(caster, total, payment))
+        {
+            throw new InvalidOperationException(
+                $"Cannot pay Escalate cost ({total}) for {card.Name} (CR 601.2h).");
         }
     }
 

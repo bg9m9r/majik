@@ -175,17 +175,13 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             }
             else
             {
-                var perMode = Majik.Core.ValueObjects.ManaCost.Parse(esc);
+                // CR 601.2f-g — no probe: SpellCastFlow checks the base cost
+                // plus the escalate mana with the cast path's affordability
+                // check (floating pool, else untapped sources).
                 escalateSpec = new EscalateSpec(
                     Description: esc,
                     BuildPerModeCost: _ => new Majik.Core.Costs.EscalateManaAdditionalCost(
-                        Majik.Core.ValueObjects.ManaCost.Parse(esc)),
-                    CanPayExtra: (player, extra) =>
-                    {
-                        var total = Majik.Core.ValueObjects.ManaCost.Zero;
-                        for (var i = 0; i < extra; i++) total = total.Combine(perMode);
-                        return player.ManaPool.CanPay(total);
-                    });
+                        Majik.Core.ValueObjects.ManaCost.Parse(esc)));
             }
         }
 
