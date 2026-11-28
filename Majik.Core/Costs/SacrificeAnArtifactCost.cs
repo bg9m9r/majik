@@ -98,9 +98,16 @@ public sealed class SacrificeAnArtifactCost : ICost
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
-        var pick = Target ?? player.Zones.Battlefield.GetCards()
-            .OfType<Permanent>()
-            .FirstOrDefault(IsEligible);
+        // CR 701.16a / 400.7 — a nominated artifact counts only while it is
+        // still an eligible artifact on the battlefield. Target also records
+        // the LAST payment's artifact, which has since left (and may have come
+        // back as a new object somewhere else); reusing it put one card in two
+        // zones (Arcbound Ravager re-sacrificing a Mox Opal in the library).
+        var pick = Target is { Zone: ZoneType.Battlefield } nominated && IsEligible(nominated)
+            ? nominated
+            : player.Zones.Battlefield.GetCards()
+                .OfType<Permanent>()
+                .FirstOrDefault(IsEligible);
 
         if (pick == null)
             throw new InvalidOperationException(

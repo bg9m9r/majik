@@ -48,6 +48,13 @@ internal static class SacrificeCostHelper
         // must be read while it is still the live battlefield object.
         var wasToken = permanent is Permanent p && p.IsToken;
 
+        // CR 701.16a — only a permanent on the battlefield can be sacrificed.
+        // Moving anything else would leave it in its real zone AND add it to
+        // the graveyard (one card in two zones, CR 400.1).
+        if (permanent.Zone != ZoneType.Battlefield)
+            throw new InvalidOperationException(
+                $"Cannot sacrifice {permanent.Name}: it is in the {permanent.Zone}, not on the battlefield (CR 701.16a).");
+
         payer.Zones.Battlefield.RemoveCard(permanent);
         payer.Zones.Graveyard.AddCard(permanent);
         permanent.SetZone(ZoneType.Graveyard);
