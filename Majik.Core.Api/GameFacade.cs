@@ -152,6 +152,11 @@ public sealed class GameFacade : IDisposable
     private readonly StateBasedActions _sba;
     private readonly CombatFlow _combatFlow;
     private readonly Player _alice;
+
+    /// <summary>The viewer of the envelope's Spectator variant: a player of no
+    /// seat, so every masking rule treats it as someone who may look at no
+    /// hidden card (CR 706, 708.2). Never in the game.</summary>
+    private readonly Player _spectatorViewer = new("spectator", 0);
     private readonly Player _bob;
     private ICardRepository? _cardRepo;
     private readonly RemoteAgent _aliceAgent;
@@ -2143,7 +2148,14 @@ public sealed class GameFacade : IDisposable
             };
         }
 
-        var envelope = new EventEnvelope(publicDto, perPlayer);
+        // CR 706 — what a recipient that is not a seated player may see.
+        var spectator = perPlayer is null ? null : new EventDto(
+            EventId: e.EventId,
+            Type: type,
+            At: wireAt,
+            Payload: EventPayloadBuilder.Build(e, _spectatorViewer, turnState, _stack),
+            Seq: seq);
+        var envelope = new EventEnvelope(publicDto, perPlayer, spectator);
 
         // Replay suppression (PLAN 08 / Phase 29.x): the state fold + seq stamp
         // above ALWAYS run (so the rebuilt facade's GetState catches up to the

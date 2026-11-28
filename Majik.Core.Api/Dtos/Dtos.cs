@@ -183,10 +183,17 @@ public sealed record EventDto(Guid EventId, string Type, DateTime At, JsonElemen
 /// legacy subscription hands subscribers <see cref="Public"/>; bridge
 /// code uses <see cref="GameFacade.SubscribeEnvelopes"/> to access the
 /// per-player dictionary.
+///
+/// <para><see cref="Spectator"/> (set whenever <see cref="PerPlayer"/> is) is
+/// the variant for a recipient that is not a seated player: masked as for
+/// someone who may look at no hidden card (CR 706: hand and library contents
+/// hidden, CR 708.2 face-down names withheld). A non-player must never get
+/// <see cref="Public"/> for a masked event.</para>
 /// </summary>
 public sealed record EventEnvelope(
     EventDto Public,
-    IReadOnlyDictionary<Guid, EventDto>? PerPlayer);
+    IReadOnlyDictionary<Guid, EventDto>? PerPlayer,
+    EventDto? Spectator = null);
 
 /// <summary>
 /// Server → client envelope signalling that the engine is awaiting a

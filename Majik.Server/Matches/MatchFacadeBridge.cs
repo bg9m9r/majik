@@ -83,6 +83,10 @@ public sealed class MatchFacadeBridge
     private readonly Func<Guid, EngineFaultReason, Exception?, CancellationToken, Task>? _onEngineErrored;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
 
+    // Matches for which a masked event was already dropped for an unmappable
+    // recipient (logged once per match).
+    private readonly ConcurrentDictionary<Guid, byte> _unmappedRecipientLogged = new();
+
     // Prod-safe desync observability (Slice 4b #3). The DEBUG-only
     // AssertAgreement guard is compiled out of Release, so operational
     // desync (clock holder ≠ engine active player, or a raw CR 505 "Main"
@@ -402,6 +406,7 @@ public sealed class MatchFacadeBridge
         // Idempotent + best-effort.
         _watchdog?.Cancel(matchId);
 
+        _unmappedRecipientLogged.TryRemove(matchId, out _);
         if (_attachments.TryRemove(matchId, out var attachment))
         {
             attachment.Dispose();
@@ -671,24 +676,31 @@ public sealed class MatchFacadeBridge
                 recipients.Add(routing.OpponentSub);
             }
 
-            if (recipients.Count == 0) return;
+            // CR 706 — each recipient gets its seat's masked variant. One the
+            // routing cannot map to a seat gets the masked Spectator variant;
+            // with none, the event is dropped for it (logged once per match).
+            // Never Public: that is the full-information variant.
+            var variants = new Dictionary<string, EventDto>(StringComparer.Ordinal);
+            foreach (var sub in recipients)
+            {
+                var playerId = routing.ResolvePlayerIdForSub(sub);
+                if (playerId.HasValue && envelope.PerPlayer.TryGetValue(playerId.Value, out var dto))
+                    variants[sub] = dto;
+                else if (envelope.Spectator is { } spectator)
+                    variants[sub] = spectator;
+                else if (_unmappedRecipientLogged.TryAdd(matchId, 0))
+                    _logger.LogWarning(
+                        "MatchFacadeBridge: dropped a masked event for a recipient with no seat and no spectator variant. MatchId={MatchId} EventType={EventType}",
+                        matchId, envelope.Public.Type);
+            }
+
+            if (variants.Count == 0) return;
 
             _hub.PublishPerRecipient(
                 matchId,
                 "event",
-                recipients,
-                sub =>
-                {
-                    var playerId = routing.ResolvePlayerIdForSub(sub);
-                    if (playerId.HasValue && envelope.PerPlayer.TryGetValue(playerId.Value, out var dto))
-                    {
-                        return dto;
-                    }
-                    // Fall back to the public variant if routing can't
-                    // map the recipient — better than dropping the event
-                    // and leaving the UI stuck on a stale snapshot.
-                    return envelope.Public;
-                });
+                variants.Keys.ToList(),
+                sub => variants[sub]);
         }
         catch (Exception ex)
         {
