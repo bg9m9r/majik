@@ -26,7 +26,8 @@ public sealed record GateGameResult(GateGame Game, IReadOnlyDictionary<string, s
 /// engine fault was reported on its flow, and (d) no event handler threw (only
 /// while <see cref="CaptureHandlerFaults"/> is open). A failure becomes a stable
 /// signature: exception type + top engine frame for faults, invariant name +
-/// card name + zone pair for zone integrity, and the last event type for a hang (a hang has
+/// card name + zone pair for zone integrity, the tripped limit for a game the
+/// loop safety net ended as a draw, and the last event type for a hang (a hang has
 /// no frame to key on: the stuck flow's stack is not observable from here).
 /// </summary>
 public static class FullGameGateRunner
@@ -45,6 +46,9 @@ public static class FullGameGateRunner
         {
             var sigs = CurrentGame.Value;
             if (sigs is null) return; // not a gate game (another test's flow)
+            // Recorded as a Draw signature from the event (see RunAsync); the
+            // exception is built, not thrown, so it has no frame to key on.
+            if (ex is LoopSafetyNetException) return;
             sigs.TryAdd(Signature("ContainedFault", ex), $"{ctx}: {ex.Message}");
         };
     }
@@ -143,6 +147,12 @@ public static class FullGameGateRunner
             facade.ReplaceBobAgent(new HeuristicBotAgent(cardRepository: Repo));
             var players = new[] { facade.Alice, facade.Bob };
             configure?.Invoke(facade);
+
+            // A runaway game the engine's LoopSafetyNet ended as a draw
+            // (CR 104.4b): keyed on the limit that tripped (a stack-depth trip
+            // carries 0 actions). The message names the turn, so it is detail.
+            facade.EventBus.Subscribe<LoopSafetyNetTrippedEvent>(e =>
+                sigs.TryAdd($"Draw|LoopSafetyNet|{(e.ActionsThisStep > 0 ? "ActionsPerStep" : "StackDepth")}", e.Message));
 
             // (b) CR 400.1 at every step boundary. A read-only walk of the zones.
             string lastEvent = "";

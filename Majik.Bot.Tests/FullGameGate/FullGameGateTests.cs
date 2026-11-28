@@ -61,14 +61,12 @@ public class FullGameGateTests
         ["ZoneIntegrity|Mox Opal|Graveyard+Library"] = new("in both the Graveyard and the Library (CR 400.1)", 3545),
         // 3 of 9 runs (Yawg vs Affinity seed 1).
         ["ZoneIntegrity|Engineered Explosives|Exile+Graveyard"] = new("intermittent: in both the Graveyard and Exile (CR 400.1)", 3545, Intermittent: true),
-        // A live loop: state-based actions keep executing (millions of
-        // StateBasedActionExecutedEvent in 60s, CR 704.3 never converges) until
-        // the timeout cancels the game. Seen only in Yawg games (GoryoVengeance vs
-        // Yawg seed 0, Yawg vs LivingEnd seed 1), on game paths that the
-        // engine's run-to-run nondeterminism reaches in roughly a third of runs,
-        // sequential or parallel. Not a crash or a zone desync; tracked on the
-        // gate issue until it gets its own.
-        ["Timeout|StateBasedActionExecutedEvent"] = new("intermittent state-based-action loop (hang)", 3543, Intermittent: true),
+        // No Timeout or Draw|LoopSafetyNet entry: none occurs. The old
+        // Timeout|StateBasedActionExecutedEvent hang (Yawg games) was a Young
+        // Wolf / Walking Ballista loop on damage a permanent kept across zones,
+        // fixed by clearing marked damage on battlefield entry (CR 704.5g);
+        // a future runaway ends as a Draw|LoopSafetyNet signature, which fails
+        // the gate as new.
     };
 
     private readonly ITestOutputHelper _out;

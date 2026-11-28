@@ -81,4 +81,28 @@ public class FullGameGateRunnerTests
         new ZoneIntegrity.Duplicate(opal, ZoneType.Stack, ZoneType.Battlefield).Signature
             .Should().Be(dup.Signature);
     }
+
+    [Theory]
+    [InlineData(10_001, 3, "Draw|LoopSafetyNet|ActionsPerStep")]
+    [InlineData(0, 1_001, "Draw|LoopSafetyNet|StackDepth")]
+    [ExpectsContainedFault] // the trip is reported as a contained fault; the gate accounts for it
+    public async Task ALoopSafetyNetTrip_IsADrawSignature_NamingTheLimit(int actions, int depth, string expected)
+    {
+        // The engine ends a runaway game as a draw (CR 104.4b) and publishes
+        // LoopSafetyNetTrippedEvent (actions = 0 for a stack-depth trip).
+        // GameFacade also reports it as a contained fault; the gate keeps only
+        // the draw signature, since the exception is built, never thrown, and
+        // would read "<no engine frame>".
+        var published = false;
+        var result = await FullGameGateRunner.RunAsync(AnyGame(), maxTurns: 2, TimeSpan.FromSeconds(20),
+            configure: f => f.EventBus.Subscribe<TurnStartedEvent>(_ =>
+            {
+                if (published) return;
+                published = true;
+                f.EventBus.Publish(new Majik.Core.Game.LoopSafetyNetTrippedEvent("tripped (test)", actions, depth));
+            }));
+
+        result.Signatures.Keys.Should().Equal(expected);
+        result.Signatures[expected].Should().Contain("tripped (test)");
+    }
 }
