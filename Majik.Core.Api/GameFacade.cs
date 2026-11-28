@@ -1709,7 +1709,13 @@ public sealed class GameFacade : IDisposable
             EligibleAttackerIds: payload?.EligibleAttackerIds,
             AttackerIds: payload?.AttackerIds,
             EligibleBlockerIds: payload?.EligibleBlockerIds,
-            TriggerOptions: payload?.TriggerOptions);
+            TriggerOptions: payload?.TriggerOptions,
+            MinX: payload?.MinX,
+            MaxX: payload?.MaxX,
+            ModeOptions: payload?.ModeOptions,
+            MinModes: payload?.MinModes,
+            MaxModes: payload?.MaxModes,
+            ChoiceOptions: payload?.ChoiceOptions);
     }
 
     private void BridgeEvent(GameEvent e)

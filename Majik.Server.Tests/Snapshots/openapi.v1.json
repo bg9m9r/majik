@@ -592,6 +592,26 @@
         ],
         "type": "object"
       },
+      "ChoiceOptionDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "type": "object"
+      },
       "ChoiceViewDto": {
         "properties": {
           "kind": {
@@ -2075,6 +2095,26 @@
         ],
         "type": "object"
       },
+      "ModeOptionDto": {
+        "properties": {
+          "index": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "text"
+        ],
+        "type": "object"
+      },
       "ParseDeckRequest": {
         "properties": {
           "text": {
@@ -2312,6 +2352,15 @@
               "array"
             ]
           },
+          "choiceOptions": {
+            "items": {
+              "$ref": "#/components/schemas/ChoiceOptionDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "choiceView": {
             "oneOf": [
               {
@@ -2381,6 +2430,51 @@
           "libraryView": {
             "items": {
               "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "maxModes": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "maxX": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "minModes": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "minX": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "modeOptions": {
+            "items": {
+              "$ref": "#/components/schemas/ModeOptionDto"
             },
             "type": [
               "null",

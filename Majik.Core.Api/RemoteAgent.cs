@@ -95,6 +95,9 @@ public sealed class RemoteAgent : IPlayerAgent
     // right slot by id and build the int[] split the engine expects. Cleared on
     // prompt resolution; replaced on each new divide-damage prompt.
     private IReadOnlyList<object>? _pendingDamageDivisionTargets;
+    // CR 700.2 — number of modes offered on the most recent choose-mode prompt,
+    // so Resolve can reject an out-of-range ChooseModeCommand.ModeIndex.
+    private int? _pendingModeCount;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -170,7 +173,7 @@ public sealed class RemoteAgent : IPlayerAgent
             complete = Resolve(_pending, command, _pendingTriggerOrder, _pendingLibraryCandidates,
                 _pendingSurveilPeeked, _pendingScryPeeked, _pendingRevealedEligible, _pendingRevealedOptional,
                 _pendingBottomCount, _pendingChoiceCandidates, _pendingChoiceKind, _pendingTargetCandidates,
-                _pendingDamageDivisionTargets);
+                _pendingDamageDivisionTargets, _pendingModeCount);
 
             // Valid: retire the prompt, then hand the engine its answer.
             ClearPendingState();
@@ -199,7 +202,8 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<object>? choiceCandidates,
         ChoiceKind? choiceKind,
         IReadOnlyList<object>? targetCandidates,
-        IReadOnlyList<object>? damageDivisionTargets)
+        IReadOnlyList<object>? damageDivisionTargets,
+        int? modeCount)
     {
         Action complete;
         switch (command)
@@ -275,9 +279,20 @@ public sealed class RemoteAgent : IPlayerAgent
                 break;
             }
             case ChooseXCommand x:
+                // CR 107.3 / 601.2b — X is announced as a number 0 or greater.
+                if (x.X < 0)
+                {
+                    throw new InvalidOperationException($"ChooseXCommand X can't be negative (got {x.X}).");
+                }
                 complete = Done<int>(tcs, x.X);
                 break;
             case ChooseModeCommand mc:
+                // CR 700.2 — the chosen mode must be one of the offered modes.
+                if (modeCount is int modes && (mc.ModeIndex < 0 || mc.ModeIndex >= modes))
+                {
+                    throw new InvalidOperationException(
+                        $"ChooseModeCommand mode index {mc.ModeIndex} is out of range (0..{modes - 1}).");
+                }
                 complete = Done<int>(tcs, mc.ModeIndex);
                 break;
             case ChooseManaCommand mp:
@@ -735,7 +750,13 @@ public sealed class RemoteAgent : IPlayerAgent
                     var picked = new List<object>(choice.SelectedInstanceIds.Count);
                     foreach (var id in choice.SelectedInstanceIds)
                     {
-                        var match = choiceCandidates.FirstOrDefault(c => CandidateMatchesId(c, id));
+                        // Match on the same ids shipped on PromptDto.ChoiceOptions
+                        // (value sentinels carry a positional synthetic id).
+                        object? match = null;
+                        for (var i = 0; i < choiceCandidates.Count && match == null; i++)
+                        {
+                            if (ChoiceOptionId(choiceCandidates[i], i) == id) match = choiceCandidates[i];
+                        }
                         if (match == null)
                         {
                             Console.Error.WriteLine(
@@ -763,6 +784,34 @@ public sealed class RemoteAgent : IPlayerAgent
     {
         var typed = (TaskCompletionSource<T>)tcs;
         return () => typed.SetResult(value);
+    }
+
+    // Synthetic ids for value options ("MAJIKOPT" + index): stable per prompt,
+    // derived from the option's position, and never drawn from the game's id
+    // source (so they don't perturb deterministic replay ids).
+    private static readonly byte[] SyntheticOptionTail = "MAJIKOPT"u8.ToArray();
+
+    /// <summary>The id a <see cref="ChoiceCommand"/> sends for the option at
+    /// <paramref name="index"/>: the card's instance id, the player's id, the
+    /// stack spell's id, or a synthetic positional id for a value sentinel.</summary>
+    private static Guid ChoiceOptionId(object candidate, int index) => candidate switch
+    {
+        ICard card => card.InstanceId,
+        Player player => player.Id,
+        Majik.Core.Spells.ISpell spell => spell.Id,
+        _ => new Guid(index + 1, 0, 0, SyntheticOptionTail),
+    };
+
+    private static ChoiceOptionDto DescribeChoiceOption(object candidate, int index, Func<object, string?>? label)
+    {
+        var custom = label?.Invoke(candidate);
+        return candidate switch
+        {
+            ICard card => new ChoiceOptionDto(card.InstanceId, "Card", custom ?? card.Name),
+            Player player => new ChoiceOptionDto(player.Id, "Player", custom ?? player.Name),
+            Majik.Core.Spells.ISpell spell => new ChoiceOptionDto(spell.Id, "Spell", custom ?? spell.Card.Name),
+            _ => new ChoiceOptionDto(ChoiceOptionId(candidate, index), "Value", custom ?? candidate.ToString() ?? ""),
+        };
     }
 
     // PLAN 01 (Slice C) — match a ChoiceCommand instance id to a candidate
@@ -1028,6 +1077,14 @@ public sealed class RemoteAgent : IPlayerAgent
     /// </summary>
     public Task<IReadOnlyList<object>> ChooseAsync(
         GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+        => ChooseCoreAsync(ctx, req, ct, label: null, decorate: null);
+
+    private Task<IReadOnlyList<object>> ChooseCoreAsync(
+        GameContext ctx,
+        ChoiceRequest req,
+        CancellationToken ct,
+        Func<object, string?>? label,
+        Func<PromptPayload, PromptPayload>? decorate)
     {
         ArgumentNullException.ThrowIfNull(req);
         if (_pending != null)
@@ -1052,10 +1109,23 @@ public sealed class RemoteAgent : IPlayerAgent
             .OfType<ICard>()
             .Select(StateSnapshotter.SnapshotCard)
             .ToList();
-        _pendingPayload = new PromptPayload(
+        // Every option — cards, players, stack spells and value sentinels (a
+        // colour, a card name, a mode index) — gets an answerable id on
+        // ChoiceOptions; players also ship as PlayerCandidates (the shape the
+        // targets prompt already uses). Before this, a choice over players or
+        // sentinels shipped nothing the client could send back.
+        var playerSnapshots = live
+            .OfType<Player>()
+            .Select(p => new Majik.Core.Api.Dtos.PlayerCandidateDto(p.Id, p.Name, p.LifeTotal))
+            .ToList();
+        var options = live.Select((c, i) => DescribeChoiceOption(c, i, label)).ToList();
+        var payload = new PromptPayload(
             Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
             Label: req.Description,
-            ChoiceView: new ChoiceViewDto(req.Kind.ToString(), req.Min, req.Max));
+            ChoiceView: new ChoiceViewDto(req.Kind.ToString(), req.Min, req.Max),
+            PlayerCandidates: playerSnapshots.Count > 0 ? playerSnapshots : null,
+            ChoiceOptions: options);
+        _pendingPayload = decorate?.Invoke(payload) ?? payload;
         try
         {
             return Prompt<IReadOnlyList<object>>(ct, typeof(ChoiceCommand));
@@ -1069,15 +1139,140 @@ public sealed class RemoteAgent : IPlayerAgent
         }
     }
 
+    /// <summary>
+    /// CR 601.2b / 107.3 — choose X. Ships <see cref="PromptDto.MinX"/> = 0 (X
+    /// can't be negative; a negative answer is rejected) and, when the engine
+    /// can tell, the mana-affordable <see cref="PromptDto.MaxX"/> hint (see
+    /// <see cref="AffordableMaxX"/>).
+    /// </summary>
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
-        => Prompt<int>(ct, typeof(ChooseXCommand));
+    {
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(MinX: 0, MaxX: AffordableMaxX(ctx, source));
+        try
+        {
+            return Prompt<int>(ct, typeof(ChooseXCommand));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
+    /// <summary>
+    /// Upper bound on X for a spell being cast with {X} in its mana cost
+    /// (CR 601.2b / 601.2f): (floating mana + one activation of every untapped
+    /// mana source − the rest of the effective cost with X = 0) ÷ number of {X}
+    /// symbols. Null when the source has no {X} mana cost or is already on the
+    /// battlefield (X chosen during resolution or for an activated ability —
+    /// the engine knows no bound there). A hint only: it can under-count
+    /// variable-output mana abilities, so it is never enforced.
+    /// </summary>
+    private int? AffordableMaxX(GameContext? ctx, ICard? source)
+    {
+        if (source is not Card card || !card.ManaCostValue.HasX || card.Zone == Majik.Core.Zones.ZoneType.Battlefield)
+        {
+            return null;
+        }
+        try
+        {
+            var xSymbols = Math.Max(1, card.ManaCost.Count(ch => ch == 'X' || ch == 'x'));
+            var rest = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, _player, ctx?.AllPlayers).TotalValue;
+            var available = PriorityLegalActions.PotentialMana(_player, Layers);
+            return Math.Max(0, (available - rest) / xSymbols);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// CR 700.2 — "choose one" modal prompt. Ships every mode
+    /// (<see cref="PromptDto.ModeOptions"/>, index = the value
+    /// <see cref="ChooseModeCommand.ModeIndex"/> accepts) with
+    /// MinModes = MaxModes = 1; an out-of-range index is rejected.
+    /// </summary>
     public Task<int> ChooseModeAsync(
         GameContext ctx,
         IReadOnlyList<string> modes,
         IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
         CancellationToken ct = default)
-        => Prompt<int>(ct, typeof(ChooseModeCommand));
+    {
+        ArgumentNullException.ThrowIfNull(modes);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingModeCount = modes.Count;
+        _pendingPayload = new PromptPayload(
+            ModeOptions: ModeRows(modes), MinModes: 1, MaxModes: 1);
+        try
+        {
+            return Prompt<int>(ct, typeof(ChooseModeCommand));
+        }
+        catch
+        {
+            _pendingModeCount = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
+    private static IReadOnlyList<ModeOptionDto> ModeRows(IReadOnlyList<string> modes) =>
+        modes.Select((text, i) => new ModeOptionDto(i, text ?? "")).ToList();
+
+    /// <summary>
+    /// CR 700.2d / 700.2e — "choose one or more" (or "choose two") modal prompt.
+    /// Answered with a <see cref="ChoiceCommand"/> (kind PickN) whose ids come
+    /// from <see cref="PromptDto.ChoiceOptions"/> (one per mode, labelled with
+    /// the mode text); <see cref="PromptDto.ModeOptions"/> / MinModes / MaxModes
+    /// describe the choice. The answer is sanitised exactly like the
+    /// <see cref="IPlayerAgent"/> default (dedupe, range, min backfill).
+    /// </summary>
+    public async Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(modes);
+        var min = Math.Max(1, minModes);
+        var max = Math.Min(maxModes, modes.Count);
+        var req = new ChoiceRequest(
+            ChoiceKind.PickN,
+            "Choose modes",
+            Min: min,
+            Max: max,
+            Candidates: Enumerable.Range(0, modes.Count).Cast<object>().ToList(),
+            Intent: Majik.Core.Cards.BotIntent.None,
+            Optional: false);
+        var chosen = await ChooseCoreAsync(ctx, req, ct,
+            label: o => o is int i && i >= 0 && i < modes.Count ? modes[i] : null,
+            decorate: p => p with { ModeOptions = ModeRows(modes), MinModes = min, MaxModes = max })
+            .ConfigureAwait(false);
+
+        var seen = new HashSet<int>();
+        var clean = new List<int>();
+        foreach (var o in chosen)
+        {
+            if (o is not int idx || idx < 0 || idx >= modes.Count || !seen.Add(idx)) continue;
+            clean.Add(idx);
+            if (clean.Count >= maxModes) break;
+        }
+        // CR 700.2e — enforce the minimum (backfill from the first unused modes).
+        for (var i = 0; i < modes.Count && clean.Count < minModes; i++)
+        {
+            if (seen.Add(i)) clean.Add(i);
+        }
+        return clean;
+    }
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
     {
@@ -1674,6 +1869,7 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingChoiceKind = null;
         _pendingTargetCandidates = null;
         _pendingDamageDivisionTargets = null;
+        _pendingModeCount = null;
         _pendingPayload = null;
     }
 
@@ -1834,4 +2030,16 @@ public sealed record PromptPayload(
     /// CR 603.3b — triggers to order. Non-null only on order-triggers prompts;
     /// forwarded onto <see cref="PromptDto.TriggerOptions"/>.
     /// </summary>
-    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null);
+    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null,
+    /// <summary>CR 107.3 — forwarded onto <see cref="PromptDto.MinX"/>.</summary>
+    int? MinX = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.MaxX"/>.</summary>
+    int? MaxX = null,
+    /// <summary>CR 700.2 — forwarded onto <see cref="PromptDto.ModeOptions"/>.</summary>
+    IReadOnlyList<ModeOptionDto>? ModeOptions = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.MinModes"/>.</summary>
+    int? MinModes = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.MaxModes"/>.</summary>
+    int? MaxModes = null,
+    /// <summary>Forwarded onto <see cref="PromptDto.ChoiceOptions"/>.</summary>
+    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null);

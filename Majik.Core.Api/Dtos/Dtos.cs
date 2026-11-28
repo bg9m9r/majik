@@ -308,7 +308,58 @@ public sealed record PromptDto(
     /// must list every <see cref="TriggerOptionDto.TriggerId"/> exactly once.
     /// Non-null only on order-triggers prompts; null on every other prompt kind.
     /// </summary>
-    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null);
+    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null,
+    /// <summary>
+    /// CR 107.3 / 601.2b — smallest legal value for <c>ChooseXCommand.X</c>
+    /// (always 0: X can't be negative). Non-null only on choose-X prompts.
+    /// </summary>
+    int? MinX = null,
+    /// <summary>
+    /// Largest X the player could currently pay for, when the engine can tell:
+    /// only for a spell being cast with {X} in its mana cost, computed as
+    /// (floating mana + one activation of every untapped mana source − the rest
+    /// of the effective cost) ÷ the number of {X} symbols. A hint for the UI,
+    /// not enforced. Null when the engine knows no upper bound (X chosen during
+    /// resolution, activated-ability X, …) and on every other prompt kind.
+    /// </summary>
+    int? MaxX = null,
+    /// <summary>
+    /// CR 700.2 — the modes of a modal spell or ability, in printed order.
+    /// <see cref="ModeOptionDto.Index"/> is the value <c>ChooseModeCommand.ModeIndex</c>
+    /// accepts on a choose-mode prompt. On a "choose one or more" prompt
+    /// (answered with <c>ChoiceCommand</c>) each mode also appears on
+    /// <see cref="ChoiceOptions"/> in the same order. Null on every other prompt kind.
+    /// </summary>
+    IReadOnlyList<ModeOptionDto>? ModeOptions = null,
+    /// <summary>CR 700.2d / 700.2e — fewest modes to choose. Set whenever
+    /// <see cref="ModeOptions"/> is.</summary>
+    int? MinModes = null,
+    /// <summary>CR 700.2d / 700.2e — most modes to choose. Set whenever
+    /// <see cref="ModeOptions"/> is.</summary>
+    int? MaxModes = null,
+    /// <summary>
+    /// Every option of a declarative choice prompt (<c>ExpectedKinds</c> contains
+    /// <c>ChoiceCommand</c>), in the engine's order: cards, players, stack spells
+    /// and value options (a colour, a card name, a mode) alike. Each
+    /// <see cref="ChoiceOptionDto.Id"/> is what <c>ChoiceCommand.SelectedInstanceIds</c>
+    /// accepts. Non-null on every choice prompt (empty for a plain yes/no); null
+    /// on every other prompt kind. <see cref="Candidates"/> /
+    /// <see cref="PlayerCandidates"/> keep carrying the card / player snapshots.
+    /// </summary>
+    IReadOnlyList<ChoiceOptionDto>? ChoiceOptions = null);
+
+/// <summary>One mode on <see cref="PromptDto.ModeOptions"/>.</summary>
+/// <param name="Index">Zero-based printed index; the value <c>ChooseModeCommand.ModeIndex</c> accepts.</param>
+/// <param name="Text">The mode's text.</param>
+public sealed record ModeOptionDto(int Index, string Text);
+
+/// <summary>One option on <see cref="PromptDto.ChoiceOptions"/>.</summary>
+/// <param name="Id">Id to send in <c>ChoiceCommand.SelectedInstanceIds</c>: the card's
+/// instance id, the player's id, the stack spell's id, or — for a value option, which
+/// has no engine id — a synthetic id that is stable for this prompt.</param>
+/// <param name="Kind"><c>"Card"</c>, <c>"Player"</c>, <c>"Spell"</c> or <c>"Value"</c>.</param>
+/// <param name="Label">Human-readable label (card / player name, colour, mode text, …).</param>
+public sealed record ChoiceOptionDto(Guid Id, string Kind, string Label);
 
 /// <summary>
 /// One triggered ability on <see cref="PromptDto.TriggerOptions"/>.

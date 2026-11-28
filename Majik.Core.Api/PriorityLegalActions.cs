@@ -237,6 +237,14 @@ public static class PriorityLegalActions
         return list;
     }
 
+    /// <summary>
+    /// Total mana <paramref name="player"/> could produce right now, colour-blind:
+    /// floating pool plus one activation (largest output) of every untapped mana
+    /// source — the same candidate set auto-pay uses. Used for the X hint.
+    /// </summary>
+    internal static int PotentialMana(Player player, ContinuousEffectsService? layers) =>
+        player.ManaPool.Total + ManaSources(player, layers).Sum(s => s.MaxTotal);
+
     private static readonly ManaColor[] Colors =
         { ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green };
 
