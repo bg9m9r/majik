@@ -1053,13 +1053,121 @@ public sealed class GameFacade : IDisposable
         // (index 0) instead of re-rolling at random; the random flip is only
         // a fallback for callers (bot-vs-bot sims) that don't specify a
         // starting player.
-        _fullGameTask = driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct);
+        _fullGameTask = RunDriverAsync(driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct), orderedPlayers[0]);
         return WaitForPromptOrLoopAsync(settled, _fullGameTask, ct);
+    }
+
+    /// <summary>
+    /// Await the driver run. On a concession (CR 104.3a) the run ends through
+    /// the engine's own game-over gate; if a declined prompt surfaced as a
+    /// cancellation instead, absorb it so <see cref="FullGameTask"/> completes
+    /// rather than faulting. Publishes the conceder's
+    /// <see cref="PlayerLostEvent"/> once the engine is quiescent and before
+    /// the task completes.
+    /// </summary>
+    private async Task<GameDriver.GameResult> RunDriverAsync(Task<GameDriver.GameResult> run, Player startingPlayer)
+    {
+        GameDriver.GameResult result;
+        try
+        {
+            result = await run.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ConcedingPlayer is not null)
+        {
+            result = new GameDriver.GameResult(_currentTurn, Opponent(ConcedingPlayer), startingPlayer);
+        }
+        PublishConcessionLoss();
+        return result;
     }
 
     /// <summary>Task representing the in-flight full-game run, or null
     /// when only <see cref="StartAsync"/> was called.</summary>
     public Task<GameDriver.GameResult>? FullGameTask => _fullGameTask;
+
+    private readonly object _concedeLock = new();
+    private Player? _concedingPlayer;
+    private bool _concessionPublished;
+
+    private Player? ConcedingPlayer
+    {
+        get { lock (_concedeLock) return _concedingPlayer; }
+    }
+
+    private Player Opponent(Player player) => ReferenceEquals(player, _alice) ? _bob : _alice;
+
+    /// <summary>
+    /// CR 104.3a — <paramref name="playerId"/> concedes: they leave the game
+    /// immediately and lose it; the remaining player wins (CR 104.2a). The
+    /// loser is marked lost at once (so every engine game-over gate sees it),
+    /// both seats' pending prompts are completed with their decline value (or
+    /// cancelled) and later prompts are answered the same way, the engine runs
+    /// to its game-over gate, the normal <see cref="PlayerLostEvent"/> is
+    /// published, and <see cref="FullGameTask"/> completes without faulting.
+    /// The returned task completes once the game has ended (for a full game:
+    /// once <see cref="FullGameTask"/> has completed — after a bot seat that is
+    /// mid-decision returns). Conceding twice, or once the game is already
+    /// over, is a no-op.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="playerId"/> is not a seat of this game.</exception>
+    public async Task ConcedeAsync(Guid playerId)
+    {
+        var player = LookupPlayer(playerId)
+            ?? throw new ArgumentException($"Unknown player {playerId}.", nameof(playerId));
+
+        lock (_concedeLock)
+        {
+            var gameOver = _concedingPlayer != null
+                || (_fullGameTask?.IsCompleted ?? false)
+                || _alice.HasLost
+                || _bob.HasLost;
+            if (gameOver)
+            {
+                player = null;
+            }
+            else
+            {
+                _concedingPlayer = player;
+                // CR 104.3a — the conceding player loses immediately.
+                player.MarkLost();
+            }
+        }
+
+        if (player != null)
+        {
+            _aliceAgent.Close();
+            _bobAgent.Close();
+        }
+
+        var run = (Task?)_fullGameTask ?? _loopTask;
+        if (run != null)
+        {
+            try
+            {
+                await run.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ConcedingPlayer is not null)
+            {
+                // Single-round loop: a cancelled decline is the expected exit.
+            }
+        }
+        if (player != null && _fullGameTask == null)
+        {
+            // No driver to publish from (not started / single-round loop).
+            PublishConcessionLoss();
+        }
+    }
+
+    private void PublishConcessionLoss()
+    {
+        Player? loser;
+        lock (_concedeLock)
+        {
+            if (_concedingPlayer == null || _concessionPublished) return;
+            _concessionPublished = true;
+            loser = _concedingPlayer;
+        }
+        _bus.Publish(new PlayerLostEvent(loser));
+    }
 
     /// <summary>
     /// Submit a player command. Returns when the engine has processed it

@@ -1555,20 +1555,113 @@ public sealed class RemoteAgent : IPlayerAgent
 
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {
-        if (_pending != null)
+        TaskCompletionSource<T> tcs;
+        lock (_closeLock)
         {
-            throw new InvalidOperationException("A prompt is already pending.");
-        }
+            if (_pending != null)
+            {
+                throw new InvalidOperationException("A prompt is already pending.");
+            }
 
-        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        ct.Register(() => tcs.TrySetCanceled(ct));
-        _pending = tcs;
-        _pendingKinds = acceptedKinds;
+            tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (_closed)
+            {
+                // CR 104.3a — the game is over (a player conceded): nobody is
+                // asked anything any more. Answer with the decline value so the
+                // engine runs straight to its game-over gate.
+                ClearPendingState();
+                Decline(tcs);
+                return tcs.Task;
+            }
+
+            ct.Register(() => tcs.TrySetCanceled(ct));
+            _pending = tcs;
+            _pendingKinds = acceptedKinds;
+            _pendingAbort = () => Decline(tcs);
+        }
 
         try { PromptRequested?.Invoke(acceptedKinds); }
         catch { /* observer fault must not abort the engine */ }
 
         return tcs.Task;
+    }
+
+    private readonly object _closeLock = new();
+    private bool _closed;
+    private Action? _pendingAbort;
+
+    /// <summary>True once <see cref="Close"/> ran: every prompt is answered
+    /// with its decline value and no <see cref="PromptRequested"/> fires.</summary>
+    public bool IsClosed
+    {
+        get { lock (_closeLock) return _closed; }
+    }
+
+    /// <summary>
+    /// CR 104.3a — the game ended by concession. Completes the outstanding
+    /// prompt (if any) with its decline value — pass priority, keep, no
+    /// attackers / blockers, cancelled mana payment, no optional targets, X = 0,
+    /// mode 0, "no" — or cancels it when no safe decline exists, and makes every
+    /// later prompt resolve the same way immediately, so the engine never waits
+    /// on this seat again. Idempotent.
+    /// </summary>
+    public void Close()
+    {
+        Action? abort;
+        lock (_closeLock)
+        {
+            if (_closed) return;
+            _closed = true;
+            abort = _pendingAbort;
+            ClearPendingState();
+        }
+        abort?.Invoke();
+    }
+
+    private void ClearPendingState()
+    {
+        _pending = null;
+        _pendingKinds = null;
+        _pendingAbort = null;
+        _pendingTriggerOrder = null;
+        _pendingLibraryCandidates = null;
+        _pendingSurveilPeeked = null;
+        _pendingScryPeeked = null;
+        _pendingRevealedEligible = null;
+        _pendingRevealedOptional = false;
+        _pendingBottomCount = null;
+        _pendingChoiceCandidates = null;
+        _pendingChoiceKind = null;
+        _pendingTargetCandidates = null;
+        _pendingDamageDivisionTargets = null;
+        _pendingPayload = null;
+    }
+
+    private static void Decline<T>(TaskCompletionSource<T> tcs)
+    {
+        object? decline = typeof(T) switch
+        {
+            var t when t == typeof(PriorityAction) => PriorityAction.Pass,
+            var t when t == typeof(MulliganDecision) => MulliganDecision.Keep,
+            var t when t == typeof(CombatPlan) => CombatPlan.None,
+            var t when t == typeof(BlockPlan) => BlockPlan.None,
+            var t when t == typeof(ManaPayment) => ManaPayment.Cancelled,
+            var t when t == typeof(IReadOnlyList<object>) => Array.Empty<object>(),
+            var t when t == typeof(bool) => false,
+            var t when t == typeof(int) => 0,
+            _ => null,
+        };
+        if (decline is T value)
+        {
+            tcs.TrySetResult(value);
+        }
+        else
+        {
+            // No answer is safe to fabricate (trigger order, scry split, bottom
+            // cards, …): cancel. The engine observes an OperationCanceledException,
+            // which the facade's concede path absorbs.
+            tcs.TrySetCanceled();
+        }
     }
 }
 
