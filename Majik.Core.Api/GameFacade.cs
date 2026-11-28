@@ -1938,6 +1938,12 @@ public sealed class GameFacade : IDisposable
     {
         PublishOnEngineFlow(allViews: true);
         var prompt = BuildPrompt(player, kinds, payload);
+        // Swap the signal BEFORE the fan-out: a SubmitAsync an observer starts
+        // during the fan-out captures the NEW signal and is released by the
+        // engine's next prompt (or the end of the run), not by this one's
+        // pulse — so it returns only once the engine processed its command.
+        // Waiters that captured the old signal are released after the fan-out.
+        var previousSignal = Interlocked.Exchange(ref _nextPromptSignal, NewSignal());
         Action<PromptDto>[] observers;
         lock (_promptSubscribers) observers = _promptSubscribers.ToArray();
         foreach (var observer in observers)
@@ -1945,7 +1951,7 @@ public sealed class GameFacade : IDisposable
             try { RunOffEngineFlow(() => observer(prompt)); }
             catch { /* one observer's fault must not starve the others or the engine */ }
         }
-        PulsePromptSignal();
+        previousSignal.TrySetResult(true);
     }
 
     // Forward the agent's per-prompt payload (currently: library-search

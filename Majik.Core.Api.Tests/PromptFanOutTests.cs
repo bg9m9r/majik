@@ -59,4 +59,34 @@ public class PromptFanOutTests
         seenByFirstObserverToo.Should().BeSameAs(prompt, "every observer receives the one DTO built for the prompt");
         answered.Should().Be(1);
     }
+
+    [Fact]
+    public async Task ASubmitStartedDuringFanOut_ReturnsOnlyOnceTheEngineReachedItsNextPrompt()
+    {
+        // An observer starts SubmitAsync while the fan-out of the prompt it
+        // answers is still running. When that task completes, the engine must
+        // have processed the command: raised its next prompt (Bob's priority,
+        // CR 117.3d) or ended the round — never "nothing pending yet".
+        var settledEarly = 0;
+        for (var i = 0; i < 30; i++)
+        {
+            var deck = Enumerable.Range(0, 20).Select(_ => (ICard)new Land("Forest")).ToList();
+            var facade = GameFacade.Create("Alice", "Bob", deck, deck.ToList());
+            var alice = Seat(facade, "_aliceAgent");
+            var bob = Seat(facade, "_bobAgent");
+            var observed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var started = 0;
+            using var sub = facade.SubscribePrompts(p =>
+            {
+                if (p.PlayerId != facade.Alice.Id || Interlocked.Exchange(ref started, 1) != 0) return;
+                var submit = facade.SubmitAsync(new PassPriorityCommand { PlayerId = facade.Alice.Id });
+                submit.ContinueWith(_ => observed.TrySetResult(bob.HasPending || alice.HasPending || facade.IsRoundComplete),
+                    TaskContinuationOptions.ExecuteSynchronously);
+            });
+
+            await facade.StartAsync();
+            if (!await observed.Task.WaitAsync(TimeSpan.FromSeconds(10))) settledEarly++;
+        }
+        settledEarly.Should().Be(0, "SubmitAsync must not be released by the pulse of the prompt it answered");
+    }
 }
