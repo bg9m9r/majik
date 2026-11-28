@@ -14,19 +14,16 @@ jobs:
     # cancelled after 24 hours, which blocks merging (#3567). Hosted runners are free for
     # this public repository. Reintroduce a self-hosted pool only with an availability check.
     runs-on: ubuntu-latest
-    timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
+    # The last hosted run took 5 min 33 s before the target-filter scanner and full-game gate
+    # steps (about 15 s and 9 s on a 16-core machine; allow a minute or two on a hosted runner).
+    # 12 minutes leaves room while still failing fast on a hang.
+    timeout-minutes: 12
 
     steps:
       - uses: actions/checkout@v7
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
-        # On self-hosted runners setup-dotnet defaults to /usr/share/dotnet,
-        # which the unprivileged runner user can't write. Install into the
-        # runner tool cache (a shared Docker volume): writable, and persisted
-        # between jobs so the SDK is downloaded only once. setup-dotnet adds
-        # this dir to PATH for the later dotnet steps. (runner.* context is
-        # only available at step scope, not in a job-level env.)
         env:
           DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
