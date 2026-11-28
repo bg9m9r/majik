@@ -62,6 +62,27 @@ public class ZoneService
     }
 
     /// <summary>
+    /// CR 406.3 — exile <paramref name="card"/> face down: only
+    /// <paramref name="mayLook"/> may look at it (empty for "you can't look at
+    /// it"). Same replacement / event path as <see cref="MoveCard"/>; the flag
+    /// is on the card by the time <see cref="CardMovedEvent"/> is published.
+    /// A replacement that sends the card elsewhere leaves it face up there.
+    /// </summary>
+    public void ExileFaceDown(ICard card, ZoneType fromZone, IReadOnlyCollection<Player> mayLook, Player? controller = null)
+    {
+        ArgumentNullException.ThrowIfNull(mayLook);
+        var intent = BuildIntent(card, fromZone, ZoneType.Exile, controller);
+        if (_replacements != null)
+        {
+            var replaced = _replacements.Apply(intent);
+            if (replaced == null) return; // cancelled
+            intent = replaced;
+        }
+
+        CommitMove(card, fromZone, intent, faceDownLookers: mayLook);
+    }
+
+    /// <summary>
     /// PLAN 08 — async twin of <see cref="MoveCard"/>. Pushes the would-move
     /// through <see cref="ReplacementBus.ApplyAsync{TIntent}"/> with the live
     /// <paramref name="ctx"/> so prompting battlefield-entry replacements
@@ -127,7 +148,8 @@ public class ZoneService
     /// <see cref="MoveCardAsync"/>; identical behaviour regardless of which
     /// bus path produced the intent.
     /// </summary>
-    private void CommitMove(ICard card, ZoneType fromZone, ZoneMoveIntent intent)
+    private void CommitMove(ICard card, ZoneType fromZone, ZoneMoveIntent intent,
+        IReadOnlyCollection<Player>? faceDownLookers = null)
     {
         var finalToZone = intent.ToZone;
         var finalController = intent.Controller;
@@ -142,8 +164,14 @@ public class ZoneService
         // value. Snapshotting here threads the correct LKI controller into the
         // CardMovedEvent published below.
         var lkiController = card.Controller;
+        // CR 406.3 — read before the zone change clears it.
+        var leftFaceDownExile = card is Card { IsExiledFaceDown: true };
 
         card.SetZone(finalToZone);
+        if (faceDownLookers != null && finalToZone == ZoneType.Exile && card is Card exiledFaceDown)
+        {
+            exiledFaceDown.MarkExiledFaceDown(faceDownLookers);
+        }
 
         if (finalController != null && finalToZone == ZoneType.Battlefield)
         {
@@ -228,7 +256,7 @@ public class ZoneService
         // still read the in-flight stamp earlier in this method. We
         // publish CardMovedEvent FIRST so any LTB subscriber that wants
         // to consult Card.WasCast can do so before the clear runs.
-        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone, lkiController));
+        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone, lkiController, leftFaceDownExile));
 
         if (fromZone == ZoneType.Battlefield && finalToZone != ZoneType.Battlefield
             && card is Card concreteForCastClear)

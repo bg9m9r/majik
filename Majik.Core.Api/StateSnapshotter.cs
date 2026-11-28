@@ -114,6 +114,14 @@ public static class StateSnapshotter
     /// payloads (EventPayloadBuilder.FaceDownName).</summary>
     internal const string FaceDownName = "Face-down permanent";
 
+    /// <summary>CR 406.3 — the name a card exiled face down is shown with to a
+    /// player the exiling effect does not let look at it.</summary>
+    internal const string FaceDownExileName = "Face-down card";
+
+    /// <summary>CR 406.3 — a card in exile face down (Bomat Courier, Vivien,
+    /// Champion of the Wilds, Necropotence).</summary>
+    internal static bool IsExiledFaceDown(ICard? card) => card is Card { IsExiledFaceDown: true };
+
     internal static bool IsFaceDown(ICard? card) => card is Permanent { IsFaceDown: true };
 
     /// <summary>CR 708.6 — the controller of a face-down permanent may look at
@@ -158,6 +166,30 @@ public static class StateSnapshotter
     /// nested pass so the snapshot stays SHALLOW (an imprinted card never
     /// carries its own imprints).</param>
     private static CardSnapshotDto SnapshotCard(ICard card, bool includeImprints, Player? viewer)
+    {
+        // CR 406.3 — same shape as a face-down permanent (CR 708.2): the object
+        // has no characteristics; IsFaceDown; the real card (name + FaceDownCard)
+        // only for a player the exiling effect lets look at it.
+        if (card is Card { IsExiledFaceDown: true } exiledFaceDown)
+        {
+            var looks = exiledFaceDown.MayLookAtFaceDownExile(viewer);
+            return new CardSnapshotDto(
+                InstanceId: card.InstanceId,
+                Name: looks ? card.Name : FaceDownExileName,
+                ManaCost: "",
+                Types: System.Array.Empty<string>(),
+                Power: null,
+                Toughness: null,
+                Tapped: false,
+                SummoningSickness: false,
+                Abilities: System.Array.Empty<AbilityDto>(),
+                IsFaceDown: true,
+                FaceDownCard: looks ? SnapshotFaceUp(card, includeImprints: false, viewer) : null);
+        }
+        return SnapshotFaceUp(card, includeImprints, viewer);
+    }
+
+    private static CardSnapshotDto SnapshotFaceUp(ICard card, bool includeImprints, Player? viewer)
     {
         var f = BuildPermanentFields(card);
 
@@ -503,6 +535,8 @@ public static class StateSnapshotter
         {
             ZoneType.Library => true,
             ZoneType.Hand => !ReferenceEquals(card.Owner, viewer),
+            // CR 406.3 — exiled face down, and this viewer may not look at it.
+            ZoneType.Exile => card is Card c && !c.MayLookAtFaceDownExile(viewer),
             _ => false,
         };
     }

@@ -296,12 +296,15 @@ public static class EventPayloadBuilder
     /// to the wrong seat.</summary>
     public static bool RequiresPerViewerMasking(GameEvent e) => e switch
     {
-        CardMovedEvent x => BothZonesHidden(x.FromZone, x.ToZone) || EntersFaceDown(x),
+        CardMovedEvent x => BothZonesHidden(x.FromZone, x.ToZone) || EntersFaceDown(x)
+            || IntoFaceDownExile(x) || (x.LeftFaceDownExile && IsHiddenZone(x.ToZone)),
         CardDrawnEvent => true, // library → hand: always both hidden
         // Library-bound cards are shown only to the surveilling player.
         SurveilEvent => true,
-        TriggeredAbilityTriggeredEvent x => x.Ability.Source is ICard c && (IsHiddenZone(c.Zone) || IsFaceDown(c)),
-        TargetsChosenEvent x => x.Targets.Select(TargetObject).Any(o => o is ICard c && IsHiddenZone(c.Zone)),
+        TriggeredAbilityTriggeredEvent x => x.Ability.Source is ICard c
+            && (IsHiddenZone(c.Zone) || IsFaceDown(c) || StateSnapshotter.IsExiledFaceDown(c)),
+        TargetsChosenEvent x => x.Targets.Select(TargetObject)
+            .Any(o => o is ICard c && (IsHiddenZone(c.Zone) || StateSnapshotter.IsExiledFaceDown(c))),
         // CR 708.2 — a face-down permanent's name is masked for non-controllers.
         PermanentTappedEvent x => IsFaceDown(x.Permanent),
         CreatureAttacksEvent x => IsFaceDown(x.Attacker),
@@ -321,6 +324,9 @@ public static class EventPayloadBuilder
 
     /// <summary>Shown for a face-down permanent to anyone but its controller.</summary>
     internal const string FaceDownName = StateSnapshotter.FaceDownName;
+
+    /// <summary>Shown for a card exiled face down to anyone who may not look at it.</summary>
+    internal const string FaceDownExileName = StateSnapshotter.FaceDownExileName;
 
     private static bool IsFaceDown(ICard? card) => StateSnapshotter.IsFaceDown(card);
 
@@ -349,6 +355,10 @@ public static class EventPayloadBuilder
     // cloak): its payload is the face-down 2/2 for anyone who may not look at it.
     private static bool EntersFaceDown(CardMovedEvent x) =>
         x.ToZone == ZoneType.Battlefield && IsFaceDown(x.Card);
+
+    // CR 406.3 — a card put into exile face down.
+    private static bool IntoFaceDownExile(CardMovedEvent x) =>
+        x.ToZone == ZoneType.Exile && StateSnapshotter.IsExiledFaceDown(x.Card);
 
     private static object TargetObject(Majik.Core.Targeting.ITarget t)
         => t is Majik.Core.Targeting.Target { TargetObject: { } o } ? o : t;
@@ -409,7 +419,11 @@ public static class EventPayloadBuilder
     private static JsonElement BuildCardMoved(CardMovedEvent x, Player? viewer, Majik.Core.Stack.Stack? stack)
     {
         var ownerId = x.Card.Owner?.Id;
-        bool mask = ShouldMaskCardForViewer(viewer, ownerId, x.FromZone, x.ToZone);
+        bool mask = ShouldMaskCardForViewer(viewer, ownerId, x.FromZone, x.ToZone)
+            // CR 406.3 / 706 — from face-down exile into a hidden zone: a
+            // non-owner never saw the card and still may not.
+            || (x.LeftFaceDownExile && IsHiddenZone(x.ToZone)
+                && viewer != null && (!ownerId.HasValue || viewer.Id != ownerId.Value));
 
         if (mask)
         {
@@ -433,6 +447,33 @@ public static class EventPayloadBuilder
         // place instead of forcing a full GET /state. A → Battlefield move
         // always touches a public zone, so it is already the revealed branch —
         // the enrichment never appears on a masked variant.
+        if (IntoFaceDownExile(x))
+        {
+            // CR 406.3 — the face-down exile shape the snapshot gives this
+            // viewer: a looker sees the card, everyone else only that it is
+            // a face-down card.
+            var looks = ((Card)x.Card).MayLookAtFaceDownExile(viewer);
+            if (!looks)
+            {
+                return SerializeCard(new CardMovedPayload(
+                    From: x.FromZone.ToString(),
+                    To: x.ToZone.ToString(),
+                    OwnerId: ownerId,
+                    CardId: x.Card.InstanceId,
+                    CardName: FaceDownExileName,
+                    IsFaceDown: true));
+            }
+            return SerializeCard(new CardMovedPayload(
+                From: x.FromZone.ToString(),
+                To: x.ToZone.ToString(),
+                OwnerId: ownerId,
+                CardId: x.Card.InstanceId,
+                CardName: x.Card.Name,
+                ManaCost: x.Card.ManaCost,
+                Types: x.Card.CardTypes.Select(t => t.ToString()).ToList(),
+                IsFaceDown: true));
+        }
+
         if (EntersFaceDown(x))
         {
             // CR 708.2 — the same face-down view the snapshot gives this viewer.

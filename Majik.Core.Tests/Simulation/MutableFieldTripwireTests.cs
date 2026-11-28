@@ -37,6 +37,8 @@ public sealed class MutableFieldTripwireTests
             "_cardTypesView",                       // DERIVED-CACHE: lazy AsReadOnly wrapper over _cardTypes; not copied — clone re-creates lazily
             "_supertypesView",                      // DERIVED-CACHE: lazy AsReadOnly wrapper over _supertypes; not copied — clone re-creates lazily
             "_subtypesView",                        // DERIVED-CACHE: lazy AsReadOnly wrapper over _subtypes; not copied — clone re-creates lazily
+            "_exiledFaceDown",                      // COPIED (CR 406.3 face-down exile flag; FaceDownExileTests.ASimulationClone_KeepsTheFlag_WithItsLookersRemapped).
+            "_faceDownLookers",                     // COPIED + RELINKED (players remapped in Card.RelinkReferences).
             "_backFaceLoyaltyAbilities",            // COPIED (AddRange — back-face loyalty DETACH LEDGER; sub-refs of _abilities, shared refs so a flip-back in sim detaches exactly these). Pairs with _mdfcState SKIPPED-DEFER.
             "_cardTypes",                           // COPIED (AddRange — definition)
             "_controller",                          // COPIED (set null; re-linked via RelinkReferences)

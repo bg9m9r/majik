@@ -96,7 +96,8 @@ public static class RevealAndChoose
         string label,
         ZoneType pickedDestination,
         ZoneType restDestination,
-        string sourceTag)
+        string sourceTag,
+        IReadOnlyCollection<Player>? pickedFaceDownLookers = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
 
@@ -109,7 +110,7 @@ public static class RevealAndChoose
                 ResolutionContext.For(
                     caster, AgentRegistry.Get(caster), game: null, chosenTargets: null),
                 caster, count, eligiblePredicate, optional, label,
-                pickedDestination, restDestination, sourceTag)
+                pickedDestination, restDestination, sourceTag, pickedFaceDownLookers)
             .GetAwaiter().GetResult();
     }
 
@@ -131,7 +132,8 @@ public static class RevealAndChoose
         string label,
         ZoneType pickedDestination,
         ZoneType restDestination,
-        string sourceTag)
+        string sourceTag,
+        IReadOnlyCollection<Player>? pickedFaceDownLookers = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
         ArgumentNullException.ThrowIfNull(caster);
@@ -195,7 +197,13 @@ public static class RevealAndChoose
         foreach (var card in revealed)
         {
             var dest = ReferenceEquals(card, picked) ? pickedDestination : restDestination;
-            if (zones != null)
+            // CR 406.3 — the picked card exiled face down ("Exile one face down").
+            var faceDown = pickedFaceDownLookers != null && dest == ZoneType.Exile && ReferenceEquals(card, picked);
+            if (zones != null && faceDown)
+            {
+                zones.ExileFaceDown(card, ZoneType.Library, pickedFaceDownLookers!, caster);
+            }
+            else if (zones != null)
             {
                 zones.MoveCard(card, ZoneType.Library, dest, caster);
             }
@@ -214,6 +222,7 @@ public static class RevealAndChoose
                 };
                 destZone.AddCard(card);
                 card.SetZone(dest);
+                if (faceDown) (card as Card)?.MarkExiledFaceDown(pickedFaceDownLookers!);
             }
         }
 

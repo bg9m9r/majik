@@ -131,6 +131,11 @@ public class Card : ICard
         if (src.Controller is { } c && players.TryGetValue(c, out var cc))
             Controller = cc;   // internal setter — ActiveEffects is null on clones, so no cache bump
 
+        // CR 406.3 — who may look at a face-down exiled card, as cloned players.
+        if (src._faceDownLookers.Length > 0)
+            _faceDownLookers = System.Array.ConvertAll(src._faceDownLookers,
+                p => players.TryGetValue(p, out var cp) ? cp : p);
+
         // Relink exile-cast grant: the copy-ctor copies the player ref as-is; here
         // we remap it to the cloned player so ReferenceEquals checks in
         // ExileCastAlternativeCost succeed against the cloned caster, not the original.
@@ -148,6 +153,35 @@ public class Card : ICard
         // Preserves companion fields (cost, anyTypeMana).
         if (src.RuntimeGraveyardNonOwnerCastAllowedCaster is { } gyA && players.TryGetValue(gyA, out var cGyA))
             GrantRuntimeGraveyardNonOwnerCast(cGyA, src.RuntimeGraveyardNonOwnerCastCost!, src.RuntimeGraveyardNonOwnerCastAnyTypeMana);
+    }
+
+    private bool _exiledFaceDown;
+    private Player[] _faceDownLookers = System.Array.Empty<Player>();
+
+    /// <summary>
+    /// CR 406.3 — this card is in exile face down (Bomat Courier, Vivien,
+    /// Champion of the Wilds −2, Necropotence). Set by the exiling effect via
+    /// <see cref="Majik.Core.Services.ZoneService.ExileFaceDown"/>; cleared when
+    /// the card leaves exile (CR 400.7: a new object, face up in its new zone).
+    /// </summary>
+    public bool IsExiledFaceDown => _exiledFaceDown && _zone == ZoneType.Exile;
+
+    /// <summary>CR 406.3 — the players an effect allows to look at this
+    /// face-down exiled card (Vivien's controller, who may cast it). Empty for
+    /// "you can't look at it" (Bomat Courier) and when face up.</summary>
+    public IReadOnlyList<Player> FaceDownExileLookers => IsExiledFaceDown ? _faceDownLookers : System.Array.Empty<Player>();
+
+    /// <summary>CR 406.3 — may <paramref name="viewer"/> see this card's face?
+    /// True for a face-up card, for an allowed looker, and for the null
+    /// (all-revealed spectator/debug) viewer.</summary>
+    public bool MayLookAtFaceDownExile(Player? viewer) =>
+        !IsExiledFaceDown || viewer is null || System.Array.Exists(_faceDownLookers, p => ReferenceEquals(p, viewer));
+
+    /// <summary>Stamp the face-down state on a card just put into exile.</summary>
+    internal void MarkExiledFaceDown(IEnumerable<Player> mayLook)
+    {
+        _exiledFaceDown = true;
+        _faceDownLookers = mayLook.Distinct().ToArray();
     }
 
     public ZoneType Zone
@@ -173,6 +207,12 @@ public class Card : ICard
                 && value != ZoneType.Battlefield)
             {
                 leaving.ResetOnLeaveBattlefield();
+            }
+            // CR 400.7 / 406.3 — a card leaving exile is a new object, face up.
+            if (previousZone == ZoneType.Exile && value != ZoneType.Exile)
+            {
+                _exiledFaceDown = false;
+                _faceDownLookers = System.Array.Empty<Player>();
             }
             // CR 613 — a permanent's battlefield presence is an input to the
             // layer system: lords/anthems/CDAs scoped to "permanents you
@@ -1807,6 +1847,9 @@ public class Card : ICard
 
         // -- scalar runtime state --
         _zone = src._zone;
+        // CR 406.3 — face-down exile state; lookers re-linked in RelinkReferences.
+        _exiledFaceDown = src._exiledFaceDown;
+        _faceDownLookers = src._faceDownLookers;
         // Owner / Controller re-linked later via PlayerMap pass.
         _controller = null;
 
