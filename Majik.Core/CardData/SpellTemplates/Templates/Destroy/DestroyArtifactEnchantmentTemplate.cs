@@ -18,9 +18,29 @@ public sealed class DestroyArtifactEnchantmentTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
 
-    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
-        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+    // CR 115.1 — the printed type words decide what can be targeted:
+    // "target artifact" is not "target artifact or enchantment". The pattern
+    // accepts all three forms; before, every form bound the same
+    // "artifact or enchantment" request (Shatter, Kolaghan's Command,
+    // Rain of Thorns, Destroy Evil, ...).
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        if (!m.Success) return null;
+        var words = new[] { m.Groups[1].Value, m.Groups[3].Value }
+            .Where(w => w.Length > 0).Select(w => w.ToLowerInvariant()).ToHashSet();
+        return new Dictionary<string, string>
+        {
+            ["artifact"] = words.Contains("artifact") ? "1" : "0",
+            ["enchantment"] = words.Contains("enchantment") ? "1" : "0",
+        };
+    }
 
-    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        DestroySpellFactory.DestroyArtifactOrEnchantmentSpell(ctx.Resolver);
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        // Older callers without the params keep the two-type form.
+        var artifact = !@params.TryGetValue("artifact", out var a) || a == "1";
+        var enchantment = !@params.TryGetValue("enchantment", out var e) || e == "1";
+        return DestroySpellFactory.DestroyArtifactOrEnchantmentSpell(ctx.Resolver, artifact, enchantment);
+    }
 }

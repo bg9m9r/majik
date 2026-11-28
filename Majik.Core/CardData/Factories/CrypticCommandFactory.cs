@@ -181,8 +181,7 @@ public static class CrypticCommandFactory
             if (slot.Count == 0) return;
             var resolved = resolver(slot[0]);
             if (resolved is not ISpell spell) return;
-            OracleSpellBinder.RemoveFromStack(stack, spell);
-            spell.Card.SetZone(ZoneType.Graveyard);
+            OracleSpellBinder.CounterSpell(stack, spell);
         });
 
     private static IEffect BuildBounceEffect(

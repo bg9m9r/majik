@@ -49,10 +49,7 @@ public sealed class DiscardACardCost : ICost
     public bool CanPay(Player player)
     {
         if (player == null) return false;
-        if (Target != null)
-        {
-            return player.Zones.Hand.ContainsCard(Target);
-        }
+        // A nominee no longer in hand is stale and ignored (CR 400.7).
         return player.Zones.Hand.GetCards().Any();
     }
 
@@ -66,13 +63,14 @@ public sealed class DiscardACardCost : ICost
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
-        var pick = Target ?? player.Zones.Hand.GetCards().FirstOrDefault();
+        // CR 400.7 — a nominee counts only while it is in this player's
+        // hand; a stale one (discarded or moved since) is ignored.
+        var pick = Target is { } nominee && player.Zones.Hand.ContainsCard(nominee)
+            ? nominee
+            : player.Zones.Hand.GetCards().FirstOrDefault();
         if (pick == null)
             throw new InvalidPlayerActionException(
                 $"Cannot pay {Description}: {player.Name}'s hand is empty.");
-        if (!player.Zones.Hand.ContainsCard(pick))
-            throw new InvalidPlayerActionException(
-                $"Cannot pay {Description}: nominated card is not in {player.Name}'s hand.");
 
         // CR 701.8 — route through the central discard chokepoint so a
         // DiscardedEvent fires (wasCost: true) and "Whenever you discard a

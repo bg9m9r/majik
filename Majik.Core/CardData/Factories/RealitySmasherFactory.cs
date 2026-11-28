@@ -229,14 +229,10 @@ public static class RealitySmasherFactory
 
                 // CR 701.5b — counter the spell. RemoveFromStack returns false
                 // for an uncounterable spell (it stays put).
-                if (!OracleSpellBinder.RemoveFromStack(liveStack, source))
+                if (!OracleSpellBinder.CounterSpell(liveStack, source))
                     return System.Threading.Tasks.ValueTask.CompletedTask;
 
-                // CR 701.5b — a countered SPELL goes to its owner's graveyard.
-                if (source is Majik.Core.Spells.ISpell spell && spell.Card is Card spellCard)
-                {
-                    spellCard.SetZone(ZoneType.Graveyard);
-                }
+                // CR 701.5b — a countered SPELL goes to its owner's graveyard (CounterSpell).
 
                 return System.Threading.Tasks.ValueTask.CompletedTask;
             });

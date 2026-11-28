@@ -69,8 +69,7 @@ public static class DispelFactory
                         // CR 608.2b — only instant spells are legal targets.
                         if (!spell.Card.HasType(CardType.Instant)) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

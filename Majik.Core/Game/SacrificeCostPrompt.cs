@@ -52,14 +52,14 @@ public static class SacrificeCostPrompt
             switch (cost)
             {
                 case IChooseCreatureToSacrificeCost creatureSac:
-                    await PromptCreatureSacAsync(actor, creatureSac, agent, ctx, ct)
+                    await PromptCreatureSacAsync(actor, creatureSac, ability.Source, agent, ctx, ct)
                         .ConfigureAwait(false);
                     break;
                 // Typed NON-creature sacrifice ("Sacrifice a Desert" / "Sacrifice
                 // a token"). A cost implementing BOTH (none today) is handled by
                 // the creature branch above and skipped here.
                 case IChoosePermanentToSacrificeCost permanentSac:
-                    await PromptPermanentSacAsync(actor, permanentSac, agent, ctx, ct)
+                    await PromptPermanentSacAsync(actor, permanentSac, ability.Source, agent, ctx, ct)
                         .ConfigureAwait(false);
                     break;
             }
@@ -69,11 +69,12 @@ public static class SacrificeCostPrompt
     private static async Task PromptCreatureSacAsync(
         Player actor,
         IChooseCreatureToSacrificeCost sacCost,
+        object source,
         IPlayerAgent agent,
         GameContext ctx,
         CancellationToken ct)
     {
-        var eligible = sacCost.EligibleSacrifices(actor);
+        var eligible = LeastValuableFirst(sacCost.EligibleSacrifices(actor), source);
         if (eligible.Count == 0) return; // unaffordable — handled upstream.
 
         if (eligible.Count == 1)
@@ -100,11 +101,12 @@ public static class SacrificeCostPrompt
     private static async Task PromptPermanentSacAsync(
         Player actor,
         IChoosePermanentToSacrificeCost sacCost,
+        object source,
         IPlayerAgent agent,
         GameContext ctx,
         CancellationToken ct)
     {
-        var eligible = sacCost.EligiblePermanents(actor);
+        var eligible = LeastValuableFirst(sacCost.EligiblePermanents(actor), source);
         if (eligible.Count == 0) return; // unaffordable — handled upstream.
 
         if (eligible.Count == 1)
@@ -127,4 +129,20 @@ public static class SacrificeCostPrompt
         var pick = chosen.OfType<Permanent>().FirstOrDefault() ?? eligible[0];
         sacCost.ChoosePermanent(pick);
     }
+
+    /// <summary>
+    /// Candidate order for the prompt: noncreatures before creatures, then
+    /// tokens, then cheapest mana value first, and the ability's own source
+    /// last. Display order only for a person; a
+    /// bot (HeuristicBotAgent picks the first candidate) therefore sacrifices
+    /// the least valuable permanent, and its source only when nothing else
+    /// is eligible.
+    /// </summary>
+    private static List<T> LeastValuableFirst<T>(IReadOnlyList<T> eligible, object source) where T : Permanent =>
+        eligible
+            .OrderBy(p => ReferenceEquals(p, source))
+            .ThenBy(p => p.HasType(Majik.Core.Cards.Types.CardType.Creature))
+            .ThenBy(p => !p.IsToken)
+            .ThenBy(p => Majik.Core.ValueObjects.ManaCost.Parse(p.ManaCost ?? "").TotalValue)
+            .ToList();
 }

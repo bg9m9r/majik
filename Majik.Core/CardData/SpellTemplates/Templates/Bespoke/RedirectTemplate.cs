@@ -33,11 +33,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Bespoke;
 ///   spell's mana value"): dropped at v1 — the redirector doesn't surface
 ///   the spell that was redirected, and the rider doesn't matter for the
 ///   stub-level effect (which doesn't actually change resolution).
-/// - <b>Effect-closure retargeting</b>: see <see cref="SpellRedirector"/>
-///   class-level remarks — the v1 redirector mutates
-///   <c>ChosenTargets</c> only; the pre-built effect closures still
-///   resolve against the original target. Lossy semantic, documented.
-///
+
 /// CR 114.6 (changing the target of a spell or ability).
 /// </summary>
 public sealed class RedirectTemplate : ISpellTemplate
@@ -75,28 +71,42 @@ public sealed class RedirectTemplate : ISpellTemplate
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
-            // One TargetRequest for the new target. v1 doesn't ask
-            // "which spell to redirect" — the redirector picks the top
-            // single-target spell. LegalCandidates is empty: the agent
-            // is expected to supply something appropriate; legality is
-            // outside the v1 stub's scope.
+            // CR 115.1 / 115.7 — the spell targets the SPELL it changes ("target
+            // spell with a single target"); the new target is chosen as it
+            // resolves.
             TargetRequests: new[]
             {
-                new TargetRequest("new target", 1, 1, Array.Empty<object>(),
-                    BotIntent.Protection | BotIntent.Removal),
+                new TargetRequest("target spell with a single target", 1, 1, Array.Empty<object>(),
+                    BotIntent.Protection | BotIntent.Removal,
+                    CandidateGatherer: g => g.Stack.GetAll()
+                        .OfType<Majik.Core.Spells.Spell>()
+                        .Where(s => s.ChosenTargets.Count == 1)
+                        .Cast<object>()
+                        .ToList()),
             },
             EffectFactory: p =>
             {
-                // Capture the resolved new target at EffectFactory time —
-                // same pattern as every other targeted template in the
-                // codebase. The redirector writes this into the top
-                // spell's ChosenTargets at resolution.
-                var newTarget = resolver(p.Targets[0][0]);
+                var picked = resolver(p.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("redirect top single-target spell", () =>
+                    new Effect("change the target of target spell with a single target", async rc =>
                     {
-                        SpellRedirector.RedirectTopSpellSingleTarget(stack, newTarget);
+                        // CR 608.2b — the spell must still be on the stack with a single target.
+                        if (picked is not Majik.Core.Spells.Spell spell
+                            || !stack.GetAll().Contains(spell)
+                            || spell.ChosenTargets.Count != 1) return;
+                        if (rc.Agent is null || rc.Game is null) return;
+
+                        // CR 115.7 — only to a legal target for that spell;
+                        // with none, the target stays.
+                        var pool = spell.CandidatesForTarget(0, rc.Game);
+                        var legal = pool.Where(c => spell.IsLegalNewTarget(0, c, rc.Game)).ToList();
+                        if (legal.Count == 0) return;
+                        var request = new TargetRequest(
+                            $"new target for {spell.Card.Name}", 1, 1, legal,
+                            BotIntent.Protection | BotIntent.Removal);
+                        var chosen = await rc.Agent.ChooseTargetsAsync(rc.Game, request, rc.Ct).ConfigureAwait(false);
+                        if (chosen.Count > 0) spell.TryRedirectTarget(0, chosen[0], rc.Game);
                     }),
                 };
             });

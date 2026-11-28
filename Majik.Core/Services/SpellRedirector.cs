@@ -9,40 +9,29 @@ namespace Majik.Core.Services;
 ///
 /// Binds the Deflection / Imp's Mischief / Shunt / Swerve family.
 ///
-/// ## v1 stub — what this actually does
+/// ## What this does
 ///
-/// The engine doesn't retain a spell's <c>SpellDefinition</c> /
-/// <c>ChosenSpellParams</c> on its <see cref="Majik.Core.Spells.ISpell"/>
-/// after the cast flow. The pre-built <see cref="Majik.Core.Abilities.IEffect"/>
-/// closures captured their targets via the cast-time
-/// <c>resolver(p.Targets[0][0])</c> call — those captures are baked into
-/// the closure and the redirector cannot rewrite them post-cast.
+/// <see cref="Spell.ChosenTargets"/> is the spell's one list of current
+/// targets. A spell cast through SpellCastFlow rebuilds its effects from it
+/// when it resolves (Spell.SyncEffectsWithTargets), so rewriting it is a real
+/// redirect: the effect lands on the new target.
 ///
-/// What the v1 helper does instead:
 ///   - Find the most recently pushed <see cref="Spell"/> on the stack
 ///     whose <see cref="Spell.ChosenTargets"/> count is exactly one.
 ///   - Replace that single chosen target with <paramref name="newTarget"/>.
 ///   - Return <c>true</c> if such a spell was found and rewritten,
 ///     <c>false</c> otherwise.
 ///
-/// Observable effect (v1): the spell's <c>ChosenTargets</c> reflects the
-/// new pick (visible to <see cref="Majik.Core.Services.StackResolver"/>'s
-/// CR 608.2b legality recheck), but the actual effect closure still
-/// resolves against the original target. This is a clear lossy stub —
-/// callers / cards bind, the engine acknowledges the redirect, but the
-/// damage / counter / destroy ultimately lands on the original creature.
-///
-/// Better than no-bind: the card now flows through the cast pipeline,
-/// the agent gets to pick a "new target", and downstream wiring (resolver
-/// + effect-rebuild on stack) can flip the v1 stub into real semantics
-/// without touching the binding templates.
+/// CR 115.7 — the new target must be legal for that spell
+/// (<see cref="Spell.TryRedirectTarget"/>); if it is not, nothing changes and
+/// this returns false. The redirect family itself targets the spell it changes
+/// (RedirectTemplate) and calls <see cref="Spell.TryRedirectTarget"/> directly.
 /// </summary>
 public static class SpellRedirector
 {
     /// <summary>
-    /// v1 stub: rewrite the top single-target spell's
+    /// Rewrite the top single-target spell's
     /// <see cref="Spell.ChosenTargets"/> to <paramref name="newTarget"/>.
-    /// See class-level remarks for the lossy semantics.
     /// </summary>
     /// <param name="stack">The shared stack to scan.</param>
     /// <param name="newTarget">Replacement target object.</param>
@@ -55,7 +44,8 @@ public static class SpellRedirector
     /// </returns>
     public static bool RedirectTopSpellSingleTarget(
         Majik.Core.Stack.Stack stack,
-        object newTarget)
+        object newTarget,
+        Majik.Core.Game.GameContext? game = null)
     {
         ArgumentNullException.ThrowIfNull(stack);
         ArgumentNullException.ThrowIfNull(newTarget);
@@ -72,8 +62,7 @@ public static class SpellRedirector
         {
             if (all[i] is not Spell spell) continue;
             if (spell.ChosenTargets.Count != 1) continue;
-            spell.ChosenTargets[0] = newTarget;
-            return true;
+            return spell.TryRedirectTarget(0, newTarget, game);
         }
 
         return false;

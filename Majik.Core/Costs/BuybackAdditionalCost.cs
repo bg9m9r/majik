@@ -39,7 +39,8 @@ public sealed class BuybackAdditionalCost : IAdditionalCost
     {
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (_card.Zone != ZoneType.Stack) return;
-        caster.Zones.Hand.AddCard(_card);
-        _card.SetZone(ZoneType.Hand);
+        // CR 702.27a — to its OWNER's hand, out of the stack zone list.
+        if (_card.Owner is null) { caster.Zones.Hand.AddCard(_card); _card.SetZone(ZoneType.Hand); return; }
+        Majik.Core.Spells.SpellStackExit.MoveWithoutEvents(_card, ZoneType.Hand);
     }
 }

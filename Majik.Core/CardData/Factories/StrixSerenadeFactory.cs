@@ -126,8 +126,7 @@ public static class StrixSerenadeFactory
                         if (!isLegal) return;
 
                         // CR 701.5 — counter the spell.
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
 
                         // CR 111.4 — the countered spell's CONTROLLER creates a
                         // 2/2 blue Bird token with flying (not the Serenade's

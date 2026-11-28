@@ -187,8 +187,7 @@ public static class PyroblastFactory
 
             // CR 701.5 — counter the spell: remove from stack and move the
             // card to its owner's graveyard.
-            OracleSpellBinder.RemoveFromStack(stack, spell);
-            spell.Card.SetZone(ZoneType.Graveyard);
+            OracleSpellBinder.CounterSpell(stack, spell);
         });
 
     /// <summary>

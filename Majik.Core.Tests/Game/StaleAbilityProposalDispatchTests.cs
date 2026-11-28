@@ -156,4 +156,46 @@ public class StaleAbilityProposalDispatchTests
         bob.LifeTotal.Should().Be(19);
         alice.ManaPool.Red.Should().Be(0, "the {R} was paid");
     }
+
+    /// <summary>
+    /// CR 602.2b / 601.2c — an activation needs its required targets. An
+    /// agent that supplies fewer than the minimum doesn't get the ability
+    /// activated anyway: the activation is abandoned (CR 732.1), nothing is
+    /// paid, and the player is told why.
+    /// </summary>
+    [Fact]
+    public async Task ActivateProposal_WithTooFewTargets_IsAbandoned()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var source = new Artifact("Staff of Fire", "") { Owner = alice, Controller = alice };
+        source.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(source);
+
+        var effectRan = false;
+        var ability = new ActivatedAbility(
+            source, alice,
+            costs: new ICost[] { new ManaCostCost("R") },
+            effects: new[] { Fx.Inline("1 damage to target creature", () => effectRan = true) },
+            targetRequests: new[] { new TargetRequest("target creature", 1, 1, System.Array.Empty<object>()) });
+        alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("R"));
+
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueuePriority(new PriorityAction.ActivateAbility(ability, System.Array.Empty<object>()));
+        aliceAgent.QueueTargets(System.Array.Empty<object>());
+        var bobAgent = new ScriptedAgent();
+        for (var i = 0; i < 200; i++)
+        {
+            aliceAgent.QueuePriority(PriorityAction.Pass);
+            bobAgent.QueuePriority(PriorityAction.Pass);
+        }
+
+        var driver = BuildDriver(alice, bob, aliceAgent, bobAgent, out var stack);
+        await driver.RunTurnAsync(alice, turnNumber: 2);
+
+        effectRan.Should().BeFalse("an activation without its required target is illegal (CR 602.2b)");
+        stack.IsEmpty.Should().BeTrue();
+        aliceAgent.ActionsReversed.Should().ContainSingle().Which.Should().Contain("CR 602.2b");
+    }
 }

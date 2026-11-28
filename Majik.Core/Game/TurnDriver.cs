@@ -855,7 +855,9 @@ public sealed class TurnDriver
         // reshapes mana sources at payment time. Null when the driver
         // was constructed without a continuous-effects service — the
         // resolver falls back to printed mana abilities.
-        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects);
+        // CR 605 — the resolver publishes each tapped source's mana event on
+        // the game bus, like a manual activation.
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects, _eventBus);
 
         async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
@@ -1031,7 +1033,7 @@ public sealed class TurnDriver
                 // auto-pay works on the prompt (display only).
                 var subject = new Majik.Core.Players.Agents.ManaPaymentSubject(
                     castCard, castFlow.PeekNextCastId(castCard),
-                    actor.ManaPool.CanPay(cost) || manaResolver.TryAutoSelectSources(actor, cost, out _));
+                    manaResolver.CanAfford(actor, cost));
                 payment = await _agents[actor].ChooseManaSourcesForAsync(ctx, cost, subject, ct);
                 // CR 601.2 / CR 727 — remote player aborted the cast at
                 // the cost-payment prompt. Nothing has been paid yet
@@ -1174,6 +1176,23 @@ public sealed class TurnDriver
             return true; // committed: spell put on the stack
         }
 
+        // CR 602.2b / 601.2c — an ability is activated only with its required
+        // targets. Checked before the prompt for an agent that can pick only
+        // from the offered pool (a remote player: a prompt with no legal
+        // answer would strand them), and after it for every agent. Nothing
+        // is paid before targets, so abandoning is a clean rewind (CR 732.1);
+        // the player is told why. True = abandon.
+        bool ActivationTargetsShort(Player actor, string name, TargetRequest req, int offered, int? chosen)
+        {
+            var agent = _agents[actor];
+            var have = chosen ?? (agent.WantsSynthesizedTargetCandidates ? offered : int.MaxValue);
+            if (have >= req.MinTargets) return false;
+            agent.NotifyActionReversed(
+                $"Cannot activate {name}: target request '{req.Description}' needs {req.MinTargets} " +
+                $"legal target(s); {(chosen.HasValue ? "chosen" : "there are")} {have} (CR 602.2b).");
+            return true;
+        }
+
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
         {
             // CR 601.2h-analogue for abilities (CR 602.2b) — re-validate
@@ -1244,7 +1263,10 @@ public sealed class TurnDriver
                     // only; targeting semantics unchanged). Mirrors
                     // GameFacade.DispatchActivate.
                     promptReq = promptReq.WithSourceLabel(aa.Source);
+                    var abilityName = (aa.Source as Majik.Core.Cards.ICard)?.Name ?? "ability";
+                    if (ActivationTargetsShort(actor, abilityName, req, live.Count, chosen: null)) return;
                     var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                    if (ActivationTargetsShort(actor, abilityName, req, live.Count, chosen.Count)) return;
                     chosenTargets.Add(chosen);
                     foreach (var obj in chosen)
                     {
@@ -1369,7 +1391,9 @@ public sealed class TurnDriver
                 var promptReq = ReferenceEquals(live, req.LegalCandidates)
                     ? req
                     : req.WithCandidates(live);
+                if (ActivationTargetsShort(actor, loyalty.Source.Name, req, live.Count, chosen: null)) return;
                 var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                if (ActivationTargetsShort(actor, loyalty.Source.Name, req, live.Count, chosen.Count)) return;
                 chosenTargets.Add(chosen);
                 foreach (var obj in chosen)
                 {
@@ -1520,7 +1544,9 @@ public sealed class TurnDriver
             checkStateBasedActions: () => _sba.CheckStateBasedActions(
                 _players,
                 _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()),
-            spellDefinitions: _spellDefResolver == null ? null : SpellDefinitionFor);
+            spellDefinitions: _spellDefResolver == null ? null : SpellDefinitionFor,
+            // LoopSafetyNet trips are published here; GameFacade reports them.
+            eventBus: _eventBus);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
     }

@@ -58,6 +58,7 @@ public static partial class TargetCandidateService
 
         if (d.Contains("nonland permanent")) return TargetCategory.NonlandPermanent;
         if (d.Contains("permanent")) return TargetCategory.Permanent;
+        if (d.Contains("artifact") && d.Contains("enchantment")) return TargetCategory.ArtifactOrEnchantment;
         if (d.Contains("artifact")) return TargetCategory.Artifact;
         if (d.Contains("enchantment")) return TargetCategory.Enchantment;
         if (d.Contains("land")) return TargetCategory.Land;
@@ -91,4 +92,7 @@ public enum TargetCategory
     NoncreatureSpell,
     CreatureSpell,
     GraveyardCard,
+    /// <summary>"target artifact or enchantment" — both types (it classified
+    /// as Artifact before, so an enchantment was not offered).</summary>
+    ArtifactOrEnchantment,
 }

@@ -44,31 +44,40 @@ public class ManaAbilityActivator
             throw new InvalidPlayerActionException("Cannot activate mana ability");
         }
 
-        // Activate the ability and generate mana
+        return Produce(ability, player, _eventBus);
+    }
+
+    /// <summary>
+    /// CR 605 — the one place a mana ability produces mana, for a player's own
+    /// activation (above) and for a payment that taps the source
+    /// (ManaPaymentResolver): activate it (tap / pay its cost), add exactly
+    /// the mana it produced to <paramref name="player"/>'s pool, then publish
+    /// <see cref="ManaAbilityActivatedEvent"/> carrying that mana.
+    /// <para>CR 106.4 — the mana is stamped with the ability's spend
+    /// restriction (Ancient Ziggurat: "spend this mana only to cast a creature
+    /// spell") and provenance reaction (Arena of Glory's exert haste) so the
+    /// payment gate and the reaction see it however the mana was produced.</para>
+    /// <para>The event is the only bus-visible signal of a mana ability (it
+    /// doesn't use the stack, CR 605.3): "whenever a player taps X for mana"
+    /// triggers (Manabarbs, Overgrowth, Mirari's Wake) key on it.</para>
+    /// </summary>
+    internal static ManaCost Produce(IManaAbility ability, Player player, IEventBus? eventBus)
+    {
         var manaGenerated = ability.Activate();
 
-        // Add mana to player's pool. CR 106.4 — when the ability declares a
-        // slot-level provenance reaction (Arena of Glory's exert: "if that
-        // mana is spent on a creature spell, it gains haste"), tag every
-        // colored unit with this ability as source + that reaction, so the
-        // payment resolver can fire it precisely when one of those units pays
-        // a cost (deferral #1). Vanilla mana abilities add untagged mana.
-        var provenance = (ability as Majik.Core.Abilities.ManaAbility)?.ProvenanceReaction;
-        if (provenance != null)
+        var concrete = ability as Majik.Core.Abilities.ManaAbility;
+        var restriction = concrete?.SpendRestriction;
+        var reaction = concrete?.ProvenanceReaction;
+        if (restriction != null || reaction != null)
         {
-            player.AddManaToPool(manaGenerated, provenanceSource: ability, onSpent: provenance);
+            player.AddManaToPool(manaGenerated, provenanceSource: ability, onSpent: reaction, restriction: restriction);
         }
         else
         {
             player.AddManaToPool(manaGenerated);
         }
 
-        // CR 605 — publish so "whenever a player taps X for mana" triggers
-        // (Manabarbs, Badgermole Cub, etc.) and analytics subscribers can
-        // observe the activation. Mana abilities don't use the stack
-        // (CR 605.3), so this event is the only bus-visible signal.
-        _eventBus?.Publish(new ManaAbilityActivatedEvent(ability, player, manaGenerated));
-
+        eventBus?.Publish(new ManaAbilityActivatedEvent(ability, player, manaGenerated));
         return manaGenerated;
     }
 

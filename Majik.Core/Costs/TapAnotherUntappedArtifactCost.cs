@@ -90,7 +90,10 @@ public sealed class TapAnotherUntappedArtifactCost : ICost
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
+        // CR 701.26a / 400.7 — a nominee counts only while it is an eligible
+        // permanent on this player's battlefield (a stale one is ignored).
         var pick = Target != null && IsEligible(Target)
+            && player.Zones.Battlefield.GetCards().Contains(Target)
             ? Target
             : player.Zones.Battlefield.GetCards()
                 .OfType<Permanent>()

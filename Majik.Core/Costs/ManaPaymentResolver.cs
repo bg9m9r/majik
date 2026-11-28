@@ -15,6 +15,8 @@ namespace Majik.Core.Costs;
 public sealed class ManaPaymentResolver
 {
     private readonly ContinuousEffectsService? _layers;
+    // CR 605 — where a tapped source's ManaAbilityActivatedEvent is published.
+    private readonly Majik.Core.Events.IEventBus? _eventBus;
 
     /// <summary>
     /// Construct a resolver. When <paramref name="layers"/> is supplied,
@@ -24,9 +26,13 @@ public sealed class ManaPaymentResolver
     /// resolver falls back to the printed mana abilities — preserves
     /// behaviour for callers (and tests) that don't have a layer service.
     /// </summary>
-    public ManaPaymentResolver(ContinuousEffectsService? layers = null)
+    /// <param name="eventBus">Where each source the payment taps publishes its
+    /// ManaAbilityActivatedEvent (CR 605), exactly as a manual activation does.
+    /// Null in harnesses without a bus.</param>
+    public ManaPaymentResolver(ContinuousEffectsService? layers = null, Majik.Core.Events.IEventBus? eventBus = null)
     {
         _layers = layers;
+        _eventBus = eventBus;
     }
 
     public bool Pay(Player payer, ManaCost cost, ManaPayment payment) =>
@@ -72,6 +78,14 @@ public sealed class ManaPaymentResolver
     /// honoured. Lands aren't summoning-sick, so their abilities activate
     /// freely.</para>
     /// </summary>
+    /// <summary>
+    /// CR 601.2g — the cast path's affordability check: the floating pool
+    /// covers <paramref name="cost"/>, or it can be covered with auto-selected
+    /// untapped sources (<see cref="TryAutoSelectSources"/>). Probes only.
+    /// </summary>
+    public bool CanAfford(Player payer, ManaCost cost) =>
+        payer.ManaPool.CanPay(cost) || TryAutoSelectSources(payer, cost, out _);
+
     public bool TryAutoSelectSources(Player payer, ManaCost cost, out ManaPayment payment)
     {
         if (payer == null) throw new ArgumentNullException(nameof(payer));
@@ -459,34 +473,14 @@ public sealed class ManaPaymentResolver
         // get the actually-consumed delta per color.
         var poolBefore = payer.ManaPool;
 
-        // Commit: actually tap each source and add to real pool, then pay.
-        foreach (var ab in abilities)
-        {
-            ab.Activate();
-        }
-        // CR 106.4 — stamp every produced unit with its ability's spend-
-        // restriction (and any provenance reaction) so the ledger records
-        // which floating units are restricted. Restriction-only abilities
-        // (Ancient Ziggurat) record slots even without an OnSpent callback;
-        // ManaAbilityActivator already stamps reaction slots on the float-
-        // then-cast path, so this covers the source-tapped-at-pay path.
+        // Commit: tap each source through the same funnel a manual activation
+        // uses (CR 605): it adds the mana the ability actually produced, stamped
+        // with its spend restriction / provenance (CR 106.4), and publishes
+        // ManaAbilityActivatedEvent so "tapped for mana" triggers fire for
+        // auto-paid mana too. Then pay.
         for (var i = 0; i < abilities.Count; i++)
         {
-            var concrete = abilities[i] as Abilities.ManaAbility;
-            var restriction = concrete?.SpendRestriction;
-            var reaction = concrete?.ProvenanceReaction;
-            if (restriction != null || reaction != null)
-            {
-                payer.AddManaToPool(
-                    produced[i],
-                    provenanceSource: abilities[i],
-                    onSpent: reaction,
-                    restriction: restriction);
-            }
-            else
-            {
-                payer.AddManaToPool(produced[i]);
-            }
+            produced[i] = Services.ManaAbilityActivator.Produce(abilities[i], payer, _eventBus);
         }
 
         // CR 106.4 — withhold the blocked restricted colored mana from the pool
@@ -503,6 +497,13 @@ public sealed class ManaPaymentResolver
         {
             payer.RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG, colorless: blockedC);
         }
+        // Failure AFTER production (a dynamic ability produced less, or other,
+        // than its preview): nothing is spent (PayMana is all-or-nothing), the
+        // sources stay tapped, their mana and the earlier floating mana stay in
+        // the pool, and their tapped-for-mana events have fired. The caller
+        // reverses the cast. CR 732.1 — the payments are cancelled; reversing
+        // the mana abilities is the player's option, so keeping the mana is a
+        // legal outcome. Pinned by ManaPaymentFailureAfterProductionTests.
         if (!ok) return false;
 
         var poolAfter = payer.ManaPool;

@@ -19,10 +19,11 @@ namespace Majik.Core.Costs;
 /// Cabal Therapy's flashback rider).
 ///
 /// ## Deferred (v1 gaps)
-/// - <see cref="Target"/> may be set by the agent before <see cref="Pay"/>
-///   is called; otherwise the first eligible artifact is chosen
-///   deterministically. Full agent-driven target prompting is the next
-///   step — same gap as <see cref="SacrificeAnotherCreatureCost"/>.
+/// - The controller chooses the artifact (CR 117.1): the activation
+///   dispatch asks through <see cref="Majik.Core.Game.SacrificeCostPrompt"/>
+///   (<see cref="IChoosePermanentToSacrificeCost"/>) and stamps
+///   <see cref="Target"/>. A caller that pays without asking gets the first
+///   eligible artifact.
 /// - <b>Self-sacrifice</b>: the picker does NOT exclude the ability's
 ///   source — Arcbound Ravager's "Sacrifice an artifact" can pay itself
 ///   when no other artifact is available (Arcbound Ravager is an
@@ -33,7 +34,7 @@ namespace Majik.Core.Costs;
 ///   "Sacrifice a nontoken artifact"). The token check reads
 ///   <see cref="Permanent.IsToken"/>.
 /// </summary>
-public sealed class SacrificeAnArtifactCost : ICost
+public sealed class SacrificeAnArtifactCost : ICost, IChoosePermanentToSacrificeCost
 {
     private readonly Permanent? _excludeSource;
     private readonly bool _requireNontoken;
@@ -85,6 +86,15 @@ public sealed class SacrificeAnArtifactCost : ICost
         && (!_requireNontoken || !p.IsToken);
 
     /// <inheritdoc/>
+    /// <remarks>CR 117.1 — the player paying the cost chooses; the activation
+    /// asks through <see cref="Majik.Core.Game.SacrificeCostPrompt"/>.</remarks>
+    public IReadOnlyList<Permanent> EligiblePermanents(Player player) =>
+        player.Zones.Battlefield.GetCards().OfType<Permanent>().Where(IsEligible).ToList();
+
+    /// <inheritdoc/>
+    public void ChoosePermanent(Permanent? permanent) => Target = permanent;
+
+    /// <inheritdoc/>
     public bool CanPay(Player player)
     {
         if (player == null) return false;
@@ -98,9 +108,17 @@ public sealed class SacrificeAnArtifactCost : ICost
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
-        var pick = Target ?? player.Zones.Battlefield.GetCards()
-            .OfType<Permanent>()
-            .FirstOrDefault(IsEligible);
+        // CR 701.16a / 400.7 — a nominated artifact counts only while it is
+        // still an eligible artifact on the battlefield. Target also records
+        // the LAST payment's artifact, which has since left (and may have come
+        // back as a new object somewhere else); reusing it put one card in two
+        // zones (Arcbound Ravager re-sacrificing a Mox Opal in the library).
+        var pick = Target is { Zone: ZoneType.Battlefield } nominated && IsEligible(nominated)
+            && player.Zones.Battlefield.GetCards().Contains(nominated)
+            ? nominated
+            : player.Zones.Battlefield.GetCards()
+                .OfType<Permanent>()
+                .FirstOrDefault(IsEligible);
 
         if (pick == null)
             throw new InvalidOperationException(

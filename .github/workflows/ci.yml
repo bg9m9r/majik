@@ -50,8 +50,20 @@ jobs:
         # [Skip]-ed per CLAUDE.md) + the same flake class #1731 quarantined.
         run: |
           set -e
-          for proj in Majik.Core.Tests Majik.Core.Api.Tests Majik.Server.Tests Majik.Bot.Tests; do
+          echo "::group::test Majik.Core.Tests"
+          dotnet test Majik.Core.Tests/Majik.Core.Tests.csproj --no-build --configuration Release --verbosity normal --filter "Category!=Scanner"
+          echo "::endgroup::"
+          for proj in Majik.Core.Api.Tests Majik.Server.Tests Majik.Bot.Tests; do
             echo "::group::test $proj"
             dotnet test "$proj/$proj.csproj" --no-build --configuration Release --verbosity normal
             echo "::endgroup::"
           done
+
+      - name: Target-filter scanner
+        # CR 115.1 / 601.2c — every template-bound target request in the
+        # embedded pool against its oracle phrase; fails on a mismatch not on
+        # the shrink-only allow-list in
+        # Majik.Core.Tests/CardData/SpellTemplates/TemplateTargetFilterAllowList.cs
+        # or on a listed one that no longer occurs. Its own step so the
+        # mismatch table (detailed logger) is readable in the log.
+        run: dotnet test Majik.Core.Tests/Majik.Core.Tests.csproj --no-build --configuration Release --filter "Category=Scanner" --logger "console;verbosity=detailed"

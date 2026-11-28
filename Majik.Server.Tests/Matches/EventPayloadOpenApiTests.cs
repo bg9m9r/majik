@@ -57,6 +57,7 @@ public class EventPayloadOpenApiTests : IClassFixture<TestAppFactory>
         "SurveilPayload",
         "CardCycledPayload",
         "ExtraTurnAddedPayload",
+        "LoopSafetyNetTrippedPayload",
     };
 
     [Fact]

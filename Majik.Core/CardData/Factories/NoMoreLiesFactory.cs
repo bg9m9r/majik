@@ -133,20 +133,10 @@ public static class NoMoreLiesFactory
                             }
 
                             // CR 701.5 — counter the spell: remove from stack.
-                            OracleSpellBinder.RemoveFromStack(stack, spell);
-
                             // Exile-on-counter rider — CR 614: the card replaces
                             // the counter's normal "to its owner's graveyard"
-                            // destination with exile. Place the underlying card
-                            // into its owner's exile zone (mirrors Spell
-                            // Queller's exile path) instead of the graveyard.
-                            if (spell.Card is not Card card) return;
-                            var owner = card.Owner;
-                            if (owner != null && card.Zone != ZoneType.Exile)
-                            {
-                                owner.Zones.Exile.AddCard(card);
-                            }
-                            card.SetZone(ZoneType.Exile);
+                            // destination with exile.
+                            OracleSpellBinder.CounterSpell(stack, spell, ZoneType.Exile);
                         }),
                 };
             });

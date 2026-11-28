@@ -82,8 +82,7 @@ public static class DissolveFactory
                         // CR 701.5 — "Counter target spell."
                         if (stack != null && resolved is ISpell spell)
                         {
-                            OracleSpellBinder.RemoveFromStack(stack, spell);
-                            spell.Card.SetZone(ZoneType.Graveyard);
+                            OracleSpellBinder.CounterSpell(stack, spell);
                         }
 
                         // CR 701.20 — "Scry 1." Look at the top card; the

@@ -275,8 +275,7 @@ public static class MagesAttendantFactory
 
         // CR 701.5 — counter: remove from stack + send to graveyard.
         // CR 701.5b — uncounterable spells survive (RemoveFromStack returns false).
-        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-        spell.Card.SetZone(ZoneType.Graveyard);
+        if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
     }
 
     private static ISpell? ResolveTargetSpell(ActivatedAbility ability)

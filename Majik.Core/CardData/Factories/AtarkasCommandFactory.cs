@@ -113,6 +113,9 @@ public static class AtarkasCommandFactory
             HasVariableX: false,
             // CR 114.1 — every Atarka mode is targetless; no target requests.
             TargetRequests: Array.Empty<TargetRequest>(),
+            // CR 700.2 — "Choose two": exactly two modes.
+            MinModes: PickCount,
+            MaxModes: PickCount,
             ModeIntents: new[]
             {
                 BotIntent.None,     // deny opponents' lifegain (no clean classifier)
@@ -132,7 +135,8 @@ public static class AtarkasCommandFactory
 
                 var effects = new List<IEffect>();
                 var seen = new HashSet<int>();
-                foreach (var raw in indices)
+                // CR 608.2c — chosen modes resolve in printed order.
+                foreach (var raw in ChosenModes.InPrintedOrder(indices, TotalModes, PickCount))
                 {
                     if (raw < 0 || raw >= TotalModes) continue;
                     if (!seen.Add(raw)) continue;      // CR 700.2e — no duplicates

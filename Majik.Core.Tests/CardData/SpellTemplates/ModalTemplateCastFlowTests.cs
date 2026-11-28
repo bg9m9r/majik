@@ -133,12 +133,14 @@ public class ModalTemplateCastFlowTests
     public async Task DromokasCommand_LiveCast_FightModeAfterThreeSingleTargetModes_ReadsItsOwnTargets()
     {
         // Mode 3 (your creature fights theirs) owns the slots after modes 0-2.
-        // Only its two targets are prompted. The template does not set
-        // MaxModes, so live play casts a "choose two" spell as choose-one
-        // (pre-existing gap, reported).
-        var def = Bind(Repo.GetByName("Dromoka's Command")!);
-        def.Modes.Should().HaveCount(4);
-        def.IsMultiMode.Should().BeFalse();
+        // Only its two targets are prompted. The template now sets the "choose
+        // two" bounds (CR 700.2); this test casts a one-mode copy so it keeps
+        // checking only the fight mode's slots.
+        var bound = Bind(Repo.GetByName("Dromoka's Command")!);
+        bound.Modes.Should().HaveCount(4);
+        bound.IsMultiMode.Should().BeTrue("choose two (CR 700.2)");
+        (bound.MinModes, bound.MaxModes).Should().Be((2, 2));
+        var def = bound with { MinModes = 1, MaxModes = 1 };
         var mine = OnBattlefield("Centaur", _alice, 3, 3);
         var theirs = OnBattlefield("Grizzly Bears", _bob, 2, 2);
         var card = InHand(new Instant("Dromoka's Command", "{G}{W}"));
@@ -158,9 +160,9 @@ public class ModalTemplateCastFlowTests
     {
         // CR 700.2d / 601.2c — with two modes chosen, targets are chosen only
         // for the chosen modes, in mode order: mode 2 (+1/+1 counter on target
-        // creature) and mode 3 (fight). The keyed layout serves "choose two" as
-        // is; only the mode count is missing from the template.
-        var def = Bind(Repo.GetByName("Dromoka's Command")!) with { MinModes = 2, MaxModes = 2 };
+        // creature) and mode 3 (fight). The template sets the bounds itself.
+        var def = Bind(Repo.GetByName("Dromoka's Command")!);
+        (def.MinModes, def.MaxModes).Should().Be((2, 2));
         var mine = OnBattlefield("Centaur", _alice, 2, 2);
         var theirs = OnBattlefield("Grizzly Bears", _bob, 2, 2);
         var card = InHand(new Instant("Dromoka's Command", "{G}{W}"));

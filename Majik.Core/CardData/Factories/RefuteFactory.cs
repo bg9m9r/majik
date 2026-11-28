@@ -91,9 +91,8 @@ public static class RefuteFactory
                         // 1. Counter target spell (CR 701.5).
                         if (stack != null && resolved is ISpell spell)
                         {
-                            if (OracleSpellBinder.RemoveFromStack(stack, spell))
+                            if (OracleSpellBinder.CounterSpell(stack, spell))
                             {
-                                spell.Card.SetZone(ZoneType.Graveyard);
                             }
                         }
 

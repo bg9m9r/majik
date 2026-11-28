@@ -75,8 +75,7 @@ public static class SternScoldingFactory
                         if (spell.Card is not Creature creature) return;
                         if (creature.Power > 2 && creature.Toughness > 2) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

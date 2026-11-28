@@ -79,8 +79,7 @@ public static class SpellSnareFactory
                         // does nothing for that target.
                         if (manaValue != 2) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

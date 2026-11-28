@@ -207,6 +207,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .Where(IsCastableSpell)
             .Where(c => sorceryWindow || IsInstantSpeed(c))
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
+            .Where(c => TargetsExist(c, ctx))
             .ToList();
 
         // CR 601.3e — Mystic Forge / Bolas's Citadel grant "you may cast
@@ -220,7 +221,8 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         if (topCast != null
             && IsCastableSpell(topCast)
             && (sorceryWindow || IsInstantSpeed(topCast))
-            && !_failedThisTurn.Contains(topCast.InstanceId))
+            && !_failedThisTurn.Contains(topCast.InstanceId)
+            && TargetsExist(topCast, ctx))
         {
             pool.Add(topCast);
         }
@@ -482,6 +484,10 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .Where(a => a is not IManaAbility)
             .Where(a => !_abilityFiredThisTurn.Contains(a.Id))
             .Where(a => a.Costs.All(cost => cost.CanPay(self)))
+            // CR 602.2b — an ability whose required targets don't exist
+            // can't be activated.
+            .Where(a => a is not Majik.Core.Abilities.ActivatedAbility withTargets
+                || Targeting.TargetFeasibility.HasLegalTargets(withTargets.TargetRequests, ctx))
             .ToList();
         // Prefer abilities whose TargetRequests resolve cleanly (we have
         // an opponent / creature / etc. to point at). Simple "first
@@ -489,6 +495,17 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         // damage first, draw second, etc.) is future work.
         return candidates.FirstOrDefault();
     }
+
+    /// <summary>
+    /// CR 601.2c — a spell can be cast only if its required targets exist (a
+    /// modal spell: enough modes have them). Uses the engine's own spell
+    /// definition and feasibility check — the one the client's legal-action
+    /// list uses — so the bot stops starting casts the engine can only
+    /// rewind. With no definition resolver on the context every spell passes.
+    /// </summary>
+    private static bool TargetsExist(ICard card, GameContext ctx) =>
+        ctx.SpellDefinitions?.Invoke(card, ctx.Self) is not { } definition
+        || Targeting.TargetFeasibility.HasLegalTargets(definition, ctx);
 
     private static bool IsCastableSpell(ICard c) =>
         c.HasType(CardType.Creature)
@@ -562,6 +579,10 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             (m => m.Black, cost.Black),
             (m => m.Red,   cost.Red),
             (m => m.Green, cost.Green),
+            // CR 106.1b / 601.2g — a {C} pip takes colorless mana only.
+            // {C} pips are a tagged subset of Generic, so the generic loop
+            // below covers only the rest.
+            (m => m.Colorless, cost.Colorless),
         };
 
         foreach (var (selector, needed) in quotas)
@@ -574,7 +595,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                 picked.Add(src);
             }
         }
-        for (var i = 0; i < cost.Generic; i++)
+        for (var i = 0; i < cost.Generic - cost.Colorless; i++)
         {
             var src = pool.FirstOrDefault(p => !used.Contains(p));
             if (src == null) return null;
@@ -821,6 +842,17 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     ///   + gain life / prevent        — value when our life is low
     ///   + create / put — board-build, valuable when our board is light
     /// Highest-scored index wins. Tie-break: first.</summary>
+    /// <summary>CR 700.2 — multi-mode pick: see <see cref="BotModeChoice"/>.</summary>
+    public async Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => BotModeChoice.FromBestMode(
+            await ChooseModeAsync(ctx, modes, modeIntents, ct).ConfigureAwait(false), modes.Count, minModes);
+
     public Task<int> ChooseModeAsync(
         GameContext ctx,
         IReadOnlyList<string> modes,

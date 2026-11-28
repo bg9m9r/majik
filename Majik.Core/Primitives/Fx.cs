@@ -859,8 +859,9 @@ public static class Fx
         // signals the veto by returning false; skip the graveyard tail so the
         // spell's card tracking zone stays aligned with the live stack
         // (the spell will resolve normally).
-        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-        spell.Card.SetZone(ZoneType.Graveyard);
+        // CR 701.6a — to its owner's graveyard, by the spell's own exit rules
+        // (flashback exiles, a copy ceases to exist: SpellStackExit).
+        OracleSpellBinder.CounterSpell(stack, spell);
     }
 
     // ------------------------------------------------------------------

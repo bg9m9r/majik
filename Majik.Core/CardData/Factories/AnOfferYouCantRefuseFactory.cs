@@ -119,8 +119,7 @@ public static class AnOfferYouCantRefuseFactory
                         if (spell.Card.HasType(CardType.Creature)) return;
 
                         // CR 701.5 — counter the noncreature spell.
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
 
                         // CR 111.10 — the countered spell's CONTROLLER creates
                         // two Treasure tokens (not the Offer's caster).

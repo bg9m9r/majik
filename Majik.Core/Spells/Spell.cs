@@ -32,20 +32,246 @@ public class Spell : ISpell
     public bool IsResolving => _resolutionState.IsResolving;
 
     /// <summary>
-    /// Raw targets selected at cast time (CR 601.2c). Independent of the
-    /// engine's <see cref="ITarget"/> abstraction — used by resolution
-    /// recheck (CR 608.2b) to validate against current game state.
+    /// The spell's CURRENT targets (CR 601.2c, 115.7), flattened in
+    /// announcement order: target slots in order, then each slot's picks. This
+    /// is the one representation every reader and writer uses: the cast flow
+    /// fills it (<see cref="SetCastTargets"/>), redirect effects rewrite it
+    /// (Spellskite, Misdirection, Deflecting Swat … CR 115.7), the CR 608.2b
+    /// recheck reads it, and resolution builds the effects from it
+    /// (<see cref="ResolveAsync"/>). Copies fill it directly.
     /// </summary>
     public IList<object> ChosenTargets { get; } = new List<object>();
 
+    // Slot sizes of a cast spell's targets (one per target request), so the
+    // flat ChosenTargets can be cut back into the slots its EffectFactory reads.
+    private int[]? _slotSizes;
+    // Rebuilds the effects for a given set of slots (SpellCastFlow's effect
+    // pipeline), and the targets the current effects were built for.
+    private Func<IReadOnlyList<IReadOnlyList<object>>, IReadOnlyList<IEffect>>? _rebuildEffects;
+    private object[]? _effectsBuiltFor;
+    // CR 608.2b / 400.7 — each current target as the spell took it (announced,
+    // or put there by a redirect) and a card target's zone-change count at that
+    // moment. A card that has changed zones since, even back to the same zone,
+    // is a new object: no longer the spell's target.
+    private object[]? _announced;
+    private int?[]? _announcedZoneChanges;
+    // The live game the spell is resolving in, for the per-request recheck.
+    private GameContext? _resolvingIn;
+
     /// <summary>
-    /// CR 601.2c — the targets announced when this spell was cast, one slot
-    /// per target request, in announcement order. Read-only metadata for state
-    /// snapshots (the effects captured their targets at cast time); not read
-    /// by resolution. Null for spells not cast through SpellCastFlow (copies,
-    /// test spells) — readers fall back to <see cref="ChosenTargets"/>.
+    /// CR 601.2c — <see cref="ChosenTargets"/> cut into one slot per target
+    /// request, in announcement order (a view: it always reflects redirects).
+    /// Null for spells not cast through SpellCastFlow (copies, test spells).
+    /// Setting it (tests) replaces <see cref="ChosenTargets"/>.
     /// </summary>
-    public IReadOnlyList<IReadOnlyList<object>>? AnnouncedTargets { get; internal set; }
+    public IReadOnlyList<IReadOnlyList<object>>? AnnouncedTargets
+    {
+        get
+        {
+            if (_slotSizes is null) return null;
+            var slots = new List<IReadOnlyList<object>>(_slotSizes.Length);
+            var i = 0;
+            foreach (var size in _slotSizes)
+            {
+                slots.Add(ChosenTargets.Skip(i).Take(size).ToArray());
+                i += size;
+            }
+            return slots;
+        }
+        internal set => SetCastTargets(value ?? Array.Empty<IReadOnlyList<object>>(), null);
+    }
+
+    /// <summary>
+    /// CR 601.2c — record the targets announced for this spell: fills
+    /// <see cref="ChosenTargets"/> and remembers the slot shape.
+    /// <paramref name="rebuildEffects"/> rebuilds the spell's effects for given
+    /// slots. The current effects are taken to be built for these targets.
+    /// </summary>
+    internal void SetCastTargets(
+        IReadOnlyList<IReadOnlyList<object>> slots,
+        Func<IReadOnlyList<IReadOnlyList<object>>, IReadOnlyList<IEffect>>? rebuildEffects)
+    {
+        ChosenTargets.Clear();
+        foreach (var slot in slots) foreach (var t in slot) ChosenTargets.Add(t);
+        _slotSizes = slots.Select(s => s.Count).ToArray();
+        _rebuildEffects = rebuildEffects;
+        _effectsBuiltFor = ChosenTargets.ToArray();
+        _announced = ChosenTargets.ToArray();
+        _announcedZoneChanges = _announced.Select(ZoneChangesOf).ToArray();
+    }
+
+    private static int? ZoneChangesOf(object target) => target is Card c ? c.ZoneChangeCount : null;
+
+    /// <summary>
+    /// CR 115.7 — a redirect changes the target at <paramref name="index"/> to
+    /// <paramref name="newTarget"/>. The new target is held to the same rules
+    /// as an announced one from here on (CR 608.2b): the same object, still
+    /// targetable, still meeting the target request of its slot.
+    /// </summary>
+    public void RedirectTarget(int index, object newTarget)
+    {
+        ArgumentNullException.ThrowIfNull(newTarget);
+        ChosenTargets[index] = newTarget;
+        if (_announced is not null && _announcedZoneChanges is not null && index < _announced.Length)
+        {
+            _announced[index] = newTarget;
+            _announcedZoneChanges[index] = ZoneChangesOf(newTarget);
+        }
+    }
+
+    /// <summary>
+    /// CR 115.7 — change the target at <paramref name="index"/> to
+    /// <paramref name="newTarget"/> only if it is a legal target for this
+    /// spell: not the spell itself (CR 115.5), not the current target,
+    /// targetable by the spell (hexproof, shroud, protection), and, with the
+    /// live game, offered by the slot's target request for the spell's
+    /// controller (the pool the cast offered). False, with nothing changed,
+    /// otherwise ("if the new target is illegal, the target doesn't change").
+    /// </summary>
+    public bool TryRedirectTarget(int index, object newTarget, GameContext? game = null)
+    {
+        if (!IsLegalNewTarget(index, newTarget, game)) return false;
+        RedirectTarget(index, newTarget);
+        return true;
+    }
+
+    /// <summary>The legal new targets for the slot at <paramref name="index"/>
+    /// among <paramref name="candidates"/> (see <see cref="TryRedirectTarget"/>).</summary>
+    public bool IsLegalNewTarget(int index, object newTarget, GameContext? game)
+    {
+        ArgumentNullException.ThrowIfNull(newTarget);
+        if (index < 0 || index >= ChosenTargets.Count) return false;
+        if (ReferenceEquals(newTarget, this) || ReferenceEquals(newTarget, ChosenTargets[index])) return false;
+        if (!Majik.Core.Targeting.TargetCandidateService.IsTargetableBy(newTarget, Controller, Card)) return false;
+        if (game is not null && RequestForTarget(index) is { } request)
+        {
+            var pool = Majik.Core.Targeting.TargetCollection.ResolveLivePool(request, AsController(game));
+            if (pool.Count > 0 && !pool.Any(c => ReferenceEquals(c, newTarget))) return false;
+        }
+        return true;
+    }
+
+    /// <summary>The live pool the slot's request offers this spell's
+    /// controller (the cast's pool, with the category fallback). A spell that
+    /// recorded no request for the slot (a copy, a test spell) gets every
+    /// player and battlefield permanent; <see cref="IsLegalNewTarget"/> then
+    /// filters.</summary>
+    public IReadOnlyList<object> CandidatesForTarget(int index, GameContext game)
+    {
+        if (RequestForTarget(index) is { } request)
+            return Majik.Core.Targeting.TargetCollection.ResolveLivePool(request, AsController(game));
+        return game.AllPlayers.Cast<object>()
+            .Concat(game.AllPlayers.SelectMany(p => p.Zones.Battlefield.GetCards()))
+            .ToList();
+    }
+
+    private GameContext AsController(GameContext game) =>
+        ReferenceEquals(game.Self, Controller)
+            ? game
+            : new GameContext(Controller, game.AllPlayers, game.ActivePlayer, game.TurnNumber,
+                game.CurrentPhase, game.Stack, game.LandPlayAvailable, game.TurnState);
+
+    /// <summary>The target request that governs <see cref="ChosenTargets"/>[<paramref name="index"/>]
+    /// (CR 601.2c), when the cast recorded one per slot.</summary>
+    public TargetRequest? RequestForTarget(int index)
+    {
+        if (_slotSizes is null || RetargetRequests is not { } reqs || reqs.Count != _slotSizes.Length) return null;
+        var at = 0;
+        for (var slot = 0; slot < _slotSizes.Length; slot++)
+        {
+            at += _slotSizes[slot];
+            if (index < at) return reqs[slot];
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// CR 608.2b — whether the target at <paramref name="index"/> of
+    /// <see cref="ChosenTargets"/> is still legal.
+    /// <para>For a spell cast through SpellCastFlow, a target is legal when
+    /// all of these hold:</para>
+    /// <list type="bullet">
+    ///   <item>CR 400.7 — it is the same object: a card target has not
+    ///   changed zones since the spell took it (announced, or redirected via
+    ///   <see cref="RedirectTarget"/>);</item>
+    ///   <item>CR 115.5 / 702.11 / 702.16 / 702.18 — the spell can still
+    ///   target it (hexproof, shroud, protection from one of its colours);</item>
+    ///   <item>CR 608.2b — with the live game (<paramref name="game"/>, or the
+    ///   one it is resolving in), it still meets its slot's target request: a
+    ///   request with a candidate gatherer must still offer it, evaluated for
+    ///   the spell's controller ("creature you don't control" after a control
+    ///   change). A request with only a static pool is not re-judged.</item>
+    /// </list>
+    /// The free-text categories are not used: too coarse to decide legality
+    /// (Exorcise's "artifact, enchantment, or creature" classifies as Creature).
+    /// <para>For other spells (copies, test spells) the rule is
+    /// <see cref="TargetLegalityPredicate"/>, else legal.</para>
+    /// </summary>
+    public bool IsTargetLegal(int index) => IsTargetLegal(index, null);
+
+    /// <inheritdoc cref="IsTargetLegal(int)"/>
+    public bool IsTargetLegal(int index, GameContext? game)
+    {
+        var target = ChosenTargets[index];
+        if (_announced is null || _announcedZoneChanges is null)
+            return TargetLegalityPredicate?.Invoke(target) ?? true;
+
+        if (index < _announced.Length && ReferenceEquals(_announced[index], target)
+            && target is Card card && _announcedZoneChanges[index] is { } changes
+            && card.ZoneChangeCount != changes)
+            return false;
+
+        if (!Majik.Core.Targeting.TargetCandidateService.IsTargetableBy(target, Controller, Card))
+            return false;
+
+        game ??= _resolvingIn;
+        if (game is not null && RequestForTarget(index) is { CandidateGatherer: not null } request)
+        {
+            if (!request.ResolveCandidates(AsController(game)).Any(c => ReferenceEquals(c, target)))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// CR 115.7 / 608.2b — make the effects act on the spell's current, legal
+    /// targets. Effects are built at cast time and hold their targets, so when
+    /// a redirect changed <see cref="ChosenTargets"/>, or a target has become
+    /// illegal, the effects are rebuilt through the cast's effect pipeline:
+    /// from the current targets, with each illegal one replaced by
+    /// <see cref="IllegalTarget.Instance"/> (an object no effect acts on: "the
+    /// spell doesn't perform any actions on it", CR 608.2b). A spell whose
+    /// every target is illegal never gets here (StackResolver counters it).
+    /// No-op for spells without a rebuild (copies, test spells).
+    /// </summary>
+    private void SyncEffectsWithTargets()
+    {
+        if (_rebuildEffects is null || _slotSizes is null) return;
+        var current = new object[ChosenTargets.Count];
+        for (var i = 0; i < current.Length; i++)
+            current[i] = IsTargetLegal(i) ? ChosenTargets[i] : IllegalTarget.Instance;
+        if (_effectsBuiltFor is not null && current.Length == _effectsBuiltFor.Length
+            && current.Zip(_effectsBuiltFor).All(p => ReferenceEquals(p.First, p.Second)))
+            return;
+
+        var slots = new List<IReadOnlyList<object>>(_slotSizes.Length);
+        var at = 0;
+        foreach (var size in _slotSizes)
+        {
+            slots.Add(current.Skip(at).Take(size).ToArray());
+            at += size;
+        }
+        var rebuilt = _rebuildEffects(slots);
+        _effects.Clear();
+        _effects.AddRange(rebuilt);
+        _effectsBuiltFor = current;
+    }
+
+    /// <summary>CR 608.2b — true when this spell has targets and at least one
+    /// legality rule applies to them (so the resolution recheck can judge).</summary>
+    public bool HasTargetLegalityRules =>
+        ChosenTargets.Count > 0
+        && (TargetLegalityPredicate != null || _announced != null);
 
     /// <summary>
     /// Predicate the resolver uses to check whether at least one chosen
@@ -258,6 +484,21 @@ public class Spell : ISpell
     public bool IsCopy { get; set; }
 
     /// <summary>
+    /// CR 702.34a / 702.133a — cast with flashback or jump-start: "exile this
+    /// card instead of putting it anywhere else any time it would leave the
+    /// stack". Stamped by SpellCastFlow; read by <see cref="SpellStackExit"/>.
+    /// </summary>
+    public bool ExileWhenLeavesStack { get; set; }
+
+    /// <summary>
+    /// CR 702.27a — the buyback cost was paid: as the spell resolves, its card
+    /// goes to its owner's hand instead of the graveyard. Only on resolution:
+    /// a countered buyback spell goes to the graveyard. Read by
+    /// <see cref="SpellStackExit"/>.
+    /// </summary>
+    public bool ReturnToHandOnResolution { get; set; }
+
+    /// <summary>
     /// CR 707.10a — the per-slot <see cref="Majik.Core.Players.Agents.TargetRequest"/>s
     /// that governed this spell's original target selection (CR 601.2c),
     /// retained on the stack object so a "copy a spell" effect can re-prompt the
@@ -339,6 +580,9 @@ public class Spell : ISpell
 
         _resolutionState = ResolutionState.Resolving();
 
+        _resolvingIn = game;
+        SyncEffectsWithTargets();
+
         // Spell.ChosenTargets is a flat list (CR 601.2c); present it to the
         // resolution context as a single target group so async effects can
         // read ChosenTargets[0] uniformly with the ability paths.
@@ -361,4 +605,16 @@ public class Spell : ISpell
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
     }
 
+}
+
+/// <summary>
+/// CR 608.2b — stands in for a target that became illegal when a spell's
+/// effects are rebuilt at resolution: it is no card, player or spell, so no
+/// effect acts on it ("the spell or ability doesn't perform any actions on it").
+/// </summary>
+public sealed class IllegalTarget
+{
+    public static readonly IllegalTarget Instance = new();
+    private IllegalTarget() { }
+    public override string ToString() => "(illegal target)";
 }

@@ -184,8 +184,7 @@ public static class LongRiversPullFactory
         // uncounterable. Gate the graveyard tail on the return so an
         // uncounterable spell resolves normally instead of being silently
         // binned while the stack still references it.
-        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-        spell.Card.SetZone(ZoneType.Graveyard);
+        if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
     }
 
     /// <summary>

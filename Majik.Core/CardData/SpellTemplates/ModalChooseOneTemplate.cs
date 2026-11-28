@@ -16,10 +16,15 @@ namespace Majik.Core.CardData.SpellTemplates;
 /// <see cref="SpellDefinition.EffectFactory"/> on
 /// <see cref="ChosenSpellParams.ModeIndex"/>.
 ///
-/// MVP supports "Choose one" (single mode picked). Multi-pick variants
-/// ("Choose two", "Choose one or both") still bind the modes but only
-/// the first ModeIndex is honored — full multi-mode runs are a follow-up
-/// (engine needs ChosenSpellParams.ModeIndexes list rather than scalar).
+/// CR 700.2 — the header's pick word sets how many modes the caster
+/// chooses (<see cref="SpellDefinition.MinModes"/> /
+/// <see cref="SpellDefinition.MaxModes"/>): "one" 1/1, "two" 2/2, "three"
+/// 3/3, "one or both" 1/2, "one or more" 1/N. No mode twice (CR 700.2d).
+/// Only the chosen modes' targets are chosen (SpellCastFlow) and the chosen
+/// modes resolve in printed order (CR 608.2c). Escalate (CR 702.121) with a
+/// mana cost is charged per extra mode; a spell whose escalate cost is not
+/// mana (Collective Brutality's "Discard a card") cannot be charged here, so it
+/// stays at one mode rather than granting extra modes for free.
 ///
 /// Priority 250 so the composer runs BEFORE single-template binds AND
 /// before ClauseCompositionTemplate (which would otherwise eat the
@@ -51,6 +56,11 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         RegexOptions.Compiled);
 
     private static readonly Regex ReminderText = new(@"\([^)]*\)", RegexOptions.Compiled);
+
+    // CR 702.121 — "Escalate {1}" (mana) or "Escalate—Discard a card" (other).
+    private static readonly Regex EscalateRegex = new(
+        @"\bescalate\s*(?:(?<mana>(?:\{[^}]+\})+)|[—-]\s*(?<other>[^(.]+))",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private SpellTemplateRegistry? _registry;
 
@@ -88,11 +98,19 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
 
         if (clauses.Count < 2) return null;
 
-        return new Dictionary<string, string>
+        var result = new Dictionary<string, string>
         {
             ["modes"] = JsonSerializer.Serialize(clauses),
             ["pick"] = header.Groups["pick"].Value.ToLowerInvariant().Replace("  ", " "),
         };
+        var escalate = EscalateRegex.Match(oracleText);
+        if (escalate.Success)
+        {
+            result["escalate"] = escalate.Groups["mana"].Success
+                ? escalate.Groups["mana"].Value
+                : "other:" + escalate.Groups["other"].Value.Trim();
+        }
+        return result;
     }
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
@@ -143,7 +161,29 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         }
 
         var pick = @params.TryGetValue("pick", out var pk) ? pk : "one";
-        var pickCount = PickCount(pick);
+        var (minModes, maxModes) = ModeBounds(pick, clauses.Count);
+
+        // CR 702.121 — escalate: a mana cost per mode beyond the first.
+        EscalateSpec? escalateSpec = null;
+        if (@params.TryGetValue("escalate", out var esc))
+        {
+            if (esc.StartsWith("other:", StringComparison.Ordinal))
+            {
+                // Not a mana cost: it can't be charged from here, so don't let
+                // the caster choose the extra modes it pays for.
+                maxModes = minModes;
+            }
+            else
+            {
+                // CR 601.2f-g — no probe: SpellCastFlow checks the base cost
+                // plus the escalate mana with the cast path's affordability
+                // check (floating pool, else untapped sources).
+                escalateSpec = new EscalateSpec(
+                    Description: esc,
+                    BuildPerModeCost: _ => new Majik.Core.Costs.EscalateManaAdditionalCost(
+                        Majik.Core.ValueObjects.ManaCost.Parse(esc)));
+            }
+        }
 
         // CR 700.2d / 601.2c — each mode's body must read ITS OWN target
         // slots, and only the chosen modes' targets are chosen. Stamp every
@@ -179,23 +219,22 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             HasVariableX: modeDefs.Any(d => d?.HasVariableX == true),
             TargetRequests: requests,
             ModeIntents: modeIntents,
+            MinModes: minModes,
+            MaxModes: maxModes,
+            Escalate: escalateSpec,
             EffectFactory: p =>
             {
-                // Multi-mode: prefer ModeIndexes when set. Caller supplies a
-                // list of distinct mode indices; each chosen mode's effects
-                // run in declaration order (CR 700.2d). Falls back to
-                // scalar ModeIndex for legacy single-mode callers and for
-                // Choose-one cards (pickCount == 1).
+                // CR 700.2 — the chosen modes (ModeIndexes; the scalar
+                // ModeIndex for a single-mode spell), each at most once
+                // (CR 700.2d), at most MaxModes, resolved in PRINTED order
+                // (CR 608.2c) whatever order they were announced in.
                 var indices = p.ModeIndexes is { Count: > 0 } list
                     ? list
                     : new[] { p.ModeIndex ?? 0 };
+                var chosen = ChosenModes.InPrintedOrder(indices, modeDefs.Count, maxModes);
                 var effects = new List<Majik.Core.Abilities.IEffect>();
-                var seen = new HashSet<int>();
-                foreach (var idx in indices)
+                foreach (var idx in chosen)
                 {
-                    if (idx < 0 || idx >= modeDefs.Count) continue;
-                    if (!seen.Add(idx)) continue; // CR 700.2d — each mode at most once
-                    if (seen.Count > pickCount) break; // honor printed pick count
                     var picked = modeDefs[idx];
                     if (picked != null) effects.AddRange(picked.EffectFactory(p with { Targets = SlotsFor(idx, p) }));
                 }
@@ -203,16 +242,20 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             });
     }
 
-    // Maps the header pick word to the max distinct mode count.
-    // "one or more" caps at modeDefs.Count at the caller; here treat as
-    // "all" by returning int.MaxValue so the runtime list bounds it.
-    private static int PickCount(string pick) => pick switch
+    /// <summary>CR 700.2 — the number of modes the pick word lets the caster
+    /// choose, bounded by the printed mode count.</summary>
+    internal static (int Min, int Max) ModeBounds(string pick, int modeCount)
     {
-        "one" => 1,
-        "two" => 2,
-        "three" => 3,
-        "one or both" => 2,
-        "one or more" => int.MaxValue,
-        _ => 1,
-    };
+        var (min, max) = pick switch
+        {
+            "one" => (1, 1),
+            "two" => (2, 2),
+            "three" => (3, 3),
+            "one or both" => (1, 2),
+            "one or more" => (1, modeCount),
+            _ => (1, 1),
+        };
+        max = Math.Clamp(max, 1, Math.Max(1, modeCount));
+        return (Math.Min(min, max), max);
+    }
 }

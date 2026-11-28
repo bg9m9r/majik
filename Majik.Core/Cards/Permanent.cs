@@ -609,6 +609,57 @@ public class Permanent : Card
     /// permanent is already untapped) so it is safe to call blindly on every
     /// battlefield exit regardless of the prior tap state.
     /// </summary>
+    /// <summary>
+    /// CR 400.7 — a permanent entering the battlefield from another zone is a
+    /// new object: it keeps none of the status the card had the last time it
+    /// was on the battlefield. Called by the Zone setter on entry, BEFORE any
+    /// "enters with" counters (CR 614.1c) are put on it. Resetting on entry
+    /// rather than on leaving keeps that status readable on the card it left
+    /// behind, which is what its leaves / dies triggers read (CR 603.10:
+    /// undying, persist, The Ozolith, Unstoppable Slasher), and keeps counters
+    /// an effect puts on it in another zone (suspend's time counters) until it
+    /// enters. Marked damage is cleared by ClearMarkedDamage at the same point.
+    /// Not reset: the transient loyalty body, which an "enters as a copy"
+    /// replacement (Spark Double copying a flipped planeswalker back, CR
+    /// 706.9b) sets BEFORE the card lands; it is inert on a card whose face is
+    /// not a planeswalker. A card's first placement (ZoneChangeCount 1) is not
+    /// reset either: it is not a zone change from an earlier object.
+    /// <list type="bullet">
+    ///   <item>counters (CR 122.2);</item>
+    ///   <item>summoning sick (CR 302.6) and a new timestamp (CR 613.7d);</item>
+    ///   <item>regeneration shields (CR 701.19), the per-object loyalty
+    ///   activation (CR 606.3), the deathtouch mark (CR 704.5h), "dealt damage
+    ///   this turn", imprinted cards (CR 702.49);</item>
+    ///   <item>Creature: "attack as though it didn't have defender this turn",
+    ///   and evoke / blitz paid unless it is entering from the stack (the cast
+    ///   that paid them, CR 702.74a / 702.152a).</item>
+    /// </list>
+    /// </summary>
+    internal virtual void ResetOnEnterBattlefield(ZoneType from)
+    {
+        if (from == ZoneType.Battlefield) return;
+        Counters.Clear();
+        _hasSummoningSickness = true;
+        _enteredBattlefieldTimestamp = null;
+        _regenerationShields = 0;
+        LoyaltyAbilityActivatedThisTurn = false;
+        MarkedForDestructionByDeathtouch = false;
+        ClearWasDealtDamageThisTurn();
+        _imprintedCards.Clear();
+        // CR 400.7 / 303.4d / 301.5c — attachments belong to the old object.
+        // An Aura or Equipment that returns is attached to nothing (an Aura
+        // put onto the battlefield is attached by the effect that puts it
+        // there, CR 303.4f), and a returning host carries nothing; SBA
+        // 704.5m/n then deal with what is left unattached. Cleared on entry,
+        // not on leaving, so last known information still reads the host
+        // (CR 603.10: "when enchanted creature dies"). An Aura spell is
+        // attached to its target as it resolves (CR 303.4a), before it lands.
+        if (from != ZoneType.Stack) Unattach();
+        foreach (var attached in _attachments.ToList()) attached.Unattach();
+        // CR 716.2a — a Class enters as a level-1 Class.
+        ClassState?.ResetToLevelOne();
+    }
+
     internal void ResetOnLeaveBattlefield()
     {
         _isTapped = false;

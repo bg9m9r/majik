@@ -380,10 +380,14 @@ public sealed class GameFacade : IDisposable
         // and freeze the match with no diagnostic. Fail loud: log (server) or
         // fail-fast (DEBUG default) instead of swallowing silently.
         _bus.OnHandlerError = HandleBusHandlerError;
+        // The engine's loop safety net ended the game as a draw: report it.
+        _bus.Subscribe<Majik.Core.Game.LoopSafetyNetTrippedEvent>(e =>
+            ReportContainedFault(new Majik.Core.Game.LoopSafetyNetException(e.Message), e.Message));
 
         _stack = new Majik.Core.Stack.Stack(_bus);
         _triggers = new TriggerManager(_stack, _bus);
         _zones = new ZoneService(_bus, Replacements);
+        _stack.ZoneService = _zones;
         _sba = new StateBasedActions(_bus, _zones, _triggers);
         _resolver = new StackResolver(_bus, _zones, _sba);
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
@@ -488,7 +492,7 @@ public sealed class GameFacade : IDisposable
         // a binder match are skipped (the card is rotated in hand). Permanents
         // and abilities still resolve through SpellCastFlow + AbilityActivator.
         var castFlow = new SpellCastFlow(_stack, _zones, _bus);
-        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects);
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects, _bus);
 
         async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {

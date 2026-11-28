@@ -103,14 +103,15 @@ public static class ArcTrailFactory
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal),
-                // "any other target" — distinctness from target[0] is
-                // caller-enforced (V1), see class remarks.
+                // "any other target" — CR 601.2c: not target[0]
+                // (TargetCollection filters it out and rejects a repeat).
                 new TargetRequest(
                     Description: "any other target",
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
+                    Intent: BotIntent.Removal,
+                    DistinctFromRequest: 0),
             },
             EffectFactory: chosen =>
             {

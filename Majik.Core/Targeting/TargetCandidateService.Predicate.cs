@@ -37,6 +37,8 @@ public static partial class TargetCandidateService
             TargetCategory.Artifact => o => o is Permanent p && p.HasType(CardType.Artifact),
             TargetCategory.Enchantment => o => o is Permanent p && p.HasType(CardType.Enchantment),
             TargetCategory.Land => o => o is Permanent p && p.HasType(CardType.Land),
+            TargetCategory.ArtifactOrEnchantment => o => o is Permanent p
+                && (p.HasType(CardType.Artifact) || p.HasType(CardType.Enchantment)),
             TargetCategory.Spell => o => o is Majik.Core.Spells.ISpell,
             TargetCategory.NoncreatureSpell => o => o is Majik.Core.Spells.ISpell s && !SpellIsCreature(s),
             TargetCategory.CreatureSpell => o => o is Majik.Core.Spells.ISpell s && SpellIsCreature(s),

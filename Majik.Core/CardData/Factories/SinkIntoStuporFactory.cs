@@ -262,20 +262,9 @@ public static class SinkIntoStuporFactory
         // resolution control changes) is an illegal target → do nothing.
         if (ReferenceEquals(spell.Controller, caster)) return;
 
-        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-
-        // Card → owner's hand (NOT graveyard). Raw zone mutation so no
-        // ETB events fire for the hand zone. Same shape Remand uses.
-        var card = spell.Card;
-        var owner = card.Owner ?? spell.Controller;
-        if (owner == null)
-        {
-            card.SetZone(ZoneType.Hand);
-            return;
-        }
-        owner.Zones.Graveyard.RemoveCard(card);
-        owner.Zones.Hand.AddCard(card);
-        card.SetZone(ZoneType.Hand);
+        // Card → owner's hand (NOT graveyard); a flashback spell is exiled
+        // instead (CR 702.34a), a copy ceases to exist.
+        OracleSpellBinder.CounterSpell(stack, spell, ZoneType.Hand);
     }
 
     /// <summary>

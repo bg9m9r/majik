@@ -162,34 +162,42 @@ public static class HydroelectricSpecimenFactory
 
         var etbEffect = new Effect(
             $"{CardName} — change the target of target single-target instant/sorcery to {CardName}",
-            () =>
+            rc =>
             {
-                if (etbTrigger == null) return;
-                if (stack == null) return;
-
-                var chosen = etbTrigger.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0)
-                {
-                    // "you may" — controller chose no target. Clean no-op
-                    // (CR 700.2 — optional target selection).
-                    return;
-                }
-
-                var raw = chosen[0][0];
-
-                // CR 608.2b — recheck legality at resolution. Legal target:
-                // a Spell still on the stack whose card is an instant or
-                // sorcery and which has EXACTLY one chosen target.
-                if (raw is not Spell spell) return;
-                if (!stack.GetAll().Contains(spell)) return;
-                if (!spell.Card.HasType(CardType.Instant)
-                    && !spell.Card.HasType(CardType.Sorcery)) return;
-                if (spell.ChosenTargets.Count != 1) return;
-
-                // CR 114.6 — change the target to this creature. Same
-                // ChosenTargets rewrite Spellskite uses.
-                spell.ChosenTargets[0] = card;
+                Redirect(rc.Game);
+                return ValueTask.CompletedTask;
             });
+
+        void Redirect(Majik.Core.Game.GameContext? game)
+        {
+            if (etbTrigger == null) return;
+            if (stack == null) return;
+
+            var chosen = etbTrigger.ChosenTargets;
+            if (chosen.Count == 0 || chosen[0].Count == 0)
+            {
+                // "you may" — controller chose no target. Clean no-op
+                // (CR 700.2 — optional target selection).
+                return;
+            }
+
+            var raw = chosen[0][0];
+
+            // CR 608.2b — recheck legality at resolution. Legal target:
+            // a Spell still on the stack whose card is an instant or
+            // sorcery and which has EXACTLY one chosen target.
+            if (raw is not Spell spell) return;
+            if (!stack.GetAll().Contains(spell)) return;
+            if (!spell.Card.HasType(CardType.Instant)
+                && !spell.Card.HasType(CardType.Sorcery)) return;
+            if (spell.ChosenTargets.Count != 1) return;
+
+            // CR 114.6 — change the target to this creature. Same
+            // ChosenTargets rewrite Spellskite uses.
+            // CR 115.7 — only if this creature is a legal target for it:
+            // with the live game, one the spell's target request offers.
+            spell.TryRedirectTarget(0, card, game);
+        }
 
         etbTrigger = new TriggeredAbility(
             source: card,

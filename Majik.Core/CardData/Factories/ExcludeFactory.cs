@@ -96,8 +96,7 @@ public static class ExcludeFactory
 
                         // CR 701.5 — counter the spell: remove from stack
                         // and move the card to graveyard.
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
 
                         // CR 121.1 — "Draw a card." Top-of-library move.
                         // Empty library flags the SBA-driven loss (CR 704.5b).

@@ -139,9 +139,8 @@ public static class FlashfreezeFactory
                             // CR 701.5 / 701.5b — RemoveFromStack returns false
                             // for an uncounterable target; only graveyard the
                             // card when it was actually removed.
-                            if (OracleSpellBinder.RemoveFromStack(stack, spell))
+                            if (OracleSpellBinder.CounterSpell(stack, spell))
                             {
-                                spell.Card.SetZone(ZoneType.Graveyard);
                             }
                         }),
                 };

@@ -117,9 +117,15 @@ public sealed class SacrificeAnotherCreatureCost : ICost, IChooseCreatureToSacri
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
-        var pick = Target ?? player.Zones.Battlefield.GetCards()
-            .OfType<Permanent>()
-            .FirstOrDefault(p => p.IsEffectivelyCreature() && !ReferenceEquals(p, _self));
+        // CR 701.16a / 400.7 — a nominated creature counts only while it is
+        // still a creature on the battlefield (a choice from an earlier
+        // activation may have left since).
+        var pick = Target is { Zone: ZoneType.Battlefield } nominated
+                && nominated.IsEffectivelyCreature() && !ReferenceEquals(nominated, _self)
+            ? nominated
+            : player.Zones.Battlefield.GetCards()
+                .OfType<Permanent>()
+                .FirstOrDefault(p => p.IsEffectivelyCreature() && !ReferenceEquals(p, _self));
 
         if (pick == null)
             throw new InvalidOperationException(

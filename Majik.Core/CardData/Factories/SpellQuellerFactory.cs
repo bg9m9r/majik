@@ -175,15 +175,17 @@ public static class SpellQuellerFactory
                 // the underlying card into its owner's exile zone.
                 if (stack != null)
                 {
-                    OracleSpellBinder.RemoveFromStack(stack, spell);
+                    if (!OracleSpellBinder.CounterSpell(stack, spell, ZoneType.Exile)) return;
                 }
-
-                var targetOwner = targetCard.Owner;
-                if (targetOwner != null && targetCard.Zone != ZoneType.Exile)
+                else
                 {
-                    targetOwner.Zones.Exile.AddCard(targetCard);
+                    var targetOwner = targetCard.Owner;
+                    if (targetOwner != null && targetCard.Zone != ZoneType.Exile)
+                    {
+                        targetOwner.Zones.Exile.AddCard(targetCard);
+                    }
+                    targetCard.SetZone(ZoneType.Exile);
                 }
-                targetCard.SetZone(ZoneType.Exile);
 
                 exiled = targetCard;
             });

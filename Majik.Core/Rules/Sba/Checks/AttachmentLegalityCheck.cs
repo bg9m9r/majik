@@ -18,16 +18,34 @@ public sealed class AttachmentLegalityCheck : IStateBasedActionCheck
         foreach (var perm in ctx.Permanents)
         {
             if (perm.Zone != ZoneType.Battlefield) continue;
-            if (perm.AttachedTo == null) continue;
+            var isAura = perm.HasType(CardType.Enchantment) && perm.HasSubtype(CardSubtype.Aura);
+            if (perm.AttachedTo == null)
+            {
+                // CR 704.5m — an Aura not attached to an object or player is
+                // put into its owner's graveyard (e.g. Pacifism after its
+                // creature was flickered: the returning creature is a new
+                // object, CR 400.7). Aura spells, bestow and Animate Dead
+                // attach before the Aura lands, and ReturnAsAuraOnDeathEffect
+                // in the same effect, so those Auras stay. Any other Aura put
+                // onto the battlefield without being cast (a flickered Aura)
+                // is not yet attached to a chosen object (CR 303.4f, #3577)
+                // and so goes to the graveyard here. A Curse
+                // enchants a player, which the engine tracks outside
+                // AttachedTo, so it is attached to something. A bestowed card
+                // is not printed as an Aura (BestowKeyword) and reverts to a
+                // creature instead (CR 702.103f). Equipment attached to
+                // nothing simply stays (CR 301.5c).
+                if (!isAura || perm.HasSubtype(CardSubtype.Curse)) continue;
+                MoveAuraToGraveyard(ctx, perm, "not attached to anything");
+                anyExecuted = true;
+                continue;
+            }
             if (perm.AttachedTo.Zone == ZoneType.Battlefield) continue;
 
-            if (perm.HasType(CardType.Enchantment) && perm.HasSubtype(CardSubtype.Aura))
+            if (isAura)
             {
                 perm.Unattach();
-                if (ctx.ZoneService != null) ctx.ZoneService.MoveCardTo(perm, ZoneType.Graveyard);
-                else perm.SetZone(ZoneType.Graveyard);
-                ctx.EventBus?.Publish(new StateBasedActionExecutedEvent(
-                    $"Aura {perm.Name} put into graveyard — no legal attachment"));
+                MoveAuraToGraveyard(ctx, perm, "no legal attachment");
             }
             else
             {
@@ -38,5 +56,13 @@ public sealed class AttachmentLegalityCheck : IStateBasedActionCheck
             anyExecuted = true;
         }
         return anyExecuted;
+    }
+
+    private static void MoveAuraToGraveyard(SbaContext ctx, Permanent aura, string why)
+    {
+        if (ctx.ZoneService != null) ctx.ZoneService.MoveCardTo(aura, ZoneType.Graveyard);
+        else aura.SetZone(ZoneType.Graveyard);
+        ctx.EventBus?.Publish(new StateBasedActionExecutedEvent(
+            $"Aura {aura.Name} put into graveyard — {why}"));
     }
 }

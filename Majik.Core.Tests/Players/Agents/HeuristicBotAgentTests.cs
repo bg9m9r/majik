@@ -531,4 +531,67 @@ public class HeuristicBotAgentTests
         picked.Should().HaveCount(1);
         picked[0].Should().BeSameAs(ourBig);
     }
+
+    /// <summary>
+    /// CR 601.2c — a spell whose required target doesn't exist can't be cast;
+    /// the bot must not propose it (the engine would only rewind it — the
+    /// full-game gate saw thousands of such rewinds: Ephemerate with no
+    /// creature, Counterspell on an empty stack).
+    /// </summary>
+    [Fact]
+    public async Task Priority_DoesNotCastASpellWithNoLegalTarget()
+    {
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        mountain.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mountain);
+        var pierce = new Instant("Lava Dart", "{R}") { Owner = _alice, Controller = _alice };
+        pierce.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(pierce);
+
+        var pool = new List<object>();
+        var def = new SpellDefinition(
+            Array.Empty<string>(), false,
+            new[] { new TargetRequest("target spell", 1, 1, Array.Empty<object>(), CandidateGatherer: _ => pool) },
+            _ => Array.Empty<Majik.Core.Abilities.IEffect>());
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack())
+        {
+            SpellDefinitions = (_, _) => def,
+        };
+
+        (await new HeuristicBotAgent().ChoosePriorityActionAsync(ctx))
+            .Should().NotBeOfType<PriorityAction.CastSpell>("the stack is empty: nothing to target");
+
+        pool.Add(new object());
+        (await new HeuristicBotAgent().ChoosePriorityActionAsync(ctx))
+            .Should().BeOfType<PriorityAction.CastSpell>().Which.Card.Should().BeSameAs(pierce);
+    }
+
+    /// <summary>
+    /// CR 106.1b / 601.2g — a {C} pip is paid only with colorless mana. With
+    /// only Mountains the bot can't cast a {C} spell (the engine would rewind
+    /// it at payment: Kozilek's Command, Glaring Fleshraker in the gate); with
+    /// a colorless source it can.
+    /// </summary>
+    [Fact]
+    public async Task Priority_DoesNotCastAColorlessPipSpell_WithoutAColorlessSource()
+    {
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            var m = NamedCardFactory.Create("Mountain", _alice);
+            m.SetZone(ZoneType.Battlefield); _alice.Zones.Battlefield.AddCard(m);
+        }
+        var spell = new Instant("Eldrazi Spark", "{1}{C}") { Owner = _alice, Controller = _alice };
+        spell.SetZone(ZoneType.Hand); _alice.Zones.Hand.AddCard(spell);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, StepStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+
+        (await new HeuristicBotAgent().ChoosePriorityActionAsync(ctx))
+            .Should().NotBeOfType<PriorityAction.CastSpell>("Mountains make red mana, not colorless");
+
+        var wastes = NamedCardFactory.Create("Wastes", _alice);
+        wastes.SetZone(ZoneType.Battlefield); _alice.Zones.Battlefield.AddCard(wastes);
+        (await new HeuristicBotAgent().ChoosePriorityActionAsync(ctx))
+            .Should().BeOfType<PriorityAction.CastSpell>().Which.Card.Should().BeSameAs(spell);
+    }
 }

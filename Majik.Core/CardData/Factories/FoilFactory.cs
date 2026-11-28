@@ -74,8 +74,7 @@ public static class FoilFactory
                     {
                         if (stack == null || resolved is not ISpell spell) return;
                         // CR 701.5b — uncounterable spells survive the attempt.
-                        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
                     }),
                 };
             });

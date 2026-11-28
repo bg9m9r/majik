@@ -572,6 +572,15 @@ public sealed class SearchAgent : IPlayerAgent
         CancellationToken ct = default)
         => _fallback.ChooseModeAsync(ctx, modes, modeIntents, ct);
 
+    public Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => _fallback.ChooseModesAsync(ctx, modes, minModes, maxModes, modeIntents, ct);
+
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(
         GameContext ctx, IReadOnlyList<ITriggeredAbility> mine,
         CancellationToken ct = default)

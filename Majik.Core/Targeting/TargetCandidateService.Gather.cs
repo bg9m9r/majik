@@ -58,6 +58,8 @@ public static partial class TargetCandidateService
             TargetCategory.Artifact => AllPermanents().Where(p => p.HasType(CardType.Artifact)),
             TargetCategory.Enchantment => AllPermanents().Where(p => p.HasType(CardType.Enchantment)),
             TargetCategory.Land => AllPermanents().Where(p => p.HasType(CardType.Land)),
+            TargetCategory.ArtifactOrEnchantment => AllPermanents()
+                .Where(p => p.HasType(CardType.Artifact) || p.HasType(CardType.Enchantment)),
             TargetCategory.Spell => Spells(),
             TargetCategory.NoncreatureSpell => Spells().Where(s => !SpellIsCreature(s)),
             TargetCategory.CreatureSpell => Spells().Where(SpellIsCreature),
@@ -70,14 +72,33 @@ public static partial class TargetCandidateService
         // right now (hexproof / shroud / protection on permanents and players).
         // Stack spells + graveyard cards carry no battlefield untargetability
         // keywords, so they pass straight through.
+        // CR 109.5 / 115.1 — a controller qualifier in the description
+        // ("target creature you control", "... an opponent controls",
+        // "... you don't control") restricts the permanents in the pool. The
+        // category alone ignored it and offered every controller's.
+        var controlledBy = ControllerQualifier(d0: description);
+
         var seen = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var result = new List<object>();
         foreach (var o in raw)
         {
             if (!seen.Add(o)) continue;
+            if (controlledBy != 0 && o is Permanent perm
+                && (controlledBy > 0) != ReferenceEquals(perm.Controller, caster)) continue;
             if (IsTargetableNow(o, caster)) result.Add(o);
         }
         return result;
+    }
+
+    /// <summary>+1: the caster's permanents only; -1: other players' only;
+    /// 0: no controller qualifier.</summary>
+    private static int ControllerQualifier(string? d0)
+    {
+        var d = (d0 ?? string.Empty).ToLowerInvariant();
+        if (d.Contains("you don't control") || d.Contains("you do not control")
+            || d.Contains("an opponent controls") || d.Contains("opponents control")) return -1;
+        if (d.Contains("you control")) return +1;
+        return 0;
     }
 
     private static bool SpellIsCreature(Majik.Core.Spells.ISpell s) =>
@@ -95,6 +116,28 @@ public static partial class TargetCandidateService
             .Artifacts()
             .Enchantments()
             .Lands();
+
+    /// <summary>
+    /// CR 115.5 / 702.11 / 702.16 / 702.18 — can a spell or ability
+    /// controlled by <paramref name="controller"/>, from
+    /// <paramref name="source"/>, target <paramref name="o"/> right now?
+    /// Applies only untargetability (hexproof, hexproof from a colour,
+    /// shroud, protection from a colour of the source) to permanents on the
+    /// battlefield and players. Anything else (a card in a graveyard, a spell)
+    /// is always targetable here; whether it is still where its target
+    /// request needs it is the request's and CR 400.7's business.
+    /// </summary>
+    public static bool IsTargetableBy(object o, Player controller, ICard? source)
+    {
+        if (o is not (Permanent { Zone: Majik.Core.Zones.ZoneType.Battlefield } or Player)) return true;
+        if (!TargetLegality.IsLegal(PermissiveSpec, o, controller)) return false;
+        if (source is null) return true;
+        foreach (var color in Majik.Core.Cards.CardColors.GetColors(source))
+        {
+            if (!TargetLegality.IsLegal(PermissiveSpec, o, controller, color.ToString())) return false;
+        }
+        return true;
+    }
 
     private static bool IsTargetableNow(object o, Player caster)
     {
