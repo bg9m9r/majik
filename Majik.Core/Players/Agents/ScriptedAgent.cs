@@ -148,8 +148,14 @@ public sealed class ScriptedAgent : IPlayerAgent
         return Task.FromResult(chooser(hand));
     }
 
+    /// <summary>Every target request this agent was asked, in order (test inspection).</summary>
+    public List<TargetRequest> TargetRequestsSeen { get; } = new();
+
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
-        => Task.FromResult(Pop(_targets, "targets"));
+    {
+        TargetRequestsSeen.Add(request);
+        return Task.FromResult(Pop(_targets, "targets"));
+    }
 
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Task.FromResult(Pop(_xValues, "X"));

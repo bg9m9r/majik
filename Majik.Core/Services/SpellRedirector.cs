@@ -22,9 +22,10 @@ namespace Majik.Core.Services;
 ///   - Return <c>true</c> if such a spell was found and rewritten,
 ///     <c>false</c> otherwise.
 ///
-/// Remaining v1 gap: it picks the top single-target spell rather than letting
-/// the caster choose which spell (see RedirectTemplate), and it does not check
-/// that the new target is legal for that spell (CR 115.7).
+/// CR 115.7 — the new target must be legal for that spell
+/// (<see cref="Spell.TryRedirectTarget"/>); if it is not, nothing changes and
+/// this returns false. The redirect family itself targets the spell it changes
+/// (RedirectTemplate) and calls <see cref="Spell.TryRedirectTarget"/> directly.
 /// </summary>
 public static class SpellRedirector
 {
@@ -43,7 +44,8 @@ public static class SpellRedirector
     /// </returns>
     public static bool RedirectTopSpellSingleTarget(
         Majik.Core.Stack.Stack stack,
-        object newTarget)
+        object newTarget,
+        Majik.Core.Game.GameContext? game = null)
     {
         ArgumentNullException.ThrowIfNull(stack);
         ArgumentNullException.ThrowIfNull(newTarget);
@@ -60,8 +62,7 @@ public static class SpellRedirector
         {
             if (all[i] is not Spell spell) continue;
             if (spell.ChosenTargets.Count != 1) continue;
-            spell.ChosenTargets[0] = newTarget;
-            return true;
+            return spell.TryRedirectTarget(0, newTarget, game);
         }
 
         return false;

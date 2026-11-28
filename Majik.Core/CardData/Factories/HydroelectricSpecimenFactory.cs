@@ -188,7 +188,8 @@ public static class HydroelectricSpecimenFactory
 
                 // CR 114.6 — change the target to this creature. Same
                 // ChosenTargets rewrite Spellskite uses.
-                spell.ChosenTargets[0] = card;
+                // CR 115.7 — only if this creature is a legal target for it.
+                spell.TryRedirectTarget(0, card);
             });
 
         etbTrigger = new TriggeredAbility(

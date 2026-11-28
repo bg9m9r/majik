@@ -119,6 +119,58 @@ public class Spell : ISpell
         }
     }
 
+    /// <summary>
+    /// CR 115.7 — change the target at <paramref name="index"/> to
+    /// <paramref name="newTarget"/> only if it is a legal target for this
+    /// spell: not the spell itself (CR 115.5), not the current target,
+    /// targetable by the spell (hexproof, shroud, protection), and, with the
+    /// live game, offered by the slot's target request for the spell's
+    /// controller (the pool the cast offered). False, with nothing changed,
+    /// otherwise ("if the new target is illegal, the target doesn't change").
+    /// </summary>
+    public bool TryRedirectTarget(int index, object newTarget, GameContext? game = null)
+    {
+        if (!IsLegalNewTarget(index, newTarget, game)) return false;
+        RedirectTarget(index, newTarget);
+        return true;
+    }
+
+    /// <summary>The legal new targets for the slot at <paramref name="index"/>
+    /// among <paramref name="candidates"/> (see <see cref="TryRedirectTarget"/>).</summary>
+    public bool IsLegalNewTarget(int index, object newTarget, GameContext? game)
+    {
+        ArgumentNullException.ThrowIfNull(newTarget);
+        if (index < 0 || index >= ChosenTargets.Count) return false;
+        if (ReferenceEquals(newTarget, this) || ReferenceEquals(newTarget, ChosenTargets[index])) return false;
+        if (!Majik.Core.Targeting.TargetCandidateService.IsTargetableBy(newTarget, Controller, Card)) return false;
+        if (game is not null && RequestForTarget(index) is { } request)
+        {
+            var pool = Majik.Core.Targeting.TargetCollection.ResolveLivePool(request, AsController(game));
+            if (pool.Count > 0 && !pool.Any(c => ReferenceEquals(c, newTarget))) return false;
+        }
+        return true;
+    }
+
+    /// <summary>The live pool the slot's request offers this spell's
+    /// controller (the cast's pool, with the category fallback). A spell that
+    /// recorded no request for the slot (a copy, a test spell) gets every
+    /// player and battlefield permanent; <see cref="IsLegalNewTarget"/> then
+    /// filters.</summary>
+    public IReadOnlyList<object> CandidatesForTarget(int index, GameContext game)
+    {
+        if (RequestForTarget(index) is { } request)
+            return Majik.Core.Targeting.TargetCollection.ResolveLivePool(request, AsController(game));
+        return game.AllPlayers.Cast<object>()
+            .Concat(game.AllPlayers.SelectMany(p => p.Zones.Battlefield.GetCards()))
+            .ToList();
+    }
+
+    private GameContext AsController(GameContext game) =>
+        ReferenceEquals(game.Self, Controller)
+            ? game
+            : new GameContext(Controller, game.AllPlayers, game.ActivePlayer, game.TurnNumber,
+                game.CurrentPhase, game.Stack, game.LandPlayAvailable, game.TurnState);
+
     /// <summary>The target request that governs <see cref="ChosenTargets"/>[<paramref name="index"/>]
     /// (CR 601.2c), when the cast recorded one per slot.</summary>
     public TargetRequest? RequestForTarget(int index)
@@ -175,11 +227,7 @@ public class Spell : ISpell
         game ??= _resolvingIn;
         if (game is not null && RequestForTarget(index) is { CandidateGatherer: not null } request)
         {
-            var asController = ReferenceEquals(game.Self, Controller)
-                ? game
-                : new GameContext(Controller, game.AllPlayers, game.ActivePlayer, game.TurnNumber,
-                    game.CurrentPhase, game.Stack, game.LandPlayAvailable, game.TurnState);
-            if (!request.ResolveCandidates(asController).Any(c => ReferenceEquals(c, target)))
+            if (!request.ResolveCandidates(AsController(game)).Any(c => ReferenceEquals(c, target)))
                 return false;
         }
         return true;

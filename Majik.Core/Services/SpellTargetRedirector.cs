@@ -61,7 +61,7 @@ public static class SpellTargetRedirector
         // requires exactly one chosen target to rewrite.
         if (spell.ChosenTargets.Count != 1) return false;
 
-        spell.ChosenTargets[0] = newTarget;
-        return true;
+        // CR 115.7 — only to a legal target; otherwise the target stays.
+        return spell.TryRedirectTarget(0, newTarget);
     }
 }

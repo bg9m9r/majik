@@ -9,6 +9,7 @@ using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 using Xunit;
 using Spell = Majik.Core.Spells.Spell;
@@ -110,7 +111,7 @@ public class RedirectTemplateTests
     // ---- Integration: Player A puts a single-target spell on the stack,
     // ----              Player B casts Deflection, original target is replaced.
     [Fact]
-    public void Integration_RedirectRewritesOriginalSpellsChosenTarget()
+    public async Task Integration_RedirectRewritesOriginalSpellsChosenTarget()
     {
         var bus = new EventBus();
         var stack = new Majik.Core.Stack.Stack(bus);
@@ -136,8 +137,8 @@ public class RedirectTemplateTests
         boltSpell.ChosenTargets.Add(originalTarget);
         stack.Push(boltSpell);
 
-        // Alice casts Deflection on Bob's Bolt. The Deflection template's
-        // effect is one call to SpellRedirector.RedirectTopSpellSingleTarget.
+        // Alice casts Deflection on Bob's Bolt: Deflection TARGETS the Bolt
+        // (CR 115.1), and the new target is chosen as it resolves (CR 115.7).
         var def = new RedirectTemplate().TryBind(Ctx(
             "Change the target of target spell with a single target.",
             stack));
@@ -145,13 +146,17 @@ public class RedirectTemplateTests
         var chosen = new ChosenSpellParams(
             ModeIndex: null,
             X: null,
-            Targets: new IReadOnlyList<object>[] { new[] { (object)redirectedTarget } },
+            Targets: new IReadOnlyList<object>[] { new[] { (object)boltSpell } },
             Mana: new ManaPayment(Array.Empty<ICard>()),
             AllPlayers: new[] { alice, bob });
         var effects = def!.EffectFactory(chosen);
 
-        // Run Deflection's effect.
-        foreach (var e in effects) e.Execute();
+        // Run Deflection's effect; Alice picks the new target.
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueueTargets(new object[] { redirectedTarget });
+        var game = new GameContext(alice, new[] { alice, bob }, bob, 1, StepStateType.PreCombatMain, stack);
+        var rc = Majik.Core.Abilities.ResolutionContext.For(alice, aliceAgent, game, chosenTargets: null, default);
+        foreach (var e in effects) await e.ExecuteAsync(rc);
 
         // The Bolt's ChosenTargets should now be the redirectedTarget,
         // observable through the stack-resident Spell.

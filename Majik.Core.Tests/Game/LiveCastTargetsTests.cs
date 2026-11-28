@@ -104,10 +104,15 @@ public class LiveCastTargetsTests
     {
         // RedirectTemplate binds 4 cards (Deflection, Imp's Mischief, Shunt,
         // Swerve); all go through SpellRedirector.RedirectTopSpellSingleTarget.
+        // Deflection targets the spell; the new target is chosen as it
+        // resolves (CR 115.7).
         var (bolt, _) = await Cast("Lightning Bolt", new object[] { _bear });
-        await Cast("Deflection", new object[] { _skite });
+        await Cast("Deflection", new object[] { bolt });
+        var chooser = new ScriptedAgent();
+        chooser.QueueTargets(new object[] { _skite });
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, StepStateType.PreCombatMain, _stack);
 
-        await _resolver.ResolveTopAsync(_stack); // Deflection
+        await _resolver.ResolveTopAsync(_stack, _ => chooser, ctx); // Deflection
         bolt.ChosenTargets.Should().Equal(_skite);
         await _resolver.ResolveTopAsync(_stack); // Lightning Bolt
 

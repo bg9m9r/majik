@@ -142,7 +142,8 @@ public static class SpellskiteFactory
                 // ineligible → no-op (CR 608.2b).
                 if (spell.ChosenTargets.Count != 1) return;
 
-                spell.ChosenTargets[0] = spellskite;
+                // CR 115.7 — only if Spellskite is a legal target for it.
+                spell.TryRedirectTarget(0, spellskite);
             });
 
         ability = new ActivatedAbility(
