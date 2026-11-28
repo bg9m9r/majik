@@ -15,6 +15,8 @@ namespace Majik.Core.Costs;
 public sealed class ManaPaymentResolver
 {
     private readonly ContinuousEffectsService? _layers;
+    // CR 605 — where a tapped source's ManaAbilityActivatedEvent is published.
+    private readonly Majik.Core.Events.IEventBus? _eventBus;
 
     /// <summary>
     /// Construct a resolver. When <paramref name="layers"/> is supplied,
@@ -24,9 +26,13 @@ public sealed class ManaPaymentResolver
     /// resolver falls back to the printed mana abilities — preserves
     /// behaviour for callers (and tests) that don't have a layer service.
     /// </summary>
-    public ManaPaymentResolver(ContinuousEffectsService? layers = null)
+    /// <param name="eventBus">Where each source the payment taps publishes its
+    /// ManaAbilityActivatedEvent (CR 605), exactly as a manual activation does.
+    /// Null in harnesses without a bus.</param>
+    public ManaPaymentResolver(ContinuousEffectsService? layers = null, Majik.Core.Events.IEventBus? eventBus = null)
     {
         _layers = layers;
+        _eventBus = eventBus;
     }
 
     public bool Pay(Player payer, ManaCost cost, ManaPayment payment) =>
@@ -459,34 +465,14 @@ public sealed class ManaPaymentResolver
         // get the actually-consumed delta per color.
         var poolBefore = payer.ManaPool;
 
-        // Commit: actually tap each source and add to real pool, then pay.
-        foreach (var ab in abilities)
-        {
-            ab.Activate();
-        }
-        // CR 106.4 — stamp every produced unit with its ability's spend-
-        // restriction (and any provenance reaction) so the ledger records
-        // which floating units are restricted. Restriction-only abilities
-        // (Ancient Ziggurat) record slots even without an OnSpent callback;
-        // ManaAbilityActivator already stamps reaction slots on the float-
-        // then-cast path, so this covers the source-tapped-at-pay path.
+        // Commit: tap each source through the same funnel a manual activation
+        // uses (CR 605): it adds the mana the ability actually produced, stamped
+        // with its spend restriction / provenance (CR 106.4), and publishes
+        // ManaAbilityActivatedEvent so "tapped for mana" triggers fire for
+        // auto-paid mana too. Then pay.
         for (var i = 0; i < abilities.Count; i++)
         {
-            var concrete = abilities[i] as Abilities.ManaAbility;
-            var restriction = concrete?.SpendRestriction;
-            var reaction = concrete?.ProvenanceReaction;
-            if (restriction != null || reaction != null)
-            {
-                payer.AddManaToPool(
-                    produced[i],
-                    provenanceSource: abilities[i],
-                    onSpent: reaction,
-                    restriction: restriction);
-            }
-            else
-            {
-                payer.AddManaToPool(produced[i]);
-            }
+            produced[i] = Services.ManaAbilityActivator.Produce(abilities[i], payer, _eventBus);
         }
 
         // CR 106.4 — withhold the blocked restricted colored mana from the pool

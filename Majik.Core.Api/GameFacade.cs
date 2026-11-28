@@ -491,7 +491,7 @@ public sealed class GameFacade : IDisposable
         // a binder match are skipped (the card is rotated in hand). Permanents
         // and abilities still resolve through SpellCastFlow + AbilityActivator.
         var castFlow = new SpellCastFlow(_stack, _zones, _bus);
-        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects);
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects, _bus);
 
         async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {

@@ -855,7 +855,9 @@ public sealed class TurnDriver
         // reshapes mana sources at payment time. Null when the driver
         // was constructed without a continuous-effects service — the
         // resolver falls back to printed mana abilities.
-        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects);
+        // CR 605 — the resolver publishes each tapped source's mana event on
+        // the game bus, like a manual activation.
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects, _eventBus);
 
         async Task<bool> DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
