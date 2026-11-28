@@ -50,6 +50,7 @@ public class ZoneService
     /// </summary>
     public void MoveCard(ICard card, ZoneType fromZone, ZoneType toZone, Player? controller = null)
     {
+        card = Revealed(card);
         var intent = BuildIntent(card, fromZone, toZone, controller);
         if (_replacements != null)
         {
@@ -71,6 +72,7 @@ public class ZoneService
     public void ExileFaceDown(ICard card, ZoneType fromZone, IReadOnlyCollection<Player> mayLook, Player? controller = null)
     {
         ArgumentNullException.ThrowIfNull(mayLook);
+        card = Revealed(card);
         var intent = BuildIntent(card, fromZone, ZoneType.Exile, controller);
         if (_replacements != null)
         {
@@ -95,6 +97,7 @@ public class ZoneService
         Player? controller = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
+        card = Revealed(card);
         var intent = BuildIntent(card, fromZone, toZone, controller);
         if (_replacements != null)
         {
@@ -148,9 +151,56 @@ public class ZoneService
     /// <see cref="MoveCardAsync"/>; identical behaviour regardless of which
     /// bus path produced the intent.
     /// </summary>
+    /// <summary>CR 708.9 — a face-down permanent that already left the
+    /// battlefield is the card it represented: a later move of that object
+    /// (an effect acting on the leaves/dies event's card) moves that card.</summary>
+    private static ICard Revealed(ICard card) =>
+        card is ManifestedCreature { Zone: not ZoneType.Battlefield } gone
+            && gone.UnderlyingCard.Zone == gone.Zone
+            ? gone.UnderlyingCard
+            : card;
+
+    /// <summary>
+    /// CR 708.9 / 400.7 — a face-down permanent leaving the battlefield is
+    /// revealed, and in its new zone it is the card it represented, face up:
+    /// the face-down wrapper is removed (it exists nowhere afterwards) and the
+    /// represented card is put into the destination. The move event names the
+    /// face-down creature that left (LKI for leaves/dies triggers, CR 603.10)
+    /// with <see cref="CardMovedEvent.RevealedCard"/> = the card.
+    /// </summary>
+    private void CommitFaceDownLeave(ManifestedCreature faceDown, ZoneMoveIntent intent)
+    {
+        var to = intent.ToZone;
+        var lkiController = faceDown.Controller;
+        var card = faceDown.UnderlyingCard;
+        var owner = card.Owner ?? faceDown.Owner;
+
+        faceDown.TurnFaceUp();              // revealed
+        faceDown.SetZone(to);               // leave-battlefield reset; in no zone list
+        faceDown.Owner?.Zones.Battlefield.RemoveCard(faceDown);
+        if (!ReferenceEquals(faceDown.Controller, faceDown.Owner))
+            faceDown.Controller?.Zones.Battlefield.RemoveCard(faceDown);
+
+        card.SetController(owner);
+        card.SetZone(to);
+        owner?.Zones.GetZone(to).AddCard(card);
+
+        _eventBus?.Publish(new CardMovedEvent(faceDown, ZoneType.Battlefield, to, lkiController)
+        {
+            RevealedCard = card,
+        });
+    }
+
     private void CommitMove(ICard card, ZoneType fromZone, ZoneMoveIntent intent,
         IReadOnlyCollection<Player>? faceDownLookers = null)
     {
+        if (card is ManifestedCreature { IsFaceDown: true } faceDown
+            && fromZone == ZoneType.Battlefield && intent.ToZone != ZoneType.Battlefield)
+        {
+            CommitFaceDownLeave(faceDown, intent);
+            return;
+        }
+
         var finalToZone = intent.ToZone;
         var finalController = intent.Controller;
 

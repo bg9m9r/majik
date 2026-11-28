@@ -471,6 +471,13 @@
               "string"
             ]
           },
+          "revealedCardId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "stackEntryId": {
             "format": "uuid",
             "type": [

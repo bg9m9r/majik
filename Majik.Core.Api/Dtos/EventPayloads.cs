@@ -62,7 +62,12 @@ public sealed record CardMovedPayload(
     // CR 601.2a — on a move to the stack (a spell being cast): the id of the
     // stack entry the card becomes, i.e. its StackObjectDto.Id, both while it
     // is being cast and once it is on the stack. Omitted for other moves.
-    Guid? StackEntryId = null);
+    Guid? StackEntryId = null,
+    // CR 708.9 — a face-down permanent left the battlefield and was revealed:
+    // CardId is the face-down permanent that left (the id clients know on the
+    // battlefield); this is the id of the card it was, now in To, face up,
+    // whose name and characteristics the card fields carry. Omitted otherwise.
+    Guid? RevealedCardId = null);
 
 /// <summary>
 /// CR 120 — a player drawing a card (Library → Hand). Dual-shape: the

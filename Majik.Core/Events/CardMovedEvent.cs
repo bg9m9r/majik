@@ -53,6 +53,12 @@ public class CardMovedEvent : GameEvent
     /// cards to hand) must not reveal it to players who could not look.</summary>
     public bool LeftFaceDownExile { get; }
 
+    /// <summary>CR 708.9 — set when a face-down permanent left the battlefield:
+    /// the card it represented, which is what is now in <see cref="ToZone"/>,
+    /// face up. <see cref="Card"/> stays the face-down creature that left (last
+    /// known information, CR 603.10: "a creature died").</summary>
+    public ICard? RevealedCard { get; init; }
+
     public CardMovedEvent(ICard card, ZoneType fromZone, ZoneType toZone)
         : this(card, fromZone, toZone, card.Controller)
     {

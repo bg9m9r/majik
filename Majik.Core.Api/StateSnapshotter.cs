@@ -122,7 +122,9 @@ public static class StateSnapshotter
     /// Champion of the Wilds, Necropotence).</summary>
     internal static bool IsExiledFaceDown(ICard? card) => card is Card { IsExiledFaceDown: true };
 
-    internal static bool IsFaceDown(ICard? card) => card is Permanent { IsFaceDown: true };
+    // CR 708.2 / 708.9 — only a permanent is face down: one that left the
+    // battlefield was revealed, and its card is face up in its new zone.
+    internal static bool IsFaceDown(ICard? card) => card is Permanent { IsFaceDown: true, Zone: ZoneType.Battlefield };
 
     /// <summary>CR 708.6 — the controller of a face-down permanent may look at
     /// it; a null viewer is the all-revealed (spectator / debug) view.</summary>
@@ -202,7 +204,7 @@ public static class StateSnapshotter
                 .ToList();
         }
 
-        if (card is Permanent { IsFaceDown: true } faceDown)
+        if (card is Permanent { IsFaceDown: true, Zone: ZoneType.Battlefield } faceDown)
             return SnapshotFaceDown(faceDown, f, imprinted, viewer);
 
         return new CardSnapshotDto(

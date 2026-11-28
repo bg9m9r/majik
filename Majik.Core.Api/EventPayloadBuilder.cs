@@ -447,6 +447,30 @@ public static class EventPayloadBuilder
         // place instead of forcing a full GET /state. A → Battlefield move
         // always touches a public zone, so it is already the revealed branch —
         // the enrichment never appears on a masked variant.
+        if (x.RevealedCard is { } revealed)
+        {
+            // CR 708.9 — a face-down permanent left the battlefield and was
+            // revealed to everyone: the payload names the card it was. CardId
+            // stays the permanent clients know; RevealedCardId is the card.
+            var rf = StateSnapshotter.BuildPermanentFields(revealed);
+            return SerializeCard(new CardMovedPayload(
+                From: x.FromZone.ToString(),
+                To: x.ToZone.ToString(),
+                OwnerId: revealed.Owner?.Id ?? ownerId,
+                CardId: x.Card.InstanceId,
+                CardName: revealed.Name,
+                ManaCost: revealed.ManaCost,
+                Types: revealed.CardTypes.Select(t => t.ToString()).ToList(),
+                Power: rf.Power,
+                Toughness: rf.Toughness,
+                Tapped: rf.Tapped,
+                SummoningSickness: rf.SummoningSickness,
+                Abilities: rf.Abilities,
+                ProducedManaColors: rf.ProducedManaColors,
+                Counters: rf.Counters,
+                RevealedCardId: revealed.InstanceId));
+        }
+
         if (IntoFaceDownExile(x))
         {
             // CR 406.3 — the face-down exile shape the snapshot gives this
