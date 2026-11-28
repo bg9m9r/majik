@@ -203,7 +203,7 @@ public class RejectedAnswerKeepsPromptTests
 
         FluentActions.Invoking(() => _agent.Submit(Cmd(new DeclareAttackersCommand(
                 new[] { new AttackerDeclarationDto(land.InstanceId, _bob.Id) }))))
-            .Should().Throw<InvalidOperationException>().WithMessage("*is not a Creature*");
+            .Should().Throw<InvalidOperationException>().WithMessage("*not an eligible attacker*");
 
         var plan = await RejectThenAccept(task,
             Cmd(new DeclareAttackersCommand(new[] { new AttackerDeclarationDto(bear.InstanceId, Guid.NewGuid()) })),

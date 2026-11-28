@@ -1425,21 +1425,29 @@ public sealed class RemoteAgent : IPlayerAgent
             return CombatPlan.None;
         }
 
+        // CR 508.1a — validate against what the engine offered (TurnDriver's
+        // layer-aware eligibility, CR 613.1c), not the C# class: an animated
+        // land or a creature-typed Land instance is an eligible attacker
+        // without being a Creature object. Without an offered list, fall back
+        // to "effectively a creature".
+        var eligible = _pendingPayload?.EligibleAttackerIds;
         var decls = new List<AttackerDeclaration>(cmd.Attackers.Count);
         foreach (var dto in cmd.Attackers)
         {
             var card = ResolveCard(dto.AttackerInstanceId);
-            if (card is not Creature creature)
+            if (eligible != null ? !eligible.Contains(dto.AttackerInstanceId) : !IsEffectivelyCreature(card))
             {
                 throw new InvalidOperationException(
-                    $"Attacker {dto.AttackerInstanceId} is not a Creature ({card.GetType().Name}).");
+                    $"Attacker {dto.AttackerInstanceId} is not an eligible attacker (CR 508.1a).");
             }
 
             var defender = ResolveDefender(dto.DefenderId);
-            decls.Add(new AttackerDeclaration(creature, defender));
+            decls.Add(new AttackerDeclaration((Permanent)card, defender));
         }
         return new CombatPlan(decls);
     }
+
+    private static bool IsEffectivelyCreature(ICard card) => card is Permanent p && p.IsEffectivelyCreature();
 
     // CR 509.1 — translate the wire DeclareBlockersCommand. Each blocker
     // must be a Creature this agent controls; each attacker (referenced
@@ -1454,24 +1462,30 @@ public sealed class RemoteAgent : IPlayerAgent
             return BlockPlan.None;
         }
 
+        // CR 509.1a — same agreement as attackers: a blocker must be one the
+        // engine offered, and the creature it blocks one of the attackers the
+        // engine listed (both layer-aware, CR 613.1c); without offered lists,
+        // fall back to "effectively a creature".
+        var eligibleBlockers = _pendingPayload?.EligibleBlockerIds;
+        var attackers = _pendingPayload?.AttackerIds;
         var decls = new List<BlockerDeclaration>(cmd.Blockers.Count);
         foreach (var dto in cmd.Blockers)
         {
             var blockerCard = ResolveCard(dto.BlockerInstanceId);
-            if (blockerCard is not Creature blocker)
+            if (eligibleBlockers != null ? !eligibleBlockers.Contains(dto.BlockerInstanceId) : !IsEffectivelyCreature(blockerCard))
             {
                 throw new InvalidOperationException(
-                    $"Blocker {dto.BlockerInstanceId} is not a Creature ({blockerCard.GetType().Name}).");
+                    $"Blocker {dto.BlockerInstanceId} is not an eligible blocker (CR 509.1a).");
             }
 
             var attackerCard = ResolveCard(dto.AttackerInstanceId);
-            if (attackerCard is not Creature attacker)
+            if (attackers != null ? !attackers.Contains(dto.AttackerInstanceId) : !IsEffectivelyCreature(attackerCard))
             {
                 throw new InvalidOperationException(
-                    $"Attacker {dto.AttackerInstanceId} is not a Creature ({attackerCard.GetType().Name}).");
+                    $"Attacker {dto.AttackerInstanceId} is not an attacking creature (CR 509.1a).");
             }
 
-            decls.Add(new BlockerDeclaration(blocker, attacker));
+            decls.Add(new BlockerDeclaration((Permanent)blockerCard, (Permanent)attackerCard));
         }
         return new BlockPlan(decls);
     }
