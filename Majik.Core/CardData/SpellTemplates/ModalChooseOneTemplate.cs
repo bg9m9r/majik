@@ -146,31 +146,26 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         var pickCount = PickCount(pick);
 
         // CR 700.2d / 601.2c — each mode's body must read ITS OWN target
-        // slots. SpellCastFlow lays modal targets out per mode: when every
-        // request carries a ModeIndex, slot = Targets[ModeIndex] and only the
-        // chosen modes are prompted. So when every mode takes at most one
-        // request, stamp each with its mode index and hand mode i the slot
-        // Targets[i]. A mode with several requests can't use that layout: keep
-        // the flat concatenation (one slot per request) and slice by offset.
-        // Before this, every mode body got the whole list and read slot 0 —
-        // the FIRST mode's slot (Drown in the Loch's destroy mode threw).
-        var perModeKeyed = modeDefs.All(d => d == null || d.TargetRequests.Count <= 1);
+        // slots, and only the chosen modes' targets are chosen. Stamp every
+        // request with its mode index: SpellCastFlow then prompts only the
+        // chosen modes and fills the ModalTargetLayout (mode by mode, one slot
+        // per request), and mode m's body gets its slice of that layout. Before
+        // this, a mode body read the first slots of the whole list (Drown in the
+        // Loch's destroy mode threw), and a mode with two requests (Bushwhack's
+        // fight) fell onto the index-aligned path and read the wrong slots.
         var requests = new List<TargetRequest>();
-        var offsets = new int[modeDefs.Count];
         for (var m = 0; m < modeDefs.Count; m++)
         {
-            offsets[m] = requests.Count;
             if (modeDefs[m] is not { } md) continue;
-            requests.AddRange(perModeKeyed
-                ? md.TargetRequests.Select(r => r with { ModeIndex = m })
-                : md.TargetRequests);
+            requests.AddRange(md.TargetRequests.Select(r => r with { ModeIndex = m }));
         }
+        var offsets = Majik.Core.Game.ModalTargetLayout.Offsets(modeDefs.Count, requests, out _);
 
         IReadOnlyList<IReadOnlyList<object>> SlotsFor(int mode, ChosenSpellParams p)
         {
             var count = modeDefs[mode]!.TargetRequests.Count;
             if (count == 0) return Array.Empty<IReadOnlyList<object>>();
-            var start = perModeKeyed ? mode : offsets[mode];
+            var start = offsets[mode];
             var slice = new IReadOnlyList<object>[count];
             for (var k = 0; k < count; k++)
             {

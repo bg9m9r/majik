@@ -1058,18 +1058,21 @@ public sealed class SpellCastFlow
         // 1 are targeted). Collect a target ONLY for a chosen targeted mode,
         // raising its minimum to the printed minimum so a chosen targeted mode
         // with no legal target makes the whole cast illegal and rewinds, rather
-        // than silently no-opping on resolution. The returned slots are keyed by
-        // ModeIndex (sized to cover the highest mode index) so the EffectFactory's
-        // per-mode Targets[ModeIndex] lookups stay aligned. This generalizes the
-        // escalate/Charm rewind (CR 601.2c) to the index-misaligned Cryptic /
-        // Command family.
+        // than silently no-opping on resolution. The returned slots follow
+        // ModalTargetLayout: mode by mode, one slot per request (at least one per
+        // mode), so a mode with one request sits at Targets[ModeIndex] and a mode
+        // with several (a fight mode) gets each of its requests, in order. This
+        // generalizes the escalate/Charm rewind (CR 601.2c) to the
+        // index-misaligned Cryptic / Command family.
         if (definition.Modes.Count > 0
             && definition.TargetRequests.Count > 0
             && definition.TargetRequests.All(r => r.ModeIndex.HasValue)
             && chosenModes.Count > 0)
         {
             var chosenModeSet = new HashSet<int>(chosenModes);
-            var slotCount = definition.Modes.Count;
+            var modeCount = definition.Modes.Count;
+            var offsets = ModalTargetLayout.Offsets(modeCount, definition.TargetRequests, out var slotCount);
+            var nextInMode = new int[modeCount];
             var perModeSparse = new IReadOnlyList<object>[slotCount];
             for (var s = 0; s < slotCount; s++)
             {
@@ -1079,7 +1082,8 @@ public sealed class SpellCastFlow
             foreach (var request in definition.TargetRequests)
             {
                 var modeIdx = request.ModeIndex!.Value;
-                if (modeIdx < 0 || modeIdx >= slotCount) continue;
+                if (modeIdx < 0 || modeIdx >= modeCount) continue;
+                var slotIdx = offsets[modeIdx] + nextInMode[modeIdx]++;
                 if (!chosenModeSet.Contains(modeIdx)) continue;
 
                 // CR 601.2c — a CHOSEN targeted mode demands its printed
@@ -1088,7 +1092,7 @@ public sealed class SpellCastFlow
                 var oneSlot = await Targeting.TargetCollection.CollectAsync(
                     new[] { request.AsChosenMode() },
                     card, ctx, agent, throwOnInsufficient: true, ct);
-                perModeSparse[modeIdx] = oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>();
+                perModeSparse[slotIdx] = oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>();
             }
 
             var sparseList = new List<IReadOnlyList<object>>(perModeSparse);
