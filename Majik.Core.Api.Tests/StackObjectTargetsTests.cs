@@ -101,4 +101,20 @@ public class StackObjectTargetsTests
         Majik.Core.Services.SpellRedirector.RedirectTopSpellSingleTarget(stack, skite).Should().BeTrue();
         Snap(stack, _alice).Stack[1].Targets.Should().Equal(new TargetRefDto(skite.InstanceId, "Card"));
     }
+
+    [Fact]
+    public void ATargetThatIsAnAbilityOnTheStack_IsListedAsAStackObjectRef()
+    {
+        // CR 115.1d / 701.5 — Stifle targets an activated or triggered ability
+        // on the stack. The ref names that stack object's id, Kind "Spell".
+        var stack = new Majik.Core.Stack.Stack();
+        var source = Put(new Creature("Pinger", "{R}", 1, 1), _bob, ZoneType.Battlefield);
+        var trigger = new TriggeredAbility(source, _bob, Triggers.OnEnterBattlefieldSelf(source));
+        stack.Push(trigger);
+        var stifle = new Spell(Put(new Instant("Stifle", "{U}"), _alice, ZoneType.Stack), _alice);
+        stifle.AnnouncedTargets = new IReadOnlyList<object>[] { new object[] { trigger } };
+        stack.Push(stifle);
+
+        Snap(stack, _alice).Stack[1].Targets.Should().Equal(new TargetRefDto(trigger.Id, "Spell"));
+    }
 }

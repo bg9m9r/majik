@@ -345,6 +345,11 @@ public static class StateSnapshotter
                 case ISpell s:
                     refs.Add(new TargetRefDto(s.Id, "Spell"));
                     break;
+                // CR 115.1d — an activated or triggered ability on the stack
+                // (Stifle's target). Same "Spell" kind: a stack-object ref.
+                case IStackObject so:
+                    refs.Add(new TargetRefDto(so.Id, "Spell"));
+                    break;
                 case ICard c:
                     refs.Add(new TargetRefDto(IsHiddenFrom(c, viewer) ? Guid.Empty : c.InstanceId, "Card"));
                     break;
