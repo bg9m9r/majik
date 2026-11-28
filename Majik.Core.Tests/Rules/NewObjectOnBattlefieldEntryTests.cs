@@ -152,6 +152,80 @@ public class NewObjectOnBattlefieldEntryTests
         sword.AttachedTo.Should().BeNull();
     }
 
+    private void RunSbasTwice()
+    {
+        var sba = new Majik.Core.Rules.StateBasedActions(_bus, _zones);
+        for (var i = 0; i < 2; i++)
+            sba.CheckStateBasedActions(new[] { _alice }, _alice.Zones.Battlefield.GetCards().ToList());
+    }
+
+    [Fact]
+    public void AFlickeredCreature_UnderPacifism_SendsPacifismToTheGraveyard()
+    {
+        // CR 704.5m — Ephemerate's exile-and-return within one resolution:
+        // Pacifism was attached to the old object and is now attached to
+        // nothing, so it is put into its owner's graveyard.
+        var bear = OnBattlefield();
+        var pacifism = Put(Majik.Core.CardData.Factories.PacifismFactory.Create(_alice));
+        pacifism.AttachTo(bear);
+
+        _zones.MoveCard(bear, ZoneType.Battlefield, ZoneType.Exile);
+        _zones.MoveCard(bear, ZoneType.Exile, ZoneType.Battlefield, _alice);
+        RunSbasTwice();
+
+        pacifism.Zone.Should().Be(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(pacifism);
+        bear.Zone.Should().Be(ZoneType.Battlefield);
+    }
+
+    [Fact]
+    public void AFlickeredCreature_LeavesItsEquipmentOnTheBattlefield_Unattached()
+    {
+        // CR 704.5n / 301.5c — Equipment attached to nothing simply stays.
+        var bear = OnBattlefield();
+        var sword = Put(new Artifact("Sword", "{2}", subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Equipment }));
+        sword.AttachTo(bear);
+
+        _zones.MoveCard(bear, ZoneType.Battlefield, ZoneType.Exile);
+        _zones.MoveCard(bear, ZoneType.Exile, ZoneType.Battlefield, _alice);
+        RunSbasTwice();
+
+        sword.Zone.Should().Be(ZoneType.Battlefield);
+        sword.AttachedTo.Should().BeNull();
+    }
+
+    [Fact]
+    public void AnAuraPutOntoTheBattlefieldByAnEffect_IsAttached_AndStays()
+    {
+        // CR 303.4f — Old-Growth Troll's return as an Aura: the effect that
+        // puts it onto the battlefield attaches it, before any SBA check.
+        var host = OnBattlefield("Forest Elemental");
+        var troll = OnBattlefield("Old-Growth Troll");
+        _zones.MoveCard(troll, ZoneType.Battlefield, ZoneType.Graveyard);
+
+        var aura = Majik.Core.Effects.ReturnAsAuraOnDeathEffect.Apply(
+            troll, "Old-Growth Troll", "{G}{G}{G}", p => ReferenceEquals(p, host),
+            Array.Empty<Func<Permanent, Majik.Core.Abilities.IAbility>>(), null, _zones);
+        RunSbasTwice();
+
+        aura.Should().NotBeNull();
+        aura!.Zone.Should().Be(ZoneType.Battlefield);
+        aura.AttachedTo.Should().BeSameAs(host);
+    }
+
+    [Fact]
+    public void ACurse_EnchantingAPlayer_IsNotPutIntoTheGraveyard()
+    {
+        // CR 303.4 / 704.5m — a Curse enchants a player, which the engine
+        // tracks outside AttachedTo; it is attached to something.
+        var curse = Put(Majik.Core.CardData.Factories.TrespassersCurseFactory.Create(_alice));
+        Majik.Core.CardData.Factories.TrespassersCurseFactory.SetEnchantedPlayer(curse, new Player("Bob", 20));
+
+        RunSbasTwice();
+
+        curse.Zone.Should().Be(ZoneType.Battlefield);
+    }
+
     [Fact]
     public void AFlickeredAura_ComesBackAttachedToNothing()
     {
