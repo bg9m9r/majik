@@ -71,11 +71,11 @@ public static class StateSnapshotter
             Life: p.LifeTotal,
             HasLost: p.HasLost,
             Mana: SnapshotMana(p.ManaPool),
-            Hand: hideHidden ? HiddenZone(p.Zones.Hand) : SnapshotZone(p.Zones.Hand),
-            Battlefield: SnapshotZone(p.Zones.Battlefield),
-            Graveyard: SnapshotZone(p.Zones.Graveyard),
+            Hand: hideHidden ? HiddenZone(p.Zones.Hand) : SnapshotZone(p.Zones.Hand, viewer),
+            Battlefield: SnapshotZone(p.Zones.Battlefield, viewer),
+            Graveyard: SnapshotZone(p.Zones.Graveyard, viewer),
             Library: HiddenZone(p.Zones.Library),       // always hidden, even to owner
-            Exile: SnapshotZone(p.Zones.Exile));
+            Exile: SnapshotZone(p.Zones.Exile, viewer));
     }
 
     /// <summary>Zone whose contents are hidden — DTO carries only the count.</summary>
@@ -104,8 +104,41 @@ public static class StateSnapshotter
         Green: pool.Green,
         Colorless: 0);
 
-    private static ZoneDto SnapshotZone(IZone zone) =>
-        new(zone.GetCards().Select(SnapshotCard).ToList());
+    private static ZoneDto SnapshotZone(IZone zone, Player? viewer) =>
+        new(zone.GetCards().Select(c => SnapshotCard(c, viewer)).ToList());
+
+    // ── CR 708 face-down permanents ──────────────────────────────────────
+
+    /// <summary>CR 708.2 — the name a face-down permanent is shown with to a
+    /// player who may not look at it (it has no name). Shared with the event
+    /// payloads (EventPayloadBuilder.FaceDownName).</summary>
+    internal const string FaceDownName = "Face-down permanent";
+
+    internal static bool IsFaceDown(ICard? card) => card is Permanent { IsFaceDown: true };
+
+    /// <summary>CR 708.6 — the controller of a face-down permanent may look at
+    /// it; a null viewer is the all-revealed (spectator / debug) view.</summary>
+    internal static bool MayLookAt(ICard card, Player? viewer) =>
+        viewer is null || (card is Permanent p && ReferenceEquals(p.Controller ?? p.Owner, viewer));
+
+    /// <summary>The card a face-down permanent is: a manifested / cloaked
+    /// permanent is a wrapper around the card it represents (CR 708.2c).</summary>
+    internal static ICard RepresentedCard(ICard card) => card is ManifestedCreature m ? m.UnderlyingCard : card;
+
+    /// <summary>The name to show <paramref name="viewer"/> for <paramref name="card"/>:
+    /// its name, or for a face-down permanent the represented card's name to
+    /// whoever may look at it and <see cref="FaceDownName"/> to everyone else.</summary>
+    internal static string DisplayName(ICard? card, Player? viewer)
+    {
+        if (card is null) return "";
+        if (!IsFaceDown(card)) return card.Name;
+        return MayLookAt(card, viewer) ? RepresentedCard(card).Name : FaceDownName;
+    }
+
+    /// <summary>Snapshot of <paramref name="card"/> as <paramref name="viewer"/>
+    /// may see it (CR 708 face-down masking; null = all revealed).</summary>
+    internal static CardSnapshotDto SnapshotCard(ICard card, Player? viewer) =>
+        SnapshotCard(card, includeImprints: true, viewer);
 
     /// <summary>
     /// Single-card snapshot shared with prompt envelopes (e.g.
@@ -116,7 +149,7 @@ public static class StateSnapshotter
     /// entry point.
     /// </summary>
     internal static CardSnapshotDto SnapshotCard(ICard card) =>
-        SnapshotCard(card, includeImprints: true);
+        SnapshotCard(card, includeImprints: true, viewer: null);
 
     /// <param name="includeImprints">When true, populate
     /// <see cref="CardSnapshotDto.ImprintedCards"/> from
@@ -124,17 +157,21 @@ public static class StateSnapshotter
     /// "with" this permanent, so a client renders them UNDER it. False on the
     /// nested pass so the snapshot stays SHALLOW (an imprinted card never
     /// carries its own imprints).</param>
-    private static CardSnapshotDto SnapshotCard(ICard card, bool includeImprints)
+    private static CardSnapshotDto SnapshotCard(ICard card, bool includeImprints, Player? viewer)
     {
         var f = BuildPermanentFields(card);
 
+        // CR 702.49 — imprinted cards are exiled face up: visible to all.
         IReadOnlyList<CardSnapshotDto> imprinted = System.Array.Empty<CardSnapshotDto>();
         if (includeImprints && card is Permanent perm && perm.ImprintedCards.Count > 0)
         {
             imprinted = perm.ImprintedCards
-                .Select(c => SnapshotCard(c, includeImprints: false))
+                .Select(c => SnapshotCard(c, includeImprints: false, viewer))
                 .ToList();
         }
+
+        if (card is Permanent { IsFaceDown: true } faceDown)
+            return SnapshotFaceDown(faceDown, f, imprinted, viewer);
 
         return new CardSnapshotDto(
             InstanceId: card.InstanceId,
@@ -149,6 +186,44 @@ public static class StateSnapshotter
             ProducedManaColors: f.ProducedManaColors,
             Counters: f.Counters,
             ImprintedCards: imprinted);
+    }
+
+    /// <summary>
+    /// CR 708.2 — what a face-down permanent is: a 2/2 creature with no name,
+    /// text, subtypes, colour or mana cost. Every viewer gets the permanent's
+    /// own state (id, its computed P/T, tapped, summoning sickness, counters,
+    /// attachments) and <see cref="CardSnapshotDto.IsFaceDown"/>. Whoever may
+    /// look at it (CR 708.6: its controller; the spectator view) also gets the
+    /// represented card's name, the permanent's real abilities (so it can be
+    /// turned face up) and the card itself in <see cref="CardSnapshotDto.FaceDownCard"/>.
+    /// Anyone else sees only the abilities its face-down state grants
+    /// (e.g. cloak's ward {2}, CR 702.168a), never "turn face up" (which would
+    /// tell them it is a creature card).
+    /// </summary>
+    private static CardSnapshotDto SnapshotFaceDown(
+        Permanent perm, PermanentFields f, IReadOnlyList<CardSnapshotDto> imprinted, Player? viewer)
+    {
+        var looks = MayLookAt(perm, viewer);
+        var represented = RepresentedCard(perm);
+        return new CardSnapshotDto(
+            InstanceId: perm.InstanceId,
+            Name: looks ? represented.Name : FaceDownName,
+            ManaCost: "",
+            Types: new[] { nameof(CardType.Creature) },
+            Power: f.Power ?? 2,
+            Toughness: f.Toughness ?? 2,
+            Tapped: f.Tapped,
+            SummoningSickness: f.SummoningSickness,
+            Abilities: looks
+                ? f.Abilities
+                : perm.EffectiveAbilities.Where(a => a is not FaceDownActivatedAbility).Select(SnapshotAbility).ToList(),
+            ProducedManaColors: "",
+            Counters: f.Counters,
+            ImprintedCards: imprinted,
+            IsFaceDown: true,
+            FaceDownCard: looks && !ReferenceEquals(represented, perm)
+                ? SnapshotCard(represented, includeImprints: false, viewer: null)
+                : null);
     }
 
     /// <summary>
@@ -342,7 +417,7 @@ public static class StateSnapshotter
 
     private static StackObjectDto SnapshotStackObject(IStackObject obj, Player? viewer,
         IReadOnlyDictionary<IStackObject, List<Guid>>? entryIds) =>
-        SnapshotStackObjectCore(obj) with { Targets = SnapshotTargets(obj, viewer, entryIds) };
+        SnapshotStackObjectCore(obj, viewer) with { Targets = SnapshotTargets(obj, viewer, entryIds) };
 
     // Same shape as a pushed spell (SnapshotStackObjectCore), flagged.
     private static StackObjectDto SnapshotBeingCast(Majik.Core.Stack.CastInProgress cast, Player? viewer,
@@ -415,7 +490,7 @@ public static class StateSnapshotter
         };
     }
 
-    private static StackObjectDto SnapshotStackObjectCore(IStackObject obj) => obj switch
+    private static StackObjectDto SnapshotStackObjectCore(IStackObject obj, Player? viewer) => obj switch
     {
         ISpell spell => new StackObjectDto(
             Id: spell.Id,
@@ -426,7 +501,7 @@ public static class StateSnapshotter
             Id: t.Id,
             Kind: "TriggeredAbility",
             ControllerId: t.Controller.Id,
-            Description: (t.Source as ICard)?.Name + " trigger"),
+            Description: DisplayName(t.Source as ICard, viewer) + " trigger"),
         IActivatedAbility a => new StackObjectDto(
             Id: a.Id,
             Kind: "ActivatedAbility",
@@ -436,14 +511,23 @@ public static class StateSnapshotter
             // Falls back to the source name alone (then to "ability") when
             // the wrapper carries no effects, so a half-built stub still
             // produces something more useful than the generic "ability"
-            // label clients saw before.
-            Description: BuildActivatedAbilityDescription(a)),
+            // label clients saw before. CR 708.2 — an ability of a face-down
+            // permanent is not described to a player who may not look at it
+            // (its text could name the card, e.g. "Turn face up: restore X").
+            Description: HidesFaceDownSource(a.Source, viewer)
+                ? FaceDownName + " ability"
+                : BuildActivatedAbilityDescription(a, viewer)),
         _ => new StackObjectDto(obj.Id, obj.GetType().Name, null, obj.GetType().Name),
     };
 
-    private static string BuildActivatedAbilityDescription(IActivatedAbility a)
+    /// <summary>True when <paramref name="source"/> is a face-down permanent
+    /// that <paramref name="viewer"/> may not look at (CR 708.2 / 708.6).</summary>
+    internal static bool HidesFaceDownSource(object? source, Player? viewer) =>
+        source is ICard c && IsFaceDown(c) && !MayLookAt(c, viewer);
+
+    private static string BuildActivatedAbilityDescription(IActivatedAbility a, Player? viewer)
     {
-        var sourceName = (a.Source as ICard)?.Name;
+        var sourceName = a.Source is ICard src ? DisplayName(src, viewer) : null;
         // IActivatedAbility does not expose Effects on the interface; the
         // concrete ActivatedAbility does. Cast and read the first effect's
         // description when present.

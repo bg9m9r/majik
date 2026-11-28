@@ -134,12 +134,12 @@ public static class EventPayloadBuilder
             StackId: x.EntryId ?? x.StackObject.Id,
             ControllerId: x.StackObject.Controller.Id,
             Kind: StackKind(x.StackObject),
-            Description: StackDescription(x.StackObject))),
+            Description: StackDescription(x.StackObject, viewer))),
         StackObjectResolvedEvent x => SerializeStack(new StackObjectPayload(
             StackId: x.EntryId ?? x.StackObject.Id,
             ControllerId: x.StackObject.Controller.Id,
             Kind: StackKind(x.StackObject),
-            Description: StackDescription(x.StackObject))),
+            Description: StackDescription(x.StackObject, viewer))),
         // Per-creature / per-player damage payload (CR 119, CR 510).
         // Frontend needs source + target Guids so it can draw a damage
         // animation from the attacker (or spell) to the victim — life
@@ -170,12 +170,12 @@ public static class EventPayloadBuilder
         // source) projects Guid.Empty / "" so the wire keys are always present.
         ContinuousEffectAddedEvent x => Serialize(new ContinuousEffectAddedPayload(
             SourceInstanceId: x.Effect.Source?.InstanceId ?? Guid.Empty,
-            SourceName: x.Effect.Source?.Name ?? "",
+            SourceName: DisplayName(x.Effect.Source, viewer),
             Layer: x.Effect.Layer.ToString(),
             Description: x.Effect.Description)),
         ContinuousEffectRemovedEvent x => Serialize(new ContinuousEffectRemovedPayload(
             SourceInstanceId: x.Effect.Source?.InstanceId ?? Guid.Empty,
-            SourceName: x.Effect.Source?.Name ?? "",
+            SourceName: DisplayName(x.Effect.Source, viewer),
             Layer: x.Effect.Layer.ToString(),
             Description: x.Effect.Description)),
         // CR 602 — activated ability put on the stack. Carries controller +
@@ -184,7 +184,7 @@ public static class EventPayloadBuilder
         AbilityActivatedEvent x => Serialize(new AbilityActivatedPayload(
             ControllerId: x.Ability.Controller.Id,
             SourceInstanceId: (x.Ability.Source as ICard)?.InstanceId ?? Guid.Empty,
-            SourceName: (x.Ability.Source as ICard)?.Name ?? "")),
+            SourceName: DisplayName(x.Ability.Source as ICard, viewer))),
         // Long-tail log / animation payloads: ids plus display names, no state
         // lookups, no layer recomputation (names and ids are plain reads).
         PermanentTappedEvent x => Serialize(new PermanentTappedPayload(
@@ -287,7 +287,7 @@ public static class EventPayloadBuilder
     /// to the wrong seat.</summary>
     public static bool RequiresPerViewerMasking(GameEvent e) => e switch
     {
-        CardMovedEvent x => BothZonesHidden(x.FromZone, x.ToZone),
+        CardMovedEvent x => BothZonesHidden(x.FromZone, x.ToZone) || EntersFaceDown(x),
         CardDrawnEvent => true, // library → hand: always both hidden
         // Library-bound cards are shown only to the surveilling player.
         SurveilEvent => true,
@@ -301,23 +301,35 @@ public static class EventPayloadBuilder
         BlockersDeclaredEvent x => x.Combat.GetAllBlockers().Any(b => IsFaceDown(b.Creature)),
         TriggeredAbilityCounteredEvent x => IsFaceDown(x.Ability.Source as ICard),
         ManaAbilityActivatedEvent x => IsFaceDown(x.Source as ICard),
+        AbilityActivatedEvent x => IsFaceDown(x.Ability.Source as ICard),
+        ContinuousEffectAddedEvent x => IsFaceDown(x.Effect.Source),
+        ContinuousEffectRemovedEvent x => IsFaceDown(x.Effect.Source),
+        StackObjectAddedEvent x => IsFaceDown(AbilitySource(x.StackObject)),
+        StackObjectResolvedEvent x => IsFaceDown(AbilitySource(x.StackObject)),
         _ => false,
     };
 
     /// <summary>Shown for a face-down permanent to anyone but its controller.</summary>
-    internal const string FaceDownName = "Face-down permanent";
+    internal const string FaceDownName = StateSnapshotter.FaceDownName;
 
-    private static bool IsFaceDown(ICard? card) => card is Permanent { IsFaceDown: true };
+    private static bool IsFaceDown(ICard? card) => StateSnapshotter.IsFaceDown(card);
+
+    private static ICard? AbilitySource(IStackObject obj) => obj switch
+    {
+        ITriggeredAbility t => t.Source as ICard,
+        IActivatedAbility a => a.Source as ICard,
+        _ => null,
+    };
 
     // CR 708.2 / 708.6 — a face-down permanent has no name; its controller may
-    // look at it. A null viewer is the all-revealed (spectator/debug) view.
-    private static string DisplayName(ICard? card, Player? viewer)
-    {
-        if (card is null) return "";
-        if (card is Permanent { IsFaceDown: true } p && viewer != null && !ReferenceEquals(p.Controller, viewer))
-            return FaceDownName;
-        return card.Name;
-    }
+    // look at it (and sees the card it represents). A null viewer is the
+    // all-revealed (spectator/debug) view. Same rule as the snapshot.
+    private static string DisplayName(ICard? card, Player? viewer) => StateSnapshotter.DisplayName(card, viewer);
+
+    // CR 708.2 — a face-down permanent entering the battlefield (manifest,
+    // cloak): its payload is the face-down 2/2 for anyone who may not look at it.
+    private static bool EntersFaceDown(CardMovedEvent x) =>
+        x.ToZone == ZoneType.Battlefield && IsFaceDown(x.Card);
 
     private static object TargetObject(Majik.Core.Targeting.ITarget t)
         => t is Majik.Core.Targeting.Target { TargetObject: { } o } ? o : t;
@@ -402,6 +414,28 @@ public static class EventPayloadBuilder
         // place instead of forcing a full GET /state. A → Battlefield move
         // always touches a public zone, so it is already the revealed branch —
         // the enrichment never appears on a masked variant.
+        if (EntersFaceDown(x))
+        {
+            // CR 708.2 — the same face-down view the snapshot gives this viewer.
+            var fd = StateSnapshotter.SnapshotCard(x.Card, viewer);
+            return SerializeCard(new CardMovedPayload(
+                From: x.FromZone.ToString(),
+                To: x.ToZone.ToString(),
+                OwnerId: ownerId,
+                CardId: fd.InstanceId,
+                CardName: fd.Name,
+                ManaCost: fd.ManaCost,
+                Types: fd.Types,
+                Power: fd.Power,
+                Toughness: fd.Toughness,
+                Tapped: fd.Tapped,
+                SummoningSickness: fd.SummoningSickness,
+                Abilities: fd.Abilities,
+                ProducedManaColors: fd.ProducedManaColors,
+                Counters: fd.Counters,
+                IsFaceDown: true));
+        }
+
         var f = StateSnapshotter.BuildPermanentFields(x.Card);
         return SerializeCard(new CardMovedPayload(
             From: x.FromZone.ToString(),
@@ -493,10 +527,10 @@ public static class EventPayloadBuilder
         _ => obj.GetType().Name,
     };
 
-    private static string StackDescription(IStackObject obj) => obj switch
+    private static string StackDescription(IStackObject obj, Player? viewer) => obj switch
     {
         ISpell spell => spell.Card?.Name ?? "",
-        ITriggeredAbility t => ((t.Source as ICard)?.Name ?? "") + " trigger",
+        ITriggeredAbility t => DisplayName(t.Source as ICard, viewer) + " trigger",
         IActivatedAbility => "ability",
         _ => obj.GetType().Name,
     };

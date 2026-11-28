@@ -437,6 +437,12 @@
               "boolean"
             ]
           },
+          "isFaceDown": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
           "manaCost": {
             "type": [
               "null",
@@ -572,6 +578,16 @@
               "object"
             ]
           },
+          "faceDownCard": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CardSnapshotDto"
+              }
+            ]
+          },
           "imprintedCards": {
             "items": {
               "$ref": "#/components/schemas/CardSnapshotDto"
@@ -584,6 +600,10 @@
           "instanceId": {
             "format": "uuid",
             "type": "string"
+          },
+          "isFaceDown": {
+            "default": false,
+            "type": "boolean"
           },
           "manaCost": {
             "type": "string"

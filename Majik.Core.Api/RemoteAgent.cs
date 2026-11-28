@@ -827,12 +827,12 @@ public sealed class RemoteAgent : IPlayerAgent
         _ => new Guid(index + 1, 0, 0, SyntheticOptionTail),
     };
 
-    private static ChoiceOptionDto DescribeChoiceOption(object candidate, int index, Func<object, string?>? label)
+    private static ChoiceOptionDto DescribeChoiceOption(object candidate, int index, Func<object, string?>? label, Player viewer)
     {
         var custom = label?.Invoke(candidate);
         return candidate switch
         {
-            ICard card => new ChoiceOptionDto(card.InstanceId, "Card", custom ?? card.Name),
+            ICard card => new ChoiceOptionDto(card.InstanceId, "Card", custom ?? StateSnapshotter.DisplayName(card, viewer)),
             Player player => new ChoiceOptionDto(player.Id, "Player", custom ?? player.Name),
             Majik.Core.Spells.ISpell spell => new ChoiceOptionDto(spell.Id, "Spell", custom ?? spell.Card.Name),
             _ => new ChoiceOptionDto(ChoiceOptionId(candidate, index), "Value", custom ?? candidate.ToString() ?? ""),
@@ -859,9 +859,9 @@ public sealed class RemoteAgent : IPlayerAgent
     };
 
     // CR 601.2d — human-readable label for a divide-damage target row.
-    private static string DamageDivisionTargetName(object target) => target switch
+    private static string DamageDivisionTargetName(object target, Player viewer) => target switch
     {
-        ICard card => card.Name,
+        ICard card => StateSnapshotter.DisplayName(card, viewer),
         Player player => player.Name,
         _ => "(unknown)",
     };
@@ -1068,7 +1068,8 @@ public sealed class RemoteAgent : IPlayerAgent
         {
             var cardSnapshots = candidates
                 .OfType<ICard>()
-                .Select(StateSnapshotter.SnapshotCard)
+                // CR 708.2 — an opponent's face-down permanent stays masked.
+                .Select(c => StateSnapshotter.SnapshotCard(c, _player))
                 .ToList();
             // CR 115 — ship players in the pool too (previously dropped by the
             // card-only snapshot), so the portal can render a player HUD as a
@@ -1178,7 +1179,8 @@ public sealed class RemoteAgent : IPlayerAgent
         // bespoke views (gift, etc.) cover those.
         var cardSnapshots = live
             .OfType<ICard>()
-            .Select(StateSnapshotter.SnapshotCard)
+            // CR 708.2 — an opponent's face-down permanent stays masked.
+            .Select(c => StateSnapshotter.SnapshotCard(c, _player))
             .ToList();
         // Every option — cards, players, stack spells and value sentinels (a
         // colour, a card name, a mode index) — gets an answerable id on
@@ -1189,7 +1191,7 @@ public sealed class RemoteAgent : IPlayerAgent
             .OfType<Player>()
             .Select(p => new Majik.Core.Api.Dtos.PlayerCandidateDto(p.Id, p.Name, p.LifeTotal))
             .ToList();
-        var options = live.Select((c, i) => DescribeChoiceOption(c, i, label)).ToList();
+        var options = live.Select((c, i) => DescribeChoiceOption(c, i, label, _player)).ToList();
         var payload = new PromptPayload(
             Candidates: cardSnapshots.Count > 0 ? cardSnapshots : null,
             Label: req.Description,
@@ -1878,7 +1880,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var targetRows = targets
             .Select(t => new DamageDivisionTargetDto(
                 DamageDivisionTargetId(t),
-                DamageDivisionTargetName(t)))
+                DamageDivisionTargetName(t, _player)))
             .ToList();
         _pendingDamageDivisionTargets = targets;
         _pendingPayload = new PromptPayload(

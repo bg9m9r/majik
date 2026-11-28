@@ -97,7 +97,18 @@ public sealed record CardSnapshotDto(
     // that currently imprint cards; defaults to an empty list everywhere else
     // (and for non-permanents). NOT recursive — an imprinted card's own
     // ImprintedCards is left empty.
-    IReadOnlyList<CardSnapshotDto>? ImprintedCards = null);
+    IReadOnlyList<CardSnapshotDto>? ImprintedCards = null,
+    // CR 708.2 — true for a face-down permanent (manifest, manifest dread,
+    // cloak). To a player who may not look at it the DTO is only what the rules
+    // allow: Name "Face-down permanent" (the same string the event payloads
+    // use), no mana cost, Types ["Creature"], its P/T (normally 2/2, plus
+    // whatever modifies it), no mana colours and only the abilities its
+    // face-down state grants; tapped, counters and attachments stay visible.
+    bool IsFaceDown = false,
+    // CR 708.6 — for the face-down permanent's controller (and the all-revealed
+    // spectator view) only: the card it represents, so the controller can look
+    // at it. Null for everyone else, and for face-up cards.
+    CardSnapshotDto? FaceDownCard = null);
 
 public sealed record AbilityDto(string Kind, string Description, Guid? Id = null);
 

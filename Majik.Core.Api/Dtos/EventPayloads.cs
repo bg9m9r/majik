@@ -53,7 +53,12 @@ public sealed record CardMovedPayload(
     IReadOnlyList<AbilityDto>? Abilities = null,
     string? ProducedManaColors = null,
     IReadOnlyDictionary<string, int>? Counters = null,
-    bool? Hidden = null);
+    bool? Hidden = null,
+    // CR 708.2 — true when a face-down permanent enters the battlefield
+    // (manifest, cloak). The card fields are then what the viewer may see:
+    // to anyone but its controller, "Face-down permanent", a 2/2 creature
+    // with no mana cost and no abilities. Omitted otherwise.
+    bool? IsFaceDown = null);
 
 /// <summary>
 /// CR 120 — a player drawing a card (Library → Hand). Dual-shape: the
