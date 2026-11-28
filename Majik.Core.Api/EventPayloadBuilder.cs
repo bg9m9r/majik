@@ -258,7 +258,7 @@ public static class EventPayloadBuilder
             PlayerId: x.Player.Id,
             SourceId: (x.Source as ICard)?.InstanceId,
             SourceName: DisplayName(x.Source as ICard, viewer),
-            Mana: x.ManaGenerated.ToString())),
+            Mana: WireMana.Amount(x.ManaGenerated))),
         LifePaidEvent x => Serialize(new LifePaidPayload(
             PlayerId: x.Player.Id,
             Amount: x.Amount,
@@ -266,7 +266,7 @@ public static class EventPayloadBuilder
         CostsPaidEvent x => Serialize(new CostsPaidPayload(
             StackId: x.StackObject.Id,
             ControllerId: x.StackObject.Controller.Id,
-            Costs: x.Costs.Select(c => c.Description).ToList())),
+            Costs: x.Costs.Select(c => c is Majik.Core.Costs.ManaCostCost m ? WireMana.Amount(m.Cost) : c.Description).ToList())),
         TargetsChosenEvent x => Serialize(new TargetsChosenPayload(
             StackId: x.StackObject.Id,
             ControllerId: x.StackObject.Controller.Id,
@@ -462,7 +462,7 @@ public static class EventPayloadBuilder
                 OwnerId: revealed.Owner?.Id ?? ownerId,
                 CardId: x.Card.InstanceId,
                 CardName: revealed.Name,
-                ManaCost: revealed.ManaCost,
+                ManaCost: WireMana.Cost(revealed.ManaCost),
                 Types: revealed.CardTypes.Select(t => t.ToString()).ToList(),
                 Power: rf.Power,
                 Toughness: rf.Toughness,
@@ -496,7 +496,7 @@ public static class EventPayloadBuilder
                 OwnerId: ownerId,
                 CardId: x.Card.InstanceId,
                 CardName: x.Card.Name,
-                ManaCost: x.Card.ManaCost,
+                ManaCost: WireMana.Cost(x.Card.ManaCost),
                 Types: x.Card.CardTypes.Select(t => t.ToString()).ToList(),
                 IsFaceDown: true));
         }
@@ -511,7 +511,7 @@ public static class EventPayloadBuilder
                 OwnerId: ownerId,
                 CardId: fd.InstanceId,
                 CardName: fd.Name,
-                ManaCost: fd.ManaCost,
+                ManaCost: WireMana.Cost(fd.ManaCost),
                 Types: fd.Types,
                 Power: fd.Power,
                 Toughness: fd.Toughness,
@@ -530,7 +530,7 @@ public static class EventPayloadBuilder
             OwnerId: ownerId,
             CardId: x.Card.InstanceId,
             CardName: x.Card.Name,
-            ManaCost: x.Card.ManaCost,
+            ManaCost: WireMana.Cost(x.Card.ManaCost),
             Types: x.Card.CardTypes.Select(t => t.ToString()).ToList(),
             Power: f.Power,
             Toughness: f.Toughness,
@@ -571,7 +571,7 @@ public static class EventPayloadBuilder
             PlayerId: ownerId,
             CardId: x.Card.InstanceId,
             CardName: x.Card.Name,
-            ManaCost: x.Card.ManaCost,
+            ManaCost: WireMana.Cost(x.Card.ManaCost),
             Types: x.Card.CardTypes.Select(t => t.ToString()).ToList()));
     }
 

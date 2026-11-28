@@ -30,7 +30,7 @@ public class EventPayloadTests
         payload.GetProperty("to").GetString().Should().Be("Stack");
         // Enriched fields the portal patch path needs to render the
         // destination zone without refetching /state:
-        payload.GetProperty("manaCost").GetString().Should().Be("R");
+        payload.GetProperty("manaCost").GetString().Should().Be("{R}", "C17: brace form on the wire (CR 107.4)");
         payload.TryGetProperty("hidden", out _).Should().BeFalse();
     }
 

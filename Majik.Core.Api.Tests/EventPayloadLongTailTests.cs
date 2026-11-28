@@ -196,7 +196,7 @@ public class EventPayloadLongTailTests
         G(p, "playerId").Should().Be(_alice.Id);
         G(p, "sourceId").Should().Be(land.InstanceId);
         S(p, "sourceName").Should().Be("Mountain");
-        S(p, "mana").Should().Be(ManaCost.Parse("R").ToString());
+        S(p, "mana").Should().Be("{R}", "C17: mana on the wire is in brace form (CR 107.4)");
     }
 
     [Fact]
@@ -365,5 +365,40 @@ public class EventPayloadLongTailTests
         byPlayer.GetProperty("sourceName").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
         EventPayloadBuilder.RequiresPerViewerMasking(
             new DamageDealtEvent(bolt, null, null, _bob, 3, DamageType.Spell)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("R", "{R}")]
+    [InlineData("GC", "{C}{G}")]
+    [InlineData("{2}", "{2}")]
+    public void ManaAbilityActivated_ManaIsInBraceForm(string produced, string wire)
+    {
+        var land = Put(new Land("Some Land"), _alice, ZoneType.Battlefield);
+        var ability = new Majik.Core.Abilities.ManaAbility(land, _alice, ManaCost.Parse(produced));
+        S(EventPayloadBuilder.Build(new ManaAbilityActivatedEvent(ability, _alice, ManaCost.Parse(produced))), "mana")
+            .Should().Be(wire);
+    }
+
+    [Fact]
+    public void CostsPaid_AManaCost_IsInBraceForm()
+    {
+        var bolt = Put(new Instant("Lightning Bolt", "{R}"), _alice, ZoneType.Stack);
+        var spell = new Spell(bolt, _alice);
+        var p = EventPayloadBuilder.Build(new CostsPaidEvent(spell, new ICost[] { new ManaCostCost("2R") }));
+        p.GetProperty("costs").EnumerateArray().Select(e => e.GetString()).Should().Equal("{2}{R}");
+    }
+
+    [Theory]
+    [InlineData("1WU", "{1}{W}{U}")]
+    [InlineData("{2}{R}", "{2}{R}")]
+    [InlineData("{R/G}{R/G}", "{R/G}{R/G}")]
+    [InlineData("{1}{R} // {2}{U}", "{1}{R} // {2}{U}")]
+    [InlineData("", "")]
+    public void ACardsManaCost_IsInBraceForm_InSnapshotsAndMoves(string printed, string wire)
+    {
+        var bear = Put(new Creature("Bear", printed, 2, 2), _alice, ZoneType.Battlefield);
+        Majik.Core.Api.StateSnapshotter.SnapshotCard(bear, _alice).ManaCost.Should().Be(wire);
+        var moved = EventPayloadBuilder.Build(new CardMovedEvent(bear, ZoneType.Battlefield, ZoneType.Graveyard));
+        (moved.TryGetProperty("manaCost", out var mc) ? mc.GetString() ?? "" : "").Should().Be(wire);
     }
 }

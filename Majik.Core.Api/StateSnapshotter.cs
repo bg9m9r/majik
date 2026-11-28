@@ -210,7 +210,7 @@ public static class StateSnapshotter
         return new CardSnapshotDto(
             InstanceId: card.InstanceId,
             Name: card.Name,
-            ManaCost: card.ManaCost,
+            ManaCost: WireMana.Cost(card.ManaCost),
             Types: EffectiveTypes(card).Select(t => t.ToString()).ToList(),
             Power: f.Power,
             Toughness: f.Toughness,
