@@ -4592,6 +4592,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchError"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "tags": [

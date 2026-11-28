@@ -99,6 +99,7 @@ public sealed class MatchServiceReplayTests : IClassFixture<TestMongoFixture>
             Array.Empty<BotDecisionAlternative>(),
             new Dictionary<string, string>()));
         buf.RecordEvent(matchId, FakeEvent("GameStateChangedEvent"));
+        buf.Seal(matchId); // the match ended
 
         var result = await svc.GetReplayAsync("stub-alice", matchId, CancellationToken.None);
 
@@ -117,9 +118,26 @@ public sealed class MatchServiceReplayTests : IClassFixture<TestMongoFixture>
         // check is "isParty", same as GetMatch on invite matches.
         var (svc, buf, matchId) = await NewMatchAsync();
         buf.RecordEvent(matchId, FakeEvent("TurnStartedEvent"));
+        buf.Seal(matchId); // the match ended
         var result = await svc.GetReplayAsync("stub-bob", matchId, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
         result.Value!.EntryCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetReplay_DuringALiveMatch_IsRefused()
+    {
+        // The buffer holds the full-information stream (both hands, the
+        // library order a search reveals to one player). While the match is
+        // live, that would show a seated player the opponent's hidden cards,
+        // so the full replay is only for a finished (sealed) match.
+        var (svc, buf, matchId) = await NewMatchAsync();
+        buf.RecordEvent(matchId, FakeEvent("TurnStartedEvent"));
+
+        var result = await svc.GetReplayAsync("stub-alice", matchId, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Error.Should().Be("match-in-progress");
     }
 
     [Fact]
