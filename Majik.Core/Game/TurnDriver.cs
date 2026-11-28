@@ -1507,9 +1507,27 @@ public sealed class TurnDriver
             // boundary instead of dying immediately.
             checkStateBasedActions: () => _sba.CheckStateBasedActions(
                 _players,
-                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()));
+                _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()),
+            spellDefinitions: _spellDefResolver == null ? null : SpellDefinitionFor);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
+    }
+
+    // CR 601.2c — the definition the cast dispatcher would resolve for a card,
+    // memoized per card object and caster: a priority context reads it to see
+    // whether a spell's required targets exist, once per prompt per card, and
+    // the oracle binder is too slow to rerun that often. Only target requests
+    // are read from it; the cast itself resolves its own definition.
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ICard, Tuple<Player, Majik.Core.Game.SpellDefinition?>> _definitionMemo = new();
+
+    private Majik.Core.Game.SpellDefinition? SpellDefinitionFor(ICard card, Player caster)
+    {
+        if (_definitionMemo.TryGetValue(card, out var hit) && ReferenceEquals(hit.Item1, caster)) return hit.Item2;
+        Majik.Core.Game.SpellDefinition? def;
+        try { def = _spellDefResolver!(card, caster, _stack); }
+        catch (InvalidOperationException) { def = null; }
+        _definitionMemo.AddOrUpdate(card, Tuple.Create(caster, def));
+        return def;
     }
 
     private async Task RunCombat(Player attacker, Player defender, CancellationToken ct)

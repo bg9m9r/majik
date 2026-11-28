@@ -185,7 +185,8 @@ public static class PriorityLegalActions
                     break;
                 case LoyaltyAbility loyalty:
                     // CR 606.3 — sorcery speed, once per turn, payable loyalty.
-                    if (sorceryWindow && loyalty.CanActivate())
+                    if (sorceryWindow && loyalty.CanActivate()
+                        && Targeting.TargetFeasibility.HasLegalTargets(loyalty.TargetRequests, ctx))
                     {
                         into.Add(new AbilityRefDto(permanent.InstanceId, loyalty.Id, LoyaltyKind));
                     }
@@ -221,7 +222,11 @@ public static class PriorityLegalActions
         }
         // CR 602.2b / 601.2h — DispatchActivate's own payability gate (floating
         // pool for mana; {T} via AdditionalCost → CR 302.6 summoning sickness).
-        return new CostPayment().CanPayCosts(self, ability.Costs, ManaSpendContext.ForAbilityCost(source));
+        if (!new CostPayment().CanPayCosts(self, ability.Costs, ManaSpendContext.ForAbilityCost(source))) return false;
+        // CR 602.2b — an ability that requires targets is activated only if
+        // enough legal targets exist (same pools the activation prompts with).
+        return ability is not ActivatedAbility withTargets
+            || Targeting.TargetFeasibility.HasLegalTargets(withTargets.TargetRequests, ctx);
     }
 
     private static bool IsCastable(
@@ -246,7 +251,14 @@ public static class PriorityLegalActions
         {
             return false;
         }
-        return CanAfford(self, cost, sources);
+        if (!CanAfford(self, cost, sources)) return false;
+
+        // CR 601.2c — a spell that requires targets can be cast only if enough
+        // legal targets exist; for a modal spell, enough modes must have them.
+        // The definition is the one the cast dispatcher resolves (memoized by
+        // the priority loop); without a resolver the check is skipped.
+        var definition = ctx.SpellDefinitions?.Invoke(card, self);
+        return definition is null || Targeting.TargetFeasibility.HasLegalTargets(definition, ctx);
     }
 
     /// <summary>One untapped permanent's mana capability (each source taps once).</summary>
@@ -287,7 +299,7 @@ public static class PriorityLegalActions
         player.ManaPool.Total + ManaSources(player, layers).Sum(s => s.MaxTotal);
 
     private static readonly ManaColor[] Colors =
-        { ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green };
+        { ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green, ManaColor.Colorless };
 
     private static int Amount(ManaCost m, ManaColor color) => color switch
     {
@@ -296,6 +308,7 @@ public static class PriorityLegalActions
         ManaColor.Black => m.Black,
         ManaColor.Red => m.Red,
         ManaColor.Green => m.Green,
+        ManaColor.Colorless => m.Colorless,
         _ => 0,
     };
 
@@ -306,8 +319,9 @@ public static class PriorityLegalActions
     /// dual land is not "spent" on the wrong colour the way the greedy auto-pay
     /// can be); generic takes any leftover output (CR 106.1c / 107.4b).
     /// Approximations: hybrid / Phyrexian costs get a colour-blind total check
-    /// with Phyrexian pips payable by 2 life (CR 107.4f); {C} pips are treated
-    /// as generic; spend restrictions on floating mana and the "spend as any
+    /// with Phyrexian pips payable by 2 life (CR 107.4f); {C} pips are matched
+    /// like a colour (CR 107.4c, as auto-pay does); spend restrictions on
+    /// floating mana and the "spend as any
     /// colour" permission are ignored; sources whose abilities have extra
     /// costs (filter lands, painlands' life) count as their printed output.
     /// </summary>
@@ -335,7 +349,9 @@ public static class PriorityLegalActions
             need[i] = Math.Max(0, required - floating);
             poolUsedForColored += Math.Min(floating, required);
         }
-        var genericNeeded = Math.Max(0, cost.Generic - (pool.Total - poolUsedForColored));
+        // CR 107.4c — {C} pips are a tagged subset of Generic, matched above
+        // as their own "colour"; only the rest of Generic takes any mana.
+        var genericNeeded = Math.Max(0, cost.Generic - cost.Colorless - (pool.Total - poolUsedForColored));
 
         var used = new bool[sources.Count];
         return AssignColored(sources, need, 0, used, genericNeeded);
@@ -348,6 +364,7 @@ public static class PriorityLegalActions
         ManaColor.Black => pool.Black,
         ManaColor.Red => pool.Red,
         ManaColor.Green => pool.Green,
+        ManaColor.Colorless => pool.Colorless,
         _ => 0,
     };
 

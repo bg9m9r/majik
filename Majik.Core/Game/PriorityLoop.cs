@@ -71,6 +71,7 @@ public sealed class PriorityLoop
     // BEFORE the trigger drain (_asyncTriggerDrain) so SBAs fire, then any
     // pending triggers go on the stack, then the player gets priority.
     private readonly Action? _checkStateBasedActions;
+    private readonly Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? _spellDefinitions;
     private Player? _activePlayer;
 
     public PriorityLoop(
@@ -91,11 +92,13 @@ public sealed class PriorityLoop
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
         Func<TurnState?>? turnStateAccessor = null,
-        Action? checkStateBasedActions = null)
+        Action? checkStateBasedActions = null,
+        Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? spellDefinitions = null)
     {
         _castDispatcher = castDispatcher;
         _asyncTriggerDrain = asyncTriggerDrain;
         _checkStateBasedActions = checkStateBasedActions;
+        _spellDefinitions = spellDefinitions;
         // CR 603.3 — when an agent-aware async drain is supplied, this loop
         // owns the drain; suppress PriorityManager's built-in sync drain so
         // pending targeted triggers are NOT auto-picked first-eligible before
@@ -530,7 +533,10 @@ public sealed class PriorityLoop
             && _landDropTracker.CanPlayLand(self, activePlayer, ph, _stack.IsEmpty, out _);
         return new(
             self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable,
-            turnState: _turnStateAccessor?.Invoke());
+            turnState: _turnStateAccessor?.Invoke())
+        {
+            SpellDefinitions = _spellDefinitions,
+        };
     }
 
     // PLAN 01 — resolve the agent for a stack object's controller when

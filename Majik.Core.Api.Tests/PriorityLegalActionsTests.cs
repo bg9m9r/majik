@@ -332,4 +332,101 @@ public class PriorityLegalActionsTests
         (RemoteAgent)typeof(GameFacade)
             .GetField("_aliceAgent", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .GetValue(facade)!;
+
+    // ---- CR 601.2c / 602.2b: a cast or activation is offered only when its
+    // required targets exist (same pools the cast flow prompts with).
+
+    private static Majik.Core.Players.Agents.TargetRequest Needs(string description, Func<IReadOnlyList<object>> pool, int min = 1, int? modeIndex = null) =>
+        new(description, min, Math.Max(1, min), Array.Empty<object>(), CandidateGatherer: _ => pool(), ModeIndex: modeIndex);
+
+    private static SpellDefinition Def(params Majik.Core.Players.Agents.TargetRequest[] requests) =>
+        new(Array.Empty<string>(), false, requests, _ => Array.Empty<Majik.Core.Abilities.IEffect>());
+
+    private GameContext CtxWith(Func<ICard, Player, SpellDefinition?> definitions) =>
+        new(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 3, StepStateType.PreCombatMain, _stack, landPlayAvailable: true)
+        {
+            SpellDefinitions = definitions,
+        };
+
+    [Fact]
+    public void ASpellWhoseRequiredTargetDoesNotExist_IsNotCastable_AndIsOnceOneExists()
+    {
+        UntappedBasic("Island", "U");
+        UntappedBasic("Island", "U");
+        var counterspell = InHand(new Instant("Counterspell", "{U}{U}"));
+        var spells = new List<object>();
+        var def = Def(Needs("target spell", () => spells));
+
+        PriorityLegalActions.Build(CtxWith((_, _) => def)).CastableCardIds
+            .Should().NotContain(counterspell.InstanceId, "CR 601.2c — with no spell to target it cannot be cast");
+
+        spells.Add(new object());
+        PriorityLegalActions.Build(CtxWith((_, _) => def)).CastableCardIds
+            .Should().Contain(counterspell.InstanceId);
+    }
+
+    [Fact]
+    public void AnUpToRequest_NeedsNoCandidate()
+    {
+        UntappedBasic("Mountain", "R");
+        var spell = InHand(new Sorcery("Up To One", "{R}"));
+        var def = Def(Needs("up to one target creature", () => Array.Empty<object>(), min: 0));
+
+        PriorityLegalActions.Build(CtxWith((_, _) => def)).CastableCardIds.Should().Contain(spell.InstanceId);
+    }
+
+    [Fact]
+    public void AModalSpell_IsCastableWhenEnoughModesHaveTargets()
+    {
+        UntappedBasic("Mountain", "R");
+        var charm = InHand(new Instant("Two Mode Charm", "{R}"));
+        var none = Array.Empty<object>();
+        var some = new object[] { new object() };
+        SpellDefinition Modal(IReadOnlyList<object> second, int minModes) => new(
+            new[] { "first", "second" }, false,
+            new[] { Needs("target artifact", () => none), Needs("target creature", () => second) },
+            _ => Array.Empty<Majik.Core.Abilities.IEffect>(), MinModes: minModes, MaxModes: 2);
+
+        PriorityLegalActions.Build(CtxWith((_, _) => Modal(some, 1))).CastableCardIds
+            .Should().Contain(charm.InstanceId, "one mode with a target is enough for choose one");
+        PriorityLegalActions.Build(CtxWith((_, _) => Modal(none, 1))).CastableCardIds
+            .Should().NotContain(charm.InstanceId, "CR 700.2 / 601.2c — no mode can be chosen");
+        PriorityLegalActions.Build(CtxWith((_, _) => Modal(some, 2))).CastableCardIds
+            .Should().NotContain(charm.InstanceId, "choose two needs two modes with targets");
+    }
+
+    [Fact]
+    public void AnActivatedAbilityWithNoLegalTarget_IsNotListed()
+    {
+        var elf = ReadyCreature("Llanowar Sniper", summoningSick: false);
+        var targets = new List<object>();
+        var ability = new ActivatedAbility(elf, _alice, costs: new ICost[] { AdditionalCost.Tap(elf) },
+            // An artifact, so the central fallback pool (which would find the
+            // Sniper itself for "target creature") is empty too.
+            targetRequests: new[] { Needs("target artifact", () => targets) });
+        elf.AddAbility(ability);
+
+        PriorityLegalActions.Build(CtxWith((_, _) => null)).ActivatableAbilities
+            .Should().NotContain(a => a.AbilityId == ability.Id, "CR 602.2b — no legal target");
+
+        targets.Add(new object());
+        PriorityLegalActions.Build(CtxWith((_, _) => null)).ActivatableAbilities
+            .Should().Contain(a => a.AbilityId == ability.Id);
+    }
+
+    [Fact]
+    public void AColorlessPip_NeedsAColorlessSource_AsThePaymentDoes()
+    {
+        UntappedBasic("Forest", "G");
+        UntappedBasic("Forest", "G");
+        var command = InHand(new Instant("Colorless Command", "{1}{C}"));
+
+        PriorityLegalActions.Build(Ctx(_alice, StepStateType.PreCombatMain, landPlayAvailable: true)).CastableCardIds
+            .Should().NotContain(command.InstanceId, "CR 107.4c — {C} is paid only with colorless mana");
+
+        UntappedBasic("Wastes", "C");
+        PriorityLegalActions.Build(Ctx(_alice, StepStateType.PreCombatMain, landPlayAvailable: true)).CastableCardIds
+            .Should().Contain(command.InstanceId);
+    }
 }
