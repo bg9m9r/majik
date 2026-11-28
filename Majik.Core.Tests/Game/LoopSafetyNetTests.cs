@@ -136,4 +136,31 @@ public class LoopSafetyNetTests
         LoopSafetyNet.MaxActionsPerStep.Should().BeGreaterThanOrEqualTo(26 * 20);
         LoopSafetyNet.MaxStackDepth.Should().BeGreaterThanOrEqualTo(12 * 20);
     }
+
+    [Fact]
+    public async Task ATrippedNet_PublishesALossForEachPlayer_AndWritesNothingToStderr()
+    {
+        // CR 104.4a — a draw: every player still in the game loses at once, so
+        // each gets the same PlayerLostEvent any other loss publishes (the
+        // facade's game-over gates and the wire both read it).
+        var alice = new ScriptedAgent();
+        for (var i = 0; i < 50; i++) alice.QueuePriority(Activate());
+        var lost = new List<Player>();
+        _bus.Subscribe<PlayerLostEvent>(e => lost.Add(e.Player));
+        using var _ = LoopSafetyNet.OverrideForTest(actionLimit: null, stackDepthLimit: 5);
+        var stderr = System.Console.Error;
+        var captured = new System.IO.StringWriter();
+        System.Console.SetError(captured);
+        try
+        {
+            await NewLoop(alice, new ScriptedAgent()).RunUntilRoundEndsAsync(_alice);
+        }
+        finally
+        {
+            System.Console.SetError(stderr);
+        }
+
+        lost.Should().BeEquivalentTo(new[] { _alice, _bob });
+        captured.ToString().Should().NotContain("safety net", "the LoopSafetyNetTrippedEvent is the report");
+    }
 }

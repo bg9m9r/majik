@@ -412,12 +412,13 @@ public sealed class PriorityLoop
             "The game is ended as a draw (CR 104.4b). This is an engine safety net against a " +
             "runaway loop, not the CR 732 loop shortcut.";
         var depth = _stack.Count;
-        foreach (var p in _players)
-        {
-            if (!p.HasLost) p.MarkLost();
-        }
-        System.Console.Error.WriteLine(message);
+        var losers = _players.Where(p => !p.HasLost).ToList();
+        foreach (var p in losers) p.MarkLost();
+        // The report first (it says why), then the losses: each player still in
+        // the game loses at once (CR 104.4a), published like every other loss
+        // (SBA 704.5a, a concession) so the game-over gates and clients see it.
         _eventBus?.Publish(new LoopSafetyNetTrippedEvent(message, actions, depth));
+        foreach (var p in losers) _eventBus?.Publish(new Majik.Core.Events.PlayerLostEvent(p));
     }
 
     /// <summary>
