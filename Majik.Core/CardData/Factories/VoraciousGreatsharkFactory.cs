@@ -136,15 +136,17 @@ public static class VoraciousGreatsharkFactory
                 // the card in its owner's graveyard.
                 if (stack != null)
                 {
-                    OracleSpellBinder.RemoveFromStack(stack, spell);
+                    OracleSpellBinder.CounterSpell(stack, spell);
                 }
-
-                var targetOwner = targetCard.Owner;
-                if (targetOwner != null && targetCard.Zone != ZoneType.Graveyard)
+                else
                 {
-                    targetOwner.Zones.Graveyard.AddCard(targetCard);
+                    var targetOwner = targetCard.Owner;
+                    if (targetOwner != null && targetCard.Zone != ZoneType.Graveyard)
+                    {
+                        targetOwner.Zones.Graveyard.AddCard(targetCard);
+                    }
+                    targetCard.SetZone(ZoneType.Graveyard);
                 }
-                targetCard.SetZone(ZoneType.Graveyard);
             });
 
         etb = new TriggeredAbility(

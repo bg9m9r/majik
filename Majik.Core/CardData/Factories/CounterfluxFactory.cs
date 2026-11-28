@@ -185,9 +185,8 @@ public static class CounterfluxFactory
                                 // an uncounterable spell (CR 701.5b); only send
                                 // the card to the graveyard when it was actually
                                 // removed.
-                                if (OracleSpellBinder.RemoveFromStack(stack, spell))
+                                if (OracleSpellBinder.CounterSpell(stack, spell))
                                 {
-                                    spell.Card.SetZone(ZoneType.Graveyard);
                                 }
                             }
                         }),
@@ -233,9 +232,8 @@ public static class CounterfluxFactory
                             // CR 701.5 / 608.2b — RemoveFromStack returns false
                             // for an uncounterable target; only graveyard the
                             // card when it was actually removed.
-                            if (OracleSpellBinder.RemoveFromStack(stack, spell))
+                            if (OracleSpellBinder.CounterSpell(stack, spell))
                             {
-                                spell.Card.SetZone(ZoneType.Graveyard);
                             }
                         }),
                 };

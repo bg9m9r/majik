@@ -116,8 +116,7 @@ public static class SpectralInterferenceFactory
                         }
 
                         // Controller couldn't pay — counter the spell (CR 701.5).
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

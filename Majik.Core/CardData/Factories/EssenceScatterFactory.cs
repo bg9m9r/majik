@@ -69,8 +69,7 @@ public static class EssenceScatterFactory
                         // CR 608.2b — only creature spells are legal targets.
                         if (!spell.Card.HasType(CardType.Creature)) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

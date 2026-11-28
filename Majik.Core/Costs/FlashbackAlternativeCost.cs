@@ -26,13 +26,11 @@ public sealed class FlashbackAlternativeCost : IAlternativeCost
 
     public void OnResolved(ICard card, Player caster)
     {
-        // CR 702.34b — after resolution, exile the card instead of normal
-        // resolution destination.
-        if (card.Owner != null)
-        {
-            card.Owner.Zones.Graveyard.RemoveCard(card);
-            card.Owner.Zones.Exile.AddCard(card);
-        }
-        card.SetZone(ZoneType.Exile);
+        // CR 702.34a — as it resolves, exile the card instead of putting it
+        // anywhere else. Out of the stack zone list (where the cast put it),
+        // not the graveyard's. The other exits (a counter, CR 608.2b) apply
+        // the same rule through Spells.SpellStackExit.
+        if (card.Zone == ZoneType.Exile) return;
+        Majik.Core.Spells.SpellStackExit.MoveWithoutEvents(card, ZoneType.Exile);
     }
 }

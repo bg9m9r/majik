@@ -154,8 +154,7 @@ public static class StubbornDenialFactory
                             if (paid) return;
                         }
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

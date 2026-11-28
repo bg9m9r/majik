@@ -116,8 +116,7 @@ public static class SpellPierceFactory
 
                             // Otherwise: counter. CR 701.5 / CR 701.5b —
                             // uncounterable spells survive the attempt.
-                            if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-                            spell.Card.SetZone(ZoneType.Graveyard);
+                            if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
                         }),
                 };
             });

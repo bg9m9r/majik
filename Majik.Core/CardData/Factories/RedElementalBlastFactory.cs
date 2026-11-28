@@ -195,8 +195,7 @@ public static class RedElementalBlastFactory
 
             // CR 701.5 — counter the spell: remove from stack, move card to
             // graveyard.
-            OracleSpellBinder.RemoveFromStack(stack, spell);
-            spell.Card.SetZone(ZoneType.Graveyard);
+            OracleSpellBinder.CounterSpell(stack, spell);
         });
 
     private static IEffect BuildDestroyEffect(

@@ -303,8 +303,7 @@ public static class MausoleumWandererFactory
         }
 
         // CR 701.5 — counter: remove from stack + send to graveyard.
-        OracleSpellBinder.RemoveFromStack(liveStack, spell);
-        spell.Card.SetZone(ZoneType.Graveyard);
+        OracleSpellBinder.CounterSpell(liveStack, spell);
     }
 
     private static void SacrificeSelf(Permanent card, Player owner, IEventBus? eventBus)

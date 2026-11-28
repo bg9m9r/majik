@@ -57,8 +57,7 @@ public static class ForceOfNegationFactory
                         // CR 608.2b — if the target is illegal at resolution
                         // (i.e. a creature spell), do nothing.
                         if (spell.Card.HasType(CardType.Creature)) return;
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

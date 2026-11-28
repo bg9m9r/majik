@@ -161,8 +161,7 @@ public static class CursecatcherFactory
 
                 // CR 701.5 — counter the spell: remove from stack,
                 // move to graveyard.
-                OracleSpellBinder.RemoveFromStack(stack, spell);
-                spell.Card.SetZone(ZoneType.Graveyard);
+                OracleSpellBinder.CounterSpell(stack, spell);
             });
 
         ability = new ActivatedAbility(

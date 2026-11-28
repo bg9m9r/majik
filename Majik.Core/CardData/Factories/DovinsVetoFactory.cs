@@ -89,8 +89,7 @@ public static class DovinsVetoFactory
                         // by resolution time, the effect does nothing for it.
                         if (spell.Card.HasType(CardType.Creature)) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

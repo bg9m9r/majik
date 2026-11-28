@@ -175,6 +175,14 @@ public static class AetherGustFactory
         {
             if (stack == null) return; // shape-only path
             OracleSpellBinder.RemoveFromStack(stack, spell);
+            // The spell's own exit rules (SpellStackExit): a flashback spell is
+            // exiled instead (CR 702.34a), a copy ceases to exist.
+            if (Majik.Core.Spells.SpellStackExit.Destination(spell, Majik.Core.Spells.StackExitKind.Countered, ZoneType.Library) != ZoneType.Library)
+            {
+                Majik.Core.Spells.SpellStackExit.Leave(stack, spell, Majik.Core.Spells.StackExitKind.Countered, ZoneType.Library);
+                return;
+            }
+            owner.Zones.Stack.RemoveCard(card);
         }
         else if (card.Zone == ZoneType.Battlefield)
         {

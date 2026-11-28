@@ -82,26 +82,10 @@ public static class RemandFactory
                         if (!stack.GetAll().Contains(spell)) return;
 
                         // CR 701.5 — counter the spell (removes it from the stack).
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-
                         // Instead of going to the graveyard, the card goes to its
-                        // owner's hand. Use raw zone mutation to avoid firing ETB
-                        // events for the hand zone.
-                        var owner = spell.Card.Owner ?? spell.Controller;
-                        if (owner != null)
-                        {
-                            // Remove from wherever the card currently thinks it is
-                            // (the RemoveFromStack implementation may leave its zone
-                            // marker in limbo; normalise here).
-                            owner.Zones.Graveyard.RemoveCard(spell.Card);
-                            owner.Zones.Hand.AddCard(spell.Card);
-                            spell.Card.SetZone(ZoneType.Hand);
-                        }
-                        else
-                        {
-                            // Fallback: no owner resolved — just set zone flag.
-                            spell.Card.SetZone(ZoneType.Hand);
-                        }
+                        // owner's hand (a flashback spell is exiled instead,
+                        // CR 702.34a; a copy ceases to exist).
+                        OracleSpellBinder.CounterSpell(stack, spell, ZoneType.Hand);
 
                         // Draw a card for the Remand caster.
                         var top = caster.Zones.Library.GetCards().FirstOrDefault();

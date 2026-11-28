@@ -156,7 +156,8 @@ public static class CounterbalanceFactory
                 // ensure the card lands in its owner's graveyard.
                 if (stack != null)
                 {
-                    OracleSpellBinder.RemoveFromStack(stack, spell);
+                    OracleSpellBinder.CounterSpell(stack, spell);
+                    return;
                 }
                 if (spell.Card.Owner != null
                     && spell.Card.Zone != ZoneType.Graveyard)

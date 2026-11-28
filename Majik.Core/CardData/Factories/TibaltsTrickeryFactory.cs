@@ -144,8 +144,7 @@ public static class TibaltsTrickeryFactory
         var controller = spell.Controller;
 
         // CR 701.5 — counter target spell.
-        OracleSpellBinder.RemoveFromStack(stack, spell);
-        spell.Card.SetZone(ZoneType.Graveyard);
+        OracleSpellBinder.CounterSpell(stack, spell);
 
         if (controller == null) return;
 

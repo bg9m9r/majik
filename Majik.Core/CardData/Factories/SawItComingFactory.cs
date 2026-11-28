@@ -127,8 +127,7 @@ public static class SawItComingFactory
                     {
                         if (stack == null || resolved is not ISpell spell) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

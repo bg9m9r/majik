@@ -504,6 +504,23 @@ public static class OracleSpellBinder
     /// spell stays on the stack and resolves normally instead of being
     /// silently sent to the graveyard while the stack still references it.
     /// </summary>
+    /// <summary>
+    /// CR 701.6a — counter <paramref name="spell"/>: remove it from the stack
+    /// and put its card in <paramref name="destination"/> (its owner's
+    /// graveyard, or a counter's own "exile it instead" / "on top of its
+    /// owner's library" / "to its owner's hand"), subject to the spell's
+    /// own exit rules (<see cref="Majik.Core.Spells.SpellStackExit"/>: flashback exiles, a copy
+    /// ceases to exist). False when the counter was vetoed (CR 701.5b).
+    /// An ability just ceases to exist.
+    /// </summary>
+    internal static bool CounterSpell(Majik.Core.Stack.Stack stack, IStackObject spell, ZoneType destination = ZoneType.Graveyard)
+    {
+        if (!RemoveFromStack(stack, spell)) return false;
+        if (spell is Majik.Core.Spells.ISpell s)
+            Majik.Core.Spells.SpellStackExit.Leave(stack, s, Majik.Core.Spells.StackExitKind.Countered, destination);
+        return true;
+    }
+
     internal static bool RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)
     {
         // CR 701.5b — "An uncounterable spell can't be countered."

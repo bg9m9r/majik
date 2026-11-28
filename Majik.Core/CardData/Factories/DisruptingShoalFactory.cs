@@ -154,8 +154,7 @@ public static class DisruptingShoalFactory
                         // effect does nothing for that target.
                         if (manaValue != x) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

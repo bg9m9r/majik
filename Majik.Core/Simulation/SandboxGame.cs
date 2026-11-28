@@ -150,6 +150,7 @@ public sealed class SandboxGame
         var stack = new Majik.Core.Stack.Stack(bus);
         var triggers = new TriggerManager(stack, bus);
         var zones = new ZoneService(bus, replacements);
+        stack.ZoneService = zones;
         var sba = new StateBasedActions(bus, zones, triggers);
         var resolver = new StackResolver(bus, zones, sba);
         var priority = new PriorityManager(cloned.Players.ToList(), stack, bus, triggers);

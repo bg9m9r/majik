@@ -87,8 +87,7 @@ public static class SwanSongFactory
                             return;
                         }
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
 
                         // "Its controller creates a 2/2 blue Bird with flying."
                         var controller = spell.Controller;

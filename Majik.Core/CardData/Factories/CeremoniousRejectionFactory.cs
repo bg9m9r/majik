@@ -111,8 +111,7 @@ public static class CeremoniousRejectionFactory
                         // has no color (no colored pips, no color indicator).
                         if (CardColors.GetColors(spell.Card).Count != 0) return;
 
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        OracleSpellBinder.CounterSpell(stack, spell);
                     }),
                 };
             });

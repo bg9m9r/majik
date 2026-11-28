@@ -132,10 +132,9 @@ public static class ConsignToMemoryFactory
                                         // resolution.
                                         return;
                                     }
-                                    OracleSpellBinder.RemoveFromStack(stack, spell);
+                                    OracleSpellBinder.CounterSpell(stack, spell);
                                     // CR 701.5a — countered spell moves to
                                     // its owner's graveyard.
-                                    spell.Card.SetZone(ZoneType.Graveyard);
                                     return;
 
                                 // Any other IStackObject shape (e.g.

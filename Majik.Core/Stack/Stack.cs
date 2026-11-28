@@ -74,6 +74,14 @@ public class Stack
     public Player? CurrentResolutionController { get; set; }
 
     /// <summary>
+    /// The game's zone service, when the stack belongs to one. A spell's card
+    /// leaving the stack moves through it (<see cref="Majik.Core.Spells.SpellStackExit"/>)
+    /// so its zone lists, CardMovedEvent and zone-change replacements stay in
+    /// step. Null for a bare test stack: the move then only updates the lists.
+    /// </summary>
+    public Majik.Core.Services.ZoneService? ZoneService { get; internal set; }
+
+    /// <summary>
     /// The stack object StackResolver is resolving right now, and the stack
     /// entry id it had. Null when nothing is mid-resolution through the
     /// resolver. Read by <see cref="PublishSpellCountered"/> to name what

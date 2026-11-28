@@ -214,15 +214,11 @@ public static class UnsettledMarinerFactory
 
                 // CR 701.5b — counter the spell or ability. RemoveFromStack
                 // returns false for an uncounterable spell (it stays put).
-                if (!OracleSpellBinder.RemoveFromStack(stack, source)) return;
+                if (!OracleSpellBinder.CounterSpell(stack, source)) return;
 
                 // CR 701.5b — a countered SPELL goes to its owner's
                 // graveyard; a countered activated/triggered ability simply
                 // ceases to exist (no zone move).
-                if (source is Majik.Core.Spells.ISpell spell && spell.Card is Card spellCard)
-                {
-                    spellCard.SetZone(ZoneType.Graveyard);
-                }
             });
 
         var trigger = new TriggeredAbility(

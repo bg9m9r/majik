@@ -195,8 +195,7 @@ public static class GetOutFactory
             // CR 701.5 — remove from the stack; the helper vetoes per CR 701.5b
             // (uncounterable) and returns false, in which case the spell stays
             // on the stack and resolves normally (don't send it to graveyard).
-            if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-            spell.Card.SetZone(ZoneType.Graveyard);
+            if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
         });
 
     private static IEffect BuildReturnEffect(

@@ -133,8 +133,7 @@ public static class RenderSilentFactory
                             // stack and send the card to its owner's graveyard.
                             if (stack != null)
                             {
-                                OracleSpellBinder.RemoveFromStack(stack, spell);
-                                spell.Card.SetZone(ZoneType.Graveyard);
+                                OracleSpellBinder.CounterSpell(stack, spell);
                             }
 
                             // "Its controller can't cast spells this turn."

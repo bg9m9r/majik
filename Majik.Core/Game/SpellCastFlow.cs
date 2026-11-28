@@ -520,6 +520,8 @@ public sealed class SpellCastFlow
         StampSpellAndCardSentinels(
             spell, card, caster, alternativeCost, totalCost,
             hasKickerPayment, giftRecipient, sourceZoneAtCast);
+        // CR 702.27a — buyback paid: to hand as it resolves (SpellStackExit).
+        spell.ReturnToHandOnResolution = mergedAdditional.OfType<BuybackAdditionalCost>().Any();
 
         // CR 702.10 / 106.4 — the mana-provenance haste rider (Arena of Glory)
         // is now applied at PAY time by ManaPaymentResolver firing the tagged
@@ -1511,6 +1513,13 @@ public sealed class SpellCastFlow
         if (card is Card concreteForTotalSpent)
         {
             concreteForTotalSpent.SetTotalManaSpentThisCast(totalManaSpent);
+        }
+
+        // CR 702.34a / 702.133a — flashback (and jump-start, which casts with a
+        // FlashbackAlternativeCost) exiles the card on any exit from the stack.
+        if (alternativeCost is FlashbackAlternativeCost)
+        {
+            spell.ExileWhenLeavesStack = true;
         }
 
         // CR 702.138b — Escape sentinel (Uro's "sacrifice unless escaped").

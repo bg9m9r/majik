@@ -117,8 +117,7 @@ public static class PactOfNegationFactory
                         // ----------------------------------------------------
                         if (stack != null && resolved is ISpell spell)
                         {
-                            OracleSpellBinder.RemoveFromStack(stack, spell);
-                            spell.Card.SetZone(ZoneType.Graveyard);
+                            OracleSpellBinder.CounterSpell(stack, spell);
                         }
 
                         // ----------------------------------------------------

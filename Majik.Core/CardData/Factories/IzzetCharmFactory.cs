@@ -172,8 +172,7 @@ public static class IzzetCharmFactory
                 return;
             }
 
-            OracleSpellBinder.RemoveFromStack(stack, spell);
-            spell.Card.SetZone(ZoneType.Graveyard);
+            OracleSpellBinder.CounterSpell(stack, spell);
         });
 
     private static IEffect BuildDamageEffect(

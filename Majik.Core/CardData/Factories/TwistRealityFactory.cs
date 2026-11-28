@@ -188,8 +188,7 @@ public static class TwistRealityFactory
             var resolved = resolver(slot[0]);
             if (resolved is not ISpell spell) return;
 
-            OracleSpellBinder.RemoveFromStack(stack, spell);
-            spell.Card.SetZone(ZoneType.Graveyard);
+            OracleSpellBinder.CounterSpell(stack, spell);
         });
 
     /// <summary>

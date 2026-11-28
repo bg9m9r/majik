@@ -153,15 +153,11 @@ public static class WardTriggerWiring
 
                 // CR 701.5b — counter the spell/ability. RemoveFromStack returns
                 // false for an uncounterable spell (it stays put).
-                if (!OracleSpellBinder.RemoveFromStack(liveStack, source))
+                if (!OracleSpellBinder.CounterSpell(liveStack, source))
                     return System.Threading.Tasks.ValueTask.CompletedTask;
 
                 // CR 701.5b — a countered SPELL goes to its owner's graveyard;
                 // a countered ability simply ceases to exist (no zone move).
-                if (source is Majik.Core.Spells.ISpell spell && spell.Card is Card spellCard)
-                {
-                    spellCard.SetZone(ZoneType.Graveyard);
-                }
 
                 return System.Threading.Tasks.ValueTask.CompletedTask;
             });

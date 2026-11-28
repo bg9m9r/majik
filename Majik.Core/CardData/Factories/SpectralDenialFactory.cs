@@ -157,8 +157,7 @@ public static class SpectralDenialFactory
                         // CR 701.5 / 701.5b — counter the spell: remove from
                         // stack, move card to graveyard. Uncounterable spells
                         // survive (RemoveFromStack returns false).
-                        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-                        spell.Card.SetZone(ZoneType.Graveyard);
+                        if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
                     }),
                 };
             });

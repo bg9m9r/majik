@@ -372,6 +372,21 @@ public class Spell : ISpell
     public bool IsCopy { get; set; }
 
     /// <summary>
+    /// CR 702.34a / 702.133a — cast with flashback or jump-start: "exile this
+    /// card instead of putting it anywhere else any time it would leave the
+    /// stack". Stamped by SpellCastFlow; read by <see cref="SpellStackExit"/>.
+    /// </summary>
+    public bool ExileWhenLeavesStack { get; set; }
+
+    /// <summary>
+    /// CR 702.27a — the buyback cost was paid: as the spell resolves, its card
+    /// goes to its owner's hand instead of the graveyard. Only on resolution:
+    /// a countered buyback spell goes to the graveyard. Read by
+    /// <see cref="SpellStackExit"/>.
+    /// </summary>
+    public bool ReturnToHandOnResolution { get; set; }
+
+    /// <summary>
     /// CR 707.10a — the per-slot <see cref="Majik.Core.Players.Agents.TargetRequest"/>s
     /// that governed this spell's original target selection (CR 601.2c),
     /// retained on the stack object so a "copy a spell" effect can re-prompt the

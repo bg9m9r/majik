@@ -387,6 +387,7 @@ public sealed class GameFacade : IDisposable
         _stack = new Majik.Core.Stack.Stack(_bus);
         _triggers = new TriggerManager(_stack, _bus);
         _zones = new ZoneService(_bus, Replacements);
+        _stack.ZoneService = _zones;
         _sba = new StateBasedActions(_bus, _zones, _triggers);
         _resolver = new StackResolver(_bus, _zones, _sba);
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);

@@ -26,8 +26,7 @@ internal static class CounterSpellFactory
                 if (requireCreature && !isCreature) return;
                 if (requireNonCreature && isCreature) return;
                 // CR 701.5b — uncounterable spells survive the attempt.
-                if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-                spell.Card.SetZone(ZoneType.Graveyard);
+                if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
             }) };
         });
 
@@ -41,8 +40,7 @@ internal static class CounterSpellFactory
             {
                 if (stack == null || target is not ISpell spell) return;
                 // CR 701.5b — uncounterable spells survive the attempt.
-                if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
-                spell.Card.SetZone(ZoneType.Graveyard);
+                if (!OracleSpellBinder.CounterSpell(stack, spell)) return;
             }) };
         });
 

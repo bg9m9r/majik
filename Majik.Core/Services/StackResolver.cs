@@ -67,6 +67,7 @@ public class StackResolver
         {
             return null;
         }
+        stack.ZoneService ??= _zoneService;
 
         // Pop the object from stack and resolve it
         var topEntryId = stack.TopEntryId;
@@ -95,7 +96,7 @@ public class StackResolver
                     .Any(spellRecheck.IsTargetLegal);
                 if (!anyLegal)
                 {
-                    PutCounteredSpellInGraveyard(spellRecheck);
+                    PutCounteredSpellInGraveyard(spellRecheck, stack);
                     _eventBus?.Publish(new StateBasedActionExecutedEvent(
                         $"{spellRecheck.Card.Name} countered: all targets illegal"));
                     // CR 608.2b — countered by the rules, not by a spell or
@@ -171,14 +172,18 @@ public class StackResolver
     /// copy just ceases to exist (CR 707.10c). Through ZoneService when there
     /// is one, so the card leaves the stack zone's list and CardMovedEvent fires.
     /// </summary>
-    private void PutCounteredSpellInGraveyard(Majik.Core.Spells.Spell spell)
+    private void PutCounteredSpellInGraveyard(Majik.Core.Spells.Spell spell, Majik.Core.Stack.Stack stack)
     {
-        if (spell.IsCopy) return;
+        // CR 608.2b — to the graveyard, by the spell's own exit rules
+        // (flashback exiles, a copy ceases to exist: SpellStackExit).
+        var to = Majik.Core.Spells.SpellStackExit.Destination(
+            spell, Majik.Core.Spells.StackExitKind.Fizzled, ZoneType.Graveyard);
+        if (to is not { } zone) return;
         var card = spell.Card;
         if (_zoneService != null && card.Owner != null && card.Zone == ZoneType.Stack)
-            _zoneService.MoveCard(card, ZoneType.Stack, ZoneType.Graveyard, card.Owner);
+            _zoneService.MoveCard(card, ZoneType.Stack, zone, card.Owner);
         else
-            card.SetZone(ZoneType.Graveyard);
+            Majik.Core.Spells.SpellStackExit.Leave(stack, spell, Majik.Core.Spells.StackExitKind.Fizzled, ZoneType.Graveyard);
     }
 
     /// <summary>
@@ -209,7 +214,20 @@ public class StackResolver
         }
 
         var card = spell.Card;
-        var destinationZone = GetSpellDestinationZone(spell);
+        // CR 608.2n — the printed-type default (or an alt-cost override), then
+        // the spell's own exit rules: flashback exiles, buyback returns it to
+        // hand, rebound exiles a spell cast from hand (SpellStackExit).
+        if (Majik.Core.Spells.SpellStackExit.Destination(
+                spell, Majik.Core.Spells.StackExitKind.Resolved, GetSpellDestinationZone(spell)) is not { } destinationZone)
+        {
+            return;
+        }
+        // A resolution cleanup effect (FlashbackAlternativeCost.OnResolved,
+        // buyback's return) already put it there.
+        if (card.Zone == destinationZone && destinationZone != ZoneType.Battlefield)
+        {
+            return;
+        }
 
         // Move card from stack to destination zone through ZoneService so
         // the destination zone's collection is updated AND CardMovedEvent
