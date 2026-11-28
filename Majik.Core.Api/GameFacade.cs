@@ -60,8 +60,36 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     public static Action<Exception, string>? OnEngineDiagnostic { get; set; }
 
+    /// <summary>
+    /// Raised for every contained fault, in addition to
+    /// <see cref="OnEngineDiagnostic"/> (which a host replaces). Lets test
+    /// harnesses observe contained faults regardless of the host's sink;
+    /// production code should use <see cref="OnEngineDiagnostic"/>.
+    /// </summary>
+    public static event Action<Exception, string>? ContainedFaultReported;
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, HashSet<string>> ReportedFaults = new();
+
+    /// <summary>
+    /// Report a contained fault at most once per <paramref name="scope"/> object
+    /// (a card or ability instance, an agent — all per game) and
+    /// <paramref name="key"/>, so a faulting card does not report at every
+    /// priority window.
+    /// </summary>
+    internal static void ReportContainedFaultOnce(object scope, string key, Exception ex, string context)
+    {
+        var seen = ReportedFaults.GetValue(scope, _ => new HashSet<string>(StringComparer.Ordinal));
+        lock (seen)
+        {
+            if (!seen.Add(key + "|" + ex.GetType().FullName)) return;
+        }
+        ReportContainedFault(ex, context);
+    }
+
     internal static void ReportContainedFault(Exception ex, string context)
     {
+        try { ContainedFaultReported?.Invoke(ex, context); }
+        catch { /* an observer fault must not take the engine down */ }
         var sink = OnEngineDiagnostic;
         if (sink is null)
         {

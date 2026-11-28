@@ -20,6 +20,7 @@ namespace Majik.Core.Api.Tests;
 /// <see cref="GameFacade.OnEngineDiagnostic"/>.
 /// </summary>
 [Collection(EngineDiagnosticSinkCollection.Name)] // mutates the static sink
+[ExpectsContainedFault] // deliberately provokes a contained fault
 public class PriorityLegalActionsFaultTests
 {
     private readonly EventBus _bus = new();
@@ -78,6 +79,17 @@ public class PriorityLegalActionsFaultTests
 
             agent.Submit(new Majik.Core.Api.Commands.PassPriorityCommand { PlayerId = _alice.Id });
             await task;
+
+            // Rate-limited: the same card's gate failing again at later
+            // priority windows of the same game is not reported again.
+            for (var window = 0; window < 3; window++)
+            {
+                var again = agent.ChoosePriorityActionAsync(Ctx());
+                agent.PendingPayload!.LegalActions!.ActivatableAbilities.Should().Contain(a => a.AbilityId == good.Id);
+                agent.Submit(new Majik.Core.Api.Commands.PassPriorityCommand { PlayerId = _alice.Id });
+                await again;
+            }
+            reported.Should().ContainSingle("a faulting card is reported once per card / ability per game");
         }
         finally
         {

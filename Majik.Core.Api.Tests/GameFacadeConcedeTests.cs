@@ -155,6 +155,7 @@ public sealed class GameFacadeConcedeTests
         bot.PriorityDecisions.Should().Be(1, "the engine halts at its game-over gate right after the bot returns");
     }
 
+    [ExpectsContainedFault] // deliberately provokes a contained fault
     [Fact]
     public async Task Concede_WhileAClosureThatIndexesTheAnswerIsWaiting_EndsCleanly()
     {

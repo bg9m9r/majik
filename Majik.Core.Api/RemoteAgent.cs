@@ -959,7 +959,7 @@ public sealed class RemoteAgent : IPlayerAgent
         }
         catch (Exception ex)
         {
-            GameFacade.ReportContainedFault(ex,
+            GameFacade.ReportContainedFaultOnce(this, "PriorityLegalActions.Build", ex,
                 $"PriorityLegalActions.Build for {_player.Name} threw; priority prompt sent without LegalActions");
             return null;
         }

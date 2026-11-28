@@ -144,7 +144,7 @@ public static class PriorityLegalActions
         }
         catch (Exception ex)
         {
-            GameFacade.ReportContainedFault(ex,
+            GameFacade.ReportContainedFaultOnce(subject, "PriorityLegalActions:" + check, ex,
                 $"PriorityLegalActions: {check} check for '{Describe(subject)}' threw; left out of the legal-action hint");
             return fallback;
         }
