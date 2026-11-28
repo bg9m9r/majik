@@ -371,6 +371,7 @@ public sealed class GameFacade : IDisposable
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
         _bus.Subscribe<PhaseStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
+        _bus.Subscribe<PlayerLostEvent>(e => { lock (_concedeLock) _lossPublished.Add(e.Player.Id); });
         // Quiescent points between prompts (bot seats raise none): a player
         // receiving priority (CR 117.3, after SBAs and triggers, CR 117.5) and
         // a step starting. Refresh only the views an off-engine reader asked for.
@@ -1121,8 +1122,12 @@ public sealed class GameFacade : IDisposable
             }
             catch (OperationCanceledException) when (ConcedingPlayer is not null)
             {
-                result = new GameDriver.GameResult(_currentTurn, Opponent(ConcedingPlayer), startingPlayer);
+                // Winner settled by FixGameResult below.
+                result = new GameDriver.GameResult(_currentTurn, null, startingPlayer);
             }
+            BeforeGameResultForTest?.Invoke();
+            result = FixGameResult(result);
+            AfterGameResultForTest?.Invoke();
             PublishConcessionLoss();
             return result;
         }
@@ -1133,6 +1138,24 @@ public sealed class GameFacade : IDisposable
         }
     }
 
+    /// <summary>
+    /// The driver has stopped: fix the result, under the concede lock, so a
+    /// concession either happened before this point (and decides the result)
+    /// or arrives after it (and is a no-op, see <see cref="ConcedeAsync"/>).
+    /// CR 104.3a — after a concession the conceder has lost; the opponent wins
+    /// only if they have not lost too — CR 104.4a, otherwise it is a draw.
+    /// </summary>
+    private GameDriver.GameResult FixGameResult(GameDriver.GameResult driverResult)
+    {
+        lock (_concedeLock)
+        {
+            _gameResultFixed = true;
+            if (_concedingPlayer is null) return driverResult;
+            var opponent = Opponent(_concedingPlayer);
+            return driverResult with { Winner = opponent.HasLost ? null : opponent };
+        }
+    }
+
     /// <summary>Task representing the in-flight full-game run, or null
     /// when only <see cref="StartAsync"/> was called.</summary>
     public Task<GameDriver.GameResult>? FullGameTask => _fullGameTask;
@@ -1140,6 +1163,19 @@ public sealed class GameFacade : IDisposable
     private readonly object _concedeLock = new();
     private Player? _concedingPlayer;
     private bool _concessionPublished;
+    private bool _gameResultFixed;
+
+    // Players whose PlayerLostEvent has gone out (SBA or concession), so a
+    // loss is published at most once per player.
+    private readonly HashSet<Guid> _lossPublished = new();
+
+    /// <summary>Test hook: runs on the engine flow right after the game
+    /// result is fixed, before <see cref="FullGameTask"/> completes.</summary>
+    internal Action? AfterGameResultForTest { get; set; }
+
+    /// <summary>Test hook: runs on the engine flow after the driver stopped,
+    /// right before the game result is fixed.</summary>
+    internal Action? BeforeGameResultForTest { get; set; }
 
     private Player? ConcedingPlayer
     {
@@ -1167,9 +1203,26 @@ public sealed class GameFacade : IDisposable
         var player = LookupPlayer(playerId)
             ?? throw new ArgumentException($"Unknown player {playerId}.", nameof(playerId));
 
+        // Ordering (all under _concedeLock, then every seat's agent lock):
+        //   1. decide: a concession already recorded, a fixed game result
+        //      (FixGameResult), a finished run, or a player already lost ⇒
+        //      no-op;
+        //   2. record the conceder;
+        //   3. with BOTH seats' agent locks held: mark the conceder lost
+        //      (CR 104.3a: immediately) and close both seats — so no Submit on
+        //      either seat is accepted after this point or interleaves with it;
+        //   4. release the agent locks, decline the outstanding prompts.
+        // The lost flag is a volatile write (Player._hasLost): a single
+        // monotonic false→true flag the engine reads at its game-over gates,
+        // so it needs visibility, not a lock. An answer accepted before the
+        // close but not yet picked up by the engine is replaced with the
+        // decline value (RemoteAgent.DeliverUnlessClosed); one the engine was
+        // already applying when the concession landed finishes — it was
+        // made before the concession.
         lock (_concedeLock)
         {
             var gameOver = _concedingPlayer != null
+                || _gameResultFixed
                 || (_fullGameTask?.IsCompleted ?? false)
                 || _alice.HasLost
                 || _bob.HasLost;
@@ -1180,15 +1233,9 @@ public sealed class GameFacade : IDisposable
             else
             {
                 _concedingPlayer = player;
-                // CR 104.3a — the conceding player loses immediately.
-                player.MarkLost();
+                var conceder = player;
+                RemoteAgent.CloseAll(new[] { _aliceAgent, _bobAgent }, () => conceder.MarkLost());
             }
-        }
-
-        if (player != null)
-        {
-            _aliceAgent.Close();
-            _bobAgent.Close();
         }
 
         var run = (Task?)_fullGameTask ?? _loopTask;
@@ -1218,6 +1265,7 @@ public sealed class GameFacade : IDisposable
             if (_concedingPlayer == null || _concessionPublished) return;
             _concessionPublished = true;
             loser = _concedingPlayer;
+            if (!_lossPublished.Add(loser.Id)) return;
         }
         _bus.Publish(new PlayerLostEvent(loser));
     }

@@ -150,9 +150,18 @@ public sealed class RemoteAgent : IPlayerAgent
                 $"Command targets player {command.PlayerId} but this agent is for player {_player.Id}.");
         }
 
-        Action complete;
         lock (_closeLock)
         {
+            // CR 104.3a — once a concession closed the seats, nothing is
+            // accepted from either player (checked under the same lock Close
+            // takes, so a Submit is either wholly before the concession or
+            // rejected).
+            if (_closed)
+            {
+                throw new InvalidOperationException(
+                    "The game is over (a player conceded); no further commands are accepted.");
+            }
+
             if (_pending == null || _pendingKinds == null)
             {
                 throw new InvalidOperationException(
@@ -170,15 +179,18 @@ public sealed class RemoteAgent : IPlayerAgent
             // answer throws here with the prompt, its stashes and its payload
             // untouched, so the client can correct it and the engine keeps
             // waiting on the same prompt (PromptRequested is not re-fired).
-            complete = Resolve(_pending, command, _pendingTriggerOrder, _pendingLibraryCandidates,
+            var complete = Resolve(_pending, command, _pendingTriggerOrder, _pendingLibraryCandidates,
                 _pendingSurveilPeeked, _pendingScryPeeked, _pendingRevealedEligible, _pendingRevealedOptional,
                 _pendingBottomCount, _pendingChoiceCandidates, _pendingChoiceKind, _pendingTargetCandidates,
                 _pendingDamageDivisionTargets, _pendingModeCount);
 
-            // Valid: retire the prompt, then hand the engine its answer.
+            // Valid: retire the prompt, then hand the engine its answer — still
+            // under the lock, so a concurrent Close can't slip in between. The
+            // answer only completes a RunContinuationsAsynchronously TCS: no
+            // engine code runs here.
             ClearPendingState();
+            complete();
         }
-        complete();
     }
 
     /// <summary>
@@ -1847,7 +1859,7 @@ public sealed class RemoteAgent : IPlayerAgent
         try { GameFacade.RunOffEngineFlow(() => PromptRequested?.Invoke(acceptedKinds)); }
         catch { /* observer fault must not abort the engine */ }
 
-        return tcs.Task;
+        return DeliverUnlessClosed(tcs.Task);
     }
 
     /// <summary>Runs on the engine flow right before <see cref="PromptRequested"/>
@@ -1875,6 +1887,64 @@ public sealed class RemoteAgent : IPlayerAgent
     /// later prompt resolve the same way immediately, so the engine never waits
     /// on this seat again. Idempotent.
     /// </summary>
+    /// <summary>
+    /// CR 104.3a — an answer given before a concession but picked up by the
+    /// engine after it must not be acted on: the conceder has left the game.
+    /// The engine awaits this instead of the answer itself: if the seat has
+    /// been closed by the time the answer is handed over, it gets the decline
+    /// value (or a cancellation) instead.
+    /// </summary>
+    private Task<T> DeliverUnlessClosed<T>(Task<T> answer)
+    {
+        var delivered = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        answer.ContinueWith(t =>
+        {
+            if (IsClosed && t.IsCompletedSuccessfully)
+            {
+                Decline(delivered);
+                return;
+            }
+            if (t.IsCanceled) delivered.TrySetCanceled();
+            else if (t.IsFaulted) delivered.TrySetException(t.Exception!.InnerExceptions);
+            else delivered.TrySetResult(t.Result);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return delivered.Task;
+    }
+
+    /// <summary>
+    /// CR 104.3a — close every seat AND run <paramref name="whileClosing"/>
+    /// (marking the conceder lost) while holding every seat's lock, so no
+    /// <see cref="Submit"/> on any seat can be accepted after it, nor
+    /// interleave with it. Outstanding prompts are declined after the locks
+    /// are released (their continuations run asynchronously).
+    /// </summary>
+    internal static void CloseAll(IReadOnlyList<RemoteAgent> agents, Action whileClosing)
+    {
+        var aborts = new List<Action>();
+        CloseLocked(agents, 0, whileClosing, aborts);
+        foreach (var abort in aborts) abort();
+
+        static void CloseLocked(IReadOnlyList<RemoteAgent> agents, int index, Action whileClosing, List<Action> aborts)
+        {
+            if (index == agents.Count)
+            {
+                whileClosing();
+                foreach (var agent in agents)
+                {
+                    if (agent._closed) continue;
+                    agent._closed = true;
+                    if (agent._pendingAbort is { } abort) aborts.Add(abort);
+                    agent.ClearPendingState();
+                }
+                return;
+            }
+            lock (agents[index]._closeLock)
+            {
+                CloseLocked(agents, index + 1, whileClosing, aborts);
+            }
+        }
+    }
+
     public void Close()
     {
         Action? abort;
