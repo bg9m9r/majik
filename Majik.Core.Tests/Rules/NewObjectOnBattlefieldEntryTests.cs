@@ -124,4 +124,46 @@ public class NewObjectOnBattlefieldEntryTests
 
         bear.Counters.HasAny.Should().BeFalse();
     }
+
+    private T Put<T>(T p) where T : Permanent
+    {
+        p.SetOwner(_alice); p.SetController(_alice);
+        p.SetZone(ZoneType.Hand); _alice.Zones.Hand.AddCard(p);
+        _zones.MoveCard(p, ZoneType.Hand, ZoneType.Battlefield, _alice);
+        return p;
+    }
+
+    [Fact]
+    public void AFlickeredCreature_ComesBackWithNothingAttached()
+    {
+        // CR 400.7 / 303.4d / 301.5c — the creature that returns is a new
+        // object; the Aura and Equipment were attached to the old one, so
+        // they are attached to nothing (and SBA 704.5m/n deal with them).
+        var bear = OnBattlefield();
+        var aura = Put(new Enchantment("Rancor", "{G}"));
+        var sword = Put(new Artifact("Sword", "{2}"));
+        aura.AttachTo(bear); sword.AttachTo(bear);
+
+        _zones.MoveCard(bear, ZoneType.Battlefield, ZoneType.Exile);
+        _zones.MoveCard(bear, ZoneType.Exile, ZoneType.Battlefield, _alice);
+
+        bear.Attachments.Should().BeEmpty();
+        aura.AttachedTo.Should().BeNull();
+        sword.AttachedTo.Should().BeNull();
+    }
+
+    [Fact]
+    public void AFlickeredAura_ComesBackAttachedToNothing()
+    {
+        var bear = OnBattlefield();
+        var aura = Put(new Enchantment("Rancor", "{G}"));
+        aura.AttachTo(bear);
+
+        _zones.MoveCard(aura, ZoneType.Battlefield, ZoneType.Exile);
+        aura.AttachedTo.Should().BeSameAs(bear, "last known information still reads its host (CR 603.10)");
+        _zones.MoveCard(aura, ZoneType.Exile, ZoneType.Battlefield, _alice);
+
+        aura.AttachedTo.Should().BeNull("an Aura entering not cast is attached by the effect that returns it (CR 303.4f)");
+        bear.Attachments.Should().BeEmpty();
+    }
 }

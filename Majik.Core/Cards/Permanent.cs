@@ -646,6 +646,16 @@ public class Permanent : Card
         MarkedForDestructionByDeathtouch = false;
         ClearWasDealtDamageThisTurn();
         _imprintedCards.Clear();
+        // CR 400.7 / 303.4d / 301.5c — attachments belong to the old object.
+        // An Aura or Equipment that returns is attached to nothing (an Aura
+        // put onto the battlefield is attached by the effect that puts it
+        // there, CR 303.4f), and a returning host carries nothing; SBA
+        // 704.5m/n then deal with what is left unattached. Cleared on entry,
+        // not on leaving, so last known information still reads the host
+        // (CR 603.10: "when enchanted creature dies"). An Aura spell is
+        // attached to its target as it resolves (CR 303.4a), before it lands.
+        if (from != ZoneType.Stack) Unattach();
+        foreach (var attached in _attachments.ToList()) attached.Unattach();
     }
 
     internal void ResetOnLeaveBattlefield()
