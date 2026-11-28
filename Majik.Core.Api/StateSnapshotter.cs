@@ -461,7 +461,46 @@ public static class StateSnapshotter
                 IActivatedAbility a => a.Source as ICard,
                 _ => null,
             }, viewer),
+            RulesText = StackRulesText(obj, viewer),
+            AbilityId = obj switch
+            {
+                ITriggeredAbility t => t.Id,
+                ActivatedAbility a => a.ActivatedFromId ?? a.Id,
+                IActivatedAbility a => a.Id,
+                _ => null,
+            },
         };
+
+    /// <summary>C20 — the ability's own text (see StackObjectDto.RulesText),
+    /// null for a spell and when the source is hidden from the viewer.</summary>
+    internal static string? StackRulesText(IStackObject obj, Player? viewer)
+    {
+        var source = obj switch
+        {
+            ITriggeredAbility t => t.Source,
+            IActivatedAbility a => a.Source,
+            _ => null,
+        };
+        if (obj is ISpell) return null;
+        if (source is ICard c && (IsHiddenFrom(c, viewer) || HidesFaceDownSource(c, viewer))) return null;
+        return obj switch
+        {
+            ITriggeredAbility t => EventPayloadBuilder.TriggerText(t),
+            IActivatedAbility a => ActivatedText(a),
+            _ => null,
+        };
+    }
+
+    private static string ActivatedText(IActivatedAbility a)
+    {
+        var costs = string.Join(", ", a.Costs
+            .Select(c => c is Majik.Core.Costs.ManaCostCost m ? WireMana.Amount(m.Cost) : c.Description)
+            .Where(d => !string.IsNullOrWhiteSpace(d)));
+        var effects = string.Join(" ", ((a as ActivatedAbility)?.Effects ?? Array.Empty<Majik.Core.Abilities.IEffect>())
+            .Select(e => e.Description)
+            .Where(d => !string.IsNullOrWhiteSpace(d)));
+        return costs.Length > 0 ? $"{costs}: {effects}" : effects;
+    }
 
     /// <summary>The source card's InstanceId (kept across zone moves), or null
     /// when there is none or it is in a zone hidden from <paramref name="viewer"/>
@@ -578,7 +617,7 @@ public static class StateSnapshotter
     internal static bool HidesFaceDownSource(object? source, Player? viewer) =>
         source is ICard c && IsFaceDown(c) && !MayLookAt(c, viewer);
 
-    private static string BuildActivatedAbilityDescription(IActivatedAbility a, Player? viewer)
+    internal static string BuildActivatedAbilityDescription(IActivatedAbility a, Player? viewer)
     {
         var sourceName = a.Source is ICard src ? DisplayName(src, viewer) : null;
         // IActivatedAbility does not expose Effects on the interface; the
@@ -599,6 +638,6 @@ public static class StateSnapshotter
             }
             return firstEffect!;
         }
-        return sourceName ?? "ability";
+        return sourceName is { Length: > 0 } ? $"{sourceName} ability" : "ability";
     }
 }

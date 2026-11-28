@@ -151,7 +151,8 @@ public class StateSnapshotterTests
             Guid.NewGuid(), 1, StepStateType.PreCombatMain, alice,
             new[] { alice }, stack);
 
-        dto.Stack.Should().ContainSingle().Which.Description.Should().Be("Windswept Heath");
+        // C20 — "{source} ability", the shape triggers use ("{source} trigger").
+        dto.Stack.Should().ContainSingle().Which.Description.Should().Be("Windswept Heath ability");
     }
 
     [Fact]

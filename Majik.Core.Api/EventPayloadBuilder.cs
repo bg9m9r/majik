@@ -630,7 +630,10 @@ public static class EventPayloadBuilder
     {
         ISpell spell => spell.Card?.Name ?? "",
         ITriggeredAbility t => DisplayName(t.Source as ICard, viewer) + " trigger",
-        IActivatedAbility => "ability",
+        // C20 — the same description the stack snapshot shows.
+        IActivatedAbility a => StateSnapshotter.HidesFaceDownSource(a.Source, viewer)
+            ? FaceDownName + " ability"
+            : StateSnapshotter.BuildActivatedAbilityDescription(a, viewer),
         _ => obj.GetType().Name,
     };
 }

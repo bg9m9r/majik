@@ -3377,6 +3377,13 @@
       },
       "StackObjectDto": {
         "properties": {
+          "abilityId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "controllerId": {
             "format": "uuid",
             "type": [
@@ -3397,6 +3404,12 @@
           },
           "kind": {
             "type": "string"
+          },
+          "rulesText": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "sourceCardId": {
             "format": "uuid",

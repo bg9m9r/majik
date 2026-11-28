@@ -141,7 +141,22 @@ public sealed record StackObjectDto(
     // across zone moves, so it is the id the client saw in the hand or on the
     // battlefield. Null when there is no source card, or when that card is in a
     // zone hidden from the viewer (CR 706: a library, another player's hand).
-    Guid? SourceCardId = null);
+    Guid? SourceCardId = null,
+    // CR 113.2 / 602.1 — an ability's own text: for an activated ability
+    // "cost: effect" (costs in brace form), for a triggered ability its effect
+    // text (the same Text TriggeredAbilityTriggeredPayload carries). The engine
+    // keeps no printed trigger sentence, so this is the generated effect text.
+    // Null for a spell (its card carries the oracle text), and when the source
+    // is in a zone hidden from the viewer or is a face-down permanent the
+    // viewer may not look at (CR 706, CR 708.2).
+    string? RulesText = null,
+    // The id of the ability this entry comes from. Triggered: the ability's
+    // id, which TriggeredAbilityTriggeredPayload.AbilityId names (that event is
+    // published when the ability triggers, before it is put on the stack,
+    // CR 603.3, so it cannot carry the entry id; this field is the link).
+    // Activated: the activated ability's id as listed on its card
+    // (AbilityDto.Id), not the stack copy's. Null for a spell.
+    Guid? AbilityId = null);
 
 /// <summary>A reference to a chosen target. <see cref="Kind"/> is "Card"
 /// (<see cref="Id"/> = the card's InstanceId), "Player" (the player id) or

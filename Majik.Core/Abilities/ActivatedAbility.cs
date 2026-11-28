@@ -44,6 +44,17 @@ public class ActivatedAbility : IActivatedAbility
     private IReadOnlyList<Game.DamageAllocation>? _chosenDamageDivision;
 
     public Guid Id { get; }
+
+    /// <summary>
+    /// CR 602.2a — for the object put on the stack by an activation, the id of
+    /// the ability that was activated (the one printed on / granted to its
+    /// source, whose id the client sees on the card). Null on that ability
+    /// itself. Display only.
+    /// </summary>
+    public Guid? ActivatedFromId { get; private set; }
+
+    internal void SetActivatedFrom(Guid abilityId) => ActivatedFromId = abilityId;
+
     public Player Controller { get; }
     public DateTime Timestamp { get; }
     public object Source { get; }
