@@ -174,6 +174,7 @@ public class EventPayloadGoldenTests
         Keys(payload).Should().BeEquivalentTo(new[]
         {
             "sourceInstanceId", "targetInstanceId", "targetIsPlayer", "amount", "damageType",
+            "sourceName", // C16: null here, the source is a player
         });
         payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(caster.Id);
         payload.GetProperty("targetInstanceId").GetGuid().Should().Be(victim.Id);

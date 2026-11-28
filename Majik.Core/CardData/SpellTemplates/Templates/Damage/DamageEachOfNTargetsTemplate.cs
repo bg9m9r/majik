@@ -44,6 +44,6 @@ public sealed class DamageEachOfNTargetsTemplate : ISpellTemplate
         // even-split to exactly N per target (k targets * N = n*k). The
         // helper splits remainder front-loaded, so for k|n*k this is exact.
         return DamageSpellFactory.DamageDividedAmongAnyTargetsSpell(
-            n * k, k, ctx.Resolver, ctx.Replacements, ctx.Caster, ctx.EventBus);
+            n * k, k, ctx.Resolver, ctx.Replacements, ctx.Caster, ctx.EventBus, ctx.Stack);
     }
 }

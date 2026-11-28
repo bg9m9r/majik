@@ -157,7 +157,9 @@ public static class EventPayloadBuilder
             TargetInstanceId: x.TargetInstanceId,
             TargetIsPlayer: x.TargetIsPlayer,
             Amount: x.Amount,
-            DamageType: x.DamageType.ToString())),
+            DamageType: x.DamageType.ToString(),
+            SourceName: x.SourceCard is { } damageSource
+                ? StateSnapshotter.DisplayName(damageSource, viewer) : null)),
         // PLAN 04 — CR 121 / CR 614 counter placement. Lean payload so the
         // portal reducer can bump the target's counter badge in place
         // (display only — P/T are recomputed authoritatively by the next
@@ -314,6 +316,7 @@ public static class EventPayloadBuilder
         TriggeredAbilityCounteredEvent x => IsFaceDown(x.Ability.Source as ICard),
         SpellCounteredEvent x => x.CounteringObject is { } by && IsFaceDown(AbilitySource(by)),
         ManaAbilityActivatedEvent x => IsFaceDown(x.Source as ICard),
+        DamageDealtEvent x => IsFaceDown(x.SourceCard),
         AbilityActivatedEvent x => IsFaceDown(x.Ability.Source as ICard),
         ContinuousEffectAddedEvent x => IsFaceDown(x.Effect.Source),
         ContinuousEffectRemovedEvent x => IsFaceDown(x.Effect.Source),

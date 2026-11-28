@@ -1066,6 +1066,12 @@
             "format": "uuid",
             "type": "string"
           },
+          "sourceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "targetInstanceId": {
             "format": "uuid",
             "type": "string"

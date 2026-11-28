@@ -161,7 +161,11 @@ public sealed record DamageDealtPayload(
     Guid TargetInstanceId,
     bool TargetIsPlayer,
     int Amount,
-    string DamageType);
+    string DamageType,
+    /// <summary>The source card's name (CR 120.2: the spell, ability source or
+    /// creature that dealt the damage), masked for a face-down source
+    /// (CR 708.2). Null when the source is a player (no object is known).</summary>
+    string? SourceName = null);
 
 /// <summary>
 /// CR 121 / CR 614 — counters placed on a permanent. Lean payload so the

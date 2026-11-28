@@ -13,32 +13,35 @@ internal static class DamageSpellFactory
 {
     /// <summary>
     /// Publish a generic <see cref="DamageDealtEvent"/> for spell-source
-    /// damage (CR 119) so the portal can animate per-target damage
-    /// pings. <paramref name="caster"/> is used as the source identity
-    /// today — full ICard threading lands when the spell pipeline
-    /// surfaces the resolving card to the effect closure.
+    /// damage (CR 119) so the portal can animate per-target damage pings.
+    /// CR 120.2 — the source of the damage is the spell: the card of the spell
+    /// resolving on <paramref name="stack"/> (the effect runs during its
+    /// resolution, CR 608.2). <paramref name="caster"/> is the source only
+    /// when no resolving spell is known (a direct effect call with no stack).
     /// </summary>
     private static void EmitDamageDealt(
-        IEventBus? bus, Player? caster, object target, int amount)
+        IEventBus? bus, Player? caster, Majik.Core.Stack.Stack? stack, object target, int amount)
     {
         if (bus == null || caster == null || amount <= 0) return;
+        var source = (stack?.CurrentlyResolving as Majik.Core.Spells.ISpell)?.Card;
+        if (source != null) caster = null;
         switch (target)
         {
             case Creature c:
                 bus.Publish(new DamageDealtEvent(
-                    sourceCard: null, sourcePlayer: caster,
+                    sourceCard: source, sourcePlayer: caster,
                     targetCard: c, targetPlayer: null,
                     amount: amount, damageType: DamageType.Spell));
                 break;
             case Planeswalker pw:
                 bus.Publish(new DamageDealtEvent(
-                    sourceCard: null, sourcePlayer: caster,
+                    sourceCard: source, sourcePlayer: caster,
                     targetCard: pw, targetPlayer: null,
                     amount: amount, damageType: DamageType.Spell));
                 break;
             case Player p:
                 bus.Publish(new DamageDealtEvent(
-                    sourceCard: null, sourcePlayer: caster,
+                    sourceCard: source, sourcePlayer: caster,
                     targetCard: null, targetPlayer: p,
                     amount: amount, damageType: DamageType.Spell));
                 break;
@@ -83,7 +86,8 @@ internal static class DamageSpellFactory
 
     internal static SpellDefinition DamageAnySpell(
         int n, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        ReplacementBus? replacements, Player? caster, IEventBus? bus,
+        Majik.Core.Stack.Stack? stack = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -94,7 +98,7 @@ internal static class DamageSpellFactory
                 var amount = Filter(replacements, (object?)caster ?? target, target, n);
                 if (amount <= 0) return;
                 OracleSpellBinder.DealDamage(target, amount);
-                EmitDamageDealt(bus, caster, target, amount);
+                EmitDamageDealt(bus, caster, stack, target, amount);
             }) };
         });
 
@@ -108,7 +112,8 @@ internal static class DamageSpellFactory
 
     internal static SpellDefinition DamagePlayerSpell(
         int n, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        ReplacementBus? replacements, Player? caster, IEventBus? bus,
+        Majik.Core.Stack.Stack? stack = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -123,7 +128,7 @@ internal static class DamageSpellFactory
                 var amount = Filter(replacements, (object?)caster ?? target, player, n);
                 if (amount <= 0) return;
                 player.LoseLife(amount);
-                EmitDamageDealt(bus, caster, player, amount);
+                EmitDamageDealt(bus, caster, stack, player, amount);
             }) };
         });
 
@@ -197,7 +202,8 @@ internal static class DamageSpellFactory
 
     internal static SpellDefinition DamageCreatureSpell(
         int n, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        ReplacementBus? replacements, Player? caster, IEventBus? bus,
+        Majik.Core.Stack.Stack? stack = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -209,7 +215,7 @@ internal static class DamageSpellFactory
                 var amount = Filter(replacements, (object?)caster ?? creature, creature, n);
                 if (amount <= 0) return;
                 creature.TakeDamage(amount);
-                EmitDamageDealt(bus, caster, creature, amount);
+                EmitDamageDealt(bus, caster, stack, creature, amount);
             }) };
         });
 
@@ -223,7 +229,8 @@ internal static class DamageSpellFactory
 
     internal static SpellDefinition DealsXAnyTargetSpell(
         Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        ReplacementBus? replacements, Player? caster, IEventBus? bus,
+        Majik.Core.Stack.Stack? stack = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -235,7 +242,7 @@ internal static class DamageSpellFactory
                 var amount = Filter(replacements, (object?)caster ?? target, target, x);
                 if (amount <= 0) return;
                 OracleSpellBinder.DealDamage(target, amount);
-                EmitDamageDealt(bus, caster, target, amount);
+                EmitDamageDealt(bus, caster, stack, target, amount);
             }) };
         });
 
@@ -249,7 +256,8 @@ internal static class DamageSpellFactory
 
     internal static SpellDefinition DealsXCreatureSpell(
         Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        ReplacementBus? replacements, Player? caster, IEventBus? bus,
+        Majik.Core.Stack.Stack? stack = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -262,7 +270,7 @@ internal static class DamageSpellFactory
                 var amount = Filter(replacements, (object?)caster ?? creature, creature, x);
                 if (amount <= 0) return;
                 creature.TakeDamage(amount);
-                EmitDamageDealt(bus, caster, creature, amount);
+                EmitDamageDealt(bus, caster, stack, creature, amount);
             }) };
         });
 
@@ -285,7 +293,8 @@ internal static class DamageSpellFactory
     /// </summary>
     internal static SpellDefinition DamageDividedAmongAnyTargetsSpell(
         int n, int maxTargets, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        ReplacementBus? replacements, Player? caster, IEventBus? bus,
+        Majik.Core.Stack.Stack? stack = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("any target", 1, maxTargets, Array.Empty<object>()) },
         // CR 601.2d — declare the divide-damage announcement so SpellCastFlow
@@ -334,7 +343,7 @@ internal static class DamageSpellFactory
                     var amount = Filter(replacements, (object?)caster ?? target, target, share);
                     if (amount <= 0) continue;
                     OracleSpellBinder.DealDamage(target, amount);
-                    EmitDamageDealt(bus, caster, target, amount);
+                    EmitDamageDealt(bus, caster, stack, target, amount);
                 }
             }) };
         });

@@ -351,4 +351,19 @@ public class EventPayloadLongTailTests
         // CR 708.6 - its controller may look at it.
         S(EventPayloadBuilder.Build(ev, _bob), "permanentName").Should().Be("Secret Morph");
     }
+
+    [Fact]
+    public void DamageDealt_NamesItsSource_AndMasksAFaceDownSource()
+    {
+        var bolt = new Instant("Lightning Bolt", "{R}");
+        bolt.SetOwner(_alice);
+        var p = EventPayloadBuilder.Build(new DamageDealtEvent(bolt, null, null, _bob, 3, DamageType.Spell));
+        p.GetProperty("sourceInstanceId").GetGuid().Should().Be(bolt.InstanceId);
+        p.GetProperty("sourceName").GetString().Should().Be("Lightning Bolt");
+
+        var byPlayer = EventPayloadBuilder.Build(new DamageDealtEvent(null, _alice, null, _bob, 1, DamageType.Spell));
+        byPlayer.GetProperty("sourceName").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+        EventPayloadBuilder.RequiresPerViewerMasking(
+            new DamageDealtEvent(bolt, null, null, _bob, 3, DamageType.Spell)).Should().BeFalse();
+    }
 }
