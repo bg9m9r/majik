@@ -1,3 +1,4 @@
+using Majik.Core.Api.BotReplay;
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
@@ -60,23 +61,28 @@ public sealed class PriorityPlayerIdTests
     {
         using var ids = DeterministicIdScope.Push(new DeterministicIdSource(5));
         var facade = GameFacade.Create("Alice", "Bob", RealDeck("Burn"), RealDeck("BorosEnergy"), cardRepo: Repo);
-        facade.ReplaceAliceAgent(new HeuristicBotAgent(cardRepository: Repo));
-        facade.ReplaceBobAgent(new HeuristicBotAgent(cardRepository: Repo));
         var mismatches = new List<string>();
         var checkedGrants = 0;
         var primed = false;
-        // Registered after the facade's own publish handler, so the snapshot
-        // for this grant is already published when this runs.
-        facade.EventBus.Subscribe<PriorityReceivedEvent>(ev =>
+        // Observed at the bot's actual priority decision (CR 117.1: the holder
+        // has priority once SBAs ran and triggers are on the stack, CR 117.5).
+        // RecordingPlayerAgent's record callback runs after the bot chose but
+        // before the loop applies the choice, i.e. inside the decision window.
+        Func<BotDecisionRecord, Task> Check(Func<Majik.Core.Players.Player> seat) => rec =>
         {
+            if (rec.Kind != BotDecisionKind.Priority) return Task.CompletedTask;
             Majik.Core.Api.Dtos.GameStateDto? alice = null, bob = null;
             EngineFlow.RunExternal(() =>
                 (alice, bob) = Task.Run(() => (facade.GetStateFor(facade.Alice.Id), facade.GetStateFor(facade.Bob.Id))).Result);
-            if (!primed) { primed = true; return; } // first foreign read registers both views
+            if (!primed) { primed = true; return Task.CompletedTask; } // first foreign read registers both views
             checkedGrants++;
-            if (alice!.PriorityPlayerId != ev.Player.Id) mismatches.Add($"alice view: {alice.PriorityPlayerId} != {ev.Player.Name}");
-            if (bob!.PriorityPlayerId != ev.Player.Id) mismatches.Add($"bob view: {bob.PriorityPlayerId} != {ev.Player.Name}");
-        });
+            var holder = seat();
+            if (alice!.PriorityPlayerId != holder.Id) mismatches.Add($"alice view: {alice.PriorityPlayerId} != {holder.Name}");
+            if (bob!.PriorityPlayerId != holder.Id) mismatches.Add($"bob view: {bob.PriorityPlayerId} != {holder.Name}");
+            return Task.CompletedTask;
+        };
+        facade.ReplaceAliceAgent(new RecordingPlayerAgent(new HeuristicBotAgent(cardRepository: Repo), Check(() => facade.Alice)));
+        facade.ReplaceBobAgent(new RecordingPlayerAgent(new HeuristicBotAgent(cardRepository: Repo), Check(() => facade.Bob)));
 
         await facade.StartFullGameAsync(firstPlayerSlot: 0, maxTurns: 6, rng: new GameRandom(5));
         await facade.FullGameTask!.WaitAsync(TimeSpan.FromSeconds(60));
@@ -84,5 +90,53 @@ public sealed class PriorityPlayerIdTests
         checkedGrants.Should().BeGreaterThan(10);
         mismatches.Should().BeEmpty();
         facade.GetState().PriorityPlayerId.Should().BeNull("nobody holds priority once the game is over");
+    }
+
+    [Fact]
+    public async Task WhileATriggerIsPutOnTheStack_BeforePriorityIsGranted_NobodyHoldsPriority()
+    {
+        // CR 117.5 / 603.3 — before a player receives priority, SBAs run and
+        // pending triggers are put on the stack; the trigger's controller (here
+        // Bob, while Alice is about to get priority) is prompted for targets.
+        // Nobody holds priority in that window, so a client gating input on
+        // PriorityPlayerId must not see Alice as the holder.
+        var deck = Enumerable.Range(0, 20).Select(_ => (ICard)new Land("Forest")).ToList();
+        var facade = GameFacade.Create("Alice", "Bob", deck, deck.ToList());
+        var source = new Creature("Pinger", "{R}", 1, 1);
+        source.SetOwner(facade.Bob); source.SetController(facade.Bob);
+        facade.Bob.Zones.Battlefield.AddCard(source); source.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
+        var trigger = new Majik.Core.Abilities.TriggeredAbility(source, facade.Bob,
+            Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(source),
+            targetRequests: new[] { new TargetRequest("target player", 1, 1, new object[] { facade.Alice, facade.Bob }) });
+        facade.Triggers.EnqueuePending(trigger);
+
+        var targetPromptHolders = new List<Guid?>();
+        var priorityMismatches = new List<string>();
+        using var sub = facade.SubscribePrompts(p =>
+        {
+            if (p.ExpectedKinds.Contains(nameof(ChooseTargetsCommand)))
+            {
+                lock (targetPromptHolders) targetPromptHolders.Add(facade.GetStateFor(facade.Alice.Id)!.PriorityPlayerId);
+                _ = facade.SubmitAsync(new ChooseTargetsCommand(new[] { facade.Alice.Id }) { PlayerId = p.PlayerId });
+                return;
+            }
+            if (p.ExpectedKinds.Contains(nameof(MulliganCommand)))
+            {
+                _ = facade.SubmitAsync(new MulliganCommand(Keep: true) { PlayerId = p.PlayerId });
+                return;
+            }
+            if (!p.ExpectedKinds.Contains(nameof(PassPriorityCommand))) return;
+            if (facade.GetState().PriorityPlayerId != p.PlayerId) lock (priorityMismatches) priorityMismatches.Add(p.PlayerId.ToString());
+            _ = facade.SubmitAsync(new PassPriorityCommand { PlayerId = p.PlayerId });
+        });
+
+        // The full-game path drains triggers through the agent-aware async
+        // drain (the single-round StartAsync path auto-targets).
+        await facade.StartFullGameAsync(firstPlayerSlot: 0, maxTurns: 1, rng: new GameRandom(1));
+        await facade.FullGameTask!.WaitAsync(TimeSpan.FromSeconds(30));
+
+        targetPromptHolders.Should().ContainSingle().Which.Should().BeNull(
+            "the engine is putting a trigger on the stack; nobody holds priority");
+        priorityMismatches.Should().BeEmpty();
     }
 }

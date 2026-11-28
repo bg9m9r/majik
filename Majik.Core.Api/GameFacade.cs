@@ -412,22 +412,20 @@ public sealed class GameFacade : IDisposable
         // Quiescent points between prompts (bot seats raise none): a player
         // receiving priority (CR 117.3, after SBAs and triggers, CR 117.5) and
         // a step starting. Refresh only the views an off-engine reader asked for.
-        // CR 117.1 / 117.3 — track who holds priority for the snapshot: the
-        // player who last received it, until all players pass in succession
-        // (CR 117.4 — the top resolves or the step ends) or a new step starts.
-        // Updated before the refresh so the published snapshot names the new
-        // holder, whichever kind of agent (human seat or bot) it is.
-        _bus.Subscribe<Majik.Core.Domain.DomainEvents.PriorityReceivedEvent>(ev =>
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.PriorityReceivedEvent>(_ => PublishOnEngineFlow(allViews: false));
+        _bus.Subscribe<StepStartedEvent>(_ => PublishOnEngineFlow(allViews: false));
+        // CR 117.1 / 117.5 — the snapshot's priority holder is the player the
+        // engine is actually waiting on for a priority decision (PriorityLoop
+        // opens the window after SBAs and the trigger drain, and closes it once
+        // the choice is made), null otherwise — so it never names a seat while
+        // the engine is prompting another seat for a trigger's targets. Every
+        // prompt republishes all views, so a prompt never ships next to a
+        // stale holder.
+        _priority.DecidingPlayerChanged += player =>
         {
-            _priorityHolder = ev.Player;
-            PublishOnEngineFlow(allViews: false);
-        });
-        _bus.Subscribe<Majik.Core.Domain.DomainEvents.AllPlayersPassedEvent>(_ => _priorityHolder = null);
-        _bus.Subscribe<StepStartedEvent>(_ =>
-        {
-            _priorityHolder = null;
-            PublishOnEngineFlow(allViews: false);
-        });
+            _priorityHolder = player;
+            if (player != null) PublishOnEngineFlow(allViews: false);
+        };
     }
 
     private void PublishOnEngineFlow(bool allViews)

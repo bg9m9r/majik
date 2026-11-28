@@ -19,11 +19,17 @@ public sealed record GameStateDto(
     // predates the seq plumbing (and any pre-deploy client) degrades to the
     // prior always-accept behaviour.
     long Seq = 0,
-    // CR 117.1 / 117.3 — the player who currently holds priority. Null while
-    // nobody does: after all players passed in succession (CR 117.4) while the
-    // top of the stack resolves or the step ends, during steps in which no
-    // player receives priority (untap; usually cleanup, CR 514.3), before the
-    // game starts and after it ends. Same value in every viewer's snapshot.
+    // CR 117.1 / 117.3 — the player the engine is waiting on for a priority
+    // decision. Null whenever the engine is doing anything else: checking
+    // state-based actions and putting triggered abilities on the stack before
+    // priority is granted (CR 117.5 — including while a trigger's controller
+    // is prompted to order triggers or choose targets), applying the chosen
+    // action, resolving (CR 117.4), during steps in which no player receives
+    // priority (untap; usually cleanup, CR 514.3), before the game starts and
+    // after it ends. Same value in every viewer's snapshot.
+    // A prompt addressed to a seat is authoritative regardless of this field:
+    // a client must answer a pending prompt for its seat even when this names
+    // the other player or is null.
     Guid? PriorityPlayerId = null);
 
 public sealed record PlayerDto(

@@ -232,7 +232,19 @@ public sealed class PriorityLoop
                     continue;
                 }
 
-                var action = await agent.ChoosePriorityActionAsync(ctx, ct).ConfigureAwait(false);
+                // CR 117.1 — the holder now actually has priority: SBAs ran and
+                // pending triggers are on the stack (CR 117.5). Mark the decision
+                // window for observers; it closes once the choice is made.
+                PriorityAction action;
+                _priority.SetDecidingPlayer(current);
+                try
+                {
+                    action = await agent.ChoosePriorityActionAsync(ctx, ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _priority.SetDecidingPlayer(null);
+                }
 
                 if (action is PriorityAction.PassAction)
                 {
