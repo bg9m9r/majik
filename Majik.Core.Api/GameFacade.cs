@@ -68,7 +68,7 @@ public sealed class GameFacade : IDisposable
             System.Diagnostics.Trace.TraceWarning($"Majik engine: contained fault ({context}): {ex}");
             return;
         }
-        try { sink(ex, context); }
+        try { RunOffEngineFlow(() => sink(ex, context)); }
         catch { /* a faulty sink must not take the engine down */ }
     }
 
@@ -2099,7 +2099,9 @@ public sealed class GameFacade : IDisposable
         var sink = OnEventHandlerError;
         if (sink != null)
         {
-            sink(ex, @event);
+            // External callback: never let it (or work it schedules) count
+            // as the engine flow.
+            RunOffEngineFlow(() => sink(ex, @event));
             return;
         }
 
