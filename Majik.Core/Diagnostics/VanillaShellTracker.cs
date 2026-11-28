@@ -86,10 +86,12 @@ public sealed class VanillaShellTracker
             + "Game will continue but EV is unreliable."
             + (string.IsNullOrEmpty(context) ? "" : $" Context: {context}.");
 
-        try { _logger?.Invoke(msg); }
+        // The logger and the bus are consumer-supplied: run them off the
+        // engine flow (Game.EngineFlow) like every other external callback.
+        try { if (_logger is { } log) Game.EngineFlow.RunExternal(() => log(msg)); }
         catch { /* observer fault must not abort engine */ }
 
-        try { _eventBus?.Publish(new UnimplementedCardEncounteredEvent(card, player, context)); }
+        try { if (_eventBus is { } bus) Game.EngineFlow.RunExternal(() => bus.Publish(new UnimplementedCardEncounteredEvent(card, player, context))); }
         catch { /* observer fault must not abort engine */ }
 
         return true;

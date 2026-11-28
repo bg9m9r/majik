@@ -309,7 +309,16 @@ public sealed class GameFacade : IDisposable
     /// <summary>Read-only access to the trigger manager (used by fuzz/diagnostic observers).</summary>
     public TriggerManager Triggers => _triggers;
 
-    /// <summary>Read-only access to the event bus (used by fuzz/diagnostic observers).</summary>
+    /// <summary>Read-only access to the event bus (used by fuzz/diagnostic observers).
+    /// <para>This is the engine's own bus: its handlers run synchronously ON
+    /// THE ENGINE FLOW, as engine callees (unlike <see cref="Subscribe"/> /
+    /// <see cref="SubscribeEnvelopes"/> / <see cref="SubscribePrompts"/>, which
+    /// run off it). A handler here may read live state on its own thread but
+    /// must not hand state reads to another thread (Task.Run, timers, an await
+    /// that resumes elsewhere): such work would inherit the engine-flow mark
+    /// and read live objects without a lock while the engine runs. Wrap any
+    /// such hand-off in <see cref="Majik.Core.Game.EngineFlow.RunExternal"/>,
+    /// or use the public subscription methods instead.</para></summary>
     public EventBus EventBus => _bus;
 
     private GameFacade(Player alice, Player bob)
@@ -383,7 +392,7 @@ public sealed class GameFacade : IDisposable
     {
         // Not running: foreign reads build live, nothing to publish. Off the
         // engine flow: must not touch live objects.
-        if (_engineRunning && ReferenceEquals(EngineFlow.Value, this))
+        if (_engineRunning && ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this))
         {
             PublishSnapshot(allViews);
         }
@@ -795,10 +804,17 @@ public sealed class GameFacade : IDisposable
     /// <see cref="Majik.Bot.BotPlayerAgent"/>). Must be called before
     /// <see cref="StartAsync"/> / <see cref="StartFullGameAsync"/>; throws
     /// once the game is running. After swap, <see cref="SubmitAsync"/> for
-    /// that seat will throw — the bot drives itself.</summary>
+    /// that seat will throw — the bot drives itself.
+    /// <para>The agent runs ON THE ENGINE FLOW (it is an engine callee and
+    /// may read live state on its own thread). It must not hand state reads
+    /// to other threads; callbacks it invokes for its consumer (a "thinking"
+    /// notification, a decision sink, a logger) must go through
+    /// <see cref="Majik.Core.Game.EngineFlow.RunExternal"/> —
+    /// <c>BotPlayerAgent</c> and <c>VanillaShellTracker</c> already do.</para></summary>
     public void ReplaceAliceAgent(IPlayerAgent agent) => SwapAgent(_alice, agent);
 
-    /// <summary>Replaces the Bob-seat agent. See <see cref="ReplaceAliceAgent"/>.</summary>
+    /// <summary>Replaces the Bob-seat agent. See <see cref="ReplaceAliceAgent"/>
+    /// (including the engine-flow contract for agents).</summary>
     public void ReplaceBobAgent(IPlayerAgent agent) => SwapAgent(_bob, agent);
 
     private void SwapAgent(Player seat, IPlayerAgent agent)
@@ -1764,7 +1780,6 @@ public sealed class GameFacade : IDisposable
 
     private sealed record PublishedStates(GameStateDto? Spectator, GameStateDto? Alice, GameStateDto? Bob);
 
-    private static readonly AsyncLocal<GameFacade?> EngineFlow = new();
     private PublishedStates? _published;
     private int _requestedViews;
     private volatile bool _engineRunning;
@@ -1780,22 +1795,12 @@ public sealed class GameFacade : IDisposable
     /// engine callees (bus handlers, bots, card closures) are not routed
     /// through here and keep live reads.
     /// </summary>
-    internal static void RunOffEngineFlow(Action callback)
-    {
-        var previous = EngineFlow.Value;
-        if (previous is null)
-        {
-            callback();
-            return;
-        }
-        EngineFlow.Value = null;
-        try { callback(); }
-        finally { EngineFlow.Value = previous; }
-    }
+    internal static void RunOffEngineFlow(Action callback) => Majik.Core.Game.EngineFlow.RunExternal(callback);
+
 
     /// <summary>Test hook: does the calling flow count as this facade's
     /// engine flow (live reads, no lock)?</summary>
-    internal bool IsOnEngineFlow => ReferenceEquals(EngineFlow.Value, this);
+    internal bool IsOnEngineFlow => ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this);
 
     /// <summary>Live build when allowed: on the engine flow (single-threaded
     /// by construction, no lock), or while no engine is running (serialised,
@@ -1804,7 +1809,7 @@ public sealed class GameFacade : IDisposable
     /// snapshot.</summary>
     private GameStateDto? TryReadLive(Player? viewer)
     {
-        if (_engineRunning && ReferenceEquals(EngineFlow.Value, this)) return BuildState(viewer);
+        if (_engineRunning && ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this)) return BuildState(viewer);
         if (_engineRunning) return null;
         lock (_liveReadLock)
         {
@@ -1824,10 +1829,10 @@ public sealed class GameFacade : IDisposable
             PublishSnapshot(allViews: true);
             _engineRunning = true;
         }
-        var previous = EngineFlow.Value;
-        EngineFlow.Value = this;
+        var previous = Majik.Core.Game.EngineFlow.Current;
+        Majik.Core.Game.EngineFlow.Current = this;
         try { return start(); }
-        finally { EngineFlow.Value = previous; }
+        finally { Majik.Core.Game.EngineFlow.Current = previous; }
     }
 
     /// <summary>

@@ -24,6 +24,12 @@ public sealed class BotPlayerAgent : IPlayerAgent
         ArgumentNullException.ThrowIfNull(self);
         _self = self;
         _onThinking = onThinking;
+        // The decision sink is consumer-supplied: run it off the engine flow
+        // (EngineFlow.RunExternal) like every other external callback.
+        if (config.DecisionSink is { } sink && sink is not Diagnostics.OffEngineFlowDecisionSink)
+        {
+            config = config with { DecisionSink = new Diagnostics.OffEngineFlowDecisionSink(sink) };
+        }
         // "frozen-fb1" — FB1, the frozen-baseline ladder's permanent reference
         // opponent: a byte-identical snapshot of the live heuristic vendored
         // under Majik.Bot.Frozen.FB1, cut 2026-06-12 at commit 38547ffb3.
@@ -73,17 +79,24 @@ public sealed class BotPlayerAgent : IPlayerAgent
     private Task<T> WrapAsync<T>(Func<T> work, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        try { _onThinking?.Invoke(true); }
-        catch { /* observer fault must not abort engine */ }
+        NotifyThinking(true);
         try
         {
             return Task.FromResult(work());
         }
         finally
         {
-            try { _onThinking?.Invoke(false); }
-            catch { /* observer fault must not abort engine */ }
+            NotifyThinking(false);
         }
+    }
+
+    /// <summary>The thinking callback is consumer code: invoke it off the
+    /// engine flow so neither it nor work it schedules reads live state.</summary>
+    private void NotifyThinking(bool thinking)
+    {
+        if (_onThinking is not { } callback) return;
+        try { EngineFlow.RunExternal(() => callback(thinking)); }
+        catch { /* observer fault must not abort engine */ }
     }
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
