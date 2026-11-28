@@ -1381,13 +1381,7 @@ public sealed class RemoteAgent : IPlayerAgent
     {
         var sourceCard = trigger.Source as ICard;
         var sourceName = sourceCard?.Name ?? "";
-        var effectText = (trigger as TriggeredAbility)?.Effects
-            .Select(e => e.Description)
-            .Where(d => !string.IsNullOrWhiteSpace(d))
-            .ToList();
-        var text = effectText is { Count: > 0 }
-            ? string.Join(" ", effectText)
-            : (sourceName.Length > 0 ? $"{sourceName} trigger" : "triggered ability");
+        var text = EventPayloadBuilder.TriggerText(trigger);
         return new TriggerOptionDto(entryId, sourceCard?.InstanceId, sourceName, text);
     }
 

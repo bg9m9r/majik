@@ -199,6 +199,168 @@ public sealed record AbilityActivatedPayload(
     Guid SourceInstanceId,
     string SourceName);
 
+// Long-tail payloads for the player-facing log and animations. Each carries
+// ids plus display names so a client needs no state lookup. Display names go
+// through the same CR 708.2 rule everywhere: a face-down permanent is shown
+// as "Face-down permanent" to anyone but its controller (CR 708.6), and its
+// payload is then built per viewer (EventPayloadBuilder.RequiresPerViewerMasking).
+
+/// <summary>CR 701.26a — a permanent became tapped. <see cref="CausedById"/>
+/// is the player whose effect or cost tapped it, when known.</summary>
+public sealed record PermanentTappedPayload(
+    Guid PermanentId,
+    string PermanentName,
+    Guid? ControllerId,
+    Guid? CausedById);
+
+/// <summary>CR 603.2 — a triggered ability triggered (before it is put on the
+/// stack). Dual-shape: when the source is in a zone hidden from the viewer
+/// (CR 706: a library, or another player's hand) only <see cref="AbilityId"/>,
+/// <see cref="ControllerId"/> and <see cref="Hidden"/> = true are sent.</summary>
+public sealed record TriggeredAbilityTriggeredPayload(
+    Guid AbilityId,
+    Guid ControllerId,
+    Guid? SourceId = null,
+    string? SourceName = null,
+    string? Text = null,
+    bool? Hidden = null);
+
+/// <summary>CR 508.1 — one declared attacker and what it attacks (a player, or
+/// a planeswalker / battle permanent).</summary>
+public sealed record DeclaredAttackerPayload(
+    Guid AttackerId,
+    string AttackerName,
+    Guid? DefendingPlayerId,
+    Guid? DefendingPermanentId);
+
+/// <summary>CR 508.8 — attackers declared (the whole declaration at once).</summary>
+public sealed record AttackersDeclaredPayload(
+    Guid AttackingPlayerId,
+    IReadOnlyList<DeclaredAttackerPayload> Attackers);
+
+/// <summary>CR 509.1 — one declared blocker and the attacker it blocks.</summary>
+public sealed record DeclaredBlockerPayload(
+    Guid BlockerId,
+    string BlockerName,
+    Guid AttackerId);
+
+/// <summary>CR 509.4 — blockers declared (the whole declaration at once).</summary>
+public sealed record BlockersDeclaredPayload(
+    Guid? DefendingPlayerId,
+    IReadOnlyList<DeclaredBlockerPayload> Blockers);
+
+/// <summary>CR 508.1 — a single creature attacks.</summary>
+public sealed record CreatureAttacksPayload(
+    Guid AttackerId,
+    string AttackerName,
+    Guid? ControllerId,
+    Guid? DefendingPlayerId,
+    Guid? DefendingPermanentId);
+
+/// <summary>CR 509.1 — a single creature blocks an attacker.</summary>
+public sealed record CreatureBlocksPayload(
+    Guid BlockerId,
+    string BlockerName,
+    Guid? BlockerControllerId,
+    Guid AttackerId,
+    string AttackerName);
+
+/// <summary>CR 701.9 — a card was discarded. Public: the card is revealed
+/// on its way to the graveyard.</summary>
+public sealed record DiscardedPayload(
+    Guid PlayerId,
+    Guid CardId,
+    string CardName,
+    bool WasCost);
+
+/// <summary>CR 701.21 — a permanent was sacrificed.</summary>
+public sealed record PermanentSacrificedPayload(
+    Guid PlayerId,
+    Guid CardId,
+    string CardName,
+    bool WasToken);
+
+/// <summary>CR 701.6 — a spell was countered. <see cref="StackId"/> is the
+/// spell's stack id.</summary>
+public sealed record SpellCounteredPayload(
+    Guid StackId,
+    Guid? CardId,
+    string CardName,
+    Guid ControllerId,
+    Guid? CounteringControllerId);
+
+/// <summary>CR 603.4 / CR 701.6 — a triggered ability was countered or removed
+/// (e.g. its intervening-if condition was false on resolution).</summary>
+public sealed record TriggeredAbilityCounteredPayload(
+    Guid StackId,
+    Guid? SourceId,
+    string SourceName,
+    Guid ControllerId,
+    string Reason);
+
+/// <summary>CR 605 — a mana ability was activated. <see cref="Mana"/> is the
+/// produced mana in mana-cost notation.</summary>
+public sealed record ManaAbilityActivatedPayload(
+    Guid PlayerId,
+    Guid? SourceId,
+    string SourceName,
+    string Mana);
+
+/// <summary>CR 119.4 — a player paid life.</summary>
+public sealed record LifePaidPayload(
+    Guid PlayerId,
+    int Amount,
+    bool WasCost);
+
+/// <summary>CR 601.2h / CR 602.2b — the costs of a spell or ability were paid.
+/// <see cref="Costs"/> lists each cost's description.</summary>
+public sealed record CostsPaidPayload(
+    Guid StackId,
+    Guid ControllerId,
+    IReadOnlyList<string> Costs);
+
+/// <summary>CR 601.2c — targets were chosen for a spell or ability. A target
+/// card in a zone hidden from the viewer is sent with an empty id (CR 706),
+/// the same rule as <see cref="StackObjectDto.Targets"/>.</summary>
+public sealed record TargetsChosenPayload(
+    Guid StackId,
+    Guid ControllerId,
+    IReadOnlyList<TargetRefDto> Targets);
+
+/// <summary>CR 117 — a player received or passed priority.</summary>
+public sealed record PriorityPlayerPayload(Guid PlayerId);
+
+/// <summary>CR 506 — the combat phase began or ended.</summary>
+public sealed record CombatPhasePayload(Guid ActivePlayerId);
+
+/// <summary>CR 701.20 — a library was shuffled.</summary>
+public sealed record LibraryShuffledPayload(
+    Guid PlayerId,
+    int CardCount,
+    string Reason);
+
+/// <summary>A card identity inside a list payload.</summary>
+public sealed record CardRefPayload(Guid CardId, string CardName);
+
+/// <summary>CR 701.42 — a player surveilled N. Dual-shape (CR 706): every
+/// viewer sees the cards put into the graveyard (a public zone) and how many
+/// stayed on top; only the surveilling player sees <see cref="ToTop"/>.</summary>
+public sealed record SurveilPayload(
+    Guid PlayerId,
+    int N,
+    IReadOnlyList<CardRefPayload> ToGraveyard,
+    int ToTopCount,
+    IReadOnlyList<CardRefPayload>? ToTop = null);
+
+/// <summary>CR 702.29 — a card was cycled.</summary>
+public sealed record CardCycledPayload(
+    Guid PlayerId,
+    Guid CardId,
+    string CardName);
+
+/// <summary>CR 500.7 — an extra turn was added for a player.</summary>
+public sealed record ExtraTurnAddedPayload(Guid PlayerId);
+
 /// <summary>
 /// PLAN 07 — OpenAPI schema anchor. The SignalR <c>event</c> channel
 /// carries <see cref="EventDto.Payload"/> as a raw <c>JsonElement</c>, so
@@ -233,4 +395,24 @@ public sealed record EventPayloadCatalog(
     CounterAddedPayload CounterAdded,
     ContinuousEffectAddedPayload ContinuousEffectAdded,
     ContinuousEffectRemovedPayload ContinuousEffectRemoved,
-    AbilityActivatedPayload AbilityActivated);
+    AbilityActivatedPayload AbilityActivated,
+    PermanentTappedPayload PermanentTapped,
+    TriggeredAbilityTriggeredPayload TriggeredAbilityTriggered,
+    AttackersDeclaredPayload AttackersDeclared,
+    BlockersDeclaredPayload BlockersDeclared,
+    CreatureAttacksPayload CreatureAttacks,
+    CreatureBlocksPayload CreatureBlocks,
+    DiscardedPayload Discarded,
+    PermanentSacrificedPayload PermanentSacrificed,
+    SpellCounteredPayload SpellCountered,
+    TriggeredAbilityCounteredPayload TriggeredAbilityCountered,
+    ManaAbilityActivatedPayload ManaAbilityActivated,
+    LifePaidPayload LifePaid,
+    CostsPaidPayload CostsPaid,
+    TargetsChosenPayload TargetsChosen,
+    PriorityPlayerPayload PriorityPlayer,
+    CombatPhasePayload CombatPhase,
+    LibraryShuffledPayload LibraryShuffled,
+    SurveilPayload Surveil,
+    CardCycledPayload CardCycled,
+    ExtraTurnAddedPayload ExtraTurnAdded);

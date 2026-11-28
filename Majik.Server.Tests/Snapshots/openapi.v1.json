@@ -82,6 +82,25 @@
         ],
         "type": "object"
       },
+      "AttackersDeclaredPayload": {
+        "properties": {
+          "attackers": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredAttackerPayload"
+            },
+            "type": "array"
+          },
+          "attackingPlayerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attackingPlayerId",
+          "attackers"
+        ],
+        "type": "object"
+      },
       "AutoPassPrefs": {
         "properties": {
           "fullControl": {
@@ -114,6 +133,28 @@
         "required": [
           "blockerInstanceId",
           "attackerInstanceId"
+        ],
+        "type": "object"
+      },
+      "BlockersDeclaredPayload": {
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredBlockerPayload"
+            },
+            "type": "array"
+          },
+          "defendingPlayerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "defendingPlayerId",
+          "blockers"
         ],
         "type": "object"
       },
@@ -209,6 +250,27 @@
         },
         "required": [
           "canReport"
+        ],
+        "type": "object"
+      },
+      "CardCycledPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "playerId",
+          "cardId",
+          "cardName"
         ],
         "type": "object"
       },
@@ -440,6 +502,22 @@
         "required": [
           "from",
           "to"
+        ],
+        "type": "object"
+      },
+      "CardRefPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cardId",
+          "cardName"
         ],
         "type": "object"
       },
@@ -684,6 +762,18 @@
         ],
         "type": "object"
       },
+      "CombatPhasePayload": {
+        "properties": {
+          "activePlayerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activePlayerId"
+        ],
+        "type": "object"
+      },
       "ContinuousEffectAddedPayload": {
         "properties": {
           "description": {
@@ -729,6 +819,30 @@
           "sourceName",
           "layer",
           "description"
+        ],
+        "type": "object"
+      },
+      "CostsPaidPayload": {
+        "properties": {
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "costs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "stackId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stackId",
+          "controllerId",
+          "costs"
         ],
         "type": "object"
       },
@@ -825,6 +939,79 @@
           "visibility",
           "deckId",
           "clockMinutes"
+        ],
+        "type": "object"
+      },
+      "CreatureAttacksPayload": {
+        "properties": {
+          "attackerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "attackerName": {
+            "type": "string"
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "defendingPermanentId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "defendingPlayerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "attackerId",
+          "attackerName",
+          "controllerId",
+          "defendingPlayerId",
+          "defendingPermanentId"
+        ],
+        "type": "object"
+      },
+      "CreatureBlocksPayload": {
+        "properties": {
+          "attackerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "attackerName": {
+            "type": "string"
+          },
+          "blockerControllerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blockerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "blockerName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "blockerId",
+          "blockerName",
+          "blockerControllerId",
+          "attackerId",
+          "attackerName"
         ],
         "type": "object"
       },
@@ -1016,6 +1203,84 @@
         ],
         "type": "object"
       },
+      "DeclaredAttackerPayload": {
+        "properties": {
+          "attackerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "attackerName": {
+            "type": "string"
+          },
+          "defendingPermanentId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "defendingPlayerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "attackerId",
+          "attackerName",
+          "defendingPlayerId",
+          "defendingPermanentId"
+        ],
+        "type": "object"
+      },
+      "DeclaredBlockerPayload": {
+        "properties": {
+          "attackerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "blockerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "blockerName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "blockerId",
+          "blockerName",
+          "attackerId"
+        ],
+        "type": "object"
+      },
+      "DiscardedPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "wasCost": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "playerId",
+          "cardId",
+          "cardName",
+          "wasCost"
+        ],
+        "type": "object"
+      },
       "EventDto": {
         "properties": {
           "at": {
@@ -1055,6 +1320,15 @@
           "abilityActivated": {
             "$ref": "#/components/schemas/AbilityActivatedPayload"
           },
+          "attackersDeclared": {
+            "$ref": "#/components/schemas/AttackersDeclaredPayload"
+          },
+          "blockersDeclared": {
+            "$ref": "#/components/schemas/BlockersDeclaredPayload"
+          },
+          "cardCycled": {
+            "$ref": "#/components/schemas/CardCycledPayload"
+          },
           "cardDrawn": {
             "$ref": "#/components/schemas/CardDrawnPayload"
           },
@@ -1064,26 +1338,59 @@
           "cardRevealed": {
             "$ref": "#/components/schemas/CardRevealedPayload"
           },
+          "combatPhase": {
+            "$ref": "#/components/schemas/CombatPhasePayload"
+          },
           "continuousEffectAdded": {
             "$ref": "#/components/schemas/ContinuousEffectAddedPayload"
           },
           "continuousEffectRemoved": {
             "$ref": "#/components/schemas/ContinuousEffectRemovedPayload"
           },
+          "costsPaid": {
+            "$ref": "#/components/schemas/CostsPaidPayload"
+          },
           "counterAdded": {
             "$ref": "#/components/schemas/CounterAddedPayload"
+          },
+          "creatureAttacks": {
+            "$ref": "#/components/schemas/CreatureAttacksPayload"
+          },
+          "creatureBlocks": {
+            "$ref": "#/components/schemas/CreatureBlocksPayload"
           },
           "damageDealt": {
             "$ref": "#/components/schemas/DamageDealtPayload"
           },
+          "discarded": {
+            "$ref": "#/components/schemas/DiscardedPayload"
+          },
           "extraPhaseAdded": {
             "$ref": "#/components/schemas/ExtraPhaseAddedPayload"
+          },
+          "extraTurnAdded": {
+            "$ref": "#/components/schemas/ExtraTurnAddedPayload"
           },
           "gameStateChanged": {
             "$ref": "#/components/schemas/GameStateChangedPayload"
           },
+          "libraryShuffled": {
+            "$ref": "#/components/schemas/LibraryShuffledPayload"
+          },
           "lifeChanged": {
             "$ref": "#/components/schemas/LifeChangedPayload"
+          },
+          "lifePaid": {
+            "$ref": "#/components/schemas/LifePaidPayload"
+          },
+          "manaAbilityActivated": {
+            "$ref": "#/components/schemas/ManaAbilityActivatedPayload"
+          },
+          "permanentSacrificed": {
+            "$ref": "#/components/schemas/PermanentSacrificedPayload"
+          },
+          "permanentTapped": {
+            "$ref": "#/components/schemas/PermanentTappedPayload"
           },
           "phaseStateChanged": {
             "$ref": "#/components/schemas/PhaseStateChangedPayload"
@@ -1091,11 +1398,29 @@
           "playerLost": {
             "$ref": "#/components/schemas/PlayerLostPayload"
           },
+          "priorityPlayer": {
+            "$ref": "#/components/schemas/PriorityPlayerPayload"
+          },
+          "spellCountered": {
+            "$ref": "#/components/schemas/SpellCounteredPayload"
+          },
           "stackObject": {
             "$ref": "#/components/schemas/StackObjectPayload"
           },
           "stepStarted": {
             "$ref": "#/components/schemas/StepStartedPayload"
+          },
+          "surveil": {
+            "$ref": "#/components/schemas/SurveilPayload"
+          },
+          "targetsChosen": {
+            "$ref": "#/components/schemas/TargetsChosenPayload"
+          },
+          "triggeredAbilityCountered": {
+            "$ref": "#/components/schemas/TriggeredAbilityCounteredPayload"
+          },
+          "triggeredAbilityTriggered": {
+            "$ref": "#/components/schemas/TriggeredAbilityTriggeredPayload"
           },
           "turnEnded": {
             "$ref": "#/components/schemas/TurnEndedPayload"
@@ -1121,7 +1446,27 @@
           "counterAdded",
           "continuousEffectAdded",
           "continuousEffectRemoved",
-          "abilityActivated"
+          "abilityActivated",
+          "permanentTapped",
+          "triggeredAbilityTriggered",
+          "attackersDeclared",
+          "blockersDeclared",
+          "creatureAttacks",
+          "creatureBlocks",
+          "discarded",
+          "permanentSacrificed",
+          "spellCountered",
+          "triggeredAbilityCountered",
+          "manaAbilityActivated",
+          "lifePaid",
+          "costsPaid",
+          "targetsChosen",
+          "priorityPlayer",
+          "combatPhase",
+          "libraryShuffled",
+          "surveil",
+          "cardCycled",
+          "extraTurnAdded"
         ],
         "type": "object"
       },
@@ -1133,6 +1478,18 @@
         },
         "required": [
           "phase"
+        ],
+        "type": "object"
+      },
+      "ExtraTurnAddedPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "playerId"
         ],
         "type": "object"
       },
@@ -1945,6 +2302,31 @@
         ],
         "type": "object"
       },
+      "LibraryShuffledPayload": {
+        "properties": {
+          "cardCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "playerId",
+          "cardCount",
+          "reason"
+        ],
+        "type": "object"
+      },
       "LifeChangedPayload": {
         "properties": {
           "current": {
@@ -1972,6 +2354,59 @@
           "playerId",
           "previous",
           "current"
+        ],
+        "type": "object"
+      },
+      "LifePaidPayload": {
+        "properties": {
+          "amount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "wasCost": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "playerId",
+          "amount",
+          "wasCost"
+        ],
+        "type": "object"
+      },
+      "ManaAbilityActivatedPayload": {
+        "properties": {
+          "mana": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "playerId",
+          "sourceId",
+          "sourceName",
+          "mana"
         ],
         "type": "object"
       },
@@ -2168,6 +2603,63 @@
         ],
         "type": "object"
       },
+      "PermanentSacrificedPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "wasToken": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "playerId",
+          "cardId",
+          "cardName",
+          "wasToken"
+        ],
+        "type": "object"
+      },
+      "PermanentTappedPayload": {
+        "properties": {
+          "causedById": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "permanentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "permanentName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "permanentId",
+          "permanentName",
+          "controllerId",
+          "causedById"
+        ],
+        "type": "object"
+      },
       "PhaseStateChangedPayload": {
         "properties": {
           "from": {
@@ -2276,6 +2768,18 @@
         "type": "object"
       },
       "PlayerLostPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "PriorityPlayerPayload": {
         "properties": {
           "playerId": {
             "format": "uuid",
@@ -2700,6 +3204,43 @@
         ],
         "type": "object"
       },
+      "SpellCounteredPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "counteringControllerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "stackId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stackId",
+          "cardId",
+          "cardName",
+          "controllerId",
+          "counteringControllerId"
+        ],
+        "type": "object"
+      },
       "StackCandidateDto": {
         "properties": {
           "cardName": {
@@ -2816,6 +3357,52 @@
         ],
         "type": "object"
       },
+      "SurveilPayload": {
+        "properties": {
+          "n": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "toGraveyard": {
+            "items": {
+              "$ref": "#/components/schemas/CardRefPayload"
+            },
+            "type": "array"
+          },
+          "toTop": {
+            "items": {
+              "$ref": "#/components/schemas/CardRefPayload"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "toTopCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "playerId",
+          "n",
+          "toGraveyard",
+          "toTopCount"
+        ],
+        "type": "object"
+      },
       "TargetRefDto": {
         "properties": {
           "id": {
@@ -2829,6 +3416,30 @@
         "required": [
           "id",
           "kind"
+        ],
+        "type": "object"
+      },
+      "TargetsChosenPayload": {
+        "properties": {
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "stackId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetRefDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "stackId",
+          "controllerId",
+          "targets"
         ],
         "type": "object"
       },
@@ -2857,6 +3468,81 @@
           "sourceInstanceId",
           "sourceName",
           "text"
+        ],
+        "type": "object"
+      },
+      "TriggeredAbilityCounteredPayload": {
+        "properties": {
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "stackId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stackId",
+          "sourceId",
+          "sourceName",
+          "controllerId",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "TriggeredAbilityTriggeredPayload": {
+        "properties": {
+          "abilityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "hidden": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "sourceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "abilityId",
+          "controllerId"
         ],
         "type": "object"
       },

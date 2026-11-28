@@ -185,6 +185,97 @@ public static class EventPayloadBuilder
             ControllerId: x.Ability.Controller.Id,
             SourceInstanceId: (x.Ability.Source as ICard)?.InstanceId ?? Guid.Empty,
             SourceName: (x.Ability.Source as ICard)?.Name ?? "")),
+        // Long-tail log / animation payloads: ids plus display names, no state
+        // lookups, no layer recomputation (names and ids are plain reads).
+        PermanentTappedEvent x => Serialize(new PermanentTappedPayload(
+            PermanentId: x.Permanent.InstanceId,
+            PermanentName: DisplayName(x.Permanent, viewer),
+            ControllerId: x.Permanent.Controller?.Id,
+            CausedById: x.CausedBy?.Id)),
+        TriggeredAbilityTriggeredEvent x => BuildTriggered(x, viewer),
+        AttackersDeclaredEvent x => Serialize(new AttackersDeclaredPayload(
+            AttackingPlayerId: x.Combat.AttackingPlayer.Id,
+            Attackers: x.Combat.Attackers.Select(a => new DeclaredAttackerPayload(
+                AttackerId: a.Creature.InstanceId,
+                AttackerName: DisplayName(a.Creature, viewer),
+                DefendingPlayerId: a.TargetPlayer?.Id,
+                DefendingPermanentId: a.TargetPlaneswalker?.InstanceId)).ToList())),
+        BlockersDeclaredEvent x => Serialize(new BlockersDeclaredPayload(
+            DefendingPlayerId: x.Combat.DefendingPlayer?.Id,
+            Blockers: x.Combat.GetAllBlockers().Select(b => new DeclaredBlockerPayload(
+                BlockerId: b.Creature.InstanceId,
+                BlockerName: DisplayName(b.Creature, viewer),
+                AttackerId: b.BlockedAttacker.Creature.InstanceId)).ToList())),
+        CreatureAttacksEvent x => Serialize(new CreatureAttacksPayload(
+            AttackerId: x.Attacker.InstanceId,
+            AttackerName: DisplayName(x.Attacker, viewer),
+            ControllerId: x.Attacker.Controller?.Id,
+            DefendingPlayerId: x.DefendingPlayer?.Id,
+            DefendingPermanentId: (x.DefendingPlayerOrPlaneswalker as ICard)?.InstanceId)),
+        CreatureBlocksEvent x => Serialize(new CreatureBlocksPayload(
+            BlockerId: x.Blocker.InstanceId,
+            BlockerName: DisplayName(x.Blocker, viewer),
+            BlockerControllerId: x.Blocker.Controller?.Id,
+            AttackerId: x.BlockedAttacker.InstanceId,
+            AttackerName: DisplayName(x.BlockedAttacker, viewer))),
+        // CR 701.9b — a discarded card is revealed on its way to the
+        // graveyard; public.
+        DiscardedEvent x => Serialize(new DiscardedPayload(
+            PlayerId: x.Player.Id,
+            CardId: x.Card.InstanceId,
+            CardName: x.Card.Name,
+            WasCost: x.WasCost)),
+        // CR 708.9 — a face-down permanent leaving the battlefield is revealed.
+        PermanentSacrificedEvent x => Serialize(new PermanentSacrificedPayload(
+            PlayerId: x.SacrificingPlayer.Id,
+            CardId: x.SacrificedCard.InstanceId,
+            CardName: x.SacrificedCard.Name,
+            WasToken: x.WasToken)),
+        SpellCounteredEvent x => Serialize(new SpellCounteredPayload(
+            StackId: x.CounteredSpell.Id,
+            CardId: x.CounteredSpell.Card?.InstanceId,
+            CardName: x.CounteredSpell.Card?.Name ?? "",
+            ControllerId: x.CounteredSpell.Controller.Id,
+            CounteringControllerId: x.CounteringController?.Id)),
+        TriggeredAbilityCounteredEvent x => Serialize(new TriggeredAbilityCounteredPayload(
+            StackId: x.Ability.Id,
+            SourceId: (x.Ability.Source as ICard)?.InstanceId,
+            SourceName: DisplayName(x.Ability.Source as ICard, viewer),
+            ControllerId: x.Ability.Controller.Id,
+            Reason: x.Reason)),
+        ManaAbilityActivatedEvent x => Serialize(new ManaAbilityActivatedPayload(
+            PlayerId: x.Player.Id,
+            SourceId: (x.Source as ICard)?.InstanceId,
+            SourceName: DisplayName(x.Source as ICard, viewer),
+            Mana: x.ManaGenerated.ToString())),
+        LifePaidEvent x => Serialize(new LifePaidPayload(
+            PlayerId: x.Player.Id,
+            Amount: x.Amount,
+            WasCost: x.WasCost)),
+        CostsPaidEvent x => Serialize(new CostsPaidPayload(
+            StackId: x.StackObject.Id,
+            ControllerId: x.StackObject.Controller.Id,
+            Costs: x.Costs.Select(c => c.Description).ToList())),
+        TargetsChosenEvent x => Serialize(new TargetsChosenPayload(
+            StackId: x.StackObject.Id,
+            ControllerId: x.StackObject.Controller.Id,
+            Targets: StateSnapshotter.TargetRefs(x.Targets.Select(TargetObject), viewer))),
+        PriorityReceivedEvent x => Serialize(new PriorityPlayerPayload(x.Player.Id)),
+        PriorityPassedEvent x => Serialize(new PriorityPlayerPayload(x.Player.Id)),
+        CombatStartedEvent x => Serialize(new CombatPhasePayload(x.ActivePlayer.Id)),
+        CombatEndedEvent x => Serialize(new CombatPhasePayload(x.Combat.AttackingPlayer.Id)),
+        // CR 701.20 — only the player and the count; no card identity.
+        LibraryShuffledEvent x => Serialize(new LibraryShuffledPayload(
+            PlayerId: x.Player.Id,
+            CardCount: x.CardCount,
+            Reason: x.Reason)),
+        SurveilEvent x => BuildSurveil(x, viewer),
+        CardCycledEvent x => Serialize(new CardCycledPayload(
+            PlayerId: x.Player.Id,
+            CardId: x.Card.InstanceId,
+            CardName: x.Card.Name)),
+        ExtraTurnAddedEvent x => Serialize(new ExtraTurnAddedPayload(x.Player.Id)),
+        // GameStartedEvent has no fields; the envelope's Type is the whole message.
         GameStartedEvent => Empty(),
         _ => Empty(),
     };
@@ -198,8 +289,91 @@ public static class EventPayloadBuilder
     {
         CardMovedEvent x => BothZonesHidden(x.FromZone, x.ToZone),
         CardDrawnEvent => true, // library → hand: always both hidden
+        // Library-bound cards are shown only to the surveilling player.
+        SurveilEvent => true,
+        TriggeredAbilityTriggeredEvent x => x.Ability.Source is ICard c && (IsHiddenZone(c.Zone) || IsFaceDown(c)),
+        TargetsChosenEvent x => x.Targets.Select(TargetObject).Any(o => o is ICard c && IsHiddenZone(c.Zone)),
+        // CR 708.2 — a face-down permanent's name is masked for non-controllers.
+        PermanentTappedEvent x => IsFaceDown(x.Permanent),
+        CreatureAttacksEvent x => IsFaceDown(x.Attacker),
+        CreatureBlocksEvent x => IsFaceDown(x.Blocker) || IsFaceDown(x.BlockedAttacker),
+        AttackersDeclaredEvent x => x.Combat.Attackers.Any(a => IsFaceDown(a.Creature)),
+        BlockersDeclaredEvent x => x.Combat.GetAllBlockers().Any(b => IsFaceDown(b.Creature)),
+        TriggeredAbilityCounteredEvent x => IsFaceDown(x.Ability.Source as ICard),
+        ManaAbilityActivatedEvent x => IsFaceDown(x.Source as ICard),
         _ => false,
     };
+
+    /// <summary>Shown for a face-down permanent to anyone but its controller.</summary>
+    internal const string FaceDownName = "Face-down permanent";
+
+    private static bool IsFaceDown(ICard? card) => card is Permanent { IsFaceDown: true };
+
+    // CR 708.2 / 708.6 — a face-down permanent has no name; its controller may
+    // look at it. A null viewer is the all-revealed (spectator/debug) view.
+    private static string DisplayName(ICard? card, Player? viewer)
+    {
+        if (card is null) return "";
+        if (card is Permanent { IsFaceDown: true } p && viewer != null && !ReferenceEquals(p.Controller, viewer))
+            return FaceDownName;
+        return card.Name;
+    }
+
+    private static object TargetObject(Majik.Core.Targeting.ITarget t)
+        => t is Majik.Core.Targeting.Target { TargetObject: { } o } ? o : t;
+
+    /// <summary>The trigger's text as the order-triggers prompt shows it: its
+    /// effects' descriptions, else "&lt;source&gt; trigger".</summary>
+    internal static string TriggerText(ITriggeredAbility trigger)
+    {
+        var sourceName = (trigger.Source as ICard)?.Name ?? "";
+        var effectText = (trigger as TriggeredAbility)?.Effects
+            .Select(e => e.Description)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .ToList();
+        return effectText is { Count: > 0 }
+            ? string.Join(" ", effectText)
+            : (sourceName.Length > 0 ? $"{sourceName} trigger" : "triggered ability");
+    }
+
+    private static JsonElement BuildTriggered(TriggeredAbilityTriggeredEvent x, Player? viewer)
+    {
+        var source = x.Ability.Source as ICard;
+        // CR 706 — a trigger from a card in a hidden zone (a library, another
+        // player's hand) tells that viewer only that something triggered.
+        if (source != null && StateSnapshotter.IsHiddenFrom(source, viewer))
+        {
+            return SerializeCard(new TriggeredAbilityTriggeredPayload(
+                AbilityId: x.Ability.Id,
+                ControllerId: x.Ability.Controller.Id,
+                Hidden: true));
+        }
+        bool nameHidden = DisplayName(source, viewer) == FaceDownName && IsFaceDown(source);
+        return SerializeCard(new TriggeredAbilityTriggeredPayload(
+            AbilityId: x.Ability.Id,
+            ControllerId: x.Ability.Controller.Id,
+            SourceId: source?.InstanceId,
+            SourceName: DisplayName(source, viewer),
+            // The text of a face-down permanent's ability would name it.
+            Text: nameHidden ? "triggered ability" : TriggerText(x.Ability)));
+    }
+
+    private static JsonElement BuildSurveil(SurveilEvent x, Player? viewer)
+    {
+        // CR 701.42a — cards put into the graveyard are public; the rest stay
+        // on top of the library, hidden from everyone but the surveilling
+        // player (who looked at them).
+        var toGraveyard = x.Cards.Where(c => c.Zone != ZoneType.Library)
+            .Select(c => new CardRefPayload(c.InstanceId, c.Name)).ToList();
+        var toTop = x.Cards.Where(c => c.Zone == ZoneType.Library).ToList();
+        bool seesTop = viewer == null || ReferenceEquals(viewer, x.Player) || viewer.Id == x.Player.Id;
+        return SerializeCard(new SurveilPayload(
+            PlayerId: x.Player.Id,
+            N: x.N,
+            ToGraveyard: toGraveyard,
+            ToTopCount: toTop.Count,
+            ToTop: seesTop ? toTop.Select(c => new CardRefPayload(c.InstanceId, c.Name)).ToList() : null));
+    }
 
     private static JsonElement BuildCardMoved(CardMovedEvent x, Player? viewer)
     {

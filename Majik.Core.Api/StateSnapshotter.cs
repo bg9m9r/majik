@@ -351,7 +351,7 @@ public static class StateSnapshotter
         return TargetRefs(raw, viewer);
     }
 
-    private static IReadOnlyList<TargetRefDto> TargetRefs(IEnumerable<object> raw, Player? viewer)
+    internal static IReadOnlyList<TargetRefDto> TargetRefs(IEnumerable<object> raw, Player? viewer)
     {
         var refs = new List<TargetRefDto>();
         foreach (var target in raw)
@@ -379,7 +379,7 @@ public static class StateSnapshotter
 
     // CR 706 — mirrors SnapshotPlayer: a library is hidden from everyone, a
     // hand from everyone but its owner; a null viewer is the all-revealed view.
-    private static bool IsHiddenFrom(ICard card, Player? viewer)
+    internal static bool IsHiddenFrom(ICard card, Player? viewer)
     {
         if (viewer is null) return false;
         return card.Zone switch
