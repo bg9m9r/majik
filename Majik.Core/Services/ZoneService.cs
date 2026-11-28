@@ -231,9 +231,10 @@ public class ZoneService
         if (finalToZone == ZoneType.Battlefield && card is Permanent permanent)
         {
             permanent.MarkEnteredBattlefield();
+            // CR 614.1c — enters with the tapped status; not a tap (no event).
             if (intent.EntersTapped && !permanent.IsTapped)
             {
-                permanent.Tap();
+                permanent.EnterTapped();
             }
             // CR 400.7 / CR 603.6a — stamp "entered directly from library"
             // sentinel so ETB abilities (Fblthp, the Lost's draw-2 clause)
