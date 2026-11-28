@@ -75,7 +75,19 @@ public class PriorityManager
     {
         if (ReferenceEquals(DecidingPlayer, player)) return;
         DecidingPlayer = player;
-        DecidingPlayerChanged?.Invoke(player);
+        var handlers = DecidingPlayerChanged;
+        if (handlers is null) return;
+        // An observer is not part of the rules: one that throws must neither
+        // escape into the priority loop (where, raised from its finally, it would
+        // also replace the agent's own exception) nor starve the others.
+        foreach (Action<Player?> handler in handlers.GetInvocationList())
+        {
+            try { handler(player); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Majik engine: DecidingPlayerChanged observer threw: {ex}");
+            }
+        }
     }
 
     public PriorityManager(

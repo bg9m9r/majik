@@ -423,9 +423,35 @@ public sealed class GameFacade : IDisposable
         // stale holder.
         _priority.DecidingPlayerChanged += player =>
         {
-            _priorityHolder = player;
-            if (player != null) PublishOnEngineFlow(allViews: false);
+            try
+            {
+                _priorityHolder = player;
+                if (player != null) PublishOnEngineFlow(allViews: false);
+                else ClearPublishedPriorityHolder();
+            }
+            catch (Exception ex)
+            {
+                ReportContainedFault(ex, "publishing the priority holder");
+            }
         };
+    }
+
+    /// <summary>
+    /// CR 117.3c — the decision just closed, so nobody holds priority. Nothing
+    /// changed game state since the decision opened and published (the agent
+    /// only chose; the loop applies the choice after this), so the published
+    /// views are patched in place instead of rebuilt: three record copies, no
+    /// snapshot walk, a few hundred nanoseconds per priority pass.
+    /// </summary>
+    private void ClearPublishedPriorityHolder()
+    {
+        if (!_engineRunning || !ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this)) return;
+        var previous = Volatile.Read(ref _published);
+        if (previous is null) return;
+        Volatile.Write(ref _published, new PublishedStates(
+            previous.Spectator is { PriorityPlayerId: not null } s ? s with { PriorityPlayerId = null } : previous.Spectator,
+            previous.Alice is { PriorityPlayerId: not null } a ? a with { PriorityPlayerId = null } : previous.Alice,
+            previous.Bob is { PriorityPlayerId: not null } b ? b with { PriorityPlayerId = null } : previous.Bob));
     }
 
     private void PublishOnEngineFlow(bool allViews)
@@ -1846,6 +1872,9 @@ public sealed class GameFacade : IDisposable
     /// <summary>Test hook: does the calling flow count as this facade's
     /// engine flow (live reads, no lock)?</summary>
     internal bool IsOnEngineFlow => ReferenceEquals(Majik.Core.Game.EngineFlow.Current, this);
+
+    /// <summary>Test hook: the priority manager (decision window, CR 117).</summary>
+    internal Majik.Core.Game.PriorityManager Priority => _priority;
 
     /// <summary>Live build when allowed: on the engine flow (single-threaded
     /// by construction, no lock), or while no engine is running (serialised,

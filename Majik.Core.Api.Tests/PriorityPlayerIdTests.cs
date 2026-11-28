@@ -93,6 +93,53 @@ public sealed class PriorityPlayerIdTests
     }
 
     [Fact]
+    public async Task OnceTheDecisionIsMade_ThePublishedSnapshotNoLongerNamesTheDecider()
+    {
+        // CR 117.3c — passing ends the decision; until the next player is
+        // granted priority nobody holds it, and an off-engine reader must see that.
+        using var ids = DeterministicIdScope.Push(new DeterministicIdSource(5));
+        var facade = GameFacade.Create("Alice", "Bob", RealDeck("Burn"), RealDeck("BorosEnergy"), cardRepo: Repo);
+        facade.ReplaceAliceAgent(new HeuristicBotAgent(cardRepository: Repo));
+        facade.ReplaceBobAgent(new HeuristicBotAgent(cardRepository: Repo));
+        var stale = new List<string>();
+        var checkedPasses = 0;
+        var primed = false;
+        facade.EventBus.Subscribe<PriorityPassedEvent>(e =>
+        {
+            Majik.Core.Api.Dtos.GameStateDto? alice = null, bob = null;
+            EngineFlow.RunExternal(() =>
+                (alice, bob) = Task.Run(() => (facade.GetStateFor(facade.Alice.Id), facade.GetStateFor(facade.Bob.Id))).Result);
+            if (!primed) { primed = true; return; } // the first foreign read registers both views
+            checkedPasses++;
+            if (alice!.PriorityPlayerId != null) stale.Add($"alice view still names {alice.PriorityPlayerId} after {e.Player.Name} passed");
+            if (bob!.PriorityPlayerId != null) stale.Add($"bob view still names {bob.PriorityPlayerId} after {e.Player.Name} passed");
+        });
+
+        await facade.StartFullGameAsync(firstPlayerSlot: 0, maxTurns: 4, rng: new GameRandom(5));
+        await facade.FullGameTask!.WaitAsync(TimeSpan.FromSeconds(60));
+
+        checkedPasses.Should().BeGreaterThan(10);
+        stale.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AThrowingDecidingPlayerSubscriber_DoesNotEscapeIntoThePriorityLoop()
+    {
+        var deck = Enumerable.Range(0, 20).Select(_ => (ICard)new Land("Forest")).ToList();
+        var facade = GameFacade.Create("Alice", "Bob", deck, deck.ToList());
+        var priority = facade.Priority;
+        var after = 0;
+        priority.DecidingPlayerChanged += _ => throw new InvalidOperationException("observer bug");
+        priority.DecidingPlayerChanged += _ => after++;
+
+        var act = () => { priority.SetDecidingPlayer(facade.Alice); priority.SetDecidingPlayer(null); };
+
+        act.Should().NotThrow();
+        after.Should().Be(2, "one throwing observer must not starve the others");
+        priority.DecidingPlayer.Should().BeNull();
+    }
+
+    [Fact]
     public async Task WhileATriggerIsPutOnTheStack_BeforePriorityIsGranted_NobodyHoldsPriority()
     {
         // CR 117.5 / 603.3 — before a player receives priority, SBAs run and
