@@ -57,6 +57,23 @@ public class Planeswalker : Permanent
         _loyalty = src._loyalty;
     }
 
+    /// <summary>
+    /// CR 306.5b / 400.7 — a planeswalker that enters from another zone is a
+    /// new object with loyalty counters equal to its printed loyalty. Reset on
+    /// entry so the card left behind keeps its last loyalty (CR 603.10).
+    /// Caveat: <see cref="Majik.Core.Effects.EntersAsCopyReplacement"/>'s
+    /// "additional loyalty counter" (CR 706.9b) runs on the move before the
+    /// card lands; for a Planeswalker-class card entering as a copy it would
+    /// be reset here. No implemented card takes that branch (Spark Double is
+    /// a creature and uses the transient loyalty body, which is not reset).
+    /// </summary>
+    internal override void ResetOnEnterBattlefield(ZoneType from)
+    {
+        if (from == ZoneType.Battlefield) return;
+        base.ResetOnEnterBattlefield(from);
+        _loyalty = StartingLoyalty;
+    }
+
     /// <inheritdoc cref="Card.CloneForSim"/>
     internal override Card CloneForSim() => new Planeswalker(this);
 

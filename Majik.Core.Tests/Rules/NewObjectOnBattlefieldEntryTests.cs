@@ -166,4 +166,21 @@ public class NewObjectOnBattlefieldEntryTests
         aura.AttachedTo.Should().BeNull("an Aura entering not cast is attached by the effect that returns it (CR 303.4f)");
         bear.Attachments.Should().BeEmpty();
     }
+
+    [Fact]
+    public void AReturningPlaneswalker_HasItsPrintedLoyalty()
+    {
+        // CR 306.5b / 400.7 — it enters with loyalty counters equal to its
+        // printed loyalty, not what the old object had.
+        var jace = Put(new Planeswalker("Jace", "{2}{U}{U}", 3));
+        jace.AddLoyalty(4);
+        jace.LoyaltyAbilityActivatedThisTurn = true;
+
+        _zones.MoveCard(jace, ZoneType.Battlefield, ZoneType.Exile);
+        jace.Loyalty.Should().Be(7, "last known information");
+        _zones.MoveCard(jace, ZoneType.Exile, ZoneType.Battlefield, _alice);
+
+        jace.Loyalty.Should().Be(3);
+        jace.LoyaltyAbilityActivatedThisTurn.Should().BeFalse();
+    }
 }
