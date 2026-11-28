@@ -24,10 +24,12 @@ public sealed class AttachmentLegalityCheck : IStateBasedActionCheck
                 // CR 704.5m — an Aura not attached to an object or player is
                 // put into its owner's graveyard (e.g. Pacifism after its
                 // creature was flickered: the returning creature is a new
-                // object, CR 400.7). Every path that puts an Aura onto the
-                // battlefield attaches it before SBAs are next checked
-                // (Aura spells and Animate Dead before landing; effects such
-                // as ReturnAsAuraOnDeathEffect in the same effect). A Curse
+                // object, CR 400.7). Aura spells, bestow and Animate Dead
+                // attach before the Aura lands, and ReturnAsAuraOnDeathEffect
+                // in the same effect, so those Auras stay. Any other Aura put
+                // onto the battlefield without being cast (a flickered Aura)
+                // is not yet attached to a chosen object (CR 303.4f, #3577)
+                // and so goes to the graveyard here. A Curse
                 // enchants a player, which the engine tracks outside
                 // AttachedTo, so it is attached to something. A bestowed card
                 // is not printed as an Aura (BestowKeyword) and reverts to a
