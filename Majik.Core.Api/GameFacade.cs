@@ -1708,7 +1708,8 @@ public sealed class GameFacade : IDisposable
             LegalActions: payload?.LegalActions,
             EligibleAttackerIds: payload?.EligibleAttackerIds,
             AttackerIds: payload?.AttackerIds,
-            EligibleBlockerIds: payload?.EligibleBlockerIds);
+            EligibleBlockerIds: payload?.EligibleBlockerIds,
+            TriggerOptions: payload?.TriggerOptions);
     }
 
     private void BridgeEvent(GameEvent e)

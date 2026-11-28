@@ -2437,6 +2437,15 @@
               "array"
             ]
           },
+          "triggerOptions": {
+            "items": {
+              "$ref": "#/components/schemas/TriggerOptionDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "yesNoView": {
             "oneOf": [
               {
@@ -2690,6 +2699,34 @@
         "required": [
           "step",
           "playerId"
+        ],
+        "type": "object"
+      },
+      "TriggerOptionDto": {
+        "properties": {
+          "sourceInstanceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "triggerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "triggerId",
+          "sourceInstanceId",
+          "sourceName",
+          "text"
         ],
         "type": "object"
       },

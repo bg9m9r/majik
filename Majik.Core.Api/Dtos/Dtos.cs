@@ -301,7 +301,26 @@ public sealed record PromptDto(
     /// determined can be declared as blockers. Non-null only on
     /// declare-blockers prompts (empty when none can block); null otherwise.
     /// </summary>
-    IReadOnlyList<Guid>? EligibleBlockerIds = null);
+    IReadOnlyList<Guid>? EligibleBlockerIds = null,
+    /// <summary>
+    /// CR 603.3b — the triggered abilities the player must order, in the
+    /// engine's default order. <c>OrderTriggersCommand.StackObjectIdsInOrder</c>
+    /// must list every <see cref="TriggerOptionDto.TriggerId"/> exactly once.
+    /// Non-null only on order-triggers prompts; null on every other prompt kind.
+    /// </summary>
+    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null);
+
+/// <summary>
+/// One triggered ability on <see cref="PromptDto.TriggerOptions"/>.
+/// </summary>
+/// <param name="TriggerId">The id <c>OrderTriggersCommand.StackObjectIdsInOrder</c>
+/// accepts for this trigger (the ability's stack-object id).</param>
+/// <param name="SourceInstanceId">Instance id of the card / permanent the trigger
+/// comes from; null when the source is not a card (e.g. an emblem).</param>
+/// <param name="SourceName">Name of the source, or "" when unknown.</param>
+/// <param name="Text">Best human-readable description the engine has: the
+/// trigger's effect text when present, otherwise "&lt;source name&gt; trigger".</param>
+public sealed record TriggerOptionDto(Guid TriggerId, Guid? SourceInstanceId, string SourceName, string Text);
 
 /// <summary>
 /// The specific legal actions at a priority window, shipped on

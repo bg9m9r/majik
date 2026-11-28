@@ -1064,23 +1064,46 @@ public sealed class RemoteAgent : IPlayerAgent
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
     {
-        // Stash the engine-provided list so the eventual
-        // OrderTriggersCommand can translate its StackObjectIds back into
-        // the matching ability instances. Replaced on each prompt; cleared
-        // in Submit when the prompt resolves. Only commit the field if
-        // Prompt actually accepts the registration (it throws if another
-        // prompt is already outstanding).
+        // CR 603.3b — stash the engine-provided list so the eventual
+        // OrderTriggersCommand can translate its ids back into the matching
+        // ability instances, and ship every trigger id + description on the
+        // payload so the client can render and answer the prompt. Stashed
+        // BEFORE Prompt fires PromptRequested (observers build the PromptDto
+        // synchronously from the payload), never on top of a pending prompt.
+        ArgumentNullException.ThrowIfNull(mine);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingTriggerOrder = mine;
+        _pendingPayload = new PromptPayload(TriggerOptions: mine.Select(DescribeTrigger).ToList());
         try
         {
-            var task = Prompt<IReadOnlyList<ITriggeredAbility>>(ct, typeof(OrderTriggersCommand));
-            _pendingTriggerOrder = mine;
-            return task;
+            return Prompt<IReadOnlyList<ITriggeredAbility>>(ct, typeof(OrderTriggersCommand));
         }
         catch
         {
             _pendingTriggerOrder = null;
+            _pendingPayload = null;
             throw;
         }
+    }
+
+    // CR 603.3b — wire row for one trigger. Text = the trigger's effect text
+    // (joined) when the ability carries any, else "<source> trigger" (the same
+    // fallback StateSnapshotter uses for a trigger on the stack).
+    private static TriggerOptionDto DescribeTrigger(ITriggeredAbility trigger)
+    {
+        var sourceCard = trigger.Source as ICard;
+        var sourceName = sourceCard?.Name ?? "";
+        var effectText = (trigger as TriggeredAbility)?.Effects
+            .Select(e => e.Description)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .ToList();
+        var text = effectText is { Count: > 0 }
+            ? string.Join(" ", effectText)
+            : (sourceName.Length > 0 ? $"{sourceName} trigger" : "triggered ability");
+        return new TriggerOptionDto(trigger.Id, sourceCard?.InstanceId, sourceName, text);
     }
 
     public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
@@ -1789,4 +1812,9 @@ public sealed record PromptPayload(
     /// CR 509.1a — engine-supplied eligible blockers. Non-null only on
     /// declare-blockers prompts; forwarded onto <see cref="PromptDto.EligibleBlockerIds"/>.
     /// </summary>
-    IReadOnlyList<Guid>? EligibleBlockerIds = null);
+    IReadOnlyList<Guid>? EligibleBlockerIds = null,
+    /// <summary>
+    /// CR 603.3b — triggers to order. Non-null only on order-triggers prompts;
+    /// forwarded onto <see cref="PromptDto.TriggerOptions"/>.
+    /// </summary>
+    IReadOnlyList<TriggerOptionDto>? TriggerOptions = null);
