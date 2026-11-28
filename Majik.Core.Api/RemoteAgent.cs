@@ -1061,11 +1061,61 @@ public sealed class RemoteAgent : IPlayerAgent
         // resolver translates Cancelled → no-op cast at the dispatch site.
         => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand), typeof(CancelCastCommand));
 
+    /// <summary>
+    /// CR 508.1a — declare-attackers prompt. Ships the engine-computed
+    /// <paramref name="eligibleAttackers"/> on the payload
+    /// (<see cref="PromptDto.EligibleAttackerIds"/>) so the client can offer
+    /// exactly the creatures that may attack.
+    /// </summary>
     public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Permanent> eligibleAttackers, CancellationToken ct = default)
-        => Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));
+    {
+        ArgumentNullException.ThrowIfNull(eligibleAttackers);
+        // Mirror the other payload-bearing prompts: stash before Prompt fires
+        // PromptRequested observers, never on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(
+            EligibleAttackerIds: eligibleAttackers.Select(p => p.InstanceId).ToList());
+        try
+        {
+            return Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
+    /// <summary>
+    /// CR 509.1a — declare-blockers prompt. Ships the engine-supplied
+    /// <paramref name="attackers"/> and <paramref name="eligibleBlockers"/> on the
+    /// payload (<see cref="PromptDto.AttackerIds"/> /
+    /// <see cref="PromptDto.EligibleBlockerIds"/>).
+    /// </summary>
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Permanent> attackers, IReadOnlyList<Permanent> eligibleBlockers, CancellationToken ct = default)
-        => Prompt<BlockPlan>(ct, typeof(DeclareBlockersCommand));
+    {
+        ArgumentNullException.ThrowIfNull(attackers);
+        ArgumentNullException.ThrowIfNull(eligibleBlockers);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(
+            AttackerIds: attackers.Select(p => p.InstanceId).ToList(),
+            EligibleBlockerIds: eligibleBlockers.Select(p => p.InstanceId).ToList());
+        try
+        {
+            return Prompt<BlockPlan>(ct, typeof(DeclareBlockersCommand));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     // CR 508.1 — translate the wire DeclareAttackersCommand into the
     // engine-shaped CombatPlan. Each declaration carries an attacker (must
@@ -1596,4 +1646,25 @@ public sealed record PromptPayload(
     /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
     /// <see cref="PromptDto.ScryView"/>.
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? ScryView = null);
+    IReadOnlyList<CardSnapshotDto>? ScryView = null,
+    /// <summary>
+    /// Specific legal actions at a priority window (lands / casts / abilities).
+    /// Non-null only on priority prompts. <see cref="GameFacade.BuildPrompt"/>
+    /// forwards this onto <see cref="PromptDto.LegalActions"/>.
+    /// </summary>
+    LegalActionsDto? LegalActions = null,
+    /// <summary>
+    /// CR 508.1a — engine-supplied eligible attackers. Non-null only on
+    /// declare-attackers prompts; forwarded onto <see cref="PromptDto.EligibleAttackerIds"/>.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleAttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — engine-supplied attacking creatures. Non-null only on
+    /// declare-blockers prompts; forwarded onto <see cref="PromptDto.AttackerIds"/>.
+    /// </summary>
+    IReadOnlyList<Guid>? AttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — engine-supplied eligible blockers. Non-null only on
+    /// declare-blockers prompts; forwarded onto <see cref="PromptDto.EligibleBlockerIds"/>.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleBlockerIds = null);

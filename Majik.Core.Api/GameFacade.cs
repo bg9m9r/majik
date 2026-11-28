@@ -1596,7 +1596,11 @@ public sealed class GameFacade : IDisposable
             DamageDivisionView: payload?.DamageDivisionView,
             PlayerCandidates: payload?.PlayerCandidates,
             StackCandidates: payload?.StackCandidates,
-            ScryView: payload?.ScryView);
+            ScryView: payload?.ScryView,
+            LegalActions: payload?.LegalActions,
+            EligibleAttackerIds: payload?.EligibleAttackerIds,
+            AttackerIds: payload?.AttackerIds,
+            EligibleBlockerIds: payload?.EligibleBlockerIds);
     }
 
     private void BridgeEvent(GameEvent e)

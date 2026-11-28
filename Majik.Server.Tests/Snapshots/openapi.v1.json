@@ -44,6 +44,27 @@
         ],
         "type": "object"
       },
+      "AbilityRefDto": {
+        "properties": {
+          "abilityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "permanentInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permanentInstanceId",
+          "abilityId",
+          "kind"
+        ],
+        "type": "object"
+      },
       "AttackerDeclarationDto": {
         "properties": {
           "attackerInstanceId": {
@@ -1867,6 +1888,36 @@
         "type": "object"
       },
       "JsonElement": {},
+      "LegalActionsDto": {
+        "properties": {
+          "activatableAbilities": {
+            "items": {
+              "$ref": "#/components/schemas/AbilityRefDto"
+            },
+            "type": "array"
+          },
+          "castableCardIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "playableLandIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "playableLandIds",
+          "castableCardIds",
+          "activatableAbilities"
+        ],
+        "type": "object"
+      },
       "LifeChangedPayload": {
         "properties": {
           "current": {
@@ -2233,6 +2284,16 @@
       },
       "PromptDto": {
         "properties": {
+          "attackerIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "bottomCount": {
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -2271,6 +2332,26 @@
               }
             ]
           },
+          "eligibleAttackerIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "eligibleBlockerIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "expectedKinds": {
             "items": {
               "type": "string"
@@ -2285,6 +2366,16 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "legalActions": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LegalActionsDto"
+              }
             ]
           },
           "libraryView": {

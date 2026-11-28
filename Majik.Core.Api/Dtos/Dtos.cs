@@ -274,7 +274,66 @@ public sealed record PromptDto(
     /// <see cref="SurveilView"/> exactly (scry's "bottom" replaces surveil's
     /// "graveyard").
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? ScryView = null);
+    IReadOnlyList<CardSnapshotDto>? ScryView = null,
+    /// <summary>
+    /// CR 117 / 305 / 601 / 602 / 605 / 606 — the specific legal actions the
+    /// prompted player can take at this priority window: lands they may play,
+    /// cards they may cast, and abilities they may activate right now (see
+    /// <see cref="LegalActionsDto"/>). Non-null only on priority prompts
+    /// (<c>ExpectedKinds</c> contains <c>PassPriorityCommand</c>); null on every
+    /// other prompt kind. Finer-grained than <see cref="ExpectedKinds"/>, which
+    /// stays the coarse, permissive command-type list.
+    /// </summary>
+    LegalActionsDto? LegalActions = null,
+    /// <summary>
+    /// CR 508.1a — instance ids of the creatures the engine determined can be
+    /// declared as attackers. Non-null only on declare-attackers prompts
+    /// (empty when none can attack); null on every other prompt kind.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleAttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — instance ids of the attacking creatures the defending player
+    /// may block. Non-null only on declare-blockers prompts; null otherwise.
+    /// </summary>
+    IReadOnlyList<Guid>? AttackerIds = null,
+    /// <summary>
+    /// CR 509.1a — instance ids of the defending player's creatures the engine
+    /// determined can be declared as blockers. Non-null only on
+    /// declare-blockers prompts (empty when none can block); null otherwise.
+    /// </summary>
+    IReadOnlyList<Guid>? EligibleBlockerIds = null);
+
+/// <summary>
+/// The specific legal actions at a priority window, shipped on
+/// <see cref="PromptDto.LegalActions"/>. Computed by
+/// <see cref="Majik.Core.Api.PriorityLegalActions"/> from the engine's own
+/// timing, cost and activation gates; a client may make exactly these clickable.
+/// </summary>
+/// <param name="PlayableLandIds">CR 305.1 / 305.2 — instance ids of the lands
+/// the player may play now (own main phase, empty stack, land drop available).</param>
+/// <param name="CastableCardIds">CR 307.1 / 601.2 — instance ids of the cards in
+/// hand the player may cast now: timing permits (sorcery speed, or instant /
+/// Flash) and the mana cost is payable from the pool plus untapped sources.</param>
+/// <param name="ActivatableAbilities">CR 602 / 605 / 606 — abilities of permanents
+/// the player controls whose activation is legal and payable now.</param>
+public sealed record LegalActionsDto(
+    IReadOnlyList<Guid> PlayableLandIds,
+    IReadOnlyList<Guid> CastableCardIds,
+    IReadOnlyList<AbilityRefDto> ActivatableAbilities);
+
+/// <summary>
+/// One activatable ability on <see cref="LegalActionsDto.ActivatableAbilities"/>.
+/// </summary>
+/// <param name="PermanentInstanceId">Instance id of the permanent carrying the ability.</param>
+/// <param name="AbilityId">Ability id to echo back: <c>ActivateAbilityCommand.AbilityId</c>
+/// for <c>"Activated"</c>, <c>ActivateLoyaltyAbilityCommand.LoyaltyAbilityId</c> for
+/// <c>"Loyalty"</c>. Mana abilities are addressed on the wire by permanent + colour
+/// (<c>ActivateManaAbilityCommand</c>) and have no engine id, so for <c>"Mana"</c>
+/// this is <see cref="Guid.Empty"/> and there is one entry per permanent with at
+/// least one activatable mana ability.</param>
+/// <param name="Kind"><c>"Mana"</c> (CR 605), <c>"Activated"</c> (CR 602) or
+/// <c>"Loyalty"</c> (CR 606).</param>
+public sealed record AbilityRefDto(Guid PermanentInstanceId, Guid AbilityId, string Kind);
 
 /// <summary>
 /// CR 601.2d / CR 119.4 — per-prompt body for a divided-damage allocation
