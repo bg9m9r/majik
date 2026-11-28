@@ -65,11 +65,12 @@ public class FullGameGateRunnerTests
     }
 
     [Fact]
-    public void AZoneDesync_SignatureNamesTheCardAndBothZones_InAFixedOrder()
+    public void AZoneDesync_WithTheStackOnOneSide_IsKeyedAsStackPlusAny()
     {
-        // CR 400.1: a card in two zones at once. The pair is part of the
-        // signature (Stack+Battlefield and Stack+Graveyard are different bugs)
-        // and is ordered by name so the scan order of the zones cannot change it.
+        // CR 400.1: a card in two zones at once. A card left in the Stack zone
+        // pairs with whatever zone it went to next, which depends on the game
+        // path (Battlefield, Graveyard, Exile, Library, Hand), so the other
+        // zone is not part of the signature: one bug, one key.
         var alice = new Player("Alice", 20);
         var bob = new Player("Bob", 20);
         var opal = new Artifact("Mox Opal", "{0}");
@@ -77,9 +78,24 @@ public class FullGameGateRunnerTests
         bob.Zones.Stack.AddCard(opal);
 
         var dup = ZoneIntegrity.FindDuplicates(new[] { alice, bob }).Should().ContainSingle().Subject;
-        dup.Signature.Should().Be("ZoneIntegrity|Mox Opal|Battlefield+Stack");
-        new ZoneIntegrity.Duplicate(opal, ZoneType.Stack, ZoneType.Battlefield).Signature
-            .Should().Be(dup.Signature);
+        dup.Signature.Should().Be("ZoneIntegrity|Mox Opal|Stack+*");
+        foreach (var other in new[] { ZoneType.Graveyard, ZoneType.Exile, ZoneType.Library, ZoneType.Hand })
+        {
+            new ZoneIntegrity.Duplicate(opal, ZoneType.Stack, other).Signature.Should().Be(dup.Signature);
+            new ZoneIntegrity.Duplicate(opal, other, ZoneType.Stack).Signature.Should().Be(dup.Signature);
+        }
+    }
+
+    [Fact]
+    public void AZoneDesync_OffTheStack_NamesBothZones_InAFixedOrder()
+    {
+        // Two non-Stack zones keep the exact pair, ordered by name so the scan
+        // order cannot change it.
+        var opal = new Artifact("Mox Opal", "{0}");
+        new ZoneIntegrity.Duplicate(opal, ZoneType.Library, ZoneType.Graveyard).Signature
+            .Should().Be("ZoneIntegrity|Mox Opal|Graveyard+Library");
+        new ZoneIntegrity.Duplicate(opal, ZoneType.Graveyard, ZoneType.Library).Signature
+            .Should().Be("ZoneIntegrity|Mox Opal|Graveyard+Library");
     }
 
     [Theory]

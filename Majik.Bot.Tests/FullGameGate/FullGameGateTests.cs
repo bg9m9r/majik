@@ -36,34 +36,25 @@ public class FullGameGateTests
     // 3544 = engine crashes / contained faults; 3545 = zone desync; 3543 = this gate.
     private static readonly IReadOnlyDictionary<string, Known> AllowList = new Dictionary<string, Known>
     {
-        // Derived from ten Release runs at the Part 2 tip; every entry below
-        // was observed, and each not marked Intermittent was seen in every run.
-        // The card stays in the Stack zone after it moves on
-        // (CR 400.1): to the Battlefield when it resolves; to the Graveyard,
-        // then Exile, as it is sacrificed and its card exiled (Ballista,
-        // Bauble, Jar, all in EldraziTron games).
-        ["ZoneIntegrity|Chalice of the Void|Battlefield+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Claws of Gix|Battlefield+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Mox Opal|Battlefield+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Mox Opal|Graveyard+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Mishra's Bauble|Exile+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Mishra's Bauble|Graveyard+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Tormod's Crypt|Graveyard+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Walking Ballista|Exile+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Walking Ballista|Graveyard+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Welding Jar|Exile+Stack"] = new(StaysOnStack, 3545),
-        ["ZoneIntegrity|Welding Jar|Graveyard+Stack"] = new(StaysOnStack, 3545),
-        // The same leftover on rarer paths, where the card then goes on to its
-        // library or its owner's hand. A card left on the Stack pairs with
-        // whatever zone it moves to next, so these depend on the game path:
-        // Library+Stack in 3 of 15 runs; Hand+Stack in 1 of 15 (both seen in
-        // SultaiMidrange vs EldraziTron seed 0).
-        ["ZoneIntegrity|Walking Ballista|Library+Stack"] = new("intermittent: " + StaysOnStack, 3545, Intermittent: true),
-        ["ZoneIntegrity|Walking Ballista|Hand+Stack"] = new("intermittent: " + StaysOnStack, 3545, Intermittent: true),
-        // Not a Stack leftover: a second desync the name-only signature hid
-        // (10/10 runs, SultaiMidrange vs Affinity seed 0).
+        // Derived from ten Release runs (--filter "Category=FullGameGate") at
+        // the rules-branch tip after B5-B12; every entry below was observed,
+        // and each not marked Intermittent was seen in all ten.
+        // The card stays in the Stack zone after it moves on (CR 400.1). Keyed
+        // Stack+*: the other zone is wherever it went next (the Battlefield when
+        // it resolves; the Graveyard, Exile, Library or Hand later), which
+        // depends on the game path, so one leftover is one signature. Before the
+        // Stack+* key this was 13 entries, 2 of them intermittent only because
+        // of the second zone. Seen in EldraziTron and Affinity games.
+        ["ZoneIntegrity|Chalice of the Void|Stack+*"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Claws of Gix|Stack+*"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Mishra's Bauble|Stack+*"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Mox Opal|Stack+*"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Tormod's Crypt|Stack+*"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Walking Ballista|Stack+*"] = new(StaysOnStack, 3545),
+        ["ZoneIntegrity|Welding Jar|Stack+*"] = new(StaysOnStack, 3545),
+        // Not a Stack leftover (10/10 runs, SultaiMidrange vs Affinity seed 0).
         ["ZoneIntegrity|Mox Opal|Graveyard+Library"] = new("in both the Graveyard and the Library (CR 400.1)", 3545),
-        // 3 of 9 runs (Yawg vs Affinity seed 1).
+        // 2 of 10 runs.
         ["ZoneIntegrity|Engineered Explosives|Exile+Graveyard"] = new("intermittent: in both the Graveyard and Exile (CR 400.1)", 3545, Intermittent: true),
         // No Timeout or Draw|LoopSafetyNet entry: none occurs. The old
         // Timeout|StateBasedActionExecutedEvent hang (Yawg games) was a Young

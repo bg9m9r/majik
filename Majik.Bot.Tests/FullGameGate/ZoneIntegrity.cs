@@ -19,14 +19,18 @@ public static class ZoneIntegrity
     /// <summary>A card found in more than one zone (across every player's zones).</summary>
     public sealed record Duplicate(ICard Card, ZoneType FirstZone, ZoneType SecondZone)
     {
-        /// <summary>"ZoneIntegrity|card|ZoneA+ZoneB", the two zones ordered by
-        /// name. The pair separates different desyncs of one card (left on the
-        /// Stack after resolving to the Battlefield vs to the Graveyard), and
-        /// ordering it keeps the signature independent of the scan order.</summary>
+        /// <summary>"ZoneIntegrity|card|Stack+*" when one of the zones is the
+        /// Stack: a card left in the Stack zone pairs with whatever zone it went
+        /// to next, which depends on the game path, so that zone is not part of
+        /// the key (one leftover, one signature). Otherwise
+        /// "ZoneIntegrity|card|ZoneA+ZoneB", the two zones ordered by name so
+        /// the scan order cannot change it.</summary>
         public string Signature
         {
             get
             {
+                if (FirstZone == ZoneType.Stack || SecondZone == ZoneType.Stack)
+                    return $"ZoneIntegrity|{Card.Name}|Stack+*";
                 var zones = new[] { FirstZone.ToString(), SecondZone.ToString() };
                 Array.Sort(zones, StringComparer.Ordinal);
                 return $"ZoneIntegrity|{Card.Name}|{zones[0]}+{zones[1]}";
