@@ -39,6 +39,15 @@ public class Spell : ISpell
     public IList<object> ChosenTargets { get; } = new List<object>();
 
     /// <summary>
+    /// CR 601.2c — the targets announced when this spell was cast, one slot
+    /// per target request, in announcement order. Read-only metadata for state
+    /// snapshots (the effects captured their targets at cast time); not read
+    /// by resolution. Null for spells not cast through SpellCastFlow (copies,
+    /// test spells) — readers fall back to <see cref="ChosenTargets"/>.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<object>>? AnnouncedTargets { get; internal set; }
+
+    /// <summary>
     /// Predicate the resolver uses to check whether at least one chosen
     /// target is still legal. Null = spell has no targets (always passes).
     /// </summary>

@@ -94,12 +94,14 @@ public class Stack
     }
 
     /// <summary>
-    /// Get all objects on the stack (from top to bottom).
-    /// Returns a read-only list for encapsulation.
+    /// Get all objects on the stack from BOTTOM to TOP: index 0 is the first
+    /// object put on the stack, the last element is the top (the object that
+    /// resolves next, CR 608.1). Returns a read-only list for encapsulation.
     /// </summary>
     public IReadOnlyList<IStackObject> GetAll()
     {
-        return _objects.ToArray().Reverse().ToList().AsReadOnly(); // Return from top to bottom
+        // System.Collections.Generic.Stack.ToArray() is top-first; reversed = bottom-first.
+        return _objects.ToArray().Reverse().ToList().AsReadOnly();
     }
 
     /// <summary>

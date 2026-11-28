@@ -2732,6 +2732,15 @@
           },
           "kind": {
             "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetRefDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
           }
         },
         "required": [
@@ -2793,6 +2802,22 @@
         "required": [
           "step",
           "playerId"
+        ],
+        "type": "object"
+      },
+      "TargetRefDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind"
         ],
         "type": "object"
       },

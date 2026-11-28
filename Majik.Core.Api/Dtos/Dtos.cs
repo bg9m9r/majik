@@ -89,11 +89,26 @@ public sealed record CardSnapshotDto(
 
 public sealed record AbilityDto(string Kind, string Description, Guid? Id = null);
 
+/// <summary>One object on the stack. <see cref="GameStateDto.Stack"/> lists
+/// them BOTTOM to TOP: the last element is the top of the stack, the object
+/// that resolves next (CR 608.1).</summary>
 public sealed record StackObjectDto(
     Guid Id,
     string Kind,
     Guid? ControllerId,
-    string Description);
+    string Description,
+    // CR 601.2c / 603.3d / 115.1 — the object's chosen targets, in the order
+    // they were announced (target slots in order, then each slot's picks).
+    // Empty when it has no targets; null only from constructions predating
+    // this field. CR 706 — a target card in a zone hidden from the viewer
+    // (an opponent's hand, any library) is listed with Id = Guid.Empty, the
+    // same placeholder hidden zones use; its Kind is still "Card".
+    IReadOnlyList<TargetRefDto>? Targets = null);
+
+/// <summary>A reference to a chosen target. <see cref="Kind"/> is "Card"
+/// (<see cref="Id"/> = the card's InstanceId), "Player" (the player id) or
+/// "Spell" (the targeted stack object's <see cref="StackObjectDto.Id"/>).</summary>
+public sealed record TargetRefDto(Guid Id, string Kind);
 
 public sealed record ManaPoolDto(int Generic, int White, int Blue, int Black, int Red, int Green, int Colorless)
 {

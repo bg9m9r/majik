@@ -42,7 +42,7 @@ public static class StateSnapshotter
             Phase: PhaseLabelResolver.Resolve(phase, turnState),
             ActivePlayerId: activePlayer.Id,
             Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
-            Stack: stack.GetAll().Select(SnapshotStackObject).ToList(),
+            Stack: stack.GetAll().Select(o => SnapshotStackObject(o, viewer)).ToList(),
             YouPlayerId: viewer?.Id,
             Seq: seq);
     }
@@ -314,7 +314,53 @@ public static class StateSnapshotter
         _ => new AbilityDto(ability.GetType().Name, ability.ToString() ?? ""),
     };
 
-    private static StackObjectDto SnapshotStackObject(IStackObject obj) => obj switch
+    private static StackObjectDto SnapshotStackObject(IStackObject obj, Player? viewer) =>
+        SnapshotStackObjectCore(obj) with { Targets = SnapshotTargets(obj, viewer) };
+
+    // CR 601.2c / 603.3d — the object's chosen targets in announcement order.
+    private static IReadOnlyList<TargetRefDto> SnapshotTargets(IStackObject obj, Player? viewer)
+    {
+        IEnumerable<object> raw = obj switch
+        {
+            Majik.Core.Spells.Spell { AnnouncedTargets: { } slots } => slots.SelectMany(s => s),
+            Majik.Core.Spells.Spell s => s.ChosenTargets,
+            TriggeredAbility t => t.ChosenTargets.SelectMany(s => s),
+            ActivatedAbility a => a.ChosenTargets.SelectMany(s => s),
+            _ => Array.Empty<object>(),
+        };
+        var refs = new List<TargetRefDto>();
+        foreach (var target in raw)
+        {
+            switch (target)
+            {
+                case Player p:
+                    refs.Add(new TargetRefDto(p.Id, "Player"));
+                    break;
+                case ISpell s:
+                    refs.Add(new TargetRefDto(s.Id, "Spell"));
+                    break;
+                case ICard c:
+                    refs.Add(new TargetRefDto(IsHiddenFrom(c, viewer) ? Guid.Empty : c.InstanceId, "Card"));
+                    break;
+            }
+        }
+        return refs;
+    }
+
+    // CR 706 — mirrors SnapshotPlayer: a library is hidden from everyone, a
+    // hand from everyone but its owner; a null viewer is the all-revealed view.
+    private static bool IsHiddenFrom(ICard card, Player? viewer)
+    {
+        if (viewer is null) return false;
+        return card.Zone switch
+        {
+            ZoneType.Library => true,
+            ZoneType.Hand => !ReferenceEquals(card.Owner, viewer),
+            _ => false,
+        };
+    }
+
+    private static StackObjectDto SnapshotStackObjectCore(IStackObject obj) => obj switch
     {
         ISpell spell => new StackObjectDto(
             Id: spell.Id,

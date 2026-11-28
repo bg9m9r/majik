@@ -472,6 +472,10 @@ public sealed class SpellCastFlow
         // "the first spell cast after the exert" as the old player-scoped
         // counter did. No cast-time provenance step is needed here.
 
+        // CR 601.2c — keep the announced targets on the stack object so a
+        // state snapshot can show what the spell targets.
+        spell.AnnouncedTargets = collectedTargets;
+
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 
