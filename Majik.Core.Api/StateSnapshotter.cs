@@ -417,7 +417,23 @@ public static class StateSnapshotter
 
     private static StackObjectDto SnapshotStackObject(IStackObject obj, Player? viewer,
         IReadOnlyDictionary<IStackObject, List<Guid>>? entryIds) =>
-        SnapshotStackObjectCore(obj, viewer) with { Targets = SnapshotTargets(obj, viewer, entryIds) };
+        SnapshotStackObjectCore(obj, viewer) with
+        {
+            Targets = SnapshotTargets(obj, viewer, entryIds),
+            SourceCardId = SourceCardId(obj switch
+            {
+                ISpell s => s.Card,
+                ITriggeredAbility t => t.Source as ICard,
+                IActivatedAbility a => a.Source as ICard,
+                _ => null,
+            }, viewer),
+        };
+
+    /// <summary>The source card's InstanceId (kept across zone moves), or null
+    /// when there is none or it is in a zone hidden from <paramref name="viewer"/>
+    /// (CR 706): the id would let that player track the hidden card.</summary>
+    private static Guid? SourceCardId(ICard? card, Player? viewer) =>
+        card is null || IsHiddenFrom(card, viewer) ? null : card.InstanceId;
 
     // Same shape as a pushed spell (SnapshotStackObjectCore), flagged.
     private static StackObjectDto SnapshotBeingCast(Majik.Core.Stack.CastInProgress cast, Player? viewer,
@@ -427,7 +443,8 @@ public static class StateSnapshotter
             ControllerId: cast.Caster.Id,
             Description: cast.Card.Name,
             Targets: TargetRefs(cast.Targets.SelectMany(s => s), viewer, entryIds),
-            IsBeingCast: true);
+            IsBeingCast: true,
+            SourceCardId: SourceCardId(cast.Card, viewer));
 
     // CR 601.2c / 603.3d — the object's chosen targets in announcement order.
     private static IReadOnlyList<TargetRefDto> SnapshotTargets(IStackObject obj, Player? viewer,

@@ -3305,6 +3305,13 @@
           "kind": {
             "type": "string"
           },
+          "sourceCardId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "targets": {
             "items": {
               "$ref": "#/components/schemas/TargetRefDto"

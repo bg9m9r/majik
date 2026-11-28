@@ -134,7 +134,14 @@ public sealed record StackObjectDto(
     // so far. If the cast is cancelled or rewound (CR 732), it disappears
     // from the stack and the card is back in its owner's hand in the next
     // snapshot.
-    bool IsBeingCast = false);
+    bool IsBeingCast = false,
+    // The InstanceId of the card this object comes from: for a spell, the card
+    // being cast (CR 601.2a); for an activated or triggered ability, its source
+    // (CR 113.7), a permanent or a card in another zone. Card ids are kept
+    // across zone moves, so it is the id the client saw in the hand or on the
+    // battlefield. Null when there is no source card, or when that card is in a
+    // zone hidden from the viewer (CR 706: a library, another player's hand).
+    Guid? SourceCardId = null);
 
 /// <summary>A reference to a chosen target. <see cref="Kind"/> is "Card"
 /// (<see cref="Id"/> = the card's InstanceId), "Player" (the player id) or
