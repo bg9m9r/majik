@@ -147,49 +147,46 @@ public sealed class RemoteAgent : IPlayerAgent
                 $"Command targets player {command.PlayerId} but this agent is for player {_player.Id}.");
         }
 
-        if (_pending == null || _pendingKinds == null)
+        Action complete;
+        lock (_closeLock)
         {
-            throw new InvalidOperationException(
-                "Agent has no pending prompt; nothing to resolve.");
-        }
+            if (_pending == null || _pendingKinds == null)
+            {
+                throw new InvalidOperationException(
+                    "Agent has no pending prompt; nothing to resolve.");
+            }
 
-        if (!_pendingKinds.Contains(command.GetType()))
-        {
-            var expected = string.Join("/", _pendingKinds.Select(t => t.Name));
-            throw new InvalidOperationException(
-                $"Engine expected {expected}, got {command.GetType().Name}.");
-        }
+            if (!_pendingKinds.Contains(command.GetType()))
+            {
+                var expected = string.Join("/", _pendingKinds.Select(t => t.Name));
+                throw new InvalidOperationException(
+                    $"Engine expected {expected}, got {command.GetType().Name}.");
+            }
 
-        var pending = _pending;
-        var triggerOrder = _pendingTriggerOrder;
-        var libraryCandidates = _pendingLibraryCandidates;
-        var surveilPeeked = _pendingSurveilPeeked;
-        var scryPeeked = _pendingScryPeeked;
-        var revealedEligible = _pendingRevealedEligible;
-        var revealedOptional = _pendingRevealedOptional;
-        var bottomCount = _pendingBottomCount;
-        var choiceCandidates = _pendingChoiceCandidates;
-        var choiceKind = _pendingChoiceKind;
-        var targetCandidates = _pendingTargetCandidates;
-        var damageDivisionTargets = _pendingDamageDivisionTargets;
-        _pending = null;
-        _pendingKinds = null;
-        _pendingTriggerOrder = null;
-        _pendingLibraryCandidates = null;
-        _pendingSurveilPeeked = null;
-        _pendingScryPeeked = null;
-        _pendingRevealedEligible = null;
-        _pendingRevealedOptional = false;
-        _pendingBottomCount = null;
-        _pendingChoiceCandidates = null;
-        _pendingChoiceKind = null;
-        _pendingTargetCandidates = null;
-        _pendingDamageDivisionTargets = null;
-        _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, scryPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind, targetCandidates, damageDivisionTargets);
+            // Validate FIRST, against the still-pending prompt. An invalid
+            // answer throws here with the prompt, its stashes and its payload
+            // untouched, so the client can correct it and the engine keeps
+            // waiting on the same prompt (PromptRequested is not re-fired).
+            complete = Resolve(_pending, command, _pendingTriggerOrder, _pendingLibraryCandidates,
+                _pendingSurveilPeeked, _pendingScryPeeked, _pendingRevealedEligible, _pendingRevealedOptional,
+                _pendingBottomCount, _pendingChoiceCandidates, _pendingChoiceKind, _pendingTargetCandidates,
+                _pendingDamageDivisionTargets);
+
+            // Valid: retire the prompt, then hand the engine its answer.
+            ClearPendingState();
+        }
+        complete();
     }
 
-    private void Resolve(
+    /// <summary>
+    /// Validate <paramref name="command"/> against the pending prompt and
+    /// translate it into the engine's answer WITHOUT touching the prompt or any
+    /// game state. Returns the completion that delivers the answer; the caller
+    /// clears the prompt and runs it only after validation succeeded. Throws
+    /// <see cref="InvalidOperationException"/> (with the rejection reason) on an
+    /// invalid answer, leaving the prompt pending for a corrected one.
+    /// </summary>
+    private Action Resolve(
         object tcs,
         GameCommand command,
         IReadOnlyList<ITriggeredAbility>? triggerOrder,
@@ -204,14 +201,15 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<object>? targetCandidates,
         IReadOnlyList<object>? damageDivisionTargets)
     {
+        Action complete;
         switch (command)
         {
             case PassPriorityCommand:
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(PriorityAction.Pass);
+                complete = Done<PriorityAction>(tcs, PriorityAction.Pass);
                 break;
             case PlayLandCommand pl:
                 var land = ResolveCard(pl.LandInstanceId);
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(new PriorityAction.PlayLand(land));
+                complete = Done<PriorityAction>(tcs, new PriorityAction.PlayLand(land));
                 break;
             case CastSpellCommand cs:
                 // Resolve the card from any zone (hand is the typical case;
@@ -228,11 +226,11 @@ public sealed class RemoteAgent : IPlayerAgent
                 var resolvedTargets = cs.TargetInstanceIds.Count == 0
                     ? (IReadOnlyList<object>)Array.Empty<object>()
                     : cs.TargetInstanceIds.Select(id => (object)ResolveCard(id)).ToList();
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.CastSpell(card, resolvedTargets));
                 break;
             case MulliganCommand m:
-                ((TaskCompletionSource<MulliganDecision>)tcs).SetResult(
+                complete = Done<MulliganDecision>(tcs, 
                     m.Keep ? MulliganDecision.Keep : MulliganDecision.Mulligan);
                 break;
             case ChooseTargetsCommand t:
@@ -273,17 +271,17 @@ public sealed class RemoteAgent : IPlayerAgent
                     }
                     resolved = picked;
                 }
-                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(resolved);
+                complete = Done<IReadOnlyList<object>>(tcs, resolved);
                 break;
             }
             case ChooseXCommand x:
-                ((TaskCompletionSource<int>)tcs).SetResult(x.X);
+                complete = Done<int>(tcs, x.X);
                 break;
             case ChooseModeCommand mc:
-                ((TaskCompletionSource<int>)tcs).SetResult(mc.ModeIndex);
+                complete = Done<int>(tcs, mc.ModeIndex);
                 break;
             case ChooseManaCommand mp:
-                ((TaskCompletionSource<ManaPayment>)tcs).SetResult(
+                complete = Done<ManaPayment>(tcs, 
                     new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
                 break;
             case CancelCastCommand:
@@ -294,7 +292,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 // (must be a ChooseManaCommand awaiting) is enforced by
                 // _pendingKinds in Submit — a CancelCastCommand sent at
                 // any other prompt is rejected before reaching here.
-                ((TaskCompletionSource<ManaPayment>)tcs).SetResult(ManaPayment.Cancelled);
+                complete = Done<ManaPayment>(tcs, ManaPayment.Cancelled);
                 break;
             case ActivateManaAbilityCommand ama:
             {
@@ -323,7 +321,7 @@ public sealed class RemoteAgent : IPlayerAgent
                         $"Permanent {permanent.Name} has no mana abilities.");
                 }
                 var chosen = PickManaAbility(permanent, manaAbilities, ama.Color);
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.ActivateManaAbility(permanent, chosen));
                 break;
             }
@@ -361,7 +359,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 // re-prompts via ChooseTargetsAsync (mirrors the
                 // CastSpellCommand posture above; CR 602.1b chooses targets
                 // as part of activation, not the priority command).
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
                 break;
             }
@@ -395,7 +393,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 }
                 // Targets are not pre-resolved here — DispatchLoyalty re-prompts
                 // via ChooseTargetsAsync (CR 602.2b; mirrors ActivateAbilityCommand).
-                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                complete = Done<PriorityAction>(tcs, 
                     new PriorityAction.ActivateLoyaltyAbility(loyaltyAbility, Array.Empty<object>()));
                 break;
             }
@@ -414,12 +412,21 @@ public sealed class RemoteAgent : IPlayerAgent
                 }
                 var byId = triggerOrder.ToDictionary(t => t.Id);
                 var orderedTriggers = new List<ITriggeredAbility>(ot.StackObjectIdsInOrder.Count);
+                var listed = new HashSet<Guid>();
                 foreach (var id in ot.StackObjectIdsInOrder)
                 {
                     if (!byId.TryGetValue(id, out var ability))
                     {
                         throw new InvalidOperationException(
                             $"OrderTriggersCommand referenced unknown stack object {id}.");
+                    }
+                    // CR 603.3b — each trigger goes on the stack exactly once; a
+                    // duplicated id would otherwise pass the count check while
+                    // silently dropping another trigger.
+                    if (!listed.Add(id))
+                    {
+                        throw new InvalidOperationException(
+                            $"OrderTriggersCommand listed stack object {id} more than once.");
                     }
                     orderedTriggers.Add(ability);
                 }
@@ -429,13 +436,13 @@ public sealed class RemoteAgent : IPlayerAgent
                         $"OrderTriggersCommand listed {orderedTriggers.Count} triggers " +
                         $"but engine expected {triggerOrder.Count}.");
                 }
-                ((TaskCompletionSource<IReadOnlyList<ITriggeredAbility>>)tcs).SetResult(orderedTriggers);
+                complete = Done<IReadOnlyList<ITriggeredAbility>>(tcs, orderedTriggers);
                 break;
             case DeclareAttackersCommand atk:
-                ((TaskCompletionSource<CombatPlan>)tcs).SetResult(BuildCombatPlan(atk));
+                complete = Done<CombatPlan>(tcs, BuildCombatPlan(atk));
                 break;
             case DeclareBlockersCommand blk:
-                ((TaskCompletionSource<BlockPlan>)tcs).SetResult(BuildBlockPlan(blk));
+                complete = Done<BlockPlan>(tcs, BuildBlockPlan(blk));
                 break;
             case ChooseSurveilCommand sc:
             {
@@ -479,7 +486,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         $"ChooseSurveilCommand partitioned {seen.Count} cards but engine peeked {surveilPeeked.Count}.");
                 }
-                ((TaskCompletionSource<SurveilAction.SurveilDecision>)tcs).SetResult(
+                complete = Done<SurveilAction.SurveilDecision>(tcs, 
                     new SurveilAction.SurveilDecision(toGy, top));
                 break;
             }
@@ -525,7 +532,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         $"ChooseScryCommand partitioned {scrySeen.Count} cards but engine peeked {scryPeeked.Count}.");
                 }
-                ((TaskCompletionSource<ScryAction.ScryDecision>)tcs).SetResult(
+                complete = Done<ScryAction.ScryDecision>(tcs, 
                     new ScryAction.ScryDecision(toBottom, scryTop));
                 break;
             }
@@ -534,7 +541,7 @@ public sealed class RemoteAgent : IPlayerAgent
                 // to the engine's TaskCompletionSource<bool>. Submit()
                 // already enforced _pendingKinds so we know the caller
                 // intended this prompt; nothing further to validate.
-                ((TaskCompletionSource<bool>)tcs).SetResult(yn.Answer);
+                complete = Done<bool>(tcs, yn.Answer);
                 break;
             case ChooseDamageDivisionCommand dd:
             {
@@ -568,7 +575,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     var id = DamageDivisionTargetId(damageDivisionTargets[i]);
                     split[i] = amountById.TryGetValue(id, out var amount) ? amount : 0;
                 }
-                ((TaskCompletionSource<IReadOnlyList<int>>)tcs).SetResult(split);
+                complete = Done<IReadOnlyList<int>>(tcs, split);
                 break;
             }
             case ChooseFromRevealedCommand cr:
@@ -619,7 +626,7 @@ public sealed class RemoteAgent : IPlayerAgent
                         "with non-empty eligible set — falling back to first eligible.");
                     picked = revealedEligible[0];
                 }
-                ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
+                complete = Done<ICard?>(tcs, picked);
                 break;
             }
             case ChooseLibraryPickCommand lp:
@@ -648,7 +655,7 @@ public sealed class RemoteAgent : IPlayerAgent
                             $"ChooseLibraryPickCommand selected instance {id} is not in the offered candidate list.");
                     }
                 }
-                ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
+                complete = Done<ICard?>(tcs, picked);
                 break;
             }
             case ChooseCardsToBottomCommand cb:
@@ -690,7 +697,7 @@ public sealed class RemoteAgent : IPlayerAgent
                     }
                     chosen.Add(resolved);
                 }
-                ((TaskCompletionSource<IReadOnlyList<ICard>>)tcs).SetResult(chosen);
+                complete = Done<IReadOnlyList<ICard>>(tcs, chosen);
                 break;
             }
             case ChoiceCommand choice:
@@ -740,12 +747,22 @@ public sealed class RemoteAgent : IPlayerAgent
                     }
                     result = picked;
                 }
-                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(result);
+                complete = Done<IReadOnlyList<object>>(tcs, result);
                 break;
             }
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
+        return complete;
+    }
+
+    // Bind the validated answer to the prompt's TaskCompletionSource now (the
+    // value is already computed) and deliver it later, after Submit has cleared
+    // the prompt — so nothing is mutated unless validation passed.
+    private static Action Done<T>(object tcs, T value)
+    {
+        var typed = (TaskCompletionSource<T>)tcs;
+        return () => typed.SetResult(value);
     }
 
     // PLAN 01 (Slice C) — match a ChoiceCommand instance id to a candidate
