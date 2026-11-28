@@ -497,6 +497,13 @@ public sealed class ManaPaymentResolver
         {
             payer.RestoreColoredMana(blockedW, blockedU, blockedB, blockedR, blockedG, colorless: blockedC);
         }
+        // Failure AFTER production (a dynamic ability produced less, or other,
+        // than its preview): nothing is spent (PayMana is all-or-nothing), the
+        // sources stay tapped, their mana and the earlier floating mana stay in
+        // the pool, and their tapped-for-mana events have fired. The caller
+        // reverses the cast. CR 732.1 — the payments are cancelled; reversing
+        // the mana abilities is the player's option, so keeping the mana is a
+        // legal outcome. Pinned by ManaPaymentFailureAfterProductionTests.
         if (!ok) return false;
 
         var poolAfter = payer.ManaPool;
