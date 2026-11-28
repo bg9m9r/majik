@@ -53,9 +53,13 @@ public class FullGameGateTests
         ["ZoneIntegrity|Walking Ballista|Graveyard+Stack"] = new(StaysOnStack, 3545),
         ["ZoneIntegrity|Welding Jar|Exile+Stack"] = new(StaysOnStack, 3545),
         ["ZoneIntegrity|Welding Jar|Graveyard+Stack"] = new(StaysOnStack, 3545),
-        // The same leftover, on a path where the card is then shuffled into its
-        // library: 1 of 10 runs (EldraziTron vs SultaiMidrange seed 1).
+        // The same leftover on rarer paths, where the card then goes on to its
+        // library or its owner's hand. A card left on the Stack pairs with
+        // whatever zone it moves to next, so these depend on the game path:
+        // Library+Stack in 3 of 15 runs; Hand+Stack in 1 of 15 (both seen in
+        // SultaiMidrange vs EldraziTron seed 0).
         ["ZoneIntegrity|Walking Ballista|Library+Stack"] = new("intermittent: " + StaysOnStack, 3545, Intermittent: true),
+        ["ZoneIntegrity|Walking Ballista|Hand+Stack"] = new("intermittent: " + StaysOnStack, 3545, Intermittent: true),
         // Not a Stack leftover: a second desync the name-only signature hid
         // (10/10 runs, SultaiMidrange vs Affinity seed 0).
         ["ZoneIntegrity|Mox Opal|Graveyard+Library"] = new("in both the Graveyard and the Library (CR 400.1)", 3545),
