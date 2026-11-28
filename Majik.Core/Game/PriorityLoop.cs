@@ -157,6 +157,11 @@ public sealed class PriorityLoop
             // silently fails). 500 is well above any realistic round.
             const int kActionLimit = 500;
             var actionCount = 0;
+            // Withdrawn casts (a cancel, or an engine-reversed cast at a seat
+            // that is asked again) are not actions and leave priority where it
+            // was; this separate, generous cap only stops a runaway client.
+            const int kWithdrawnLimit = 5000;
+            var withdrawnCount = 0;
             while (!_priority.AllPlayersPassed && !ct.IsCancellationRequested)
             {
                 var current = _priority.CurrentPlayer
@@ -255,7 +260,7 @@ public sealed class PriorityLoop
                     continue;
                 }
 
-                if (++actionCount > kActionLimit)
+                if (actionCount + 1 > kActionLimit)
                 {
                     System.Console.Error.WriteLine(
                         $"PRIORITY LOOP SAFETY: {kActionLimit} non-pass actions in one round, " +
@@ -263,8 +268,33 @@ public sealed class PriorityLoop
                     return;
                 }
 
-                var applied = await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
+                bool applied;
+                try
+                {
+                    applied = await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
+                }
+                catch (Majik.Core.Players.Agents.CastCancelledException)
+                {
+                    // CR 732.1 — the player backed out of a cast or activation
+                    // at one of its prompts; it has been rewound and nothing
+                    // was paid. Not an action: the same player is asked again
+                    // with the same priority state (pass count untouched).
+                    if (++withdrawnCount > kWithdrawnLimit) { WithdrawnLimitHit(current); return; }
+                    continue;
+                }
 
+                if (!applied && action is PriorityAction.CastSpell && agent.RepromptsAfterReversal)
+                {
+                    // CR 732.1 — the engine reversed this player's cast (it
+                    // turned out illegal, e.g. the chosen mana could not pay
+                    // it) and has told them why. A seat with a person behind it
+                    // is asked again, as after a cancel, instead of losing
+                    // priority to a forced pass.
+                    if (++withdrawnCount > kWithdrawnLimit) { WithdrawnLimitHit(current); return; }
+                    continue;
+                }
+
+                actionCount++;
                 if (!applied)
                 {
                     // The proposal was rejected / no-op'd (e.g. an illegal
@@ -550,6 +580,10 @@ public sealed class PriorityLoop
         if (_agents.TryGetValue(controller, out var seatAgent)) return seatAgent;
         return AgentRegistry.Get(controller);
     }
+
+    private static void WithdrawnLimitHit(Player actor) =>
+        System.Console.Error.WriteLine(
+            $"PRIORITY LOOP SAFETY: too many withdrawn casts in one round, actor={actor.Name}. Forcing round end.");
 
     private static bool HoldsPriority(PriorityAction action) => action switch
     {

@@ -1086,6 +1086,10 @@ public sealed class RemoteAgent : IPlayerAgent
     /// </summary>
     public bool WantsSynthesizedTargetCandidates => true;
 
+    /// <inheritdoc />
+    /// <remarks>A person reads the reversal notice and chooses again.</remarks>
+    public bool RepromptsAfterReversal => true;
+
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);

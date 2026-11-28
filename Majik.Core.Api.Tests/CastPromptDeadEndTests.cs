@@ -149,6 +149,70 @@ public class CastPromptDeadEndTests
     }
 
     [Fact]
+    public async Task ACancelledCast_ByTheNonActivePlayer_LeavesPriorityWithThatPlayer()
+    {
+        // CR 117.3c / 732.1 — Bob, not the active player, starts Lightning
+        // Bolt in Alice's turn and backs out at the targets prompt. Nothing
+        // happened: Bob is asked again, not Alice.
+        var (facade, _) = Game();
+        var mountain = new Land("Mountain", supertypes: new[] { CardSupertype.Basic }, subtypes: new[] { CardSubtype.Mountain });
+        mountain.SetOwner(facade.Bob); mountain.ChangeController(facade.Bob);
+        mountain.SetZone(ZoneType.Battlefield);
+        OracleManaBinder.BindBasicLandMana(mountain, facade.Bob);
+        facade.Bob.Zones.Battlefield.AddCard(mountain);
+        var bolt = new Instant("Lightning Bolt", "{R}");
+        bolt.SetOwner(facade.Bob); bolt.SetController(facade.Bob);
+        facade.Bob.Zones.Hand.AddCard(bolt); bolt.SetZone(ZoneType.Hand);
+
+        var order = new List<(bool Bob, IReadOnlyList<string> Kinds)>();
+        var cast = false;
+        using var sub = facade.SubscribePrompts(p =>
+        {
+            GameCommand? answer = null;
+            var isBob = p.PlayerId == facade.Bob.Id;
+            lock (order) order.Add((isBob, p.ExpectedKinds));
+            if (p.ExpectedKinds.Contains(nameof(MulliganCommand))) answer = new MulliganCommand(Keep: true);
+            else if (isBob && !cast && p.LegalActions?.CastableCardIds.Contains(bolt.InstanceId) == true)
+            {
+                cast = true;
+                answer = new CastSpellCommand(bolt.InstanceId, Array.Empty<Guid>(), null, null);
+            }
+            else if (isBob && p.ExpectedKinds.Contains(nameof(ChooseTargetsCommand))) answer = new CancelCastCommand();
+            else if (p.ExpectedKinds.Contains(nameof(ChooseManaCommand)))
+                answer = new ChooseManaCommand(new List<Guid> { mountain.InstanceId });
+            else if (p.ExpectedKinds.Contains(nameof(PassPriorityCommand))) answer = new PassPriorityCommand();
+            if (answer != null) _ = facade.SubmitAsync(answer with { PlayerId = p.PlayerId });
+        });
+        await facade.StartFullGameAsync(firstPlayerSlot: 0, maxTurns: 1, rng: new GameRandom(1));
+        await facade.FullGameTask!.WaitAsync(TimeSpan.FromSeconds(30));
+
+        cast.Should().BeTrue("Bob is offered Lightning Bolt in Alice's turn");
+        bolt.Zone.Should().Be(ZoneType.Hand);
+        List<(bool Bob, IReadOnlyList<string> Kinds)> seen;
+        lock (order) seen = order.ToList();
+        var after = seen.SkipWhile(o => !o.Kinds.Contains(nameof(ChooseTargetsCommand))).Skip(1).First();
+        after.Bob.Should().BeTrue("a cancelled cast is a no-op: the same player is asked again");
+        after.Kinds.Should().Contain(nameof(CastSpellCommand));
+    }
+
+    [Fact]
+    public async Task ACastReversedForUnpayableMana_AsksTheSamePersonAgain_WithTheReason()
+    {
+        // CR 732.1 — Alice picks a Mountain to pay for Opt ({U}); the engine
+        // reverses the cast. She is told why and keeps priority, as after a
+        // cancel, instead of losing it to a forced pass.
+        var (facade, _) = Game(("Mountain", CardSubtype.Mountain));
+        var opt = InHand(facade, new Instant("Opt", "{U}"));
+        var prompts = await Drive(facade, opt, _ => null);
+
+        _zoneAfterCast.Should().Be(ZoneType.Hand);
+        var after = _order.SkipWhile(o => !o.Kinds.Contains(nameof(ChooseManaCommand))).Skip(1).First();
+        after.Alice.Should().BeTrue("a person whose cast the engine reversed is asked again");
+        after.Kinds.Should().Contain(nameof(CastSpellCommand));
+        prompts.Should().Contain(p => p.Notice != null && p.Notice.Contains("Opt"));
+    }
+
+    [Fact]
     public async Task TheModePrompt_OfACast_AcceptsCancel()
     {
         var (facade, _) = Game(("Island", CardSubtype.Island), ("Mountain", CardSubtype.Mountain));

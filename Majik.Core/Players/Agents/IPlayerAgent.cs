@@ -55,6 +55,15 @@ public interface IPlayerAgent
     void NotifyActionReversed(string reason) { }
 
     /// <summary>
+    /// CR 732.1 — when the engine reverses this agent's cast, ask the same
+    /// player again (priority unchanged) instead of forcing a pass. True for a
+    /// seat with a person behind it, who reads the reason and chooses again;
+    /// false (the default) for bots, so one that re-proposes the same illegal
+    /// cast cannot spin the priority round.
+    /// </summary>
+    bool RepromptsAfterReversal => false;
+
+    /// <summary>
     /// Pick targets satisfying the request (cardinality + legality).
     /// </summary>
     Task<IReadOnlyList<object>> ChooseTargetsAsync(

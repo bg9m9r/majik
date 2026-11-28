@@ -528,16 +528,9 @@ public sealed class GameFacade : IDisposable
             int? chosenX = null;
             if (cast.AlternativeCost == null && cost.HasX)
             {
-                try
-                {
-                    chosenX = await agent.ChooseXAsync(ctx, cast.Card, CancellationToken.None);
-                }
-                catch (Majik.Core.Players.Agents.CastCancelledException)
-                {
-                    // CR 601.2 — backed out before anything moved or was paid;
-                    // the player keeps priority, as after a payment cancel.
-                    return true;
-                }
+                // A CastCancelledException here propagates to PriorityLoop,
+                // which treats the cancel as a no-op (nothing moved or paid).
+                chosenX = await agent.ChooseXAsync(ctx, cast.Card, CancellationToken.None);
                 if (chosenX is { } xv && xv > 0)
                 {
                     cost = cost.AddGenericCost(xv);
@@ -568,12 +561,10 @@ public sealed class GameFacade : IDisposable
                 // Cancelled sentinel. Spell stays in hand, nothing fires.
                 if (payment.IsCancelled)
                 {
-                    // CR 601.2 / CR 727 — player explicitly cancelled. The cast
-                    // is abandoned but priority is NOT forced-passed (the human
-                    // made a deliberate choice; they remain the priority holder so
-                    // they can choose again). Return true so PriorityLoop keeps
-                    // the current player rather than calling PassPriority().
-                    return true;
+                    // CR 601.2 / CR 727 — player explicitly cancelled. Nothing
+                    // has been paid; PriorityLoop treats the cancel as a no-op
+                    // and asks the same player again.
+                    throw new Majik.Core.Players.Agents.CastCancelledException();
                 }
 
                 // Portal "Auto-pay" — empty (non-cancelled) source list means
@@ -605,7 +596,7 @@ public sealed class GameFacade : IDisposable
             }
             catch (Majik.Core.Players.Agents.CastCancelledException)
             {
-                return true; // CR 732.1 — the player backed out; they keep priority
+                throw; // CR 732.1 — the player backed out: a no-op for PriorityLoop
             }
             catch (InvalidOperationException)
             {
@@ -708,15 +699,9 @@ public sealed class GameFacade : IDisposable
                 && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
                 && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
             {
-                int x;
-                try
-                {
-                    x = await agents[actor].ChooseXAsync(ctx, xSource, ct: default);
-                }
-                catch (Majik.Core.Players.Agents.CastCancelledException)
-                {
-                    return; // nothing is paid before the activation itself
-                }
+                // A cancel propagates to PriorityLoop as a no-op: nothing is
+                // paid before the activation itself.
+                var x = await agents[actor].ChooseXAsync(ctx, xSource, ct: default);
                 aaForX.SetChosenX(x);
                 costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
                     activate.Ability.Costs, x);

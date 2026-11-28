@@ -976,17 +976,10 @@ public sealed class TurnDriver
             int? chosenX = null;
             if (def.HasVariableX)
             {
-                try
-                {
-                    chosenX = await _agents[actor].ChooseXAsync(ctx, castCard, ct);
-                }
-                catch (Majik.Core.Players.Agents.CastCancelledException)
-                {
-                    // CR 601.2 — backed out at the X announcement; nothing
-                    // has moved or been paid yet. Like a cancel at the
-                    // payment prompt, the player keeps priority (true).
-                    return true;
-                }
+                // CR 601.2 — a cancel at the X announcement (nothing moved or
+                // paid yet) propagates to PriorityLoop, which treats it as a
+                // no-op and asks the same player again.
+                chosenX = await _agents[actor].ChooseXAsync(ctx, castCard, ct);
             }
 
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
@@ -1048,11 +1041,9 @@ public sealed class TurnDriver
                 {
                     // CR 601.2 / CR 727 — player explicitly cancelled the cast at
                     // the cost-payment prompt. Nothing has been paid; spell stays
-                    // in hand. Return true so PriorityLoop keeps the current player
-                    // rather than force-passing (a deliberate cancel is not a
-                    // silent failure — the player chose this outcome and may choose
-                    // a different action next).
-                    return true;
+                    // in hand. PriorityLoop treats the cancel as a no-op and asks
+                    // the same player again.
+                    throw new Majik.Core.Players.Agents.CastCancelledException();
                 }
 
                 // Portal "Auto-pay": the mana-cost prompt's Auto-pay button
@@ -1169,10 +1160,9 @@ public sealed class TurnDriver
             catch (Majik.Core.Players.Agents.CastCancelledException)
             {
                 // CR 732.1 — the player backed out at a casting prompt; the
-                // cast flow has rewound the card. The player keeps priority,
-                // as after a cancel at the payment prompt (true = no forced
-                // pass in PriorityLoop).
-                return true;
+                // cast flow has rewound the card. PriorityLoop treats the
+                // cancel as a no-op and asks the same player again.
+                throw;
             }
             catch (InvalidOperationException ex)
             {
@@ -1321,16 +1311,9 @@ public sealed class TurnDriver
                 && Majik.Core.Costs.VariableXCostExpansion.HasVariableX(activate.Ability.Costs)
                 && activate.Ability.Source is Majik.Core.Cards.ICard xSource)
             {
-                int x;
-                try
-                {
-                    x = await _agents[actor].ChooseXAsync(ctx, xSource, ct: default);
-                }
-                catch (Majik.Core.Players.Agents.CastCancelledException)
-                {
-                    // Nothing is paid before ActivateAbility; abandon it.
-                    return;
-                }
+                // A cancel propagates to PriorityLoop as a no-op: nothing is
+                // paid before ActivateAbility.
+                var x = await _agents[actor].ChooseXAsync(ctx, xSource, ct: default);
                 aaForX.SetChosenX(x);
                 costsToPay = Majik.Core.Costs.VariableXCostExpansion.Expand(
                     activate.Ability.Costs, x);
