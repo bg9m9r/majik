@@ -1956,9 +1956,21 @@ public sealed class GameFacade : IDisposable
 
     /// <summary>
     /// Stream events. Returned <see cref="IDisposable"/> unsubscribes.
-    /// Receives the public / full-reveal <see cref="EventDto"/>; use
-    /// <see cref="SubscribeEnvelopes"/> when you need access to the
-    /// per-player masked variants for CR 706 hidden-information events.
+    /// <para>
+    /// <b>Full information — never send these to a player.</b> Each
+    /// <see cref="EventDto"/> is <see cref="EventEnvelope.Public"/>, built with
+    /// no viewer (<c>EventPayloadBuilder.Build(e, viewer: null)</c>): it names
+    /// cards moving between hidden zones (CR 706), the card a player drew, the
+    /// cards surveilled to the top of a library, and the card underneath a
+    /// face-down permanent (CR 708.2). It is for spectator/replay, logs, tests
+    /// and in-process tools. To deliver events to a seat, use
+    /// <see cref="SubscribeEnvelopes"/> and send that seat
+    /// <see cref="EventEnvelope.PerPlayer"/>[playerId] whenever
+    /// <see cref="EventEnvelope.PerPlayer"/> is non-null (it is non-null
+    /// exactly when <c>EventPayloadBuilder.RequiresPerViewerMasking</c> says the
+    /// payload differs per viewer); <see cref="EventEnvelope.Public"/> is safe
+    /// to broadcast only when it is null.
+    /// </para>
     /// </summary>
     public IDisposable Subscribe(Action<EventDto> handler)
     {
