@@ -1176,6 +1176,23 @@ public sealed class TurnDriver
             return true; // committed: spell put on the stack
         }
 
+        // CR 602.2b / 601.2c — an ability is activated only with its required
+        // targets. Checked before the prompt for an agent that can pick only
+        // from the offered pool (a remote player: a prompt with no legal
+        // answer would strand them), and after it for every agent. Nothing
+        // is paid before targets, so abandoning is a clean rewind (CR 732.1);
+        // the player is told why. True = abandon.
+        bool ActivationTargetsShort(Player actor, string name, TargetRequest req, int offered, int? chosen)
+        {
+            var agent = _agents[actor];
+            var have = chosen ?? (agent.WantsSynthesizedTargetCandidates ? offered : int.MaxValue);
+            if (have >= req.MinTargets) return false;
+            agent.NotifyActionReversed(
+                $"Cannot activate {name}: target request '{req.Description}' needs {req.MinTargets} " +
+                $"legal target(s); {(chosen.HasValue ? "chosen" : "there are")} {have} (CR 602.2b).");
+            return true;
+        }
+
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
         {
             // CR 601.2h-analogue for abilities (CR 602.2b) — re-validate
@@ -1246,7 +1263,10 @@ public sealed class TurnDriver
                     // only; targeting semantics unchanged). Mirrors
                     // GameFacade.DispatchActivate.
                     promptReq = promptReq.WithSourceLabel(aa.Source);
+                    var abilityName = (aa.Source as Majik.Core.Cards.ICard)?.Name ?? "ability";
+                    if (ActivationTargetsShort(actor, abilityName, req, live.Count, chosen: null)) return;
                     var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                    if (ActivationTargetsShort(actor, abilityName, req, live.Count, chosen.Count)) return;
                     chosenTargets.Add(chosen);
                     foreach (var obj in chosen)
                     {
@@ -1371,7 +1391,9 @@ public sealed class TurnDriver
                 var promptReq = ReferenceEquals(live, req.LegalCandidates)
                     ? req
                     : req.WithCandidates(live);
+                if (ActivationTargetsShort(actor, loyalty.Source.Name, req, live.Count, chosen: null)) return;
                 var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
+                if (ActivationTargetsShort(actor, loyalty.Source.Name, req, live.Count, chosen.Count)) return;
                 chosenTargets.Add(chosen);
                 foreach (var obj in chosen)
                 {

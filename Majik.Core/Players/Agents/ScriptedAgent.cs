@@ -13,6 +13,13 @@ namespace Majik.Core.Players.Agents;
 /// </summary>
 public sealed class ScriptedAgent : IPlayerAgent
 {
+    /// <summary>Every reason the engine gave for reversing an action this
+    /// agent started (CR 732.1), in order.</summary>
+    public List<string> ActionsReversed { get; } = new();
+
+    /// <inheritdoc/>
+    public void NotifyActionReversed(string reason) => ActionsReversed.Add(reason);
+
     private readonly Queue<PriorityAction> _priorityActions = new();
     private readonly Queue<MulliganDecision> _mulligans = new();
     private readonly Queue<IReadOnlyList<object>> _targets = new();
