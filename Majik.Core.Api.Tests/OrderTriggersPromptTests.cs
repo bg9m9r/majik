@@ -67,4 +67,38 @@ public class OrderTriggersPromptTests
         prompts.Should().ContainSingle().Which.TriggerOptions.Should().BeNull();
         agent.Submit(new DeclareAttackersCommand(Array.Empty<AttackerDeclarationDto>()) { PlayerId = facade.Alice.Id });
     }
+
+    [Fact]
+    public async Task TheSameAbilityTriggeringTwice_GetsTwoDistinctIds_ThatRoundTrip()
+    {
+        // CR 603.2 / 603.3b — an ability that triggers twice in one batch
+        // (Blade of the Bloodchief when two creatures die at once) is two
+        // trigger instances the controller orders independently. The engine
+        // hands the agent the same ability object twice; the prompt must still
+        // give each instance its own id, and the command answering it must
+        // round-trip back to both instances.
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var blade = new Creature("Blade of the Bloodchief", "{1}", 0, 0);
+        blade.SetOwner(facade.Alice);
+        blade.SetController(facade.Alice);
+        facade.Alice.Zones.Battlefield.AddCard(blade);
+        blade.SetZone(ZoneType.Battlefield);
+        var dies = new TriggeredAbility(blade, facade.Alice, Triggers.OnEnterBattlefieldSelf(blade),
+            effects: new IEffect[] { new Effect("Put a +1/+1 counter on equipped creature.", () => { }) });
+        var other = new TriggeredAbility(blade, facade.Alice, Triggers.OnEnterBattlefieldSelf(blade));
+        var prompts = new List<PromptDto>();
+        using var sub = facade.SubscribePrompts(prompts.Add);
+        var agent = AliceAgent(facade);
+
+        var task = agent.OrderTriggersAsync(null!, new ITriggeredAbility[] { dies, other, dies });
+
+        var options = prompts.Should().ContainSingle().Subject.TriggerOptions!;
+        options.Should().HaveCount(3);
+        options.Select(o => o.TriggerId).Should().OnlyHaveUniqueItems("each trigger instance needs its own id");
+        options[0].TriggerId.Should().Be(dies.Id, "the first instance keeps the ability's id");
+
+        agent.Submit(new OrderTriggersCommand(new[] { options[2].TriggerId, options[1].TriggerId, options[0].TriggerId })
+            { PlayerId = facade.Alice.Id });
+        (await task).Should().Equal(dies, other, dies);
+    }
 }

@@ -437,7 +437,11 @@ public sealed class RemoteAgent : IPlayerAgent
                     throw new InvalidOperationException(
                         "OrderTriggersCommand resolved without a pending trigger order.");
                 }
-                var byId = triggerOrder.ToDictionary(t => t.Id);
+                // One id per trigger INSTANCE (TriggerEntryIds): the same ability
+                // that triggered twice appears twice under distinct ids.
+                var entryIds = TriggerEntryIds(triggerOrder);
+                var byId = new Dictionary<Guid, ITriggeredAbility>(entryIds.Count);
+                for (var i = 0; i < entryIds.Count; i++) byId[entryIds[i]] = triggerOrder[i];
                 var orderedTriggers = new List<ITriggeredAbility>(ot.StackObjectIdsInOrder.Count);
                 var listed = new HashSet<Guid>();
                 foreach (var id in ot.StackObjectIdsInOrder)
@@ -1317,7 +1321,8 @@ public sealed class RemoteAgent : IPlayerAgent
             throw new InvalidOperationException("A prompt is already pending.");
         }
         _pendingTriggerOrder = mine;
-        _pendingPayload = new PromptPayload(TriggerOptions: mine.Select(DescribeTrigger).ToList());
+        var entryIds = TriggerEntryIds(mine);
+        _pendingPayload = new PromptPayload(TriggerOptions: mine.Select((t, i) => DescribeTrigger(t, entryIds[i])).ToList());
         try
         {
             return Prompt<IReadOnlyList<ITriggeredAbility>>(ct, typeof(OrderTriggersCommand));
@@ -1333,7 +1338,7 @@ public sealed class RemoteAgent : IPlayerAgent
     // CR 603.3b — wire row for one trigger. Text = the trigger's effect text
     // (joined) when the ability carries any, else "<source> trigger" (the same
     // fallback StateSnapshotter uses for a trigger on the stack).
-    private static TriggerOptionDto DescribeTrigger(ITriggeredAbility trigger)
+    private static TriggerOptionDto DescribeTrigger(ITriggeredAbility trigger, Guid entryId)
     {
         var sourceCard = trigger.Source as ICard;
         var sourceName = sourceCard?.Name ?? "";
@@ -1344,7 +1349,39 @@ public sealed class RemoteAgent : IPlayerAgent
         var text = effectText is { Count: > 0 }
             ? string.Join(" ", effectText)
             : (sourceName.Length > 0 ? $"{sourceName} trigger" : "triggered ability");
-        return new TriggerOptionDto(trigger.Id, sourceCard?.InstanceId, sourceName, text);
+        return new TriggerOptionDto(entryId, sourceCard?.InstanceId, sourceName, text);
+    }
+
+    /// <summary>
+    /// CR 603.2 / 603.3b — one wire id per trigger INSTANCE in
+    /// <paramref name="triggers"/>. The trigger manager queues the registered
+    /// ability object on every firing, so an ability that triggered twice in
+    /// one batch (Blade of the Bloodchief when two creatures die together)
+    /// appears twice with the same <see cref="ITriggeredAbility.Id"/>. The first
+    /// occurrence keeps the ability's id; the n-th repeat gets an id derived
+    /// deterministically from it, so the prompt and the answering
+    /// <see cref="OrderTriggersCommand"/> agree without extra state.
+    /// </summary>
+    private static IReadOnlyList<Guid> TriggerEntryIds(IReadOnlyList<ITriggeredAbility> triggers)
+    {
+        var seen = new Dictionary<ITriggeredAbility, int>(ReferenceEqualityComparer.Instance);
+        var used = new HashSet<Guid>();
+        var ids = new List<Guid>(triggers.Count);
+        foreach (var trigger in triggers)
+        {
+            seen.TryGetValue(trigger, out var occurrence);
+            seen[trigger] = occurrence + 1;
+            var id = trigger.Id;
+            for (var salt = occurrence; !used.Add(id); salt++)
+            {
+                var bytes = trigger.Id.ToByteArray();
+                var mix = BitConverter.GetBytes(salt * -1640531535); // golden-ratio mix of the repeat index
+                for (var b = 0; b < 4; b++) bytes[12 + b] ^= mix[b];
+                id = new Guid(bytes);
+            }
+            ids.Add(id);
+        }
+        return ids;
     }
 
     public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
