@@ -18,7 +18,13 @@ public sealed record GameStateDto(
     // to detect dropped events. Defaults to 0 so any construction that
     // predates the seq plumbing (and any pre-deploy client) degrades to the
     // prior always-accept behaviour.
-    long Seq = 0);
+    long Seq = 0,
+    // CR 117.1 / 117.3 — the player who currently holds priority. Null while
+    // nobody does: after all players passed in succession (CR 117.4) while the
+    // top of the stack resolves or the step ends, during steps in which no
+    // player receives priority (untap; usually cleanup, CR 514.3), before the
+    // game starts and after it ends. Same value in every viewer's snapshot.
+    Guid? PriorityPlayerId = null);
 
 public sealed record PlayerDto(
     Guid Id,

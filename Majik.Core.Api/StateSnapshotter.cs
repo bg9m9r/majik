@@ -30,7 +30,9 @@ public static class StateSnapshotter
         // PLAN 04 — the per-game seq of the last event folded into this
         // snapshot. Threaded onto GameStateDto.Seq so the portal can drop
         // stale snapshots. Defaults to 0 for callers that don't track seq.
-        long seq = 0)
+        long seq = 0,
+        // CR 117.1 — who holds priority (null = nobody).
+        Player? priorityPlayer = null)
     {
         ArgumentNullException.ThrowIfNull(players);
         ArgumentNullException.ThrowIfNull(activePlayer);
@@ -44,7 +46,8 @@ public static class StateSnapshotter
             Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
             Stack: stack.GetAll().Select(o => SnapshotStackObject(o, viewer)).ToList(),
             YouPlayerId: viewer?.Id,
-            Seq: seq);
+            Seq: seq,
+            PriorityPlayerId: priorityPlayer?.Id);
     }
 
     private static PlayerDto SnapshotPlayer(Player p, Player? viewer)

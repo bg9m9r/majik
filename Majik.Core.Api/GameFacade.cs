@@ -412,8 +412,22 @@ public sealed class GameFacade : IDisposable
         // Quiescent points between prompts (bot seats raise none): a player
         // receiving priority (CR 117.3, after SBAs and triggers, CR 117.5) and
         // a step starting. Refresh only the views an off-engine reader asked for.
-        _bus.Subscribe<Majik.Core.Domain.DomainEvents.PriorityReceivedEvent>(_ => PublishOnEngineFlow(allViews: false));
-        _bus.Subscribe<StepStartedEvent>(_ => PublishOnEngineFlow(allViews: false));
+        // CR 117.1 / 117.3 — track who holds priority for the snapshot: the
+        // player who last received it, until all players pass in succession
+        // (CR 117.4 — the top resolves or the step ends) or a new step starts.
+        // Updated before the refresh so the published snapshot names the new
+        // holder, whichever kind of agent (human seat or bot) it is.
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.PriorityReceivedEvent>(ev =>
+        {
+            _priorityHolder = ev.Player;
+            PublishOnEngineFlow(allViews: false);
+        });
+        _bus.Subscribe<Majik.Core.Domain.DomainEvents.AllPlayersPassedEvent>(_ => _priorityHolder = null);
+        _bus.Subscribe<StepStartedEvent>(_ =>
+        {
+            _priorityHolder = null;
+            PublishOnEngineFlow(allViews: false);
+        });
     }
 
     private void PublishOnEngineFlow(bool allViews)
@@ -1794,7 +1808,12 @@ public sealed class GameFacade : IDisposable
         viewer: viewer,
         turnState: _currentTurnState,
         // PLAN 04 — report the last event's seq; reading does NOT advance it.
-        seq: Interlocked.Read(ref _lastEventSeq));
+        seq: Interlocked.Read(ref _lastEventSeq),
+        priorityPlayer: _priorityHolder);
+
+    /// <summary>CR 117.1 — the player holding priority, or null. Written only
+    /// on the engine flow; read by snapshot builds (engine flow, or not running).</summary>
+    private volatile Player? _priorityHolder;
 
     // ── Published snapshot (thread-safe state reads) ──────────────────────
     // The engine flow is the only flow that walks live game objects (layer
@@ -1893,6 +1912,9 @@ public sealed class GameFacade : IDisposable
     /// the final snapshot, then let reads go live (nothing else mutates).</summary>
     private void ExitEngineRunning()
     {
+        // Nobody holds priority once the engine stopped (game over, or the
+        // single round ended).
+        _priorityHolder = null;
         try { PublishSnapshot(allViews: true); }
         catch (Exception) { /* a faulted game may not snapshot; reads go live below */ }
         lock (_liveReadLock) _engineRunning = false;

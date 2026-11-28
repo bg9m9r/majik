@@ -1855,6 +1855,13 @@
             },
             "type": "array"
           },
+          "priorityPlayerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "seq": {
             "default": 0,
             "format": "int64",
