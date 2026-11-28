@@ -30,6 +30,17 @@ internal static class LegalActionEnumerator
     /// INCLUDING Pass. Pure enumeration — no scoring. Single source of truth
     /// shared by PriorityPolicy (which scores these) and the bot search.
     /// </summary>
+    /// <summary>
+    /// CR 601.2c — a spell can be cast only if its required targets exist (for
+    /// a modal spell: enough modes have them). Uses the engine's own
+    /// definition and feasibility check, the one the live legal-actions list
+    /// uses, so the bot stops proposing casts the engine can only rewind.
+    /// With no definition resolver (a bare test context) every spell passes.
+    /// </summary>
+    private static bool TargetsExist(ICard card, Player self, GameContext ctx) =>
+        ctx.SpellDefinitions?.Invoke(card, self) is not { } definition
+        || Majik.Core.Targeting.TargetFeasibility.HasLegalTargets(definition, ctx);
+
     public static IReadOnlyList<PriorityAction> ForPriority(GameContext ctx, Player self)
     {
         var result = new List<PriorityAction>();
@@ -98,7 +109,7 @@ internal static class LegalActionEnumerator
                 //   + main phase + empty stack — checked above).
                 if (!instantSpeed && !sorceryWindow) continue;
 
-                if (ApproxCmc(card) <= manaAvailable)
+                if (ApproxCmc(card) <= manaAvailable && TargetsExist(card, self, ctx))
                     result.Add(new PriorityAction.CastSpell(card, Array.Empty<object>()));
             }
 
@@ -120,6 +131,7 @@ internal static class LegalActionEnumerator
                 if (!instantSpeed && !sorceryWindow) continue;
 
                 if (exileCost.TotalValue > manaAvailable) continue;
+                if (!TargetsExist(c, self, ctx)) continue;
 
                 result.Add(new PriorityAction.CastSpell(
                     card,
@@ -154,6 +166,11 @@ internal static class LegalActionEnumerator
                         ? aa.CanActivateNow(ctx)
                         : ability.CanActivateNow();
                     if (!canActivate) continue;
+                    // CR 602.2b / 601.2c — an activation whose required
+                    // targets don't exist can't be activated.
+                    if (ability is Majik.Core.Abilities.ActivatedAbility withTargets
+                        && !Majik.Core.Targeting.TargetFeasibility.HasLegalTargets(withTargets.TargetRequests, ctx))
+                        continue;
                     // Affordability is symmetric with casting: mana portion against
                     // UntappedManaSources (floating + tappable), non-mana costs via CanPay.
                     if (CanAffordAbility(ability, self, manaAvailable))

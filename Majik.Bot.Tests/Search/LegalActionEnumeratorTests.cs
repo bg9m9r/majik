@@ -116,4 +116,36 @@ public class LegalActionEnumeratorTests
         actions.Should().NotContain(a => a is PriorityAction.CastSpell,
             because: "zero mana is insufficient to cast a {15} spell");
     }
+
+    /// <summary>
+    /// CR 601.2c — a spell whose required target doesn't exist can't be cast,
+    /// so the bot must not propose it (the engine would only rewind it).
+    /// </summary>
+    [Fact]
+    public void ForPriority_DoesNotOfferASpellWithNoLegalTarget()
+    {
+        var s = new BotTestScenario();
+        s.AddLandToBattlefield(s.Self, "Island");
+        var bolt = new Instant("Spell Pierce", "{U}");
+        s.AddCardToHand(s.Self, bolt);
+        var pool = new List<object>();
+        var def = new Majik.Core.Game.SpellDefinition(
+            Array.Empty<string>(), false,
+            new[] { new TargetRequest("target spell", 1, 1, Array.Empty<object>(), CandidateGatherer: _ => pool) },
+            _ => Array.Empty<Majik.Core.Abilities.IEffect>());
+        var ctx = new Majik.Core.Game.GameContext(
+            s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Self,
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.StepStateType.PreCombatMain,
+            stack: s.Stack, landPlayAvailable: true)
+        {
+            SpellDefinitions = (_, _) => def,
+        };
+
+        LegalActionEnumerator.ForPriority(ctx, s.Self)
+            .Should().NotContain(a => a is PriorityAction.CastSpell, "the stack is empty: nothing to target");
+
+        pool.Add(new object());
+        LegalActionEnumerator.ForPriority(ctx, s.Self)
+            .OfType<PriorityAction.CastSpell>().Should().Contain(c => ReferenceEquals(c.Card, bolt));
+    }
 }
