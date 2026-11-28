@@ -82,4 +82,81 @@ public class StaleCostTargetTests
         opal.Zone.Should().Be(ZoneType.Library);
         _alice.Zones.Graveyard.GetCards().Should().BeEmpty();
     }
+
+    private T InZone<T>(T card, ZoneType zone) where T : Card
+    {
+        card.SetOwner(_alice); card.SetController(_alice);
+        _alice.Zones.GetZone(zone).AddCard(card); card.SetZone(zone);
+        return card;
+    }
+
+    [Fact]
+    public void TapAnUntappedArtifact_IgnoresANomineeThatLeftTheBattlefield()
+    {
+        var gone = InZone(new Artifact("Mox Opal", "{0}"), ZoneType.Graveyard);
+        var bauble = OnBattlefield(new Artifact("Mishra's Bauble", "{0}"));
+        var cost = new TapAnotherUntappedArtifactCost { Target = gone };
+
+        cost.Pay(_alice);
+
+        bauble.IsTapped.Should().BeTrue("only a permanent on the battlefield can be tapped for a cost");
+        gone.IsTapped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TapAnUntappedCreature_IgnoresANomineeThatLeftTheBattlefield()
+    {
+        var drum = OnBattlefield(new Artifact("Springleaf Drum", "{1}"));
+        var gone = InZone(new Creature("Bear", "{1}{G}", 2, 2), ZoneType.Hand);
+        gone.ClearSummoningSickness();
+        var elk = OnBattlefield(new Creature("Elk", "{1}{G}", 3, 3));
+        elk.ClearSummoningSickness();
+        var cost = new TapAnotherUntappedCreatureCost(drum) { Target = gone };
+
+        cost.Pay(_alice);
+
+        elk.IsTapped.Should().BeTrue();
+        gone.IsTapped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void DiscardACard_IgnoresANomineeNoLongerInHand()
+    {
+        var gone = InZone(new Instant("Bolt", "{R}"), ZoneType.Graveyard);
+        var opt = InZone(new Instant("Opt", "{U}"), ZoneType.Hand);
+        var cost = new DiscardACardCost { Target = gone };
+
+        cost.CanPay(_alice).Should().BeTrue("a card is in hand");
+        cost.Pay(_alice);
+
+        opt.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void DiscardACardAdditionalCost_IgnoresANomineeNoLongerInHand()
+    {
+        var gone = InZone(new Instant("Bolt", "{R}"), ZoneType.Graveyard);
+        var opt = InZone(new Instant("Opt", "{U}"), ZoneType.Hand);
+        var cost = new DiscardACardAdditionalCost { Target = gone };
+
+        cost.CanPay(_alice).Should().BeTrue();
+        cost.Pay(_alice).Should().BeTrue();
+
+        opt.Zone.Should().Be(ZoneType.Graveyard);
+        cost.Discarded.Should().BeSameAs(opt);
+    }
+
+    [Fact]
+    public void SacrificeACreatureOrBloodToken_IgnoresANomineeThatLeftTheBattlefield()
+    {
+        var source = OnBattlefield(new Creature("Vampire", "{B}", 1, 1));
+        var gone = InZone(new Creature("Bear", "{1}{G}", 2, 2), ZoneType.Graveyard);
+        var elk = OnBattlefield(new Creature("Elk", "{1}{G}", 3, 3));
+        var cost = new SacrificeAnotherCreatureOrBloodTokenCost(source) { Target = gone };
+
+        cost.Pay(_alice);
+
+        elk.Zone.Should().Be(ZoneType.Graveyard);
+        source.Zone.Should().Be(ZoneType.Battlefield);
+    }
 }

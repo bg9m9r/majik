@@ -78,12 +78,12 @@ public sealed class SacrificeAnotherCreatureOrBloodTokenCost : ICost
     {
         if (player == null) throw new ArgumentNullException(nameof(player));
 
-        var pick = Target;
-        if (pick != null && !IsEligible(pick))
-        {
-            throw new InvalidOperationException(
-                $"Target {pick.Name} is not eligible: must be a non-source creature or a Blood token.");
-        }
+        // CR 701.16a / 400.7 — a nominee counts only while it is an eligible
+        // permanent on this player's battlefield; a stale one is ignored.
+        var pick = Target is { } nominee && IsEligible(nominee)
+            && player.Zones.Battlefield.GetCards().Contains(nominee)
+            ? nominee
+            : null;
 
         // Deterministic v1 picker: prefer the cheaper resource (Blood token)
         // before sacrificing a creature.
