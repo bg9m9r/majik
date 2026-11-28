@@ -51,6 +51,10 @@ namespace Majik.Core.Api;
 /// </list>
 /// Pure and side-effect free: nothing is tapped, paid, moved or published; no
 /// search is run. Known approximations are documented on the helpers below.
+/// <para>Fault-contained: every card / ability check runs card-supplied code
+/// (gates, costs, reductions, mana abilities). One that throws is left out of
+/// the list and reported via <see cref="GameFacade.OnEngineDiagnostic"/>; the
+/// rest of the list is still built.</para>
 /// </summary>
 public static class PriorityLegalActions
 {
@@ -92,9 +96,12 @@ public static class PriorityLegalActions
         {
             foreach (var card in self.Zones.Hand.GetCards())
             {
-                if (card.HasType(CardType.Land)) lands.Add(card.InstanceId);
+                if (Guard(card, "land play", () => card.HasType(CardType.Land))) lands.Add(card.InstanceId);
             }
-            foreach (var card in Majik.Core.Keywords.ExilePlayPermission.PlayableLandsFromExile(self))
+            var fromExile = Guard<IReadOnlyList<ICard>>(self, "lands playable from exile",
+                () => Majik.Core.Keywords.ExilePlayPermission.PlayableLandsFromExile(self).ToList(),
+                fallback: Array.Empty<ICard>());
+            foreach (var card in fromExile)
             {
                 if (!lands.Contains(card.InstanceId)) lands.Add(card.InstanceId);
             }
@@ -104,8 +111,10 @@ public static class PriorityLegalActions
         var sources = ManaSources(self, layers);
         foreach (var card in self.Zones.Hand.GetCards())
         {
-            if (card.HasType(CardType.Land)) continue;
-            if (IsCastable(card, self, ctx, sorceryWindow, sources)) casts.Add(card.InstanceId);
+            if (Guard(card, "cast", () => !card.HasType(CardType.Land) && IsCastable(card, self, ctx, sorceryWindow, sources)))
+            {
+                casts.Add(card.InstanceId);
+            }
         }
 
         // CR 602 / 605 / 606 — abilities of permanents Self controls (CR 602.2:
@@ -117,18 +126,50 @@ public static class PriorityLegalActions
                 if (card is not Permanent permanent) continue;
                 var controller = permanent.Controller ?? permanent.Owner;
                 if (!ReferenceEquals(controller, self)) continue;
-                CollectAbilities(permanent, self, ctx, sorceryWindow, abilities);
+                var list = Guard<IReadOnlyList<IAbility>>(permanent, "abilities", () => permanent.Abilities.ToList(), fallback: Array.Empty<IAbility>());
+                CollectAbilities(permanent, list, self, ctx, sorceryWindow, abilities);
             }
         }
 
         return new LegalActionsDto(lands, casts, abilities);
     }
 
+    /// <summary>Run one card-supplied check; a throw counts as "not legal" for
+    /// that item only, and is reported (not swallowed, not fail-fast).</summary>
+    private static T Guard<T>(object subject, string check, Func<T> evaluate, T fallback = default!)
+    {
+        try
+        {
+            return evaluate();
+        }
+        catch (Exception ex)
+        {
+            GameFacade.ReportContainedFault(ex,
+                $"PriorityLegalActions: {check} check for '{Describe(subject)}' threw; left out of the legal-action hint");
+            return fallback;
+        }
+    }
+
+    private static string Describe(object subject) => subject switch
+    {
+        ICard card => card.Name,
+        Player player => player.Name,
+        _ => subject.GetType().Name,
+    };
+
     private static void CollectAbilities(
-        Permanent permanent, Player self, GameContext ctx, bool sorceryWindow, List<AbilityRefDto> into)
+        Permanent permanent, IEnumerable<IAbility> abilities, Player self, GameContext ctx, bool sorceryWindow,
+        List<AbilityRefDto> into)
     {
         var manaListed = false;
-        foreach (var ability in permanent.Abilities)
+        foreach (var ability in abilities)
+        {
+            // An ability is added only after all of its checks passed, so a
+            // throw mid-check leaves nothing half-listed.
+            Guard(permanent, "ability", () => { CollectAbility(ability); return true; }, fallback: false);
+        }
+
+        void CollectAbility(IAbility ability)
         {
             switch (ability)
             {
@@ -228,10 +269,10 @@ public static class PriorityLegalActions
         foreach (var card in self.Zones.Battlefield.GetCards())
         {
             if (card is not Permanent perm || perm.IsTapped) continue;
-            var outputs = EffectiveManaAbilities.For(perm, layers)
+            var outputs = Guard<IReadOnlyList<ManaCost>>(perm, "mana source", () => EffectiveManaAbilities.For(perm, layers)
                 .Where(SafeCanActivate)
                 .Select(a => a.ManaGenerated)
-                .ToList();
+                .ToList(), fallback: Array.Empty<ManaCost>());
             if (outputs.Count > 0) list.Add(new ManaSource(outputs));
         }
         return list;

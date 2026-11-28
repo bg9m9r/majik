@@ -924,7 +924,7 @@ public sealed class RemoteAgent : IPlayerAgent
         {
             throw new InvalidOperationException("A prompt is already pending.");
         }
-        _pendingPayload = new PromptPayload(LegalActions: PriorityLegalActions.Build(ctx, Layers));
+        _pendingPayload = new PromptPayload(LegalActions: BuildLegalActionsHint(ctx));
         try
         {
             return Prompt<PriorityAction>(ct, PriorityKinds.Build(ctx));
@@ -933,6 +933,23 @@ public sealed class RemoteAgent : IPlayerAgent
         {
             _pendingPayload = null;
             throw;
+        }
+    }
+
+    /// <summary>The legal actions are a hint: a fault building them (beyond the
+    /// per-card containment inside <see cref="PriorityLegalActions.Build"/>)
+    /// ships the prompt without the list instead of faulting the game.</summary>
+    private LegalActionsDto? BuildLegalActionsHint(GameContext ctx)
+    {
+        try
+        {
+            return PriorityLegalActions.Build(ctx, Layers);
+        }
+        catch (Exception ex)
+        {
+            GameFacade.ReportContainedFault(ex,
+                $"PriorityLegalActions.Build for {_player.Name} threw; priority prompt sent without LegalActions");
+            return null;
         }
     }
 

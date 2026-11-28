@@ -51,6 +51,28 @@ public sealed class GameFacade : IDisposable
     public static Action<Exception, GameEvent>? OnEventHandlerError { get; set; }
 
     /// <summary>
+    /// Process-wide sink for engine faults that are CONTAINED rather than
+    /// fatal (the second argument says where: e.g. which card's gate threw
+    /// while building a prompt's legal-action hint, or what was unwinding
+    /// after a concession). Same seam as <see cref="OnEventHandlerError"/>
+    /// (the server bridges both to its logger) but never fails fast: when
+    /// left null the fault goes to <see cref="System.Diagnostics.Trace"/>.
+    /// </summary>
+    public static Action<Exception, string>? OnEngineDiagnostic { get; set; }
+
+    internal static void ReportContainedFault(Exception ex, string context)
+    {
+        var sink = OnEngineDiagnostic;
+        if (sink is null)
+        {
+            System.Diagnostics.Trace.TraceWarning($"Majik engine: contained fault ({context}): {ex}");
+            return;
+        }
+        try { sink(ex, context); }
+        catch { /* a faulty sink must not take the engine down */ }
+    }
+
+    /// <summary>
     /// Feature flag (DEFAULT TRUE): when on, factory-backed NON-LAND deck
     /// cards are built through their <c>[CardName]</c> <c>*Factory</c> during
     /// <see cref="Create"/> rather than arriving as ability-less binder-chain

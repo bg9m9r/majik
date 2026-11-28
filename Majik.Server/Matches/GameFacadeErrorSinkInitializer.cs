@@ -36,12 +36,18 @@ public sealed class GameFacadeErrorSinkInitializer : IHostedService
                 "Delivery to other handlers continued; this is a defect that must be investigated.",
                 @event.GetType().Name, @event.EventId);
         };
+        // Contained engine faults (a card's gate throwing while the prompt's
+        // legal-action hint is built, unwinding after a concession): the game
+        // carried on, but the defect must still be visible.
+        GameFacade.OnEngineDiagnostic = (ex, context) =>
+            _logger.LogWarning(ex, "Engine contained a fault: {Context}", context);
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
         GameFacade.OnEventHandlerError = null;
+        GameFacade.OnEngineDiagnostic = null;
         return Task.CompletedTask;
     }
 }
