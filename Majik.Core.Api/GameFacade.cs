@@ -325,8 +325,8 @@ public sealed class GameFacade : IDisposable
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
         _combatFlow = new CombatFlow(_bus, _sba, Replacements);
 
-        _aliceAgent = new RemoteAgent(alice, LookupCard, LookupPlayer);
-        _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer);
+        _aliceAgent = new RemoteAgent(alice, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
+        _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
         _aliceAgent.PromptRequested += _ => PulsePromptSignal();
         _bobAgent.PromptRequested += _ => PulsePromptSignal();
 

@@ -838,8 +838,37 @@ public sealed class RemoteAgent : IPlayerAgent
             ?? throw new InvalidOperationException($"No card found for instance {id}.");
     }
 
+    /// <summary>
+    /// Layer service used by <see cref="PriorityLegalActions"/> to discover
+    /// layer-granted / retyped mana abilities (CR 305.6). Set by
+    /// <see cref="GameFacade"/>; null leaves printed abilities only.
+    /// </summary>
+    internal Majik.Core.Effects.ContinuousEffectsService? Layers { get; set; }
+
+    /// <summary>
+    /// Priority prompt. <see cref="PromptDto.ExpectedKinds"/> stays the coarse
+    /// <see cref="PriorityKinds"/> list; the payload additionally carries the
+    /// specific legal lands / casts / abilities
+    /// (<see cref="PromptDto.LegalActions"/>, CR 117 / 305 / 601 / 602 / 605 / 606).
+    /// </summary>
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
-        => Prompt<PriorityAction>(ct, PriorityKinds.Build(ctx));
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(LegalActions: PriorityLegalActions.Build(ctx, Layers));
+        try
+        {
+            return Prompt<PriorityAction>(ct, PriorityKinds.Build(ctx));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Prompt<MulliganDecision>(ct, typeof(MulliganCommand));
