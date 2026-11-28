@@ -36,9 +36,9 @@ public class FullGameGateTests
     // 3544 = engine crashes / contained faults; 3545 = zone desync; 3543 = this gate.
     private static readonly IReadOnlyDictionary<string, Known> AllowList = new Dictionary<string, Known>
     {
-        // Derived from ten Release runs (--filter "Category=FullGameGate") at
-        // the rules-branch tip after B5-B12; every entry below was observed,
-        // and each not marked Intermittent was seen in all ten.
+        // Derived from twenty Release runs (--filter "Category=FullGameGate")
+        // at the rules-branch tip; every entry not marked Intermittent was
+        // seen in all twenty.
         // The card stays in the Stack zone after it moves on (CR 400.1). Keyed
         // Stack+*: the other zone is wherever it went next (the Battlefield when
         // it resolves; the Graveyard, Exile, Library or Hand later), which
@@ -52,9 +52,11 @@ public class FullGameGateTests
         ["ZoneIntegrity|Tormod's Crypt|Stack+*"] = new(StaysOnStack, 3545),
         ["ZoneIntegrity|Walking Ballista|Stack+*"] = new(StaysOnStack, 3545),
         ["ZoneIntegrity|Welding Jar|Stack+*"] = new(StaysOnStack, 3545),
-        // Not a Stack leftover (10/10 runs, SultaiMidrange vs Affinity seed 0).
-        ["ZoneIntegrity|Mox Opal|Graveyard+Library"] = new("in both the Graveyard and the Library (CR 400.1)", 3545),
-        // 2 of 10 runs.
+        // The Mox Opal Graveyard+Library entry (SultaiMidrange vs Affinity
+        // seed 0) is gone: Arcbound Ravager's sacrifice cost re-sacrificed the
+        // Opal it had sacrificed before, after Endurance put it in the library.
+        // 2 of an earlier 10 runs; 0 of the last 20 (the bot now plays
+        // different lines), kept as intermittent until it is understood.
         ["ZoneIntegrity|Engineered Explosives|Exile+Graveyard"] = new("intermittent: in both the Graveyard and Exile (CR 400.1)", 3545, Intermittent: true),
         // No Timeout or Draw|LoopSafetyNet entry: none occurs. The old
         // Timeout|StateBasedActionExecutedEvent hang (Yawg games) was a Young
