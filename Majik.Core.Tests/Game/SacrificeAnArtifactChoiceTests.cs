@@ -93,6 +93,24 @@ public class SacrificeAnArtifactChoiceTests
     }
 
     [Fact]
+    public async Task TheBot_KeepsItsArtifactCreatures_WhenANoncreatureArtifactCanGo()
+    {
+        var ravager = OnBattlefield(new Artifact("Arcbound Ravager", "{2}"));
+        var memnite = OnBattlefield(new Creature("Memnite", "{0}", 1, 1));
+        var plating = OnBattlefield(new Artifact("Cranial Plating", "{2}"));
+        var cost = new SacrificeAnArtifactCost();
+        var ability = new ActivatedAbility(source: ravager, controller: _alice, costs: new ICost[] { cost },
+            effects: new IEffect[] { new Effect("noop", () => { }) });
+        memnite.AddCardType(Majik.Core.Cards.Types.CardType.Artifact);
+
+        await SacrificeCostPrompt.ChooseSacrificesAsync(_alice, ability, new HeuristicBotAgent(), Ctx(_alice));
+        cost.Pay(_alice);
+
+        plating.Zone.Should().Be(ZoneType.Graveyard);
+        memnite.Zone.Should().Be(ZoneType.Battlefield);
+    }
+
+    [Fact]
     public async Task ACreatureOrBloodTokenCost_AsksWhichToSacrifice()
     {
         // Falkenrath Pit Fighter: "Sacrifice another creature or a Blood

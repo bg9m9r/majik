@@ -131,8 +131,9 @@ public static class SacrificeCostPrompt
     }
 
     /// <summary>
-    /// Candidate order for the prompt: tokens, then cheapest mana value first,
-    /// and the ability's own source last. Display order only for a person; a
+    /// Candidate order for the prompt: noncreatures before creatures, then
+    /// tokens, then cheapest mana value first, and the ability's own source
+    /// last. Display order only for a person; a
     /// bot (HeuristicBotAgent picks the first candidate) therefore sacrifices
     /// the least valuable permanent, and its source only when nothing else
     /// is eligible.
@@ -140,6 +141,7 @@ public static class SacrificeCostPrompt
     private static List<T> LeastValuableFirst<T>(IReadOnlyList<T> eligible, object source) where T : Permanent =>
         eligible
             .OrderBy(p => ReferenceEquals(p, source))
+            .ThenBy(p => p.HasType(Majik.Core.Cards.Types.CardType.Creature))
             .ThenBy(p => !p.IsToken)
             .ThenBy(p => Majik.Core.ValueObjects.ManaCost.Parse(p.ManaCost ?? "").TotalValue)
             .ToList();
