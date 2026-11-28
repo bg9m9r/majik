@@ -1520,7 +1520,9 @@ public sealed class TurnDriver
             checkStateBasedActions: () => _sba.CheckStateBasedActions(
                 _players,
                 _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList()),
-            spellDefinitions: _spellDefResolver == null ? null : SpellDefinitionFor);
+            spellDefinitions: _spellDefResolver == null ? null : SpellDefinitionFor,
+            // LoopSafetyNet trips are published here; GameFacade reports them.
+            eventBus: _eventBus);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
     }

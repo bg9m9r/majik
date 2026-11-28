@@ -1423,6 +1423,9 @@
           "lifePaid": {
             "$ref": "#/components/schemas/LifePaidPayload"
           },
+          "loopSafetyNetTripped": {
+            "$ref": "#/components/schemas/LoopSafetyNetTrippedPayload"
+          },
           "manaAbilityActivated": {
             "$ref": "#/components/schemas/ManaAbilityActivatedPayload"
           },
@@ -1506,7 +1509,8 @@
           "libraryShuffled",
           "surveil",
           "cardCycled",
-          "extraTurnAdded"
+          "extraTurnAdded",
+          "loopSafetyNetTripped"
         ],
         "type": "object"
       },
@@ -2419,6 +2423,35 @@
           "playerId",
           "amount",
           "wasCost"
+        ],
+        "type": "object"
+      },
+      "LoopSafetyNetTrippedPayload": {
+        "properties": {
+          "actionsThisStep": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "stackDepth": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "message",
+          "actionsThisStep",
+          "stackDepth"
         ],
         "type": "object"
       },

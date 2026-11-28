@@ -380,6 +380,9 @@ public sealed class GameFacade : IDisposable
         // and freeze the match with no diagnostic. Fail loud: log (server) or
         // fail-fast (DEBUG default) instead of swallowing silently.
         _bus.OnHandlerError = HandleBusHandlerError;
+        // The engine's loop safety net ended the game as a draw: report it.
+        _bus.Subscribe<Majik.Core.Game.LoopSafetyNetTrippedEvent>(e =>
+            ReportContainedFault(new Majik.Core.Game.LoopSafetyNetException(e.Message), e.Message));
 
         _stack = new Majik.Core.Stack.Stack(_bus);
         _triggers = new TriggerManager(_stack, _bus);

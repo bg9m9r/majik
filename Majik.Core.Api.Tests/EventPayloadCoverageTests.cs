@@ -62,6 +62,7 @@ public class EventPayloadCoverageTests
         "ExtraTurnAddedEvent",
         "LibraryShuffledEvent",
         "LifePaidEvent",
+        "LoopSafetyNetTrippedEvent",
         "ManaAbilityActivatedEvent",
         "PermanentSacrificedEvent",
         "PermanentTappedEvent",

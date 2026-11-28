@@ -72,6 +72,8 @@ public sealed class PriorityLoop
     // pending triggers go on the stack, then the player gets priority.
     private readonly Action? _checkStateBasedActions;
     private readonly Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? _spellDefinitions;
+    // Where a LoopSafetyNet trip is published. Null in harnesses without a bus.
+    private readonly Majik.Core.Events.IEventBus? _eventBus;
     private Player? _activePlayer;
 
     public PriorityLoop(
@@ -93,8 +95,10 @@ public sealed class PriorityLoop
         Func<Player, GameContext, CancellationToken, Task>? asyncTriggerDrain = null,
         Func<TurnState?>? turnStateAccessor = null,
         Action? checkStateBasedActions = null,
+        Majik.Core.Events.IEventBus? eventBus = null,
         Func<Majik.Core.Cards.ICard, Player, SpellDefinition?>? spellDefinitions = null)
     {
+        _eventBus = eventBus;
         _castDispatcher = castDispatcher;
         _asyncTriggerDrain = asyncTriggerDrain;
         _checkStateBasedActions = checkStateBasedActions;
@@ -146,6 +150,24 @@ public sealed class PriorityLoop
     public async Task RunUntilRoundEndsAsync(Player activePlayer, CancellationToken ct = default)
     {
         _activePlayer = activePlayer;
+        // LoopSafetyNet — committed actions + resolutions in this step, and the
+        // stack's peak depth. A safety net, not CR 732 (see LoopSafetyNet).
+        var stepActions = 0;
+        var peakDepth = 0;
+        try
+        {
+            await RunStepAsync(activePlayer, ct, () => ++stepActions, d => peakDepth = Math.Max(peakDepth, d))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            LoopSafetyNet.StepObserver?.Invoke(stepActions, peakDepth);
+        }
+    }
+
+    private async Task RunStepAsync(
+        Player activePlayer, CancellationToken ct, Func<int> countAction, Action<int> recordDepth)
+    {
         while (true)
         {
             _priority.InitializeForPhase(activePlayer);
@@ -203,6 +225,13 @@ public sealed class PriorityLoop
                 {
                     var drainCtx = MakeContext(activePlayer, activePlayer);
                     await _asyncTriggerDrain(activePlayer, drainCtx, ct).ConfigureAwait(false);
+                }
+
+                recordDepth(_stack.Count);
+                if (_stack.Count > LoopSafetyNet.StackDepthLimit)
+                {
+                    TripSafetyNet($"the stack holds {_stack.Count} objects (cap {LoopSafetyNet.StackDepthLimit})", 0);
+                    return;
                 }
 
                 // CR 800.4a — a player who has lost the game can no longer take
@@ -295,6 +324,12 @@ public sealed class PriorityLoop
                 }
 
                 actionCount++;
+                if (applied && countAction() > LoopSafetyNet.ActionLimit)
+                {
+                    TripSafetyNet($"{LoopSafetyNet.ActionLimit} actions and resolutions without the step ending, last {action.GetType().Name} by {current.Name}", LoopSafetyNet.ActionLimit + 1);
+                    return;
+                }
+
                 if (!applied)
                 {
                     // The proposal was rejected / no-op'd (e.g. an illegal
@@ -337,6 +372,12 @@ public sealed class PriorityLoop
                 MakeContext(activePlayer, activePlayer),
                 ct).ConfigureAwait(false);
 
+            if (countAction() > LoopSafetyNet.ActionLimit)
+            {
+                TripSafetyNet($"{LoopSafetyNet.ActionLimit} actions and resolutions without the step ending", LoopSafetyNet.ActionLimit + 1);
+                return;
+            }
+
             // CR 704.1 — check state-based actions immediately after the object
             // resolves, before priority is offered again (the loop restarts a
             // fresh round above, which also checks at its top — but checking
@@ -356,6 +397,27 @@ public sealed class PriorityLoop
 
             // Loop back: start a fresh priority round with active player.
         }
+    }
+
+    /// <summary>
+    /// LoopSafetyNet tripped: end the game as a draw. Every player still in the
+    /// game loses at once (CR 104.4a: a draw); CR 104.4b is the rule for an
+    /// unstoppable loop. A safety net, not CR 732: it stops a game that no longer
+    /// advances so it cannot hang. Published as a LoopSafetyNetTrippedEvent.
+    /// </summary>
+    private void TripSafetyNet(string what, int actions)
+    {
+        var message =
+            $"Loop safety net tripped on turn {_turnNumberAccessor()}, step {_phaseAccessor()}: {what}. " +
+            "The game is ended as a draw (CR 104.4b). This is an engine safety net against a " +
+            "runaway loop, not the CR 732 loop shortcut.";
+        var depth = _stack.Count;
+        foreach (var p in _players)
+        {
+            if (!p.HasLost) p.MarkLost();
+        }
+        System.Console.Error.WriteLine(message);
+        _eventBus?.Publish(new LoopSafetyNetTrippedEvent(message, actions, depth));
     }
 
     /// <summary>

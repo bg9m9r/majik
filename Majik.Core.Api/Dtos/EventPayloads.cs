@@ -394,6 +394,13 @@ public sealed record CardCycledPayload(
 /// <summary>CR 500.7 — an extra turn was added for a player.</summary>
 public sealed record ExtraTurnAddedPayload(Guid PlayerId);
 
+/// <summary>The engine's loop safety net ended the game as a draw (CR 104.4b):
+/// the game stopped advancing (a runaway loop). Not a rules outcome and not
+/// the CR 732 loop shortcut. <see cref="Message"/> says why, with the turn and
+/// step; <see cref="ActionsThisStep"/> is the committed actions + resolutions
+/// in that step; <see cref="StackDepth"/> the objects on the stack.</summary>
+public sealed record LoopSafetyNetTrippedPayload(string Message, int ActionsThisStep, int StackDepth);
+
 /// <summary>
 /// PLAN 07 — OpenAPI schema anchor. The SignalR <c>event</c> channel
 /// carries <see cref="EventDto.Payload"/> as a raw <c>JsonElement</c>, so
@@ -448,4 +455,5 @@ public sealed record EventPayloadCatalog(
     LibraryShuffledPayload LibraryShuffled,
     SurveilPayload Surveil,
     CardCycledPayload CardCycled,
-    ExtraTurnAddedPayload ExtraTurnAdded);
+    ExtraTurnAddedPayload ExtraTurnAdded,
+    LoopSafetyNetTrippedPayload LoopSafetyNetTripped);

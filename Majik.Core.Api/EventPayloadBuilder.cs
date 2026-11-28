@@ -286,6 +286,10 @@ public static class EventPayloadBuilder
             CardId: x.Card.InstanceId,
             CardName: x.Card.Name)),
         ExtraTurnAddedEvent x => Serialize(new ExtraTurnAddedPayload(x.Player.Id)),
+        Majik.Core.Game.LoopSafetyNetTrippedEvent x => Serialize(new LoopSafetyNetTrippedPayload(
+            Message: x.Message,
+            ActionsThisStep: x.ActionsThisStep,
+            StackDepth: x.StackDepth)),
         // GameStartedEvent has no fields; the envelope's Type is the whole message.
         GameStartedEvent => Empty(),
         _ => Empty(),
