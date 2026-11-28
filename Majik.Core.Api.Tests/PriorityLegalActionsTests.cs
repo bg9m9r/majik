@@ -429,4 +429,23 @@ public class PriorityLegalActionsTests
         PriorityLegalActions.Build(Ctx(_alice, StepStateType.PreCombatMain, landPlayAvailable: true)).CastableCardIds
             .Should().Contain(command.InstanceId);
     }
+
+    [Fact]
+    public void AnyOtherTarget_NeedsASecondDistinctCandidate()
+    {
+        // CR 601.2c / 115.3 — Arc Trail's "any other target" can't be the
+        // first target, so one candidate between them is not enough.
+        UntappedBasic("Mountain", "R");
+        var arc = InHand(new Sorcery("Arc Trail", "{R}"));
+        var pool = new List<object> { new object() };
+        var def = Def(
+            Needs("any target", () => pool),
+            Needs("any other target", () => pool) with { DistinctFromRequest = 0 });
+
+        PriorityLegalActions.Build(CtxWith((_, _) => def)).CastableCardIds
+            .Should().NotContain(arc.InstanceId, "the second target must differ from the first");
+
+        pool.Add(new object());
+        PriorityLegalActions.Build(CtxWith((_, _) => def)).CastableCardIds.Should().Contain(arc.InstanceId);
+    }
 }

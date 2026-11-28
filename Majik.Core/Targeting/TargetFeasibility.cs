@@ -48,6 +48,19 @@ public static class TargetFeasibility
         for (var i = 0; i < requests.Count; i++)
         {
             if (!Satisfiable(requests[i], ctx)) return false;
+            // CR 601.2c — "any other target": this request's targets must
+            // differ from the earlier request's, so together the two pools
+            // need enough distinct objects for both minimums. With no pool of
+            // its own the request uses the earlier one's, as the cast does.
+            if (requests[i].DistinctFromRequest is { } other && other >= 0 && other < i
+                && requests[i].MinTargets > 0)
+            {
+                var mine = TargetCollection.ResolveLivePool(requests[i], ctx, synthesizeWhenEmpty: true);
+                var theirs = TargetCollection.ResolveLivePool(requests[other], ctx, synthesizeWhenEmpty: true);
+                if (mine.Count == 0) mine = theirs;
+                var distinct = mine.Concat(theirs).Distinct(ReferenceEqualityComparer.Instance).Count();
+                if (distinct < requests[i].MinTargets + requests[other].MinTargets) return false;
+            }
         }
         return true;
     }
@@ -55,6 +68,9 @@ public static class TargetFeasibility
     private static bool Satisfiable(TargetRequest request, GameContext ctx)
     {
         if (request.MinTargets <= 0) return true;
+        // An "any other target" request with no pool of its own borrows the
+        // earlier request's; the pair check above covers it.
+        if (request.DistinctFromRequest.HasValue) return true;
         // CR 115.3 — one request's targets are distinct objects, so the pool
         // must hold at least MinTargets of them.
         return TargetCollection.ResolveLivePool(request, ctx, synthesizeWhenEmpty: true).Count >= request.MinTargets;
