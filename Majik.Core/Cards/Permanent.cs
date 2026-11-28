@@ -609,6 +609,45 @@ public class Permanent : Card
     /// permanent is already untapped) so it is safe to call blindly on every
     /// battlefield exit regardless of the prior tap state.
     /// </summary>
+    /// <summary>
+    /// CR 400.7 — a permanent entering the battlefield from another zone is a
+    /// new object: it keeps none of the status the card had the last time it
+    /// was on the battlefield. Called by the Zone setter on entry, BEFORE any
+    /// "enters with" counters (CR 614.1c) are put on it. Resetting on entry
+    /// rather than on leaving keeps that status readable on the card it left
+    /// behind, which is what its leaves / dies triggers read (CR 603.10:
+    /// undying, persist, The Ozolith, Unstoppable Slasher), and keeps counters
+    /// an effect puts on it in another zone (suspend's time counters) until it
+    /// enters. Marked damage is cleared by ClearMarkedDamage at the same point.
+    /// Not reset: the transient loyalty body, which an "enters as a copy"
+    /// replacement (Spark Double copying a flipped planeswalker back, CR
+    /// 706.9b) sets BEFORE the card lands; it is inert on a card whose face is
+    /// not a planeswalker. A card's first placement (ZoneChangeCount 1) is not
+    /// reset either: it is not a zone change from an earlier object.
+    /// <list type="bullet">
+    ///   <item>counters (CR 122.2);</item>
+    ///   <item>summoning sick (CR 302.6) and a new timestamp (CR 613.7d);</item>
+    ///   <item>regeneration shields (CR 701.19), the per-object loyalty
+    ///   activation (CR 606.3), the deathtouch mark (CR 704.5h), "dealt damage
+    ///   this turn", imprinted cards (CR 702.49);</item>
+    ///   <item>Creature: "attack as though it didn't have defender this turn",
+    ///   and evoke / blitz paid unless it is entering from the stack (the cast
+    ///   that paid them, CR 702.74a / 702.152a).</item>
+    /// </list>
+    /// </summary>
+    internal virtual void ResetOnEnterBattlefield(ZoneType from)
+    {
+        if (from == ZoneType.Battlefield) return;
+        Counters.Clear();
+        _hasSummoningSickness = true;
+        _enteredBattlefieldTimestamp = null;
+        _regenerationShields = 0;
+        LoyaltyAbilityActivatedThisTurn = false;
+        MarkedForDestructionByDeathtouch = false;
+        ClearWasDealtDamageThisTurn();
+        _imprintedCards.Clear();
+    }
+
     internal void ResetOnLeaveBattlefield()
     {
         _isTapped = false;

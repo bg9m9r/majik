@@ -295,4 +295,17 @@ public class Creature : Permanent
     /// (CR 514.2) alongside other "until end of turn" effects.
     /// </summary>
     public bool CanAttackAsThoughItDidntHaveDefenderThisTurn { get; set; }
+
+    /// <inheritdoc/>
+    internal override void ResetOnEnterBattlefield(Majik.Core.Zones.ZoneType from)
+    {
+        if (from == Majik.Core.Zones.ZoneType.Battlefield) return;
+        base.ResetOnEnterBattlefield(from);
+        CanAttackAsThoughItDidntHaveDefenderThisTurn = false;
+        if (from != Majik.Core.Zones.ZoneType.Stack)
+        {
+            EvokeWasPaid = false;
+            BlitzWasPaid = false;
+        }
+    }
 }

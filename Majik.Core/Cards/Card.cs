@@ -236,6 +236,9 @@ public class Card : ICard
                 && value == ZoneType.Battlefield)
             {
                 entering.ClearMarkedDamage();
+                // A card's first placement (a new card, or a test setting
+                // up a board) is not a zone change from an earlier object.
+                if (ZoneChangeCount > 1) entering.ResetOnEnterBattlefield(previousZone);
             }
             // CR 613 — a permanent's battlefield presence is an input to the
             // layer system: lords/anthems/CDAs scoped to "permanents you
