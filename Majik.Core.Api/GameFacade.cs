@@ -327,12 +327,8 @@ public sealed class GameFacade : IDisposable
 
         _aliceAgent = new RemoteAgent(alice, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
         _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer) { Layers = ContinuousEffects };
-        _aliceAgent.PromptRequested += _ => PulsePromptSignal();
-        _bobAgent.PromptRequested += _ => PulsePromptSignal();
-        // Quiescent point: publish every view BEFORE the prompt reaches any
-        // observer (RemoteAgent fires this ahead of PromptRequested).
-        _aliceAgent.BeforePromptRequested = () => PublishOnEngineFlow(allViews: true);
-        _bobAgent.BeforePromptRequested = () => PublishOnEngineFlow(allViews: true);
+        _aliceAgent.PromptRaised = (kinds, payload) => OnPromptRaised(_alice, kinds, payload);
+        _bobAgent.PromptRaised = (kinds, payload) => OnPromptRaised(_bob, kinds, payload);
 
         _aliceAgentEffective = _aliceAgent;
         _bobAgentEffective = _bobAgent;
@@ -1826,37 +1822,54 @@ public sealed class GameFacade : IDisposable
     public IDisposable SubscribePrompts(Action<PromptDto> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        Action<IReadOnlyList<Type>> aliceHandler = kinds =>
-        {
-            var prompt = BuildPrompt(_alice, _aliceAgent, kinds);
-            RunOffEngineFlow(() => handler(prompt));
-        };
-        Action<IReadOnlyList<Type>> bobHandler = kinds =>
-        {
-            var prompt = BuildPrompt(_bob, _bobAgent, kinds);
-            RunOffEngineFlow(() => handler(prompt));
-        };
-        _aliceAgent.PromptRequested += aliceHandler;
-        _bobAgent.PromptRequested += bobHandler;
+        lock (_promptSubscribers) _promptSubscribers.Add(handler);
         return new Subscription(() =>
         {
-            _aliceAgent.PromptRequested -= aliceHandler;
-            _bobAgent.PromptRequested -= bobHandler;
+            lock (_promptSubscribers) _promptSubscribers.Remove(handler);
         });
+    }
+
+    private readonly List<Action<PromptDto>> _promptSubscribers = new();
+
+    /// <summary>
+    /// A seat's agent is about to wait (engine flow). In order:
+    /// <list type="number">
+    ///   <item>publish every state view (quiescent point; a client reading
+    ///     state on receipt of the prompt sees this prompt's state);</item>
+    ///   <item>build the <see cref="PromptDto"/> ONCE, from the payload the
+    ///     agent captured when it raised the prompt;</item>
+    ///   <item>hand that same instance to every observer, off the engine flow;</item>
+    ///   <item>only then release <see cref="SubmitAsync"/> / <see cref="StartAsync"/>
+    ///     waiters — so no submitter they release can answer the prompt before
+    ///     every observer has it (and even an observer that answers at once
+    ///     can't strip the payload: it was captured up front).</item>
+    /// </list>
+    /// </summary>
+    private void OnPromptRaised(Player player, IReadOnlyList<Type> kinds, PromptPayload? payload)
+    {
+        PublishOnEngineFlow(allViews: true);
+        var prompt = BuildPrompt(player, kinds, payload);
+        Action<PromptDto>[] observers;
+        lock (_promptSubscribers) observers = _promptSubscribers.ToArray();
+        foreach (var observer in observers)
+        {
+            try { RunOffEngineFlow(() => observer(prompt)); }
+            catch { /* one observer's fault must not starve the others or the engine */ }
+        }
+        PulsePromptSignal();
     }
 
     // Forward the agent's per-prompt payload (currently: library-search
     // candidate list + label + full library view,
     // see RemoteAgent.ChooseLibraryPickAsync) onto the wire PromptDto.
-    // Read synchronously inside PromptRequested — RemoteAgent stashes
-    // PendingPayload before invoking the observer, so the field is populated
-    // for the kinds that need it (null otherwise).
+    // The payload is the one RemoteAgent captured under its lock when it
+    // raised the prompt (see OnPromptRaised), so it is populated for the
+    // kinds that need it (null otherwise) even if an answer already arrived.
     // Privacy: the PromptDto is published only to the seat whose agent fired
     // PromptRequested (per-recipient SignalR routing in MatchFacadeBridge).
     // LibraryView is therefore never visible to the opponent.
-    private PromptDto BuildPrompt(Player player, RemoteAgent agent, IReadOnlyList<Type> kinds)
+    private PromptDto BuildPrompt(Player player, IReadOnlyList<Type> kinds, PromptPayload? payload)
     {
-        var payload = agent.PendingPayload;
         return new PromptDto(
             GameId: GameId,
             PlayerId: player.Id,

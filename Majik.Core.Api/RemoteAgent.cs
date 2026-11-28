@@ -1791,6 +1791,7 @@ public sealed class RemoteAgent : IPlayerAgent
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {
         TaskCompletionSource<T> tcs;
+        PromptPayload? payload;
         lock (_closeLock)
         {
             if (_pending != null)
@@ -1813,13 +1814,16 @@ public sealed class RemoteAgent : IPlayerAgent
             _pending = tcs;
             _pendingKinds = acceptedKinds;
             _pendingAbort = () => Decline(tcs);
+            // Captured with the prompt: an answer clears _pendingPayload, and
+            // one can arrive as soon as the first observer has seen the prompt.
+            payload = _pendingPayload;
         }
 
-        // Quiescent point: the engine is about to wait on this seat. Let the
-        // facade publish its state snapshot BEFORE observers learn about the
-        // prompt, so a client reading state on receipt sees this prompt's state.
-        try { BeforePromptRequested?.Invoke(); }
-        catch { /* a snapshot fault must not abort the engine */ }
+        // The facade publishes its state snapshot, builds the one PromptDto
+        // from the captured payload, fans it out, and only then releases
+        // waiting submitters.
+        try { PromptRaised?.Invoke(acceptedKinds, payload); }
+        catch { /* a facade fault must not abort the engine */ }
 
         // Observers are external code: run them off the engine flow so work
         // they start never counts as the engine (GameFacade reads).
@@ -1830,8 +1834,10 @@ public sealed class RemoteAgent : IPlayerAgent
     }
 
     /// <summary>Runs on the engine flow right before <see cref="PromptRequested"/>
-    /// fires (set by <see cref="GameFacade"/> to publish its state snapshot).</summary>
-    internal Action? BeforePromptRequested { get; set; }
+    /// fires, with the payload captured when the prompt was raised (set by
+    /// <see cref="GameFacade"/>: publish the snapshot, build and fan out the
+    /// prompt, release submitters).</summary>
+    internal Action<IReadOnlyList<Type>, PromptPayload?>? PromptRaised { get; set; }
 
     private readonly object _closeLock = new();
     private bool _closed;
