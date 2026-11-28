@@ -23,7 +23,8 @@ public sealed record GateGameResult(GateGame Game, IReadOnlyDictionary<string, s
 /// <summary>
 /// Runs gate games. Each game asserts (a) its game task does not fault,
 /// (b) zone integrity (CR 400.1) at every step boundary, and (c) no contained
-/// engine fault was reported on its flow. A failure becomes a stable
+/// engine fault was reported on its flow, and (d) no event handler threw (only
+/// while <see cref="CaptureHandlerFaults"/> is open). A failure becomes a stable
 /// signature: exception type + top engine frame for faults, invariant name +
 /// card name for zone integrity, and the last event type for a hang (a hang has
 /// no frame to key on: the stuck flow's stack is not observable from here).
@@ -48,7 +49,84 @@ public static class FullGameGateRunner
         };
     }
 
-    public static async Task<GateGameResult> RunAsync(GateGame game, int maxTurns, TimeSpan timeout)
+    private static readonly object HookLock = new();
+    private static int _hookDepth;
+    private static Action<Exception, GameEvent>? _previousHook;
+
+    /// <summary>
+    /// (d) While the returned scope is open, an exception thrown by an event
+    /// handler in a gate game becomes a <c>HandlerFault|ExceptionType|top Majik
+    /// frame</c> signature on that game. The bus isolates handlers and routes
+    /// the exception to the process-wide GameFacade.OnEventHandlerError, which
+    /// otherwise swallows it in Release and crashes the process in Debug.
+    /// Attributed like contained faults, through the game's AsyncLocal (the
+    /// hook runs synchronously on the publishing flow, or on a faulted async
+    /// handler's continuation, which carries the same ExecutionContext).
+    /// Faults on other flows go to the hook that was installed before. Scopes
+    /// nest (a counter); the last one to close restores that hook.
+    /// </summary>
+    public static IDisposable CaptureHandlerFaults()
+    {
+        lock (HookLock)
+        {
+            if (_hookDepth++ == 0)
+            {
+                var previous = _previousHook = GameFacade.OnEventHandlerError;
+                GameFacade.OnEventHandlerError = (ex, e) =>
+                {
+                    if (CurrentGame.Value is { } sigs)
+                    {
+                        sigs.TryAdd(Signature("HandlerFault", ex), $"{e.GetType().Name}: {ex.Message}");
+                        return;
+                    }
+                    if (previous is not null) { previous(ex, e); return; }
+#if DEBUG
+                    // No previous hook: keep GameFacade's Debug default (fail loud).
+                    var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex);
+                    ThreadPool.QueueUserWorkItem(_ => captured.Throw());
+#endif
+                };
+            }
+        }
+        return new Restore(() =>
+        {
+            lock (HookLock)
+            {
+                if (--_hookDepth == 0)
+                {
+                    GameFacade.OnEventHandlerError = _previousHook;
+                    _previousHook = null;
+                }
+            }
+        });
+    }
+
+    private sealed class Restore(Action dispose) : IDisposable
+    {
+        private Action? _dispose = dispose;
+        public void Dispose() => Interlocked.Exchange(ref _dispose, null)?.Invoke();
+    }
+
+    /// <summary>The gate's verdict over a set of results. <paramref name="allowList"/>
+    /// maps each tolerated signature to whether it is intermittent (exempt from
+    /// the vanished check).</summary>
+    public static (IReadOnlyList<string> Unlisted, IReadOnlyList<string> Vanished) Evaluate(
+        IEnumerable<GateGameResult> results, IReadOnlyDictionary<string, bool> allowList)
+    {
+        var bySignature = results
+            .SelectMany(r => r.Signatures.Keys.Select(s => (Signature: s, r.Game)))
+            .GroupBy(x => x.Signature)
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
+            .ToList();
+        var unlisted = bySignature.Where(g => !allowList.ContainsKey(g.Key))
+            .Select(g => $"{g.Key} ({g.Count()} games, e.g. {g.First().Game})").ToList();
+        var vanished = allowList.Where(kv => !kv.Value).Select(kv => kv.Key)
+            .Except(bySignature.Select(g => g.Key)).OrderBy(k => k, StringComparer.Ordinal).ToList();
+        return (unlisted, vanished);
+    }
+
+    public static async Task<GateGameResult> RunAsync(GateGame game, int maxTurns, TimeSpan timeout,
+        Action<GameFacade>? configure = null)
     {
         EnsureSubscribed();
         var sigs = new ConcurrentDictionary<string, string>();
@@ -64,6 +142,7 @@ public static class FullGameGateRunner
             facade.ReplaceAliceAgent(new HeuristicBotAgent(cardRepository: Repo));
             facade.ReplaceBobAgent(new HeuristicBotAgent(cardRepository: Repo));
             var players = new[] { facade.Alice, facade.Bob };
+            configure?.Invoke(facade);
 
             // (b) CR 400.1 at every step boundary. A read-only walk of the zones.
             string lastEvent = "";

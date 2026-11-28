@@ -10,8 +10,8 @@ namespace Majik.Bot.Tests.FullGameGate;
 /// Full-game gate (issue 3543). Every ordered pair of BotDeckCatalog
 /// archetypes × 2 seeds, the heuristic bot on both seats, turn cap 30, run in
 /// parallel shards. Per game: the game task does not fault, every card is in
-/// exactly one zone at every step boundary (CR 400.1), and no contained engine
-/// fault is reported.
+/// exactly one zone at every step boundary (CR 400.1), no contained engine
+/// fault is reported, and no event handler throws.
 ///
 /// <para>Known failures are allow-listed by signature, each with a reason and
 /// an issue. The gate fails on a signature that is NOT listed (a new bug) and
@@ -71,9 +71,12 @@ public class FullGameGateTests
         var games = AllGames();
         var results = new ConcurrentBag<GateGameResult>();
         var wall = Stopwatch.StartNew();
-        await Parallel.ForEachAsync(games,
-            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-            async (game, _) => results.Add(await FullGameGateRunner.RunAsync(game, MaxTurns, GameTimeout)));
+        using (FullGameGateRunner.CaptureHandlerFaults())
+        {
+            await Parallel.ForEachAsync(games,
+                new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                async (game, _) => results.Add(await FullGameGateRunner.RunAsync(game, MaxTurns, GameTimeout)));
+        }
         wall.Stop();
 
         var times = results.Select(r => r.Elapsed.TotalMilliseconds).OrderBy(t => t).ToList();
@@ -95,10 +98,9 @@ public class FullGameGateTests
             _out.WriteLine($"GATE sig [{tag}] {g.Count()}x {g.Key}  e.g. {eg.Game} ({eg.Detail})");
         }
 
-        var unlisted = bySignature.Where(g => !AllowList.ContainsKey(g.Key))
-            .Select(g => $"{g.Key} ({g.Count()} games, e.g. {g.First().Game})").ToList();
-        var vanished = AllowList.Where(kv => !kv.Value.Intermittent).Select(kv => kv.Key).Except(bySignature.Select(g => g.Key)).OrderBy(k => k, StringComparer.Ordinal)
-            .Select(k => $"{k} (#{AllowList[k].Issue})").ToList();
+        var (unlisted, vanishedKeys) = FullGameGateRunner.Evaluate(results,
+            AllowList.ToDictionary(kv => kv.Key, kv => kv.Value.Intermittent));
+        var vanished = vanishedKeys.Select(k => $"{k} (#{AllowList[k].Issue})").ToList();
 
         unlisted.Should().BeEmpty("a failure signature that is not on the allow-list is a new engine bug");
         vanished.Should().BeEmpty("an allow-listed signature no longer occurs: it was fixed, remove its entry");
