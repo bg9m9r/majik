@@ -238,7 +238,7 @@ public class BadgermoleCubProdPathTests
     // ---------------------------------------------------------------------
 
     [Fact]
-    public async Task RemoteAgent_DropsIllegalTarget_NotInOfferedPool()
+    public async Task RemoteAgent_RejectsIllegalTarget_NotInOfferedPool_PromptStaysPending()
     {
         var alice = new Player("Alice", 20);
         var bob = new Player("Bob", 20);
@@ -265,13 +265,17 @@ public class BadgermoleCubProdPathTests
 
         var task = agent.ChooseTargetsAsync(ctx, req);
 
-        // The client tries to smuggle in the OPPONENT'S land (illegal).
-        agent.Submit(new Majik.Core.Api.Commands.ChooseTargetsCommand(
-            new[] { oppLand.InstanceId }) { PlayerId = alice.Id });
+        // The client tries to smuggle in the OPPONENT'S land (illegal): the
+        // answer is rejected (CR 601.2c / 608.2b) and the prompt stays pending.
+        FluentActions.Invoking(() => agent.Submit(new Majik.Core.Api.Commands.ChooseTargetsCommand(
+                new[] { oppLand.InstanceId }) { PlayerId = alice.Id }))
+            .Should().Throw<InvalidOperationException>().WithMessage("*not in the offered legal-target set*");
+        agent.HasPending.Should().BeTrue();
+        task.IsCompleted.Should().BeFalse();
 
-        var chosen = await task;
-        chosen.Should().BeEmpty(
-            "an opponent's land is not in the offered 'target land you control' pool — dropped (CR 608.2b)");
+        agent.Submit(new Majik.Core.Api.Commands.ChooseTargetsCommand(
+            new[] { myLand.InstanceId }) { PlayerId = alice.Id });
+        (await task).Should().ContainSingle().Which.Should().BeSameAs(myLand);
     }
 
     [Fact]

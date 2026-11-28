@@ -77,6 +77,8 @@ public sealed class RemoteAgent : IPlayerAgent
     // resolution; replaced on each new ChooseAsync prompt.
     private IReadOnlyList<object>? _pendingChoiceCandidates;
     private ChoiceKind? _pendingChoiceKind;
+    // ChoiceRequest bounds for the pending ChoiceCommand: (Optional ? 0 : Min, Max).
+    private (int Min, int Max)? _pendingChoiceBounds;
     // CR 115.4 / 608.2b — engine-resolved legal candidate pool for the most
     // recent ChooseTargetsAsync prompt. The TargetRequest handed to us by the
     // shared targeting pipeline (TargetCollection.CollectAsync) already has its
@@ -251,14 +253,15 @@ public sealed class RemoteAgent : IPlayerAgent
                 break;
             case ChooseTargetsCommand t:
             {
-                // CR 115.4 / 608.2b — validate every picked instance id against
-                // the engine-offered legal candidate pool (resolved upstream by
-                // TargetCollection from the TargetRequest's CandidateGatherer /
-                // "you control" / type restriction). A pick not in the offered
-                // set is ILLEGAL and is dropped (logged), rather than resolved
-                // blindly — this is the agent-boundary recheck that stops the
-                // portal from smuggling an opponent's land / any creature into a
-                // "target land you control" slot. When the engine attached no
+                // CR 115.4 / 601.2c / 608.2b — validate every picked instance id
+                // against the engine-offered legal candidate pool (resolved
+                // upstream by TargetCollection from the TargetRequest's
+                // CandidateGatherer / "you control" / type restriction). A pick
+                // not in the offered set, or the same object picked twice
+                // (CR 601.2c), is ILLEGAL: the answer is rejected with the prompt
+                // left pending so the client can answer again — the agent-boundary
+                // recheck that stops the portal from smuggling an opponent's land
+                // into a "target land you control" slot. When the engine attached no
                 // candidate pool (targetCandidates == null — e.g. a request with
                 // only a Description string and no machine-readable restriction),
                 // fall back to the prior behaviour and resolve the ids as-is so
@@ -278,10 +281,14 @@ public sealed class RemoteAgent : IPlayerAgent
                             .FirstOrDefault(c => CandidateMatchesId(c, id));
                         if (match == null)
                         {
-                            Console.Error.WriteLine(
-                                $"WARN: ChooseTargetsCommand selected instance {id} " +
-                                "is not in the offered legal-target set (CR 608.2b) — dropping.");
-                            continue;
+                            throw new InvalidOperationException(
+                                $"ChooseTargetsCommand selected instance {id}, which is not in the " +
+                                "offered legal-target set (CR 601.2c / 608.2b).");
+                        }
+                        if (picked.Any(p => ReferenceEquals(p, match)))
+                        {
+                            throw new InvalidOperationException(
+                                $"ChooseTargetsCommand selected instance {id} more than once (CR 601.2c).");
                         }
                         picked.Add(match);
                     }
@@ -618,11 +625,12 @@ public sealed class RemoteAgent : IPlayerAgent
                 // engine-offered eligible subset so the client can't smuggle
                 // an arbitrary revealed-but-ineligible card past the filter.
                 //
-                // Server-side validation posture (per spec): if the wire
-                // submits an InstanceId not in the eligible set, return
-                // null + log to console rather than throwing. The brief
-                // explicitly calls this out so a malicious / buggy client
-                // can't crash a live match — better to no-op the pick.
+                // An InstanceId not in the eligible set, or no pick on a
+                // mandatory prompt with eligible cards, is rejected with the
+                // prompt left pending (the client answers again; a rejected
+                // answer no longer wedges the game). No pick is legal when the
+                // prompt is optional or nothing is eligible — a mandatory clause
+                // can't force a pick from nothing.
                 if (revealedEligible == null)
                 {
                     throw new InvalidOperationException(
@@ -634,28 +642,14 @@ public sealed class RemoteAgent : IPlayerAgent
                     picked = revealedEligible.FirstOrDefault(c => c.InstanceId == pickedId);
                     if (picked == null)
                     {
-                        // Out-of-set pick — coerce to decline + warn. The
-                        // engine sees the same null payload it would on a
-                        // legitimate decline, but the log surfaces the
-                        // client misbehaviour for diagnostics.
-                        Console.Error.WriteLine(
-                            $"WARN: ChooseFromRevealedCommand selected instance {pickedId} " +
-                            $"is not in the offered eligible list — treating as decline.");
+                        throw new InvalidOperationException(
+                            $"ChooseFromRevealedCommand selected instance {pickedId}, which is not in the offered eligible list.");
                     }
                 }
-                // When the prompt was MANDATORY (Optional=false) AND the
-                // eligible set is non-empty, a null pick is an agent
-                // misbehaviour, not a legal decline. Fall back to the first
-                // eligible card so the engine doesn't see a no-op on a
-                // "put one of them" clause. When eligible is empty, null
-                // is always legal — mandatory clauses can't force a pick
-                // from nothing.
-                if (picked == null && !revealedOptional && revealedEligible.Count > 0)
+                else if (!revealedOptional && revealedEligible.Count > 0)
                 {
-                    Console.Error.WriteLine(
-                        "WARN: ChooseFromRevealedCommand declined on a mandatory prompt " +
-                        "with non-empty eligible set — falling back to first eligible.");
-                    picked = revealedEligible[0];
+                    throw new InvalidOperationException(
+                        "ChooseFromRevealedCommand must pick a card: the prompt is mandatory and eligible cards exist.");
                 }
                 complete = Done<ICard?>(tcs, picked);
                 break;
@@ -736,9 +730,9 @@ public sealed class RemoteAgent : IPlayerAgent
                 // PLAN 01 (Slice C) — unified declarative choice. Validate the
                 // submitted Kind matches the outstanding prompt, then map each
                 // SelectedInstanceId back to its offered candidate object
-                // (ICard by InstanceId, Player by Id). Out-of-set ids are
-                // dropped (logged) rather than thrown — same don't-crash-a-
-                // live-match posture as ChooseFromRevealedCommand.
+                // (ICard by InstanceId, Player by Id). An id not offered, an id
+                // named twice, or a pick count outside the request's bounds is
+                // rejected with the prompt left pending.
                 if (choiceCandidates == null || choiceKind == null)
                 {
                     throw new InvalidOperationException(
@@ -775,12 +769,27 @@ public sealed class RemoteAgent : IPlayerAgent
                         }
                         if (match == null)
                         {
-                            Console.Error.WriteLine(
-                                $"WARN: ChoiceCommand selected instance {id} is not in the offered " +
-                                "candidate set — dropping.");
-                            continue;
+                            throw new InvalidOperationException(
+                                $"ChoiceCommand selected {id}, which is not in the offered candidate set.");
+                        }
+                        if (picked.Any(p => ReferenceEquals(p, match)))
+                        {
+                            throw new InvalidOperationException(
+                                $"ChoiceCommand selected {id} more than once.");
                         }
                         picked.Add(match);
+                    }
+                    // ChoiceRequest.Min / Max. An optional choice may pick none;
+                    // a minimum larger than the pool needs only the whole pool
+                    // (choose as many as possible).
+                    if (_pendingChoiceBounds is var (min, max))
+                    {
+                        var required = Math.Min(min, choiceCandidates.Count);
+                        if (picked.Count < required || picked.Count > max)
+                        {
+                            throw new InvalidOperationException(
+                                $"ChoiceCommand picked {picked.Count}; it must pick between {required} and {max}.");
+                        }
                     }
                     result = picked;
                 }
@@ -1112,6 +1121,34 @@ public sealed class RemoteAgent : IPlayerAgent
         GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
         => ChooseCoreAsync(ctx, req, ct, label: null, decorate: null);
 
+    // The interface's "pick zero or one card" shims (ChooseFromHand /
+    // ChooseFromBattlefield / ChooseFromPile) document null as a decline the
+    // calling effect handles, but declare Min 1. Now that ChoiceCommand counts
+    // are enforced, the human seat states that contract explicitly (Optional)
+    // so an empty selection stays a legal decline. Same prompt and payload as
+    // the interface defaults; bots keep their own implementations.
+    public Task<ICard?> ChooseFromHandAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct = default)
+        => PickOneOrNoneAsync("choose from hand", candidates, intent, ct);
+
+    public Task<ICard?> ChooseFromBattlefieldAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct = default)
+        => PickOneOrNoneAsync("choose from battlefield", candidates, intent, ct);
+
+    public Task<ICard?> ChooseFromPileAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, string pileLabel, BotIntent intent, CancellationToken ct = default)
+        => PickOneOrNoneAsync(pileLabel, candidates, intent, ct);
+
+    private async Task<ICard?> PickOneOrNoneAsync(
+        string description, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct)
+    {
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, description, Min: 1, Max: 1,
+            Candidates: candidates, Intent: intent, Optional: true);
+        var chosen = await ChooseAsync(null!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
+
     private Task<IReadOnlyList<object>> ChooseCoreAsync(
         GameContext ctx,
         ChoiceRequest req,
@@ -1127,6 +1164,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var live = req.ResolveCandidates(ctx);
         _pendingChoiceCandidates = live;
         _pendingChoiceKind = req.Kind;
+        _pendingChoiceBounds = (req.Optional ? 0 : req.Min, req.Max);
 
         // Ship the candidate cards + the choice descriptor onto the wire
         // payload (mirrors ChooseTargetsAsync). Without these the portal had
@@ -1167,6 +1205,7 @@ public sealed class RemoteAgent : IPlayerAgent
         {
             _pendingChoiceCandidates = null;
             _pendingChoiceKind = null;
+            _pendingChoiceBounds = null;
             _pendingPayload = null;
             throw;
         }
@@ -2040,6 +2079,7 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingBottomCount = null;
         _pendingChoiceCandidates = null;
         _pendingChoiceKind = null;
+        _pendingChoiceBounds = null;
         _pendingTargetCandidates = null;
         _pendingDamageDivisionTargets = null;
         _pendingModeCount = null;
